@@ -9,6 +9,7 @@ import {
   useControlPlaneProfile,
 } from "../control-plane-service.js";
 import { optionalValue, print, resultToEffect } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const controlPlaneModes = ["cloud", "self-hosted"] as const;
 
@@ -54,7 +55,7 @@ const authLoginCommand = EffectCommand.make(
   },
   ({ mode, profile, url }) =>
     loginTask(loginInput(url, optionalValue(mode), optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Login to an Appaloft control plane"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogin));
 
 const authStatusCommand = EffectCommand.make(
   "status",
@@ -62,7 +63,7 @@ const authStatusCommand = EffectCommand.make(
     profile: profileOption,
   },
   ({ profile }) => runControlPlaneTask(controlPlaneStatus(optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Show local Appaloft control-plane profile status"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneStatus));
 
 const authLogoutCommand = EffectCommand.make(
   "logout",
@@ -70,7 +71,7 @@ const authLogoutCommand = EffectCommand.make(
     profile: profileOption,
   },
   ({ profile }) => runControlPlaneTask(logoutControlPlane(optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Logout from an Appaloft control-plane profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogout));
 
 export const authControlPlaneCommands = [
   authLoginCommand,
@@ -87,7 +88,7 @@ export const loginCommand = EffectCommand.make(
   },
   ({ mode, profile, url }) =>
     loginTask(loginInput(url, optionalValue(mode), optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Login to an Appaloft control plane"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogin));
 
 export const logoutCommand = EffectCommand.make(
   "logout",
@@ -95,11 +96,11 @@ export const logoutCommand = EffectCommand.make(
     profile: profileOption,
   },
   ({ profile }) => runControlPlaneTask(logoutControlPlane(optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Logout from an Appaloft control-plane profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogout));
 
 const contextListCommand = EffectCommand.make("list", {}, () =>
   runControlPlaneTask(controlPlaneStatus()),
-).pipe(EffectCommand.withDescription("List local Appaloft control-plane profiles"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneContextList));
 
 const contextShowCommand = EffectCommand.make(
   "show",
@@ -107,7 +108,7 @@ const contextShowCommand = EffectCommand.make(
     profile: profileOption,
   },
   ({ profile }) => runControlPlaneTask(controlPlaneStatus(optionalValue(profile))),
-).pipe(EffectCommand.withDescription("Show the active Appaloft control-plane profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneContextShow));
 
 const contextUseCommand = EffectCommand.make(
   "use",
@@ -115,9 +116,9 @@ const contextUseCommand = EffectCommand.make(
     profile: profileArg,
   },
   ({ profile }) => runControlPlaneTask(useControlPlaneProfile(profile)),
-).pipe(EffectCommand.withDescription("Select the active Appaloft control-plane profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneContextUse));
 
 export const contextCommand = EffectCommand.make("context").pipe(
-  EffectCommand.withDescription("Manage local Appaloft control-plane profiles"),
+  EffectCommand.withDescription(cliCommandDescriptions.controlPlaneContext),
   EffectCommand.withSubcommands([contextListCommand, contextShowCommand, contextUseCommand]),
 );

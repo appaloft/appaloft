@@ -1,0 +1,339 @@
+import {
+  type Command as AppCommand,
+  type Query as AppQuery,
+  findOperationCatalogEntryByMessageName,
+  type OperationCatalogEntry,
+} from "@appaloft/application";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type AppaloftSdkFetch,
+  type AppaloftSdkOperationRequest,
+  type SdkOperationDescriptor,
+} from "@appaloft/sdk";
+import { Command as EffectCommand } from "@effect/cli";
+import { NodeContext } from "@effect/platform-node";
+import { Effect, Layer } from "effect";
+import { mainCommand } from "./commands/index.js";
+import {
+  findControlPlaneOperation,
+  performControlPlaneHandshake,
+  requestControlPlaneOperation,
+} from "./control-plane-client.js";
+import { type CliControlPlaneProfile } from "./control-plane-profile.js";
+import { type CliProgram, CliRuntime, type CliTerminalIO, printCliError } from "./runtime.js";
+
+export interface RemoteCliProgramInput {
+  readonly version: string;
+  readonly profile: CliControlPlaneProfile;
+  readonly fetch?: AppaloftSdkFetch;
+  readonly now?: () => string;
+  readonly terminalIO?: CliTerminalIO;
+}
+
+type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
+
+const webhookSignatureOnlyOperations = new Set(["source-events.ingest"]);
+const followStreamOperationKeys = new Set(["deployments.stream-events", "resources.runtime-logs"]);
+
+function remoteOperationError(
+  code: string,
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): DomainError {
+  return {
+    code,
+    category: "user",
+    message,
+    retryable: false,
+    details: {
+      phase: "remote-operation-dispatch",
+      ...(details ?? {}),
+    },
+  };
+}
+
+function infraRemoteOperationError(
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): DomainError {
+  return {
+    code: "control_plane_operation_missing",
+    category: "infra",
+    message,
+    retryable: false,
+    details: {
+      phase: "remote-operation-dispatch",
+      ...(details ?? {}),
+    },
+  };
+}
+
+function readMessagePayload(message: RemoteOperationMessage): Record<string, unknown> {
+  const payload = Object.fromEntries(
+    Object.entries(message as Record<string, unknown>).filter(([, value]) => value !== undefined),
+  );
+
+  return Object.keys(payload).length === 1 && isRecord(payload.input) ? payload.input : payload;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function flattenQueryValue(
+  output: Record<string, string | number | boolean>,
+  prefix: string,
+  value: unknown,
+): void {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    output[prefix] = value;
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    flattenQueryValue(output, `${prefix}.${key}`, child);
+  }
+}
+
+function flattenQueryPayload(
+  payload: Record<string, unknown>,
+  pathKeys: ReadonlySet<string>,
+): Record<string, string | number | boolean> {
+  const query: Record<string, string | number | boolean> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (!pathKeys.has(key)) {
+      flattenQueryValue(query, key, value);
+    }
+  }
+
+  return query;
+}
+
+function pathParamNames(path: string): string[] {
+  return [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1] as string);
+}
+
+function requestForOperation(input: {
+  readonly message: RemoteOperationMessage;
+  readonly operation: SdkOperationDescriptor;
+}): Result<Omit<AppaloftSdkOperationRequest, "operation">> {
+  const payload = readMessagePayload(input.message);
+  const pathParams: Record<string, string> = {};
+  const pathKeys = new Set(pathParamNames(input.operation.route.path));
+
+  for (const key of pathKeys) {
+    const value = payload[key];
+    if (typeof value !== "string" || value.length === 0) {
+      return err(
+        remoteOperationError(
+          "validation_error",
+          `Remote operation ${input.operation.operationKey} is missing path parameter ${key}`,
+          {
+            operationKey: input.operation.operationKey,
+            pathParam: key,
+          },
+        ),
+      );
+    }
+    pathParams[key] = value;
+  }
+
+  if (input.operation.route.method === "GET") {
+    const query = flattenQueryPayload(payload, pathKeys);
+
+    return ok({
+      ...(Object.keys(pathParams).length > 0 ? { pathParams } : {}),
+      ...(Object.keys(query).length > 0 ? { query } : {}),
+    });
+  }
+
+  return ok({
+    ...(Object.keys(pathParams).length > 0 ? { pathParams } : {}),
+    body: payload,
+  });
+}
+
+function operationForMessage(input: {
+  readonly kind: "command" | "query";
+  readonly message: RemoteOperationMessage;
+}): Result<OperationCatalogEntry> {
+  const messageName = input.message.constructor.name;
+  const entry = findOperationCatalogEntryByMessageName(messageName);
+  if (!entry || entry.kind !== input.kind) {
+    return err(
+      infraRemoteOperationError(`Operation catalog entry for ${messageName} is not available`, {
+        messageName,
+      }),
+    );
+  }
+
+  return ok(entry);
+}
+
+function assertRemoteCapable(
+  operation: SdkOperationDescriptor,
+  payload: Record<string, unknown>,
+): Result<void> {
+  if (operation.streaming) {
+    return err(
+      remoteOperationError(
+        "control_plane_unsupported",
+        "Streaming remote CLI operation is not supported by the current remote runtime",
+        {
+          operationKey: operation.operationKey,
+        },
+      ),
+    );
+  }
+
+  if (followStreamOperationKeys.has(operation.operationKey) && payload.follow === true) {
+    return err(
+      remoteOperationError(
+        "control_plane_unsupported",
+        "Streaming remote CLI operation is not supported by the current remote runtime",
+        {
+          operationKey: operation.operationKey,
+        },
+      ),
+    );
+  }
+
+  if (
+    operation.authPolicy === "webhook-signature" ||
+    webhookSignatureOnlyOperations.has(operation.operationKey)
+  ) {
+    return err(
+      remoteOperationError(
+        "control_plane_unsupported",
+        "Webhook-signed operations cannot be dispatched from a logged-in CLI profile",
+        {
+          operationKey: operation.operationKey,
+        },
+      ),
+    );
+  }
+
+  return ok(undefined);
+}
+
+async function dispatchRemoteMessage<TResult>(input: {
+  readonly kind: "command" | "query";
+  readonly message: RemoteOperationMessage;
+  readonly profile: CliControlPlaneProfile;
+  readonly fetch?: AppaloftSdkFetch;
+}): Promise<Result<TResult>> {
+  const payload = readMessagePayload(input.message);
+  const catalogEntry = operationForMessage({
+    kind: input.kind,
+    message: input.message,
+  });
+  if (catalogEntry.isErr()) {
+    return err(catalogEntry.error);
+  }
+
+  const operation = findControlPlaneOperation(catalogEntry.value.key);
+  if (operation.isErr()) {
+    return err(operation.error);
+  }
+
+  const capable = assertRemoteCapable(operation.value, payload);
+  if (capable.isErr()) {
+    return err(capable.error);
+  }
+
+  const request = requestForOperation({
+    message: input.message,
+    operation: operation.value,
+  });
+  if (request.isErr()) {
+    return err(request.error);
+  }
+
+  const result = await requestControlPlaneOperation({
+    profile: input.profile,
+    operation: operation.value,
+    ...(request.value.pathParams ? { pathParams: request.value.pathParams } : {}),
+    ...(request.value.query ? { query: request.value.query } : {}),
+    ...(request.value.body === undefined ? {} : { body: request.value.body }),
+    ...(input.fetch ? { fetch: input.fetch } : {}),
+    phase: "remote-operation-dispatch",
+  });
+
+  return result.map((value) => value as TResult);
+}
+
+function unsupportedLocalRemoteError(message: string): DomainError {
+  return remoteOperationError("control_plane_unsupported", message);
+}
+
+export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram {
+  let handshake: Promise<Result<void>> | undefined;
+  const ensureHandshake = async (): Promise<Result<void>> => {
+    handshake ??= performControlPlaneHandshake({
+      baseUrl: input.profile.baseUrl,
+      auth: input.profile.auth,
+      checkedAt: input.now?.() ?? new Date().toISOString(),
+      ...(input.fetch ? { fetch: input.fetch } : {}),
+    }).then((result) => result.map(() => undefined));
+
+    return handshake;
+  };
+  const terminalIO = input.terminalIO ?? {
+    stdin: process.stdin,
+    stdout: process.stdout,
+    stderr: process.stderr,
+  };
+  const live = Layer.mergeAll(
+    NodeContext.layer,
+    Layer.succeed(CliRuntime, {
+      version: input.version,
+      startServer: async () => {
+        throw unsupportedLocalRemoteError("Serving the local Appaloft backend is local-only");
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        const compatible = await ensureHandshake();
+        if (compatible.isErr()) {
+          return err(compatible.error);
+        }
+
+        return dispatchRemoteMessage<T>({
+          kind: "command",
+          message: message as RemoteOperationMessage,
+          profile: input.profile,
+          ...(input.fetch ? { fetch: input.fetch } : {}),
+        });
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        const compatible = await ensureHandshake();
+        if (compatible.isErr()) {
+          return err(compatible.error);
+        }
+
+        return dispatchRemoteMessage<T>({
+          kind: "query",
+          message: message as RemoteOperationMessage,
+          profile: input.profile,
+          ...(input.fetch ? { fetch: input.fetch } : {}),
+        });
+      },
+      terminalIO,
+    }),
+  );
+
+  return {
+    parseAsync: (argv = process.argv) =>
+      EffectCommand.run(mainCommand, {
+        name: "appaloft",
+        version: input.version,
+      })(argv).pipe(
+        Effect.provide(live),
+        Effect.catchAll((error) => printCliError(error).pipe(Effect.zipRight(Effect.fail(error)))),
+        Effect.runPromise,
+      ),
+  };
+}

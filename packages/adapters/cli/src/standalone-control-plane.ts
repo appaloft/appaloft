@@ -6,13 +6,10 @@ import {
   type CliControlPlaneProfileStore,
 } from "./control-plane-profile.js";
 import {
-  activeControlPlaneProfile,
   type CliControlPlaneDependencies,
   controlPlaneStatus,
-  dispatchRemoteProjectOperation,
   loginControlPlane,
   logoutControlPlane,
-  unsupportedRemoteProjectOperation,
   useControlPlaneProfile,
 } from "./control-plane-service.js";
 
@@ -39,16 +36,6 @@ interface ParsedOptions {
   readonly values: Readonly<Record<string, string>>;
   readonly positional: readonly string[];
 }
-
-const projectRemoteUnsupportedSubcommands = new Set([
-  "archive",
-  "create",
-  "delete",
-  "delete-check",
-  "rename",
-  "restore",
-  "set-description",
-]);
 
 function commandArgs(argv: readonly string[]): readonly string[] {
   const args = argv.slice(2);
@@ -244,78 +231,6 @@ function handleContext(
   return finish(parseError("context requires list, show, or use"), input);
 }
 
-async function hasActiveProfile(input: StandaloneControlPlaneCliInput): Promise<Result<boolean>> {
-  const profile = await activeControlPlaneProfile(deps(input));
-  if (profile.isErr()) {
-    return err(profile.error);
-  }
-  return ok(Boolean(profile.value));
-}
-
-async function handleProject(
-  args: readonly string[],
-  input: StandaloneControlPlaneCliInput,
-): Promise<StandaloneControlPlaneCliResult> {
-  const subcommand = args[0];
-  if (subcommand === "list") {
-    if (args.length > 1) {
-      return finish(parseError("project list does not accept positional arguments"), input);
-    }
-    const profile = await hasActiveProfile(input);
-    if (profile.isErr()) {
-      return finish(profile, input);
-    }
-    if (!profile.value) {
-      return { handled: false };
-    }
-    return finish(
-      dispatchRemoteProjectOperation({
-        operationKey: "projects.list",
-        deps: deps(input),
-      }),
-      input,
-    );
-  }
-
-  if (subcommand === "show") {
-    const profile = await hasActiveProfile(input);
-    if (profile.isErr()) {
-      return finish(profile, input);
-    }
-    if (!profile.value) {
-      return { handled: false };
-    }
-    const projectId = args[1];
-    if (!projectId) {
-      return finish(parseError("project show requires a project id"), input);
-    }
-    if (args.length > 2) {
-      return finish(parseError("project show accepts exactly one project id"), input);
-    }
-    return finish(
-      dispatchRemoteProjectOperation({
-        operationKey: "projects.show",
-        projectId,
-        deps: deps(input),
-      }),
-      input,
-    );
-  }
-
-  if (subcommand && projectRemoteUnsupportedSubcommands.has(subcommand)) {
-    const profile = await hasActiveProfile(input);
-    if (profile.isErr()) {
-      return finish(profile, input);
-    }
-    if (!profile.value) {
-      return { handled: false };
-    }
-    return finish(err(unsupportedRemoteProjectOperation(subcommand)), input);
-  }
-
-  return { handled: false };
-}
-
 export async function runStandaloneControlPlaneCli(
   input: StandaloneControlPlaneCliInput = {},
 ): Promise<StandaloneControlPlaneCliResult> {
@@ -344,9 +259,5 @@ export async function runStandaloneControlPlaneCli(
   if (command === "context") {
     return handleContext(args.slice(1), input);
   }
-  if (command === "project") {
-    return handleProject(args.slice(1), input);
-  }
-
   return { handled: false };
 }

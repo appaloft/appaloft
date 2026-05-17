@@ -2,12 +2,14 @@
 
 ## Status
 
-- Round: Code Round with Post-Implementation Sync for the first self-hosted read-only slice.
-- Artifact state: first slice implemented and synchronized; Cloud auth, full target resolution,
-  adoption, and broader remote command coverage remain deferred.
-- Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile and
-  read-only remote operation dispatch concrete without completing Cloud-assisted Action,
-  self-hosted adoption, or control-plane-owned execution.
+- Round: Code Round with Post-Implementation Sync for the ordinary CLI remote client bridge.
+- Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
+  handshake, and generic generated SDK non-streaming operation dispatch are implemented and
+  synchronized. Default Cloud auth, OS keychain storage, SSH PGlite adoption, source-package
+  quick deploy, streaming/watch, and future MCP exposure remain deferred.
+- Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
+  resolution, and ordinary generated SDK remote operation dispatch concrete without completing
+  Cloud-assisted Action, self-hosted adoption, or control-plane-owned source-package execution.
 - Compatibility impact: `pre-1.0-policy`; additive public CLI behavior with strict secret and
   fallback boundaries.
 
@@ -16,11 +18,11 @@
 Operators can keep using Appaloft as a pure local CLI or GitHub Action deployment tool while also
 using the CLI as a client for Appaloft Cloud or a self-hosted Appaloft control plane.
 
-After an operator logs in to a trusted control plane, ordinary CLI business commands that are
-declared remote-capable can call the remote HTTP/oRPC operation contract instead of always
-bootstrapping a local shell composition and dispatching an in-process command or query bus. The CLI
-must still use the same application operation keys and input schemas as HTTP/oRPC, Web, SDK, and
-future MCP/tool surfaces.
+After an operator logs in to a trusted control plane, ordinary CLI business commands that map to a
+generated non-streaming HTTP/API operation can call the remote typed operation contract instead of
+always bootstrapping a local shell composition and dispatching an in-process command or query bus.
+The CLI must still use the same application operation keys and input schemas as HTTP/oRPC, Web, SDK,
+and future MCP/tool surfaces.
 
 Login and context selection are not deployment admission, not adoption, and not migration. A normal
 login must not upload SSH PGlite state, write control-plane fields to `deployments.create`, mutate
@@ -86,10 +88,9 @@ Login must not:
 - adopt, import, upload, or reconcile SSH PGlite state;
 - store raw token material in command history, committed config, logs, diagnostics, or JSON output.
 
-The exact first auth acquisition mechanism remains a Code Round decision. Acceptable first slices
-are browser/device flow, product-session cookie import, or token input through stdin or environment,
-provided the stored result uses the same profile and handshake rules. Cloud public auth remains
-deferred until the Cloud auth mechanism is accepted.
+The implemented auth acquisition mechanism accepts trusted local product-session cookie or bearer
+token input from environment variables. Browser/device/OIDC login and a default public Cloud URL
+remain deferred until the Cloud auth mechanism is accepted.
 
 ### Logout
 
@@ -141,7 +142,10 @@ Resolution rules:
   explicitly selected local mode.
 
 Remote dispatch must call a typed client generated from or shared with the HTTP/oRPC operation
-contract. It must not redefine transport-only business input schemas for CLI remote mode.
+contract. It must not redefine transport-only business input schemas for CLI remote mode. The
+implemented dispatcher uses the application operation catalog to map constructed command/query
+messages to operation keys, then uses generated SDK operation descriptors for method, path, query,
+body, auth, and streaming metadata.
 
 ### Fallback
 
@@ -156,51 +160,55 @@ Fallback is explicit and observable:
 
 ## Initial Support Boundary
 
-### First Required Remote-Capable Slice
+### Implemented Remote-Capable Slice
 
-The recommended first Code Round slice is:
+The implemented Code Round slice includes:
 
 - local profile store and active context commands;
 - `appaloft login/auth login`, `appaloft auth status`, and `appaloft logout/auth logout`;
 - compatibility handshake against `/api/version`;
 - authenticated product-session status through the existing current organization context contract
   when available;
-- remote dispatch for read-only `projects.list` and `projects.show`;
-- clear unsupported-operation errors for non-remoteized commands when remote mode is selected.
+- full CLI flags/env/profile/config resolver for `none`, `auto`, `cloud`, and `self-hosted`;
+- pre-composition shell routing so selected remote commands avoid SSH PGlite sync and local shell
+  composition;
+- remote dispatch for generated SDK non-streaming command/query operations that are not explicitly
+  webhook-signature-only, source-package, local gateway, or streaming/watch operations;
+- clear unsupported-operation errors for local-only commands when remote mode is selected.
 
-`projects.list` and `projects.show` are chosen because they are active product-session member
-queries in `CORE_OPERATIONS.md`, already exposed through HTTP/oRPC, and useful for proving remote
-dispatch without mutating state.
+`projects.list`, `projects.show`, `projects.rename`, and `servers.list` are covered by automated
+tests as proof points for the generic dispatcher, including both read and write operation shapes.
 
 ### Commands That Stay Local Or SSH-Only In The First Slice
 
-The first slice must keep these local unless a later Spec/Test-First/Code Round remoteizes them:
+These commands remain local or explicitly unsupported in selected remote mode unless a later
+Spec/Test-First/Code Round remoteizes the missing transport/custody behavior:
 
 - `appaloft serve`
 - `appaloft db *`
 - `appaloft remote-state *`
 - `appaloft init`
 - pure SSH `appaloft deploy` and repository config bootstrap
-- deployment create/retry/redeploy/rollback/cancel
-- resource/server/environment/domain/certificate/deploy-token mutations
-- terminal attach and other local gateway operations
-- runtime logs, deployment event streaming, and long-running watch behavior unless a remote stream
-  contract is explicitly implemented
+- source-package/config bootstrap quick deploy flows
+- local terminal attach and other local gateway operations
+- webhook-signature-only ingestion such as `source-events.ingest`
+- runtime logs, deployment event streaming, and long-running watch behavior when streaming/follow is
+  requested unless a remote stream contract is explicitly implemented
 
 ### Cloud Boundary
 
-Cloud is planned but not complete in the first CLI client slice. The CLI accepts `--mode cloud` only
-far enough to return a structured `control_plane_unsupported` auth-phase error before profile
-write. A Cloud URL or future default Cloud endpoint may become usable only after a trusted browser,
-device, or OIDC auth mechanism and compatibility handshake are accepted.
+Cloud is partially supported as an explicit endpoint mode: `--mode cloud --url <url>` or
+`--control-plane-mode cloud --control-plane-url <url>` may use trusted local token/session input and
+the same handshake/profile/dispatch path. A default public Cloud endpoint, browser/device/OIDC
+login, and Cloud-specific token custody remain deferred.
 
 ### Self-Hosted Boundary
 
 Self-hosted is the first practical target for the CLI remote client because `/api/version`,
-product-session auth routes, current organization context, and project read routes already exist.
-The first implemented slice accepts `APPALOFT_AUTH_COOKIE` or `APPALOFT_TOKEN` as trusted local
+product-session auth routes, current organization context, and generated operation routes already
+exist. The implemented slice accepts `APPALOFT_AUTH_COOKIE` or `APPALOFT_TOKEN` as trusted local
 credential input, performs `/api/version` plus current organization context verification, then
-stores an active local profile. Self-hosted remote dispatch must require HTTPS before release
+stores or uses a local profile. Self-hosted remote dispatch must require HTTPS before release
 readiness unless an explicit local-development allowance is used for localhost or loopback.
 
 Self-hosted login does not install a control plane and does not adopt SSH state.
@@ -228,8 +236,8 @@ not bypass server-side authorization on any remote operation.
 
 ## Handshake And Compatibility
 
-Every remote profile must pass a compatibility handshake before remote mutation. The first read-only
-slice should also handshake before authenticated remote queries so users get one consistent failure
+Every remote profile must pass a compatibility handshake before remote mutation. The implemented
+bridge also handshakes before authenticated remote queries so users get one consistent failure
 phase.
 
 The handshake must eventually compare:
@@ -242,21 +250,23 @@ The handshake must eventually compare:
 - selected execution mode and state/control-plane owner;
 - auth scope and current organization context.
 
-The current `/api/version` endpoint is the minimum discovery endpoint for the first self-hosted
-slice. If it lacks a field needed for a remote operation, the operation must fail with
+The current `/api/version` endpoint is the minimum discovery endpoint for the implemented bridge. If
+it lacks a field needed for a remote operation, the operation must fail with
 `control_plane_unsupported` or `control_plane_handshake_failed` before mutation.
 
 ## Error Phases
 
 | Error code | Phase | Retriable | Meaning |
 | --- | --- | --- | --- |
-| `validation_error` | `cli-profile-input` | No | Profile name, URL, mode, or command input is invalid. |
-| `validation_error` | `cli-profile-resolution` | No | The requested profile or active context does not exist, is ambiguous, or lacks required auth. |
-| `infra_error` | `cli-profile-store` | Conditional | Local profile or credential store cannot be read, written, locked, or permission-hardened. |
-| `control_plane_unavailable` | `control-plane-connect` | Yes | Selected control plane cannot be reached. |
+| `validation_error` | `control-plane-profile-write` or `control-plane-cli-parse` | No | Profile name, URL, mode, or profile command input is invalid. |
+| `validation_error` | `control-plane-resolution` | No | Explicit mode/profile/config selection is invalid, including profile-mode mismatch. |
+| `control_plane_profile_not_found` | `control-plane-profile-read` or `control-plane-resolution` | No | The requested profile or active context does not exist. |
+| `control_plane_profile_store_unavailable` | `control-plane-profile-read` or `control-plane-profile-write` | Conditional | Local profile or credential store cannot be read, written, locked, or permission-hardened. |
+| `control_plane_unavailable` | `control-plane-handshake` or `remote-operation-dispatch` | Yes | Selected control plane cannot be reached. |
 | `control_plane_handshake_failed` | `control-plane-handshake` | Conditional | Client/API/version/feature/auth compatibility failed. |
 | `product_auth_missing` | `control-plane-auth` | No | Remote operation requires a product session or token that is not available. |
 | `product_auth_invalid` | `control-plane-auth` | No | Stored or supplied token/session is rejected by the control plane. |
+| `control_plane_unsupported` | `control-plane-resolution` | No | Explicit remote mode was selected for a command that remains local-only before dispatch. |
 | `control_plane_unsupported` | `remote-operation-dispatch` | No | Remote mode was selected for an operation that is not remote-capable in this slice. |
 
 All errors must include sanitized details such as profile name, URL origin, selected mode, client
@@ -271,7 +281,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-002 | Login failure stores nothing | The URL is unreachable, incompatible, unsafe, or auth fails | The operator runs login | The CLI returns a structured control-plane/profile error and leaves existing profiles unchanged. |
 | CLI-RCPC-SPEC-003 | Logout is local credential removal | A profile exists | The operator runs logout for that profile | Local credential/session material is removed or marked logged out, safe metadata may remain, and no server-side business state is mutated. |
 | CLI-RCPC-SPEC-004 | Context commands are safe selectors | Multiple profiles exist | The operator lists, shows, and switches context | The active profile changes locally, output is redacted, and no remote business operation runs except optional status refresh. |
-| CLI-RCPC-SPEC-005 | Remote project list/show dispatch | A compatible authenticated profile is active | The operator runs `appaloft project list` or `appaloft project show <projectId>` | The CLI calls the remote typed operation client, sends auth, returns the same response shape as HTTP/oRPC, and does not create local shell composition, SSH PGlite sync, or local state mutation. |
+| CLI-RCPC-SPEC-005 | Remote generated operation dispatch | A compatible authenticated profile is active | The operator runs a generated non-streaming command/query such as `appaloft project list`, `appaloft project show <projectId>`, `appaloft project rename`, or `appaloft server list` | The CLI performs handshake, calls the remote typed operation client, sends auth, returns the same response shape as HTTP/oRPC, and does not create local shell composition, SSH PGlite sync, or local state mutation. |
 | CLI-RCPC-SPEC-006 | Pure CLI remains the default without trust | No profile, URL, env token, or adoption marker exists | The operator runs an ordinary local CLI command | The CLI follows current local/pure SSH behavior, including `ssh-pglite` defaults for SSH deploys. |
 | CLI-RCPC-SPEC-007 | Remote errors do not silently fall back | Remote mode/profile is selected and the operation is unsupported or handshake fails | The operator runs a non-remoteized command | The CLI fails before local mutation and reports the remote failure phase. |
 | CLI-RCPC-SPEC-008 | `auto` does not adopt | An active profile exists or no trusted source exists | The operator runs with `auto` | With a profile, remote dispatch may be selected after handshake; without a trusted source, local mode is selected. In neither case does the CLI upload or adopt SSH PGlite state. |
@@ -279,19 +289,20 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 
 ## Public Surfaces
 
-- API/oRPC: no new business operation for the first slice; remote dispatch uses existing
-  authenticated operation contracts such as `GET /api/projects` and `GET /api/projects/{projectId}`.
+- API/oRPC: no new business operation; remote dispatch uses existing authenticated operation
+  contracts such as `GET /api/projects`, `GET /api/projects/{projectId}`,
+  `POST /api/projects/{projectId}/rename`, and `GET /api/servers`.
 - CLI: new login/logout/status/context affordances plus remote dispatch selection for declared
   operations.
-- Web/UI: no Web change required for the first slice; Web remains an HTTP/oRPC client.
+- Web/UI: no Web runtime change required; Web remains an HTTP/oRPC client.
 - Config: no new committed secret fields. Existing `controlPlane.mode/url` policy remains governed
   by ADR-025.
 - SDK: remote dispatch should reuse `@appaloft/sdk` generated operation descriptors or an extended
   `@appaloft/orpc/client` with auth support. It must not create CLI-only schemas.
 - Future MCP/tools: no new tool semantics; future generated tools continue to use operation catalog
   entries and remote API auth.
-- Public docs/help: needs a Docs Round before release, with a stable public anchor for CLI login,
-  context selection, local/pure SSH fallback, and remote unsupported-operation errors.
+- Public docs/help: covered by the CLI reference anchors
+  `#cli-remote-control-plane-login` and `#cli-remote-control-plane-dispatch`.
 
 ## Non-Goals
 
@@ -301,40 +312,45 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 - Putting `controlPlane` on `deployments.create`.
 - Storing tokens, database URLs, SSH keys, credential ids, tenant/org secret identity, or raw
   secrets in committed `appaloft.yml`.
-- Remoteizing every CLI command in the first slice.
+- Remoteizing local-only, source-package, webhook-signature-only, or streaming/watch CLI behavior
+  without the required transport and custody specs.
 - Creating a new business operation for "CLI login" unless a later auth ADR/spec decides a
   product-level login operation is needed.
 - Replacing pure CLI/GitHub Action SSH mode.
 
 ## Open Questions
 
-- Which first login credential acquisition path should ship: browser/device flow, product-session
-  cookie import, token stdin, or more than one?
+- Which browser/device/OIDC login flow should replace or complement trusted local token/session
+  input?
 - Should public Cloud use an implicit default URL, or should `--url` be required until Cloud auth is
   accepted?
 - Should profile credential storage require OS keychain support for release readiness, or is a
-  file-backed owner-only fallback acceptable for the first self-hosted slice?
+  file-backed owner-only fallback acceptable for the current bridge?
 - Should context eventually include project/environment/resource defaults, and what command should
   explicitly set them without making repository config an identity selector?
-- Which remote mutation should be the first after read-only `projects.list/show`: `projects.create`,
-  `organizations.current-context/switch`, or a resource read path?
+- Which local/source/streaming capability should be remoteized next: quick deploy source-package,
+  remote streaming logs/events, terminal attach gateway, or MCP/public tool exposure?
 
 ## Current Implementation Notes And Migration Gaps
 
 - `packages/adapters/cli/src/control-plane-profile.ts` implements a CLI-adapter-local profile
   store with an owner-only file-backed fallback under `APPALOFT_HOME` or the user's Appaloft home.
   It is intentionally outside `core` and `application`.
-- `packages/adapters/cli/src/control-plane-service.ts` implements self-hosted `auth login/status`,
-  `logout`, `context list/use/show`, active profile resolution, and first-slice remote project
-  dispatch.
+- `packages/adapters/cli/src/control-plane-service.ts` implements `auth login/status`, `logout`,
+  `context list/use/show`, and active profile resolution for self-hosted and explicit-URL Cloud
+  profiles.
 - `packages/adapters/cli/src/control-plane-client.ts` reuses `@appaloft/sdk` generated operation
-  descriptors for `organizations.current-context`, `projects.list`, and `projects.show`; it does
-  not define parallel CLI schemas.
-- `apps/shell/src/run.ts` now calls `runStandaloneControlPlaneCli` before SSH PGlite sync or shell
-  composition. Remote `project list/show` and profile/context commands therefore avoid local
-  runtime setup in the implemented slice.
+  descriptors for handshake and remote operation dispatch; it does not define parallel CLI schemas.
+- `packages/adapters/cli/src/control-plane-target.ts` implements flags/env/profile/config target
+  resolution and strips global control-plane options before normal CLI parsing.
+- `packages/adapters/cli/src/remote-cli-program.ts` implements the remote CLI runtime over the
+  generated SDK operation descriptors, including dispatch-time handshake, path/query/body mapping,
+  streaming/follow rejection, and webhook-signature rejection.
+- `apps/shell/src/run.ts` now calls `runStandaloneControlPlaneCli` and `resolveCliExecutionTarget`
+  before SSH PGlite sync or shell composition. Selected remote business commands and
+  profile/context commands therefore avoid local runtime setup.
 - `packages/adapters/cli/src/runtime.ts` still executes non-remoteized CLI commands and queries
   through local `CommandBus` and `QueryBus` using the shell composition.
-- Cloud browser/device/OIDC login, OS keychain storage, full flags/env/config/`auto` target
-  resolution, broad unsupported-command blocking, remote mutations, remote streaming, MCP exposure,
-  and SSH PGlite adoption remain deferred governed work.
+- Default Cloud URL/browser/device/OIDC login, OS keychain storage, source-package quick deploy,
+  remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption remain
+  deferred governed work.

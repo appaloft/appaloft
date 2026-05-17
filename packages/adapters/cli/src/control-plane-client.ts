@@ -115,7 +115,7 @@ function authForProfile(auth: CliControlPlaneAuth) {
   };
 }
 
-function findOperation(operationKey: string): Result<SdkOperationDescriptor> {
+export function findControlPlaneOperation(operationKey: string): Result<SdkOperationDescriptor> {
   const operation = generatedSdkOperations.find((entry) => entry.operationKey === operationKey);
   if (!operation) {
     return err(
@@ -247,7 +247,7 @@ export async function performControlPlaneHandshake(input: {
     return err(handshake.error);
   }
 
-  const currentContextOperation = findOperation("organizations.current-context");
+  const currentContextOperation = findControlPlaneOperation("organizations.current-context");
   if (currentContextOperation.isErr()) {
     return err(currentContextOperation.error);
   }
@@ -277,10 +277,12 @@ export async function performControlPlaneHandshake(input: {
   });
 }
 
-async function requestControlPlaneOperation(input: {
+export async function requestControlPlaneOperation(input: {
   readonly profile: CliControlPlaneProfile;
   readonly operation: SdkOperationDescriptor;
   readonly pathParams?: Readonly<Record<string, string>>;
+  readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  readonly body?: unknown;
   readonly fetch?: AppaloftSdkFetch;
   readonly phase: string;
 }): Promise<Result<unknown>> {
@@ -293,6 +295,8 @@ async function requestControlPlaneOperation(input: {
   const request: AppaloftSdkOperationRequest = {
     operation: input.operation,
     ...(input.pathParams ? { pathParams: input.pathParams } : {}),
+    ...(input.query ? { query: input.query } : {}),
+    ...(input.body === undefined ? {} : { body: input.body }),
   };
 
   try {
@@ -312,7 +316,7 @@ export async function requestRemoteProjectOperation(input: {
   readonly projectId?: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<unknown>> {
-  const operation = findOperation(input.operationKey);
+  const operation = findControlPlaneOperation(input.operationKey);
   if (operation.isErr()) {
     return err(operation.error);
   }

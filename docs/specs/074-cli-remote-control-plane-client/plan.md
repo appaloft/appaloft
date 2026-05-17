@@ -26,7 +26,7 @@
 
 ## Decision And ADR Need
 
-No new ADR is required for the first read-only CLI remote client slice.
+No new ADR is required for this CLI remote client bridge.
 
 ADR-025 already decides the durable cross-cutting rules needed here:
 
@@ -95,36 +95,27 @@ Local implementation:
 
 Remote implementation:
 
-- uses `@appaloft/sdk` generated operation descriptors or an extended `@appaloft/orpc/client`
-  that supports auth headers and Node fetch;
+- uses `@appaloft/sdk` generated operation descriptors;
 - sends product-session cookie or bearer token auth from the active profile;
-- maps each remote-capable CLI command to the existing operation key and schema-shaped input;
+- maps each command/query message to the existing operation key and schema-shaped input through
+  `packages/application/src/operation-catalog.ts`;
 - returns structured operation results and errors without parsing human message text;
 - fails before local mutation when remote mode is selected for an unsupported operation.
 
-The first slice can remoteize only `projects.list` and `projects.show` to keep the write set small,
-but it should introduce the dispatcher shape so later commands do not grow one-off HTTP calls.
+The implemented dispatcher remoteizes generated SDK non-streaming operations generically and blocks
+streaming, webhook-signature-only, local gateway, and local/source-package entry flows before they
+can mutate through the wrong owner.
 
 ### Command Helper Shape
 
-Current CLI command modules call `runCommand(Command.create(input))` or
-`runQuery(Query.create(input))`. Remote dispatch needs the operation key and the original
-schema-shaped input, not only the constructed application message object.
+The implemented bridge keeps existing CLI command modules calling `runCommand(Command.create(input))`
+or `runQuery(Query.create(input))`. The remote runtime maps the constructed command/query message
+class name back to an operation catalog entry and generated SDK operation descriptor. This avoids a
+large command-module rewrite while still avoiding CLI-only business schemas.
 
-Code Round should introduce a helper shape such as:
-
-```ts
-runOperation({
-  operationKey: "projects.list",
-  kind: "query",
-  input,
-  createLocalMessage: () => ListProjectsQuery.create(input),
-});
-```
-
-The helper lets local dispatch keep application message factories while remote dispatch uses the
-typed operation client. This avoids serializing application command/query class instances across
-HTTP and avoids inventing CLI-only schemas.
+A future local/remote `runOperation` helper remains a maintainability option if command modules
+need operation-key-aware behavior before message construction, for example source-package dispatch,
+streaming selection, or better route-specific diagnostics.
 
 ### Profile Store Package Boundary
 
@@ -146,7 +137,7 @@ or DI tokens.
 
 ### Remote Client Selection
 
-Preferred first implementation:
+Implemented client selection:
 
 - use `@appaloft/sdk` for operation dispatch because it already has generated operation
   descriptors, product-session cookie auth, bearer token auth, structured errors, and no
@@ -169,13 +160,13 @@ Forbidden:
 
 | Surface | Impact |
 | --- | --- |
-| CLI | New login/logout/status/context commands; selected business commands can run remote dispatch. |
+| CLI | New login/logout/status/context commands; generated non-streaming business commands can run remote dispatch when a remote target is selected. |
 | HTTP/oRPC | Existing routes stay the remote contract. `/api/version` remains infrastructure handshake discovery. |
-| Web | No first-slice change; Web already consumes HTTP/oRPC. Future Web help can link to the same docs anchor. |
+| Web | No runtime change; Web already consumes HTTP/oRPC. Future Web help can link to the same docs anchor. |
 | SDK | Existing `@appaloft/sdk` is the best current typed remote operation client for CLI dispatch. |
 | Future MCP/tools | No new MCP semantics; generated tools continue to use operation catalog entries and auth policy metadata. |
 | Repository config | No secret fields. Existing `controlPlane.mode/url` connection policy remains separate from local profiles. |
-| Public docs/help | Docs Round required before release for CLI login/context/remote dispatch, local fallback, and unsupported-operation errors. |
+| Public docs/help | CLI reference anchors now cover login/context/remote dispatch, local fallback, and unsupported-operation errors. |
 
 ## Roadmap And Compatibility
 
@@ -202,46 +193,48 @@ Expected test layers:
 - CLI adapter tests for login/status/logout/context output and redaction;
 - shell tests proving remote-capable commands do not create local shell composition or SSH PGlite
   sync when remote target is selected;
-- running-server or stub HTTP tests for `/api/version`, auth failure propagation, and
-  `projects.list/show` remote dispatch;
+- running-server or stub HTTP tests for `/api/version`, auth failure propagation, and generated SDK
+  remote dispatch;
 - import-boundary tests proving profile store and remote dispatcher do not import `core`,
   repositories, use cases, shell composition, or DI tokens;
-- operation parity tests proving remote `project list/show` use the same operation descriptors and
-  response/error shapes as HTTP/oRPC/SDK.
+- operation parity tests proving remote generated SDK operations use the same operation descriptors
+  and response/error shapes as HTTP/oRPC/SDK.
 
-## Minimal Deliverable Slice
+## Implemented Deliverable Slice
 
-First Code Round implemented:
+Code Round implemented:
 
 1. Added a CLI-adapter-local profile store and active profile resolver.
 2. Added `appaloft auth login/status/logout` plus top-level `appaloft login/logout` aliases.
 3. Added `appaloft context list/use/show`.
 4. Added `/api/version` and current organization context verification before profile write.
-5. Added remote dispatch for `appaloft project list` and `appaloft project show <projectId>`.
-6. Added first-slice unsupported-operation errors for project mutations when a remote profile is
-   active.
-7. Kept deployment, resource/server mutation, remote-state, DB, terminal, and streaming commands
-   local or deferred.
+5. Added dispatch-time handshake before remote business operations.
+6. Added full flags/env/profile/config target resolution for `none`, `auto`, `cloud`, and
+   `self-hosted`, including mode mismatch guards.
+7. Added pre-composition shell routing so selected remote commands skip local shell composition and
+   SSH PGlite sync.
+8. Added generic generated SDK non-streaming dispatch for command/query messages, with tests for
+   project reads, project mutation, and a non-project read.
+9. Kept top-level quick deploy, source-package/bootstrap paths, remote-state, DB, serve, terminal
+   attach, webhook-signed source ingestion, and streaming/follow behavior local or explicitly
+   unsupported in selected remote mode.
 
 This slice proves the new architecture without touching deployment admission, SSH state adoption,
-domain mapping, or control-plane-owned execution.
+domain mapping, or control-plane-owned source-package execution.
 
-The broader `CliExecutionTargetResolver` and generalized `CliOperationDispatcher` remain planned
-architecture boundaries. The first implementation uses `runStandaloneControlPlaneCli` before shell
-composition for profile/context and remote project reads, and uses `@appaloft/sdk` generated
-operation descriptors for remote dispatch.
+The broader `CliExecutionTargetResolver` and generalized remote dispatcher are now implemented in
+the CLI adapter as `control-plane-target.ts` and `remote-cli-program.ts`.
 
 ## Risks And Migration Gaps
 
-- `packages/orpc/src/client.ts` does not currently accept auth headers, so `@appaloft/sdk` is the
-  more practical first remote dispatch client unless oRPC client auth support is added.
-- Current shell startup prepares remote PGlite sync and shell composition before CLI parsing.
-  Remote-only commands require pre-parse target resolution or lazy composition to avoid unwanted
-  local state work.
-- The first auth acquisition flow is not selected. Choosing it may require ADR-025 or a new auth ADR
-  update if credential custody or Cloud defaults become durable product policy.
+- `packages/orpc/src/client.ts` does not currently accept auth headers, so `@appaloft/sdk` remains
+  the practical remote dispatch client unless oRPC client auth support is added.
+- Browser/device/OIDC auth is not selected. Choosing it may require ADR-025 or a new auth ADR update
+  if credential custody or Cloud defaults become durable product policy.
 - Long-running remote mutations need progress, streaming, and async acceptance alignment before
   remoteization.
 - Project/environment/resource context defaults are intentionally deferred because they can change
   operation targeting and should not become hidden state.
+- Top-level quick deploy still needs a source package/server-side config contract before it can be
+  equivalent to remote `deployments.create` from the CLI.
 - Adoption marker detection remains governed by ADR-025 but is not part of login.

@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { runStandaloneControlPlaneCli } from "@appaloft/adapter-cli";
+import {
+  createRemoteCliProgram,
+  resolveCliExecutionTarget,
+  runStandaloneControlPlaneCli,
+} from "@appaloft/adapter-cli";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
@@ -234,8 +238,40 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     return;
   }
 
-  const remotePgliteStateSync = await prepareRemotePgliteStateSync({
+  const executionTarget = await resolveCliExecutionTarget({
     argv: process.argv,
+    env: process.env,
+  });
+  if (executionTarget.isErr()) {
+    writeDomainError(executionTarget.error);
+    process.exit(1);
+  }
+
+  const target = executionTarget.value;
+  const cliArgv = Array.from(target.argv);
+  if (target.kind === "remote") {
+    const remoteCliProgram = createRemoteCliProgram({
+      version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
+      profile: target.profile,
+    });
+    let exitCode = 0;
+
+    try {
+      await remoteCliProgram.parseAsync(cliArgv);
+      process.exitCode = 0;
+    } catch {
+      const currentExitCode = readExitCode();
+      exitCode = currentExitCode !== 0 ? currentExitCode : 1;
+    }
+
+    if (exitCode !== 0) {
+      process.exit(exitCode);
+    }
+    return;
+  }
+
+  const remotePgliteStateSync = await prepareRemotePgliteStateSync({
+    argv: cliArgv,
     env: process.env,
   });
   if (remotePgliteStateSync.isErr()) {
@@ -273,13 +309,13 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
       }
     }
 
-    await app.cliProgram.parseAsync(process.argv);
+    await app.cliProgram.parseAsync(cliArgv);
     process.exitCode = 0;
   } catch {
     const currentExitCode = readExitCode();
     exitCode = currentExitCode !== 0 ? currentExitCode : 1;
   } finally {
-    if (!process.argv.includes("serve")) {
+    if (!cliArgv.includes("serve")) {
       await app.shutdown();
     }
 

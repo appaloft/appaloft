@@ -126,21 +126,6 @@ export async function loginControlPlane(
   const resolved = dependencies(deps);
   const mode = input.mode ?? "self-hosted";
 
-  if (mode === "cloud") {
-    return err(
-      controlPlaneError(
-        "control_plane_unsupported",
-        "user",
-        "Appaloft Cloud browser/device login is not implemented in this CLI slice",
-        false,
-        {
-          phase: "control-plane-auth",
-          mode,
-        },
-      ),
-    );
-  }
-
   const normalizedUrl = normalizeControlPlaneUrl(input.url);
   if (normalizedUrl.isErr()) {
     return err(normalizedUrl.error);

@@ -1,11 +1,16 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
   type CliControlPlaneProfile,
+  createRemoteCliProgram,
   loginControlPlane,
   MemoryCliControlPlaneProfileStore,
+  resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   useControlPlaneProfile,
 } from "../src";
@@ -38,6 +43,36 @@ function captureOutput() {
     },
     read: () => ({ stderr, stdout }),
   };
+}
+
+async function captureProcessOutput<T>(callback: () => Promise<T>): Promise<{
+  readonly result: T;
+  readonly stderr: string;
+  readonly stdout: string;
+}> {
+  const originalStdoutWrite = process.stdout.write;
+  const originalStderrWrite = process.stderr.write;
+  const originalExitCode = process.exitCode;
+  let stdout = "";
+  let stderr = "";
+
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    const result = await callback();
+    return { result, stderr, stdout };
+  } finally {
+    process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
+    process.exitCode = originalExitCode;
+  }
 }
 
 function profile(name: string, baseUrl = "http://127.0.0.1:4310"): CliControlPlaneProfile {
@@ -122,6 +157,26 @@ function createControlPlaneFetch(
         slug: "remote-project",
         lifecycleStatus: "active",
         createdAt: "2026-05-17T00:00:00.000Z",
+      });
+    }
+
+    if (url.pathname === "/api/projects/prj_remote/rename") {
+      return jsonResponse({
+        id: "prj_remote",
+      });
+    }
+
+    if (url.pathname === "/api/servers") {
+      return jsonResponse({
+        items: [
+          {
+            id: "srv_remote",
+            name: "Remote Server",
+            providerKey: "ssh",
+            lifecycleStatus: "active",
+            createdAt: "2026-05-17T00:00:00.000Z",
+          },
+        ],
       });
     }
 
@@ -257,68 +312,105 @@ describe("CLI remote control-plane client", () => {
     expect(logoutOutput.read().stdout).not.toContain("tok_remote_secret_1234");
   });
 
-  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] project list and show dispatch through the generated SDK route when a remote profile is active", async () => {
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] project list/show dispatch through the generated SDK route when a remote profile is active", async () => {
     const requests: Request[] = [];
-    const store = activeStore();
-    const listOutput = captureOutput();
-    const showOutput = captureOutput();
-
-    const listed = await runStandaloneControlPlaneCli({
-      argv: ["node", "appaloft", "project", "list"],
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
       fetch: createControlPlaneFetch(requests),
-      store,
-      stderr: listOutput.stderr,
-      stdout: listOutput.stdout,
-    });
-    const shown = await runStandaloneControlPlaneCli({
-      argv: ["node", "appaloft", "project", "show", "prj_remote"],
-      fetch: createControlPlaneFetch(requests),
-      store,
-      stderr: showOutput.stderr,
-      stdout: showOutput.stdout,
+      now: () => "2026-05-17T00:00:00.000Z",
     });
 
-    expect(listed).toEqual({ handled: true, exitCode: 0 });
-    expect(shown).toEqual({ handled: true, exitCode: 0 });
-    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
-      ["GET /api/projects", "GET /api/projects/prj_remote"],
+    const listed = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "project", "list"]),
     );
-    expect(listOutput.read().stdout).toContain("prj_remote");
-    expect(showOutput.read().stdout).toContain("Remote Project");
+    const shown = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "project", "show", "prj_remote"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/projects",
+        "GET /api/projects/prj_remote",
+      ],
+    );
+    expect(listed.stdout).toContain("prj_remote");
+    expect(shown.stdout).toContain("Remote Project");
   });
 
-  test("[CONTROL-PLANE-CLI-007] project commands stay on the local CLI path when no remote profile is active", async () => {
-    const result = await runStandaloneControlPlaneCli({
+  test("[CONTROL-PLANE-CLI-007][CONTROL-PLANE-MODE-003] no trusted remote source preserves the local CLI path", async () => {
+    const result = await resolveCliExecutionTarget({
       argv: ["node", "appaloft", "project", "list"],
       store: new MemoryCliControlPlaneProfileStore(),
     });
 
-    expect(result).toEqual({ handled: false });
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "local",
+      diagnostics: {
+        effectiveMode: "none",
+      },
+    });
   });
 
-  test("[CONTROL-PLANE-CLI-008] unsupported remote project mutation fails before local mutation", async () => {
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] project mutations dispatch through the generated SDK route when remote-capable", async () => {
     const requests: Request[] = [];
-    const output = captureOutput();
-
-    const result = await runStandaloneControlPlaneCli({
-      argv: ["node", "appaloft", "project", "rename", "prj_remote", "--name", "Renamed"],
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
       fetch: createControlPlaneFetch(requests),
-      store: activeStore(),
-      stderr: output.stderr,
-      stdout: output.stdout,
+      now: () => "2026-05-17T00:00:00.000Z",
     });
 
-    expect(result).toEqual({ handled: true, exitCode: 1 });
-    expect(requests).toHaveLength(0);
-    expect(output.read().stderr).toContain("control_plane_unsupported");
+    await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "project",
+        "rename",
+        "prj_remote",
+        "--name",
+        "Renamed",
+      ]),
+    );
+
+    expect(requests.map((entry) => `${entry.method} ${new URL(entry.url).pathname}`)).toEqual([
+      "GET /api/version",
+      "GET /api/organizations/current-context",
+      "POST /api/projects/prj_remote/rename",
+    ]);
+    expect(await requests[2]?.json()).toMatchObject({
+      projectId: "prj_remote",
+      name: "Renamed",
+    });
+  });
+
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] generated SDK dispatch covers non-project operations", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const listed = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "server", "list"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context", "GET /api/servers"],
+    );
+    expect(listed.stdout).toContain("srv_remote");
   });
 
   test("[CONTROL-PLANE-CLI-011] remote dispatch errors do not fall back to local execution", async () => {
-    const output = captureOutput();
-
-    const result = await runStandaloneControlPlaneCli({
-      argv: ["node", "appaloft", "project", "list"],
-      fetch: createControlPlaneFetch([], {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
         "/api/projects": jsonResponse(
           {
             code: "product_auth_missing",
@@ -329,13 +421,144 @@ describe("CLI remote control-plane client", () => {
           401,
         ),
       }),
-      store: activeStore(),
-      stderr: output.stderr,
-      stdout: output.stdout,
+      now: () => "2026-05-17T00:00:00.000Z",
     });
 
-    expect(result).toEqual({ handled: true, exitCode: 1 });
-    expect(output.read().stderr).toContain("product_auth_missing");
-    expect(output.read().stderr).toContain("remote-operation-dispatch");
+    const output = await captureProcessOutput(async () => {
+      await expect(
+        program.parseAsync(["node", "appaloft", "project", "list"]),
+      ).rejects.toBeDefined();
+    });
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context", "GET /api/projects"],
+    );
+    expect(output.stderr).toContain("product_auth_missing");
+    expect(output.stderr).toContain("remote-operation-dispatch");
+  });
+
+  test("[CONTROL-PLANE-MODE-002][CONTROL-PLANE-MODE-005] explicit none and config none preserve pure local mode even with an active profile", async () => {
+    const configHome = await mkdtemp(join(tmpdir(), "appaloft-control-plane-config-"));
+    await writeFile(
+      join(configHome, "appaloft.yml"),
+      ["controlPlane:", "  mode: none", ""].join("\n"),
+    );
+
+    const store = activeStore();
+    const fromFlag = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "--control-plane-mode", "none", "project", "list"],
+      cwd: configHome,
+      store,
+    });
+    const fromConfig = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "project", "list"],
+      cwd: configHome,
+      store,
+    });
+
+    expect(fromFlag._unsafeUnwrap()).toMatchObject({
+      kind: "local",
+      argv: ["node", "appaloft", "project", "list"],
+      diagnostics: {
+        source: "cli",
+        requestedMode: "none",
+        effectiveMode: "none",
+      },
+    });
+    expect(fromConfig._unsafeUnwrap()).toMatchObject({
+      kind: "local",
+      diagnostics: {
+        source: "config",
+        requestedMode: "none",
+        effectiveMode: "none",
+      },
+    });
+  });
+
+  test("[CONTROL-PLANE-MODE-004] env self-hosted URL and token select an ephemeral remote target without profile write", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "server", "list"],
+      env: {
+        APPALOFT_CONTROL_PLANE_MODE: "self-hosted",
+        APPALOFT_CONTROL_PLANE_URL: "http://127.0.0.1:4310",
+        APPALOFT_TOKEN: "tok_remote_secret_1234",
+      },
+      store,
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    const stored = await store.read();
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      profile: {
+        baseUrl: "http://127.0.0.1:4310",
+        auth: {
+          kind: "bearer",
+          token: "tok_remote_secret_1234",
+        },
+      },
+      diagnostics: {
+        source: "env",
+        requestedMode: "self-hosted",
+      },
+    });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-008] explicit remote mode for local-only deploy fails before local mutation", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "--control-plane-mode", "self-hosted", "deploy", "."],
+      store: activeStore(),
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_unsupported",
+      details: {
+        phase: "control-plane-resolution",
+        command: "deploy",
+      },
+    });
+  });
+
+  test("[CONTROL-PLANE-CLI-008] explicit remote mode for terminal attach local gateway fails before local mutation", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: [
+        "node",
+        "appaloft",
+        "--control-plane-mode",
+        "self-hosted",
+        "server",
+        "terminal",
+        "srv_1",
+      ],
+      store: activeStore(),
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_unsupported",
+      details: {
+        phase: "control-plane-resolution",
+        command: "server terminal",
+      },
+    });
+  });
+
+  test("[CONTROL-PLANE-MODE-004] explicit remote mode must match the selected profile mode", async () => {
+    const store = activeStore();
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "--control-plane-mode", "cloud", "project", "list"],
+      store,
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "control-plane-resolution",
+        profile: "local",
+        profileMode: "self-hosted",
+        requestedMode: "cloud",
+      },
+    });
   });
 });

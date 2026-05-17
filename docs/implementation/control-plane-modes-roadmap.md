@@ -112,7 +112,7 @@ Exit criteria:
 Purpose: let the ordinary CLI act as a client of Appaloft Cloud or a self-hosted Appaloft control
 plane without removing pure CLI/SSH mode.
 
-Recommended first slice:
+Implemented bridge:
 
 - Add a local uncommitted CLI profile store and active context resolver.
 - Add `appaloft login --url`, `appaloft logout`, `appaloft auth status`, and
@@ -120,9 +120,12 @@ Recommended first slice:
   aliases if useful.
 - Perform `/api/version` compatibility discovery and authenticated current-context/status checks
   before storing or using a profile.
-- Dispatch `appaloft project list` and `appaloft project show <projectId>` through a typed remote
-  API client when a compatible remote profile is selected.
-- Fail unsupported remote operations before local mutation when remote mode/profile is selected.
+- Resolve CLI flags, env vars, active profile, and repository config before local shell composition
+  or SSH PGlite sync.
+- Dispatch generated SDK non-streaming command/query operations through a typed remote API client
+  when a compatible remote profile or explicit endpoint is selected.
+- Fail local-only, webhook-signature-only, streaming/follow, source-package, or mode-mismatched
+  selections before local mutation when remote mode/profile is selected.
 - Keep pure SSH `controlPlane.mode: none` as the default when no trusted profile, URL, env token, or
   adoption marker exists.
 - Keep login separate from SSH PGlite adoption, source upload, managed domain mapping, and
@@ -130,8 +133,8 @@ Recommended first slice:
 
 Exit criteria:
 
-- Remote project read queries use the same operation contract as HTTP/oRPC, Web, SDK, and future
-  MCP/tool surfaces.
+- Remote generated SDK command/query operations use the same operation contract as HTTP/oRPC, Web,
+  SDK, and future MCP/tool surfaces.
 - Remote-only CLI commands do not create local shell composition or run SSH PGlite sync.
 - Profile output is redacted and no token, database URL, SSH key, credential id, tenant/org secret
   identity, or raw secret value is written to committed repository config.
@@ -259,7 +262,7 @@ Deliverables:
 | Mode diagnostics | 1 | Yes | Needed for support and CI logs. |
 | CLI profile store and context commands | 1.5 | Yes before documenting ordinary CLI remote client mode | Local uncommitted profile/context only; no committed secrets or identity selectors. |
 | CLI remote typed operation dispatcher | 1.5 | Yes before ordinary CLI commands claim remote support | Reuse `@appaloft/sdk` or authenticated `@appaloft/orpc/client`; no parallel CLI schemas. |
-| Remote project read dispatch | 1.5 | First recommended proof slice | `projects.list` and `projects.show` prove remote query dispatch without mutation. |
+| Generated SDK non-streaming dispatch | 1.5 | Yes before ordinary CLI commands claim remote support | Project reads, project rename, and server list prove generic query/write dispatch without CLI-only schemas. |
 | Control-plane handshake | 2 | Yes for Cloud/self-hosted | Version, schema, feature, auth, and source policy gate. |
 | Cloud auth | 2 | Yes for Cloud | Decide token/OIDC/GitHub App shape. |
 | Cloud source links | 2 | Yes for Cloud | Replaces SSH source-link state for Cloud-owned mode. |
@@ -285,7 +288,7 @@ Deliverables:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current implementation is between Phase 1 and the first Phase 1.5 slice:
+Current implementation has Phase 1 and the ordinary CLI Phase 1.5 bridge active:
 
 - pure SSH Action/CLI remote state exists;
 - config domains and canonical redirects have provider route support;
@@ -298,21 +301,20 @@ Current implementation is between Phase 1 and the first Phase 1.5 slice:
   console on an SSH server using the release installer path;
 - Action Server Config Deploy is specified as the next `0.9.x` server-mode slice, but source package
   transport/storage and server-side config bootstrap code do not exist yet;
-- CLI remote control-plane client first slice is implemented under
+- CLI remote control-plane client bridge is implemented under
   [spec 074](../specs/074-cli-remote-control-plane-client/spec.md): local uncommitted profile
   storage, `appaloft login/logout`, `appaloft auth login/status/logout`, `appaloft context
-  list/use/show`, self-hosted `/api/version` plus current-context handshake, pre-composition shell
-  dispatch, and remote `projects.list/show` through `@appaloft/sdk` generated operation
-  descriptors;
-- full CLI flags/env/config/`auto` target resolution, Cloud login, OS keychain storage, remote
-  mutations, remote streaming, future MCP exposure, and broad local/remote dispatcher coverage do
-  not exist yet;
+  list/use/show`, explicit Cloud/self-hosted URL token/session profiles, `/api/version` plus
+  current-context handshake, flags/env/profile/config target resolution, pre-composition shell
+  dispatch, and generic generated SDK non-streaming operation dispatch;
+- default Cloud browser/device/OIDC login, OS keychain storage, remote streaming/watch,
+  source-package quick deploy, terminal attach gateway, and future MCP exposure do not exist yet;
 - adoption import/marker does not exist;
 - Web mode selection does not exist;
 - deploy-action has control-plane mode, URL, token, and optional trusted id inputs.
 
-Future Code Rounds should choose the next narrow slice. For ordinary CLI remote client behavior,
-the next best slice is a full `CliExecutionTargetResolver` that reconciles flags/env/profile/config
-and `auto` diagnostics without widening remote mutation coverage. For GitHub Action server mode,
-use the source package/config bootstrap contract. Finish the remaining Phase 3 adoption work before
+Future Code Rounds should choose the next bounded transport/custody gap. For ordinary CLI remote
+client behavior, the next best slice is source-package/config bootstrap for top-level quick deploy
+or remote streaming logs/events, depending on product priority. For GitHub Action server mode, use
+the source package/config bootstrap contract. Finish the remaining Phase 3 adoption work before
 claiming self-hosted mode as complete.
