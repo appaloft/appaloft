@@ -6199,6 +6199,14 @@ export interface ActionDeployTokenRequestedScope {
   serverId?: string;
 }
 
+export interface ActionDeployTokenResolvedScope {
+  environmentIds: string[];
+  projectIds: string[];
+  repositoryFullNames: string[];
+  resourceIds: string[];
+  serverIds: string[];
+}
+
 export interface ActionDeployTokenAuthorizationInput {
   method: string;
   path: string;
@@ -6210,6 +6218,7 @@ export interface ActionDeployTokenAuthorizationInput {
 export interface ActionDeployTokenAuthorizationResult {
   actor: ExecutionActor;
   organizationId?: string;
+  scope?: ActionDeployTokenResolvedScope;
 }
 
 export interface ActionDeployTokenAuthorizationPort {

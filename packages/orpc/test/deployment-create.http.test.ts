@@ -1185,6 +1185,95 @@ describe("deployment create HTTP route", () => {
     });
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-019] Action server config endpoint reports unresolved target before mutation", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return err({
+            code: "action_deployment_target_unresolved",
+            category: "user",
+            message:
+              "Action deployment target could not be resolved from source-link state, deploy token scope, or trusted bootstrap context",
+            retryable: false,
+            details: {
+              phase: "source-link-resolution",
+              sourceFingerprint: command.sourceFingerprint,
+              nextActions: [
+                "create-or-link-source-binding-in-console",
+                "run-source-links-relink",
+                "pass-one-time-trusted-bootstrap-ids",
+              ],
+            },
+          });
+        }
+        capturedCommands.push(command as Command<unknown>);
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: ["controlPlane:", "  mode: self-hosted", "  url: https://console.example.com"].join(
+            "\n",
+          ),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amissing:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amissing:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_deployment_target_unresolved",
+        details: {
+          phase: "source-link-resolution",
+          nextActions: [
+            "create-or-link-source-binding-in-console",
+            "run-source-links-relink",
+            "pass-one-time-trusted-bootstrap-ids",
+          ],
+        },
+      },
+    });
+    expect(capturedCommands).toEqual([]);
+  });
+
   test("[CONFIG-FILE-ENTRY-028] Action server config endpoint bootstraps source-link context from trusted ids", async () => {
     let capturedCommand: Command<unknown> | undefined;
     let targetCommand: ResolveActionServerConfigDeploymentTargetCommand | undefined;

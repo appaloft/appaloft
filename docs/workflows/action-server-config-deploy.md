@@ -22,7 +22,8 @@ GitHub Action
   -> POST /api/action/deployments/from-config-package
   -> self-hosted server authenticates and authorizes the deploy token
   -> self-hosted server validates package manifest and config
-  -> self-hosted server resolves source link and trusted context
+  -> self-hosted server resolves target from source-link state, token scope, repository facts, or
+     trusted bootstrap context
   -> self-hosted server applies resource/environment/profile changes through explicit commands
   -> self-hosted server dispatches deployments.create with ids only
   -> Action publishes deployment id, deployment URL, console URL, and optional PR feedback
@@ -116,11 +117,14 @@ type ActionServerConfigDeployRequest = {
 };
 ```
 
-`trustedContext` is trusted entrypoint/server context. The deploy-action wrapper may derive its
-project/environment/resource/server/destination ids from explicit workflow inputs or from the
-selected config file's non-secret `controlPlane.deploymentContext`. If any explicit deployment
-identity field is supplied, the same completeness and conflict checks as the source-link trigger
-slice apply before mutation.
+`trustedContext` is trusted entrypoint/server context. The recommended steady-state request carries
+GitHub repository/ref/revision facts and no Appaloft deployment ids. The deploy-action wrapper may
+derive project/environment/resource/server/destination ids from explicit workflow inputs or from
+the selected config file's non-secret `controlPlane.deploymentContext` only for one-time bootstrap,
+advanced override, relink, or support/debug workflows. If any explicit deployment identity field is
+supplied, project/environment/resource/server must all be present, and the server must
+conflict-check those ids against existing source-link state, deploy-token scope, and trusted
+repository facts before package/config/profile/route/deployment mutation.
 
 `resolvedSecrets` is a transient Action-to-server payload keyed by trusted `ci-env:` environment
 name. It is allowed only to satisfy matching `secrets.KEY.from: ci-env:NAME` entries from the
@@ -182,10 +186,10 @@ mode:
 validate package
   -> read selected config from package
   -> parse and validate repository config
-  -> accept controlPlane.deploymentContext as the only committed deployment identity
+  -> accept controlPlane.deploymentContext only as narrow advanced bootstrap context
   -> reject broad committed identity and secret material
-  -> resolve control-plane/source-link context from trusted inputs, deploymentContext, token scope,
-     source link state, preview context, or future adoption state
+  -> resolve deployment target from source link state, deploy-token scope, trusted repository facts,
+     preview-scoped source fingerprint, explicit trusted bootstrap context, or future adoption state
   -> apply resource source/runtime/network/health profile changes through explicit commands
   -> apply non-secret environment values and required secret references through environment commands
   -> map route/domain intent according to selected control-plane capabilities
@@ -196,6 +200,13 @@ The server must fail before mutation when config contains project/resource/serve
 outside `controlPlane.deploymentContext`, organization ids, tenant ids, credential ids, provider
 account ids, database URLs, raw tokens, raw SSH keys, raw secret values, certificate material, or
 unsupported future fields.
+
+When target resolution cannot uniquely select a project/environment/resource/server, the server
+returns a structured `action_deployment_target_unresolved` error in phase
+`source-link-resolution` before config/profile/route/deployment mutation. Recovery guidance must be
+actionable: create or link a source binding in the console, run/source-link relink, or pass
+one-time trusted bootstrap ids. Explicit ids outside token scope return `action_auth_forbidden`
+with `403` before mutation.
 
 When a package/config is valid but the selected resource has protected profile drift, the workflow
 must follow the existing resource profile drift contract instead of silently overwriting resource
@@ -244,9 +255,10 @@ console output.
   support.
 - The wrapper dry-run path maps the selected mode to
   `POST /api/action/deployments/from-config-package`.
-- The wrapper can read `controlPlane.mode`, `controlPlane.url`, and
-  `controlPlane.deploymentContext` from the selected config file so a repository can describe its
-  self-hosted console deploy target without duplicating non-secret ids in workflow variables.
+- The wrapper can read `controlPlane.mode`, `controlPlane.url`, and, for advanced bootstrap only,
+  `controlPlane.deploymentContext` from the selected config file. The ordinary self-hosted
+  server-config deploy request needs URL/token/config plus trusted GitHub repository/ref/revision/
+  preview context, not project/environment/resource/server ids in workflow variables.
 - The server route `POST /api/action/deployments/from-config-package` validates request shape,
   source package manifest fields, source package path boundaries, source fingerprint/path
   consistency, archive checksum presence, and size limits before any command dispatch.
@@ -258,14 +270,19 @@ console output.
   the selected config file from `raw.githubusercontent.com` using trusted `repositoryFullName`,
   revision, and config path metadata. Unsupported package transports still fail closed until their
   storage/fetch contracts exist.
-- When the validated config does not require server-side profile application and trusted
-  project/environment/resource/server ids are supplied, the endpoint dispatches the existing
-  ids-only `deployments.create` command, bootstraps the source-link context when the link is
-  missing, and returns the accepted deployment id and console deployment href.
+- When the validated config does not require server-side profile application and a missing source
+  link can be resolved from complete deploy-token scope or trusted bootstrap ids, the endpoint
+  dispatches the existing ids-only `deployments.create` command, bootstraps the source-link context
+  when needed, and returns the accepted deployment id and console deployment href.
 - When the validated config does not require server-side profile application and the source
   fingerprint already has source-link state, the endpoint can resolve project/environment/resource/
-  server context from that link without requiring trusted ids on every Action run. Complete trusted
-  ids still conflict-check against existing source-link state before deployment admission.
+  server context from that link without requiring Appaloft ids on every Action run. Complete
+  explicit ids still conflict-check against existing source-link state and deploy-token scope before
+  deployment admission.
+- When no source link exists and the deploy-token scope does not uniquely identify a complete
+  target, the endpoint fails with `action_deployment_target_unresolved` and safe next actions before
+  config/profile/route/deployment mutation. Existing repository/source binding beyond
+  source-fingerprint links remains a governed follow-up.
 - When the validated config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.

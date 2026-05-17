@@ -34,23 +34,34 @@ belongs in application code, not oRPC route code.
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `sourceFingerprint` | Required | Stable Action-derived source identity. |
-| `trustedContext.projectId` | Optional bootstrap context | Trusted project id from Action config. |
-| `trustedContext.environmentId` | Optional bootstrap context | Trusted environment id from Action config. |
-| `trustedContext.resourceId` | Optional bootstrap context | Trusted resource id from Action config. |
-| `trustedContext.serverId` | Optional bootstrap context | Trusted server id from Action config. |
-| `trustedContext.destinationId` | Optional bootstrap context | Trusted destination id from Action config. |
+| `trustedContext.projectId` | Optional advanced bootstrap context | Trusted project id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.environmentId` | Optional advanced bootstrap context | Trusted environment id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.resourceId` | Optional advanced bootstrap context | Trusted resource id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.serverId` | Optional advanced bootstrap context | Trusted deployment target id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.destinationId` | Optional advanced bootstrap context | Trusted destination id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.repositoryFullName` | Optional trusted repository fact | GitHub repository full name used for source-package and scope conflict checks. |
+| `trustedContext.repositoryId` | Optional trusted repository fact | GitHub provider repository id. |
+| `trustedContext.ref` | Optional trusted repository fact | Git ref that participated in source fingerprint construction. |
+| `trustedContext.revision` | Optional trusted repository fact | Git revision that participated in source-package context. |
+| `authorizedTokenScope` | Optional authorized scope fact | Safe deploy-token scope returned by the Action auth boundary. |
 
-If any trusted context field is supplied, `projectId`, `environmentId`, `resourceId`, and `serverId`
-must all be present.
+If any explicit deployment identity field is supplied, `projectId`, `environmentId`, `resourceId`,
+and `serverId` must all be present. Repository/ref/revision facts may be supplied without ids.
 
 ## Resolution Flow
 
-1. Validate completeness of trusted context when present.
+1. Validate completeness of explicit trusted deployment context when present.
 2. Read existing source-link state for `sourceFingerprint`.
-3. If an existing link conflicts with trusted context, reject before config mutation.
-4. If a link exists, return it.
-5. If no link exists and no complete trusted context exists, reject with not found.
-6. Persist and return a new source-link record from the trusted context.
+3. Conflict-check explicit ids, existing source-link targets, and trusted repository facts against
+   deploy-token scope before config/profile/route/deployment mutation.
+4. If an existing link conflicts with explicit context, reject before config mutation.
+5. If a link exists, return it.
+6. If no link exists and complete explicit trusted context exists, persist and return a new
+   source-link record from the trusted context.
+7. If no link exists and deploy-token scope uniquely identifies project/environment/resource/server,
+   persist and return a new source-link record from token scope.
+8. If no target can be resolved, reject with `action_deployment_target_unresolved`, phase
+   `source-link-resolution`, and safe next actions.
 
 ## Boundary Rules
 

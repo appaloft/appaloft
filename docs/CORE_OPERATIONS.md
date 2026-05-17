@@ -1230,6 +1230,9 @@ Current boundary:
   `POST /api/action/deployments/from-config-package`, and self-hosted Action
   `POST /api/deployments/cleanup-preview` must require bearer deploy-token authorization before
   mutation
+- deploy-token scope is also a safe target-resolution fact for Action source-link/server-config
+  deploys; complete unique project/environment/resource/server scope can remove the need for
+  ordinary workflow-supplied ids, while conflicts still return 403 before mutation
 - deploy tokens must never be accepted from repository config, query strings, source packages, or
   `deployments.create` input
 - raw token values are one-time output only; list/show/readiness/log surfaces expose safe metadata

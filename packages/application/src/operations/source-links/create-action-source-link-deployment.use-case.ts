@@ -12,6 +12,10 @@ import {
 import { tokens } from "../../tokens";
 import { type CreateDeploymentUseCase } from "../deployments/create-deployment.use-case";
 import {
+  resolveActionDeploymentTarget,
+  sourceLinkRecordFromTarget,
+} from "./action-deployment-target-resolution";
+import {
   type CreateActionSourceLinkDeploymentCommandParsedInput,
   type CreateActionSourceLinkDeploymentResponse,
 } from "./create-action-source-link-deployment.schema";
@@ -38,55 +42,18 @@ export class CreateActionSourceLinkDeploymentUseCase {
       return err(link.error);
     }
 
-    const hasExplicitContext = Boolean(
-      input.projectId ||
-        input.environmentId ||
-        input.resourceId ||
-        input.serverId ||
-        input.destinationId,
-    );
-
-    if (
-      hasExplicitContext &&
-      (!input.projectId || !input.environmentId || !input.resourceId || !input.serverId)
-    ) {
-      return err(
-        domainError.validation(
-          "Action deployment source-link bootstrap requires project, environment, resource, and server ids",
-          {
-            phase: "action-source-link-deployment",
-            sourceFingerprint: input.sourceFingerprint,
-          },
-        ),
-      );
-    }
-
-    if (!link.value && !hasExplicitContext) {
-      return err(domainError.notFound("Source link", input.sourceFingerprint));
-    }
-
-    if (link.value && hasExplicitContext && sourceLinkConflicts(link.value, input)) {
-      return err(
-        domainError.validation(
-          "Action deployment explicit context conflicts with existing source link; relink the source before deploying",
-          {
-            phase: "action-source-link-deployment",
-            sourceFingerprint: input.sourceFingerprint,
-          },
-        ),
-      );
-    }
-
-    const target = link.value ?? {
+    const trustedContext = mergedTrustedContext(input);
+    const targetResult = resolveActionDeploymentTarget({
+      explicitContextReason: "github-action-source-link-bootstrap",
       sourceFingerprint: input.sourceFingerprint,
-      projectId: input.projectId ?? "",
-      environmentId: input.environmentId ?? "",
-      resourceId: input.resourceId ?? "",
-      serverId: input.serverId,
-      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
-      updatedAt: this.clock.now(),
-      reason: "github-action-source-link-bootstrap",
-    };
+      sourceLink: link.value,
+      ...(input.authorizedTokenScope ? { authorizedTokenScope: input.authorizedTokenScope } : {}),
+      ...(trustedContext ? { trustedContext } : {}),
+    });
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+    const target = targetResult.value;
 
     if (!target.serverId) {
       return err(
@@ -109,16 +76,12 @@ export class CreateActionSourceLinkDeploymentUseCase {
     }
 
     if (!link.value) {
-      const record = {
-        sourceFingerprint: target.sourceFingerprint,
-        projectId: target.projectId,
-        environmentId: target.environmentId,
-        resourceId: target.resourceId,
-        updatedAt: target.updatedAt,
-        reason: "github-action-source-link-bootstrap",
-        ...(target.serverId ? { serverId: target.serverId } : {}),
-        ...(target.destinationId ? { destinationId: target.destinationId } : {}),
-      } satisfies SourceLinkRecord;
+      const record = sourceLinkRecordFromTarget({
+        sourceFingerprint: input.sourceFingerprint,
+        target,
+        updatedAt: this.clock.now(),
+        reason: target.reason,
+      }) satisfies SourceLinkRecord;
       const persisted = await this.sourceLinkRepository.upsert(
         record,
         UpsertSourceLinkSpec.fromRecord(record),
@@ -132,15 +95,34 @@ export class CreateActionSourceLinkDeploymentUseCase {
   }
 }
 
-function sourceLinkConflicts(
-  link: SourceLinkRecord,
-  input: CreateActionSourceLinkDeploymentCommandParsedInput,
-): boolean {
-  return (
-    link.projectId !== input.projectId ||
-    link.environmentId !== input.environmentId ||
-    link.resourceId !== input.resourceId ||
-    link.serverId !== input.serverId ||
-    Boolean(input.destinationId && link.destinationId !== input.destinationId)
-  );
+function explicitContextFromLegacyInput(input: CreateActionSourceLinkDeploymentCommandParsedInput) {
+  if (
+    !input.projectId &&
+    !input.environmentId &&
+    !input.resourceId &&
+    !input.serverId &&
+    !input.destinationId
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.environmentId ? { environmentId: input.environmentId } : {}),
+    ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+    ...(input.serverId ? { serverId: input.serverId } : {}),
+    ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+  };
+}
+
+function mergedTrustedContext(input: CreateActionSourceLinkDeploymentCommandParsedInput) {
+  const legacyContext = explicitContextFromLegacyInput(input);
+  if (!legacyContext && !input.trustedContext) {
+    return undefined;
+  }
+
+  return {
+    ...legacyContext,
+    ...input.trustedContext,
+  };
 }
