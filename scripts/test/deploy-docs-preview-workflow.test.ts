@@ -11,7 +11,8 @@ const shellVariableOpen = "$" + "{";
 
 test("[PUB-DOCS-004] deploy-docs-preview reports a passing no-op preview for non-docs changes", () => {
   expect(workflow).toContain("name: Deploy Docs Preview");
-  expect(workflow).toContain("group: appaloft-docs-preview-remote-state");
+  expect(workflow).toContain("group: appaloft-preview-remote-state");
+  expect(workflow).not.toContain("group: appaloft-docs-preview-remote-state");
   expect(workflow).toContain(
     `echo "docs_preview_required=${shellVariableOpen}docs_preview_required}"`,
   );

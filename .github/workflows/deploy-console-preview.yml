@@ -55,10 +55,10 @@ jobs:
     if: ${{ needs.changes.outputs.console_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Use a surface-specific GitHub group so console and docs previews for the same PR are not
-    # cancelled against each other. SSH remote-state locks still coordinate the shared state root.
+    # Use one shared preview group for remote deploys so console and docs previews do not compete
+    # for Docker build capacity on the same SSH host.
     concurrency:
-      group: appaloft-console-preview-remote-state
+      group: appaloft-preview-remote-state
       cancel-in-progress: false
     environment:
       name: console-preview-pr-${{ github.event.pull_request.number }}
@@ -218,10 +218,9 @@ jobs:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Use the same surface-specific group as console preview deploys; SSH remote-state locks still
-    # coordinate the shared state root with other repository workflows.
+    # Use the same shared preview group as preview deploys so cleanup does not race remote writes.
     concurrency:
-      group: appaloft-console-preview-remote-state
+      group: appaloft-preview-remote-state
       cancel-in-progress: false
     permissions:
       contents: read

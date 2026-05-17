@@ -27,8 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Docs production deploys and this maintenance action share this GitHub group. PR preview
-    # workflows use surface-specific GitHub groups and coordinate the shared root through SSH
-    # remote-state locks so docs and console previews are not cancelled against each other.
+    # workflows use their own shared preview group so remote Docker builds stay serialized.
     concurrency:
       group: appaloft-www-remote-state
       cancel-in-progress: false
