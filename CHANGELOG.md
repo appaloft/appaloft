@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1-rc.3](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.3...v1.0.1-rc.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **deploy:** resolve preview config targets from policy ([054b5e6](https://github.com/appaloft/appaloft/commit/054b5e6ec5986d18ec6891477eab1372f482c04f))
+
 ## [1.0.0-rc.3](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-05-17)
 
 
