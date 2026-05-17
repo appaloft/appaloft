@@ -11,7 +11,8 @@ GitHub Release, and distribution artifacts.
 
 - Use a single product SemVer version for backend, CLI, desktop, Docker, Homebrew, and npm.
 - Release tags use `vX.Y.Z`, or a SemVer prerelease tag such as `v1.0.0-rc.1` when the roadmap gate
-  allows a prerelease.
+  allows a prerelease. Follow-up release candidates on the same prerelease line, such as
+  `1.0.0-rc.1` after `1.0.0-rc`, use the same roadmap phase gate.
 - `CHANGELOG.md` is maintained by Release Please in the release PR.
 - `docs/PRODUCT_ROADMAP.md` is the release gate before `1.0.0`; read it before every
   release workflow run and reject any Release Please PR whose version is not allowed by the

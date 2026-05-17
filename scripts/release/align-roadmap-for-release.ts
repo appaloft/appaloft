@@ -138,6 +138,29 @@ function findTargetPhase(phases: readonly PhaseSection[], targetVersion: string)
   }
 
   const target = parseSemver(targetVersion);
+  const prereleaseLine = phases.find((phase): phase is PhaseSection & { target: string } => {
+    if (!phase.target) {
+      return false;
+    }
+    const phaseTarget = parseSemver(phase.target);
+    if (
+      phaseTarget.major !== target.major ||
+      phaseTarget.minor !== target.minor ||
+      phaseTarget.patch !== target.patch ||
+      !phaseTarget.prerelease ||
+      !target.prerelease
+    ) {
+      return false;
+    }
+    return (
+      target.prerelease === phaseTarget.prerelease ||
+      target.prerelease.startsWith(`${phaseTarget.prerelease}.`)
+    );
+  });
+  if (prereleaseLine) {
+    return prereleaseLine;
+  }
+
   const sameMinorPhases = phases
     .filter((phase): phase is PhaseSection & { target: string } => {
       if (!phase.target || !/^\d+\.\d+\.\d+$/u.test(phase.target)) {
