@@ -276,6 +276,19 @@ function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
+function summarizeCommandFailureOutput(input: { stdout: string; stderr: string }): string | undefined {
+  const lines = `${input.stderr}\n${input.stdout}`
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const summary = lines.slice(-3).join(" | ");
+  if (!summary) {
+    return undefined;
+  }
+
+  return summary.length > 800 ? `${summary.slice(0, 797)}...` : summary;
+}
+
 async function runShellCommand(input: {
   command: string;
   cwd: string;
@@ -1568,20 +1581,33 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
         if (build.failed || !image) {
           const message = "Docker image build failed";
+          const failureSummary = summarizeCommandFailureOutput(build);
+          const failureLogs = failureSummary
+            ? [
+                ...logs,
+                phaseLog("package", `${message}: ${failureSummary}`, "error", "application"),
+                phaseLog("package", message, "error"),
+              ]
+            : [
+                ...logs,
+                phaseLog("package", message, "error"),
+              ];
           this.report(context, {
             deploymentId: state.id.value,
             phase: "package",
             status: "failed",
             level: "error",
-            message,
+            message: failureSummary ? `${message}: ${failureSummary}` : message,
           });
           return ok({
             deployment: this.applyFailure(deployment, {
-              logs: [
-                ...logs,
-                phaseLog("package", message, "error"),
-              ],
+              logs: failureLogs,
               errorCode: "docker_build_failed",
+              metadata: {
+                dockerBuildExitCode: String(build.exitCode),
+                ...(build.reason ? { dockerBuildReason: build.reason } : {}),
+                ...(failureSummary ? { dockerBuildFailureSummary: failureSummary } : {}),
+              },
               retryable: true,
             }).deployment,
           });
