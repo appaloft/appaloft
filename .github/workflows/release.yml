@@ -82,6 +82,22 @@ jobs:
           manifest-file: .github/.release-please-manifest.json
           release-as: ${{ inputs.release_as }}
 
+      - name: Mark prerelease release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.release.outputs.tag_name, '-') }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${PRERELEASE}" != "true" ]]; then
+            echo "Release ${TAG_NAME} is not a prerelease."
+            exit 0
+          fi
+
+          gh release edit "${TAG_NAME}" --prerelease
+
       - name: Check out release pull request branch
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         uses: actions/checkout@v4
