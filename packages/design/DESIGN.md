@@ -17,6 +17,7 @@ Consumers:
 ## Package Entrypoints
 
 - `@appaloft/design`: typed product identity and package metadata.
+- `@appaloft/ui`: Community Svelte design primitives and shell primitives built on these tokens.
 - `@appaloft/design/styles/web.css`: Web console fonts, tokens, Tailwind v4 theme mapping, and
   base layer.
 - `@appaloft/design/styles/docs.css`: documentation theme derived from Web tokens.
@@ -69,7 +70,14 @@ restrained shadows. Semantic colors are only for real workflow meaning.
 
 ## Component Rules
 
-- Base primitives should come from the existing shadcn-svelte implementation when available.
+- Base primitives should come from `@appaloft/ui` when available.
+- `@appaloft/ui` owns neutral controls, overlays, form controls, app-shell regions, icon wrappers,
+  and shell primitives. App-specific project, resource, deployment, organization, provider, and
+  operational workflow components stay in the consuming app.
+- Shell regions should support contributed header, dropdown, toolbar, and sidebar content without
+  naming a page workflow in the primitive package.
+- Prefer package subpath imports such as `@appaloft/ui/button` and `@appaloft/ui/dialog` for
+  tree-shaking-friendly consumers.
 - Component styling belongs in Tailwind utility classes.
 - Global CSS is limited to design tokens, Tailwind theme mapping, base typography, and framework
   adapters.

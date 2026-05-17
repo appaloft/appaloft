@@ -146,6 +146,7 @@ export class CreateResourceUseCase {
       );
 
       if (existing) {
+        const existingState = existing.toState();
         return err(
           domainError.resourceSlugConflict(
             "Resource name already exists for this project environment",
@@ -153,6 +154,7 @@ export class CreateResourceUseCase {
               phase: "resource-admission",
               projectId: projectId.value,
               environmentId: environmentId.value,
+              resourceId: existingState.id.value,
               resourceSlug: slug.value,
             },
           ),
