@@ -1308,6 +1308,15 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
         payload="${payload},\"destinationId\":\"$(json_escape "$destination_id")\""
       fi
     fi
+    if [ "$wrapper_command" = "deploy" ] && { [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; }; then
+      payload="${payload},\"trustedContext\":{"
+      separator=""
+      if [ -n "${GITHUB_REPOSITORY:-}" ]; then payload="${payload}${separator}\"repositoryFullName\":\"$(json_escape "$GITHUB_REPOSITORY")\""; separator=","; fi
+      if [ -n "${GITHUB_REPOSITORY_ID:-}" ]; then payload="${payload}${separator}\"repositoryId\":\"$(json_escape "$GITHUB_REPOSITORY_ID")\""; separator=","; fi
+      if [ -n "${GITHUB_REF:-}" ]; then payload="${payload}${separator}\"ref\":\"$(json_escape "$GITHUB_REF")\""; separator=","; fi
+      if [ -n "${GITHUB_SHA:-}" ]; then payload="${payload}${separator}\"revision\":\"$(json_escape "$GITHUB_SHA")\""; fi
+      payload="${payload}}"
+    fi
     payload="${payload}}"
 
     if [ "$wrapper_command" = "preview-cleanup" ]; then

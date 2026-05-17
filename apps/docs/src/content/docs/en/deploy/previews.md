@@ -85,6 +85,8 @@ control plane. The server validates committed config, applies
 runtime/network/health/env/domain settings through Appaloft operations, resolves source-link or
 repository binding context, then dispatches ids-only deployment admission.
 
+Without `server-config-deploy`, this server API slice requires the project, environment, resource, and deployment target to already be resolvable by the Appaloft server. The Action calls the server source-link deployment route. The server resolves context from existing source-link state or a deploy token whose scope uniquely selects the target. Explicit ids are advanced bootstrap/debug inputs only and must match source-link state, token scope, and trusted repository facts. That path does not apply `appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite state.
+
 Project, environment, resource, and server ids should not be the default user mental model. Prefer
 server resolution from source-link state, repository binding, deploy-token scope, and GitHub
 repository/config fingerprints. When no binding exists, use one trusted bootstrap or advanced
@@ -99,19 +101,18 @@ override:
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
     config: appaloft.yml
     server-config-deploy: true
-    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
-    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
-    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
-    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
     secret-variables: |
       APP_SECRET=ci-env:APP_SECRET
 ```
 
-Without `server-config-deploy`, server source-link trigger mode remains available for resources
-whose profile already exists. It calls the source-link deployment route and does not apply
-`appaloft.yml`, upload a source archive, create resources, open SSH, or mutate SSH-server PGlite
-state. Explicit ids are bootstrap/debug context; later runs should let the server resolve from
-source-link state.
+In this mode the Action performs the server handshake, sends a bounded GitHub source/config
+reference, resolves `ci-env:` secrets from the runner environment, and calls the server API. The
+runner still does not install the CLI, open SSH, select a state backend, or mutate SSH-server PGlite
+state. The server validates the committed config, rejects identity and raw secret fields, applies
+runtime/network/health/env/domain settings through Appaloft operations, then dispatches ids-only
+deployment admission. If no existing source link, token scope, source binding, or trusted bootstrap
+context identifies the target, the server fails before mutation and tells you to link the source,
+run source-link relink, or pass one-time bootstrap ids.
 
 Self-hosted server mode can also trigger PR preview deploys:
 
@@ -133,10 +134,12 @@ Self-hosted server mode can also trigger PR preview deploys:
 
 Server-mode preview deploys use a preview-scoped source fingerprint and write `preview-id`,
 `deployment-id`, `console-url`, and, when configured, `preview-url` outputs.
-`preview-domain-template` and `preview-tls-mode` are applied as transient server-side preview route
-intent; `environment-variables` and `secret-variables` can carry preview-specific runtime values.
-Preview cleanup resolves context from preview source-link state and does not accept
-project/resource/server ids.
+The preview fingerprint resolves independently from the production branch target unless an accepted
+preview binding or token/source scope explicitly selects the same target. `preview-domain-template`
+and `preview-tls-mode` are applied as transient server-side preview route intent;
+`environment-variables` and `secret-variables` can carry preview-specific runtime values. Preview
+cleanup resolves context from preview source-link state and does not accept project/resource/server
+ids.
 
 The non-secret control-plane connection policy may also live in `appaloft.yml`:
 
@@ -146,7 +149,7 @@ controlPlane:
   url: https://console.example.com
 ```
 
-Keep project, environment, resource, server, token, SSH, and database identity out of committed config. Those values must come from trusted workflow inputs, variables, secrets, existing source links, or the Appaloft server.
+Keep token, SSH, database identity, organization/tenant/provider account identity, and broad target identity out of committed config. Project, environment, resource, and server ids are optional advanced bootstrap context only; ordinary self-hosted Action deploys should let source links, token scope, source binding, or the Appaloft server resolve them.
 `controlPlane.deploymentContext` is a narrow bootstrap/advanced override exception for intentionally
 binding a repository to an existing self-hosted project/environment/resource/server. It is not a
 default set of ids every workflow should maintain.

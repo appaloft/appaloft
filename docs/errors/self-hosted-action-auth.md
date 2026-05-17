@@ -14,7 +14,7 @@ private repository secrets, source package raw payloads, or credential-bearing h
 | --- | --- | --- | --- | --- | --- |
 | `action_auth_missing` | `permission` | `401` | `action-authentication` | No | The Action mutation endpoint requires a bearer deploy token and none was supplied. |
 | `action_auth_invalid` | `permission` | `401` | `action-authentication` | No | The supplied token is malformed, unknown, expired, revoked, or cannot be verified. |
-| `action_auth_forbidden` | `permission` | `403` | `action-authorization` | No | The token is valid but its scopes do not authorize the requested endpoint, project, environment, resource, repository, preview workflow, or command. |
+| `action_auth_forbidden` | `permission` | `403` | `action-authorization` | No | The token is valid but its scopes do not authorize the requested endpoint, project, environment, resource, server, repository, preview workflow, command, or target-resolution fact. |
 | `deploy_token_bootstrap_failed` | `infra` | `500` or `503` | `deploy-token-bootstrap` | Conditional | The installer or backend could not create or persist the initial deploy token verifier. |
 | `deploy_token_rotation_blocked` | `conflict` | `409` | `deploy-token-rotation` | No | The requested token cannot be rotated because it is revoked, missing, or not visible to the actor. |
 | `deploy_token_revoke_blocked` | `conflict` | `409` | `deploy-token-revocation` | No | The requested token cannot be revoked because it is already revoked, missing, or not visible to the actor. |
@@ -40,7 +40,7 @@ private repository secrets, source package raw payloads, or credential-bearing h
   `deployment-target`, or `repository`
 - `reasonCode`, such as `scope_value_missing` when the request did not supply a scope required by
   the token, or `scope_value_not_allowed` when the requested value is outside the token scope
-- safe requested scope fields such as `projectId`, `environmentId`, `resourceId`,
+- safe requested scope fields such as `projectId`, `environmentId`, `resourceId`, `serverId`,
   `repositoryFullName`, `previewKind`, or `workflowCommand`
 - `missingScope` as a compatibility alias for `deniedScope`
 

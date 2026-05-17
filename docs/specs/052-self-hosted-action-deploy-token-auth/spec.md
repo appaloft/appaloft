@@ -22,7 +22,7 @@ workflows without requiring external OAuth or an interactive user session.
 | --- | --- | --- | --- |
 | Deploy token | Appaloft-issued machine credential used by automation to call self-hosted Action mutation endpoints. | Identity governance / control-plane entry workflow | action token, server deploy token |
 | Token verifier | Stored non-secret verifier/hash used to authenticate a presented deploy token. | Identity governance / persistence | token hash |
-| Deploy token scope | Authorization facts that limit a deploy token to organization, project, environment, resource, source repository, preview workflow, and workflow command. | Identity governance | token claims |
+| Deploy token scope | Authorization facts that limit a deploy token to organization, project, environment, resource, server, source repository, preview workflow, and workflow command. A complete unique target scope can also resolve ordinary self-hosted Action deploys without workflow-supplied ids. | Identity governance | token claims |
 | Action mutation endpoint | A self-hosted HTTP endpoint that can mutate Appaloft state when called by GitHub Actions. | Adapter / entry workflow | Action API |
 | Authenticated Action actor | Application execution context derived from a valid deploy token plus safe Action request facts. | Application / authorization | automation actor |
 
@@ -34,6 +34,8 @@ workflows without requiring external OAuth or an interactive user session.
 | ACTION-AUTH-SPEC-002 | Invalid token fails before mutation | A request includes an unknown, malformed, expired, or revoked deploy token | The request reaches HTTP/oRPC | The endpoint returns `401` with `action_auth_invalid` and no downstream command dispatch occurs. |
 | ACTION-AUTH-SPEC-003 | Valid token builds an Action actor | A request includes a valid deploy token | The endpoint accepts the token | The adapter creates an authenticated Action actor with token id, organization id, scopes, repository facts when supplied, and no raw token value; workflow commands receive that actor context before business admission. |
 | ACTION-AUTH-SPEC-004 | Scope mismatch returns forbidden | A token is valid but does not cover the requested project, environment, resource, source repository, preview workflow, or workflow command | The request reaches an Action mutation endpoint | The endpoint returns `403` with `action_auth_forbidden` before mutation. |
+| ACTION-AUTH-SPEC-004A | Scope resolves target | A valid token scope uniquely identifies project, environment, resource, and server, and the Action request has no Appaloft ids | Source-link deploy or server-config deploy reaches target resolution | The application resolves the deployment target from token scope, may create the source-link record after admission when missing, and dispatches only ids-only deployment admission. |
+| ACTION-AUTH-SPEC-004B | Scope conflicts fail before mutation | A valid token scope conflicts with explicit bootstrap ids, an existing source-link target, or trusted repository facts | Source-link deploy or server-config deploy reaches target resolution | The endpoint returns `403` with `action_auth_forbidden` before package/config/profile/route/deployment mutation. |
 | ACTION-AUTH-SPEC-005 | Source-link deploy is protected | `POST /api/action/deployments/from-source-link` is called | Auth succeeds and scope permits source-link deployment | The route may dispatch `CreateActionSourceLinkDeploymentCommand`; otherwise it fails with `401` or `403` before command dispatch. |
 | ACTION-AUTH-SPEC-006 | Server config deploy is protected | `POST /api/action/deployments/from-config-package` is called | Auth succeeds and scope permits server config deploy | The route may validate package/config and dispatch server config workflow commands; otherwise it fails with `401` or `403` before package, source-link, profile, route, or deployment mutation. |
 | ACTION-AUTH-SPEC-007 | Preview cleanup is protected | `POST /api/deployments/cleanup-preview` is called from self-hosted Action server mode | Auth succeeds and scope permits preview cleanup | The route may dispatch `deployments.cleanup-preview`; otherwise it fails with `401` or `403` before cleanup mutation. |
@@ -62,7 +64,9 @@ workflows without requiring external OAuth or an interactive user session.
   same admin-protected oRPC contracts and stable public docs anchor. Future MCP token management
   remains a named Phase 8 migration gap.
 - Config: repository config must not contain deploy tokens. GitHub Actions should provide the token
-  through trusted secret inputs or environment variables.
+  through trusted secret inputs or environment variables. Config may contain only the narrow
+  `controlPlane.deploymentContext` bootstrap ids; those ids are optional advanced context and must
+  be checked against token scope before mutation.
 - Events: token lifecycle events are safe audit facts only; they must not include raw token values.
 - Public docs/help: self-hosted Action server mode docs must explain token creation, storage in
   GitHub Secrets, rotation/revocation, scope failures, and 401/403 recovery.
@@ -73,7 +77,9 @@ workflows without requiring external OAuth or an interactive user session.
 - Implementing complete first-admin login, OAuth, organization/team invitations, or Web onboarding
   in this first deploy-token slice.
 - Adding token fields to `deployments.create` or repository config.
-- Letting Action auth decide deployment, source-link, profile, route, or cleanup business policy.
+- Letting Action auth own deployment, source-link, profile, route, or cleanup business policy. Auth
+  may provide scope facts for application target resolution, but the owning workflow commands still
+  enforce source-link and deployment policy.
 - Supporting token authentication for pure SSH CLI mode.
 
 ## Open Questions
@@ -109,6 +115,12 @@ workflows without requiring external OAuth or an interactive user session.
   dispatch. Forbidden responses include a stable `deniedScope` plus `reasonCode` so operators can
   distinguish missing requested scope from a requested value outside the token scope without
   exposing token material.
+- The authorization port now also returns safe resolved scope arrays to application target
+  resolution. `CreateActionSourceLinkDeploymentCommand` and
+  `ResolveActionServerConfigDeploymentTargetCommand` can resolve a missing source-link target from
+  complete token scope, conflict-check explicit ids/source-link targets/repository facts against the
+  scope, and return `action_deployment_target_unresolved` before mutation when no link, scope,
+  binding, or trusted bootstrap context identifies the target.
 - The deploy-action wrapper sends `X-Appaloft-Action-Command: preview-cleanup` for self-hosted
   preview cleanup. That Action-marked cleanup path is protected by the same application-owned
   deploy-token authorization port before `deployments.cleanup-preview` dispatch; ordinary

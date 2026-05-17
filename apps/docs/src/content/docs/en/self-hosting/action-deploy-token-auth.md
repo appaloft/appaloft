@@ -65,8 +65,11 @@ metadata only and does not show the raw token again.
 <h2 id="self-hosting-action-token-scope">Scopes and current limits</h2>
 
 Deploy tokens can be limited by workflow command, project, environment, resource, server, and
-repository. The current installer creates the initial self-hosted Action token so server API deploy,
-server config deploy, and preview cleanup paths have an authentication boundary.
+repository. When a token uniquely names project, environment, resource, and server, ordinary
+self-hosted Action deploys can omit those ids; the server uses the token scope with source-link and
+repository facts to resolve the target. The current installer creates the initial self-hosted
+Action token so server API deploy, server config deploy, and preview cleanup paths have an
+authentication boundary.
 
 After the first admin is created, administrators can manage deploy tokens through CLI or
 product-session protected HTTP/API entrypoints. CLI uses the same application command/query
@@ -95,7 +98,9 @@ verified by the server. When copying the secret, copy only the `aplt_dt_...` tok
 entire bootstrap JSON.
 
 `403 action_auth_forbidden` means the token is valid but its scope does not allow this request. The
-usual causes are a repository, resource, environment, or workflow command mismatch.
+usual causes are a repository, project, environment, resource, server, or workflow command mismatch.
+It also happens when explicit bootstrap ids or an existing source link point outside the token
+scope. Update the token scope, relink the source, or remove the conflicting bootstrap ids.
 
 <h2 id="self-hosting-action-token-rotation">Rotation and revocation</h2>
 
