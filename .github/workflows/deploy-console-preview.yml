@@ -166,6 +166,16 @@ jobs:
             --server-ssh-private-key-file "$key_file" \
             --state-backend ssh-pglite
 
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --config appaloft.console-backend-preview.yml \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
           bun run apps/shell/src/index.ts deploy . \
             --config appaloft.console-backend-preview.yml \
             --method dockerfile \

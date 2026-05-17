@@ -42,6 +42,15 @@ test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview keeps preview routing a
       "bun run apps/shell/src/index.ts deploy . \\\n            --config appaloft.console-backend-preview.yml",
     ),
   );
+  expect(
+    workflow.indexOf(
+      "bun run apps/shell/src/index.ts preview cleanup . \\\n            --config appaloft.console-backend-preview.yml",
+    ),
+  ).toBeLessThan(
+    workflow.indexOf(
+      "bun run apps/shell/src/index.ts deploy . \\\n            --config appaloft.console-backend-preview.yml",
+    ),
+  );
   expect(backendConfig).toContain("controlPlane:");
   expect(backendConfig).toContain("mode: none");
   expect(backendConfig).not.toContain("baseDirectory");

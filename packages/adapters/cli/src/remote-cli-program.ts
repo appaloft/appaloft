@@ -1,9 +1,8 @@
+import { type Command as AppCommand, type Query as AppQuery } from "@appaloft/application";
 import {
-  type Command as AppCommand,
-  type Query as AppQuery,
   findOperationCatalogEntryByMessageName,
   type OperationCatalogEntry,
-} from "@appaloft/application";
+} from "@appaloft/application/operation-catalog";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import {
   type AppaloftSdkFetch,
