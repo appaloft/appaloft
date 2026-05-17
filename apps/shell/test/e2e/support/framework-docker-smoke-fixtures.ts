@@ -452,7 +452,7 @@ export const frameworkDockerSmokeFixtures: FrameworkDockerSmokeFixture[] = [
     expectedBuildStrategy: "workspace-commands",
     expectedDockerfile: "Dockerfile.appaloft",
     expectedGeneratedLog: "Generated workspace Dockerfile",
-    expectedPlanner: "python",
+    expectedPlanner: "generic-python",
     expectedResourceKind: "application",
     expectedRuntimeText: "explicit start",
     install: "pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt",
