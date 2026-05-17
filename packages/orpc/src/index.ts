@@ -6681,10 +6681,42 @@ async function resolveActionServerConfigDeploymentTarget(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   body: ActionServerConfigDeployBody;
+  request: Request;
 }): Promise<Result<ResolveActionServerConfigDeploymentTargetResponse>> {
+  const firstAttempt = await executeActionServerConfigTargetResolution(input, {
+    ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+  });
+  if (firstAttempt.isOk() || firstAttempt.error.code !== "action_deployment_target_unresolved") {
+    return firstAttempt;
+  }
+
+  const previewTrustedContext = await trustedContextFromPreviewPolicy(input);
+  if (previewTrustedContext.isErr()) {
+    return err(previewTrustedContext.error);
+  }
+  if (!previewTrustedContext.value) {
+    return firstAttempt;
+  }
+
+  return executeActionServerConfigTargetResolution(input, {
+    trustedContext: previewTrustedContext.value,
+  });
+}
+
+async function executeActionServerConfigTargetResolution(
+  input: {
+    authorizedTokenScope?: ActionDeployTokenResolvedScope;
+    context: AppaloftOrpcContext;
+    executionContext: ExecutionContext;
+    body: ActionServerConfigDeployBody;
+  },
+  targetInput: {
+    trustedContext?: ActionServerConfigDeployBody["trustedContext"];
+  },
+): Promise<Result<ResolveActionServerConfigDeploymentTargetResponse>> {
   const command = ResolveActionServerConfigDeploymentTargetCommand.create({
     sourceFingerprint: input.body.sourceFingerprint,
-    ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+    ...(targetInput.trustedContext ? { trustedContext: targetInput.trustedContext } : {}),
     ...(input.authorizedTokenScope ? { authorizedTokenScope: input.authorizedTokenScope } : {}),
   });
   if (command.isErr()) {
@@ -6692,6 +6724,53 @@ async function resolveActionServerConfigDeploymentTarget(input: {
   }
 
   return input.context.commandBus.execute(input.executionContext, command.value);
+}
+
+async function trustedContextFromPreviewPolicy(input: {
+  context: AppaloftOrpcContext;
+  executionContext: ExecutionContext;
+  body: ActionServerConfigDeployBody;
+  request: Request;
+}): Promise<Result<ActionServerConfigDeployBody["trustedContext"] | undefined>> {
+  const preview = input.body.preview;
+  if (preview?.kind !== "pull-request") {
+    return ok(undefined);
+  }
+
+  const repositoryFullName =
+    input.body.sourcePackage.repositoryFullName ?? input.body.trustedContext?.repositoryFullName;
+  const baseRef = preview.baseRef;
+  if (!repositoryFullName || !baseRef) {
+    return ok(undefined);
+  }
+
+  const previewContext = await resolvePreviewPullRequestContext({
+    context: input.context,
+    executionContext: input.executionContext,
+    request: input.request,
+    event: {
+      repositoryFullName,
+      ...(input.body.sourcePackage.repositoryId
+        ? { providerRepositoryId: input.body.sourcePackage.repositoryId }
+        : input.body.trustedContext?.repositoryId
+          ? { providerRepositoryId: input.body.trustedContext.repositoryId }
+          : {}),
+      baseRef,
+    },
+  });
+  if (previewContext.isErr()) {
+    return err(previewContext.error);
+  }
+
+  return ok({
+    ...input.body.trustedContext,
+    repositoryFullName,
+    projectId: previewContext.value.projectId,
+    environmentId: previewContext.value.environmentId,
+    resourceId: previewContext.value.resourceId,
+    serverId: previewContext.value.serverId,
+    destinationId: previewContext.value.destinationId,
+  });
 }
 
 async function handleActionServerConfigDeploymentRoute(input: {
@@ -6815,6 +6894,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
     context,
     executionContext,
     body: body.data,
+    request,
   });
   if (target.isErr()) {
     return domainErrorHttpResponse(target.error, executionContext);

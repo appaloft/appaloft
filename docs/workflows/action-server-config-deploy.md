@@ -189,7 +189,8 @@ validate package
   -> accept controlPlane.deploymentContext only as narrow advanced bootstrap context
   -> reject broad committed identity and secret material
   -> resolve deployment target from source link state, deploy-token scope, trusted repository facts,
-     preview-scoped source fingerprint, explicit trusted bootstrap context, or future adoption state
+     pull-request preview policy, preview-scoped source fingerprint, explicit trusted bootstrap
+     context, or future adoption state
   -> apply resource source/runtime/network/health profile changes through explicit commands
   -> apply non-secret environment values and required secret references through environment commands
   -> map route/domain intent according to selected control-plane capabilities
@@ -207,6 +208,12 @@ returns a structured `action_deployment_target_unresolved` error in phase
 actionable: create or link a source binding in the console, run/source-link relink, or pass
 one-time trusted bootstrap ids. Explicit ids outside token scope return `action_auth_forbidden`
 with `403` before mutation.
+
+For pull-request previews, server-config deploy first honors existing source-link or token-scoped
+targets. If neither resolves a target and the Action request includes repository and base-ref
+context, the server may use the same neutral preview/source-event policy reader that product-grade
+preview ingestion uses, then bootstrap the preview-scoped source link with the resolved
+project/environment/resource/server target.
 
 When a package/config is valid but the selected resource has protected profile drift, the workflow
 must follow the existing resource profile drift contract instead of silently overwriting resource
