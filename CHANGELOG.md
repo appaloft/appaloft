@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0-rc.2](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **release:** mark release candidates as prereleases ([24ed09f](https://github.com/appaloft/appaloft/commit/24ed09f532a64ea32c3735fb5d8b3281faba41d1))
+* **release:** stabilize framework fixture gates ([5e4326e](https://github.com/appaloft/appaloft/commit/5e4326e893e101cb11653cb1629a5b50713a7c64))
+* **runtime:** stabilize framework fixture release gates ([2209ddd](https://github.com/appaloft/appaloft/commit/2209ddd7c41c42cf9519ae8a63af18c120c6f890))
+* **runtime:** surface docker build failure details ([8a76469](https://github.com/appaloft/appaloft/commit/8a76469c1df52d7d1ccb507e31946838ef66fd88))
+* **server:** tolerate corrupt legacy preview state ([18fa3da](https://github.com/appaloft/appaloft/commit/18fa3da2648e4c9f591cf71da94822c316e092fd))
+
 ## [1.0.0-rc.1](https://github.com/appaloft/appaloft/compare/v0.12.5...v1.0.0-rc.1) (2026-05-17)
 
 
