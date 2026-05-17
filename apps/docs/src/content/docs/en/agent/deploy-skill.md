@@ -28,7 +28,9 @@ deploy through the existing CLI, HTTP API, or Web Quick Deploy surfaces.
 
 The skill covers the full Appaloft deploy entry surface and keeps the result focused on what the
 user needs next: access URL, deployment status, logs, diagnostics, and recovery. Static output is
-one fast entrypoint, not the boundary of the skill.
+one fast entrypoint, not the boundary of the skill. For GitHub Actions, the agent must first
+distinguish Pure SSH Action, Self-hosted Server Action, and Product-grade Preview instead of
+collapsing them into one template.
 
 <h2 id="agent-deploy-install">Install the skill</h2>
 
@@ -52,6 +54,23 @@ separate npm installer.
    request `deployments.create`.
 4. Return the outcome: access URL first, then deployment id, resource id, logs command, diagnostic
    command, and recovery readiness command.
+
+<h2 id="agent-deploy-action-modes">GitHub Action deployment modes</h2>
+
+- Pure SSH Action: default `control-plane-mode: none`; the Action installs/runs the CLI, deploys
+  over SSH, and uses server-owned `ssh-pglite` state on the SSH target. Do not require an Appaloft
+  console, deploy token, project id, resource id, or server id.
+- Self-hosted Server Action: an existing self-hosted Appaloft console/API owns state. The Action
+  calls the server API selected by `control-plane-url`, must use `appaloft-token`, and does not run
+  the CLI or open SSH. Prefer `server-config-deploy: true` so the server reads `appaloft.yml`,
+  applies profile/env/domain intent, then dispatches ids-only deployment admission.
+- Product-grade Preview: Appaloft Cloud or a self-hosted control plane owns preview policy, GitHub
+  App webhooks, comments/checks, cleanup retry, scheduler, audit, and quota. It is not the same as
+  an Action-only PR preview workflow file maintained by the repository.
+
+When source-link or repository binding context is missing, prompt the user to establish the binding
+or run one trusted bootstrap context. Project/resource/server ids are for first bootstrap, advanced
+override, or debugging, not the default input an ordinary user should provide.
 
 <h2 id="agent-deploy-safety">Safety boundary</h2>
 

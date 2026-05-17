@@ -15,8 +15,9 @@ surface available in the session.
 1. Classify the user's intent into an Appaloft operation area: deploy, project/server/environment,
    resource profile, runtime control, domain/TLS, dependency resource, storage, scheduled task,
    observation, recovery, audit/retention, organization/auth, or system maintenance.
-2. Choose the active surface: CLI for local shell-capable agents, HTTP/API for control-plane
-   integrations, Web when guiding a human through the console, and MCP only when available.
+2. Choose the active surface and state owner: CLI/pure SSH for local shell-capable agents and
+   BYOS Action deploys, HTTP/API for selected control planes, Web when guiding a human through the
+   console, and MCP only when available.
 3. Use existing Appaloft operations only. Do not invent hidden agent commands, bypass adapters, call
    provider SDKs directly, mutate Docker/SSH/database state directly, or inspect repositories/use
    cases/persistence internals for product behavior.
@@ -32,12 +33,16 @@ surface available in the session.
 - Read [references/surfaces.md](references/surfaces.md) when choosing between CLI, HTTP/API, Web,
   repository config, and future MCP/tool entrypoints.
 - Read [references/deploy-protocol.md](references/deploy-protocol.md) for deploy, preview cleanup,
-  plan, observe, retry, redeploy, and rollback tasks.
+  GitHub Action mode selection, preview cleanup, plan, observe, retry, redeploy, and rollback tasks.
 
 ## Common Workflows
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
   plan when useful, deploy, observe, and return URL plus diagnostics.
+- GitHub Action deploy: default to Pure SSH Action when the user supplies an SSH target and no
+  control plane; use Self-hosted Server Action only when `control-plane-url` selects an Appaloft
+  instance and a deploy token is available; treat product-grade previews as control-plane-owned,
+  not as the same thing as a repository-maintained workflow file.
 - Operate an existing resource: use resource profile commands for source/runtime/network/health/
   access/variables/dependencies/storage, then redeploy or restart only when needed.
 - Recover a failed deployment: read deployment detail, logs, resource diagnostics, and recovery

@@ -24,9 +24,17 @@ Use the Web console for first-time setup, status inspection, field-level help, a
 
 Use the CLI for local development, SSH server bootstrap, CI scripts, and interactive confirmation.
 
+The default BYOS GitHub Action shape also enters through the CLI surface: Pure SSH Action uses
+`control-plane-mode: none`, installs/runs the CLI in the Action, deploys over SSH, and stores state
+in `ssh-pglite` on the target server.
+
 <h2 id="entrypoint-http-api">HTTP API</h2>
 
 Use the HTTP API for automation. API descriptions should link to the same public docs anchors instead of redefining separate input semantics.
+
+Self-hosted Server Action uses the HTTP API surface: `control-plane-url` explicitly selects the
+Appaloft instance, and `appaloft-token` supplies deploy-token authentication. The Action does not
+run the CLI, open SSH, or scan target machines to discover a control plane.
 
 <h2 id="entrypoint-mcp-tools">MCP tools</h2>
 

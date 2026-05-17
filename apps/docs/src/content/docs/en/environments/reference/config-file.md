@@ -55,5 +55,21 @@ Use `mode: none` for pure CLI or Action SSH deployments. Use `mode: self-hosted`
 server API instead of mutating SSH PGlite directly.
 
 `controlPlane.url` is not a secret, but it must be an `http` or `https` origin without credentials,
-path, query, or fragment. Keep tokens, SSH keys, repository identity, project ids, and resource ids
-outside repository config.
+path, query, or fragment. Keep tokens, SSH keys, repository identity, organization ids, provider
+account ids, database URLs, and secret values outside repository config.
+
+For self-hosted server config deploy, `controlPlane.deploymentContext` can be used as a narrow
+bootstrap/advanced override that binds a repository to an existing project, environment, resource,
+server, and optional destination. Ordinary users should not maintain these ids by default; prefer
+source-link state, repository binding, and deploy-token scope for context resolution.
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
+```

@@ -992,20 +992,16 @@ Current boundary:
   variables. It is separate from `command: deploy`, so existing SSH CLI deployments with
   `control-plane-mode: none` continue to mutate SSH-server `ssh-pglite` directly until the operator
   selects a self-hosted control-plane API mode.
-- In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode for the
-  first 0.9.x slice: it does not install or invoke the CLI, open SSH, select a state backend, or
-  mutate SSH-server PGlite. It calls the self-hosted server's `/api/version` endpoint, then uses
-  `POST /api/action/deployments/from-source-link` for `command: deploy` and
-  `POST /api/deployments/cleanup-preview` for `command: preview-cleanup`, both with derived source
-  fingerprints. Trusted project/environment/resource/server ids supplied by the workflow may
-  bootstrap a missing source link for deploy; later runs may omit those ids so the server resolves
-  context from existing source-link state. For `preview=pull-request`, server-mode deploy derives a
-  preview-scoped source fingerprint and triggers the same source-link deployment API, but it still
-  does not apply runner-side runtime/profile/env/secret inputs, preview route inputs, or
-  `require-preview-url`. The deployment API response includes the accepted deployment id and console
-  deployment href so the Action can publish a stable detail link in GitHub outputs, step summaries,
-  and optional PR comments. Preview cleanup always resolves context from the preview source link.
-- The next `0.9.x` self-hosted Action slice is
+- In `control-plane-mode: self-hosted`, the deploy action uses server API trigger mode: the
+  deployment path does not invoke the CLI, open SSH, select a state backend, or mutate SSH-server
+  PGlite. It calls the selected self-hosted server's `/api/version` endpoint, then uses protected Action
+  mutation endpoints with a deploy-token bearer credential. The source-link trigger path calls
+  `POST /api/action/deployments/from-source-link` for `command: deploy`; trusted
+  project/environment/resource/server ids supplied by the workflow may bootstrap a missing source
+  link for deploy, but later runs should omit those ids so the server resolves context from
+  existing source-link state. `POST /api/deployments/cleanup-preview` handles
+  `command: preview-cleanup` and always resolves context from preview source-link state.
+- The active self-hosted Action server config deploy slice is
   [Action Server Config Deploy](./workflows/action-server-config-deploy.md), coordinated by
   [spec 050](./specs/050-action-server-config-deploy/spec.md). It moves config bootstrap and source
   materialization into the self-hosted server by sending a bounded source package reference and
