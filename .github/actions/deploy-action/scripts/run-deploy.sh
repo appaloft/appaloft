@@ -490,25 +490,134 @@ preview_route_payload_for_action() {
   printf ',"previewRoute":{"host":"%s","pathPrefix":"/","tlsMode":"%s"}' "$(json_escape "$preview_domain_template")" "$(json_escape "$tls_mode")"
 }
 
+render_control_plane_error() {
+  local endpoint="$1"
+  local http_status="$2"
+  local response_file="$3"
+
+  APPALOFT_ACTION_ENDPOINT="$endpoint" APPALOFT_ACTION_HTTP_STATUS="$http_status" node - "$response_file" <<'NODE'
+const fs = require("fs");
+
+const responsePath = process.argv[2];
+const endpoint = process.env.APPALOFT_ACTION_ENDPOINT || "";
+const status = process.env.APPALOFT_ACTION_HTTP_STATUS || "";
+const raw = responsePath ? fs.readFileSync(responsePath, "utf8").trim() : "";
+
+function clean(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+    return undefined;
+  }
+  return String(value).replace(/[\r\n]+/g, " ").slice(0, 240);
+}
+
+function add(fields, key, value) {
+  const cleaned = clean(value);
+  if (cleaned !== undefined) fields.push(`${key}=${cleaned}`);
+}
+
+let parsed;
+try {
+  parsed = raw ? JSON.parse(raw) : undefined;
+} catch {
+  parsed = undefined;
+}
+
+const error =
+  parsed && typeof parsed === "object" && parsed.error && typeof parsed.error === "object"
+    ? parsed.error
+    : parsed && typeof parsed === "object"
+      ? parsed
+      : undefined;
+const details = error && typeof error.details === "object" && error.details ? error.details : {};
+const message =
+  clean(error && error.message) || "self-hosted control-plane request failed";
+const fields = [];
+
+add(fields, "status", status);
+add(fields, "code", error && error.code);
+add(fields, "deniedScope", details.deniedScope);
+add(fields, "reasonCode", details.reasonCode);
+add(fields, "missingScope", details.missingScope);
+add(fields, "workflow", details.workflow);
+add(fields, "endpoint", details.endpoint || endpoint);
+add(fields, "projectId", details.projectId);
+add(fields, "environmentId", details.environmentId);
+add(fields, "resourceId", details.resourceId);
+add(fields, "serverId", details.serverId);
+add(fields, "repositoryFullName", details.repositoryFullName);
+add(fields, "organizationId", details.organizationId);
+add(fields, "tokenId", details.tokenId);
+
+console.error(`::error::${message}${fields.length > 0 ? ` (${fields.join(" ")})` : ""}`);
+
+if (!error && raw) {
+  console.error(raw.slice(0, 1000));
+}
+NODE
+}
+
 post_json() {
   local endpoint="$1"
   local payload="$2"
   local payload_file
+  local response_file
+  local status_file
   local status
+  local http_status
+  local request_curl_args=()
 
   payload_file="$(mktemp "${RUNNER_TEMP:-/tmp}/appaloft-payload.XXXXXX")"
+  response_file="$(mktemp "${RUNNER_TEMP:-/tmp}/appaloft-response.XXXXXX")"
+  status_file="$(mktemp "${RUNNER_TEMP:-/tmp}/appaloft-status.XXXXXX")"
   chmod 600 "$payload_file"
+  chmod 600 "$response_file" "$status_file"
   printf '%s' "$payload" > "$payload_file"
+
+  for arg in "${curl_args[@]}"; do
+    if [ "$arg" = "-fsS" ]; then
+      request_curl_args+=("-sS")
+    else
+      request_curl_args+=("$arg")
+    fi
+  done
+
   set +e
   if [ "$wrapper_command" = "preview-cleanup" ]; then
-    curl "${curl_args[@]}" -H "X-Appaloft-Action-Command: preview-cleanup" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+    curl "${request_curl_args[@]}" -H "X-Appaloft-Action-Command: preview-cleanup" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file" -o "$response_file" -w "%{http_code}" > "$status_file"
   else
-    curl "${curl_args[@]}" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file"
+    curl "${request_curl_args[@]}" -X POST "$endpoint" -H "Content-Type: application/json" --data-binary "@$payload_file" -o "$response_file" -w "%{http_code}" > "$status_file"
   fi
   status=$?
   set -e
+  http_status="$(cat "$status_file")"
+  if ! [[ "$http_status" =~ ^[0-9][0-9][0-9]$ ]]; then
+    if [ ! -s "$response_file" ] && [ -s "$status_file" ]; then
+      cp "$status_file" "$response_file"
+      http_status="200"
+    else
+      http_status="000"
+    fi
+  fi
   rm -f "$payload_file"
-  return "$status"
+  if [ "$status" -ne 0 ]; then
+    render_control_plane_error "$endpoint" "$http_status" "$response_file"
+    rm -f "$response_file" "$status_file"
+    return "$status"
+  fi
+
+  case "$http_status" in
+    2*)
+      cat "$response_file"
+      rm -f "$response_file" "$status_file"
+      return 0
+      ;;
+    *)
+      render_control_plane_error "$endpoint" "$http_status" "$response_file"
+      rm -f "$response_file" "$status_file"
+      return 22
+      ;;
+  esac
 }
 
 source_package_payload_for_action() {
