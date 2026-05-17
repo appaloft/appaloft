@@ -1,15 +1,153 @@
 {
   "name": "@appaloft/ui",
-  "private": true,
+  "version": "0.0.0",
+  "description": "Community design primitives and shell primitives for Appaloft interfaces.",
+  "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
+  "svelte": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "svelte": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./app-shell": {
+      "svelte": "./src/app-shell/index.ts",
+      "types": "./src/app-shell/index.ts",
+      "default": "./src/app-shell/index.ts"
+    },
+    "./avatar": {
+      "svelte": "./src/avatar/index.ts",
+      "types": "./src/avatar/index.ts",
+      "default": "./src/avatar/index.ts"
+    },
+    "./badge": {
+      "svelte": "./src/badge/index.ts",
+      "types": "./src/badge/index.ts",
+      "default": "./src/badge/index.ts"
+    },
+    "./breadcrumb": {
+      "svelte": "./src/breadcrumb/index.ts",
+      "types": "./src/breadcrumb/index.ts",
+      "default": "./src/breadcrumb/index.ts"
+    },
+    "./button": {
+      "svelte": "./src/button/index.ts",
+      "types": "./src/button/index.ts",
+      "default": "./src/button/index.ts"
+    },
+    "./card": {
+      "svelte": "./src/card/index.ts",
+      "types": "./src/card/index.ts",
+      "default": "./src/card/index.ts"
+    },
+    "./collapsible": {
+      "svelte": "./src/collapsible/index.ts",
+      "types": "./src/collapsible/index.ts",
+      "default": "./src/collapsible/index.ts"
+    },
+    "./dialog": {
+      "svelte": "./src/dialog/index.ts",
+      "types": "./src/dialog/index.ts",
+      "default": "./src/dialog/index.ts"
+    },
+    "./dropdown-menu": {
+      "svelte": "./src/dropdown-menu/index.ts",
+      "types": "./src/dropdown-menu/index.ts",
+      "default": "./src/dropdown-menu/index.ts"
+    },
+    "./icon": {
+      "svelte": "./src/icon/index.ts",
+      "types": "./src/icon/index.ts",
+      "default": "./src/icon/index.ts"
+    },
+    "./input": {
+      "svelte": "./src/input/index.ts",
+      "types": "./src/input/index.ts",
+      "default": "./src/input/index.ts"
+    },
+    "./popover": {
+      "svelte": "./src/popover/index.ts",
+      "types": "./src/popover/index.ts",
+      "default": "./src/popover/index.ts"
+    },
+    "./select": {
+      "svelte": "./src/select/index.ts",
+      "types": "./src/select/index.ts",
+      "default": "./src/select/index.ts"
+    },
+    "./separator": {
+      "svelte": "./src/separator/index.ts",
+      "types": "./src/separator/index.ts",
+      "default": "./src/separator/index.ts"
+    },
+    "./sheet": {
+      "svelte": "./src/sheet/index.ts",
+      "types": "./src/sheet/index.ts",
+      "default": "./src/sheet/index.ts"
+    },
+    "./sidebar": {
+      "svelte": "./src/sidebar/index.ts",
+      "types": "./src/sidebar/index.ts",
+      "default": "./src/sidebar/index.ts"
+    },
+    "./skeleton": {
+      "svelte": "./src/skeleton/index.ts",
+      "types": "./src/skeleton/index.ts",
+      "default": "./src/skeleton/index.ts"
+    },
+    "./table": {
+      "svelte": "./src/table/index.ts",
+      "types": "./src/table/index.ts",
+      "default": "./src/table/index.ts"
+    },
+    "./tabs": {
+      "svelte": "./src/tabs/index.ts",
+      "types": "./src/tabs/index.ts",
+      "default": "./src/tabs/index.ts"
+    },
+    "./textarea": {
+      "svelte": "./src/textarea/index.ts",
+      "types": "./src/textarea/index.ts",
+      "default": "./src/textarea/index.ts"
+    },
+    "./theme": {
+      "types": "./src/theme.ts",
+      "default": "./src/theme.ts"
+    },
+    "./tooltip": {
+      "svelte": "./src/tooltip/index.ts",
+      "types": "./src/tooltip/index.ts",
+      "default": "./src/tooltip/index.ts"
+    },
+    "./utils": {
+      "types": "./src/utils.ts",
+      "default": "./src/utils.ts"
+    }
   },
   "dependencies": {
-    "@appaloft/design": "workspace:*"
+    "@appaloft/design": "workspace:*",
+    "@lucide/svelte": "^1.14.0",
+    "bits-ui": "^2.18.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwind-variants": "^3.2.2"
+  },
+  "peerDependencies": {
+    "svelte": "^5.55.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "svelte": "^5.55.5",
+    "svelte-check": "^4.4.8",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
   },
   "scripts": {
     "lint": "biome check .",
-    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"
+    "test:unit": "vitest --run",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   }
 }

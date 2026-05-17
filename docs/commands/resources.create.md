@@ -294,7 +294,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | `validation_error` | `resource-runtime-resolution` | No | Runtime strategy or strategy-specific runtime profile fields are invalid, such as missing or unsafe static publish directory. |
 | `not_found` | `context-resolution` | No | Project, environment, or destination is missing. |
 | `resource_context_mismatch` | `context-resolution` | No | Environment or destination does not belong to the supplied project/environment context. |
-| `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. |
+| `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. Details include the existing `resourceId` so create-or-reuse entry workflows can recover without renaming. |
 | `invariant_violation` | `resource-admission` | No | Resource aggregate rule rejected the requested state, such as invalid multi-service declaration. |
 | `validation_error` | `resource-network-resolution` | No | Network profile input is missing or invalid for a resource that requires an inbound endpoint. |
 | `validation_error` | `config-identity`, `config-secret-validation`, or `config-profile-resolution` | No | Repository config file profile input is invalid before it can be mapped into this command. |

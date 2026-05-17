@@ -610,6 +610,7 @@ describe("CreateResourceUseCase", () => {
     expect(second.isErr()).toBe(true);
     expect(second._unsafeUnwrapErr().code).toBe("resource_slug_conflict");
     expect(second._unsafeUnwrapErr().details?.phase).toBe("resource-admission");
+    expect(second._unsafeUnwrapErr().details?.resourceId).toBe(first._unsafeUnwrap().id);
     expect(eventBus.events).toHaveLength(1);
   });
 

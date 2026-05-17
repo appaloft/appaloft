@@ -177,7 +177,6 @@ jobs:
             --upstream-protocol http \
             --exposure-mode reverse-proxy \
             --health-path /api/health \
-            --env "APPALOFT_APP_NAME=Appaloft Preview PR ${PR_NUMBER}" \
             --env "APPALOFT_APP_VERSION=$APPALOFT_APP_VERSION" \
             --env "APPALOFT_ENV=preview" \
             --env "APPALOFT_AUTO_MIGRATE=true" \

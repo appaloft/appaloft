@@ -47,6 +47,7 @@ import {
   quickDeployWorkflow,
 } from "@appaloft/contracts";
 import {
+  type DomainError,
   domainError,
   type EnvironmentKind,
   environmentKinds,
@@ -642,6 +643,20 @@ function findResource(
   );
 }
 
+function hasDomainErrorCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
+function stringDomainErrorDetail(error: DomainError, key: string): string | undefined {
+  const value = error.details?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function listProjects() {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -748,7 +763,36 @@ function createResource(input: CreateResourceInput) {
     const cli = yield* CliRuntime;
     const message = yield* resultToEffect(CreateResourceCommand.create(input));
     const result = yield* Effect.promise(() => cli.executeCommand(message));
-    return yield* resultToEffect(result);
+    const created = yield* Effect.either(resultToEffect(result));
+    if (Either.isRight(created)) {
+      return created.right;
+    }
+
+    if (
+      hasDomainErrorCode(created.left, "resource_slug_conflict") &&
+      input.projectId &&
+      input.environmentId
+    ) {
+      const existingResourceId = stringDomainErrorDetail(created.left, "resourceId");
+      if (existingResourceId) {
+        return { id: existingResourceId };
+      }
+
+      const existing = findResource(
+        (yield* listResources(input.projectId, input.environmentId)).items,
+        {
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: input.name,
+        },
+      );
+
+      if (existing) {
+        return { id: existing.id };
+      }
+    }
+
+    return yield* Effect.fail(created.left);
   });
 }
 
