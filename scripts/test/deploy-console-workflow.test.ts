@@ -37,6 +37,10 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow defaults to production
   expect(workflow).toContain("default: postgres");
   expect(workflow).toContain(`console-database: ${expression("inputs.database")}`);
   expect(workflow).toContain(`console-url: ${expression("vars.APPALOFT_CONSOLE_ORIGIN")}`);
+  expect(workflow).toContain("APPALOFT_CONSOLE_DOMAIN");
+  expect(workflow).toContain('domain="${APPALOFT_CONSOLE_ORIGIN#http://}"');
+  expect(workflow).toContain('domain="${domain#https://}"');
+  expect(workflow).toContain(`console-domain: ${expression("steps.settings.outputs.domain")}`);
   expect(workflow).toContain(`url: ${expression("steps.console.outputs.console-url")}`);
 });
 
