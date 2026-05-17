@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1-rc.4](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.4...v1.0.1-rc.4) (2026-05-17)
+
+
+### Bug Fixes
+
+* **installer:** recover stale compose networks ([cb2ad61](https://github.com/appaloft/appaloft/commit/cb2ad61c95b3a7762e3a44ee6c53b5d3d63bd178))
+* **installer:** recover stale compose networks ([e796ccb](https://github.com/appaloft/appaloft/commit/e796ccb75667a0a86aedd8c66c61658d35dc5798))
+
 ## [1.0.0-rc.4](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-05-17)
 
 
