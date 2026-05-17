@@ -13,7 +13,8 @@ test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview workflow deploys a PR-s
   expect(workflow).toContain("console_preview_required");
   expect(workflow).toContain("apps/web/*");
   expect(workflow).toContain("apps/shell/*");
-  expect(workflow).toContain("group: appaloft-console-preview-remote-state");
+  expect(workflow).toContain("group: appaloft-preview-remote-state");
+  expect(workflow).not.toContain("group: appaloft-console-preview-remote-state");
   expect(workflow).toContain("bun run apps/shell/src/index.ts deploy .");
   expect(workflow).toContain("--config appaloft.console-backend-preview.yml");
   expect(workflow).toContain("--method dockerfile");

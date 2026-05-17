@@ -1017,6 +1017,7 @@ describe("deploy-action wrapper reference", () => {
         INPUT_REQUIRE_PREVIEW_URL: "true",
         INPUT_SECRET_VARIABLES: "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
         INPUT_SERVER_CONFIG_DEPLOY: "true",
+        INPUT_GITHUB_TOKEN: "github-token-fixture",
       },
       stderr: "pipe",
       stdout: "pipe",
@@ -1050,6 +1051,9 @@ describe("deploy-action wrapper reference", () => {
         },
         resolvedSecrets: {
           APPALOFT_BETTER_AUTH_SECRET: "resolved-secret",
+        },
+        sourcePackageCredentials: {
+          githubToken: "github-token-fixture",
         },
         trustedContext: {
           repositoryFullName: "appaloft/www",
@@ -1135,6 +1139,87 @@ describe("deploy-action wrapper reference", () => {
       expect(stderr).toContain("workflow=server-config-deploy");
       expect(stderr).toContain("repositoryFullName=appaloft/appaloft-cloud");
       expect(stderr).not.toContain("action-token-fixture");
+      expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").not.toContain(
+        "deployment-id=",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-HANDSHAKE-015] self-hosted deploy surfaces source package fetch details", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-config-fetch-denied-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'args="$*"',
+        'output_file=""',
+        'while [ "$#" -gt 0 ]; do',
+        '  if [ "$1" = "-o" ]; then',
+        "    shift",
+        '    output_file="$1"',
+        "  fi",
+        "  shift || true",
+        "done",
+        'case "$args" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        "    cat > \"$output_file\" <<'JSON'",
+        '{"error":{"code":"validation_error","message":"GitHub source package config could not be fetched","details":{"phase":"config-bootstrap","reasonCode":"github_source_package_config_fetch_failed","upstreamStatus":404,"configPath":"appaloft.cloud-preview.yml","repositoryFullName":"appaloft/appaloft-cloud","credentialProvided":true}}}',
+        "JSON",
+        "    printf '400'",
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: "appaloft/appaloft-cloud",
+        GITHUB_SHA: "abc123",
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_APPALOFT_TOKEN: "action-token-fixture",
+        INPUT_CONFIG: "appaloft.cloud-preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_GITHUB_TOKEN: "github-token-fixture",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(22);
+      const stderr = result.stderr.toString();
+      expect(stderr).toContain("GitHub source package config could not be fetched");
+      expect(stderr).toContain("status=400");
+      expect(stderr).toContain("code=validation_error");
+      expect(stderr).toContain("reasonCode=github_source_package_config_fetch_failed");
+      expect(stderr).toContain("phase=config-bootstrap");
+      expect(stderr).toContain("upstreamStatus=404");
+      expect(stderr).toContain("configPath=appaloft.cloud-preview.yml");
+      expect(stderr).toContain("repositoryFullName=appaloft/appaloft-cloud");
+      expect(stderr).toContain("credentialProvided=true");
+      expect(stderr).not.toContain("github-token-fixture");
       expect(existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "").not.toContain(
         "deployment-id=",
       );

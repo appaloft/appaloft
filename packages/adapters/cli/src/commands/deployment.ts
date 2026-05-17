@@ -9,6 +9,7 @@ import {
   DeploymentLogsQuery,
   DeploymentPlanQuery,
   DeploymentRecoveryReadinessQuery,
+  type DeploymentSummary,
   ListDeploymentsQuery,
   PruneDeploymentLogsCommand,
   PruneDeploymentsCommand,
@@ -836,6 +837,31 @@ interface PreviewAccessResolution {
   previewUrls: string[];
 }
 
+function deploymentFailureLogTailDetails(deployment: DeploymentSummary) {
+  const logs = deployment.logs ?? [];
+  if (logs.length === 0) {
+    return {};
+  }
+
+  const diagnosticLogs = logs.filter((log) => log.level === "error" || log.level === "warn");
+  const selectedLogs = (diagnosticLogs.length > 0 ? diagnosticLogs : logs).slice(-8);
+
+  return {
+    failureLogCount: logs.length,
+    failureLogTail: selectedLogs.map((log) =>
+      [
+        log.timestamp,
+        `${log.phase}/${log.level}`,
+        log.source,
+        log.masked ? "[masked]" : log.message,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 1000),
+    ),
+  };
+}
+
 function previewOutputFileText(input: {
   previewId?: string;
   resolution: PreviewAccessResolution;
@@ -929,6 +955,7 @@ function resolvePreviewAccessForDeployment(input: {
           deploymentId: input.deploymentId,
           resourceId: input.resourceId,
           status: deployment.status,
+          ...deploymentFailureLogTailDetails(deployment),
         }),
       );
     }
@@ -942,6 +969,7 @@ function resolvePreviewAccessForDeployment(input: {
           resourceId: input.resourceId,
           status: deployment.status,
           previewUrls: previewUrls.join(","),
+          ...deploymentFailureLogTailDetails(deployment),
         }),
       );
     }

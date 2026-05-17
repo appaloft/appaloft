@@ -187,6 +187,11 @@ and calls `POST /api/action/deployments/from-config-package`. This selects the a
 operations, resolves target context from source-link state, deploy-token scope, source binding, or
 trusted bootstrap context, and dispatches ids-only `deployments.create`.
 
+For private GitHub repositories, pass `github-token: ${{ github.token }}`. In server config deploy
+mode the action sends that token as a transient source-package credential so the self-hosted server
+can read the committed config file for the checked-out revision. The token is not written into
+resource profiles or deployment state.
+
 `control-plane-url` is how you select the Appaloft instance. It is not inferred by scanning the SSH
 target. `appaloft-token` is required for self-hosted Action mutation endpoints and is sent as an
 HTTP bearer token; keep it in GitHub Secrets, not in repository config.
@@ -447,7 +452,7 @@ account identity must never come from committed config.
 | `preview-tls-mode` | empty | Preview TLS mode for `preview-domain-template`. |
 | `require-preview-url` | `false` | Fail deploy if no public preview URL can be resolved. |
 | `pr-comment` | `false` | Post or update one pull request comment with preview, deployment, cleanup, and console feedback. |
-| `github-token` | empty | GitHub token used only when `pr-comment` is true. |
+| `github-token` | empty | GitHub token used for PR comments and, in `server-config-deploy` mode, as a transient credential for reading committed config from private repositories. |
 | `control-plane-mode` | empty | Use `none` for pure SSH CLI mode or `self-hosted` for server API mode. When empty, `controlPlane.mode` from config may select the mode; otherwise the effective default is `none`. |
 | `control-plane-url` | empty | Required for self-hosted server API mode unless `controlPlane.url` supplies the endpoint. Selects the Appaloft instance explicitly. |
 | `appaloft-token` | empty | Bearer deploy token for self-hosted Action mutation endpoints. Required for server API deploy, server-config-deploy, and server-mode preview cleanup. |

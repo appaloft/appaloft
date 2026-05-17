@@ -711,6 +711,7 @@ export interface ActionSourcePackageConfigReader {
     configPath: string;
     sourceRoot: string;
     sourcePackage: z.infer<typeof sourcePackageManifestSchema>;
+    credentials?: { githubToken?: string | undefined } | undefined;
   }): Promise<Result<{ text: string; fileName?: string }>>;
 }
 
@@ -776,12 +777,19 @@ const sourcePackageManifestSchema = z
   })
   .strict();
 
+const sourcePackageCredentialsSchema = z
+  .object({
+    githubToken: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 const actionServerConfigDeployBodySchema = z
   .object({
     sourceFingerprint: z.string().trim().min(1),
     configPath: z.string().trim().min(1),
     sourceRoot: z.string().trim().min(1),
     sourcePackage: sourcePackageManifestSchema,
+    sourcePackageCredentials: sourcePackageCredentialsSchema.optional(),
     environmentVariables: z.record(z.string().trim().min(1), z.string()).optional(),
     resolvedSecrets: z.record(z.string().trim().min(1), z.string()).optional(),
     previewRoute: z
@@ -6753,6 +6761,9 @@ async function handleActionServerConfigDeploymentRoute(input: {
     configPath: body.data.configPath,
     sourceRoot: body.data.sourceRoot,
     sourcePackage: body.data.sourcePackage,
+    ...(body.data.sourcePackageCredentials
+      ? { credentials: body.data.sourcePackageCredentials }
+      : {}),
   });
   if (configText.isErr()) {
     return domainErrorHttpResponse(configText.error, executionContext);

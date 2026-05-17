@@ -2248,6 +2248,99 @@ describe("CLI deployment config entry workflow", () => {
     }
   });
 
+  test("[CONFIG-FILE-ENTRY-024B] deploy action PR preview failure includes deployment log tail", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-url-failed-"));
+    const harness = await createPreviewDeployCliHarness({
+      withRouteStore: true,
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "failed",
+          logs: [
+            {
+              timestamp: "2026-05-17T11:48:38.000Z",
+              source: "runtime",
+              phase: "deploy",
+              level: "error",
+              message: "docker build failed: process killed",
+            },
+          ],
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  domains: ["pr-124.preview.example.com"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      const result = await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/124/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () =>
+            harness.program
+              .parseAsync([
+                "node",
+                "appaloft",
+                "deploy",
+                workspace,
+                "--method",
+                "workspace-commands",
+                "--start",
+                "bun run start",
+                "--port",
+                "4321",
+                "--preview",
+                "pull-request",
+                "--preview-id",
+                "pr-124",
+                "--preview-domain-template",
+                "pr-124.preview.example.com",
+                "--preview-tls-mode",
+                "disabled",
+                "--require-preview-url",
+                "--server-host",
+                "203.0.113.10",
+                "--server-provider",
+                "generic-ssh",
+              ])
+              .then(
+                () => ({ ok: true as const }),
+                (error: unknown) => ({ ok: false as const, error }),
+              ),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected require-preview-url to fail");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"phase":"preview-access-resolution"');
+      expect(errorText).toContain('"reason":"deployment_failed"');
+      expect(errorText).toContain("failureLogCount");
+      expect(errorText).toContain("docker build failed: process killed");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-ENTRY-026] deploy action PR preview writes action-safe preview output", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-output-"));
