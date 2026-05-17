@@ -48,7 +48,7 @@ export function createShellE2eWorkspace(
   const workspaceDir = mkdtempSync(join(tmpdir(), prefix));
   const dataDir = join(workspaceDir, ".appaloft", "data");
   const pgliteDataDir = join(dataDir, "pglite");
-  const httpPort = options.httpPort ?? String(3500 + Math.floor(Math.random() * 2000));
+  const httpPort = options.httpPort ?? String(3500 + Math.floor(Math.random() * 1700));
   const cliOptions: ShellCliOptions = {
     dataDir,
     httpPort,

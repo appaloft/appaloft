@@ -202,6 +202,9 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/capacity-prune-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/preview-provider-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/dependency-redis-backup-e2e.yml");
+    expect(releaseWorkflow).toContain("Mark prerelease release");
+    expect(releaseWorkflow).toContain("gh release edit");
+    expect(releaseWorkflow).toContain("--prerelease");
     expect(releaseWorkflow).toContain(
       [
         "build-release:",
