@@ -1,4 +1,5 @@
-import { dirname } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import {
   type ServerAppliedRouteDesiredStateStore as CliServerAppliedRouteStateStore,
   type CliSourceLinkStore,
@@ -60,6 +61,112 @@ function sameTarget(
 
 function adoptionError(message: string, details: Record<string, unknown>): Error {
   return new Error(`${message}: ${JSON.stringify(details)}`);
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && "code" in error ? String(error.code) : undefined;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function hasString(value: Record<string, unknown>, key: string): boolean {
+  return typeof value[key] === "string";
+}
+
+function isSourceLinkRecord(value: unknown): value is SourceLinkRecord {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    hasString(value, "sourceFingerprint") &&
+    hasString(value, "projectId") &&
+    hasString(value, "environmentId") &&
+    hasString(value, "resourceId") &&
+    hasString(value, "updatedAt")
+  );
+}
+
+function isServerAppliedRouteRecord(value: unknown): value is ServerAppliedRouteDesiredStateRecord {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    hasString(value, "routeSetId") &&
+    hasString(value, "projectId") &&
+    hasString(value, "environmentId") &&
+    hasString(value, "resourceId") &&
+    hasString(value, "serverId") &&
+    hasString(value, "updatedAt") &&
+    Array.isArray(value.domains) &&
+    ["desired", "applied", "failed"].includes(String(value.status))
+  );
+}
+
+async function listLegacyRecords<T>(input: {
+  dataRoot: string;
+  directoryName: "source-links" | "server-applied-routes";
+  phase: "source-link-resolution" | "config-domain-resolution";
+  enumerateErrorMessage: string;
+  logger: AppLogger;
+  isRecord: (value: unknown) => value is T;
+}): Promise<T[]> {
+  const directory = join(input.dataRoot, input.directoryName);
+  let entries: Array<{ name: string; isFile(): boolean }>;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") {
+      return [];
+    }
+
+    throw adoptionError(input.enumerateErrorMessage, {
+      phase: input.phase,
+      message: errorMessage(error),
+    });
+  }
+
+  const records: T[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      input.logger.warn("legacy_pglite_state_adoption.skipped_unexpected_file", {
+        phase: input.phase,
+        directory: input.directoryName,
+        file: entry.name,
+      });
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(await readFile(join(directory, entry.name), "utf8"));
+      if (!input.isRecord(parsed)) {
+        input.logger.warn("legacy_pglite_state_adoption.skipped_invalid_record", {
+          phase: input.phase,
+          directory: input.directoryName,
+          file: entry.name,
+        });
+        continue;
+      }
+
+      records.push(parsed);
+    } catch (error) {
+      input.logger.warn("legacy_pglite_state_adoption.skipped_unreadable_file", {
+        phase: input.phase,
+        directory: input.directoryName,
+        file: entry.name,
+        message: errorMessage(error),
+      });
+    }
+  }
+
+  return records;
 }
 
 async function importLegacyRouteState(input: {
@@ -140,29 +247,30 @@ export async function adoptLegacyPgliteState(
   const legacySourceLinkStore = new FileSystemSourceLinkStore(dataRoot);
   const legacyServerAppliedRouteStore = new FileSystemServerAppliedRouteDesiredStateStore(dataRoot);
 
-  const legacySourceLinksResult = await legacySourceLinkStore.list();
-  if (legacySourceLinksResult.isErr()) {
-    throw adoptionError("Legacy source links could not be enumerated", {
-      errorCode: legacySourceLinksResult.error.code,
-      phase: legacySourceLinksResult.error.details?.phase,
-    });
-  }
+  const legacySourceLinks = await listLegacyRecords({
+    dataRoot,
+    directoryName: "source-links",
+    phase: "source-link-resolution",
+    enumerateErrorMessage: "Legacy source links could not be enumerated",
+    logger: input.logger,
+    isRecord: isSourceLinkRecord,
+  });
+  const legacyRouteStates = await listLegacyRecords({
+    dataRoot,
+    directoryName: "server-applied-routes",
+    phase: "config-domain-resolution",
+    enumerateErrorMessage: "Legacy server-applied routes could not be enumerated",
+    logger: input.logger,
+    isRecord: isServerAppliedRouteRecord,
+  });
 
-  const legacyRouteStatesResult = await legacyServerAppliedRouteStore.list();
-  if (legacyRouteStatesResult.isErr()) {
-    throw adoptionError("Legacy server-applied routes could not be enumerated", {
-      errorCode: legacyRouteStatesResult.error.code,
-      phase: legacyRouteStatesResult.error.details?.phase,
-    });
-  }
-
-  if (legacySourceLinksResult.value.length === 0 && legacyRouteStatesResult.value.length === 0) {
+  if (legacySourceLinks.length === 0 && legacyRouteStates.length === 0) {
     return emptySummary();
   }
 
   const summary = emptySummary();
 
-  for (const legacySourceLink of legacySourceLinksResult.value) {
+  for (const legacySourceLink of legacySourceLinks) {
     const current = await input.sourceLinkStore.read(legacySourceLink.sourceFingerprint);
     if (current.isErr()) {
       throw adoptionError("Existing source link state could not be read", {
@@ -208,7 +316,7 @@ export async function adoptLegacyPgliteState(
     }
   }
 
-  for (const legacyRouteState of legacyRouteStatesResult.value) {
+  for (const legacyRouteState of legacyRouteStates) {
     const target = routeTarget(legacyRouteState);
     let shouldImport = true;
 
