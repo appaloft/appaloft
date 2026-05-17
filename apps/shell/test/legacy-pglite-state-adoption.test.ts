@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -377,6 +377,109 @@ describe("legacy PGlite state adoption", () => {
       expect(remainingLegacySourceLinks._unsafeUnwrap()).toEqual([]);
       expect(remainingLegacyRoutes.isOk()).toBe(true);
       expect(remainingLegacyRoutes._unsafeUnwrap()).toEqual([]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[CONFIG-FILE-STATE-014A] shell skips unreadable legacy state files during adoption", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-shell-legacy-state-"));
+    const dataDir = join(workspaceDir, ".appaloft", "data");
+    const pgliteDataDir = join(dataDir, "pglite");
+    const warnings: Array<{ message: string; context: Record<string, unknown> | undefined }> = [];
+    const warningLogger: AppLogger = {
+      ...noopLogger,
+      warn(message, context) {
+        warnings.push({ message, context });
+      },
+    };
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "legacy_skip_invalid");
+      const sourceFingerprint = "source-fingerprint:v1:branch%3Ainvalid-state";
+      const legacySourceLinkStore = new FileSystemSourceLinkStore(dataDir);
+      const legacyRouteStore = new FileSystemServerAppliedRouteDesiredStateStore(dataDir);
+      const sourceLinkRepository = new PgSourceLinkRepository(database.db);
+      const routeRepository = new PgServerAppliedRouteStateRepository(database.db);
+      const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
+      const routeStore = createCliServerAppliedRouteStore(routeRepository);
+
+      const createdSourceLink = await legacySourceLinkStore.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(createdSourceLink.isOk()).toBe(true);
+      const createdRoute = await legacyRouteStore.upsertDesired({
+        target,
+        sourceFingerprint,
+        updatedAt: "2026-01-01T00:02:00.000Z",
+        domains: [
+          {
+            host: "preview.appaloft.com",
+            pathPrefix: "/",
+            tlsMode: "disabled",
+          },
+        ],
+      });
+      expect(createdRoute.isOk()).toBe(true);
+
+      mkdirSync(join(dataDir, "source-links"), { recursive: true });
+      mkdirSync(join(dataDir, "server-applied-routes"), { recursive: true });
+      writeFileSync(join(dataDir, "source-links", "corrupt.json"), "{");
+      writeFileSync(
+        join(dataDir, "server-applied-routes", "invalid.json"),
+        JSON.stringify({ routeSetId: "broken-route" }),
+      );
+
+      const summary = await adoptLegacyPgliteState({
+        pgliteDataDir,
+        sourceLinkStore,
+        serverAppliedRouteStore: routeStore,
+        logger: warningLogger,
+      });
+
+      expect(summary).toEqual({
+        importedSourceLinks: 1,
+        prunedSourceLinks: 0,
+        importedServerAppliedRoutes: 1,
+        prunedServerAppliedRoutes: 0,
+      });
+      expect(warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message: "legacy_pglite_state_adoption.skipped_unreadable_file",
+          }),
+          expect.objectContaining({
+            message: "legacy_pglite_state_adoption.skipped_invalid_record",
+          }),
+        ]),
+      );
+
+      const adoptedSourceLink = await sourceLinkStore.read(sourceFingerprint);
+      const adoptedRoute = await routeStore.read(target);
+
+      expect(adoptedSourceLink.isOk()).toBe(true);
+      expect(adoptedSourceLink._unsafeUnwrap()).toMatchObject({
+        sourceFingerprint,
+        ...target,
+      });
+      expect(adoptedRoute.isOk()).toBe(true);
+      expect(adoptedRoute._unsafeUnwrap()).toMatchObject({
+        routeSetId: createdRoute._unsafeUnwrap().routeSetId,
+        sourceFingerprint,
+      });
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });
