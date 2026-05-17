@@ -96,7 +96,7 @@ jobs:
             exit 0
           fi
 
-          gh release edit "${TAG_NAME}" --prerelease
+          gh release edit "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --prerelease
 
       - name: Check out release pull request branch
         if: ${{ steps.release.outputs.prs_created == 'true' }}
