@@ -166,16 +166,6 @@ jobs:
             --server-ssh-private-key-file "$key_file" \
             --state-backend ssh-pglite
 
-          bun run apps/shell/src/index.ts preview cleanup . \
-            --config appaloft.console-backend-preview.yml \
-            --preview pull-request \
-            --preview-id "pr-${PR_NUMBER}" \
-            --server-host "$APPALOFT_SSH_HOST" \
-            --server-provider generic-ssh \
-            --server-ssh-username "$APPALOFT_SSH_USER" \
-            --server-ssh-private-key-file "$key_file" \
-            --state-backend ssh-pglite
-
           bun run apps/shell/src/index.ts deploy . \
             --config appaloft.console-backend-preview.yml \
             --method dockerfile \
@@ -187,7 +177,6 @@ jobs:
             --upstream-protocol http \
             --exposure-mode reverse-proxy \
             --health-path /api/health \
-            --env "APPALOFT_APP_NAME=Appaloft Preview PR ${PR_NUMBER}" \
             --env "APPALOFT_APP_VERSION=$APPALOFT_APP_VERSION" \
             --env "APPALOFT_ENV=preview" \
             --env "APPALOFT_AUTO_MIGRATE=true" \

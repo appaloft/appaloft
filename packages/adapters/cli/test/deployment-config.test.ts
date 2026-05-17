@@ -9,7 +9,7 @@ import {
   type ExecutionContextFactory,
   type QueryBus,
 } from "@appaloft/application";
-import { ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import { Effect, Either, Layer } from "effect";
 import { resolveDeploymentStateBackend } from "../src/commands/deployment-state";
 
@@ -88,7 +88,9 @@ async function createPreviewDeployCliHarness(
   input: {
     withRouteStore?: boolean;
     deploymentSummaries?: unknown[];
+    createResourceSlugConflict?: boolean;
     sourceLinkRecord?: Record<string, unknown> | null;
+    resourceSummaries?: unknown[];
     resourceDetail?: Record<string, unknown> | null;
     resourceEffectiveConfig?: Record<string, unknown> | null;
   } = {},
@@ -113,6 +115,20 @@ async function createPreviewDeployCliHarness(
         case "CreateEnvironmentCommand":
           return ok({ id: "env_1" } as T);
         case "CreateResourceCommand":
+          if (input.createResourceSlugConflict) {
+            return err(
+              domainError.resourceSlugConflict(
+                "Resource name already exists for this project environment",
+                {
+                  phase: "resource-admission",
+                  projectId: "proj_1",
+                  environmentId: "env_1",
+                  resourceSlug: "appaloft-console-backend-preview-pr-262",
+                },
+              ),
+            );
+          }
+          return ok({ id: "res_1" } as T);
         case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
         case "CreateDeploymentCommand":
@@ -128,6 +144,9 @@ async function createPreviewDeployCliHarness(
       queries.push(query as AppQuery<unknown>);
       if (query.constructor.name === "ListDeploymentsQuery") {
         return ok({ items: input.deploymentSummaries ?? [] } as T);
+      }
+      if (query.constructor.name === "ListResourcesQuery") {
+        return ok({ items: input.resourceSummaries ?? [] } as T);
       }
       if (query.constructor.name === "ShowResourceQuery") {
         return ok(
@@ -1085,6 +1104,90 @@ describe("CLI deployment config entry workflow", () => {
     });
     expect("preview" in (deployment as Record<string, unknown>)).toBe(false);
     expect("pullRequestNumber" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-015E] deploy action recovers a missing source link by reusing the resource slug", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-source-link-recovery-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "network:",
+        "  internalPort: 4310",
+        "  exposureMode: reverse-proxy",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      createResourceSlugConflict: true,
+      resourceSummaries: [
+        {
+          id: "res_existing",
+          projectId: "proj_1",
+          environmentId: "env_1",
+          name: "appaloft-console-backend-preview-pr-262",
+          slug: "appaloft-console-backend-preview-pr-262",
+          kind: "application",
+          deploymentCount: 1,
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/262/merge",
+          GITHUB_HEAD_REF: "feature/preview-recovery",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-262",
+              "--resource-name",
+              "appaloft-console-backend-preview-pr-262",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateResourceCommand"),
+    ).toBeDefined();
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      environmentId: "env_1",
+      resourceId: "res_existing",
+    });
+    expect(harness.createdLinks[0]).toMatchObject({
+      target: {
+        resourceId: "res_existing",
+      },
+    });
   });
 
   test("[CONFIG-FILE-ENTRY-015A] deploy action PR preview renders runtime.name templates before resource creation", async () => {

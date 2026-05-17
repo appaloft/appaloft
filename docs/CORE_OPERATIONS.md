@@ -1027,10 +1027,9 @@ Current boundary:
   repository `Dockerfile` as an application Resource through the CLI to the shared SSH target,
   serves Web assets and `/api` from the same preview origin, configures preview-scoped auth origin
   values through trusted environment flags, and uses a backend-preview config fingerprint so it does
-  not drift against earlier static console preview Resources. The workflow runs both legacy static
-  preview cleanup and backend-preview cleanup before deploying the backend preview so an older route
-  or resource-scoped preview profile cannot keep the same PR hostname or block redeploy admission.
-  Full operator-owned self-hosted control-plane installation remains owned by
+  not drift against earlier static console preview Resources. The workflow also runs legacy static
+  preview cleanup before deploying the backend preview so an older static route cannot keep the same
+  PR hostname. Full operator-owned self-hosted control-plane installation remains owned by
   `.github/workflows/deploy-console.yml` and `command: install-console`.
 - When preview-specific profile input does not override runtime naming, the default preview runtime
   name seed is `preview-{pr_number}` so effective runtime/container names remain human-recognizable

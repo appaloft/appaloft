@@ -33,19 +33,15 @@ test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview keeps preview routing a
   expect(workflow).toContain("bun run apps/shell/src/index.ts preview cleanup .");
   expect(workflow).toContain("--config appaloft.console-preview.yml");
   expect(workflow).toContain("--config appaloft.console-backend-preview.yml");
-  const legacyStaticCleanupIndex = workflow.indexOf(
-    "bun run apps/shell/src/index.ts preview cleanup . \\\n            --config appaloft.console-preview.yml",
+  expect(
+    workflow.indexOf(
+      "bun run apps/shell/src/index.ts preview cleanup . \\\n            --config appaloft.console-preview.yml",
+    ),
+  ).toBeLessThan(
+    workflow.indexOf(
+      "bun run apps/shell/src/index.ts deploy . \\\n            --config appaloft.console-backend-preview.yml",
+    ),
   );
-  const backendCleanupIndex = workflow.indexOf(
-    "bun run apps/shell/src/index.ts preview cleanup . \\\n            --config appaloft.console-backend-preview.yml",
-  );
-  const backendDeployIndex = workflow.indexOf(
-    "bun run apps/shell/src/index.ts deploy . \\\n            --config appaloft.console-backend-preview.yml",
-  );
-
-  expect(legacyStaticCleanupIndex).toBeGreaterThan(-1);
-  expect(backendCleanupIndex).toBeGreaterThan(legacyStaticCleanupIndex);
-  expect(backendCleanupIndex).toBeLessThan(backendDeployIndex);
   expect(backendConfig).toContain("controlPlane:");
   expect(backendConfig).toContain("mode: none");
   expect(backendConfig).not.toContain("baseDirectory");
@@ -59,6 +55,7 @@ test("[CONTROL-PLANE-INSTALL-007] deploy-console-preview uses a PR-scoped same-o
   expect(workflow).toContain("APPALOFT_BETTER_AUTH_SECRET");
   expect(workflow).toContain("crypto.getRandomValues(new Uint8Array(48))");
   expect(workflow).toContain('await Bun.file("package.json").json()');
+  expect(workflow).not.toContain("APPALOFT_APP_NAME=");
   expect(workflow).toContain('--env "APPALOFT_APP_VERSION=$APPALOFT_APP_VERSION"');
   expect(workflow).toContain('--env "APPALOFT_WEB_ORIGIN=$PREVIEW_URL"');
   expect(workflow).toContain('--env "APPALOFT_BETTER_AUTH_URL=$PREVIEW_URL"');
