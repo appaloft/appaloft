@@ -10,7 +10,8 @@ GitHub Release, and distribution artifacts.
 ## Versioning And Changelog
 
 - Use a single product SemVer version for backend, CLI, desktop, Docker, Homebrew, and npm.
-- Release tags use `vX.Y.Z`.
+- Release tags use `vX.Y.Z`, or a SemVer prerelease tag such as `v1.0.0-rc.1` when the roadmap gate
+  allows a prerelease.
 - `CHANGELOG.md` is maintained by Release Please in the release PR.
 - `docs/PRODUCT_ROADMAP.md` is the release gate before `1.0.0`; read it before every
   release workflow run and reject any Release Please PR whose version is not allowed by the
@@ -23,6 +24,9 @@ GitHub Release, and distribution artifacts.
   conventional-commit changelog.
 - npm package versions are injected during the publish job so release PRs do not need to rewrite
   workspace package versions or `bun.lock`.
+- Create release tags and GitHub Releases only from merged `main` release commits. Do not publish a
+  new version for PR-only fixes, pending console deploy workflow changes, or commits that have not
+  entered the release source branch.
 
 ## Build Locally
 
@@ -143,6 +147,7 @@ The CLI binary bundle embeds:
 
 - GitHub Release is the canonical artifact host.
 - GHCR publishes `ghcr.io/appaloft/appaloft:X.Y.Z`, `X.Y`, `X`, and `latest` for stable releases.
+  Prereleases publish their exact tag only and do not move `latest`.
 - npm publishes `@appaloft/cli`, platform-specific optional dependency packages, and
   `@appaloft/sdk`.
 - Homebrew publishes `appaloft` to `appaloft/homebrew-tap` when `HOMEBREW_TAP_TOKEN` is configured.
