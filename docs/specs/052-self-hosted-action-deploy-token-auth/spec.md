@@ -106,7 +106,9 @@ workflows without requiring external OAuth or an interactive user session.
   `action_auth_missing`; invalid or unverifiable tokens return `action_auth_invalid`.
   Source-link/config requests pass safe requested-scope facts to the application-owned
   authorization port; scope mismatch returns `action_auth_forbidden` with `403` before command
-  dispatch.
+  dispatch. Forbidden responses include a stable `deniedScope` plus `reasonCode` so operators can
+  distinguish missing requested scope from a requested value outside the token scope without
+  exposing token material.
 - The deploy-action wrapper sends `X-Appaloft-Action-Command: preview-cleanup` for self-hosted
   preview cleanup. That Action-marked cleanup path is protected by the same application-owned
   deploy-token authorization port before `deployments.cleanup-preview` dispatch; ordinary

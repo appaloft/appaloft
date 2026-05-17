@@ -93,19 +93,37 @@ describe("DeployToken", () => {
       }),
     ).toBe(true);
     expect(
-      token.authorizesScope({
+      token.authorizeScope({
         projectId: ProjectId.rehydrate("prj_other"),
         repositoryFullName: SourceRepositoryFullName.rehydrate("owner/repo"),
         workflowCommand: workflow("source-link-deploy"),
       }),
-    ).toBe(false);
+    ).toEqual({
+      allowed: false,
+      deniedScope: "project",
+      reasonCode: "scope_value_not_allowed",
+    });
     expect(
-      token.authorizesScope({
+      token.authorizeScope({
+        projectId: ProjectId.rehydrate("prj_demo"),
+        workflowCommand: workflow("source-link-deploy"),
+      }),
+    ).toEqual({
+      allowed: false,
+      deniedScope: "repository",
+      reasonCode: "scope_value_missing",
+    });
+    expect(
+      token.authorizeScope({
         projectId: ProjectId.rehydrate("prj_demo"),
         repositoryFullName: SourceRepositoryFullName.rehydrate("owner/repo"),
         workflowCommand: workflow("server-config-deploy"),
       }),
-    ).toBe(false);
+    ).toEqual({
+      allowed: false,
+      deniedScope: "workflow-command",
+      reasonCode: "scope_value_not_allowed",
+    });
   });
 
   test("[SELF-AUTH-TOKEN-002] rotates active token verifier and preserves scope", () => {

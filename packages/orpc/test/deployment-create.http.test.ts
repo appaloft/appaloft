@@ -664,6 +664,89 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
+  test("[SELF-AUTH-ACTION-004][SELF-AUTH-ACTION-006] Action server config deployment forwards repository scope to auth", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedRequestedRepositoryFullName: string | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_unexpected" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort = {
+      authorize: async (_context, input) => {
+        capturedRequestedRepositoryFullName = input.requestedScope?.repositoryFullName;
+        return err({
+          code: "action_auth_forbidden",
+          category: "user",
+          message: "Action deploy token is not authorized for this request",
+          retryable: false,
+          details: {
+            deniedScope: "repository",
+            endpoint: input.path,
+            missingScope: "repository",
+            phase: "action-authorization",
+            reasonCode: "scope_value_not_allowed",
+            repositoryFullName: input.requestedScope?.repositoryFullName ?? null,
+            workflow: input.workflow,
+          },
+        });
+      },
+    };
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionDeployTokenAuthorizationPort,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(capturedRequestedRepositoryFullName).toBe("appaloft/www");
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "action_auth_forbidden",
+        details: {
+          deniedScope: "repository",
+          missingScope: "repository",
+          reasonCode: "scope_value_not_allowed",
+          repositoryFullName: "appaloft/www",
+          workflow: "server-config-deploy",
+        },
+      },
+    });
+    expect(capturedCommand).toBeUndefined();
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-015] Action server config endpoint rejects unsafe package paths before mutation", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
