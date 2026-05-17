@@ -240,7 +240,60 @@ is user-visible. Suggested names:
 - `APPALOFT_CONTROL_PLANE_URL`
 - `APPALOFT_TOKEN` or a future provider-specific token source
 
-CLI flags win over config.
+CLI flags win over config. For interactive CLI use, a local login profile may also be a trusted
+control-plane source, but explicit command flags and environment variables must remain able to
+override the active profile for one invocation.
+
+#### CLI Remote Control-Plane Client
+
+The CLI remote control-plane client is a client-side entry workflow over this mode resolver. It is
+governed by [CLI Remote Control-Plane Client](../specs/074-cli-remote-control-plane-client/spec.md).
+
+Initial user-facing affordances:
+
+- `appaloft login --url <cloud-or-self-hosted-url>` or the namespaced
+  `appaloft auth login --url <cloud-or-self-hosted-url>`;
+- `appaloft logout` or `appaloft auth logout`;
+- `appaloft auth status`;
+- `appaloft context list`;
+- `appaloft context use <profile>`;
+- `appaloft context show`.
+
+Login creates or updates a local uncommitted CLI profile only after URL validation,
+compatibility discovery, and accepted auth/session verification. Context selection switches the
+active local profile/context and must not create projects, resources, source links, deployments, or
+domain bindings.
+
+Profile storage rules:
+
+- profile and token/session material live outside the repository tree, for example under an
+  Appaloft CLI home or OS config/keychain location;
+- token, cookie, database URL, SSH key, credential id, tenant/org secret identity, provider account
+  id, and raw secret values must not be written to committed `appaloft.yml`, logs, diagnostics, or
+  machine-readable output;
+- profile list/show/status output may include only safe endpoint, mode, profile name, token safe
+  suffix/reference metadata, current organization/user display metadata, and last handshake summary;
+- profile context must not bypass server-side authorization.
+
+Remote operation dispatch rules:
+
+- remote-capable CLI commands dispatch through the typed remote API client using the same operation
+  key and schema-shaped input as HTTP/oRPC, Web, SDK, and future MCP/tool surfaces;
+- the active bridge dispatches generated SDK non-streaming command/query operations generically
+  after compatibility/auth handshake;
+- selected remote mode plus an unsupported command fails before local mutation with a structured
+  control-plane error;
+- no active profile or trusted remote source preserves current pure CLI/local behavior;
+- `auto` may use an active profile as a trusted source, but without a trusted source it falls back
+  to `none`;
+- `auto` must not contact public Cloud by default, scan arbitrary networks, upload SSH-server
+  PGlite state, or adopt a server.
+
+The CLI must resolve whether a command is local or remote before SSH remote-state preparation,
+source-link lookup, local shell composition, or deployment mutation when the command can be remote
+only. Local-only commands such as `serve`, `db`, `remote-state`, pure SSH quick `deploy`,
+source-package/config bootstrap, terminal attach, webhook-signature-only ingestion, and
+streaming/watch commands remain local or fail as unsupported in selected remote mode.
 
 ### GitHub Action
 
@@ -320,10 +373,16 @@ entrypoint overrides, but they must not become a separate deployment semantics p
 | `validation_error` | `control-plane-config` | No | Repository config declares an invalid mode, unsafe URL, identity selector, or secret-bearing control-plane field. |
 | `validation_error` | `control-plane-resolution` | No | Selected mode cannot resolve the required URL, credential, or trusted source before mutation. |
 | `control_plane_handshake_failed` | `control-plane-handshake` | Conditional | Endpoint is reachable but client/API/schema/feature/auth compatibility failed. |
-| `control_plane_unavailable` | `control-plane-connect` | Yes | Selected control plane cannot be reached. |
+| `control_plane_unavailable` | `control-plane-handshake` or `remote-operation-dispatch` | Yes | Selected control plane cannot be reached. |
 | `control_plane_adoption_required` | `control-plane-resolution` | No | A server adoption marker says control-plane ownership exists, but the entrypoint attempted uncoordinated direct SSH state mutation. |
 | `control_plane_unsupported` | `control-plane-capability` | No | The selected control plane does not support a requested feature such as managed config domain mapping or action-custodied credentials. |
 | `infra_error` | `control-plane-adoption` | Conditional | Adoption export/import/marker write failed and recovery metadata must be surfaced. |
+| `validation_error` | `control-plane-profile-write` or `control-plane-cli-parse` | No | CLI profile name, URL, mode, or local context input is invalid. |
+| `control_plane_profile_not_found` | `control-plane-profile-read` or `control-plane-resolution` | No | The selected profile or active context does not exist. |
+| `control_plane_profile_store_unavailable` | `control-plane-profile-read` or `control-plane-profile-write` | Conditional | Local CLI profile or credential storage cannot be read, written, locked, or permission-hardened. |
+| `product_auth_missing` | `control-plane-auth` | No | Remote CLI dispatch requires a product session or token that is not available. |
+| `product_auth_invalid` | `control-plane-auth` | No | The stored or supplied CLI profile token/session is rejected by the selected control plane. |
+| `control_plane_unsupported` | `remote-operation-dispatch` | No | Remote mode was selected for a CLI command that is not remote-capable in the current bridge. |
 
 Errors must include sanitized details such as selected mode, URL origin, client version, minimum
 server version, feature flag, or adoption marker state. They must not include tokens, SSH keys,
@@ -346,6 +405,10 @@ Current implementation has an active self-hosted control-plane baseline:
 - the active self-hosted server-config deploy slice is available through
   `POST /api/action/deployments/from-config-package` for compatible servers that advertise source
   package and server-side config bootstrap support.
+- the CLI remote control-plane client bridge has local uncommitted profile storage,
+  `appaloft login/logout`, `appaloft auth login/status/logout`, `appaloft context list/use/show`,
+  flags/env/profile/config target resolution, dispatch-time handshake, and generic generated SDK
+  non-streaming operation dispatch for active Cloud or self-hosted profiles.
 
 Governed follow-ups remain:
 
@@ -353,6 +416,8 @@ Governed follow-ups remain:
 - Cloud-assisted Action API mode and OIDC/token exchange remain governed control-plane follow-ups;
 - Additional config-aware backend workflow APIs beyond the active `server-config-deploy` route are
   governed follow-ups;
+- default Cloud browser/device/OIDC login, remote streaming/watch, source-package quick deploy,
+  terminal attach gateway, OS keychain storage, and future MCP exposure remain governed follow-ups;
 - no Web selection surface exists.
 
 ## Open Questions

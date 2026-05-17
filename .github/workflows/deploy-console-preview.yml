@@ -55,9 +55,10 @@ jobs:
     if: ${{ needs.changes.outputs.console_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Console previews mutate the same SSH remote-state root used by repository dogfood deploys.
+    # Use a surface-specific GitHub group so console and docs previews for the same PR are not
+    # cancelled against each other. SSH remote-state locks still coordinate the shared state root.
     concurrency:
-      group: appaloft-www-remote-state
+      group: appaloft-console-preview-remote-state
       cancel-in-progress: false
     environment:
       name: console-preview-pr-${{ github.event.pull_request.number }}
@@ -166,6 +167,16 @@ jobs:
             --server-ssh-private-key-file "$key_file" \
             --state-backend ssh-pglite
 
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --config appaloft.console-backend-preview.yml \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
           bun run apps/shell/src/index.ts deploy . \
             --config appaloft.console-backend-preview.yml \
             --method dockerfile \
@@ -207,9 +218,10 @@ jobs:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Cleanup mutates the same SSH remote-state root as preview deploys.
+    # Use the same surface-specific group as console preview deploys; SSH remote-state locks still
+    # coordinate the shared state root with other repository workflows.
     concurrency:
-      group: appaloft-www-remote-state
+      group: appaloft-console-preview-remote-state
       cancel-in-progress: false
     permissions:
       contents: read

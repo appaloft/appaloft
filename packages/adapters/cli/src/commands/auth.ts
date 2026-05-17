@@ -2,6 +2,7 @@ import { BootstrapFirstAdminCommand, GetAuthBootstrapStatusQuery } from "@appalo
 import { Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { authControlPlaneCommands } from "./control-plane.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const emailOption = Options.text("email");
@@ -40,5 +41,9 @@ const bootstrapFirstAdminCommand = EffectCommand.make(
 
 export const authCommand = EffectCommand.make("auth").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.auth),
-  EffectCommand.withSubcommands([bootstrapStatusCommand, bootstrapFirstAdminCommand]),
+  EffectCommand.withSubcommands([
+    ...authControlPlaneCommands,
+    bootstrapStatusCommand,
+    bootstrapFirstAdminCommand,
+  ]),
 );

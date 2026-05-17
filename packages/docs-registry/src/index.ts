@@ -139,6 +139,68 @@ export const publicDocsHelpTopics = {
       "docs/testing/deployment-config-file-test-matrix.md",
     ],
   },
+  "cli.remote-control-plane-login": {
+    id: "cli.remote-control-plane-login",
+    title: "CLI remote control-plane login",
+    description:
+      "How CLI login, logout, status, and context selection work for Appaloft Cloud or self-hosted control planes.",
+    page: {
+      "zh-CN": "reference/cli",
+      "en-US": "en/reference/cli",
+    },
+    anchor: "cli-remote-control-plane-login",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "repository-config", "mcp"],
+    aliases: [
+      "appaloft login",
+      "appaloft auth login",
+      "appaloft context use",
+      "control plane profile",
+      "控制平面登录",
+      "CLI profile",
+    ],
+    specReferences: [
+      "docs/specs/074-cli-remote-control-plane-client/spec.md",
+      "docs/workflows/control-plane-mode-selection-and-adoption.md",
+      "docs/testing/control-plane-modes-test-matrix.md",
+      "docs/decisions/ADR-025-control-plane-modes-and-action-execution.md",
+    ],
+  },
+  "cli.remote-control-plane-dispatch": {
+    id: "cli.remote-control-plane-dispatch",
+    title: "CLI remote control-plane dispatch",
+    description:
+      "How ordinary CLI commands choose local pure SSH mode or remote HTTP/API dispatch safely.",
+    page: {
+      "zh-CN": "reference/cli",
+      "en-US": "en/reference/cli",
+    },
+    anchor: "cli-remote-control-plane-dispatch",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "repository-config", "mcp"],
+    aliases: [
+      "remote CLI",
+      "control plane mode",
+      "control-plane-mode",
+      "remote dispatch",
+      "远程 CLI",
+      "远程控制面",
+    ],
+    specReferences: [
+      "docs/specs/074-cli-remote-control-plane-client/spec.md",
+      "docs/workflows/control-plane-mode-selection-and-adoption.md",
+      "docs/implementation/control-plane-modes-roadmap.md",
+      "docs/testing/control-plane-modes-test-matrix.md",
+      "docs/decisions/ADR-025-control-plane-modes-and-action-execution.md",
+      "docs/decisions/ADR-046-typescript-sdk-interface-parity.md",
+    ],
+  },
   "project.concept": {
     id: "project.concept",
     title: "Project",

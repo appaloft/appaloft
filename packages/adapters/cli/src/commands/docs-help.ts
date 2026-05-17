@@ -52,6 +52,8 @@ export const cliDocsHrefs = {
   operatorAuditEvents: resolvePublicDocsHelpHref("operator.audit-events"),
   operatorDomainEvents: resolvePublicDocsHelpHref("operator.domain-events"),
   operatorProviderJobLogs: resolvePublicDocsHelpHref("operator.provider-job-logs"),
+  cliRemoteControlPlaneLogin: resolvePublicDocsHelpHref("cli.remote-control-plane-login"),
+  cliRemoteControlPlaneDispatch: resolvePublicDocsHelpHref("cli.remote-control-plane-dispatch"),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
   sourceAutoDeploySetup: resolvePublicDocsHelpHref("source.auto-deploy-setup"),
   sourceAutoDeploySignatures: resolvePublicDocsHelpHref("source.auto-deploy-signatures"),
@@ -71,6 +73,34 @@ export const cliDocsHrefs = {
 export const cliCommandDescriptions = {
   deploy: withDocs("Create a deployment", "deployment.source"),
   deploymentPlan: withDocs("Preview deployment plan without execution", "deployment.plan-preview"),
+  controlPlaneLogin: withDocs(
+    "Login to an Appaloft control plane",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneStatus: withDocs(
+    "Show local Appaloft control-plane profile status",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneLogout: withDocs(
+    "Logout from an Appaloft control-plane profile",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneContext: withDocs(
+    "Manage local Appaloft control-plane profiles",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneContextList: withDocs(
+    "List local Appaloft control-plane profiles",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneContextShow: withDocs(
+    "Show the active Appaloft control-plane profile",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneContextUse: withDocs(
+    "Select the active Appaloft control-plane profile",
+    "cli.remote-control-plane-login",
+  ),
   deploymentLogs: withDocs("Show deployment logs", "observability.runtime-logs"),
   deploymentLogsPrune: withDocs(
     "Dry-run or prune old embedded deployment log entries",

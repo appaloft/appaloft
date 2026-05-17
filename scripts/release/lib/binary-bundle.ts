@@ -43,7 +43,7 @@ ${entries.join("\n")}
   );
 }
 
-async function createBinaryEntryModule(input: {
+export async function createBinaryEntryModule(input: {
   entryPath: string;
   root: string;
   version: string;
@@ -52,9 +52,14 @@ async function createBinaryEntryModule(input: {
   pgliteFsBundlePath: string;
   pgliteWasmPath: string;
   initdbWasmPath: string;
+  reflectMetadataPath?: string;
 }): Promise<void> {
   const runModulePath = join(input.root, "apps", "shell", "src", "run.ts");
   const runModuleSpecifier = toImportSpecifier(input.entryPath, runModulePath);
+  const reflectMetadataPath =
+    input.reflectMetadataPath ??
+    Bun.resolveSync("reflect-metadata", join(input.root, "apps", "shell", "src", "index.ts"));
+  const reflectMetadataSpecifier = toImportSpecifier(input.entryPath, reflectMetadataPath);
   const embeddedAssetsSpecifier = toImportSpecifier(
     input.entryPath,
     input.embeddedWebAssetsModulePath,
@@ -69,11 +74,12 @@ async function createBinaryEntryModule(input: {
 
   await Bun.write(
     input.entryPath,
-    `import pgliteFsBundlePath from "${pgliteFsBundleSpecifier}" with { type: "file" };
+    `import "${reflectMetadataSpecifier}";
+
+import pgliteFsBundlePath from "${pgliteFsBundleSpecifier}" with { type: "file" };
 import pgliteWasmPath from "${pgliteWasmSpecifier}" with { type: "file" };
 import initdbWasmPath from "${initdbWasmSpecifier}" with { type: "file" };
 
-import { runShellCli } from "${runModuleSpecifier}";
 import { embeddedWebAssets } from "${embeddedAssetsSpecifier}";
 import { embeddedDocsAssets } from "${embeddedDocsAssetsSpecifier}";
 
@@ -102,6 +108,8 @@ function shouldUseEmbeddedPglite(): boolean {
 	const driver = process.env.APPALOFT_DATABASE_DRIVER?.toLowerCase();
 	return !driver || driver === "pglite";
 }
+
+const { runShellCli } = await import("${runModuleSpecifier}");
 
 await runShellCli({
 	embeddedWebAssets,

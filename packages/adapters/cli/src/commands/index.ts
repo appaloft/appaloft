@@ -3,6 +3,7 @@ import { Command as EffectCommand } from "@effect/cli";
 import { auditEventCommand } from "./audit-event.js";
 import { authCommand } from "./auth.js";
 import { certificateCommand } from "./certificate.js";
+import { contextCommand, loginCommand, logoutCommand } from "./control-plane.js";
 import { dbCommand } from "./db.js";
 import { defaultAccessCommand } from "./default-access.js";
 import { dependencyCommand } from "./dependency.js";
@@ -37,6 +38,9 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     serveCommand,
     initCommand,
     doctorCommand,
+    loginCommand,
+    logoutCommand,
+    contextCommand,
     dbCommand,
     authCommand,
     defaultAccessCommand,

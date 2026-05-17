@@ -73,9 +73,13 @@ Production docs deploys run from `.github/workflows/deploy-docs.yml` on `main` a
 `self-hosted`, the workflow calls the Appaloft server config deploy API so the server owns config
 bootstrap and state. Otherwise it keeps the pure SSH CLI fallback path.
 
-PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The preview job runs only for
-same-repository pull requests whose changed files affect docs content, the docs app, or docs build
-inputs. It invokes:
+PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The workflow classifies
+changed files first. For same-repository pull requests that do not affect docs content, the docs
+app, or docs build inputs, the `Preview` job records a no-op skip summary and succeeds so unrelated
+PRs do not carry a cancelled docs-preview check. Docs and console preview jobs use separate GitHub
+concurrency groups so a PR that requires both previews does not cancel one pending job; SSH
+remote-state locks still coordinate the shared remote state root. When docs preview is required, it
+invokes:
 
 ```bash
 appaloft deploy . \
