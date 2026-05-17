@@ -10,6 +10,17 @@ on:
         required: false
         default: false
         type: boolean
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing release tag to build and publish assets for.
+        required: true
+        type: string
+      prerelease:
+        description: Publish npm with the next tag and mark the release as a prerelease.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
