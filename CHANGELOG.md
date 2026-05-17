@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0-rc.3](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **ci:** serialize remote preview deploys ([f63d28f](https://github.com/appaloft/appaloft/commit/f63d28fbe44849de189e5399be9cb69918d2d66d))
+* **deploy:** fetch private source package config ([b99847a](https://github.com/appaloft/appaloft/commit/b99847a5c74f6fb91e4634544d7adabe81fc5428))
+* **deploy:** fetch private source package config ([b99847a](https://github.com/appaloft/appaloft/commit/b99847a5c74f6fb91e4634544d7adabe81fc5428))
+* **deploy:** fetch private source package config ([847fae7](https://github.com/appaloft/appaloft/commit/847fae719fa5a942d50db9435d715393a1aacb2a))
+* **deploy:** include preview failure logs ([40cfde0](https://github.com/appaloft/appaloft/commit/40cfde0a83749b850363f45d65196ede2adadb2a))
+* **release:** allow manual release asset rebuilds ([647e4f0](https://github.com/appaloft/appaloft/commit/647e4f05489d21710188b327c5aac89630a470f4))
+* **release:** edit prerelease by repository ([27aa83e](https://github.com/appaloft/appaloft/commit/27aa83ede1d9b34feb0d27f2a5c3497127b62749))
+* **release:** edit prerelease by repository ([2550379](https://github.com/appaloft/appaloft/commit/25503797250aa7abcd2edc92135d7255af3fec44))
+* **release:** preserve console route domain ([7cb6fb7](https://github.com/appaloft/appaloft/commit/7cb6fb754654fd92d612d21f0de5c7548c5b857a))
+* **release:** preserve console route domain ([7cb6fb7](https://github.com/appaloft/appaloft/commit/7cb6fb754654fd92d612d21f0de5c7548c5b857a))
+* **release:** preserve console route domain ([72f4242](https://github.com/appaloft/appaloft/commit/72f4242409dbe54261e5f9488f8f31f53dc44b6a))
+* **release:** stabilize prerelease recovery ([27aa83e](https://github.com/appaloft/appaloft/commit/27aa83ede1d9b34feb0d27f2a5c3497127b62749))
+
 ## [1.0.0-rc.2](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-05-17)
 
 
