@@ -12,10 +12,25 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow installs self-hosted A
   expect(workflow).toContain("APPALOFT_CONSOLE_SSH_PRIVATE_KEY");
   expect(workflow).toContain("uses: ./.github/actions/deploy-action");
   expect(workflow).toContain("command: install-console");
-  expect(workflow).toContain(`ssh-host: ${expression("vars.APPALOFT_CONSOLE_SSH_HOST")}`);
   expect(workflow).toContain(
-    `ssh-private-key: ${expression("secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY")}`,
+    `ssh-host: ${expression("vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST")}`,
   );
+  expect(workflow).toContain(
+    `ssh-private-key: ${expression("secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY || secrets.APPALOFT_SSH_PRIVATE_KEY")}`,
+  );
+});
+
+test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow resolves explicit prerelease versions", () => {
+  expect(workflow).toContain("APPALOFT_CONSOLE_VERSION");
+  expect(workflow).toContain("latest stable");
+  expect(workflow).toContain(
+    "Deploy Console version must be a release tag like v1.0.0-rc.1 or latest.",
+  );
+  expect(workflow).toContain(
+    `APPALOFT_CONSOLE_VERSION: ${expression("inputs.version || vars.APPALOFT_CONSOLE_VERSION || 'latest'")}`,
+  );
+  expect(workflow).toContain(`version: ${expression("steps.settings.outputs.version")}`);
+  expect(workflow).toContain("Pass a prerelease tag explicitly");
 });
 
 test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow defaults to production Postgres mode", () => {
@@ -36,6 +51,7 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow keeps secrets out of r
   expect(workflow).not.toContain("APPALOFT_POSTGRES_PASSWORD");
   expect(workflow).not.toContain("APPALOFT_DATABASE_URL");
   expect(workflow).toContain("secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY");
+  expect(workflow).toContain("secrets.APPALOFT_SSH_PRIVATE_KEY");
   expect(workflow).toContain("vars.APPALOFT_CONSOLE_ORIGIN");
   expect(workflow).not.toContain("scp \\");
 });

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Appaloft image tag to install. Defaults to latest.
+        description: Appaloft release tag to install. Empty uses APPALOFT_CONSOLE_VERSION, then latest stable.
         required: false
-        default: latest
+        default: ""
         type: string
       database:
         description: Self-hosted database backend for the console.
@@ -51,9 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate Console SSH Settings
+      - name: Resolve Console Settings
+        id: settings
         shell: bash
         env:
+          APPALOFT_CONSOLE_VERSION: ${{ inputs.version || vars.APPALOFT_CONSOLE_VERSION || 'latest' }}
           APPALOFT_CONSOLE_SSH_HOST: ${{ vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST }}
           HAS_CONSOLE_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY != '' || secrets.APPALOFT_SSH_PRIVATE_KEY != '' }}
         run: |
@@ -71,12 +73,24 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+          case "$APPALOFT_CONSOLE_VERSION" in
+            ''|*[!A-Za-z0-9._-]*)
+              echo "::error::Deploy Console version must be a release tag like v1.0.0-rc.1 or latest."
+              exit 1
+              ;;
+          esac
+          if [ "$APPALOFT_CONSOLE_VERSION" = "latest" ]; then
+            notice="Deploy Console resolved version=latest, which tracks the latest stable release."
+            notice="${notice} Pass a prerelease tag explicitly or set APPALOFT_CONSOLE_VERSION when upgrading a prerelease console."
+            echo "::notice::${notice}"
+          fi
+          echo "version=${APPALOFT_CONSOLE_VERSION}" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/deploy-action
         id: console
         with:
           command: install-console
-          version: ${{ inputs.version }}
+          version: ${{ steps.settings.outputs.version }}
           ssh-host: ${{ vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST }}
           ssh-user: ${{ vars.APPALOFT_CONSOLE_SSH_USER || vars.APPALOFT_SSH_USER }}
           ssh-port: ${{ vars.APPALOFT_CONSOLE_SSH_PORT || vars.APPALOFT_SSH_PORT }}
