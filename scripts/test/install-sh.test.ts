@@ -62,6 +62,16 @@ case "$1" in
     ;;
   compose)
     case "$*" in
+      *" up -d"*)
+        if [ "\${APPALOFT_FAKE_DOCKER_COMPOSE_UP_STALE_NETWORK_ONCE:-0}" = "1" ]; then
+          marker="\${APPALOFT_FAKE_DOCKER_LOG}.compose-up-stale-network"
+          if [ ! -f "$marker" ]; then
+            : > "$marker"
+            printf '%s\\n' "Error response from daemon: failed to set up container networking: network 0123456789abcdef not found" >&2
+            exit 1
+          fi
+        fi
+        ;;
       *" ps -q app"*) printf 'appaloft-app-1\\n' ;;
       *" exec -T app sh -c "*)
         print_bootstrap_output "$*"
@@ -354,6 +364,48 @@ test("install.sh writes a Compose self-host stack and starts it with Docker", as
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} pull`);
     expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} up -d`);
     expect(dockerLog).toContain("exec -T app sh -c");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("install.sh recovers Compose containers attached to a missing Docker network", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
+
+  try {
+    const { binDir, logPath } = await createFakeDocker(tempRoot);
+    const home = join(tempRoot, "appaloft");
+
+    const install = await run(
+      [
+        "sh",
+        installScript,
+        "--version",
+        "9.8.7",
+        "--home",
+        home,
+        "--web-origin",
+        "https://appaloft.example.test",
+        "--postgres-password",
+        "fixture-password",
+      ],
+      {
+        APPALOFT_FAKE_DOCKER_COMPOSE_UP_STALE_NETWORK_ONCE: "1",
+        APPALOFT_FAKE_DOCKER_LOG: logPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+      },
+    );
+
+    expect(install.exitCode, `${install.stdout}\n${install.stderr}`).toBe(0);
+    expect(install.stderr).toContain(
+      "Docker Compose found containers attached to a missing Docker network",
+    );
+
+    const dockerLog = await Bun.file(logPath).text();
+    const upCommand = `-f ${join(home, "docker-compose.yml")} up -d`;
+    expect(dockerLog.split(upCommand).length - 1).toBe(2);
+    expect(dockerLog).toContain(`-f ${join(home, "docker-compose.yml")} down --remove-orphans`);
+    expect(dockerLog).not.toContain(`-f ${join(home, "docker-compose.yml")} down -v`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

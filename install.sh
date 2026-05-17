@@ -1300,6 +1300,28 @@ docker_compose() {
   root_docker compose --env-file "$env_file" -p "$APPALOFT_COMPOSE_PROJECT_NAME" -f "$compose_file" "$@"
 }
 
+docker_compose_up_with_recovery() {
+  compose_up_output="$(mktemp "${TMPDIR:-/tmp}/appaloft-compose-up.XXXXXX")"
+  if docker_compose up -d >"$compose_up_output" 2>&1; then
+    cat "$compose_up_output"
+    rm -f "$compose_up_output"
+    return 0
+  fi
+
+  cat "$compose_up_output" >&2
+  if grep -E "failed to set up container networking: network .* not found|network .* not found" "$compose_up_output" >/dev/null 2>&1; then
+    warn "Docker Compose found containers attached to a missing Docker network; recreating project containers while preserving volumes."
+    rm -f "$compose_up_output"
+    docker_compose down --remove-orphans ||
+      fail "Docker Compose failed to remove stale containers after a missing Docker network; check Docker errors above and rerun the same install command"
+    docker_compose up -d
+    return $?
+  fi
+
+  rm -f "$compose_up_output"
+  return 1
+}
+
 docker_stack_deploy() {
   set -a
   # shellcheck disable=SC1090
@@ -1678,7 +1700,7 @@ else
   fi
 
   step "Starting Appaloft containers"
-  docker_compose up -d ||
+  docker_compose_up_with_recovery ||
     fail "Docker Compose failed to start Appaloft; check Docker errors above and rerun the same install command"
   wait_for_compose_app_health
   read_bootstrap_deploy_token_output
