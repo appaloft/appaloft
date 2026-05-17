@@ -52,7 +52,7 @@ jobs:
   preview:
     name: Preview
     needs: changes
-    if: ${{ needs.changes.outputs.docs_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Preview deploys share the same remote-state root as production docs deploys.
@@ -63,15 +63,27 @@ jobs:
       name: docs-preview-pr-${{ github.event.pull_request.number }}
       url: ${{ steps.deploy.outputs.preview_url }}
     steps:
+      - name: Skip Docs Preview
+        if: ${{ needs.changes.outputs.docs_preview_required != 'true' }}
+        shell: bash
+        run: |
+          {
+            echo "### Docs preview"
+            echo "Docs preview is not required for this change set."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout PR Source
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Resolve Preview Settings
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         id: settings
         shell: bash
         env:
@@ -114,6 +126,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remote Runtime Capacity Preflight
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         uses: ./.github/actions/remote-runtime-capacity-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
@@ -121,6 +134,7 @@ jobs:
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Remote State Lock Preflight
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         uses: ./.github/actions/remote-state-lock-preflight
         with:
           ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
@@ -128,6 +142,7 @@ jobs:
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Deploy Docs Preview
+        if: ${{ needs.changes.outputs.docs_preview_required == 'true' }}
         id: deploy
         shell: bash
         env:

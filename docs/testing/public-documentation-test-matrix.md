@@ -85,8 +85,9 @@ Current status:
   remote typed SDK dispatch, explicit unsupported-operation behavior, and the no-adoption/no-secret
   boundary under `reference/cli#cli-remote-control-plane-login` and
   `reference/cli#cli-remote-control-plane-dispatch`.
-- `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
-  a dedicated automated link checker does not exist yet.
+- `PUB-DOCS-004` is partially covered by successful static build, explicit anchor smoke checks, and
+  docs preview workflow status coverage that reports a passing no-op `Preview` job for unrelated PR
+  changes; a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
   explicit anchor in docs source.
 - `PUB-DOCS-006` is covered at build level by Starlight Pagefind index generation.
