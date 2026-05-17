@@ -21,6 +21,11 @@ describe("release build workflow", () => {
     const workflow = await readText(".github/workflows/release-build.yml");
 
     expect(workflow).toContain("name: Release Build");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("Existing release tag to build and publish assets for.");
+    expect(workflow).toContain(
+      "Publish npm with the next tag and mark the release as a prerelease.",
+    );
     expect(workflow).toContain("release-source");
     expect(workflow).toContain("appaloft-backend-v*.tar.gz");
     expect(workflow).toContain("appaloft-web-static-v*.tar.gz");
