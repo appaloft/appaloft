@@ -687,6 +687,7 @@ export interface AppaloftOrpcContext {
   actionDeployTokenAuthorizationPort?: ActionDeployTokenAuthorizationPort;
   actionSourcePackageConfigReader?: ActionSourcePackageConfigReader;
   productSessionAuthorizationPort?: ProductSessionAuthorizationPort;
+  requestContextRunner?: RequestContextRunner;
 }
 
 interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
@@ -703,7 +704,14 @@ export interface RequestContextRunner {
     request: Request,
     context: ExecutionContext,
     callback: () => Promise<T>,
+    options?: RequestContextRunnerOptions,
   ): Promise<T>;
+}
+
+export interface RequestContextRunnerOptions {
+  providerAccessTokens?: {
+    github?: string | undefined;
+  };
 }
 
 export interface ActionSourcePackageConfigReader {
@@ -5436,10 +5444,11 @@ function createRequestRunner(
   request: Request,
   executionContext: ExecutionContext,
   requestContextRunner?: RequestContextRunner,
+  options?: RequestContextRunnerOptions,
 ): <T>(callback: () => Promise<T>) => Promise<T> {
   if (requestContextRunner) {
     return <T>(callback: () => Promise<T>) =>
-      requestContextRunner.runWithRequest(request, executionContext, callback);
+      requestContextRunner.runWithRequest(request, executionContext, callback, options);
   }
 
   return <T>(callback: () => Promise<T>) => callback();
@@ -6454,6 +6463,21 @@ function effectiveActionServerConfigForRequest(input: {
   return ok(previewConfig);
 }
 
+function requestContextOptionsFromSourcePackageCredentials(
+  credentials: ActionServerConfigDeployBody["sourcePackageCredentials"],
+): RequestContextRunnerOptions | undefined {
+  const githubToken = credentials?.githubToken?.trim();
+  if (!githubToken) {
+    return undefined;
+  }
+
+  return {
+    providerAccessTokens: {
+      github: githubToken,
+    },
+  };
+}
+
 async function resolveActionServerConfigDomainContext(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -6920,85 +6944,94 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
-  const target = await resolveActionServerConfigDeploymentTarget({
-    ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
-    context,
-    executionContext,
-    body: body.data,
+  const runWithSourcePackageCredentials = createRequestRunner(
     request,
-  });
-  if (target.isErr()) {
-    return domainErrorHttpResponse(target.error, executionContext);
-  }
-
-  if (!target.value.serverId) {
-    return domainErrorHttpResponse(
-      domainError.validation("Source link does not include a deployment target", {
-        phase: "source-link-resolution",
-        sourceFingerprint: body.data.sourceFingerprint,
-      }),
-      executionContext,
-    );
-  }
-
-  const profileApplied = await applyActionServerConfigProfileCommands({
-    context,
     executionContext,
-    config: effectiveConfig.value,
-    sourceFingerprint: body.data.sourceFingerprint,
-    ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
-    ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
-    target: target.value,
-  });
-  if (profileApplied.isErr()) {
-    return domainErrorHttpResponse(profileApplied.error, executionContext);
-  }
-
-  const command = CreateDeploymentCommand.create({
-    projectId: target.value.projectId,
-    environmentId: target.value.environmentId,
-    resourceId: target.value.resourceId,
-    serverId: target.value.serverId,
-    ...(target.value.destinationId ? { destinationId: target.value.destinationId } : {}),
-  });
-  if (command.isErr()) {
-    return domainErrorHttpResponse(command.error, executionContext);
-  }
-
-  const result = await context.commandBus.execute(executionContext, command.value);
-  if (result.isErr()) {
-    return domainErrorHttpResponse(result.error, executionContext);
-  }
-
-  const previewRoute = body.data.previewRoute;
-  const previewRouteVerification = previewRoute
-    ? await (async () => {
-        const command = ConfirmActionPreviewRouteCommand.create({
-          deploymentId: result.value.id,
-          host: previewRoute.host,
-          pathPrefix: previewRoute.pathPrefix,
-          tlsMode: previewRoute.tlsMode,
-        });
-        if (command.isErr()) {
-          return err(command.error);
-        }
-        return context.commandBus.execute(executionContext, command.value);
-      })()
-    : ok(undefined);
-  if (previewRouteVerification.isErr()) {
-    return domainErrorHttpResponse(previewRouteVerification.error, executionContext);
-  }
-
-  return Response.json(
-    {
-      ...result.value,
-      ...(previewRouteVerification.value
-        ? { previewUrl: previewRouteVerification.value.previewUrl }
-        : {}),
-      deploymentHref: `/deployments/${result.value.id}`,
-    },
-    { status: 202 },
+    context.requestContextRunner,
+    requestContextOptionsFromSourcePackageCredentials(body.data.sourcePackageCredentials),
   );
+
+  return runWithSourcePackageCredentials(async () => {
+    const target = await resolveActionServerConfigDeploymentTarget({
+      ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
+      context,
+      executionContext,
+      body: body.data,
+      request,
+    });
+    if (target.isErr()) {
+      return domainErrorHttpResponse(target.error, executionContext);
+    }
+
+    if (!target.value.serverId) {
+      return domainErrorHttpResponse(
+        domainError.validation("Source link does not include a deployment target", {
+          phase: "source-link-resolution",
+          sourceFingerprint: body.data.sourceFingerprint,
+        }),
+        executionContext,
+      );
+    }
+
+    const profileApplied = await applyActionServerConfigProfileCommands({
+      context,
+      executionContext,
+      config: effectiveConfig.value,
+      sourceFingerprint: body.data.sourceFingerprint,
+      ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
+      ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
+      target: target.value,
+    });
+    if (profileApplied.isErr()) {
+      return domainErrorHttpResponse(profileApplied.error, executionContext);
+    }
+
+    const command = CreateDeploymentCommand.create({
+      projectId: target.value.projectId,
+      environmentId: target.value.environmentId,
+      resourceId: target.value.resourceId,
+      serverId: target.value.serverId,
+      ...(target.value.destinationId ? { destinationId: target.value.destinationId } : {}),
+    });
+    if (command.isErr()) {
+      return domainErrorHttpResponse(command.error, executionContext);
+    }
+
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return domainErrorHttpResponse(result.error, executionContext);
+    }
+
+    const previewRoute = body.data.previewRoute;
+    const previewRouteVerification = previewRoute
+      ? await (async () => {
+          const command = ConfirmActionPreviewRouteCommand.create({
+            deploymentId: result.value.id,
+            host: previewRoute.host,
+            pathPrefix: previewRoute.pathPrefix,
+            tlsMode: previewRoute.tlsMode,
+          });
+          if (command.isErr()) {
+            return err(command.error);
+          }
+          return context.commandBus.execute(executionContext, command.value);
+        })()
+      : ok(undefined);
+    if (previewRouteVerification.isErr()) {
+      return domainErrorHttpResponse(previewRouteVerification.error, executionContext);
+    }
+
+    return Response.json(
+      {
+        ...result.value,
+        ...(previewRouteVerification.value
+          ? { previewUrl: previewRouteVerification.value.previewUrl }
+          : {}),
+        deploymentHref: `/deployments/${result.value.id}`,
+      },
+      { status: 202 },
+    );
+  });
 }
 
 async function handleGitHubPreviewPullRequestRoute(input: {

@@ -189,8 +189,10 @@ trusted bootstrap context, and dispatches ids-only `deployments.create`.
 
 For private GitHub repositories, pass `github-token: ${{ github.token }}`. In server config deploy
 mode the action sends that token as a transient source-package credential so the self-hosted server
-can read the committed config file for the checked-out revision. The token is not written into
-resource profiles or deployment state.
+can read the committed config file for the checked-out revision and, when the selected resource
+uses a GitHub provider-aware source binding, materialize the deployment source through the same
+request-scoped provider credential. The token is not written into resource profiles or deployment
+state.
 
 `control-plane-url` is how you select the Appaloft instance. It is not inferred by scanning the SSH
 target. `appaloft-token` is required for self-hosted Action mutation endpoints and is sent as an

@@ -94,6 +94,9 @@ type ActionServerConfigDeployRequest = {
   configPath: string;
   sourceRoot: string;
   sourcePackage: SourcePackageManifest;
+  sourcePackageCredentials?: {
+    githubToken?: string;
+  };
   resolvedSecrets?: Record<string, string>;
   preview?: {
     kind: "pull-request";
@@ -130,6 +133,12 @@ repository facts before package/config/profile/route/deployment mutation.
 name. It is allowed only to satisfy matching `secrets.KEY.from: ci-env:NAME` entries from the
 committed config. The server applies the resulting secret values through environment commands and
 must not include raw values in errors, logs, summaries, PR comments, or read models.
+
+`sourcePackageCredentials` is a transient Action-to-server payload for provider-scoped source
+package access. For `server-github-fetch`, the server may use `githubToken` to read the committed
+config file and to scope GitHub source materialization for the accepted deployment through the
+neutral integration auth boundary. It must not persist the raw token in resource profiles,
+deployment state, logs, errors, summaries, or read models.
 
 Success response:
 

@@ -211,11 +211,18 @@ export interface AppaloftServerOptions {
   systemPlugins?: readonly SystemPluginDefinition[];
 }
 
+interface RequestContextRunnerOptions {
+  providerAccessTokens?: {
+    github?: string | undefined;
+  };
+}
+
 interface RequestContextRunner extends IntegrationAuthPort {
   runWithRequest<T>(
     request: Request,
     context: ExecutionContext,
     callback: () => Promise<T>,
+    options?: RequestContextRunnerOptions,
   ): Promise<T>;
 }
 
