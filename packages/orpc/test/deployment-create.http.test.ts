@@ -1633,6 +1633,97 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config preview renders runtime name templates before applying profile commands", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
+        capturedCommands.push(command as Command<unknown>);
+        return ok({
+          id:
+            command instanceof CreateDeploymentCommand
+              ? "dep_preview_runtime_template"
+              : `cmd_${capturedCommands.length}`,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "runtime:",
+            "  strategy: dockerfile",
+            "  name: cloud-pr-{pr_number}",
+            "  dockerfilePath: Dockerfile",
+          ].join("\n"),
+          fileName: "appaloft.preview.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A1:github:provider-repository%3A123456:.:appaloft.preview.yml",
+          configPath: "appaloft.preview.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:preview%3Apr%3A1:github:provider-repository%3A123456:.:appaloft.preview.yml",
+            configPath: "appaloft.preview.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/appaloft-cloud",
+          },
+          preview: {
+            kind: "pull-request",
+            previewId: "cloud-pr-1",
+            pullRequestNumber: 1,
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_preview",
+            resourceId: "res_preview",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceRuntimeCommand,
+      CreateDeploymentCommand,
+    ]);
+    expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_preview",
+      runtimeProfile: {
+        strategy: "dockerfile",
+        runtimeName: "cloud-pr-1",
+        dockerfilePath: "Dockerfile",
+      },
+    });
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies plain environment variables before deployment", async () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {
