@@ -49,7 +49,11 @@ import {
   wrapHttpRequestHandlerWithSpan,
   writeActiveTraceResponseHeaders,
 } from "@appaloft/observability";
-import { type ActionSourcePackageConfigReader, mountAppaloftOrpcRoutes } from "@appaloft/orpc";
+import {
+  type ActionSourcePackageConfigReader,
+  mountAppaloftOrpcRoutes,
+  type RequestContextRunnerOptions,
+} from "@appaloft/orpc";
 import {
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
@@ -97,6 +101,7 @@ interface RequestContextRunner {
     request: Request,
     context: ExecutionContext,
     callback: () => Promise<T>,
+    options?: RequestContextRunnerOptions,
   ): Promise<T>;
 }
 

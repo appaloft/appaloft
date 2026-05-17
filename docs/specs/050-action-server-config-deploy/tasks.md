@@ -26,6 +26,9 @@
   uses trusted source/preview context for identity.
 - [x] `ACTION-SERVER-CONFIG-SPEC-008`: Action server config deploy resolves `ci-env:` secrets from
   runner environment and applies them through server-owned environment commands.
+- [x] `ACTION-SERVER-CONFIG-SPEC-010`: Action server config deploy scopes transient source-package
+  provider credentials through integration auth for deployment source materialization without
+  persisting raw tokens.
 - [x] `CONTROL-PLANE-INSTALL-003`: `command=install-console` reads non-secret console install
   settings from repository config while keeping SSH host/key and secrets in trusted workflow inputs.
 
@@ -35,6 +38,7 @@
 - [x] Define the first `server-github-fetch` source package manifest fields, path boundaries,
   fingerprint consistency checks, revision/repository metadata, and fail-closed unsupported
   transport behavior.
+- [x] Define request-scoped source-package credential handling for GitHub source materialization.
 - [ ] Define inline archive and remote archive URL source package storage lifecycle, cleanup
   behavior, diagnostics, and public support output.
 - [x] Define source package/config bootstrap error phases for the implemented server config deploy

@@ -724,6 +724,9 @@ class EmptyStorageVolumeBackupSafetyReader implements StorageVolumeBackupSafetyR
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   private readonly storage = new AsyncLocalStorage<{
     context: ExecutionContext;
+    providerAccessTokens?: {
+      github?: string | undefined;
+    };
     request: Request;
   }>();
 
@@ -736,8 +739,22 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
     request: Request,
     context: ExecutionContext,
     callback: () => Promise<T>,
+    options?: {
+      providerAccessTokens?: {
+        github?: string | undefined;
+      };
+    },
   ): Promise<T> {
-    return this.storage.run({ request, context }, callback);
+    return this.storage.run(
+      {
+        request,
+        context,
+        ...(options?.providerAccessTokens
+          ? { providerAccessTokens: options.providerAccessTokens }
+          : {}),
+      },
+      callback,
+    );
   }
 
   async getProviderAccessToken(
@@ -748,6 +765,11 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
 
     if (!scope) {
       return null;
+    }
+
+    const scopedAccessToken = scope.providerAccessTokens?.[providerKey]?.trim();
+    if (scopedAccessToken) {
+      return scopedAccessToken;
     }
 
     try {
