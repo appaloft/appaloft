@@ -89,6 +89,7 @@ async function createPreviewDeployCliHarness(
     withRouteStore?: boolean;
     deploymentSummaries?: unknown[];
     createResourceSlugConflict?: boolean;
+    resourceSlugConflictResourceId?: string;
     sourceLinkRecord?: Record<string, unknown> | null;
     resourceSummaries?: unknown[];
     resourceDetail?: Record<string, unknown> | null;
@@ -123,6 +124,9 @@ async function createPreviewDeployCliHarness(
                   phase: "resource-admission",
                   projectId: "proj_1",
                   environmentId: "env_1",
+                  ...(input.resourceSlugConflictResourceId
+                    ? { resourceId: input.resourceSlugConflictResourceId }
+                    : {}),
                   resourceSlug: "appaloft-console-backend-preview-pr-262",
                 },
               ),
@@ -1123,17 +1127,7 @@ describe("CLI deployment config entry workflow", () => {
     );
     const harness = await createPreviewDeployCliHarness({
       createResourceSlugConflict: true,
-      resourceSummaries: [
-        {
-          id: "res_existing",
-          projectId: "proj_1",
-          environmentId: "env_1",
-          name: "appaloft-console-backend-preview-pr-262",
-          slug: "appaloft-console-backend-preview-pr-262",
-          kind: "application",
-          deploymentCount: 1,
-        },
-      ],
+      resourceSlugConflictResourceId: "res_existing",
     });
 
     try {

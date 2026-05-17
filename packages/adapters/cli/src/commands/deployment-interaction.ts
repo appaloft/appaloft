@@ -47,6 +47,7 @@ import {
   quickDeployWorkflow,
 } from "@appaloft/contracts";
 import {
+  type DomainError,
   domainError,
   type EnvironmentKind,
   environmentKinds,
@@ -651,6 +652,11 @@ function hasDomainErrorCode(error: unknown, code: string): boolean {
   );
 }
 
+function stringDomainErrorDetail(error: DomainError, key: string): string | undefined {
+  const value = error.details?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function listProjects() {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -767,6 +773,11 @@ function createResource(input: CreateResourceInput) {
       input.projectId &&
       input.environmentId
     ) {
+      const existingResourceId = stringDomainErrorDetail(created.left, "resourceId");
+      if (existingResourceId) {
+        return { id: existingResourceId };
+      }
+
       const existing = findResource(
         (yield* listResources(input.projectId, input.environmentId)).items,
         {
