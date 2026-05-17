@@ -55,9 +55,10 @@ jobs:
     if: ${{ github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Preview deploys share the same remote-state root as production docs deploys.
+    # Use a surface-specific GitHub group so docs and console previews for the same PR are not
+    # cancelled against each other. SSH remote-state locks still coordinate the shared state root.
     concurrency:
-      group: appaloft-www-remote-state
+      group: appaloft-docs-preview-remote-state
       cancel-in-progress: false
     environment:
       name: docs-preview-pr-${{ github.event.pull_request.number }}
@@ -194,9 +195,10 @@ jobs:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Cleanup mutates the same remote-state root as preview and production docs deploys.
+    # Use the same surface-specific group as docs preview deploys; SSH remote-state locks still
+    # coordinate the shared state root with production and console workflows.
     concurrency:
-      group: appaloft-www-remote-state
+      group: appaloft-docs-preview-remote-state
       cancel-in-progress: false
     permissions:
       contents: read
