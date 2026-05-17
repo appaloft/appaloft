@@ -54,18 +54,18 @@ jobs:
       - name: Validate Console SSH Settings
         shell: bash
         env:
-          APPALOFT_CONSOLE_SSH_HOST: ${{ vars.APPALOFT_CONSOLE_SSH_HOST }}
-          HAS_CONSOLE_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY != '' }}
+          APPALOFT_CONSOLE_SSH_HOST: ${{ vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST }}
+          HAS_CONSOLE_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY != '' || secrets.APPALOFT_SSH_PRIVATE_KEY != '' }}
         run: |
           set -euo pipefail
 
           missing=0
           if [ -z "$APPALOFT_CONSOLE_SSH_HOST" ]; then
-            echo "::error::Missing repository variable APPALOFT_CONSOLE_SSH_HOST."
+            echo "::error::Missing repository variable APPALOFT_CONSOLE_SSH_HOST or APPALOFT_SSH_HOST."
             missing=1
           fi
           if [ "$HAS_CONSOLE_SSH_PRIVATE_KEY" != "true" ]; then
-            echo "::error::Missing repository secret APPALOFT_CONSOLE_SSH_PRIVATE_KEY."
+            echo "::error::Missing repository secret APPALOFT_CONSOLE_SSH_PRIVATE_KEY or APPALOFT_SSH_PRIVATE_KEY."
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
@@ -77,10 +77,10 @@ jobs:
         with:
           command: install-console
           version: ${{ inputs.version }}
-          ssh-host: ${{ vars.APPALOFT_CONSOLE_SSH_HOST }}
-          ssh-user: ${{ vars.APPALOFT_CONSOLE_SSH_USER }}
-          ssh-port: ${{ vars.APPALOFT_CONSOLE_SSH_PORT }}
-          ssh-private-key: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY }}
+          ssh-host: ${{ vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ vars.APPALOFT_CONSOLE_SSH_USER || vars.APPALOFT_SSH_USER }}
+          ssh-port: ${{ vars.APPALOFT_CONSOLE_SSH_PORT || vars.APPALOFT_SSH_PORT }}
+          ssh-private-key: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY || secrets.APPALOFT_SSH_PRIVATE_KEY }}
           console-url: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
           console-database: ${{ inputs.database }}
           console-orchestrator: ${{ inputs.orchestrator }}
