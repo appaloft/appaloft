@@ -134,6 +134,11 @@ interface ActionSourcePackageConfigReaderInput {
   configPath: string;
   sourceRoot: string;
   sourcePackage: ActionSourcePackageManifestInput;
+  credentials?:
+    | {
+        githubToken?: string | undefined;
+      }
+    | undefined;
 }
 
 function isSafeGitHubRepositoryFullName(value: string): boolean {
@@ -203,9 +208,11 @@ export class GitHubRawActionSourcePackageConfigReader {
       )}`,
       `${this.rawBaseUrl.replace(/\/+$/, "")}/`,
     );
+    const githubToken = input.credentials?.githubToken?.trim();
     const response = await this.fetcher(url, {
       headers: {
         accept: "text/plain",
+        ...(githubToken ? { authorization: `Bearer ${githubToken}` } : {}),
         "user-agent": "appaloft-control-plane",
       },
     });
@@ -214,9 +221,13 @@ export class GitHubRawActionSourcePackageConfigReader {
       return err(
         domainError.validation("GitHub source package config could not be fetched", {
           phase: "config-bootstrap",
+          reasonCode: "github_source_package_config_fetch_failed",
           status: response.status,
+          upstreamStatus: response.status,
           repositoryFullName,
           configPath: input.configPath,
+          revision,
+          credentialProvided: Boolean(githubToken),
         }),
       );
     }

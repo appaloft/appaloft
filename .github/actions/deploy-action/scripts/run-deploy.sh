@@ -539,8 +539,14 @@ add(fields, "code", error && error.code);
 add(fields, "deniedScope", details.deniedScope);
 add(fields, "reasonCode", details.reasonCode);
 add(fields, "missingScope", details.missingScope);
+add(fields, "phase", details.phase);
+add(fields, "field", details.field);
 add(fields, "workflow", details.workflow);
 add(fields, "endpoint", details.endpoint || endpoint);
+add(fields, "upstreamStatus", details.upstreamStatus);
+add(fields, "configPath", details.configPath);
+add(fields, "transport", details.transport);
+add(fields, "credentialProvided", details.credentialProvided);
 add(fields, "projectId", details.projectId);
 add(fields, "environmentId", details.environmentId);
 add(fields, "resourceId", details.resourceId);
@@ -628,6 +634,7 @@ source_package_payload_for_action() {
   local resolved_secrets_payload
   local resolved_environment_payload
   local preview_route_payload
+  local source_package_github_token
 
   payload="{\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\",\"sourcePackage\":{\"transport\":\"server-github-fetch\",\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
   if [ -n "${GITHUB_SHA:-}" ]; then
@@ -640,6 +647,10 @@ source_package_payload_for_action() {
     payload="${payload},\"repositoryId\":\"$(json_escape "$GITHUB_REPOSITORY_ID")\""
   fi
   payload="${payload}}"
+  source_package_github_token="${input_github_token:-${GITHUB_TOKEN:-}}"
+  if [ -n "$source_package_github_token" ]; then
+    payload="${payload},\"sourcePackageCredentials\":{\"githubToken\":\"$(json_escape "$source_package_github_token")\"}"
+  fi
   if [ -n "$project_id" ] || [ -n "$environment_id" ] || [ -n "$resource_id" ] || [ -n "$server_id" ] || [ -n "$destination_id" ] || [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; then
     payload="${payload},\"trustedContext\":{"
     local separator=""
