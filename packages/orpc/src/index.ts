@@ -5488,13 +5488,17 @@ function extractBearerToken(request: Request): string | undefined {
   return token;
 }
 
-async function authorizeActionDeployToken(input: {
+interface ActionDeployTokenAuthorizationRequest {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   request: Request;
   requestedScope?: ActionDeployTokenRequestedScope;
   workflow: ActionDeployTokenWorkflow;
-}): Promise<Result<ExecutionActor>> {
+}
+
+async function authorizeActionDeployToken(
+  input: ActionDeployTokenAuthorizationRequest,
+): Promise<Result<ExecutionActor>> {
   const url = new URL(input.request.url);
   const token = extractBearerToken(input.request);
   if (!token) {
@@ -5546,30 +5550,59 @@ async function authorizeActionDeployToken(input: {
 function actionSourceLinkDeploymentRequestedScope(
   body: z.infer<typeof actionSourceLinkDeploymentBodySchema>,
 ): ActionDeployTokenRequestedScope | undefined {
-  return compactActionDeployTokenRequestedScope({
-    ...(body.projectId ? { projectId: body.projectId } : {}),
-    ...(body.environmentId ? { environmentId: body.environmentId } : {}),
-    ...(body.resourceId ? { resourceId: body.resourceId } : {}),
-    ...(body.serverId ? { serverId: body.serverId } : {}),
-  });
+  const scope: ActionDeployTokenRequestedScope = {};
+  if (body.projectId) scope.projectId = body.projectId;
+  if (body.environmentId) scope.environmentId = body.environmentId;
+  if (body.resourceId) scope.resourceId = body.resourceId;
+  if (body.serverId) scope.serverId = body.serverId;
+  return compactActionDeployTokenRequestedScope(scope);
 }
 
 function actionServerConfigDeploymentRequestedScope(
   body: ActionServerConfigDeployBody,
 ): ActionDeployTokenRequestedScope | undefined {
-  return compactActionDeployTokenRequestedScope({
-    ...(body.trustedContext?.projectId ? { projectId: body.trustedContext.projectId } : {}),
-    ...(body.trustedContext?.environmentId
-      ? { environmentId: body.trustedContext.environmentId }
-      : {}),
-    ...(body.trustedContext?.resourceId ? { resourceId: body.trustedContext.resourceId } : {}),
-    ...(body.trustedContext?.serverId ? { serverId: body.trustedContext.serverId } : {}),
-    ...(body.trustedContext?.repositoryFullName
-      ? { repositoryFullName: body.trustedContext.repositoryFullName }
-      : body.sourcePackage.repositoryFullName
-        ? { repositoryFullName: body.sourcePackage.repositoryFullName }
-        : {}),
-  });
+  const scope: ActionDeployTokenRequestedScope = {};
+  const trustedContext = body.trustedContext;
+
+  if (trustedContext?.projectId) scope.projectId = trustedContext.projectId;
+  if (trustedContext?.environmentId) scope.environmentId = trustedContext.environmentId;
+  if (trustedContext?.resourceId) scope.resourceId = trustedContext.resourceId;
+  if (trustedContext?.serverId) scope.serverId = trustedContext.serverId;
+  if (trustedContext?.repositoryFullName) {
+    scope.repositoryFullName = trustedContext.repositoryFullName;
+  } else if (body.sourcePackage.repositoryFullName) {
+    scope.repositoryFullName = body.sourcePackage.repositoryFullName;
+  }
+
+  return compactActionDeployTokenRequestedScope(scope);
+}
+
+async function actionSourceLinkDeploymentRequestedScopeFromRequest(
+  request: Request,
+): Promise<ActionDeployTokenRequestedScope | undefined> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(await request.clone().text());
+  } catch {
+    return undefined;
+  }
+
+  const body = actionSourceLinkDeploymentBodySchema.safeParse(parsedJson);
+  return body.success ? actionSourceLinkDeploymentRequestedScope(body.data) : undefined;
+}
+
+async function actionServerConfigDeploymentRequestedScopeFromRequest(
+  request: Request,
+): Promise<ActionDeployTokenRequestedScope | undefined> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(await request.clone().text());
+  } catch {
+    return undefined;
+  }
+
+  const body = actionServerConfigDeployBodySchema.safeParse(parsedJson);
+  return body.success ? actionServerConfigDeploymentRequestedScope(body.data) : undefined;
 }
 
 function compactActionDeployTokenRequestedScope(
@@ -5928,13 +5961,17 @@ async function handleActionSourceLinkDeploymentRoute(input: {
   }
 
   const requestedScope = actionSourceLinkDeploymentRequestedScope(body.data);
-  const authorizedScope = await authorizeActionDeployToken({
+  const actionAuthorizationRequest: ActionDeployTokenAuthorizationRequest = {
     context,
     executionContext,
     request,
-    ...(requestedScope ? { requestedScope } : {}),
     workflow: "source-link-deploy",
-  });
+  };
+  if (requestedScope) {
+    actionAuthorizationRequest.requestedScope = requestedScope;
+  }
+
+  const authorizedScope = await authorizeActionDeployToken(actionAuthorizationRequest);
   if (authorizedScope.isErr()) {
     return actionAuthErrorResponse(authorizedScope.error);
   }
@@ -6612,13 +6649,17 @@ async function handleActionServerConfigDeploymentRoute(input: {
   }
 
   const requestedScope = actionServerConfigDeploymentRequestedScope(body.data);
-  const authorizedScope = await authorizeActionDeployToken({
+  const actionAuthorizationRequest: ActionDeployTokenAuthorizationRequest = {
     context,
     executionContext,
     request,
-    ...(requestedScope ? { requestedScope } : {}),
     workflow: "server-config-deploy",
-  });
+  };
+  if (requestedScope) {
+    actionAuthorizationRequest.requestedScope = requestedScope;
+  }
+
+  const authorizedScope = await authorizeActionDeployToken(actionAuthorizationRequest);
   if (authorizedScope.isErr()) {
     return actionAuthErrorResponse(authorizedScope.error);
   }
@@ -6995,12 +7036,18 @@ export function mountAppaloftOrpcRoutes(
       "http",
       request,
     );
-    const authorized = await authorizeActionDeployToken({
+    const requestedScope = await actionSourceLinkDeploymentRequestedScopeFromRequest(request);
+    const actionAuthorizationRequest: ActionDeployTokenAuthorizationRequest = {
       context,
       executionContext: unauthenticatedContext,
       request,
       workflow: "source-link-deploy",
-    });
+    };
+    if (requestedScope) {
+      actionAuthorizationRequest.requestedScope = requestedScope;
+    }
+
+    const authorized = await authorizeActionDeployToken(actionAuthorizationRequest);
     if (authorized.isErr()) {
       return actionAuthErrorResponse(authorized.error);
     }
@@ -7037,12 +7084,18 @@ export function mountAppaloftOrpcRoutes(
       "http",
       request,
     );
-    const authorized = await authorizeActionDeployToken({
+    const requestedScope = await actionServerConfigDeploymentRequestedScopeFromRequest(request);
+    const actionAuthorizationRequest: ActionDeployTokenAuthorizationRequest = {
       context,
       executionContext: unauthenticatedContext,
       request,
       workflow: "server-config-deploy",
-    });
+    };
+    if (requestedScope) {
+      actionAuthorizationRequest.requestedScope = requestedScope;
+    }
+
+    const authorized = await authorizeActionDeployToken(actionAuthorizationRequest);
     if (authorized.isErr()) {
       return actionAuthErrorResponse(authorized.error);
     }
