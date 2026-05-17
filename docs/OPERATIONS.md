@@ -274,10 +274,13 @@ there, and verifies `/api/health`.
 
 Configure:
 
-- repository variable `APPALOFT_CONSOLE_SSH_HOST`
-- repository secret `APPALOFT_CONSOLE_SSH_PRIVATE_KEY`
+- repository variable `APPALOFT_CONSOLE_SSH_HOST`, or shared `APPALOFT_SSH_HOST` as a fallback
+- repository secret `APPALOFT_CONSOLE_SSH_PRIVATE_KEY`, or shared `APPALOFT_SSH_PRIVATE_KEY` as a
+  fallback
 - optional repository variable `APPALOFT_CONSOLE_SSH_USER`, default `root`
 - optional repository variable `APPALOFT_CONSOLE_SSH_PORT`, default `22`
+- optional repository variable `APPALOFT_CONSOLE_VERSION`, used when the dispatch `version` input is
+  empty
 
 Non-secret console settings can be committed in the selected Appaloft config:
 
@@ -300,6 +303,12 @@ installer as the Appaloft instance console route, and action inputs override mat
 Once the console is healthy, other repositories can set their `controlPlane.mode: self-hosted` and
 `controlPlane.url` to this origin, while keeping tokens, SSH keys, and resource identity in trusted
 Action inputs or the Appaloft server.
+
+Leave the workflow `version` input empty only when the repository variable
+`APPALOFT_CONSOLE_VERSION` is set or when the latest stable release is intentionally desired.
+`latest` follows GitHub's latest stable release and does not select prereleases such as release
+candidates. To upgrade a prerelease console, pass the exact tag, for example `v1.0.0-rc.1`, after
+the code for that tag has merged and its release artifacts have been published.
 
 ## PostgreSQL
 
