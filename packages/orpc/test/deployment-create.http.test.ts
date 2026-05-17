@@ -38,7 +38,11 @@ import {
 import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
-import { type ActionSourcePackageConfigReader, mountAppaloftOrpcRoutes } from "../src";
+import {
+  type ActionSourcePackageConfigReader,
+  mountAppaloftOrpcRoutes,
+  type RequestContextRunnerOptions,
+} from "../src";
 
 class NoopLogger implements AppLogger {
   debug(): void {}
@@ -1026,7 +1030,7 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
-  test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint dispatches ids-only deployment for an existing resource", async () => {
+  test("[CONTROL-PLANE-HANDSHAKE-017][ACTION-SERVER-CONFIG-SPEC-010] Action server config endpoint dispatches ids-only deployment for an existing resource", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
@@ -1055,12 +1059,19 @@ describe("deployment create HTTP route", () => {
         });
       },
     } satisfies ActionSourcePackageConfigReader;
+    const capturedRequestContextOptions: Array<RequestContextRunnerOptions | undefined> = [];
     const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
       actionSourcePackageConfigReader,
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
       queryBus,
+      requestContextRunner: {
+        runWithRequest: async (_request, _context, callback, options) => {
+          capturedRequestContextOptions.push(options);
+          return callback();
+        },
+      },
     });
 
     const response = await app.handle(
@@ -1113,6 +1124,11 @@ describe("deployment create HTTP route", () => {
     });
     expect(capturedReadConfigInput?.credentials).toEqual({
       githubToken: "github-token-fixture",
+    });
+    expect(capturedRequestContextOptions).toContainEqual({
+      providerAccessTokens: {
+        github: "github-token-fixture",
+      },
     });
   });
 
