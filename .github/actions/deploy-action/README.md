@@ -2,14 +2,26 @@
 
 Run Appaloft deployments from GitHub Actions.
 
-The default mode is a thin wrapper around the released `appaloft` binary for pure SSH deployments.
-Self-hosted server API mode is available for repositories that already have their project,
-environment, resource, and deployment target registered in an Appaloft server. In self-hosted mode,
-the action may read non-secret project/environment/resource/server ids from
-`controlPlane.deploymentContext` in committed `appaloft.yml`; credentials, tokens, and secret
-values still come from trusted workflow inputs or secrets.
+The action supports two Action-owned deployment shapes and points to a separate control-plane-owned
+preview product line. Pick the shape from state ownership first, not from how many ids you have in a
+workflow.
 
-## Basic Deploy
+## Deployment Modes
+
+| Mode | Use when | What the action does | Required Appaloft context |
+| --- | --- | --- | --- |
+| Pure SSH Action | You want the fastest BYOS deployment to an SSH server. | Installs/runs the Appaloft CLI, connects over SSH, and deploys with `control-plane-mode: none`. SSH targets default to server-owned `ssh-pglite` state. | SSH host/user/key. No Appaloft console, no `project-id`, no `resource-id`, no `server-id`, and no `appaloft-token` are required. Source-link state is created once and reused later. |
+| Self-hosted Server Action | You already run a self-hosted Appaloft console/API and want it to own state. | Does not run the CLI deployment path, open SSH, or select `state-backend`; it calls the selected control-plane API. | `control-plane-url` selects the Appaloft instance explicitly, and `appaloft-token` must authenticate mutation endpoints. Prefer `server-config-deploy: true` so the server reads `appaloft.yml`, applies profile/env/domain changes, then dispatches ids-only `deployments.create`. |
+| Product-grade Preview | You want Appaloft Cloud or a self-hosted control plane to own PR preview policy, webhook intake, comments/checks, cleanup retry, scheduler, audit, and quota. | The product workflow is owned by the control plane, not this Action-only workflow file. | Configure preview policy and GitHub integration in the selected Appaloft instance. This is different from a repository-maintained Action-only PR preview. |
+
+Multiple Appaloft instances are selected explicitly with `control-plane-url`. The action does not
+scan SSH targets or networks to discover a console.
+
+## Pure SSH Action
+
+This is the default BYOS path. When no control plane is selected, the action installs the Appaloft
+CLI and deploys over SSH. For SSH targets, Appaloft state defaults to `ssh-pglite` on the target
+server, not the ephemeral GitHub runner.
 
 ```yaml
 name: Deploy
@@ -58,6 +70,11 @@ secrets:
     from: ci-env:DATABASE_URL
 ```
 
+Pure SSH Action does not need an Appaloft console. The first trusted deploy can create source-link
+context in the SSH-server state; later deploys reuse that link automatically. Use source relink or a
+trusted one-time bootstrap override only when you intentionally move the repository to another
+project/resource/server context.
+
 ## Install Self-Hosted Console
 
 Use `command: install-console` when a workflow should install or upgrade an Appaloft console on an
@@ -95,13 +112,7 @@ jobs:
 
 The action connects to the SSH host, downloads the matching Appaloft release `install.sh`, runs the
 self-hosted Docker installer with the selected public console origin and Docker orchestrator, and
-verifies `/api/health`. The installer defaults to PostgreSQL, direct host access on port `3721`,
-and an Appaloft-managed Traefik edge proxy. `console-domain` is passed to the installer as the
-Appaloft instance console route. `console-url` may be supplied directly when the public origin is
-not `https://<console-domain>`. Set `console-orchestrator: swarm` to deploy the console as a Docker
-Swarm stack; `console-swarm-init: true` may initialize a single-node Swarm manager when the host is
-not already a manager. Use `console-proxy: none` only when another reverse proxy owns public
-routing. This command is separate from `deploy`, so the original pure SSH CLI deployment path
+verifies `/api/health`. This command is separate from `deploy`, so the pure SSH CLI deployment path
 remains available.
 
 Non-secret console install settings can live in the selected config file. SSH host, SSH key, API
@@ -111,12 +122,6 @@ tokens, and raw database credentials still come from trusted workflow inputs or 
 controlPlane:
   mode: self-hosted
   url: https://console.example.com
-  deploymentContext:
-    projectId: prj_www
-    environmentId: env_prod
-    resourceId: res_www
-    serverId: srv_prod
-    # destinationId is optional.
   install:
     database: postgres
     domain: console.example.com
@@ -132,10 +137,110 @@ When `command: install-console` is used, explicit action inputs override the mat
 `controlPlane.install.url`, then `controlPlane.url`, then `https://<console-domain>`, and finally
 `http://<ssh-host>:<console-http-port>`.
 
+## Self-Hosted Server Action
+
+Use this mode when a self-hosted Appaloft server owns deployment state and the repository should
+trigger deployment through the server API. The deployment path does not invoke the CLI, open SSH,
+choose a state backend, or mutate SSH-server PGlite.
+
+Recommended server-config deploy:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: appaloft/deploy-action@v1
+        id: deploy
+        with:
+          control-plane-mode: self-hosted
+          control-plane-url: https://console.example.com
+          appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+          server-config-deploy: true
+          config: appaloft.yml
+          secret-variables: |
+            APP_SECRET=ci-env:APP_SECRET
+```
+
+With `server-config-deploy: true`, the action performs a compatibility check against `/api/version`
+and calls `POST /api/action/deployments/from-config-package`. This selects the active self-hosted server config workflow. The self-hosted server validates the source/config reference, reads
+`appaloft.yml`, applies resource runtime/network/health/env/domain intent through Appaloft
+operations, resolves source-link context, and dispatches ids-only `deployments.create`.
+
+`control-plane-url` is how you select the Appaloft instance. It is not inferred by scanning the SSH
+target. `appaloft-token` is required for self-hosted Action mutation endpoints and is sent as an
+HTTP bearer token; keep it in GitHub Secrets, not in repository config.
+
+Non-secret connection policy can live in `appaloft.yml`:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+```
+
+Project, environment, resource, server, and destination ids are not the normal user mental model.
+Prefer source-link state, repository binding, and deploy-token scope. Use ids only for first
+bootstrap, advanced override, or debugging when the server cannot resolve context yet:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.yml
+    project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
+    environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
+    resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
+    server-id: ${{ secrets.APPALOFT_SERVER_ID }}
+```
+
+The selected config file may also carry a narrow `controlPlane.deploymentContext` for a deliberate
+repository-to-resource bootstrap or advanced override:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://console.example.com
+  deploymentContext:
+    projectId: prj_www
+    environmentId: env_prod
+    resourceId: res_www
+    serverId: srv_prod
+    # destinationId is optional.
+```
+
+Do not put credentials, tokens, organization ids, provider account ids, database URLs, SSH keys, or
+raw secret values in committed config.
+
+Existing source-link trigger mode remains available when the resource profile already exists and
+you intentionally leave `server-config-deploy` unset. It calls
+`POST /api/action/deployments/from-source-link`. If ids are omitted, the server resolves context
+from existing source-link state. If ids are supplied, they are trusted bootstrap/debug context and
+must be complete enough for the server to conflict-check before mutation.
+
 ## Pull Request Preview
 
 Action-only pull request previews require a workflow file. The action does not install a webhook or
 make GitHub run previews on its own.
+
+Pure SSH PR preview example:
 
 ```yaml
 name: Appaloft Preview
@@ -185,14 +290,41 @@ The default example skips fork pull requests before deployment credentials are e
 previews need an explicit reduced-credential policy.
 
 Use `appaloft.preview.yml` when the root config is production-oriented. Preview route intent should
-come from generated/default access, this trusted `preview-domain-template`, or an explicitly
-selected preview config file. Production `access.domains[]` should not be reinterpreted as pull
-request preview hostnames.
+come from generated/default access, trusted `preview-domain-template`, or an explicitly selected
+preview config file. Production `access.domains[]` should not be reinterpreted as pull request
+preview hostnames.
+
+Self-hosted server-config preview uses the same control-plane API boundary:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  id: deploy
+  with:
+    control-plane-mode: self-hosted
+    control-plane-url: https://console.example.com
+    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
+    server-config-deploy: true
+    config: appaloft.preview.yml
+    preview: pull-request
+    preview-id: pr-${{ github.event.pull_request.number }}
+    preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
+    preview-tls-mode: disabled
+    require-preview-url: true
+    environment-variables: |
+      HOST=0.0.0.0
+      PORT=4321
+```
+
+In `server-config-deploy` mode, preview route and environment inputs are transient API payload.
+They are not committed to `appaloft.yml`, and production config domains are not reused for PR
+preview routing unless a future preview-safe policy explicitly selects them.
 
 ## Preview Cleanup
 
-Add a separate close-event workflow so preview runtime and route state are cleaned when the pull
-request closes:
+Action-only cleanup is explicit. Add a separate close-event workflow so preview runtime and route
+state are cleaned when the pull request closes.
+
+Pure SSH cleanup:
 
 ```yaml
 name: Appaloft Preview Cleanup
@@ -224,158 +356,44 @@ jobs:
           ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 ```
 
-Cleanup is idempotent. It stops preview-owned runtime state when present, removes preview route
-desired state, unlinks preview source identity, and preserves production deployments and ordinary
-deployment history.
-
-## Self-Hosted Server API Mode
-
-Use this mode when a self-hosted Appaloft server owns deployment state and the repository should
-only trigger a deployment through the server API. The resource profile must already exist in the
-server; this first slice does not apply `appaloft.yml`, upload a source archive, create resources,
-or apply preview route/profile inputs from the runner.
-
-```yaml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.console-url }}
-    steps:
-      - uses: appaloft/deploy-action@v1
-        id: deploy
-        with:
-          control-plane-mode: self-hosted
-          control-plane-url: https://console.example.com
-          appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
-          project-id: ${{ secrets.APPALOFT_PROJECT_ID }}
-          environment-id: ${{ secrets.APPALOFT_ENVIRONMENT_ID }}
-          resource-id: ${{ secrets.APPALOFT_RESOURCE_ID }}
-          server-id: ${{ secrets.APPALOFT_SERVER_ID }}
-```
-
-Server API mode performs a lightweight compatibility check against `/api/version`, derives a safe
-source fingerprint from GitHub repository context and config path, and calls
-`POST /api/action/deployments/from-source-link`. When trusted ids are supplied, the server can use
-them to bootstrap a missing source link before later runs omit ids. When ids are omitted, the server
-resolves project, environment, resource, and target from existing source-link state. It does not
-install or invoke the Appaloft CLI, open SSH, or read or write SSH-server PGlite state.
-
-`server-config-deploy: true` selects the active self-hosted server config workflow. In that mode the
-action feature-gates server support through `/api/version` before source package handoff and then
-calls `POST /api/action/deployments/from-config-package`. A server that does not advertise source
-package and server-side config bootstrap support fails before package upload or state mutation. This
-mode is for compatible `0.9.x` self-hosted servers; leave it unset for the existing source-link
-trigger mode.
+Self-hosted server cleanup:
 
 ```yaml
 - uses: appaloft/deploy-action@v1
-  id: deploy
   with:
-    server-config-deploy: true
-    config: appaloft.yml
-```
-
-With this shape, `controlPlane.mode`, `controlPlane.url`, and
-`controlPlane.deploymentContext` come from `appaloft.yml`. Explicit action inputs still override
-the matching config values when a workflow needs to do so. `appaloft-token` is optional in the
-current 0.9.x slice, but production hardening will require a deploy token or OIDC exchange for
-Action mutation endpoints.
-
-If the committed config declares `secrets.KEY.from: ci-env:NAME`, expose the GitHub secret to the
-runner environment and list the matching `secret-variables` entry. The action resolves the value
-locally, sends it only as transient API payload to the self-hosted server, and the server applies it
-as a runtime secret through its environment-variable operation.
-
-```yaml
-- uses: appaloft/deploy-action@v1
-  id: deploy
-  env:
-    APPALOFT_BETTER_AUTH_SECRET: ${{ secrets.APPALOFT_BETTER_AUTH_SECRET }}
-  with:
+    command: preview-cleanup
     control-plane-mode: self-hosted
     control-plane-url: https://console.example.com
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
-    server-config-deploy: true
-    config: appaloft.yml
-    secret-variables: |
-      APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET
-```
-
-For `preview: pull-request`, server API mode derives a preview-scoped source fingerprint and calls
-the same deployment endpoint. It writes `preview-id`, `deployment-id`, `deployment-url`, and
-`console-url` outputs. Existing source-link server mode does not apply runner-side route/profile
-inputs. In `server-config-deploy` mode, pull request previews may keep using
-`environment-variables`, `preview-domain-template`, `preview-tls-mode`, and `require-preview-url`
-for per-run values such as PR ports, callback URLs, and preview hostnames. Those values are sent as
-transient API payload; they do not need to be committed to `appaloft.yml`. Production config
-domains from `appaloft.yml` are not reused for pull request preview routing unless a later
-preview-safe policy explicitly selects them. When a preview domain is supplied, the server must
-confirm that the resulting deployment uses that domain before the action writes `preview-url`.
-`runtime-name` remains a pure SSH CLI input and is not accepted by server config deploy. In
-`server-config-deploy` mode, `secret-variables` is reserved for resolving committed `ci-env:`
-secret references before the API request.
-
-```yaml
-- uses: appaloft/deploy-action@v1
-  id: deploy
-  with:
-    control-plane-mode: self-hosted
-    control-plane-url: https://console.example.com
-    appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
-    server-config-deploy: true
     config: appaloft.preview.yml
     preview: pull-request
     preview-id: pr-${{ github.event.pull_request.number }}
-    preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
-    preview-tls-mode: disabled
-    require-preview-url: true
-    environment-variables: |
-      HOST=0.0.0.0
-      PORT=4321
-      APPALOFT_BETTER_AUTH_URL=http://pr-${{ github.event.pull_request.number }}.preview.example.com
 ```
 
-For `command: preview-cleanup`, server API mode derives the preview-scoped source fingerprint from
-the trusted `preview` and `preview-id` inputs and calls `POST /api/deployments/cleanup-preview`.
-Cleanup context is resolved from source-link state; project/resource/server ids are not accepted for
-server-mode preview cleanup.
+Cleanup is idempotent. It stops preview-owned runtime state when present, removes preview route
+desired state, unlinks preview source identity, and preserves production deployments and ordinary
+deployment history. In self-hosted server API mode, cleanup resolves context from server-owned
+preview source-link state; project/resource/server ids are not accepted for cleanup.
 
-Server API mode writes the console URL and deployment detail URL to the GitHub step summary when
-GitHub provides `GITHUB_STEP_SUMMARY`. When the server response includes a deployment href or URL,
-the action uses that server-provided console target; otherwise it falls back to the standard
-`/deployments/{deploymentId}` console route. For cleanup it writes the console URL and cleanup
-status. Workflows can also use the `console-url` or `deployment-url` output for environment URLs or
-PR comments.
+## Pull Request Comments
 
 When `pr-comment: true`, the action posts or updates one stable pull request comment with the
 preview URL, console URL, deployment detail URL, or cleanup status that is available for the
 selected mode.
+
 The workflow must pass `github-token: ${{ github.token }}` and grant `pull-requests: write` or
 `issues: write`. This is entrypoint feedback only; product-grade GitHub App comments/checks remain
 control-plane features. Comment publishing is best-effort: GitHub API permission failures are
 reported as warnings and do not fail an otherwise successful deployment or cleanup.
 
-The control-plane connection policy can live in `appaloft.yml`:
+## Product-Grade Previews
 
-```yaml
-controlPlane:
-  mode: self-hosted
-  url: https://console.example.com
-```
+This action supports workflow-file previews. Product-grade previews are owned by Appaloft Cloud or
+a self-hosted control plane with preview policy, GitHub App webhook verification, comments/checks,
+cleanup retries, scheduler ownership, quotas, audit, and managed route/domain follow-up.
 
-Explicit action inputs override config values. Project, environment, resource, server, token, SSH,
-and database identity still come from trusted workflow inputs, variables, secrets, existing
-source-link state, or the Appaloft server, not from committed config.
+Use product-grade previews when you want Appaloft to own preview lifecycle and cleanup instead of
+requiring every repository to maintain deploy and close-event workflow files.
 
 ## Inputs
 
@@ -385,7 +403,7 @@ source-link state, or the Appaloft server, not from committed config.
 | `version` | `latest` | Appaloft release tag such as `v0.9.0`. Used for CLI install and self-hosted console install. |
 | `config` | empty | Optional Appaloft config path. If omitted, `appaloft.yml` is used only when present. |
 | `source` | `.` | Source path or locator passed to the CLI. |
-| `runtime-name` | empty | Trusted runtime name override for deploy. |
+| `runtime-name` | empty | Trusted runtime name override for pure SSH deploy. |
 | `ssh-host` | empty | SSH target host for pure SSH deployments. |
 | `ssh-user` | empty | SSH username. |
 | `ssh-port` | empty | SSH port. |
@@ -406,11 +424,11 @@ source-link state, or the Appaloft server, not from committed config.
 | `console-image` | config or `ghcr.io/appaloft/appaloft` | Appaloft console image repository or full image reference passed to the self-hosted console installer. |
 | `console-installer-url` | empty | Override URL for the self-hosted `install.sh` used by `command: install-console`. |
 | `console-skip-docker-install` | `false` | Require Docker Engine to already exist on the SSH host during `command: install-console`. |
-| `server-provider` | `generic-ssh` | Server provider key. |
+| `server-provider` | `generic-ssh` | Server provider key for pure SSH deployments. |
 | `server-proxy-kind` | empty | Server proxy kind such as `traefik` or `caddy`. |
 | `state-backend` | empty | Explicit state backend. SSH targets default to `ssh-pglite`. |
-| `environment-variables` | empty | Newline-separated values passed as repeated CLI `--env` flags in pure SSH CLI mode. In `server-config-deploy` pull request previews, sent as transient server API payload and applied through the server environment-variable operation after committed `env` values, so Action values can override per-preview fields. |
-| `secret-variables` | empty | Newline-separated values passed as repeated CLI `--secret` flags in pure SSH CLI mode. In `server-config-deploy` mode, resolves `ci-env:` references and sends the matched values as transient server API payload for committed config `secrets` entries. Prefer `ci-env:` references over raw secret values. |
+| `environment-variables` | empty | Newline-separated values passed as repeated CLI `--env` flags in pure SSH CLI mode. In `server-config-deploy` pull request previews, sent as transient server API payload after committed `env` values. |
+| `secret-variables` | empty | Newline-separated values passed as repeated CLI `--secret` flags in pure SSH CLI mode. In `server-config-deploy` mode, resolves committed `ci-env:` secret references and sends matched values as transient server API payload. |
 | `preview` | empty | Use `pull-request` for PR preview deploy or cleanup. |
 | `preview-id` | empty | Trusted preview scope, for example `pr-123`. Required for pull request previews. |
 | `preview-domain-template` | empty | Trusted preview hostname for deploy, for example `pr-123.preview.example.com`. |
@@ -419,15 +437,15 @@ source-link state, or the Appaloft server, not from committed config.
 | `pr-comment` | `false` | Post or update one pull request comment with preview, deployment, cleanup, and console feedback. |
 | `github-token` | empty | GitHub token used only when `pr-comment` is true. |
 | `control-plane-mode` | empty | Use `none` for pure SSH CLI mode or `self-hosted` for server API mode. When empty, `controlPlane.mode` from config may select the mode; otherwise the effective default is `none`. |
-| `control-plane-url` | empty | Self-hosted Appaloft server endpoint for server API mode. When empty, `controlPlane.url` from config may supply the endpoint. |
-| `appaloft-token` | empty | Optional bearer token for server API mode. |
+| `control-plane-url` | empty | Required for self-hosted server API mode unless `controlPlane.url` supplies the endpoint. Selects the Appaloft instance explicitly. |
+| `appaloft-token` | empty | Required deploy token for self-hosted server API mutation endpoints. Ignored in pure SSH mode. |
 | `use-oidc` | `false` | Reserved for future GitHub OIDC exchange. |
 | `server-config-deploy` | `false` | Active self-hosted server config deploy mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
-| `project-id` | config or empty | Optional trusted project id for server API mode. Defaults to `controlPlane.deploymentContext.projectId` when present. |
-| `environment-id` | config or empty | Optional trusted environment id for server API mode. Defaults to `controlPlane.deploymentContext.environmentId` when present. Required only when any explicit deployment id is supplied. |
-| `resource-id` | config or empty | Optional trusted resource id for server API mode. Defaults to `controlPlane.deploymentContext.resourceId` when present. Required only when any explicit deployment id is supplied. |
-| `server-id` | config or empty | Optional trusted deployment target id for server API mode. Defaults to `controlPlane.deploymentContext.serverId` when present. Required only when any explicit deployment id is supplied. |
-| `destination-id` | config or empty | Optional trusted destination id for server API mode. Defaults to `controlPlane.deploymentContext.destinationId` when present. |
+| `project-id` | config or empty | Advanced trusted bootstrap/debug project id for server API mode. Defaults to `controlPlane.deploymentContext.projectId` when present. |
+| `environment-id` | config or empty | Advanced trusted bootstrap/debug environment id for server API mode. Defaults to `controlPlane.deploymentContext.environmentId` when present. Required only when any explicit deployment id is supplied. |
+| `resource-id` | config or empty | Advanced trusted bootstrap/debug resource id for server API mode. Defaults to `controlPlane.deploymentContext.resourceId` when present. Required only when any explicit deployment id is supplied. |
+| `server-id` | config or empty | Advanced trusted bootstrap/debug deployment target id for server API mode. Defaults to `controlPlane.deploymentContext.serverId` when present. Required only when any explicit deployment id is supplied. |
+| `destination-id` | config or empty | Advanced trusted bootstrap/debug destination id for server API mode. Defaults to `controlPlane.deploymentContext.destinationId` when present. |
 
 ## Outputs
 
@@ -446,18 +464,18 @@ source-link state, or the Appaloft server, not from committed config.
 
 - `ssh-private-key` is written to a runner temp file with mode `0600`; raw key material is not
   passed as a command-line argument.
-- Do not commit SSH keys, tokens, database URLs, production secret values, or Appaloft identity
+- Do not commit SSH keys, deploy tokens, database URLs, production secret values, or broad identity
   selectors into `appaloft.yml`.
 - The action defaults SSH deployments to server-owned `ssh-pglite` state when `ssh-host` is set and
   no control plane is selected.
 - `control-plane-mode: self-hosted` does not accept SSH keys or `state-backend`; the action calls
   the Appaloft server API and leaves state ownership with the server.
-- In self-hosted server API mode, preview deploy accepts trusted `preview` and `preview-id` inputs
-  for source fingerprinting and feedback outputs. Preview route/profile inputs remain rejected by
-  source-link trigger mode. `server-config-deploy` may accept preview route and environment inputs
-  only with `preview=pull-request`; `command: preview-cleanup` accepts only source/config and
-  trusted preview scope inputs. Deployment target ids are intentionally ignored/rejected for cleanup
-  because cleanup resolves from server-owned source-link state.
+- In self-hosted server API mode, mutation endpoints require `appaloft-token`. Missing or invalid
+  tokens fail as `401`, and scope failures fail as `403`, before source-link, resource, route,
+  preview cleanup, or deployment mutation.
+- Current implementation note: the composite wrapper still runs its shared binary install/setup
+  step before dispatch. In self-hosted server API mode that binary is not used as the deployment
+  executor; deployment and cleanup mutations are API calls to the selected control plane.
 - `server-config-deploy` requires explicit self-hosted server support. The action fails before
   source package handoff when the server handshake does not advertise the required capability.
 - In `server-config-deploy` mode, `secret-variables` supports only `KEY=ci-env:NAME` references.
@@ -466,9 +484,3 @@ source-link state, or the Appaloft server, not from committed config.
 - `pr-comment` requires explicit workflow permission and token wiring. The action updates the same
   marker comment for the PR instead of creating a new comment on each run. Comment API failures are
   warnings so they do not mask a successful deployment.
-
-## Product-Grade Previews
-
-This action supports workflow-file previews. Product-grade previews with GitHub App webhooks,
-preview policy, comments/checks, cleanup retries, quotas, audit, and managed domain lifecycle are
-future Appaloft Cloud or self-hosted control-plane features.

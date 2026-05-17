@@ -48,8 +48,8 @@ PGlite from the runner.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token or currently accepted anonymous self-host policy, and a source package manifest includes a safe config path | The Action submits the server config deploy request with Appaloft identity ids and optional trusted GitHub repository/ref/revision metadata | The server validates the package manifest and config, resolves identity from trusted context/source links or `controlPlane.deploymentContext`, accepts GitHub metadata without treating it as source-link identity, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
-| ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The Action does not install or invoke the CLI, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. |
+| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL and deploy token, and a source package manifest includes a safe config path | The Action submits the server config deploy request with Appaloft identity ids and optional trusted GitHub repository/ref/revision metadata | The server validates the package manifest and config, resolves identity from trusted context/source links or `controlPlane.deploymentContext`, accepts GitHub metadata without treating it as source-link identity, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
+| ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The deployment path does not invoke the CLI, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. Current composite wrapper setup may still install the released binary before dispatch, but this workflow does not use it as the deployment executor. |
 | ACTION-SERVER-CONFIG-SPEC-003 | Committed config can only select narrow self-hosted deployment context | `appaloft.yml` contains `controlPlane.deploymentContext` with project/environment/resource/server and optional destination ids | The Action/server parses the config | The ids are treated as non-secret explicit deployment context for this repository and may bootstrap a missing source link after authorization. |
 | ACTION-SERVER-CONFIG-SPEC-003A | Committed config cannot select secrets or broad identity | `appaloft.yml` contains credential ids, organization ids, tenant ids, provider account ids, tokens, database URLs, or secret values | The server parses the config | The request fails before mutation with structured validation details and no source link, resource profile, route, or deployment mutation. |
 | ACTION-SERVER-CONFIG-SPEC-004 | Existing trigger mode remains supported | A repository already uses the source-link trigger mode for an existing resource profile | The wrapper and server are upgraded | The old `from-source-link` request shape continues to work, while server config deploy is selected only by an explicit supported input or endpoint. |
@@ -123,8 +123,9 @@ PGlite from the runner.
 - Existing implementation supports the first self-hosted Action API trigger:
   `/api/version`, `POST /api/action/deployments/from-source-link`, and
   `POST /api/deployments/cleanup-preview`.
-- Existing server trigger mode does not install or invoke the CLI and does not mutate SSH-server
-  PGlite from the runner.
+- Existing server trigger mode does not invoke the CLI deployment executor and does not mutate
+  SSH-server PGlite from the runner. Current composite wrapper setup may still install the released
+  binary before dispatch.
 - The first Action Server Config Deploy code slices validate package metadata, read
   `server-github-fetch` config files from GitHub raw content, accept the narrow
   `controlPlane.deploymentContext`, reject broad committed identity/secrets,

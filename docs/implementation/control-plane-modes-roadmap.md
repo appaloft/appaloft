@@ -146,12 +146,13 @@ Purpose: users can run Appaloft as their own control plane.
   includes a deployment detail href so GitHub step summaries and PR comments can point back to the
   self-hosted console.
 - The Action calls `POST /api/deployments/cleanup-preview` for server-owned preview cleanup.
-- The Action does not install or invoke the CLI, open SSH, apply repository config to create a full
-  resource profile, mutate SSH-server PGlite, or run the full product-grade preview workflow in this
-  slice.
+- The deployment path does not invoke the CLI, open SSH, apply repository config to create a full
+  resource profile, mutate SSH-server PGlite, or run the full product-grade preview workflow in
+  this slice. Current composite wrapper setup may still install the released binary before
+  dispatch.
 - This is not SSH PGlite adoption and does not make `auto` mode active.
 
-Next `0.9.x` accepted candidate:
+Active `0.9.x` server-config deploy slice:
 
 - [Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by
   [spec 050](../specs/050-action-server-config-deploy/spec.md), lets the Action hand a bounded
@@ -159,10 +160,11 @@ Next `0.9.x` accepted candidate:
 - The self-hosted server validates package metadata, parses repository config, rejects committed
   identity/secret fields, applies profile/env/route intent through explicit commands, resolves
   source links from trusted context, and dispatches ids-only deployment admission.
-- The Action still does not install or invoke the CLI, open SSH, select a state backend, or mutate
+- The deployment path still does not invoke the CLI, open SSH, select a state backend, or mutate
   SSH-server PGlite in this mode.
-- Source package transport, storage limits, diagnostics, and cleanup rules must be closed before
-  this candidate is marked implemented.
+- Source package transport, storage limits, diagnostics, and cleanup rules are governed by
+  [Action Server Config Deploy](../workflows/action-server-config-deploy.md) and its implementation
+  notes.
 
 Deliverables:
 

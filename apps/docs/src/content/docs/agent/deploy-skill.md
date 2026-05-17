@@ -26,7 +26,7 @@ Appaloft Deploy Skill 是完整 [Appaloft Skill](/docs/agent/appaloft-skill/#app
 中的部署子协议。它不是新的部署操作，也不是 MCP 的替代实现；它是一套给 AI agent 使用的用户层协议，让 agent
 使用现有 CLI、HTTP API 或 Web Quick Deploy 完成部署。
 
-Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。静态输出只是最快的入口之一，不是 skill 的边界。
+Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用户真正关心的问题：访问地址、部署状态、日志、诊断摘要和恢复路径。静态输出只是最快的入口之一，不是 skill 的边界。GitHub Action 部署时，agent 还必须先区分 Pure SSH Action、Self-hosted Server Action 和 Product-grade Preview，不要把三者混成一个配置模板。
 
 <h2 id="agent-deploy-install">安装 skill</h2>
 
@@ -46,6 +46,14 @@ npx skills add appaloft/appaloft
 3. 使用既有操作：在当前可用的 Appaloft 表面中创建或选择项目、服务器、环境和资源，然后发起 `deployments.create`。Shell
    场景可以使用 CLI；Web 或 HTTP/API 场景使用等价的 Resource/Deployment 操作。
 4. 输出结果：优先给访问 URL，其次给 deployment id、resource id、日志命令、诊断命令和 recovery readiness 命令。
+
+<h2 id="agent-deploy-action-modes">GitHub Action 部署模式</h2>
+
+- Pure SSH Action：默认 `control-plane-mode: none`，Action 安装/运行 CLI，通过 SSH 部署，SSH 目标使用 server-owned `ssh-pglite` 状态。不要要求 Appaloft console、deploy token、project id、resource id 或 server id。
+- Self-hosted Server Action：已有 self-hosted Appaloft console/API 拥有状态。Action 只调用由 `control-plane-url` 显式选择的 server API，必须使用 `appaloft-token`，不运行 CLI、不打开 SSH。优先使用 `server-config-deploy: true`，让 server 读取 `appaloft.yml` 并应用 profile/env/domain 后再 dispatch ids-only deployment。
+- Product-grade Preview：由 Appaloft Cloud 或 self-hosted control plane 拥有 preview policy、GitHub App webhook、comments/checks、cleanup retry、scheduler、audit 和 quota。它不是用户自己维护 workflow file 的 Action-only PR preview。
+
+如果缺少 source-link 或 repository binding，agent 应提示建立绑定，或运行一次 trusted bootstrap context。Project/resource/server ids 只适合首次 bootstrap、advanced override 或 debug，不是普通用户默认要提供的输入。
 
 <h2 id="agent-deploy-safety">安全边界</h2>
 

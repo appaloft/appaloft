@@ -186,8 +186,10 @@ Implemented slices:
   references, while rejecting committed identity selectors, raw secret material, unknown fields, and
   unsupported CPU/memory/replica/restart/rollout fields.
 - `controlPlane.mode` and `controlPlane.url` are implemented as non-secret connection policy in the
-  parser. They do not select project/resource/server identity and do not carry tokens, database
-  URLs, SSH keys, or raw credential material.
+  parser. `controlPlane.deploymentContext` is the narrow self-hosted server config deploy
+  bootstrap/advanced override for project/environment/resource/server identity. Other committed
+  identity selectors remain rejected, and config must not carry tokens, database URLs, SSH keys, or
+  raw credential material.
 - `FileSystemDeploymentConfigReader` supports explicit config paths, Git-root discovery for nested
   local sources, YAML parsing, ambiguous-file rejection, and profile snapshot mapping.
 - CLI `appaloft init` writes a profile-only config and no longer writes project/resource/server

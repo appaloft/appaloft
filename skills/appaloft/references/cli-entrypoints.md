@@ -4,6 +4,17 @@ This reference mirrors every Appaloft CLI transport in `packages/application/src
 Use it to map AI intent to the same operations exposed through CLI, HTTP/API, Web, and future MCP
 surfaces. If a command is absent here, treat it as unsupported until the operation catalog adds it.
 
+## Deploy Mode Notes
+
+- `appaloft deploy` is the CLI entrypoint used by Pure SSH Action. SSH targets default to
+  server-owned `ssh-pglite` state when no control plane is selected.
+- Self-hosted Server Action does not call the CLI for deployment. It calls self-hosted Action API
+  endpoints with `control-plane-url` and `appaloft-token`; server-config deploy then resolves
+  source-link context and dispatches ids-only `deployments.create`.
+- Product-grade preview operations are the `preview-policies.*` and `preview-environments.*`
+  catalog entries. They are control-plane-owned and are not the same as Action-only PR preview
+  workflow files.
+
 ## Catalog
 
 - `appaloft auth bootstrap-status` - `auth.bootstrap-status`

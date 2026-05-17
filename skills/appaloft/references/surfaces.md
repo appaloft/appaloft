@@ -18,15 +18,32 @@ installer; that would blur the boundary between installing an agent skill and ru
 ## Surface Selection
 
 1. CLI: use when the agent has a trusted local shell and the user expects direct project or server
-   work. Use `references/cli-entrypoints.md` for exact commands and operation keys.
+   work. Pure SSH GitHub Actions also enter through the CLI wrapper by default with
+   `control-plane-mode: none` and SSH-server `ssh-pglite` state. Use
+   `references/cli-entrypoints.md` for exact commands and operation keys.
 2. HTTP/API: use when the agent is integrated beside an Appaloft control plane or when shell access
-   is not the right boundary. Reuse the same command/query semantics and public operation names.
+   is not the right boundary. Self-hosted Server Action uses this surface: `control-plane-url`
+   selects the instance explicitly, `appaloft-token` authenticates mutation endpoints, and the
+   Action must not SSH or run the CLI.
 3. Web: use when guiding a human through the console. Describe the next UI action and keep business
    behavior aligned with the same operation catalog.
 4. Repository config: use Appaloft config files as deployment intent, not as a replacement for
-   Resource profile ownership.
+   Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
+   connection policy; project/resource/server ids are bootstrap/advanced override context, not the
+   ordinary default mental model.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
+
+## GitHub Action Boundary
+
+- Pure SSH Action is the default for BYOS SSH deployments and does not require an Appaloft console,
+  project id, resource id, server id, or deploy token.
+- Self-hosted Server Action is selected only by an explicit self-hosted control-plane URL and
+  deploy-token credential. Prefer `server-config-deploy: true` so the server reads config and
+  dispatches ids-only deployment admission.
+- Product-grade preview belongs to Appaloft Cloud or a self-hosted control plane with preview
+  policy, GitHub App webhook intake, cleanup retry, scheduler, audit, and quota. Do not collapse it
+  into Action-only PR preview guidance.
 
 ## Boundary Rules
 

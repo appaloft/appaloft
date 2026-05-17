@@ -87,7 +87,8 @@ sanitized diagnostics.
 - contact Appaloft Cloud by default without a trusted token or endpoint selection;
 - scan arbitrary network addresses;
 - import or upload SSH-server state as a side effect of deploy;
-- retarget project/resource/server identity from committed config.
+- retarget project/resource/server identity from committed config outside the narrow self-hosted
+  `controlPlane.deploymentContext` bootstrap/advanced override.
 
 ### `cloud`
 
@@ -155,8 +156,11 @@ Rules:
 - `mode` may be `none`, `auto`, `cloud`, or `self-hosted`.
 - `url` is allowed only as non-secret connection metadata for self-hosted or future private Cloud
   endpoints.
-- Raw tokens, API keys, database URLs, SSH keys, certificate material, project ids, resource ids,
-  server ids, destination ids, credential ids, organization ids, and tenant ids are rejected.
+- Raw tokens, API keys, database URLs, SSH keys, certificate material, credential ids, organization
+  ids, tenant ids, provider account ids, and secret values are rejected. Project/environment/
+  resource/server/destination ids are accepted only inside the narrow self-hosted
+  `controlPlane.deploymentContext` bootstrap/advanced override field governed by Action Server
+  Config Deploy; broad committed identity selectors remain rejected.
 - `controlPlane.install` is limited to non-secret console installer defaults. SSH host/key, API
   tokens, raw database credentials, and deployment identity remain trusted entrypoint inputs or
   server-owned state.
@@ -262,8 +266,9 @@ GitHub Action
   -> call POST /api/deployments/cleanup-preview with a preview source fingerprint for preview cleanup
 ```
 
-In this slice the Action must not install or invoke the CLI, open SSH, select `state-backend`,
-create or configure resource profile state, upload source archives, or mutate SSH-server PGlite.
+In this slice the Action must not invoke the CLI deployment path, open SSH, select
+`state-backend`, create or configure resource profile state, upload source archives, or mutate
+SSH-server PGlite.
 The source-link API route dispatches the internal
 `CreateActionSourceLinkDeploymentCommand` to resolve project/environment/resource/server context
 from existing server-owned source-link state. If trusted ids are supplied by the Action for deploy,
@@ -331,6 +336,8 @@ Current implementation has an active self-hosted control-plane baseline:
 - repository config parsing accepts safe `controlPlane.mode` and `controlPlane.url` values while
   rejecting identity selectors and secret-bearing fields;
 - deploy-action self-hosted modes use `/api/version` as the compatibility handshake;
+- deploy-action's composite wrapper still runs its shared binary install/setup step before dispatch,
+  but self-hosted server API mode does not use that binary as the deployment executor;
 - source-link server API deployments are available through
   `POST /api/action/deployments/from-source-link`;
 - the active self-hosted server-config deploy slice is available through

@@ -159,7 +159,7 @@ inputs:
     required: false
     default: ""
   appaloft-token:
-    description: Optional bearer token for self-hosted Appaloft server API mode.
+    description: Deploy token required for self-hosted Appaloft server API mutation endpoints. Ignored in pure SSH mode.
     required: false
     default: ""
   use-oidc:
@@ -171,23 +171,23 @@ inputs:
     required: false
     default: "false"
   project-id:
-    description: Trusted Appaloft project id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.projectId from config.
+    description: Advanced trusted bootstrap or debug Appaloft project id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.projectId from config when present.
     required: false
     default: ""
   environment-id:
-    description: Trusted Appaloft environment id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.environmentId from config.
+    description: Advanced trusted bootstrap or debug Appaloft environment id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.environmentId from config when present.
     required: false
     default: ""
   resource-id:
-    description: Trusted Appaloft resource id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.resourceId from config.
+    description: Advanced trusted bootstrap or debug Appaloft resource id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.resourceId from config when present.
     required: false
     default: ""
   server-id:
-    description: Trusted Appaloft deployment target id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.serverId from config.
+    description: Advanced trusted bootstrap or debug Appaloft deployment target id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.serverId from config when present.
     required: false
     default: ""
   destination-id:
-    description: Optional trusted Appaloft destination id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.destinationId from config.
+    description: Advanced trusted bootstrap or debug Appaloft destination id for self-hosted server API mode. Defaults to controlPlane.deploymentContext.destinationId from config when present.
     required: false
     default: ""
 

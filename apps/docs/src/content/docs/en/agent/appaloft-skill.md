@@ -30,6 +30,13 @@ It is not a new business operation and not an `appaloft deploy` wrapper. It tran
 into existing Appaloft operations and chooses CLI, HTTP/API, Web, or future MCP based on the active
 agent environment.
 
+For GitHub Actions, the skill must keep three modes separate: Pure SSH Action is the default BYOS
+SSH path and does not require an Appaloft console or ids; Self-hosted Server Action calls an
+existing self-hosted console/API through `control-plane-url` and `appaloft-token` without running
+the CLI or SSH; Product-grade Preview is owned by Appaloft Cloud or a self-hosted control plane
+with preview policy, GitHub App webhooks, comments/checks, cleanup retry, scheduler, audit, and
+quota.
+
 <h2 id="appaloft-skill-install">Install</h2>
 
 Install the full Appaloft skill:
