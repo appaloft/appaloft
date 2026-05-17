@@ -2,6 +2,7 @@ import {
   type ActionDeployTokenAuthorizationInput,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenAuthorizationResult,
+  type ActionDeployTokenRequestedScope,
   type ChangeOrganizationMemberRoleInput,
   type Clock,
   type CurrentOrganizationContext,
@@ -32,6 +33,8 @@ import {
   ActiveDeployTokenByVerifierDigestSpec,
   CreatedAt,
   DeploymentTargetId,
+  type DeployTokenAuthorizationScopeDenyReason,
+  type DeployTokenAuthorizationScopeDimension,
   DeployTokenSecretSuffix,
   DeployTokenVerifierDigest,
   DeployTokenWorkflowCommandValue,
@@ -1186,48 +1189,79 @@ export class StaticActionDeployTokenAuthorizationPort
   private scopeFailure(input: ActionDeployTokenAuthorizationInput) {
     const allowedWorkflows = this.scope.workflows;
     if (allowedWorkflows && !allowedWorkflows.includes(input.workflow)) {
-      return actionAuthForbidden(input, "workflow-command");
+      return actionAuthForbidden(input, "workflow-command", "scope_value_not_allowed");
     }
 
     const requested = input.requestedScope;
     if (!requested) {
-      return undefined;
+      return this.missingRequestedScopeFailure(input);
     }
 
-    if (
-      this.scope.projectId &&
-      requested.projectId &&
-      requested.projectId !== this.scope.projectId
-    ) {
-      return actionAuthForbidden(input, "project");
+    if (!requested.projectId && this.scope.projectId) {
+      return actionAuthForbidden(input, "project", "scope_value_missing");
     }
 
-    if (
-      this.scope.environmentId &&
-      requested.environmentId &&
-      requested.environmentId !== this.scope.environmentId
-    ) {
-      return actionAuthForbidden(input, "environment");
+    if (this.scope.projectId && requested.projectId !== this.scope.projectId) {
+      return actionAuthForbidden(input, "project", "scope_value_not_allowed");
     }
 
-    if (
-      this.scope.resourceId &&
-      requested.resourceId &&
-      requested.resourceId !== this.scope.resourceId
-    ) {
-      return actionAuthForbidden(input, "resource");
+    if (!requested.environmentId && this.scope.environmentId) {
+      return actionAuthForbidden(input, "environment", "scope_value_missing");
     }
 
-    if (this.scope.serverId && requested.serverId && requested.serverId !== this.scope.serverId) {
-      return actionAuthForbidden(input, "server");
+    if (this.scope.environmentId && requested.environmentId !== this.scope.environmentId) {
+      return actionAuthForbidden(input, "environment", "scope_value_not_allowed");
+    }
+
+    if (!requested.resourceId && this.scope.resourceId) {
+      return actionAuthForbidden(input, "resource", "scope_value_missing");
+    }
+
+    if (this.scope.resourceId && requested.resourceId !== this.scope.resourceId) {
+      return actionAuthForbidden(input, "resource", "scope_value_not_allowed");
+    }
+
+    if (!requested.serverId && this.scope.serverId) {
+      return actionAuthForbidden(input, "deployment-target", "scope_value_missing");
+    }
+
+    if (this.scope.serverId && requested.serverId !== this.scope.serverId) {
+      return actionAuthForbidden(input, "deployment-target", "scope_value_not_allowed");
+    }
+
+    if (!requested.repositoryFullName && this.scope.repositoryFullName) {
+      return actionAuthForbidden(input, "repository", "scope_value_missing");
     }
 
     if (
       this.scope.repositoryFullName &&
-      requested.repositoryFullName &&
       requested.repositoryFullName !== this.scope.repositoryFullName
     ) {
-      return actionAuthForbidden(input, "repository");
+      return actionAuthForbidden(input, "repository", "scope_value_not_allowed");
+    }
+
+    return undefined;
+  }
+
+  private missingRequestedScopeFailure(input: ActionDeployTokenAuthorizationInput) {
+    if (this.scope.projectId) {
+      return actionAuthForbidden(input, "project", "scope_value_missing");
+    }
+
+    if (this.scope.environmentId) {
+      return actionAuthForbidden(input, "environment", "scope_value_missing");
+    }
+
+    if (this.scope.resourceId) {
+      return actionAuthForbidden(input, "resource", "scope_value_missing");
+    }
+
+    if (this.scope.serverId) {
+      return actionAuthForbidden(input, "deployment-target", "scope_value_missing");
+    }
+
+    if (this.scope.repositoryFullName) {
+      return actionAuthForbidden(input, "repository", "scope_value_missing");
     }
 
     return undefined;
@@ -1272,11 +1306,16 @@ export class PersistedActionDeployTokenAuthorizationPort
 
       const workflowCommand = DeployTokenWorkflowCommandValue.create(input.workflow);
       if (workflowCommand.isErr()) {
-        return err(actionAuthForbidden(input, "workflow-command"));
+        return err(actionAuthForbidden(input, "workflow-command", "scope_value_not_allowed"));
       }
 
-      if (!deployToken.authorizesScope(toScopeRequest(input, workflowCommand.value))) {
-        return err(actionAuthForbidden(input, "scope"));
+      const scopeAuthorization = deployToken.authorizeScope(
+        toScopeRequest(input, workflowCommand.value),
+      );
+      if (!scopeAuthorization.allowed) {
+        return err(
+          actionAuthForbidden(input, scopeAuthorization.deniedScope, scopeAuthorization.reasonCode),
+        );
       }
 
       const lastUsedAt = LastUsedAt.create(this.input.clock.now());
@@ -1337,22 +1376,29 @@ export class BetterAuthDeployTokenMaterialIssuer implements DeployTokenMaterialI
   }
 }
 
-function actionAuthForbidden(input: ActionDeployTokenAuthorizationInput, missingScope: string) {
+function actionAuthForbidden(
+  input: ActionDeployTokenAuthorizationInput,
+  deniedScope: DeployTokenAuthorizationScopeDimension,
+  reasonCode: DeployTokenAuthorizationScopeDenyReason,
+) {
   return {
     code: "action_auth_forbidden",
     category: "user",
     message: "Action deploy token is not authorized for this request",
     retryable: false,
     details: {
+      deniedScope,
       endpoint: input.path,
-      missingScope,
+      missingScope: deniedScope,
       phase: "action-authorization",
+      reasonCode,
       workflow: input.workflow,
       ...(input.requestedScope?.projectId ? { projectId: input.requestedScope.projectId } : {}),
       ...(input.requestedScope?.environmentId
         ? { environmentId: input.requestedScope.environmentId }
         : {}),
       ...(input.requestedScope?.resourceId ? { resourceId: input.requestedScope.resourceId } : {}),
+      ...(input.requestedScope?.serverId ? { serverId: input.requestedScope.serverId } : {}),
       ...(input.requestedScope?.repositoryFullName
         ? { repositoryFullName: input.requestedScope.repositoryFullName }
         : {}),
@@ -1379,25 +1425,25 @@ function toScopeRequest(
   input: ActionDeployTokenAuthorizationInput,
   workflowCommand: DeployTokenWorkflowCommandValue,
 ) {
+  const requestedScope: ActionDeployTokenRequestedScope = input.requestedScope ?? {};
+
   return {
     workflowCommand,
-    ...(input.requestedScope?.projectId
-      ? { projectId: ProjectId.rehydrate(input.requestedScope.projectId) }
+    ...(requestedScope.projectId
+      ? { projectId: ProjectId.rehydrate(requestedScope.projectId) }
       : {}),
-    ...(input.requestedScope?.environmentId
-      ? { environmentId: EnvironmentId.rehydrate(input.requestedScope.environmentId) }
+    ...(requestedScope.environmentId
+      ? { environmentId: EnvironmentId.rehydrate(requestedScope.environmentId) }
       : {}),
-    ...(input.requestedScope?.resourceId
-      ? { resourceId: ResourceId.rehydrate(input.requestedScope.resourceId) }
+    ...(requestedScope.resourceId
+      ? { resourceId: ResourceId.rehydrate(requestedScope.resourceId) }
       : {}),
-    ...(input.requestedScope?.serverId
-      ? { deploymentTargetId: DeploymentTargetId.rehydrate(input.requestedScope.serverId) }
+    ...(requestedScope.serverId
+      ? { deploymentTargetId: DeploymentTargetId.rehydrate(requestedScope.serverId) }
       : {}),
-    ...(input.requestedScope?.repositoryFullName
+    ...(requestedScope.repositoryFullName
       ? {
-          repositoryFullName: SourceRepositoryFullName.rehydrate(
-            input.requestedScope.repositoryFullName,
-          ),
+          repositoryFullName: SourceRepositoryFullName.rehydrate(requestedScope.repositoryFullName),
         }
       : {}),
   };
