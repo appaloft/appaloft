@@ -36,9 +36,13 @@ private repository secrets, source package raw payloads, or credential-bearing h
 - `endpoint`
 - `tokenId` when known
 - `organizationId` when known
+- `deniedScope`, such as `workflow-command`, `project`, `environment`, `resource`,
+  `deployment-target`, or `repository`
+- `reasonCode`, such as `scope_value_missing` when the request did not supply a scope required by
+  the token, or `scope_value_not_allowed` when the requested value is outside the token scope
 - safe requested scope fields such as `projectId`, `environmentId`, `resourceId`,
   `repositoryFullName`, `previewKind`, or `workflowCommand`
-- `missingScope` or `blockedReasonCode`
+- `missingScope` as a compatibility alias for `deniedScope`
 
 Token lifecycle errors:
 

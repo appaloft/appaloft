@@ -135,6 +135,26 @@ export interface DeployTokenAuthorizationScopeRequest {
   workflowCommand: DeployTokenWorkflowCommandValue;
 }
 
+export type DeployTokenAuthorizationScopeDimension =
+  | "deployment-target"
+  | "environment"
+  | "project"
+  | "repository"
+  | "resource"
+  | "workflow-command";
+
+export type DeployTokenAuthorizationScopeDenyReason =
+  | "scope_value_missing"
+  | "scope_value_not_allowed";
+
+export type DeployTokenAuthorizationScopeResult =
+  | { allowed: true }
+  | {
+      allowed: false;
+      deniedScope: DeployTokenAuthorizationScopeDimension;
+      reasonCode: DeployTokenAuthorizationScopeDenyReason;
+    };
+
 export class DeployTokenScope extends ValueObject<DeployTokenScopeState> {
   private constructor(state: DeployTokenScopeState) {
     super(state);
@@ -181,17 +201,50 @@ export class DeployTokenScope extends ValueObject<DeployTokenScopeState> {
   }
 
   authorizes(request: DeployTokenAuthorizationScopeRequest): boolean {
+    return this.authorize(request).allowed;
+  }
+
+  authorize(request: DeployTokenAuthorizationScopeRequest): DeployTokenAuthorizationScopeResult {
     if (!containsValue(this.state.workflowCommands, request.workflowCommand)) {
-      return false;
+      return denyScope("workflow-command", "scope_value_not_allowed");
     }
 
-    return (
-      matchesOptionalConstraint(this.state.projectIds, request.projectId) &&
-      matchesOptionalConstraint(this.state.environmentIds, request.environmentId) &&
-      matchesOptionalConstraint(this.state.resourceIds, request.resourceId) &&
-      matchesOptionalConstraint(this.state.deploymentTargetIds, request.deploymentTargetId) &&
-      matchesOptionalConstraint(this.state.repositoryFullNames, request.repositoryFullName)
+    const project = authorizeOptionalConstraint(
+      "project",
+      this.state.projectIds,
+      request.projectId,
     );
+    if (!project.allowed) return project;
+
+    const environment = authorizeOptionalConstraint(
+      "environment",
+      this.state.environmentIds,
+      request.environmentId,
+    );
+    if (!environment.allowed) return environment;
+
+    const resource = authorizeOptionalConstraint(
+      "resource",
+      this.state.resourceIds,
+      request.resourceId,
+    );
+    if (!resource.allowed) return resource;
+
+    const deploymentTarget = authorizeOptionalConstraint(
+      "deployment-target",
+      this.state.deploymentTargetIds,
+      request.deploymentTargetId,
+    );
+    if (!deploymentTarget.allowed) return deploymentTarget;
+
+    const repository = authorizeOptionalConstraint(
+      "repository",
+      this.state.repositoryFullNames,
+      request.repositoryFullName,
+    );
+    if (!repository.allowed) return repository;
+
+    return { allowed: true };
   }
 
   toState(): DeployTokenScopeState {
@@ -275,8 +328,14 @@ export class DeployToken extends AggregateRoot<DeployTokenState> {
     return this.state.status.isActive() && !this.isExpiredAt(now);
   }
 
+  authorizeScope(
+    request: DeployTokenAuthorizationScopeRequest,
+  ): DeployTokenAuthorizationScopeResult {
+    return this.state.scope.authorize(request);
+  }
+
   authorizesScope(request: DeployTokenAuthorizationScopeRequest): boolean {
-    return this.state.scope.authorizes(request);
+    return this.authorizeScope(request).allowed;
   }
 
   rotate(input: {
@@ -356,13 +415,35 @@ function deployTokenUseBlocked(id: DeployTokenId, relatedState: string): DomainE
   };
 }
 
-function matchesOptionalConstraint<TValue extends ScalarValueObject<string>>(
+function authorizeOptionalConstraint<TValue extends ScalarValueObject<string>>(
+  deniedScope: DeployTokenAuthorizationScopeDimension,
   allowedValues: readonly TValue[],
   requestedValue: TValue | undefined,
-): boolean {
-  return allowedValues.length === 0 || requestedValue === undefined
-    ? allowedValues.length === 0
-    : containsValue(allowedValues, requestedValue);
+): DeployTokenAuthorizationScopeResult {
+  if (allowedValues.length === 0) {
+    return { allowed: true };
+  }
+
+  if (requestedValue === undefined) {
+    return denyScope(deniedScope, "scope_value_missing");
+  }
+
+  if (!containsValue(allowedValues, requestedValue)) {
+    return denyScope(deniedScope, "scope_value_not_allowed");
+  }
+
+  return { allowed: true };
+}
+
+function denyScope(
+  deniedScope: DeployTokenAuthorizationScopeDimension,
+  reasonCode: DeployTokenAuthorizationScopeDenyReason,
+): DeployTokenAuthorizationScopeResult {
+  return {
+    allowed: false,
+    deniedScope,
+    reasonCode,
+  };
 }
 
 function containsValue<TValue extends ScalarValueObject<string>>(
