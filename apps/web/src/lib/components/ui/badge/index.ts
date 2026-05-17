@@ -1,1 +1,1 @@
-export { type BadgeVariant, badgeVariants, default as Badge } from "./badge.svelte";
+export * from "@appaloft/ui/badge";

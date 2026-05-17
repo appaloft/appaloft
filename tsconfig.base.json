@@ -63,7 +63,8 @@
       "@appaloft/plugin-host": ["./packages/plugins/host/src/index.ts"],
       "@appaloft/ai-mcp": ["./packages/ai/mcp/src/index.ts"],
       "@appaloft/testkit": ["./packages/testkit/src/index.ts"],
-      "@appaloft/ui": ["./packages/ui/src/index.ts"]
+      "@appaloft/ui": ["./packages/ui/src/index.ts"],
+      "@appaloft/ui/*": ["./packages/ui/src/*"]
     }
   }
 }
