@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-rc.5](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-05-17)
+
+
+### Bug Fixes
+
+* **deploy:** render server preview runtime templates ([9060cb6](https://github.com/appaloft/appaloft/commit/9060cb61a7726ae291a9b26f8394fd49967c983c))
+* **deploy:** render server preview runtime templates ([ef07713](https://github.com/appaloft/appaloft/commit/ef0771372a01b37270e95e250a1f71facc86255a))
+* **deploy:** scope action source package credentials ([a087309](https://github.com/appaloft/appaloft/commit/a087309d751d4d469b6a7b588f0c74c6973c94bf))
+* **deploy:** scope action source package credentials ([998f6c8](https://github.com/appaloft/appaloft/commit/998f6c8975157caca4013e2fad89d47a3f6492ae))
+* **installer:** recover stale compose networks ([cb2ad61](https://github.com/appaloft/appaloft/commit/cb2ad61c95b3a7762e3a44ee6c53b5d3d63bd178))
+* **installer:** recover stale compose networks ([e796ccb](https://github.com/appaloft/appaloft/commit/e796ccb75667a0a86aedd8c66c61658d35dc5798))
+
 ## [1.0.0-rc.4](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-05-17)
 
 
