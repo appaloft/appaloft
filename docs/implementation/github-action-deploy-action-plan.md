@@ -54,9 +54,10 @@ It must follow these boundaries:
   managed domain workflow state.
 - `control-plane-mode: self-hosted` in the 0.9.x server API slice means the Appaloft server owns
   state and execution. The Action is only a trigger and must reject SSH credentials and state
-  backend selection. Deploy may pass explicit trusted ids or ask the server to resolve an existing
-  source link by source fingerprint; preview cleanup must resolve context from preview source-link
-  state and must not accept deployment target ids.
+  backend selection. Deploy should normally pass URL/token/config plus trusted GitHub source facts
+  and let the server resolve target identity from source-link state, deploy-token scope, or source
+  binding; explicit ids are advanced bootstrap/debug context. Preview cleanup must resolve context
+  from preview source-link state and must not accept deployment target ids.
 - active server config deploy mode keeps the Action as a trigger and the self-hosted server as the
   owner of config bootstrap/source package handling. It must not add config/source fields to
   `deployments.create` and must keep committed config free of identity and secret material.
@@ -235,11 +236,11 @@ Initial inputs:
 | `control-plane-url` | Required for `self-hosted` | Trusted endpoint for the self-hosted Appaloft server, mapped outside committed config. |
 | `appaloft-token` | Required for self-hosted mutation endpoints | Deploy-token bearer credential for self-hosted API mode; must never be logged or written to config. |
 | `use-oidc` | No | Future boolean for GitHub OIDC exchange when the Cloud auth ADR accepts it. |
-| `project-id` | Advanced/bootstrap only | Trusted project id for first source-link bootstrap, advanced override, or debugging. Prefer source-link/repository binding and deploy-token scope for normal runs. Required only when any explicit deployment id is supplied. |
-| `environment-id` | Advanced/bootstrap only | Trusted environment id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
-| `resource-id` | Advanced/bootstrap only | Trusted resource id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
-| `server-id` | Advanced/bootstrap only | Trusted deployment target id for first source-link bootstrap, advanced override, or debugging. Required only when any explicit deployment id is supplied. |
-| `destination-id` | Advanced/bootstrap only | Optional trusted destination id for first source-link bootstrap, advanced override, or debugging. |
+| `project-id` | Optional advanced bootstrap/debug | Trusted project id for source-link bootstrap or relink support; ordinary deploys should resolve from source-link state, token scope, or source binding. Required only when any explicit deployment id is supplied. |
+| `environment-id` | Optional advanced bootstrap/debug | Trusted environment id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `resource-id` | Optional advanced bootstrap/debug | Trusted resource id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `server-id` | Optional advanced bootstrap/debug | Trusted deployment target id for source-link bootstrap. Required only when any explicit deployment id is supplied. |
+| `destination-id` | No | Optional trusted destination id for source-link bootstrap. |
 | `preview` | No | Accepted value `pull-request` enables preview-scoped source link and environment/resource identity behavior. |
 | `preview-id` | Required when `preview=pull-request` | Trusted preview scope such as `pr-123`; examples derive it from `github.event.pull_request.number`. |
 | `preview-domain-template` | No | Trusted preview hostname template rendered by the workflow/action, for example `pr-123.preview.example.com`; requires user-owned DNS in Action-only mode. |

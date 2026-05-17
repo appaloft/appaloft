@@ -1054,8 +1054,8 @@ Rules:
   lifecycle status, and safe scope metadata are modeled
 - workflow-command scope must be non-empty
 - revoked deploy tokens cannot be rotated or used for future Action authentication
-- scope checks are admission checks only; deployment, source-link, route, and preview cleanup
-  business policy remains in the owning bounded contexts
+- scope checks gate admission and may provide safe Action target-resolution facts; deployment,
+  source-link, route, and preview cleanup business policy remains in the owning bounded contexts
 
 Current scope:
 - foundational aggregate in `core`

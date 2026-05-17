@@ -3,6 +3,7 @@ import {
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenAuthorizationResult,
   type ActionDeployTokenRequestedScope,
+  type ActionDeployTokenResolvedScope,
   type ChangeOrganizationMemberRoleInput,
   type Clock,
   type CurrentOrganizationContext,
@@ -1120,6 +1121,18 @@ export interface StaticActionDeployTokenScope {
   workflows?: readonly ActionDeployTokenAuthorizationInput["workflow"][];
 }
 
+function staticActionDeployTokenScope(
+  scope: StaticActionDeployTokenScope,
+): ActionDeployTokenResolvedScope {
+  return {
+    environmentIds: scope.environmentId ? [scope.environmentId] : [],
+    projectIds: scope.projectId ? [scope.projectId] : [],
+    repositoryFullNames: scope.repositoryFullName ? [scope.repositoryFullName] : [],
+    resourceIds: scope.resourceId ? [scope.resourceId] : [],
+    serverIds: scope.serverId ? [scope.serverId] : [],
+  };
+}
+
 export class StaticActionDeployTokenAuthorizationPort
   implements ActionDeployTokenAuthorizationPort
 {
@@ -1182,6 +1195,7 @@ export class StaticActionDeployTokenAuthorizationPort
           id: "dtok_static_self_hosted",
           label: "Self-hosted deploy token",
         },
+        scope: staticActionDeployTokenScope(this.scope),
       }),
     );
   }
@@ -1329,6 +1343,7 @@ export class PersistedActionDeployTokenAuthorizationPort
       }
 
       const state = deployToken.toState();
+      const scope = state.scope.toState();
       return ok({
         actor: {
           kind: "deploy-token",
@@ -1336,6 +1351,13 @@ export class PersistedActionDeployTokenAuthorizationPort
           label: state.displayName.value,
         },
         organizationId: state.organizationId.value,
+        scope: {
+          environmentIds: scope.environmentIds.map((id) => id.value),
+          projectIds: scope.projectIds.map((id) => id.value),
+          repositoryFullNames: scope.repositoryFullNames.map((name) => name.value),
+          resourceIds: scope.resourceIds.map((id) => id.value),
+          serverIds: scope.deploymentTargetIds.map((id) => id.value),
+        },
       });
     } catch {
       return err(actionAuthInvalid(input, "verifier-unavailable"));

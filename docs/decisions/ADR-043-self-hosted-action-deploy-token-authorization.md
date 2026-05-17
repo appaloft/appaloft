@@ -33,12 +33,17 @@ workflow-specific mutation runs.
   repository config, query strings, source packages, or deployment input fields.
 - Authentication failure returns `401` before source-link, resource, route, preview, or deployment
   mutation. Authorization failure returns `403` before mutation.
+- Deploy-token scope participates in Action deployment target resolution after authentication. A
+  complete unique project/environment/resource/server scope may identify the target without
+  workflow-supplied ids, and any explicit ids, existing source-link target, or trusted repository
+  facts must conflict-check against the token scope before mutation.
 - Public health, readiness, version, static assets, and documented login/bootstrap endpoints remain
   explicitly public. Action mutation endpoints are not public.
 - Token create, list/show safe metadata, rotate, and revoke are explicit lifecycle operations when
   exposed. Generic token update operations are forbidden.
-- Deploy-token authorization gates transport/workflow admission. After authorization succeeds,
-  deployment behavior still goes through the existing command/query boundaries such as
+- Deploy-token authorization gates transport/workflow admission and provides safe scope facts to
+  application target resolution. After authorization succeeds, deployment behavior still goes
+  through the existing command/query boundaries such as
   `CreateActionSourceLinkDeploymentCommand`, `ResolveActionServerConfigDeploymentTargetCommand`,
   `resources.configure-*`, and ids-only `deployments.create`.
 
@@ -48,6 +53,9 @@ workflow-specific mutation runs.
   are available.
 - Multiple repositories can share one Appaloft instance without sharing a global mutation secret,
   because token scopes are first-class authorization facts.
+- A scoped token can remove the need for ordinary Action workflows to carry project/environment/
+  resource/server ids, while still returning `403` before mutation when explicit ids or source-link
+  state are outside scope.
 - Action auth failures are distinct from deployment admission failures: a valid token can still be
   rejected by source-link, config, resource, route, or deployment policy.
 - Transport adapters may parse bearer headers and build an authenticated actor context, but they

@@ -59,6 +59,10 @@
   - wrapper does not invoke CLI/SSH/state-backend in server config mode;
   - HTTP route validates package manifest and rejects identity/secret config fields before
     mutation;
+  - application target resolution succeeds without ids from existing source-link state or complete
+    deploy-token scope;
+  - unresolved targets and explicit id conflicts fail before config/profile/route/deployment
+    mutation with actionable structured errors;
   - server-side config bootstrap dispatches resource/environment commands before ids-only
     deployment;
   - preview server config deploy uses preview-scoped source fingerprints.

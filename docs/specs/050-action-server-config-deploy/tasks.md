@@ -54,12 +54,12 @@
 - [x] Orchestrate server-side config bootstrap through existing resource/environment commands and
   ids-only `CreateDeploymentCommand`. Current implementation accepts the existing-resource/no-profile
   slice, resolves existing source-link context for no-profile requests, bootstraps source-link
-  context from complete trusted ids, applies runtime/network/health profile fields through explicit
-  resource commands, applies plain `env` values through `environments.set-variable`, applies
-  `access.domains[]` through managed `domain-bindings.create` commands using trusted
-  resource/destination/server proxy context, applies `ci-env:` secret references through
-  `environments.set-variable` from transient Action-supplied values, and rejects unsupported source
-  profile application before mutation.
+  context from complete deploy-token scope or complete trusted ids, conflict-checks explicit ids
+  before mutation, applies runtime/network/health profile fields through explicit resource commands,
+  applies plain `env` values through `environments.set-variable`, applies `access.domains[]`
+  through managed `domain-bindings.create` commands using trusted resource/destination/server proxy
+  context, applies `ci-env:` secret references through `environments.set-variable` from transient
+  Action-supplied values, and rejects unsupported source profile application before mutation.
 - [x] Move source-link lookup/bootstrap policy behind internal application commands so oRPC only
   dispatches command/query messages and does not import repository ports.
 - [ ] Add safe source package diagnostics/read-model output if needed for Web and support.

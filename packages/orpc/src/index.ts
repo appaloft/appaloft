@@ -1,6 +1,7 @@
 import {
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
+  type ActionDeployTokenResolvedScope,
   type ActionDeployTokenWorkflow,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
@@ -739,6 +740,20 @@ const actionSourceLinkDeploymentBodySchema = z
     resourceId: z.string().trim().min(1).optional(),
     serverId: z.string().trim().min(1).optional(),
     destinationId: z.string().trim().min(1).optional(),
+    trustedContext: z
+      .object({
+        projectId: z.string().trim().min(1).optional(),
+        environmentId: z.string().trim().min(1).optional(),
+        resourceId: z.string().trim().min(1).optional(),
+        serverId: z.string().trim().min(1).optional(),
+        destinationId: z.string().trim().min(1).optional(),
+        repositoryFullName: z.string().trim().min(1).optional(),
+        repositoryId: z.string().trim().min(1).optional(),
+        ref: z.string().trim().min(1).optional(),
+        revision: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -1724,6 +1739,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         },
       });
     case "conflict":
+    case "action_deployment_target_conflict":
     case "certificate_attempt_conflict":
     case "project_archived":
     case "environment_archived":
@@ -1801,6 +1817,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         },
       });
     case "validation_error":
+    case "action_deployment_target_unresolved":
     case "invariant_violation":
       return new ORPCError("BAD_REQUEST", {
         message,
@@ -4125,7 +4142,7 @@ export const cleanupPreviewProcedure = base
         context.executionContextFactory,
         "http",
         request,
-        authorized.value,
+        authorized.value.actor,
       );
       return executeCommand(
         {
@@ -5488,6 +5505,12 @@ function extractBearerToken(request: Request): string | undefined {
   return token;
 }
 
+interface AuthorizedActionDeployToken {
+  actor: ExecutionActor;
+  organizationId?: string;
+  scope?: ActionDeployTokenResolvedScope;
+}
+
 interface ActionDeployTokenAuthorizationRequest {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -5498,7 +5521,7 @@ interface ActionDeployTokenAuthorizationRequest {
 
 async function authorizeActionDeployToken(
   input: ActionDeployTokenAuthorizationRequest,
-): Promise<Result<ExecutionActor>> {
+): Promise<Result<AuthorizedActionDeployToken>> {
   const url = new URL(input.request.url);
   const token = extractBearerToken(input.request);
   if (!token) {
@@ -5544,18 +5567,41 @@ async function authorizeActionDeployToken(
     return err(authorized.error);
   }
 
-  return ok(authorized.value.actor);
+  return ok({
+    actor: authorized.value.actor,
+    ...(authorized.value.organizationId ? { organizationId: authorized.value.organizationId } : {}),
+    ...(authorized.value.scope ? { scope: authorized.value.scope } : {}),
+  });
 }
 
 function actionSourceLinkDeploymentRequestedScope(
   body: z.infer<typeof actionSourceLinkDeploymentBodySchema>,
 ): ActionDeployTokenRequestedScope | undefined {
-  const scope: ActionDeployTokenRequestedScope = {};
-  if (body.projectId) scope.projectId = body.projectId;
-  if (body.environmentId) scope.environmentId = body.environmentId;
-  if (body.resourceId) scope.resourceId = body.resourceId;
-  if (body.serverId) scope.serverId = body.serverId;
-  return compactActionDeployTokenRequestedScope(scope);
+  return compactActionDeployTokenRequestedScope({
+    ...(body.trustedContext?.projectId
+      ? { projectId: body.trustedContext.projectId }
+      : body.projectId
+        ? { projectId: body.projectId }
+        : {}),
+    ...(body.trustedContext?.environmentId
+      ? { environmentId: body.trustedContext.environmentId }
+      : body.environmentId
+        ? { environmentId: body.environmentId }
+        : {}),
+    ...(body.trustedContext?.resourceId
+      ? { resourceId: body.trustedContext.resourceId }
+      : body.resourceId
+        ? { resourceId: body.resourceId }
+        : {}),
+    ...(body.trustedContext?.serverId
+      ? { serverId: body.trustedContext.serverId }
+      : body.serverId
+        ? { serverId: body.serverId }
+        : {}),
+    ...(body.trustedContext?.repositoryFullName
+      ? { repositoryFullName: body.trustedContext.repositoryFullName }
+      : {}),
+  });
 }
 
 function actionServerConfigDeploymentRequestedScope(
@@ -5983,6 +6029,8 @@ async function handleActionSourceLinkDeploymentRoute(input: {
     ...(body.data.resourceId ? { resourceId: body.data.resourceId } : {}),
     ...(body.data.serverId ? { serverId: body.data.serverId } : {}),
     ...(body.data.destinationId ? { destinationId: body.data.destinationId } : {}),
+    ...(body.data.trustedContext ? { trustedContext: body.data.trustedContext } : {}),
+    ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
   });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);
@@ -6036,6 +6084,28 @@ function validateActionServerConfigDeployBody(
     return domainError.validation("Source package root must match request source root", {
       phase: "source-package-validation",
       field: "sourcePackage.sourceRoot",
+    });
+  }
+
+  if (
+    body.trustedContext?.repositoryFullName &&
+    body.sourcePackage.repositoryFullName &&
+    body.trustedContext.repositoryFullName !== body.sourcePackage.repositoryFullName
+  ) {
+    return domainError.validation("Trusted repository context must match source package metadata", {
+      phase: "source-package-validation",
+      field: "trustedContext.repositoryFullName",
+    });
+  }
+
+  if (
+    body.trustedContext?.revision &&
+    body.sourcePackage.revision &&
+    body.trustedContext.revision !== body.sourcePackage.revision
+  ) {
+    return domainError.validation("Trusted revision context must match source package metadata", {
+      phase: "source-package-validation",
+      field: "trustedContext.revision",
     });
   }
 
@@ -6599,6 +6669,7 @@ async function applyActionServerConfigProfileCommands(input: {
 }
 
 async function resolveActionServerConfigDeploymentTarget(input: {
+  authorizedTokenScope?: ActionDeployTokenResolvedScope;
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   body: ActionServerConfigDeployBody;
@@ -6606,6 +6677,7 @@ async function resolveActionServerConfigDeploymentTarget(input: {
   const command = ResolveActionServerConfigDeploymentTargetCommand.create({
     sourceFingerprint: input.body.sourceFingerprint,
     ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+    ...(input.authorizedTokenScope ? { authorizedTokenScope: input.authorizedTokenScope } : {}),
   });
   if (command.isErr()) {
     return err(command.error);
@@ -6728,6 +6800,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
   }
 
   const target = await resolveActionServerConfigDeploymentTarget({
+    ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
     context,
     executionContext,
     body: body.data,
@@ -7056,7 +7129,7 @@ export function mountAppaloftOrpcRoutes(
       context.executionContextFactory,
       "http",
       request,
-      authorized.value,
+      authorized.value.actor,
     );
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
 
@@ -7104,7 +7177,7 @@ export function mountAppaloftOrpcRoutes(
       context.executionContextFactory,
       "http",
       request,
-      authorized.value,
+      authorized.value.actor,
     );
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
 

@@ -26,24 +26,37 @@ route may parse the Action request and dispatch this command, but it must not ca
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `sourceFingerprint` | Required | Stable Action-derived source identity. |
-| `projectId` | Optional bootstrap context | Trusted project id from Action config. |
-| `environmentId` | Optional bootstrap context | Trusted environment id from Action config. |
-| `resourceId` | Optional bootstrap context | Trusted resource id from Action config. |
-| `serverId` | Optional bootstrap context | Trusted server id from Action config. |
-| `destinationId` | Optional bootstrap context | Trusted destination id from Action config. |
+| `projectId` / `trustedContext.projectId` | Optional advanced bootstrap context | Trusted project id from Action input or `controlPlane.deploymentContext`. |
+| `environmentId` / `trustedContext.environmentId` | Optional advanced bootstrap context | Trusted environment id from Action input or `controlPlane.deploymentContext`. |
+| `resourceId` / `trustedContext.resourceId` | Optional advanced bootstrap context | Trusted resource id from Action input or `controlPlane.deploymentContext`. |
+| `serverId` / `trustedContext.serverId` | Optional advanced bootstrap context | Trusted deployment target id from Action input or `controlPlane.deploymentContext`. |
+| `destinationId` / `trustedContext.destinationId` | Optional advanced bootstrap context | Trusted destination id from Action input or `controlPlane.deploymentContext`. |
+| `trustedContext.repositoryFullName` | Optional trusted repository fact | GitHub repository full name used for scope conflict checks. |
+| `trustedContext.repositoryId` | Optional trusted repository fact | GitHub provider repository id. |
+| `trustedContext.ref` | Optional trusted repository fact | Git ref that participated in source fingerprint construction. |
+| `trustedContext.revision` | Optional trusted repository fact | Git revision that participated in source package/source fingerprint context. |
+| `authorizedTokenScope` | Optional authorized scope fact | Safe deploy-token scope returned by the Action auth boundary. |
 
-If any bootstrap context field is present, `projectId`, `environmentId`, `resourceId`, and
-`serverId` must all be present. `destinationId` remains optional.
+If any explicit deployment identity field is present, `projectId`, `environmentId`, `resourceId`,
+and `serverId` must all be present. `destinationId` remains optional. Ordinary Action deploys
+should not need these ids when an existing source-link or unique deploy-token scope resolves the
+target.
 
 ## Admission Flow
 
 1. Read existing source-link state for `sourceFingerprint`.
-2. If no link exists and no complete trusted context was supplied, reject with not found.
-3. If a link exists and trusted context conflicts with it, reject before deployment admission.
-4. Resolve deployment target from the link or trusted bootstrap context.
-5. Dispatch `deployments.create` through `CreateDeploymentUseCase` with ids only.
-6. If the link was missing and trusted context was used, persist the new source-link record after
-   deployment admission succeeds.
+2. If explicit ids were supplied, validate completeness and conflict-check them against deploy-token
+   scope and trusted repository facts.
+3. If a link exists, conflict-check it against deploy-token scope and any explicit ids, then use the
+   link as the target.
+4. If no link exists and complete explicit trusted context exists, use that target.
+5. If no link exists and deploy-token scope uniquely identifies project/environment/resource/server,
+   use that token-scoped target.
+6. If no target can be resolved, reject with `action_deployment_target_unresolved`, phase
+   `source-link-resolution`, and safe next actions before deployment mutation.
+7. Dispatch `deployments.create` through `CreateDeploymentUseCase` with ids only.
+8. If the link was missing and a trusted or token-scoped target was used, persist the new
+   source-link record after deployment admission succeeds.
 
 ## Boundary Rules
 

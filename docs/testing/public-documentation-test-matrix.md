@@ -67,8 +67,8 @@ Current status:
   pglite` escape hatch, direct `3721` access, and `--domain` Appaloft instance console route under
   the stable `self-hosting/install#self-hosting-install-docker` anchor.
   Self-hosted Action deploy-token docs now describe installer bootstrap output, GitHub Secret
-  wiring through `appaloft-token`, 401/403 recovery, scope meaning, CLI lifecycle commands, and
-  admin-protected HTTP/API lifecycle endpoints under
+  wiring through `appaloft-token`, 401/403 recovery, scope meaning including id-free target
+  resolution, CLI lifecycle commands, and admin-protected HTTP/API lifecycle endpoints under
   `self-hosting/action-deploy-token-auth#self-hosting-action-deploy-token-auth`.
   Self-hosted first-admin docs now describe installer-driven local admin bootstrap, generated
   one-time passwords, login URL expectations, public bootstrap status/setup endpoints, OAuth
@@ -79,7 +79,8 @@ Current status:
   member and invitation lists, member invitation, role updates, removal, CLI session handoff, safe
   outputs, and product auth 401/403 recovery under
   `self-hosting/organization-team-management#self-hosting-organization-team-management`.
-  Repository config docs now describe `controlPlane.mode` and safe `controlPlane.url` usage under
+  Repository config docs now describe `controlPlane.mode`, safe `controlPlane.url` usage, and the
+  narrow advanced-bootstrap role of `controlPlane.deploymentContext` under
   `environments/reference/config-file#environment-config-file-control-plane`.
 - `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
   a dedicated automated link checker does not exist yet.

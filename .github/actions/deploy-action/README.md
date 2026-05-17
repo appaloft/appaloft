@@ -4,7 +4,13 @@ Run Appaloft deployments from GitHub Actions.
 
 The action supports two Action-owned deployment shapes and points to a separate control-plane-owned
 preview product line. Pick the shape from state ownership first, not from how many ids you have in a
-workflow.
+workflow. The default mode is a thin wrapper around the released `appaloft` binary for pure SSH
+deployments. Self-hosted server API mode is available for repositories that deploy through an
+Appaloft server. In the common self-hosted path, the workflow supplies only the control-plane URL,
+deploy token, config path, and GitHub repository/ref/revision/preview context; the server resolves
+the deployment target from token scope, existing source-link state, source binding, or one-time
+trusted bootstrap context. Credentials, tokens, and secret values still come from trusted workflow
+inputs or secrets.
 
 ## Deployment Modes
 
@@ -178,7 +184,8 @@ jobs:
 With `server-config-deploy: true`, the action performs a compatibility check against `/api/version`
 and calls `POST /api/action/deployments/from-config-package`. This selects the active self-hosted server config workflow. The self-hosted server validates the source/config reference, reads
 `appaloft.yml`, applies resource runtime/network/health/env/domain intent through Appaloft
-operations, resolves source-link context, and dispatches ids-only `deployments.create`.
+operations, resolves target context from source-link state, deploy-token scope, source binding, or
+trusted bootstrap context, and dispatches ids-only `deployments.create`.
 
 `control-plane-url` is how you select the Appaloft instance. It is not inferred by scanning the SSH
 target. `appaloft-token` is required for self-hosted Action mutation endpoints and is sent as an
@@ -232,8 +239,9 @@ raw secret values in committed config.
 Existing source-link trigger mode remains available when the resource profile already exists and
 you intentionally leave `server-config-deploy` unset. It calls
 `POST /api/action/deployments/from-source-link`. If ids are omitted, the server resolves context
-from existing source-link state. If ids are supplied, they are trusted bootstrap/debug context and
-must be complete enough for the server to conflict-check before mutation.
+from existing source-link state or a token scope that uniquely selects the target. If ids are
+supplied, they are trusted bootstrap/debug context and must be complete enough for the server to
+conflict-check against source-link state, token scope, and repository facts before mutation.
 
 ## Pull Request Preview
 
@@ -394,6 +402,10 @@ cleanup retries, scheduler ownership, quotas, audit, and managed route/domain fo
 
 Use product-grade previews when you want Appaloft to own preview lifecycle and cleanup instead of
 requiring every repository to maintain deploy and close-event workflow files.
+Explicit action inputs override config values. Project, environment, resource, and server ids are
+advanced bootstrap/debug inputs; ordinary deploys should rely on source-link state, deploy-token
+scope, source binding, or the Appaloft server. Tokens, SSH identity, database identity, and provider
+account identity must never come from committed config.
 
 ## Inputs
 
@@ -438,7 +450,7 @@ requiring every repository to maintain deploy and close-event workflow files.
 | `github-token` | empty | GitHub token used only when `pr-comment` is true. |
 | `control-plane-mode` | empty | Use `none` for pure SSH CLI mode or `self-hosted` for server API mode. When empty, `controlPlane.mode` from config may select the mode; otherwise the effective default is `none`. |
 | `control-plane-url` | empty | Required for self-hosted server API mode unless `controlPlane.url` supplies the endpoint. Selects the Appaloft instance explicitly. |
-| `appaloft-token` | empty | Required deploy token for self-hosted server API mutation endpoints. Ignored in pure SSH mode. |
+| `appaloft-token` | empty | Bearer deploy token for self-hosted Action mutation endpoints. Required for server API deploy, server-config-deploy, and server-mode preview cleanup. |
 | `use-oidc` | `false` | Reserved for future GitHub OIDC exchange. |
 | `server-config-deploy` | `false` | Active self-hosted server config deploy mode that calls `POST /api/action/deployments/from-config-package` after the server advertises source package and server-side config bootstrap support. |
 | `project-id` | config or empty | Advanced trusted bootstrap/debug project id for server API mode. Defaults to `controlPlane.deploymentContext.projectId` when present. |
@@ -464,8 +476,8 @@ requiring every repository to maintain deploy and close-event workflow files.
 
 - `ssh-private-key` is written to a runner temp file with mode `0600`; raw key material is not
   passed as a command-line argument.
-- Do not commit SSH keys, deploy tokens, database URLs, production secret values, or broad identity
-  selectors into `appaloft.yml`.
+- Do not commit SSH keys, tokens, database URLs, production secret values, organization/tenant/
+  provider account identity, or broad Appaloft target identity into `appaloft.yml`.
 - The action defaults SSH deployments to server-owned `ssh-pglite` state when `ssh-host` is set and
   no control plane is selected.
 - `control-plane-mode: self-hosted` does not accept SSH keys or `state-backend`; the action calls
@@ -478,6 +490,10 @@ requiring every repository to maintain deploy and close-event workflow files.
   executor; deployment and cleanup mutations are API calls to the selected control plane.
 - `server-config-deploy` requires explicit self-hosted server support. The action fails before
   source package handoff when the server handshake does not advertise the required capability.
+- If the server cannot resolve a target from source-link state, token scope, source binding, or
+  trusted bootstrap context, it returns a structured error before config/profile/route/deployment
+  mutation. Link the repository in the console, run source-link relink, or pass one-time bootstrap
+  ids.
 - In `server-config-deploy` mode, `secret-variables` supports only `KEY=ci-env:NAME` references.
   Missing runner environment values fail before the server API request, and raw secret values are
   not written to step summaries or PR comments.

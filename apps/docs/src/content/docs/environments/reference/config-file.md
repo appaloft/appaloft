@@ -53,13 +53,13 @@ controlPlane:
 Action 应调用 server API 而不是直接改 SSH PGlite 时，使用 `mode: self-hosted` 和可信 `url`。
 
 `controlPlane.url` 不是 secret，但必须是没有凭据、路径、query 或 fragment 的 `http` 或
-`https` origin。Token、SSH key、仓库身份、organization id、provider account id、database URL 和
-secret value 不应写进仓库配置。
+`https` origin。Token、SSH key、仓库身份、organization/tenant/provider account identity、database
+URL、secret value 和 broad target identity 不应写进仓库配置。
 
-对于 self-hosted server config deploy，`controlPlane.deploymentContext` 可以作为 narrow
-bootstrap/advanced override，把仓库显式绑定到已有 project、environment、resource、server 和可选
-destination。普通用户默认不需要维护这些 ids；优先使用 source-link、repository binding 和 deploy-token
-scope 解析上下文。
+对于 self-hosted Action deploy，普通路径不需要在配置中写 project/environment/resource/server ids。
+Server 应从 source-link state、deploy-token scope、source binding，或可信 GitHub repository/ref/
+revision/preview context 解析目标。`controlPlane.deploymentContext` 只用于很窄的一次性 bootstrap、
+relink、override 或 support/debug workflow，并且只能包含 project、environment、resource、server 和可选 destination ids。
 
 ```yaml
 controlPlane:

@@ -25,6 +25,9 @@ export class ResolveActionServerConfigDeploymentTargetCommandHandler
     return this.useCase.execute(context, {
       sourceFingerprint: command.sourceFingerprint,
       ...(command.trustedContext ? { trustedContext: command.trustedContext } : {}),
+      ...(command.authorizedTokenScope
+        ? { authorizedTokenScope: command.authorizedTokenScope }
+        : {}),
     });
   }
 }

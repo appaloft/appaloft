@@ -42,18 +42,19 @@ PGlite from the runner.
 | Source package | A trusted, bounded source snapshot or reference that the Action makes available to the control plane for one deployment request. | Source integration / workload delivery | source archive, repository snapshot |
 | Source package manifest | Safe metadata for a source package, including source fingerprint, config path, source root, revision, provider repository facts, size, and checksum. | Source integration | package manifest |
 | Server-side config bootstrap | Control-plane execution of the repository config workflow, including config validation, source-link resolution, resource profile mutation, env reference mapping, route intent handling, and ids-only deployment dispatch. | Workspace / release orchestration | config-aware backend workflow |
-| Trusted execution context | Action inputs, GitHub event facts, token scope, source link state, and server-owned policy used to select identity outside committed config. | Entry workflow | trusted context |
+| Trusted execution context | Action inputs, GitHub event facts, token scope, source link state, and server-owned policy used to select identity outside committed config. Explicit Appaloft ids are advanced bootstrap context, not the ordinary Action mental model. | Entry workflow | trusted context |
 
 ## Scenarios And Acceptance Criteria
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL and deploy token, and a source package manifest includes a safe config path | The Action submits the server config deploy request with Appaloft identity ids and optional trusted GitHub repository/ref/revision metadata | The server validates the package manifest and config, resolves identity from trusted context/source links or `controlPlane.deploymentContext`, accepts GitHub metadata without treating it as source-link identity, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
-| ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The deployment path does not invoke the CLI, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. Current composite wrapper setup may still install the released binary before dispatch, but this workflow does not use it as the deployment executor. |
-| ACTION-SERVER-CONFIG-SPEC-003 | Committed config can only select narrow self-hosted deployment context | `appaloft.yml` contains `controlPlane.deploymentContext` with project/environment/resource/server and optional destination ids | The Action/server parses the config | The ids are treated as non-secret explicit deployment context for this repository and may bootstrap a missing source link after authorization. |
+| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token and a source package manifest includes a safe config path | The Action submits the server config deploy request with config plus trusted GitHub repository/ref/revision/preview metadata and no Appaloft ids | The server validates the package manifest and config, resolves identity from existing source-link state, deploy-token scope, accepted source/repository binding, preview-scoped source fingerprint, or explicit trusted bootstrap context, applies resource profile and env reference changes through explicit operations, then dispatches ids-only `deployments.create`. |
+| ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The Action does not invoke the CLI as the deployment executor, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. Current composite wrapper setup may still install the released binary before dispatch, but this workflow does not use it as the deployment executor. |
+| ACTION-SERVER-CONFIG-SPEC-003 | Committed config can only select narrow advanced bootstrap context | `appaloft.yml` contains `controlPlane.deploymentContext` with project/environment/resource/server and optional destination ids | The Action/server parses the config | The ids are treated as non-secret one-time bootstrap/advanced context, must be complete when any id is supplied, and may bootstrap a missing source link only after authorization and conflict checks against token scope, source-link state, and repository facts. |
 | ACTION-SERVER-CONFIG-SPEC-003A | Committed config cannot select secrets or broad identity | `appaloft.yml` contains credential ids, organization ids, tenant ids, provider account ids, tokens, database URLs, or secret values | The server parses the config | The request fails before mutation with structured validation details and no source link, resource profile, route, or deployment mutation. |
+| ACTION-SERVER-CONFIG-SPEC-003B | Target resolution fails safely | A server-config Action request has no matching source link, no unique token-scoped target, no accepted source/repository binding, and no complete trusted bootstrap ids | The server reaches target resolution | The request fails with structured `action_deployment_target_unresolved` details before config/profile/route/deployment mutation and tells the operator to create/link a source binding, run/source-link relink, or pass one-time trusted bootstrap ids. |
 | ACTION-SERVER-CONFIG-SPEC-004 | Existing trigger mode remains supported | A repository already uses the source-link trigger mode for an existing resource profile | The wrapper and server are upgraded | The old `from-source-link` request shape continues to work, while server config deploy is selected only by an explicit supported input or endpoint. |
-| ACTION-SERVER-CONFIG-SPEC-005 | Preview context is scoped by trusted event facts | `preview=pull-request` and `preview-id` are supplied by a user-authored PR workflow | Server-side config bootstrap runs | The server uses a preview-scoped source fingerprint and trusted preview context; root production config domains or secrets are not reused as preview route or secret policy unless an accepted preview-safe config/overlay selects them. |
+| ACTION-SERVER-CONFIG-SPEC-005 | Preview context is scoped by trusted event facts | `preview=pull-request` and `preview-id` are supplied by a user-authored PR workflow | Server-side config bootstrap runs | The server uses a preview-scoped source fingerprint and trusted preview context; it must not accidentally reuse a production branch target unless an accepted preview binding or token/source scope explicitly selects that target. Root production config domains or secrets are not reused as preview route or secret policy unless an accepted preview-safe config/overlay selects them. |
 | ACTION-SERVER-CONFIG-SPEC-005A | Preview Action inputs remain transient | A pull request preview workflow selects `server-config-deploy` and supplies `environment-variables`, `preview-domain-template`, `preview-tls-mode`, or `require-preview-url` | The Action submits the server config deploy request | The Action sends those values as transient API payload, the server applies preview environment values after committed `env` values, and preview route application writes only the trusted preview route as preview-scoped server-applied route desired state instead of committed production `access.domains[]` or durable DomainBinding state. If the resulting deployment does not contain that requested preview route, the server returns a structured `validation_error` at `preview-route-verification` and the Action does not publish `preview-url`. |
 | ACTION-SERVER-CONFIG-SPEC-006 | Incompatible feature fails before upload mutation | The server handshake does not advertise source package or server-side config bootstrap support | The Action starts | The Action fails in `control-plane-handshake` or `control-plane-capability` before source upload, source-link mutation, resource mutation, route mutation, or deployment creation. |
 | ACTION-SERVER-CONFIG-SPEC-007 | Source package is bounded and verifiable | A source package is prepared by the Action | The server accepts the package or reference | The server records safe package metadata, verifies checksum/size/path boundaries, rejects parent traversal or untrusted config paths, and does not persist raw secrets or oversized package content as read-model data. |
@@ -89,9 +90,9 @@ PGlite from the runner.
 - Web/UI: Web may link to the accepted deployment detail and source package diagnostics; Web mode
   selection remains separate.
 - Config: committed config may carry non-secret profile, `ci-env:` secret references,
-  control-plane connection policy, and the narrow self-hosted `controlPlane.deploymentContext`.
-  It must not carry credentials, org/tenant/provider account identity, tokens, database URLs, or
-  raw secret material.
+  control-plane connection policy, and the narrow self-hosted `controlPlane.deploymentContext` for
+  advanced bootstrap/debug only. It must not carry credentials, org/tenant/provider account
+  identity, tokens, database URLs, broad target identity, or raw secret material.
 - Events: Code Round must define any new source package accepted/rejected events or process-state
   records before adding workers.
 - Public docs/help: docs must keep distinguishing pure Action/SSH, self-hosted source-link trigger,
@@ -128,21 +129,24 @@ PGlite from the runner.
   binary before dispatch.
 - The first Action Server Config Deploy code slices validate package metadata, read
   `server-github-fetch` config files from GitHub raw content, accept the narrow
-  `controlPlane.deploymentContext`, reject broad committed identity/secrets,
-  resolve/bootstrap source-link context, apply runtime/network/health profile fields through
-  explicit resource commands, apply plain `env` values through `environments.set-variable`, apply
-  `access.domains[]` through managed `domain-bindings.create` commands when trusted
-  resource/destination/server proxy context is available, apply `ci-env:` secret references from
-  transient Action-supplied values through `environments.set-variable`, accept transient
-  Action-supplied preview `environmentVariables` and `previewRoute` for pull request previews, and
-  dispatch ids-only deployment admission. Pull request previews do not reuse committed production
-  `access.domains[]`; when a preview route is supplied, it is the only route intent applied for
-  that request. Inline archive transport, remote archive URL transport, durable source package blob
-  storage, archive diagnostics, archive cleanup, source profile bootstrap, broader control-plane
-  adoption, and non-`ci-env:` secret resolvers remain governed follow-ups for this Action endpoint.
+  `controlPlane.deploymentContext` as advanced bootstrap context, reject broad committed
+  identity/secrets, resolve/bootstrap source-link context from existing source-link state, complete
+  deploy-token scope, or explicit trusted bootstrap ids, conflict-check explicit ids against source
+  links and token scope, apply runtime/network/health profile fields through explicit resource
+  commands, apply plain `env` values through `environments.set-variable`, apply `access.domains[]`
+  through managed `domain-bindings.create` commands when trusted resource/destination/server proxy
+  context is available, apply `ci-env:` secret references from transient Action-supplied values
+  through `environments.set-variable`, accept transient Action-supplied preview
+  `environmentVariables` and `previewRoute` for pull request previews, and dispatch ids-only
+  deployment admission. Pull request previews do not reuse committed production `access.domains[]`;
+  when a preview route is supplied, it is the only route intent applied for that request. Automatic
+  repository/source binding beyond exact source-fingerprint links, inline archive transport, remote
+  archive URL transport, durable source package blob storage, archive diagnostics, archive cleanup,
+  source profile bootstrap, broader control-plane adoption, and non-`ci-env:` secret resolvers
+  remain governed follow-ups for this Action endpoint.
   Product-grade preview orchestration is active in the separate control-plane workflow and must not
   be folded into this server trigger surface.
-- The next auth hardening slice must make Action mutation endpoints require an installer-generated
-  deploy token or future OIDC exchange, return clear 401/403 errors, and fail before source-link,
-  resource, route, or deployment mutation. This is now positioned by
-  [Self-Hosted Action Deploy Token Auth](../052-self-hosted-action-deploy-token-auth/spec.md).
+- Action mutation endpoints require deploy-token authorization before mutation. Token scope now
+  participates in target resolution as an application-layer fact, returning clear 401/403 errors or
+  `action_deployment_target_unresolved` before source-link, resource, route, or deployment
+  mutation.

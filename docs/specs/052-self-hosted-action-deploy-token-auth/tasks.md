@@ -92,6 +92,9 @@
 - The same slice now passes safe request scope facts into the application-owned authorization port
   after body validation and before command dispatch. Scope mismatch returns
   `action_auth_forbidden` with `403`.
+- The current target-resolution slice returns safe resolved token scope to source-link/server-config
+  application commands. Complete target scope can resolve id-free Action deploys, and explicit ids,
+  existing source links, or repository facts outside scope fail before mutation.
 - The shell composition root wires the `@appaloft/auth-better` static verifier from
   `APPALOFT_ACTION_DEPLOY_TOKEN`. This is an operator-provided bootstrap path, not the final
   deploy-token lifecycle model.

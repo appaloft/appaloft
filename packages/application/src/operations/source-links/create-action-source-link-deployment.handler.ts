@@ -29,6 +29,10 @@ export class CreateActionSourceLinkDeploymentCommandHandler
       ...(command.resourceId ? { resourceId: command.resourceId } : {}),
       ...(command.serverId ? { serverId: command.serverId } : {}),
       ...(command.destinationId ? { destinationId: command.destinationId } : {}),
+      ...(command.trustedContext ? { trustedContext: command.trustedContext } : {}),
+      ...(command.authorizedTokenScope
+        ? { authorizedTokenScope: command.authorizedTokenScope }
+        : {}),
     });
   }
 }

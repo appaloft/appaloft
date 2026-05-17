@@ -32,6 +32,7 @@ GitHub Action
   -> application token verifier authenticates token and loads safe scope metadata
   -> application authorization checks endpoint, workflow command, repository, project,
      environment, resource, preview, and organization scope
+  -> source-link/server-config target resolution may use safe token scope facts
   -> existing Action workflow command dispatch runs only after authorization succeeds
 ```
 
@@ -65,11 +66,18 @@ before mutation:
 - project id;
 - environment id;
 - resource id;
+- server/deployment target id;
 - source repository id or full name;
 - preview workflow kind and preview id/pull request context when present.
 
 When an endpoint cannot safely determine enough facts to prove scope before mutation, it must fail
 with `action_auth_forbidden` instead of guessing.
+
+After authorization succeeds, source-link and server-config target resolution may also use the safe
+resolved token scope as trusted context. A complete unique project/environment/resource/server scope
+can resolve the deployment target without Action ids. Explicit ids, existing source-link targets,
+and trusted repository facts outside token scope still fail with `action_auth_forbidden` before
+mutation.
 
 ## Boundary Rules
 

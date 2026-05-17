@@ -2,6 +2,16 @@ import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";
 
+const actionDeployTokenResolvedScopeSchema = z
+  .object({
+    environmentIds: z.array(nonEmptyTrimmedString("Environment id")).default([]),
+    projectIds: z.array(nonEmptyTrimmedString("Project id")).default([]),
+    repositoryFullNames: z.array(nonEmptyTrimmedString("Repository full name")).default([]),
+    resourceIds: z.array(nonEmptyTrimmedString("Resource id")).default([]),
+    serverIds: z.array(nonEmptyTrimmedString("Server id")).default([]),
+  })
+  .strict();
+
 export const resolveActionServerConfigDeploymentTargetCommandInputSchema = z
   .object({
     sourceFingerprint: nonEmptyTrimmedString("Source fingerprint"),
@@ -19,6 +29,7 @@ export const resolveActionServerConfigDeploymentTargetCommandInputSchema = z
       })
       .strict()
       .optional(),
+    authorizedTokenScope: actionDeployTokenResolvedScopeSchema.optional(),
   })
   .strict();
 

@@ -54,10 +54,16 @@ The default for repository config deploys remains `none` unless a trusted contro
 explicitly supplied. Appaloft must not silently connect to Cloud or move state into a control plane
 because a new CLI release or action wrapper is used.
 
-Repository config may select control-plane connection policy. For self-hosted server config
-deploys, repository config may also carry a narrow non-secret deployment context that binds the
-repository to an already-created Appaloft project/environment/resource/server. This is an explicit
-operator-authored adoption/configuration choice, not a secret or authentication credential:
+Repository config may select control-plane connection policy. For self-hosted Action deploys, the
+common path is URL/token/config plus GitHub repository/ref/revision/preview facts. The server, not
+the workflow author, resolves deployment identity from deploy-token scope, existing source-link
+state, source/repository binding, preview-scoped source fingerprints, or an explicit one-time
+trusted bootstrap context.
+
+Repository config may also carry a narrow non-secret `controlPlane.deploymentContext` for advanced
+bootstrap, override, relink, or support/debug workflows where an operator intentionally binds a
+repository to an already-created Appaloft project/environment/resource/server. This is not the
+recommended steady-state Action experience and it is not a secret or authentication credential:
 
 ```yaml
 controlPlane:
@@ -77,17 +83,20 @@ Allowed mode values are:
 | `none` | Do not use Appaloft Cloud or a self-hosted control plane. SSH deploys use `ssh-pglite` unless an explicit local-only backend is selected. |
 | `auto` | Use a trusted control plane only when the entrypoint supplies a trusted URL/token or the SSH server exposes a compatible adoption marker; otherwise fall back to `none`. The chosen mode must be reported in diagnostics. |
 | `cloud` | Use Appaloft Cloud as state/control-plane owner. Requires trusted authentication from environment, action input, local login, OIDC, or another accepted credential source. |
-| `self-hosted` | Use a user-operated Appaloft control plane. Requires a trusted URL and authentication or an explicitly anonymous self-host policy. |
+| `self-hosted` | Use a user-operated Appaloft control plane. Action mutation endpoints require a trusted URL and authentication; any anonymous self-host policy must be explicitly documented for non-mutating public/read-only surfaces only. |
 
 `controlPlane.url` may be present for `self-hosted` or future private Cloud endpoints because it is
 connection metadata. `controlPlane.deploymentContext` may include only project, environment,
-resource, server, and optional destination ids. Raw tokens, SSH keys, database URLs, credential ids,
-organization/tenant ids, provider account ids, and secret values remain rejected from committed
-repository config.
+resource, server, and optional destination ids, and explicit ids must be completeness-checked and
+conflict-checked against existing source-link state, deploy-token scope, and trusted repository
+facts before mutation. Raw tokens, SSH keys, database URLs, credential ids, organization/tenant ids,
+provider account ids, and secret values remain rejected from committed repository config.
 
 Control-plane identity selection comes from trusted sources outside committed config:
 
 - the authenticated Cloud/self-hosted token or OIDC claims;
+- deploy-token scope when it uniquely identifies a project/environment/resource/server or
+  restricts accepted repository facts;
 - GitHub App installation, repository id, repository full name, branch, pull request, and source
   fingerprint;
 - existing source link state in the selected control plane;
@@ -95,11 +104,11 @@ Control-plane identity selection comes from trusted sources outside committed co
   future MCP tool parameters;
 - explicit `source-links.relink` or a future control-plane source-link command.
 
-Changing `appaloft.yml` may intentionally move a self-hosted server config deploy to another
-project, environment, resource, server, or destination only through
-`controlPlane.deploymentContext` and only after server-side authorization accepts the caller. It
-must not be sufficient to move a deployment to another credential, tenant, organization, provider
-account, or secret scope.
+Changing `appaloft.yml` is not by itself sufficient to retarget a self-hosted Action deploy.
+Explicit ids from `controlPlane.deploymentContext` or Action inputs are accepted only as trusted
+bootstrap/advanced context after server-side authorization, source-link conflict checks, token-scope
+checks, and repository-fact checks succeed. A committed config change must never move a deployment
+to another credential, tenant, organization, provider account, or secret scope.
 
 ## Control-Plane Mode Contract
 

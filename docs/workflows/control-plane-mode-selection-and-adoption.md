@@ -271,12 +271,15 @@ In this slice the Action must not invoke the CLI deployment path, open SSH, sele
 SSH-server PGlite.
 The source-link API route dispatches the internal
 `CreateActionSourceLinkDeploymentCommand` to resolve project/environment/resource/server context
-from existing server-owned source-link state. If trusted ids are supplied by the Action for deploy,
-the server may bootstrap a missing source link; if ids are omitted and no link exists, deployment
-fails before mutation. Preview cleanup must resolve context from preview source-link state. Config
-bootstrap and source package handling are not part of this source-link trigger route; they are owned
-by the active explicit `server-config-deploy` route below. Broader adoption, Cloud reporting, and
-managed product-grade preview policy remain separate control-plane workflows.
+from existing server-owned source-link state or complete deploy-token scope. Explicit ids supplied
+by the Action are advanced bootstrap/debug context: the server may bootstrap a missing source link
+only after completeness, source-link, repository-fact, and token-scope conflict checks. If ids are
+omitted and no link, token scope, source binding, or trusted bootstrap context resolves the target,
+deployment fails before mutation with actionable recovery guidance. Preview cleanup must resolve
+context from preview source-link state. Config bootstrap and source package handling are not part of
+this source-link trigger route; they are owned by the active explicit `server-config-deploy` route
+below. Broader adoption, Cloud reporting, and managed product-grade preview policy remain separate
+control-plane workflows.
 
 The active self-hosted server-config deploy slice is
 [Action Server Config Deploy](../workflows/action-server-config-deploy.md), coordinated by the

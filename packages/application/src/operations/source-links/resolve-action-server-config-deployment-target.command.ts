@@ -1,6 +1,7 @@
 import { type Result } from "@appaloft/core";
 
 import { Command } from "../../cqrs";
+import { type ActionDeployTokenResolvedScope } from "../../ports";
 import { parseOperationInput } from "../shared-schema";
 import {
   type ResolveActionServerConfigDeploymentTargetCommandInput,
@@ -14,6 +15,10 @@ type TrustedActionServerConfigDeploymentContext = {
   resourceId?: string;
   serverId?: string;
   destinationId?: string;
+  repositoryFullName?: string;
+  repositoryId?: string;
+  ref?: string;
+  revision?: string;
 };
 
 export {
@@ -27,6 +32,7 @@ export class ResolveActionServerConfigDeploymentTargetCommand extends Command<Re
   constructor(
     public readonly sourceFingerprint: string,
     public readonly trustedContext?: TrustedActionServerConfigDeploymentContext,
+    public readonly authorizedTokenScope?: ActionDeployTokenResolvedScope,
   ) {
     super();
   }
@@ -42,6 +48,7 @@ export class ResolveActionServerConfigDeploymentTargetCommand extends Command<Re
         new ResolveActionServerConfigDeploymentTargetCommand(
           parsed.sourceFingerprint,
           trustedContextFromParsed(parsed.trustedContext),
+          authorizedTokenScopeFromParsed(parsed.authorizedTokenScope),
         ),
     );
   }
@@ -68,5 +75,35 @@ function trustedContextFromParsed(trustedContext?: {
     ...(trustedContext.resourceId ? { resourceId: trustedContext.resourceId } : {}),
     ...(trustedContext.serverId ? { serverId: trustedContext.serverId } : {}),
     ...(trustedContext.destinationId ? { destinationId: trustedContext.destinationId } : {}),
+    ...(trustedContext.repositoryFullName
+      ? { repositoryFullName: trustedContext.repositoryFullName }
+      : {}),
+    ...(trustedContext.repositoryId ? { repositoryId: trustedContext.repositoryId } : {}),
+    ...(trustedContext.ref ? { ref: trustedContext.ref } : {}),
+    ...(trustedContext.revision ? { revision: trustedContext.revision } : {}),
+  };
+}
+
+function authorizedTokenScopeFromParsed(
+  scope:
+    | {
+        environmentIds?: string[] | undefined;
+        projectIds?: string[] | undefined;
+        repositoryFullNames?: string[] | undefined;
+        resourceIds?: string[] | undefined;
+        serverIds?: string[] | undefined;
+      }
+    | undefined,
+): ActionDeployTokenResolvedScope | undefined {
+  if (!scope) {
+    return undefined;
+  }
+
+  return {
+    environmentIds: scope.environmentIds ?? [],
+    projectIds: scope.projectIds ?? [],
+    repositoryFullNames: scope.repositoryFullNames ?? [],
+    resourceIds: scope.resourceIds ?? [],
+    serverIds: scope.serverIds ?? [],
   };
 }

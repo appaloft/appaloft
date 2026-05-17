@@ -222,7 +222,9 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 | CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
 | CONFIG-FILE-ENTRY-027 | contract | Deploy action optional PR comment | With `pr-comment=true`, trusted PR context, and an explicit GitHub token, the wrapper posts or updates one marker-based PR comment with available preview URL, console URL, deployment id, or cleanup status; without `pr-comment`, no GitHub comment permission is required. |
-| CONFIG-FILE-ENTRY-028 | integration | Self-hosted Action server config deploy keeps config non-secret | The active `control-plane-mode: self-hosted` server config deploy submits a source package/config path to the self-hosted server | Server-side config bootstrap accepts only non-secret repository config fields, resolves identity from trusted Action/server/source-link context or the narrow `controlPlane.deploymentContext` bootstrap/advanced override, and rejects broad committed identity or secret fields before mutation. |
+| CONFIG-FILE-ENTRY-028 | integration | Self-hosted Action server config deploy keeps config non-secret | A `control-plane-mode: self-hosted` server config deploy submits a source package/config path to the self-hosted server | Server-side config bootstrap accepts only non-secret repository config fields, resolves identity from trusted Action/server/source-link/token-scope context, and rejects committed broad identity or secret fields before mutation. |
+| CONFIG-FILE-ENTRY-028A | integration | Self-hosted Action server config deploy does not require ids in the common path | `server-config-deploy=true` supplies control-plane URL, deploy token, config path, and trusted GitHub repository/ref/revision/preview context, but no project/environment/resource/server ids | Server-side target resolution reuses an existing source link or complete deploy-token scope, then applies config/profile/env/domain commands and dispatches ids-only `deployments.create`; no ids are required in the workflow for the steady-state path. |
+| CONFIG-FILE-ENTRY-028B | integration | Self-hosted Action bootstrap ids are narrow advanced context | `server-config-deploy=true` supplies explicit ids through Action inputs or `controlPlane.deploymentContext` | The ids are completeness-checked and conflict-checked against source-link state, deploy-token scope, and trusted repository facts; missing or conflicting context fails before config/profile/route/deployment mutation. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -371,6 +373,14 @@ pass-through to CLI `--env`/`--secret`, optional marker-based PR comment feedbac
 fork-safety/cleanup examples, no-config default behavior, unsupported control-plane input rejection,
 self-hosted preview cleanup API routing, and self-hosted preview deploy API routing in this
 repository.
+
+`scripts/test/deploy-action-wrapper.test.ts`, `packages/orpc/test/deployment-create.http.test.ts`,
+and `packages/application/test/action-source-link-deployment.test.ts` now cover
+`CONFIG-FILE-ENTRY-028` through `CONFIG-FILE-ENTRY-028B` for the active self-hosted server-config
+deploy path: the wrapper can call the config package API without project/environment/resource/server
+ids, repository/ref/revision facts travel as trusted context, the server validates package/config
+before mutation, existing source links and complete deploy-token scope can resolve the target, and
+explicit bootstrap ids are narrow advanced context that conflict-checks before mutation.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,

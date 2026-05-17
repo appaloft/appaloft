@@ -16,7 +16,8 @@
   - model deploy-token identity, lifecycle status, scope, and safe metadata in identity governance;
   - expose an application token verifier/authenticator port for HTTP/oRPC and future CLI/server
     workflows;
-  - keep Action workflow commands and deployment admission unchanged after actor authorization.
+  - pass safe resolved scope facts to Action target-resolution commands while keeping deployment
+    admission, source-link policy, profile, route, and cleanup behavior in their owning workflows.
 - Repository/specification/visitor impact:
   - add a deploy-token repository/read model in persistence during Code Round;
   - store only verifier/hash and safe metadata, never raw token values;

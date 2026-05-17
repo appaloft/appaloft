@@ -136,6 +136,8 @@ Codes must be stable identifiers, not localized text. Examples:
 | `invariant_violation` | `domain` | current state and attempted transition |
 | `not_found` | `not-found` | entity type and id |
 | `conflict` | `conflict` | conflict subject and state |
+| `action_deployment_target_unresolved` | `validation` | phase `source-link-resolution`; source fingerprint; safe next actions |
+| `action_deployment_target_conflict` | `conflict` | phase `source-link-resolution`; source fingerprint and safe conflict subject |
 | `deployment_not_retryable` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, current status, blocked reason code, readiness generated time |
 | `deployment_not_redeployable` | `domain` or `application` | phase `recovery-admission`; deployment id, resource id, current status, profile/readiness blocked reason code |
 | `deployment_not_rollback_ready` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, requested rollback candidate id when provided, blocked reason code, missing artifact/snapshot/environment detail when safe |
