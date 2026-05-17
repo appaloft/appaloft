@@ -57,11 +57,14 @@ jobs:
         env:
           APPALOFT_CONSOLE_VERSION: ${{ inputs.version || vars.APPALOFT_CONSOLE_VERSION || 'latest' }}
           APPALOFT_CONSOLE_SSH_HOST: ${{ vars.APPALOFT_CONSOLE_SSH_HOST || vars.APPALOFT_SSH_HOST }}
+          APPALOFT_CONSOLE_ORIGIN: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
+          APPALOFT_CONSOLE_DOMAIN: ${{ vars.APPALOFT_CONSOLE_DOMAIN }}
           HAS_CONSOLE_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY != '' || secrets.APPALOFT_SSH_PRIVATE_KEY != '' }}
         run: |
           set -euo pipefail
 
           missing=0
+          domain="${APPALOFT_CONSOLE_DOMAIN:-}"
           if [ -z "$APPALOFT_CONSOLE_SSH_HOST" ]; then
             echo "::error::Missing repository variable APPALOFT_CONSOLE_SSH_HOST or APPALOFT_SSH_HOST."
             missing=1
@@ -84,7 +87,22 @@ jobs:
             notice="${notice} Pass a prerelease tag explicitly or set APPALOFT_CONSOLE_VERSION when upgrading a prerelease console."
             echo "::notice::${notice}"
           fi
+          if [ -z "$domain" ] && [ -n "$APPALOFT_CONSOLE_ORIGIN" ]; then
+            domain="${APPALOFT_CONSOLE_ORIGIN#http://}"
+            domain="${domain#https://}"
+            domain="${domain%%/*}"
+            domain="${domain%%:*}"
+          fi
+          if [ -n "$domain" ]; then
+            case "$domain" in
+              *[!A-Za-z0-9.-]*|.*|*..*|*-|*.|-*)
+                echo "::error::Deploy Console domain must be a hostname such as console.example.com."
+                exit 1
+                ;;
+            esac
+          fi
           echo "version=${APPALOFT_CONSOLE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "domain=${domain}" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/deploy-action
         id: console
@@ -96,6 +114,7 @@ jobs:
           ssh-port: ${{ vars.APPALOFT_CONSOLE_SSH_PORT || vars.APPALOFT_SSH_PORT }}
           ssh-private-key: ${{ secrets.APPALOFT_CONSOLE_SSH_PRIVATE_KEY || secrets.APPALOFT_SSH_PRIVATE_KEY }}
           console-url: ${{ vars.APPALOFT_CONSOLE_ORIGIN }}
+          console-domain: ${{ steps.settings.outputs.domain }}
           console-database: ${{ inputs.database }}
           console-orchestrator: ${{ inputs.orchestrator }}
           console-compose-project-name: ${{ vars.APPALOFT_CONSOLE_COMPOSE_PROJECT_NAME }}
