@@ -76,6 +76,8 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(maintenanceWorkflow).toContain("workflow_dispatch:");
     expect(maintenanceWorkflow).toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("ref: main");
+    expect(deployDocsPreviewWorkflow).toContain("group: appaloft-docs-preview-remote-state");
+    expect(deployDocsPreviewWorkflow).not.toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("default: /var/lib/appaloft/runtime");
     expect(maintenanceWorkflow).toContain(
       `APPALOFT_SSH_HOST: ${githubExpressionOpen} vars.APPALOFT_SSH_HOST }}`,

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { bundleReadme } from "../release/lib/binary-bundle";
+import { bundleReadme, createBinaryEntryModule } from "../release/lib/binary-bundle";
 
 describe("binary bundle README", () => {
   test("[PUB-DOCS-013] documents embedded docs and override path", () => {
@@ -24,6 +27,38 @@ describe("binary bundle README", () => {
 });
 
 describe("Docker runtime image packaging", () => {
+  test("[RELEASE-HARDENING-003] binary entry initializes reflect metadata before shell runtime", async () => {
+    const root = await mkdtemp(join(tmpdir(), "appaloft-binary-entry-"));
+    try {
+      const entryDir = join(root, "dist", ".tmp-binary-bundle");
+      const entryPath = join(entryDir, "binary-entry.ts");
+      await mkdir(entryDir, { recursive: true });
+      await createBinaryEntryModule({
+        entryPath,
+        root,
+        version: "0.1.0-test",
+        embeddedWebAssetsModulePath: join(entryDir, "embedded-web-assets.generated.ts"),
+        embeddedDocsAssetsModulePath: join(entryDir, "embedded-docs-assets.generated.ts"),
+        pgliteFsBundlePath: join(root, "vendor", "pglite.data"),
+        pgliteWasmPath: join(root, "vendor", "pglite.wasm"),
+        initdbWasmPath: join(root, "vendor", "initdb.wasm"),
+        reflectMetadataPath: join(root, "node_modules", "reflect-metadata", "Reflect.js"),
+      });
+
+      const source = await readFile(entryPath, "utf8");
+      const reflectIndex = source.indexOf(
+        'import "../../node_modules/reflect-metadata/Reflect.js";',
+      );
+      const shellRuntimeIndex = source.indexOf("const { runShellCli } = await import(");
+
+      expect(reflectIndex).toBe(0);
+      expect(shellRuntimeIndex).toBeGreaterThan(reflectIndex);
+      expect(source).not.toContain("import { runShellCli }");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("[SELF-HOSTED-AUTH-E2E-003] Docker build context excludes heavyweight local artifacts", async () => {
     const dockerignore = await Bun.file(new URL("../../.dockerignore", import.meta.url)).text();
 

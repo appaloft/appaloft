@@ -26,8 +26,9 @@ jobs:
     name: Remote State Lock
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Docs production deploys, docs preview deploys, preview cleanup, and this maintenance action
-    # all mutate or inspect the same SSH remote-state root.
+    # Docs production deploys and this maintenance action share this GitHub group. PR preview
+    # workflows use surface-specific GitHub groups and coordinate the shared root through SSH
+    # remote-state locks so docs and console previews are not cancelled against each other.
     concurrency:
       group: appaloft-www-remote-state
       cancel-in-progress: false

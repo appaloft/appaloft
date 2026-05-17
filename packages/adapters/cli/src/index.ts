@@ -22,7 +22,39 @@ export {
   sshRemoteStateTargetFromDecision,
 } from "./commands/deployment-ssh-remote-state.js";
 export { buildSshRemoteStateDiagnosticsCommand } from "./commands/remote-state.js";
+export {
+  findControlPlaneOperation,
+  requestControlPlaneOperation,
+  requestRemoteProjectOperation,
+} from "./control-plane-client.js";
+export {
+  type CliControlPlaneProfile,
+  type CliControlPlaneProfileStore,
+  defaultCliControlPlaneProfileStore,
+  FileSystemCliControlPlaneProfileStore,
+  MemoryCliControlPlaneProfileStore,
+  profileView,
+} from "./control-plane-profile.js";
+export {
+  activeControlPlaneProfile,
+  controlPlaneStatus,
+  dispatchRemoteProjectOperation,
+  loginControlPlane,
+  logoutControlPlane,
+  unsupportedRemoteProjectOperation,
+  useControlPlaneProfile,
+} from "./control-plane-service.js";
+export {
+  type CliControlPlaneGlobalOptions,
+  type CliControlPlaneSelectionMode,
+  type CliExecutionTarget,
+  type CliExecutionTargetDiagnostics,
+  parseCliControlPlaneGlobalOptions,
+  resolveCliExecutionTarget,
+} from "./control-plane-target.js";
+export { createRemoteCliProgram } from "./remote-cli-program.js";
 export type { CliSourceLinkStore } from "./runtime.js";
+export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {
   const live = Layer.mergeAll(NodeContext.layer, CliRuntimeLive(input));

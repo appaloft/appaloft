@@ -82,8 +82,13 @@ Current status:
   Repository config docs now describe `controlPlane.mode`, safe `controlPlane.url` usage, and the
   narrow advanced-bootstrap role of `controlPlane.deploymentContext` under
   `environments/reference/config-file#environment-config-file-control-plane`.
-- `PUB-DOCS-004` is partially covered by successful static build and explicit anchor smoke checks;
-  a dedicated automated link checker does not exist yet.
+  CLI remote control-plane client docs now describe login/profile/context storage, local fallback,
+  remote typed SDK dispatch, explicit unsupported-operation behavior, and the no-adoption/no-secret
+  boundary under `reference/cli#cli-remote-control-plane-login` and
+  `reference/cli#cli-remote-control-plane-dispatch`.
+- `PUB-DOCS-004` is partially covered by successful static build, explicit anchor smoke checks, and
+  docs preview workflow status coverage that reports a passing no-op `Preview` job for unrelated PR
+  changes; a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
   explicit anchor in docs source.
 - `PUB-DOCS-006` is covered at build level by Starlight Pagefind index generation.
@@ -120,6 +125,8 @@ Current status:
 - `PUB-DOCS-011` now also covers dependency resource and resource dependency binding guidance
   through CLI dependency help. Dependency runtime injection has a registered CLI help target for
   plan/show blocked readiness.
+- `PUB-DOCS-011` now also covers CLI remote control-plane login/context help through the stable
+  `cli.remote-control-plane-login` topic.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
@@ -151,8 +158,10 @@ Current status:
   traceability is recorded for installer bootstrap output, GitHub Action secret wiring, and
   HTTP/API 401/403 recovery. Organization/team management traceability is recorded for HTTP/API
   routes, CLI commands, apps/web `/organization`, and product session 401/403 recovery. Dependency
-  runtime injection traceability is recorded for safe bind-to-deploy
-  behavior and plan/show blocked readiness.
+  runtime injection traceability is recorded for safe bind-to-deploy behavior and plan/show blocked
+  readiness. CLI remote control-plane client traceability is recorded for local profile/context
+  commands, remote generated SDK operation dispatch, explicit local fallback, and unsupported
+  remote-operation recovery.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
 

@@ -46,6 +46,15 @@ to an explicit application operation.
    `{aggregate}.patch`, or `{aggregate}.save` are forbidden. If a future operation cannot be named
    without a generic update verb, it needs a Spec Round before implementation.
 
+CLI login, logout, profile, and context selection for remote control-plane client mode are
+entrypoint/session-management affordances, not standalone business operations in the CLI remote
+client bridge. They may choose where later CLI business commands dispatch, but those later commands
+must still map to the operation keys and schemas in this file. The CLI remote dispatcher uses this
+catalog and generated SDK descriptors for non-streaming remote-capable operations; it must not add
+transport-only schemas or login/context operation aliases. Adding a product-level auth
+command/query for login or token issuance would require its own ADR/spec and operation-catalog
+entry.
+
 ## Business Capability Model
 
 The current Appaloft core is organized into nine implemented capability groups:
@@ -1638,6 +1647,15 @@ CLI:
 - CLI commands are transport shells only
 - they parse flags and positional args, then construct the matching command or query input and
   dispatch through the bus
+- when a local CLI profile selects a remote Appaloft Cloud or self-hosted control plane, the CLI may
+  dispatch generated non-streaming operations through the typed remote API client instead of a local
+  bus, but the operation key and input schema must remain the same as the HTTP/oRPC operation
+- `appaloft login`, `appaloft logout`, `appaloft auth status`, and `appaloft context *` manage local
+  uncommitted client state; they must not write secrets to `appaloft.yml`, create operation-catalog
+  aliases, or add control-plane fields to `deployments.create`
+- top-level quick deploy/source-package, webhook-signature-only ingestion, terminal attach, and
+  streaming/watch behavior remain separate governed entrypoint capabilities until their transport
+  contracts are specified
 
 oRPC / HTTP:
 - business endpoints map to the operations above
