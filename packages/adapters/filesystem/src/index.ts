@@ -652,6 +652,16 @@ function gradleStringAssignment(text: string | null, key: string): string | unde
   return text?.match(new RegExp(`\\b${escaped}\\s*=\\s*["']([^"']+)["']`, "u"))?.[1];
 }
 
+function gradleProjectName(input: {
+  buildText: string | null;
+  settingsText: string | null;
+}): string | undefined {
+  return (
+    gradleStringAssignment(input.settingsText, "rootProject.name") ??
+    gradleStringAssignment(input.buildText, "rootProject.name")
+  );
+}
+
 function findSingleJarUnder(path: string, directoryName: string): string | undefined {
   const directoryPath = join(path, directoryName);
 
@@ -768,6 +778,8 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
     const pomPath = join(path, "pom.xml");
     const gradlePath = join(path, "build.gradle");
     const gradleKtsPath = join(path, "build.gradle.kts");
+    const gradleSettingsPath = join(path, "settings.gradle");
+    const gradleSettingsKtsPath = join(path, "settings.gradle.kts");
     const hasPom = existsSync(pomPath);
     const hasGradle = existsSync(gradlePath) || existsSync(gradleKtsPath);
     const hasJar = Boolean(
@@ -786,10 +798,18 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
       : existsSync(gradleKtsPath)
         ? readText(gradleKtsPath)
         : null;
+    const gradleSettings = existsSync(gradleSettingsPath)
+      ? readText(gradleSettingsPath)
+      : existsSync(gradleSettingsKtsPath)
+        ? readText(gradleSettingsKtsPath)
+        : null;
     const packageManager = detectJavaPackageManager({ hasPom, hasGradle });
     const projectName =
       firstXmlText(pom, "artifactId") ??
-      gradle?.match(/rootProject\.name\s*=\s*["']([^"']+)["']/)?.[1];
+      gradleProjectName({
+        buildText: gradle,
+        settingsText: gradleSettings,
+      });
     const version = firstXmlText(pom, "version") ?? gradleStringAssignment(gradle, "version");
     const runtimeVersion = readFirstExistingVersion(path, [".java-version"]);
     const framework = detectJavaFramework({ pom, gradle });
