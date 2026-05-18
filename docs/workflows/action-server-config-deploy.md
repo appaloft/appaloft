@@ -303,6 +303,10 @@ console output.
   trusted package manifest and Action context before dispatching `deployments.create`. GitHub source
   packages become `git-github-app` resource source profiles with safe repository metadata,
   normalized branch/tag refs, and the observed revision recorded as source metadata.
+- Runtime adapters that materialize a Git source initialize repository submodules after clone and
+  before build or runtime plan execution. Provider-scoped credentials may be used transiently for
+  GitHub submodule URL rewrites, but raw tokens must not be persisted or echoed in logs, errors,
+  summaries, or read models.
 - When the validated config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.

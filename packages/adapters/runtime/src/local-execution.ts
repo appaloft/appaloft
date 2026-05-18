@@ -49,6 +49,10 @@ import {
   sourceCommitShaMetadataKey,
 } from "./git-source-metadata";
 import {
+  gitSubmoduleUpdateArgs,
+  githubHttpsSubmodulePrefix,
+} from "./git-source-submodules";
+import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
@@ -878,6 +882,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const cloneLocator = accessToken
       ? withGitHubAccessToken(source.locator, accessToken)
       : source.locator;
+    const tokenizedGithubHttpsPrefix = accessToken
+      ? withGitHubAccessToken(githubHttpsSubmodulePrefix, accessToken)
+      : undefined;
+    const redactions = [
+      cloneLocator,
+      ...(accessToken ? [accessToken] : []),
+      ...(tokenizedGithubHttpsPrefix ? [tokenizedGithubHttpsPrefix] : []),
+    ];
 
     logs.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
     this.report(context, {
@@ -900,7 +912,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       args: cloneArgs,
       cwd: input.runtimeDir,
       env: input.env,
-      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+      redactions,
     });
     this.pushCommandOutput(logs, {
       context,
@@ -909,7 +921,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: clone.stdout,
       level: "info",
       stream: "stdout",
-      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+      redactions,
     });
     this.pushCommandOutput(logs, {
       context,
@@ -918,7 +930,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: clone.stderr,
       level: "warn",
       stream: "stderr",
-      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+      redactions,
     });
 
     if (clone.failed) {
@@ -939,6 +951,69 @@ export class LocalExecutionBackend implements ExecutionBackend {
         deployment: this.applyFailure(deployment, {
           logs,
           errorCode: "remote_git_clone_failed",
+          retryable: true,
+          metadata: {
+            source: source.locator,
+            sourceDir,
+          },
+        }).deployment,
+      };
+    }
+
+    logs.push(phaseLog("package", `Initialize git submodules in ${sourceDir}`));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "running",
+      message: "Initialize git submodules",
+    });
+    const submodule = await runProcess({
+      command: "git",
+      args: gitSubmoduleUpdateArgs({
+        workdir: sourceDir,
+        tokenizedGithubHttpsPrefix,
+      }),
+      cwd: input.runtimeDir,
+      env: input.env,
+      redactions,
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "package",
+      output: submodule.stdout,
+      level: "info",
+      stream: "stdout",
+      redactions,
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "package",
+      output: submodule.stderr,
+      level: "warn",
+      stream: "stderr",
+      redactions,
+    });
+
+    if (submodule.failed) {
+      const message = submodule.reason
+        ? `Remote git submodule update failed: ${submodule.reason}`
+        : `Remote git submodule update failed with exit code ${submodule.exitCode}`;
+      logs.push(phaseLog("package", message, "error"));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "failed",
+        level: "error",
+        message,
+      });
+
+      return {
+        prepared: false,
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: "remote_git_submodule_update_failed",
           retryable: true,
           metadata: {
             source: source.locator,
