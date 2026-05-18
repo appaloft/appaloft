@@ -53,6 +53,10 @@ import {
   sourceCommitShaMetadataKey,
 } from "./git-source-metadata";
 import {
+  gitSubmoduleUpdateArgs,
+  githubHttpsSubmodulePrefix,
+} from "./git-source-submodules";
+import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
@@ -1014,6 +1018,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const redactions: string[] = [];
       let setupCommand = "";
       let cloneEnv = "";
+      let tokenizedGithubHttpsPrefix: string | undefined;
 
       if (source.kind === "git-github-app") {
         if (!isGitHubHttpsLocator(source.locator)) {
@@ -1053,7 +1058,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         cloneLocator = withGitHubAccessToken(source.locator, accessToken);
-        redactions.push(accessToken, cloneLocator);
+        tokenizedGithubHttpsPrefix = withGitHubAccessToken(
+          githubHttpsSubmodulePrefix,
+          accessToken,
+        );
+        redactions.push(accessToken, cloneLocator, tokenizedGithubHttpsPrefix);
       }
 
       if (source.kind === "git-deploy-key") {
@@ -1154,6 +1163,70 @@ export class SshExecutionBackend implements ExecutionBackend {
           deployment: this.applyFailure(deployment, {
             logs,
             errorCode: "remote_git_clone_failed",
+            retryable: true,
+            metadata: {
+              source: source.locator,
+              remoteWorkdir: remoteSourceRoot,
+            },
+          }),
+        };
+      }
+
+      const submoduleArgs = gitSubmoduleUpdateArgs({
+        workdir: remoteSourceRoot,
+        tokenizedGithubHttpsPrefix,
+      });
+      logs.push(phaseLog("package", `Initialize git submodules on ${input.target.host}`));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "running",
+        message: "Initialize git submodules on target",
+      });
+      let submoduleStdoutCount = 0;
+      let submoduleStderrCount = 0;
+      const submodule = await this.runRemoteCommandStreaming({
+        target: input.target,
+        command: `${cloneEnv} git ${submoduleArgs.map((arg) => shellQuote(arg)).join(" ")}`.trim(),
+        cwd: input.runtimeDir,
+        env: input.env,
+        redactions,
+        onOutput: (line, level, stream) => {
+          if (stream === "stdout") {
+            submoduleStdoutCount = this.pushStreamingCommandOutput(logs, {
+              context,
+              deploymentId: state.id.value,
+              phase: "package",
+              line,
+              level,
+              stream,
+              persistedCount: submoduleStdoutCount,
+            });
+            return;
+          }
+
+          submoduleStderrCount = this.pushStreamingCommandOutput(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "package",
+            line,
+            level,
+            stream,
+            persistedCount: submoduleStderrCount,
+          });
+        },
+      });
+
+      if (submodule.failed) {
+        const message = submodule.reason
+          ? `Remote git submodule update failed: ${submodule.reason}`
+          : `Remote git submodule update failed with exit code ${submodule.exitCode}`;
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "remote_git_submodule_update_failed",
             retryable: true,
             metadata: {
               source: source.locator,
