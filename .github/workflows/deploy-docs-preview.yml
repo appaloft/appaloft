@@ -164,16 +164,16 @@ jobs:
 
           APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE="$PREVIEW_URL" bun run --cwd apps/docs build
 
-          artifact_dir="$RUNNER_TEMP/appaloft-docs-dist"
-          mkdir -p "$artifact_dir"
-          cp -R apps/docs/dist/. "$artifact_dir"/
+          artifact_dir="$RUNNER_TEMP/appaloft-docs-artifact"
+          mkdir -p "$artifact_dir/site"
+          cp -R apps/docs/dist/. "$artifact_dir/site"/
 
           bun run apps/shell/src/index.ts deploy "$artifact_dir" \
             --method static \
             --resource-name "$RESOURCE_NAME" \
             --resource-kind static-site \
             --runtime-name "$RESOURCE_NAME" \
-            --publish-dir . \
+            --publish-dir site \
             --port 80 \
             --upstream-protocol http \
             --exposure-mode reverse-proxy \
