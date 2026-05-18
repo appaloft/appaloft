@@ -1,4 +1,4 @@
-import { ok, type Result } from "@appaloft/core";
+import { type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { QueryHandler, type QueryHandlerContract } from "../../cqrs";
@@ -23,6 +23,6 @@ export class ListProjectsQueryHandler
     query: ListProjectsQuery,
   ): Promise<Result<{ items: ProjectSummary[] }>> {
     void query;
-    return ok(await this.queryService.execute(context));
+    return this.queryService.execute(context);
   }
 }

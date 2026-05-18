@@ -558,15 +558,28 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
 
   async list(
     context: RepositoryContext,
-    input?: { organizationId?: string },
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
   ): Promise<ProjectSummary[]> {
     void context;
+    const organizationIds = input?.organizationIds?.length
+      ? new Set(input.organizationIds)
+      : undefined;
+    const projectIds = input?.projectIds?.length ? new Set(input.projectIds) : undefined;
+
     return [...this.repository.items.values()]
       .filter((project) =>
         input?.organizationId
           ? project.toState().organizationId?.value === input.organizationId
           : true,
       )
+      .filter((project) =>
+        organizationIds ? organizationIds.has(project.toState().organizationId?.value ?? "") : true,
+      )
+      .filter((project) => (projectIds ? projectIds.has(project.toState().id.value) : true))
       .flatMap((project) => {
         const summary = projectSummaryFromState(project);
         if (!summary) {
