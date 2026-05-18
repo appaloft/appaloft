@@ -20,6 +20,13 @@ import {
   type CreateActionSourceLinkDeploymentResponse,
 } from "./create-action-source-link-deployment.schema";
 
+type CreateActionSourceLinkDeploymentUseCaseInput = Omit<
+  CreateActionSourceLinkDeploymentCommandParsedInput,
+  "executionMode"
+> & {
+  executionMode?: CreateActionSourceLinkDeploymentCommandParsedInput["executionMode"];
+};
+
 @injectable()
 export class CreateActionSourceLinkDeploymentUseCase {
   constructor(
@@ -33,7 +40,7 @@ export class CreateActionSourceLinkDeploymentUseCase {
 
   async execute(
     context: ExecutionContext,
-    input: CreateActionSourceLinkDeploymentCommandParsedInput,
+    input: CreateActionSourceLinkDeploymentUseCaseInput,
   ): Promise<Result<CreateActionSourceLinkDeploymentResponse>> {
     const link = await this.sourceLinkRepository.findOne(
       SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
@@ -70,6 +77,7 @@ export class CreateActionSourceLinkDeploymentUseCase {
       resourceId: target.resourceId,
       serverId: target.serverId,
       ...(target.destinationId ? { destinationId: target.destinationId } : {}),
+      ...(input.executionMode ? { executionMode: input.executionMode } : {}),
     });
     if (result.isErr()) {
       return err(result.error);
@@ -95,7 +103,7 @@ export class CreateActionSourceLinkDeploymentUseCase {
   }
 }
 
-function explicitContextFromLegacyInput(input: CreateActionSourceLinkDeploymentCommandParsedInput) {
+function explicitContextFromLegacyInput(input: CreateActionSourceLinkDeploymentUseCaseInput) {
   if (
     !input.projectId &&
     !input.environmentId &&
@@ -115,7 +123,7 @@ function explicitContextFromLegacyInput(input: CreateActionSourceLinkDeploymentC
   };
 }
 
-function mergedTrustedContext(input: CreateActionSourceLinkDeploymentCommandParsedInput) {
+function mergedTrustedContext(input: CreateActionSourceLinkDeploymentUseCaseInput) {
   const legacyContext = explicitContextFromLegacyInput(input);
   if (!legacyContext && !input.trustedContext) {
     return undefined;

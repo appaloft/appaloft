@@ -22,6 +22,18 @@ export interface DependencyRuntimeEnvironment {
   dependencyTargetNames: Set<string>;
 }
 
+const appaloftDeploymentRuntimeEnvironmentKeys = new Set([
+  "APPALOFT_DEPLOYMENT_ID",
+  "APPALOFT_PROJECT_ID",
+  "APPALOFT_ENVIRONMENT_ID",
+  "APPALOFT_RESOURCE_ID",
+  "APPALOFT_DESTINATION_ID",
+]);
+
+export function isAppaloftManagedRuntimeEnvironmentKey(key: string): boolean {
+  return appaloftDeploymentRuntimeEnvironmentKeys.has(key);
+}
+
 function isInjectableDependencyReference(
   reference: DeploymentDependencyBindingReferenceState,
 ): boolean {

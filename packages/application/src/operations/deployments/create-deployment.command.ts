@@ -5,6 +5,7 @@ import { parseOperationInput } from "../shared-schema";
 import {
   type CreateDeploymentCommandInput,
   createDeploymentCommandInputSchema,
+  type DeploymentExecutionMode,
 } from "./create-deployment.schema";
 
 export {
@@ -19,6 +20,7 @@ export class CreateDeploymentCommand extends Command<{ id: string }> {
     public readonly environmentId: string,
     public readonly resourceId: string,
     public readonly destinationId?: string,
+    public readonly executionMode: DeploymentExecutionMode = "synchronous",
   ) {
     super();
   }
@@ -32,6 +34,7 @@ export class CreateDeploymentCommand extends Command<{ id: string }> {
           parsed.environmentId,
           parsed.resourceId,
           parsed.destinationId,
+          parsed.executionMode,
         ),
     );
   }

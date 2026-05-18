@@ -36,6 +36,7 @@ export const createActionSourceLinkDeploymentCommandInputSchema = z
     destinationId: nonEmptyTrimmedString("Destination id").optional(),
     trustedContext: actionDeploymentTrustedContextSchema.optional(),
     authorizedTokenScope: actionDeployTokenResolvedScopeSchema.optional(),
+    executionMode: z.enum(["synchronous", "detached"]).default("synchronous"),
   })
   .strict();
 

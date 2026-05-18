@@ -460,6 +460,7 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       sourceFingerprint:
         "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+      executionMode: "detached",
     });
     expect(capturedContext?.actor).toEqual({
       kind: "deploy-token",
@@ -1211,6 +1212,7 @@ describe("deployment create HTTP route", () => {
       resourceId: "res_linked",
       serverId: "srv_linked",
       destinationId: "dst_linked",
+      executionMode: "detached",
     });
   });
 

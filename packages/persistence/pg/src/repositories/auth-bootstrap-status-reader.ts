@@ -78,7 +78,7 @@ export class PgAuthBootstrapStatusReader implements AuthBootstrapStatusReader {
                 : {}),
             nextSteps: owner ? ["sign-in"] : ["create-first-admin"],
           });
-        } catch {
+        } catch (error) {
           return err({
             code: "first_admin_bootstrap_failed",
             category: "infra",
@@ -86,6 +86,8 @@ export class PgAuthBootstrapStatusReader implements AuthBootstrapStatusReader {
             retryable: true,
             details: {
               phase: "first-admin-bootstrap-status",
+              causeName: error instanceof Error ? error.name : typeof error,
+              causeMessage: error instanceof Error ? error.message : String(error),
             },
           });
         }
