@@ -158,6 +158,7 @@ export interface DockerSwarmApplyPlan {
 }
 
 const defaultEdgeNetworkName = "appaloft-edge";
+const defaultTraefikCertificateResolver = "appaloft";
 const composeTargetServiceMetadataKeys = [
   "swarmTargetService",
   "composeTargetService",
@@ -701,7 +702,12 @@ function routeLabels(input: {
       `traefik.docker.network=${route.networkName}`,
       `traefik.http.routers.${router}.rule=${traefikRule(route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
-      ...(route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+      ...(route.tlsMode === "auto"
+        ? [
+            `traefik.http.routers.${router}.tls=true`,
+            `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+          ]
+        : []),
       `traefik.http.routers.${router}.service=${service}`,
       `traefik.http.services.${service}.loadbalancer.server.port=${targetPort}`,
       "appaloft.route-target=active",

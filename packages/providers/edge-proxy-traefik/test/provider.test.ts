@@ -97,6 +97,18 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(ensure._unsafeUnwrap().containerCommand).toContain(
       "--add-host host.docker.internal:host-gateway",
     );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--certificatesresolvers.appaloft.acme.httpchallenge=true",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "-v appaloft-traefik-acme:/letsencrypt",
+    );
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
       image: "traefik:v3.6.2",
     });
@@ -189,6 +201,7 @@ describe("TraefikEdgeProxyProvider", () => {
       expect.arrayContaining([
         "traefik.http.routers.dep-tls.entrypoints=websecure",
         "traefik.http.routers.dep-tls.tls=true",
+        "traefik.http.routers.dep-tls.tls.certresolver=appaloft",
       ]),
     );
     expect(view.isOk()).toBe(true);
@@ -240,6 +253,8 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(labels).toContain("example.test");
     expect(labels).toContain("redirect");
     expect(labels).toContain("308");
+    expect(labels).toContain("traefik.http.routers.dep-canonical.tls.certresolver=appaloft");
+    expect(labels).toContain("traefik.http.routers.dep-canonical-1.tls.certresolver=appaloft");
     expect(labels).not.toContain("dep-canonical-1-svc.loadbalancer");
   });
 
