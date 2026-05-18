@@ -23,6 +23,7 @@ export class CreateDeploymentCommandHandler
       ...(command.destinationId ? { destinationId: command.destinationId } : {}),
       environmentId: command.environmentId,
       resourceId: command.resourceId,
+      executionMode: command.executionMode,
     });
   }
 }

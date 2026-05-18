@@ -33,6 +33,7 @@ export class CreateActionSourceLinkDeploymentCommandHandler
       ...(command.authorizedTokenScope
         ? { authorizedTokenScope: command.authorizedTokenScope }
         : {}),
+      executionMode: command.executionMode,
     });
   }
 }

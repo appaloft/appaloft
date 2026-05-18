@@ -46,7 +46,10 @@ import {
   ok,
 } from "@appaloft/core";
 import { type DependencyResourceSecretStore, type ExecutionContext } from "@appaloft/application";
-import { resolveDependencyRuntimeEnvironment } from "../src/dependency-runtime-secrets";
+import {
+  isAppaloftManagedRuntimeEnvironmentKey,
+  resolveDependencyRuntimeEnvironment,
+} from "../src/dependency-runtime-secrets";
 import {
   RuntimeCommandBuilder,
   renderRuntimeCommandString,
@@ -165,6 +168,16 @@ function createDeploymentWithDependencyRef(
 }
 
 describe("dependency runtime secret resolution", () => {
+  test("[RUNTIME-ENV-ISOLATION-001] classifies only Appaloft deployment context env as managed runtime env", () => {
+    expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_DEPLOYMENT_ID")).toBe(true);
+    expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_PROJECT_ID")).toBe(true);
+    expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE")).toBe(
+      false,
+    );
+    expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_DATABASE_URL")).toBe(false);
+    expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_BETTER_AUTH_SECRET")).toBe(false);
+  });
+
   test("[DEP-BIND-SECRET-RESOLVE-005] resolves Appaloft-owned dependency refs into runtime env with redaction metadata", async () => {
     const context = testContext("req_dependency_runtime_secret_test");
     const store = new MemoryDependencyResourceSecretStore();

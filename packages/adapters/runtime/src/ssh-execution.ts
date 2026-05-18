@@ -68,7 +68,10 @@ import {
   renderRuntimeCommandString,
 } from "./runtime-commands";
 import { runStreamingProcess } from "./streaming-process";
-import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
+import {
+  isAppaloftManagedRuntimeEnvironmentKey,
+  resolveDependencyRuntimeEnvironment,
+} from "./dependency-runtime-secrets";
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
@@ -1978,7 +1981,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         .filter(
           ([key]) =>
             key === "PORT" ||
-            key.startsWith("APPALOFT_") ||
+            isAppaloftManagedRuntimeEnvironmentKey(key) ||
             dependencyTargetNames.has(key) ||
             state.environmentSnapshot.variables.some((variable) => variable.key === key),
         )

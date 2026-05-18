@@ -368,6 +368,33 @@ class HermeticExecutionBackend implements ExecutionBackend {
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
+class DeferredExecutionBackend extends HermeticExecutionBackend {
+  readonly started = deferred<Deployment>();
+  readonly release = deferred<void>();
+  readonly completed = deferred<void>();
+
+  override async execute(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    this.started.resolve(deployment);
+    await this.release.promise;
+    const result = await super.execute(context, deployment);
+    this.completed.resolve();
+    return result;
+  }
+}
+
 class HermeticRuntimeTargetBackend
   extends HermeticExecutionBackend
   implements RuntimeTargetBackend
@@ -1415,6 +1442,43 @@ describe("CreateDeploymentUseCase", () => {
 
     expect(command.isErr()).toBe(true);
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
+  test("[DEP-CREATE-ASYNC-001] admits detached deployment execution before runtime completion", async () => {
+    const executionBackend = new DeferredExecutionBackend();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new LocalEmbeddedDefaultsPolicy(), {
+      executionBackend,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
+    const created = unwrapDeploymentCreateResult(result);
+    const startedDeployment = await executionBackend.started.promise;
+
+    expect(startedDeployment.toState().id.value).toBe(created.id);
+    const admitted = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(created.id)),
+    );
+    expect(admitted?.toState().status.value).toBe("running");
+
+    executionBackend.release.resolve();
+    await executionBackend.completed.promise;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const completed = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(created.id)),
+    );
+    expect(completed?.toState().status.value).toBe("succeeded");
   });
 
   test("adds runtime context metadata for workload diagnostics", async () => {

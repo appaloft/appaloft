@@ -1038,56 +1038,87 @@ export class CreateDeploymentUseCase {
         }),
       });
 
-      const executionResult = await executionBackend.execute(context, deployment);
-      if (executionResult.isErr()) {
-        if (isExecutionSupersededError(executionResult.error)) {
-          return ok({ id: deployment.toState().id.value });
-        }
+      const completeDeploymentExecution = async (
+        admitted: Deployment,
+      ): Promise<Result<{ id: string }>> =>
+        safeTry(async function* () {
+          const executionResult = await executionBackend.execute(context, admitted);
+          if (executionResult.isErr()) {
+            if (isExecutionSupersededError(executionResult.error)) {
+              return ok({ id: admitted.toState().id.value });
+            }
 
-        const failureResult = deploymentLifecycleService.failExecution(
-          deployment,
-          executionResult.error,
-        );
-        yield* failureResult;
+            const failureResult = deploymentLifecycleService.failExecution(
+              admitted,
+              executionResult.error,
+            );
+            yield* failureResult;
 
-        const failurePersistResult = yield* await persistDeployment(context, deployment);
-        if (failurePersistResult === "fenced") {
-          return ok({ id: deployment.toState().id.value });
-        }
-        await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
-        await recordDeploymentProcessAttempt({
-          recorder: processAttemptRecorder,
-          repositoryContext,
-          context,
-          deployment,
-          operationKey: recovery?.ownerLabel ?? "deployments.create",
+            const failurePersistResult = yield* await persistDeployment(context, admitted);
+            if (failurePersistResult === "fenced") {
+              return ok({ id: admitted.toState().id.value });
+            }
+            await publishDomainEventsAndReturn(context, eventBus, logger, admitted, undefined);
+            await recordDeploymentProcessAttempt({
+              recorder: processAttemptRecorder,
+              repositoryContext,
+              context,
+              deployment: admitted,
+              operationKey: recovery?.ownerLabel ?? "deployments.create",
+            });
+
+            return ok({ id: admitted.toState().id.value });
+          }
+
+          const execution = executionResult.value;
+
+          const terminalPersistResult = yield* await persistDeployment(
+            context,
+            execution.deployment,
+          );
+          if (terminalPersistResult === "fenced") {
+            return ok({ id: execution.deployment.toState().id.value });
+          }
+          await publishDomainEventsAndReturn(
+            context,
+            eventBus,
+            logger,
+            execution.deployment,
+            undefined,
+          );
+          await recordDeploymentProcessAttempt({
+            recorder: processAttemptRecorder,
+            repositoryContext,
+            context,
+            deployment: execution.deployment,
+            operationKey: recovery?.ownerLabel ?? "deployments.create",
+          });
+
+          return ok({ id: execution.deployment.toState().id.value });
         });
 
-        return ok({ id: deployment.toState().id.value });
+      if (input.executionMode === "detached") {
+        void completeDeploymentExecution(deployment)
+          .then((result) => {
+            if (result.isErr()) {
+              logger.error("detached_deployment_execution_failed", {
+                deploymentId,
+                errorCode: result.error.code,
+                message: result.error.message,
+              });
+            }
+          })
+          .catch((error) => {
+            logger.error("detached_deployment_execution_unhandled_error", {
+              deploymentId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          });
+        return ok({ id: deploymentId });
       }
 
-      const execution = executionResult.value;
-
-      const terminalPersistResult = yield* await persistDeployment(context, execution.deployment);
-      if (terminalPersistResult === "fenced") {
-        return ok({ id: execution.deployment.toState().id.value });
-      }
-      await publishDomainEventsAndReturn(
-        context,
-        eventBus,
-        logger,
-        execution.deployment,
-        undefined,
-      );
-      await recordDeploymentProcessAttempt({
-        recorder: processAttemptRecorder,
-        repositoryContext,
-        context,
-        deployment: execution.deployment,
-        operationKey: recovery?.ownerLabel ?? "deployments.create",
-      });
-
-      return ok({ id: execution.deployment.toState().id.value });
+      const completed = yield* await completeDeploymentExecution(deployment);
+      return ok(completed);
     });
   }
 }
