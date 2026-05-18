@@ -37,9 +37,14 @@ export interface ExecutionPrincipal {
   userId?: string;
 }
 
+export interface ExecutionProviderAccessTokens {
+  github?: string | undefined;
+}
+
 export interface ExecutionAuthContext {
   authorizationHeader?: string;
   cookieHeader?: string;
+  providerAccessTokens?: ExecutionProviderAccessTokens;
 }
 
 export interface AppSpan {
@@ -137,6 +142,47 @@ export function createExecutionContext(input: {
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.auth ? { auth: input.auth } : {}),
     ...(input.principal ? { principal: input.principal } : {}),
+  };
+}
+
+export function getExecutionAuthProviderAccessToken(
+  context: ExecutionContext,
+  providerKey: keyof ExecutionProviderAccessTokens,
+): string | null {
+  const accessToken = context.auth?.providerAccessTokens?.[providerKey]?.trim();
+  return accessToken || null;
+}
+
+function normalizeExecutionProviderAccessTokens(
+  providerAccessTokens: ExecutionProviderAccessTokens | undefined,
+): ExecutionProviderAccessTokens | undefined {
+  const github = providerAccessTokens?.github?.trim();
+  if (!github) {
+    return undefined;
+  }
+
+  return { github };
+}
+
+export function withExecutionAuthProviderAccessTokens(
+  context: ExecutionContext,
+  providerAccessTokens: ExecutionProviderAccessTokens | undefined,
+): ExecutionContext {
+  const normalizedProviderAccessTokens =
+    normalizeExecutionProviderAccessTokens(providerAccessTokens);
+  if (!normalizedProviderAccessTokens) {
+    return context;
+  }
+
+  return {
+    ...context,
+    auth: {
+      ...context.auth,
+      providerAccessTokens: {
+        ...context.auth?.providerAccessTokens,
+        ...normalizedProviderAccessTokens,
+      },
+    },
   };
 }
 
