@@ -6478,6 +6478,83 @@ function requestContextOptionsFromSourcePackageCredentials(
   };
 }
 
+function normalizeActionGitRef(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized.startsWith("refs/heads/")) {
+    return normalized.slice("refs/heads/".length);
+  }
+
+  if (normalized.startsWith("refs/tags/")) {
+    return normalized.slice("refs/tags/".length);
+  }
+
+  if (normalized.startsWith("refs/pull/")) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+type ActionServerConfigSourceProfile = {
+  kind: "git-github-app";
+  locator: string;
+  displayName: string;
+  gitRef?: string;
+  commitSha?: string;
+  repositoryId?: string;
+  repositoryFullName: string;
+};
+
+function sourceProfileFromActionSourcePackage(
+  body: ActionServerConfigDeployBody,
+): Result<ActionServerConfigSourceProfile | undefined> {
+  if (body.sourcePackage.transport !== "server-github-fetch") {
+    return ok(undefined);
+  }
+
+  const repositoryFullName =
+    body.sourcePackage.repositoryFullName?.trim() ??
+    body.trustedContext?.repositoryFullName?.trim();
+  if (!repositoryFullName) {
+    return ok(undefined);
+  }
+
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repositoryFullName)) {
+    return err(
+      domainError.validation("Action source package repository full name is invalid", {
+        phase: "source-package-runtime-profile",
+        repositoryFullName,
+      }),
+    );
+  }
+
+  const gitRef =
+    normalizeActionGitRef(body.preview?.headRef) ??
+    normalizeActionGitRef(body.trustedContext?.ref) ??
+    undefined;
+  const commitSha =
+    body.sourcePackage.revision?.trim() ??
+    body.trustedContext?.revision?.trim() ??
+    body.preview?.headSha?.trim() ??
+    undefined;
+  const repositoryId =
+    body.sourcePackage.repositoryId?.trim() ?? body.trustedContext?.repositoryId?.trim() ?? "";
+
+  return ok({
+    kind: "git-github-app",
+    locator: `https://github.com/${repositoryFullName}.git`,
+    displayName: repositoryFullName,
+    repositoryFullName,
+    ...(repositoryId ? { repositoryId } : {}),
+    ...(gitRef ? { gitRef } : {}),
+    ...(commitSha ? { commitSha } : {}),
+  });
+}
+
 async function resolveActionServerConfigDomainContext(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
@@ -6562,6 +6639,7 @@ async function applyActionServerConfigProfileCommands(input: {
   context: AppaloftOrpcContext;
   executionContext: ExecutionContext;
   config: AppaloftDeploymentConfig;
+  sourceProfile?: ActionServerConfigSourceProfile;
   sourceFingerprint: string;
   resolvedSecrets?: Record<string, string>;
   previewRoute?: ActionServerConfigDeployBody["previewRoute"];
@@ -6573,9 +6651,32 @@ async function applyActionServerConfigProfileCommands(input: {
     config,
     previewRoute,
     resolvedSecrets,
+    sourceProfile,
     sourceFingerprint,
     target,
   } = input;
+
+  const secretVariables = actionServerConfigSecretEnvironmentVariables({
+    config,
+    ...(resolvedSecrets ? { resolvedSecrets } : {}),
+  });
+  if (secretVariables.isErr()) {
+    return err(secretVariables.error);
+  }
+
+  if (sourceProfile) {
+    const command = ConfigureResourceSourceCommand.create({
+      resourceId: target.resourceId,
+      source: sourceProfile,
+    });
+    if (command.isErr()) {
+      return err(command.error);
+    }
+    const result = await context.commandBus.execute(executionContext, command.value);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+  }
 
   const runtimeProfile = runtimeProfileFromActionServerConfig(config);
   if (runtimeProfile) {
@@ -6640,14 +6741,6 @@ async function applyActionServerConfigProfileCommands(input: {
     if (result.isErr()) {
       return err(result.error);
     }
-  }
-
-  const secretVariables = actionServerConfigSecretEnvironmentVariables({
-    config,
-    ...(resolvedSecrets ? { resolvedSecrets } : {}),
-  });
-  if (secretVariables.isErr()) {
-    return err(secretVariables.error);
   }
 
   for (const variable of secretVariables.value) {
@@ -6932,6 +7025,11 @@ async function handleActionServerConfigDeploymentRoute(input: {
     return domainErrorHttpResponse(effectiveConfig.error, executionContext);
   }
 
+  const sourceProfile = sourceProfileFromActionSourcePackage(body.data);
+  if (sourceProfile.isErr()) {
+    return domainErrorHttpResponse(sourceProfile.error, executionContext);
+  }
+
   if (actionServerConfigHasUnsupportedProfileApplication(effectiveConfig.value)) {
     return domainErrorHttpResponse(
       domainError.validation(
@@ -6978,6 +7076,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
       executionContext,
       config: effectiveConfig.value,
       sourceFingerprint: body.data.sourceFingerprint,
+      ...(sourceProfile.value ? { sourceProfile: sourceProfile.value } : {}),
       ...(body.data.resolvedSecrets ? { resolvedSecrets: body.data.resolvedSecrets } : {}),
       ...(body.data.previewRoute ? { previewRoute: body.data.previewRoute } : {}),
       target: target.value,

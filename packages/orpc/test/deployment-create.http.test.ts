@@ -13,6 +13,7 @@ import {
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
+  ConfigureResourceSourceCommand,
   ConfirmActionPreviewRouteCommand,
   CreateActionSourceLinkDeploymentCommand,
   CreateDeploymentCommand,
@@ -1613,12 +1614,23 @@ describe("deployment create HTTP route", () => {
 
     expect(response.status).toBe(202);
     expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceSourceCommand,
       ConfigureResourceRuntimeCommand,
       ConfigureResourceNetworkCommand,
       ConfigureResourceHealthCommand,
       CreateDeploymentCommand,
     ]);
     expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_www",
+      source: {
+        kind: "git-github-app",
+        locator: "https://github.com/appaloft/www.git",
+        displayName: "appaloft/www",
+        repositoryFullName: "appaloft/www",
+        commitSha: "abc123",
+      },
+    });
+    expect(capturedCommands[1]).toMatchObject({
       resourceId: "res_www",
       runtimeProfile: {
         strategy: "static",
@@ -1628,7 +1640,7 @@ describe("deployment create HTTP route", () => {
         publishDirectory: "dist",
       },
     });
-    expect(capturedCommands[1]).toMatchObject({
+    expect(capturedCommands[2]).toMatchObject({
       resourceId: "res_www",
       networkProfile: {
         internalPort: 80,
@@ -1636,7 +1648,7 @@ describe("deployment create HTTP route", () => {
         exposureMode: "reverse-proxy",
       },
     });
-    expect(capturedCommands[2]).toMatchObject({
+    expect(capturedCommands[3]).toMatchObject({
       resourceId: "res_www",
       healthCheck: {
         enabled: true,
@@ -1646,7 +1658,7 @@ describe("deployment create HTTP route", () => {
         },
       },
     });
-    expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands[4]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config preview renders runtime name templates before applying profile commands", async () => {
@@ -1714,6 +1726,7 @@ describe("deployment create HTTP route", () => {
             kind: "pull-request",
             previewId: "cloud-pr-1",
             pullRequestNumber: 1,
+            headRef: "fix/v0-2-cloud-authz",
           },
           trustedContext: {
             projectId: "prj_console",
@@ -1727,10 +1740,22 @@ describe("deployment create HTTP route", () => {
 
     expect(response.status).toBe(202);
     expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceSourceCommand,
       ConfigureResourceRuntimeCommand,
       CreateDeploymentCommand,
     ]);
     expect(capturedCommands[0]).toMatchObject({
+      resourceId: "res_preview",
+      source: {
+        kind: "git-github-app",
+        locator: "https://github.com/appaloft/appaloft-cloud.git",
+        displayName: "appaloft/appaloft-cloud",
+        repositoryFullName: "appaloft/appaloft-cloud",
+        gitRef: "fix/v0-2-cloud-authz",
+        commitSha: "abc123",
+      },
+    });
+    expect(capturedCommands[1]).toMatchObject({
       resourceId: "res_preview",
       runtimeProfile: {
         strategy: "dockerfile",
@@ -1805,11 +1830,12 @@ describe("deployment create HTTP route", () => {
 
     expect(response.status).toBe(202);
     expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceSourceCommand,
       SetEnvironmentVariableCommand,
       SetEnvironmentVariableCommand,
       CreateDeploymentCommand,
     ]);
-    expect(capturedCommands[0]).toMatchObject({
+    expect(capturedCommands[1]).toMatchObject({
       environmentId: "env_prod",
       key: "PUBLIC_SITE",
       value: "https://www.example.com",
@@ -1818,7 +1844,7 @@ describe("deployment create HTTP route", () => {
       scope: "environment",
       isSecret: false,
     });
-    expect(capturedCommands[1]).toMatchObject({
+    expect(capturedCommands[2]).toMatchObject({
       environmentId: "env_prod",
       key: "HOST",
       value: "0.0.0.0",
@@ -1827,7 +1853,7 @@ describe("deployment create HTTP route", () => {
       scope: "environment",
       isSecret: false,
     });
-    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint applies resolved CI secrets before deployment", async () => {
@@ -1903,10 +1929,11 @@ describe("deployment create HTTP route", () => {
 
     expect(response.status).toBe(202);
     expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceSourceCommand,
       SetEnvironmentVariableCommand,
       CreateDeploymentCommand,
     ]);
-    expect(capturedCommands[0]).toMatchObject({
+    expect(capturedCommands[1]).toMatchObject({
       environmentId: "env_prod",
       key: "APPALOFT_BETTER_AUTH_SECRET",
       value: "resolved-ci-secret",
@@ -1915,7 +1942,7 @@ describe("deployment create HTTP route", () => {
       scope: "environment",
       isSecret: true,
     });
-    expect(capturedCommands[1]).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint rejects missing resolved CI secrets before mutation", async () => {
@@ -2128,11 +2155,12 @@ describe("deployment create HTTP route", () => {
       deploymentHref: "/deployments/dep_domain_config",
     });
     expect(capturedCommands.map((command) => command.constructor)).toEqual([
+      ConfigureResourceSourceCommand,
       CreateDomainBindingCommand,
       CreateDomainBindingCommand,
       CreateDeploymentCommand,
     ]);
-    expect(capturedCommands[0]).toMatchObject({
+    expect(capturedCommands[1]).toMatchObject({
       projectId: "prj_console",
       environmentId: "env_prod",
       resourceId: "res_www",
@@ -2143,12 +2171,12 @@ describe("deployment create HTTP route", () => {
       proxyKind: "traefik",
       tlsMode: "auto",
     });
-    expect(capturedCommands[1]).toMatchObject({
+    expect(capturedCommands[2]).toMatchObject({
       domainName: "www.example.com",
       redirectTo: "docs.example.com",
       redirectStatus: 308,
     });
-    expect(capturedCommands[2]).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands[3]).toBeInstanceOf(CreateDeploymentCommand);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config preview applies transient env and preview route only", async () => {
