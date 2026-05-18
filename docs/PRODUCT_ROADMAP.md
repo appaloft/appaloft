@@ -53,9 +53,9 @@ Current release alignment:
 
 <!-- release-alignment:start -->
 - [x] On 2026-05-18, the latest public release is `v0.12.4`; root package
-  and Release Please manifest on `main` are `1.0.0-rc.6`; the release PR target is
-  `1.0.0-rc.7`.
-- [x] On 2026-05-18, the roadmap gate allows `Release-As: 1.0.0-rc.7` because
+  and Release Please manifest on `main` are `1.0.0-rc.7`; the release PR target is
+  `1.0.0-rc.8`.
+- [x] On 2026-05-18, the roadmap gate allows `Release-As: 1.0.0-rc.8` because
   Phase 0 through Phase 11 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
