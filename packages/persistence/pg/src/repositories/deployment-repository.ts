@@ -19,7 +19,13 @@ import {
   type Result,
   type UpsertDeploymentSpec,
 } from "@appaloft/core";
-import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
+import {
+  type Insertable,
+  type Kysely,
+  type Selectable,
+  type SelectQueryBuilder,
+  type UpdateResult,
+} from "kysely";
 
 import { type Database } from "../schema";
 import {
@@ -190,55 +196,72 @@ export class PgDeploymentRepository implements DeploymentRepository {
     const executor = resolveRepositoryExecutor(this.db, context);
     const state = deployment.toState();
     const mutation = spec.accept(new KyselyDeploymentMutationVisitor());
-    const updateResult = await context.tracer.startActiveSpan(
-      createRepositorySpanName("deployment", "update_one"),
-      {
-        attributes: {
-          [appaloftTraceAttributes.repositoryName]: "deployment",
-          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
+    let updateResult: UpdateResult;
+    try {
+      updateResult = await context.tracer.startActiveSpan(
+        createRepositorySpanName("deployment", "update_one"),
+        {
+          attributes: {
+            [appaloftTraceAttributes.repositoryName]: "deployment",
+            [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
+          },
         },
-      },
-      async () => {
-        return await executor
-          .updateTable("deployments")
-          .set({
-            resource_id: mutation.values.resource_id,
-            server_id: mutation.values.server_id,
-            destination_id: mutation.values.destination_id,
-            status: mutation.values.status,
-            runtime_plan: mutation.values.runtime_plan as unknown as Record<string, unknown>,
-            environment_snapshot: mutation.values.environment_snapshot as unknown as Record<
-              string,
-              unknown
-            >,
-            dependency_binding_references: mutation.values
-              .dependency_binding_references as unknown as Record<string, unknown>[],
-            logs: mutation.values.logs as unknown as Record<string, unknown>[],
-            started_at: mutation.values.started_at ?? null,
-            finished_at: mutation.values.finished_at ?? null,
-            trigger_kind: mutation.values.trigger_kind,
-            source_deployment_id: mutation.values.source_deployment_id ?? null,
-            rollback_of_deployment_id: mutation.values.rollback_of_deployment_id ?? null,
-            supersedes_deployment_id: mutation.values.supersedes_deployment_id ?? null,
-            superseded_by_deployment_id: mutation.values.superseded_by_deployment_id ?? null,
-            archived_at: mutation.values.archived_at ?? null,
-          })
-          .where("id", "=", state.id.value)
-          .where((builder) =>
-            mutation.values.superseded_by_deployment_id
-              ? builder.or([
-                  builder("superseded_by_deployment_id", "is", null),
-                  builder(
-                    "superseded_by_deployment_id",
-                    "=",
-                    mutation.values.superseded_by_deployment_id,
-                  ),
-                ])
-              : builder("superseded_by_deployment_id", "is", null),
-          )
-          .executeTakeFirst();
-      },
-    );
+        async () => {
+          return await executor
+            .updateTable("deployments")
+            .set({
+              resource_id: mutation.values.resource_id,
+              server_id: mutation.values.server_id,
+              destination_id: mutation.values.destination_id,
+              status: mutation.values.status,
+              runtime_plan: mutation.values.runtime_plan as unknown as Record<string, unknown>,
+              environment_snapshot: mutation.values.environment_snapshot as unknown as Record<
+                string,
+                unknown
+              >,
+              dependency_binding_references: mutation.values
+                .dependency_binding_references as unknown as Record<string, unknown>[],
+              logs: mutation.values.logs as unknown as Record<string, unknown>[],
+              started_at: mutation.values.started_at ?? null,
+              finished_at: mutation.values.finished_at ?? null,
+              trigger_kind: mutation.values.trigger_kind,
+              source_deployment_id: mutation.values.source_deployment_id ?? null,
+              rollback_of_deployment_id: mutation.values.rollback_of_deployment_id ?? null,
+              supersedes_deployment_id: mutation.values.supersedes_deployment_id ?? null,
+              superseded_by_deployment_id: mutation.values.superseded_by_deployment_id ?? null,
+              archived_at: mutation.values.archived_at ?? null,
+            })
+            .where("id", "=", state.id.value)
+            .where((builder) =>
+              mutation.values.superseded_by_deployment_id
+                ? builder.or([
+                    builder("superseded_by_deployment_id", "is", null),
+                    builder(
+                      "superseded_by_deployment_id",
+                      "=",
+                      mutation.values.superseded_by_deployment_id,
+                    ),
+                  ])
+                : builder("superseded_by_deployment_id", "is", null),
+            )
+            .executeTakeFirst();
+        },
+      );
+    } catch (error) {
+      const errorMetadata: Record<string, string | number | boolean | null> = {
+        aggregateRoot: "deployment",
+        operation: "updateOne",
+        deploymentId: state.id.value,
+        resourceId: state.resourceId.value,
+      };
+      const errorMessage = safeErrorMessage(error);
+
+      if (errorMessage) {
+        errorMetadata.message = errorMessage;
+      }
+
+      return err(domainError.infra("Deployment could not be updated", errorMetadata));
+    }
 
     if (Number(updateResult.numUpdatedRows ?? 0) > 0) {
       return ok(undefined);
