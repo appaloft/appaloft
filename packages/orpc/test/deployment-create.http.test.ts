@@ -1034,8 +1034,10 @@ describe("deployment create HTTP route", () => {
 
   test("[CONTROL-PLANE-HANDSHAKE-017][ACTION-SERVER-CONFIG-SPEC-010] Action server config endpoint dispatches ids-only deployment for an existing resource", async () => {
     let capturedCommand: Command<unknown> | undefined;
+    const capturedCommandContexts: ExecutionContext[] = [];
     const commandBus = {
-      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+      execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommandContexts.push(context);
         if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
           return ok(actionServerConfigTarget(command) as T);
         }
@@ -1132,6 +1134,15 @@ describe("deployment create HTTP route", () => {
         github: "github-token-fixture",
       },
     });
+    expect(capturedCommandContexts.length).toBeGreaterThan(0);
+    expect(
+      capturedCommandContexts.every(
+        (context) =>
+          context.auth?.providerAccessTokens?.github === "github-token-fixture" &&
+          context.auth?.authorizationHeader === undefined &&
+          context.auth?.cookieHeader === undefined,
+      ),
+    ).toBe(true);
   });
 
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint resolves existing source-link context without trusted ids", async () => {

@@ -155,6 +155,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionPrincipal,
+  type ExecutionProviderAccessTokens,
   ExpireTerminalSessionsCommand,
   ExportAuditEventsQuery,
   ExportGlobalAuditEventsQuery,
@@ -458,6 +459,7 @@ import {
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
+  withExecutionAuthProviderAccessTokens,
 } from "@appaloft/application";
 import {
   archiveDeploymentResponseSchema,
@@ -709,9 +711,7 @@ export interface RequestContextRunner {
 }
 
 export interface RequestContextRunnerOptions {
-  providerAccessTokens?: {
-    github?: string | undefined;
-  };
+  providerAccessTokens?: ExecutionProviderAccessTokens;
 }
 
 export interface ActionSourcePackageConfigReader {
@@ -7043,23 +7043,30 @@ async function handleActionServerConfigDeploymentRoute(input: {
     );
   }
 
+  const requestContextOptions = requestContextOptionsFromSourcePackageCredentials(
+    body.data.sourcePackageCredentials,
+  );
+  const sourcePackageExecutionContext = withExecutionAuthProviderAccessTokens(
+    executionContext,
+    requestContextOptions?.providerAccessTokens,
+  );
   const runWithSourcePackageCredentials = createRequestRunner(
     request,
-    executionContext,
+    sourcePackageExecutionContext,
     context.requestContextRunner,
-    requestContextOptionsFromSourcePackageCredentials(body.data.sourcePackageCredentials),
+    requestContextOptions,
   );
 
   return runWithSourcePackageCredentials(async () => {
     const target = await resolveActionServerConfigDeploymentTarget({
       ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
       context,
-      executionContext,
+      executionContext: sourcePackageExecutionContext,
       body: body.data,
       request,
     });
     if (target.isErr()) {
-      return domainErrorHttpResponse(target.error, executionContext);
+      return domainErrorHttpResponse(target.error, sourcePackageExecutionContext);
     }
 
     if (!target.value.serverId) {
@@ -7068,13 +7075,13 @@ async function handleActionServerConfigDeploymentRoute(input: {
           phase: "source-link-resolution",
           sourceFingerprint: body.data.sourceFingerprint,
         }),
-        executionContext,
+        sourcePackageExecutionContext,
       );
     }
 
     const profileApplied = await applyActionServerConfigProfileCommands({
       context,
-      executionContext,
+      executionContext: sourcePackageExecutionContext,
       config: effectiveConfig.value,
       sourceFingerprint: body.data.sourceFingerprint,
       ...(sourceProfile.value ? { sourceProfile: sourceProfile.value } : {}),
@@ -7083,7 +7090,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
       target: target.value,
     });
     if (profileApplied.isErr()) {
-      return domainErrorHttpResponse(profileApplied.error, executionContext);
+      return domainErrorHttpResponse(profileApplied.error, sourcePackageExecutionContext);
     }
 
     const command = CreateDeploymentCommand.create({
@@ -7095,12 +7102,12 @@ async function handleActionServerConfigDeploymentRoute(input: {
       executionMode: "detached",
     });
     if (command.isErr()) {
-      return domainErrorHttpResponse(command.error, executionContext);
+      return domainErrorHttpResponse(command.error, sourcePackageExecutionContext);
     }
 
-    const result = await context.commandBus.execute(executionContext, command.value);
+    const result = await context.commandBus.execute(sourcePackageExecutionContext, command.value);
     if (result.isErr()) {
-      return domainErrorHttpResponse(result.error, executionContext);
+      return domainErrorHttpResponse(result.error, sourcePackageExecutionContext);
     }
 
     const previewRoute = body.data.previewRoute;
@@ -7115,11 +7122,11 @@ async function handleActionServerConfigDeploymentRoute(input: {
           if (command.isErr()) {
             return err(command.error);
           }
-          return context.commandBus.execute(executionContext, command.value);
+          return context.commandBus.execute(sourcePackageExecutionContext, command.value);
         })()
       : ok(undefined);
     if (previewRouteVerification.isErr()) {
-      return domainErrorHttpResponse(previewRouteVerification.error, executionContext);
+      return domainErrorHttpResponse(previewRouteVerification.error, sourcePackageExecutionContext);
     }
 
     return Response.json(
