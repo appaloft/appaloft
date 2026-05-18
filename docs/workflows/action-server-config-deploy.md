@@ -155,6 +155,11 @@ type ActionServerConfigDeployResponse = {
 The response means the deployment request has been accepted, not that runtime execution or route
 verification has completed.
 
+For self-hosted Action routes, deployment admission should use detached execution so HTTP clients
+do not have to hold the request open while image builds, runtime startup, proxy convergence, and
+health verification run. The deployment remains observable through the normal deployment read
+model, logs, events, and resource health surfaces.
+
 ## Runtime Environment Boundary
 
 The runtime adapter must not forward the control-plane process environment wholesale into workload

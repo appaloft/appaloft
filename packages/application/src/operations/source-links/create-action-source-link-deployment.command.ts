@@ -5,6 +5,7 @@ import { type ActionDeployTokenResolvedScope } from "../../ports";
 import { parseOperationInput } from "../shared-schema";
 import {
   type CreateActionSourceLinkDeploymentCommandInput,
+  type CreateActionSourceLinkDeploymentCommandParsedInput,
   type CreateActionSourceLinkDeploymentResponse,
   createActionSourceLinkDeploymentCommandInputSchema,
 } from "./create-action-source-link-deployment.schema";
@@ -38,6 +39,7 @@ export class CreateActionSourceLinkDeploymentCommand extends Command<CreateActio
     public readonly destinationId?: string,
     public readonly trustedContext?: TrustedActionSourceLinkDeploymentContext,
     public readonly authorizedTokenScope?: ActionDeployTokenResolvedScope,
+    public readonly executionMode: CreateActionSourceLinkDeploymentCommandParsedInput["executionMode"] = "synchronous",
   ) {
     super();
   }
@@ -56,6 +58,7 @@ export class CreateActionSourceLinkDeploymentCommand extends Command<CreateActio
           parsed.destinationId,
           trustedContextFromParsed(parsed),
           authorizedTokenScopeFromParsed(parsed.authorizedTokenScope),
+          parsed.executionMode,
         ),
     );
   }

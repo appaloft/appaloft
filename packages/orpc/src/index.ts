@@ -6049,6 +6049,7 @@ async function handleActionSourceLinkDeploymentRoute(input: {
     ...(body.data.destinationId ? { destinationId: body.data.destinationId } : {}),
     ...(body.data.trustedContext ? { trustedContext: body.data.trustedContext } : {}),
     ...(authorizedScope.value.scope ? { authorizedTokenScope: authorizedScope.value.scope } : {}),
+    executionMode: "detached",
   });
   if (command.isErr()) {
     return domainErrorHttpResponse(command.error, executionContext);
@@ -7091,6 +7092,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
       resourceId: target.value.resourceId,
       serverId: target.value.serverId,
       ...(target.value.destinationId ? { destinationId: target.value.destinationId } : {}),
+      executionMode: "detached",
     });
     if (command.isErr()) {
       return domainErrorHttpResponse(command.error, executionContext);
