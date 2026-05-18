@@ -52,20 +52,20 @@ design package is `@appaloft/design`; Web remains the reference surface for prod
 Docs/www consume those tokens instead of redefining font, color, radius, shadow, or Tailwind theme
 variables locally.
 
-The public documentation site technology is **Astro Starlight** unless a later ADR supersedes this
-decision. Starlight is selected because it fits Appaloft's current requirements:
+The public documentation site technology is **Fumadocs on Next.js static export**. Fumadocs is
+selected because it fits Appaloft's current requirements:
 
 - static documentation output;
-- fast page delivery and low runtime JavaScript by default;
-- built-in Pagefind search for static sites;
+- fast page delivery with a React Server Component docs model;
+- built-in Orama-compatible document search for static sites;
 - internationalization support;
 - Tailwind-compatible customization path;
-- Bun-compatible development and build flow through Astro;
-- component and override mechanisms for Appaloft-specific help widgets;
+- Bun-compatible development and build flow through Next.js;
+- composable UI, source-loader, and OpenAPI extension mechanisms for Appaloft-specific help widgets;
 - a credible path to `llms.txt` and Markdown-friendly agent consumption.
 
 Docusaurus remains the fallback choice if Appaloft later needs first-class multi-version
-documentation that Starlight cannot support without excessive custom work. VitePress is not selected
+documentation that Fumadocs cannot support without excessive custom work. VitePress is not selected
 because its versioning story is weaker for Appaloft's expected release documentation needs and its
 current major line is less stable than the alternatives.
 
@@ -186,7 +186,7 @@ public documentation contract.
 - Public documentation becomes a required delivery surface for user-visible behavior, not a
   marketing-site afterthought.
 - `apps/docs` is the expected documentation app location in the monorepo.
-- `apps/docs` may use Astro, Starlight, Tailwind, and documentation-only tooling, but must not
+- `apps/docs` may use Fumadocs, Next.js, Tailwind, and documentation-only tooling, but must not
   depend on `packages/core` or `packages/application`.
 - `apps/docs` and future `www` must consume `@appaloft/design` so product surfaces share the same
   typography, color semantics, radius, shadows, and Tailwind theme vocabulary.
@@ -206,14 +206,14 @@ public documentation contract.
 
 ## Migration Notes
 
-Current implementation has an `apps/docs` Starlight/Astro application with:
+Current implementation has an `apps/docs` Fumadocs/Next static documentation application with:
 
 - static output configured for the `/docs` base path;
 - `zh-CN` root locale and `en-US` locale content;
 - IA v2 nested documentation paths for start, deploy, resources, servers, environments, access,
   observe, integrations, reference, and self-hosting content;
 - legacy top-level seed pages intentionally removed after IA v2 cutover;
-- Pagefind search index generation through Starlight;
+- Orama static search index generation through Fumadocs;
 - stable explicit anchors in specific nested pages rather than group-only overview pages;
 - a curated `llms.txt` file.
 
@@ -225,8 +225,8 @@ Current implementation has a shared `@appaloft/design` package with:
 - a canonical `packages/design/DESIGN.md` design-language contract.
 
 `apps/web` imports `@appaloft/design/styles/web.css`. `apps/docs` imports
-`@appaloft/design/styles/docs.css`, which maps the same tokens into Starlight variables so docs
-feel like the product manual for the console rather than a separate visual system.
+`@appaloft/design/styles/docs.css`, which maps the same tokens into Fumadocs/Tailwind variables so
+docs feel like the product manual for the console rather than a separate visual system.
 
 Current implementation also has documentation packaging support:
 
@@ -261,10 +261,10 @@ the machine-readable source.
 Current implementation still has no full automated public documentation coverage checker for all
 links, locale drift, search freshness, or full Web/CLI/API/MCP surface adoption.
 
-Tailwind Vite plugin integration for Docs is deferred because the current Tailwind v4 Vite plugin
-path fails against the repository's current Vite 8/Rolldown dependency set during static docs
-builds. The docs app still consumes `@appaloft/design` tokens and fonts; it does not yet consume the
-Tailwind entrypoint directly.
+OpenAPI reference generation stays inside the docs app through `fumadocs-openapi`. If future
+Fumadocs OpenAPI output changes public route shape, update
+`docs/documentation/public-docs-structure.md`, docs-registry coverage, and `PUB-DOCS-012` in the
+same change.
 
 Until those are implemented, user-visible Code Rounds must still identify the intended public docs
 page and anchor in specs or migration gaps when the behavior changes user-facing input, output,
