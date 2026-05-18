@@ -46,6 +46,42 @@ function parseSemver(version: string): Semver {
   };
 }
 
+function comparePrerelease(left: string, right: string): number {
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    if (leftPart === undefined) {
+      return -1;
+    }
+    if (rightPart === undefined) {
+      return 1;
+    }
+    if (leftPart === rightPart) {
+      continue;
+    }
+
+    const leftNumeric = /^\d+$/u.test(leftPart);
+    const rightNumeric = /^\d+$/u.test(rightPart);
+    if (leftNumeric && rightNumeric) {
+      return Number.parseInt(leftPart, 10) - Number.parseInt(rightPart, 10);
+    }
+    if (leftNumeric) {
+      return -1;
+    }
+    if (rightNumeric) {
+      return 1;
+    }
+
+    return leftPart.localeCompare(rightPart);
+  }
+
+  return 0;
+}
+
 function compareSemver(left: string, right: string): number {
   const parsedLeft = parseSemver(left);
   const parsedRight = parseSemver(right);
@@ -64,7 +100,7 @@ function compareSemver(left: string, right: string): number {
     return 1;
   }
   if (parsedLeft.prerelease && parsedRight.prerelease) {
-    return parsedLeft.prerelease.localeCompare(parsedRight.prerelease);
+    return comparePrerelease(parsedLeft.prerelease, parsedRight.prerelease);
   }
 
   return 0;

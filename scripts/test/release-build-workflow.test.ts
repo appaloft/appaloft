@@ -1064,6 +1064,33 @@ describe("release build workflow", () => {
     expect(output).not.toContain("Roadmap gate rejects release 1.0.0-rc.1");
   });
 
+  test("[RELEASE-HARDENING-006] orders double-digit release candidates numerically", () => {
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        "scripts/release/align-roadmap-for-release.ts",
+        "--target-version",
+        "1.0.0-rc.10",
+        "--current-version",
+        "1.0.0-rc.9",
+        "--latest-release-tag",
+        "v1.0.0-rc.9",
+        "--check",
+      ],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+
+    const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+    expect(result.exitCode).toBe(0);
+    expect(output).toContain("docs/PRODUCT_ROADMAP.md release alignment is valid for 1.0.0-rc.10");
+    expect(output).not.toContain("must be greater than current version 1.0.0-rc.9");
+  });
+
   test("[RELEASE-HARDENING-006] keeps local smoke control-plane and cleanup isolated", async () => {
     const smokeScript = await readText("scripts/smoke/local-deploy.ts");
 
