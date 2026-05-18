@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1-rc.7](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.7...v1.0.1-rc.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deployments:** allow supersede forward references ([#290](https://github.com/appaloft/appaloft/issues/290)) ([9ca6e8f](https://github.com/appaloft/appaloft/commit/9ca6e8fd38767e11651d92b63ffff668a4f741ea))
+
 ## [1.0.0-rc.7](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-05-18)
 
 
