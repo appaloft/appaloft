@@ -107,6 +107,9 @@ describe("TraefikEdgeProxyProvider", () => {
       "--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json",
     );
     expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge=true'",
+    );
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
       "-v appaloft-traefik-acme:/letsencrypt",
     );
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
