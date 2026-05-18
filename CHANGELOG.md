@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-rc.7](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* **runtime:** initialize git source submodules ([91ffb7d](https://github.com/appaloft/appaloft/commit/91ffb7d72188829b7406936df895fbce0a7f759e))
+* **runtime:** initialize git source submodules ([d070eed](https://github.com/appaloft/appaloft/commit/d070eedc82b1fc9fbccb3d6a1ed77cb0c422adad))
+
 ## [1.0.0-rc.6](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-05-18)
 
 
