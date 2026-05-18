@@ -29,6 +29,9 @@ const defaultAccessFailureStatuses = [404, 502, 503, 504] as const;
 const defaultRouteNotFoundSignalHeader = "X-Appaloft-Resource-Access-Signal";
 const defaultRouteNotFoundSignalValue = "route-not-found";
 const defaultCatchAllPriority = 1;
+const defaultTraefikCertificateResolver = "appaloft";
+const defaultTraefikAcmeStoragePath = "/letsencrypt/acme.json";
+const defaultTraefikAcmeVolumeName = "appaloft-traefik-acme";
 
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
@@ -371,6 +374,14 @@ function labelsForTraefik(input: {
     deploymentId: input.deploymentId,
     ...(input.index === 0 ? {} : { suffix: String(input.index) }),
   });
+  const autoTlsLabels =
+    input.route.tlsMode === "auto"
+      ? [
+          `traefik.http.routers.${router}.tls=true`,
+          `traefik.http.routers.${router}.tls.certresolver=${defaultTraefikCertificateResolver}`,
+        ]
+      : [];
+
   if (isRedirectRoute(input.route) && input.route.redirectTo) {
     const middleware = `${router}-redirect`;
     const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
@@ -384,7 +395,7 @@ function labelsForTraefik(input: {
       `traefik.docker.network=${traefikEdgeNetworkName}`,
       `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
-      ...(input.route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+      ...autoTlsLabels,
       `traefik.http.routers.${router}.middlewares=${middleware}`,
       `traefik.http.routers.${router}.service=noop@internal`,
       `traefik.http.middlewares.${middleware}.redirectregex.regex=${regex}`,
@@ -402,7 +413,7 @@ function labelsForTraefik(input: {
     `traefik.docker.network=${traefikEdgeNetworkName}`,
     `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
     `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
-    ...(input.route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+    ...autoTlsLabels,
     ...(input.accessFailureMiddlewareName
       ? [`traefik.http.routers.${router}.middlewares=${input.accessFailureMiddlewareName}`]
       : []),
@@ -519,9 +530,18 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     const httpPort = hostPort(input.httpPort, 80);
     const httpsPort = hostPort(input.httpsPort, 443);
     const containerName = "appaloft-traefik";
+    const acmeResolverArgs = [
+      `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.httpchallenge=true`,
+      `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.httpchallenge.entrypoint=web`,
+      `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.storage=${defaultTraefikAcmeStoragePath}`,
+    ];
     const runningWithExpectedImageCommand = [
       `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null`,
       `[ "$(docker inspect -f '{{.Config.Image}}' ${containerName} 2>/dev/null)" = "${traefikImage}" ]`,
+      ...acmeResolverArgs.map(
+        (arg) =>
+          `docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${containerName} 2>/dev/null | grep -Fx ${shellQuote(arg)} >/dev/null`,
+      ),
     ].join(" && ");
 
     return ok({
@@ -540,12 +560,14 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         `-p ${httpsPort}:443`,
         "--add-host host.docker.internal:host-gateway",
         "-v /var/run/docker.sock:/var/run/docker.sock:ro",
+        `-v ${defaultTraefikAcmeVolumeName}:/letsencrypt`,
         traefikImage,
         "--providers.docker=true",
         "--providers.docker.exposedbydefault=false",
         `--providers.docker.network=${traefikEdgeNetworkName}`,
         "--entrypoints.web.address=:80",
         "--entrypoints.websecure.address=:443",
+        ...acmeResolverArgs,
         ")",
       ].join(" "),
       metadata: {
