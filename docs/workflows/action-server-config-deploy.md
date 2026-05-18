@@ -299,6 +299,10 @@ console output.
   target, the endpoint fails with `action_deployment_target_unresolved` and safe next actions before
   config/profile/route/deployment mutation. Existing repository/source binding beyond
   source-fingerprint links remains a governed follow-up.
+- For provider-backed source packages, the endpoint derives the deployable source profile from the
+  trusted package manifest and Action context before dispatching `deployments.create`. GitHub source
+  packages become `git-github-app` resource source profiles with safe repository metadata,
+  normalized branch/tag refs, and the observed revision recorded as source metadata.
 - When the validated config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.
@@ -325,8 +329,9 @@ console output.
   must reject the Action request after deployment execution if the accepted runtime plan does not
   contain the requested preview host/path/TLS route; it must not silently publish a generated
   fallback URL as if the custom preview domain succeeded.
-- When the validated config contains `source`, the endpoint fails before mutation with
-  `profile-application`; source profile bootstrap still requires a later explicit-operation slice.
+- When the committed config contains `source`, the endpoint fails before mutation with
+  `profile-application`; server config deploy derives source from the trusted source package
+  envelope, not from mutable repository config.
 - `/api/version` advertises granular feature flags. Self-hosted console builds that wire the
   source package config reader advertise Action Server Config Deploy support; builds without the
   reader keep failing wrapper handshakes before source package handoff.
@@ -334,7 +339,7 @@ console output.
   `POST /api/action/deployments/from-source-link`, which triggers an existing resource profile from
   source-link context.
 - Inline archive and remote archive URL transport, durable source package blob storage, archive
-  diagnostics, archive cleanup rules, source profile bootstrap, broader control-plane adoption, and
-  non-`ci-env:` secret resolvers remain governed follow-ups. Committed `access.domains[]` domain
+  diagnostics, archive cleanup rules, broader control-plane adoption, and non-`ci-env:` secret
+  resolvers remain governed follow-ups. Committed `access.domains[]` domain
   bootstrap is currently the managed `DomainBinding` control-plane path; transient Action preview
   routes use server-applied route state.
