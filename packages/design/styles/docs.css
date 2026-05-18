@@ -2,20 +2,7 @@
 @import "./tokens.css";
 
 :root {
-  --sl-font: var(--appaloft-font-sans);
-  --sl-font-mono: var(--appaloft-font-mono);
-  --sl-color-accent-low: color-mix(in oklch, var(--ring) 15%, var(--background));
-  --sl-color-accent: var(--ring);
-  --sl-color-accent-high: color-mix(in oklch, var(--ring) 72%, var(--foreground));
-  --sl-color-white: var(--foreground);
-  --sl-color-gray-1: color-mix(in oklch, var(--foreground) 88%, var(--background));
-  --sl-color-gray-2: color-mix(in oklch, var(--foreground) 72%, var(--background));
-  --sl-color-gray-3: color-mix(in oklch, var(--foreground) 54%, var(--background));
-  --sl-color-gray-4: color-mix(in oklch, var(--foreground) 36%, var(--background));
-  --sl-color-gray-5: color-mix(in oklch, var(--foreground) 20%, var(--background));
-  --sl-color-gray-6: color-mix(in oklch, var(--foreground) 10%, var(--background));
-  --sl-color-gray-7: color-mix(in oklch, var(--foreground) 5%, var(--background));
-  --sl-color-black: var(--background);
+  --fd-layout-width: 1500px;
   --appaloft-docs-grid: color-mix(in oklch, var(--border) 44%, transparent);
 }
 
@@ -28,48 +15,52 @@ body {
     3.5rem 3.5rem,
     auto;
   color: var(--foreground);
+  font-family: var(--appaloft-font-sans);
   font-feature-settings:
     "cv02" 1,
     "cv03" 1,
     "ss01" 1;
 }
 
-.site-title {
-  color: var(--foreground);
-  font-family: var(--appaloft-font-sans);
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--appaloft-font-mono);
+}
+
+h1,
+h2,
+h3 {
   letter-spacing: 0;
 }
 
-.site-title img {
-  border-radius: calc(var(--radius) + 0.25rem);
-  box-shadow: var(--shadow-sm);
-  height: 2rem;
-  width: 2rem;
-}
-
-.site-title span {
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3 {
-  letter-spacing: 0;
-}
-
-.sl-markdown-content h1 {
+h1 {
   font-family: var(--appaloft-font-serif);
 }
 
-.sl-markdown-content code {
-  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-}
-
-.sl-markdown-content a {
+a {
   text-underline-offset: 0.2em;
 }
 
-.hero img {
-  filter: drop-shadow(0 24px 80px color-mix(in oklch, var(--ring) 18%, transparent));
+.appaloft-docs-title {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.appaloft-version-badge {
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: calc(var(--radius) - 0.125rem);
+  color: var(--muted-foreground);
+  font-family: var(--appaloft-font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+}
+
+.fd-page article img {
+  border-radius: var(--radius);
 }

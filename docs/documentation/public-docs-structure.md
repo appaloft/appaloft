@@ -273,7 +273,7 @@ Docs static assets must be packaged separately from Web console assets.
 
 ## Current Implementation Notes And Migration Gaps
 
-`apps/docs` exists as a Starlight/Astro static documentation application.
+`apps/docs` exists as a Fumadocs/Next static documentation application.
 
 IA v2 pages now exist in `zh-CN` and `en-US` under nested grouped paths such as `deploy/sources`,
 `deploy/lifecycle`, `resources/profiles/*`, `servers/credentials/*`,
@@ -284,7 +284,7 @@ removed, and product help surfaces now target specific nested pages instead of g
 
 `@appaloft/design` now owns product-facing design tokens and the design-language contract. Web
 imports `@appaloft/design/styles/web.css` and remains the reference implementation. Docs imports
-`@appaloft/design/styles/docs.css`, which maps the same tokens into Starlight variables. The future
+`@appaloft/design/styles/docs.css`, which maps the same tokens into Fumadocs/Tailwind variables. The future
 `www` surface should import `@appaloft/design/styles/www.css`.
 
 The shell, HTTP adapter, Docker image, install script, and binary bundle now treat docs static
@@ -317,8 +317,8 @@ There is still no full automated public docs link, locale, search, or product-he
 Registry anchor-source coverage, operation coverage, and packaging coverage exist for the initial
 slices.
 
-Tailwind Vite plugin integration is deferred for Docs; the docs app consumes shared
-`@appaloft/design` variables and fonts but does not yet consume the Tailwind entrypoint directly.
+OpenAPI reference pages are generated through `fumadocs-openapi` inside the docs app. The stable
+public path remains `/docs/reference/openapi/`.
 
 ## Open Questions
 

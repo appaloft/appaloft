@@ -14,7 +14,7 @@ COPY . .
 RUN bun install --frozen-lockfile
 RUN bun run --cwd apps/shell build
 RUN bun run --cwd apps/web build
-RUN cd apps/docs && node node_modules/astro/bin/astro.mjs check && node node_modules/astro/bin/astro.mjs build
+RUN bun run --cwd apps/docs build
 RUN mkdir -p /app/dist/pglite-runtime-assets \
   && bun -e 'const { dirname, join } = await import("node:path"); const entry = Bun.resolveSync("@electric-sql/pglite", "/app/packages/persistence/pg/src/index.ts"); const dir = dirname(entry); for (const file of ["pglite.data", "pglite.wasm", "initdb.wasm"]) await Bun.write(`/app/dist/pglite-runtime-assets/${file}`, Bun.file(join(dir, file)));'
 

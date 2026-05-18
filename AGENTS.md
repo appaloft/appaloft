@@ -14,7 +14,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - `packages/application` depends only on `core`
 - adapters, persistence, providers, integrations, plugins, and shell depend inward
 - `apps/web` may depend on `contracts`, `@appaloft/orpc/client`, `@tanstack/svelte-query`, and optional `ui`, never on `core` or `application`
-- `apps/docs` is the public documentation app; it may depend on documentation-site tooling such as Astro/Starlight/Tailwind and generated public docs metadata, never on `core` or `application`
+- `apps/docs` is the public documentation app; it may depend on documentation-site tooling such as Fumadocs/Next/Tailwind and generated public docs metadata, never on `core` or `application`
 
 ## Package Boundaries
 

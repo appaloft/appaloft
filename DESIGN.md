@@ -9,5 +9,5 @@ redefining colors, fonts, radius, shadows, or Tailwind theme variables locally.
 Current consumers:
 
 - `apps/web`: imports `@appaloft/design/styles/web.css` and remains the reference surface.
-- `apps/docs`: imports `@appaloft/design/styles/docs.css` for Starlight.
+- `apps/docs`: imports `@appaloft/design/styles/docs.css` for Fumadocs.
 - future `www`: should import `@appaloft/design/styles/www.css`.

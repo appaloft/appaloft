@@ -5,19 +5,33 @@
   "type": "module",
   "scripts": {
     "dev": "bun run scripts/dev.mjs",
-    "build": "astro check && astro build",
-    "preview": "astro preview",
-    "typecheck": "astro check",
+    "build": "bun run scripts/build.mjs",
+    "preview": "next start",
+    "typecheck": "fumadocs-mdx && tsc --noEmit",
     "lint": "biome check ."
   },
-  "devDependencies": {
-    "@appaloft/openapi": "workspace:*",
+  "dependencies": {
     "@appaloft/design": "workspace:*",
-    "@astrojs/check": "^0.9.9",
-    "@astrojs/starlight": "^0.39.2",
-    "astro": "^6.3.1",
+    "@appaloft/openapi": "workspace:*",
+    "@orama/orama": "^3.1.18",
+    "@orama/tokenizers": "^3.1.18",
+    "@types/mdx": "^2.0.13",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "fumadocs-core": "^16.8.11",
+    "fumadocs-mdx": "^15.0.6",
+    "fumadocs-openapi": "^10.8.5",
+    "fumadocs-ui": "^16.8.11",
+    "next": "^16.2.6",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "shiki": "^3.19.0",
+    "tailwindcss": "^4.1.17",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
     "reflect-metadata": "^0.2.2",
-    "starlight-openapi": "^0.25.1",
     "typescript": "^6.0.3"
   }
 }

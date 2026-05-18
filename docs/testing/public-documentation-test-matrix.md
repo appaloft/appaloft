@@ -40,11 +40,11 @@ and final round summaries must identify the row as a documented manual or deferr
 
 ## Current Implementation Notes And Migration Gaps
 
-`apps/docs` now provides an initial Starlight/Astro static docs app.
+`apps/docs` now provides a Fumadocs/Next static docs app.
 
 Current status:
 
-- `PUB-DOCS-001` is covered by the IA v2 Starlight sidebar groups and nested page set. Deploy,
+- `PUB-DOCS-001` is covered by the IA v2 Fumadocs sidebar groups and nested page set. Deploy,
   resources, servers, environments, access, observe, integrations, reference, and self-hosting each
   expose concrete child pages below the group overview.
 - `PUB-DOCS-002` is covered by `@appaloft/docs-registry` operation coverage tests. Every current
@@ -91,7 +91,7 @@ Current status:
   changes; a dedicated automated link checker does not exist yet.
 - `PUB-DOCS-005` is covered for registered help topics by tests that resolve each locale page and
   explicit anchor in docs source.
-- `PUB-DOCS-006` is covered at build level by Starlight Pagefind index generation.
+- `PUB-DOCS-006` is covered at build level by Fumadocs static Orama search index generation.
 - `PUB-DOCS-007` is covered at content-schema level by required `localeState` frontmatter for each
   docs page.
 - `PUB-DOCS-008` is covered by the curated `apps/docs/public/llms.txt` file.
