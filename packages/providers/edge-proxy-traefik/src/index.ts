@@ -540,7 +540,7 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       `[ "$(docker inspect -f '{{.Config.Image}}' ${containerName} 2>/dev/null)" = "${traefikImage}" ]`,
       ...acmeResolverArgs.map(
         (arg) =>
-          `docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${containerName} 2>/dev/null | grep -Fx ${shellQuote(arg)} >/dev/null`,
+          `docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${containerName} 2>/dev/null | grep -Fx -- ${shellQuote(arg)} >/dev/null`,
       ),
     ].join(" && ");
 
