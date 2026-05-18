@@ -15,6 +15,7 @@
     "@appaloft/openapi": "workspace:*",
     "@orama/orama": "^3.1.18",
     "@orama/tokenizers": "^3.1.18",
+    "@scalar/api-client-react": "2.0.1",
     "@types/mdx": "^2.0.13",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

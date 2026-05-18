@@ -1,3 +1,10 @@
+import {
+  remarkAdmonition,
+  remarkCodeTab,
+  remarkMdxFiles,
+  remarkNpm,
+  remarkSteps,
+} from "fumadocs-core/mdx-plugins";
 import { pageSchema } from "fumadocs-core/source/schema";
 import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 import { z } from "zod";
@@ -8,6 +15,9 @@ const docsBase = normalizeDocsBase(process.env.APPALOFT_DOCS_BASE);
 export const docs = defineDocs({
   dir: "src/content/docs",
   docs: {
+    postprocess: {
+      includeProcessedMarkdown: true,
+    },
     schema: pageSchema.extend({
       docType: z
         .enum(["task", "concept", "reference", "troubleshooting", "index"])
@@ -37,6 +47,13 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
+    remarkPlugins: [
+      remarkAdmonition,
+      remarkSteps,
+      [remarkNpm, { persist: { id: "appaloft-package-manager" } }],
+      remarkCodeTab,
+      remarkMdxFiles,
+    ],
     remarkImageOptions: {
       useImport: false,
     },
