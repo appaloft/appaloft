@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1-rc.9](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.9...v1.0.1-rc.9) (2026-05-18)
+
+
+### Bug Fixes
+
+* tolerate pending TLS on public route checks ([c6b1bef](https://github.com/appaloft/appaloft/commit/c6b1befa75ae221befcfb69bc9b431b4d369bdfb))
+
 ## [1.0.0-rc.9](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.8...v1.0.0-rc.9) (2026-05-18)
 
 
