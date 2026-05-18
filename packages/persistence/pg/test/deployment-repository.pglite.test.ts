@@ -101,12 +101,13 @@ function createRepositoryContext(): RepositoryContext {
 function createDeploymentRecord(input: {
   id: string;
   createdAt: string;
-  status: "planned" | "succeeded";
+  status: "planned" | "succeeded" | "canceled";
   includeDependencyBindingReference?: boolean;
   targetKind?: TargetKindValue;
   targetProviderKey?: ProviderKey;
   executionMetadata?: Record<string, string>;
   supersedesDeploymentId?: string;
+  supersededByDeploymentId?: string;
   triggerKind?: DeploymentTriggerKindValue;
   sourceDeploymentId?: string;
   rollbackCandidateDeploymentId?: string;
@@ -210,6 +211,16 @@ function createDeploymentRecord(input: {
           ...(input.executionMetadata ? { metadata: input.executionMetadata } : {}),
         }),
       )
+      ._unsafeUnwrap();
+  }
+
+  if (input.status === "canceled") {
+    deployment
+      .cancel(FinishedAt.rehydrate("2026-01-01T00:10:00.000Z"), [], {
+        ...(input.supersededByDeploymentId
+          ? { supersededByDeploymentId: DeploymentId.rehydrate(input.supersededByDeploymentId) }
+          : {}),
+      })
       ._unsafeUnwrap();
   }
 
@@ -400,6 +411,30 @@ describe("pglite deployment repository", () => {
       sourceDeploymentId: "dep_failed",
       rollbackCandidateDeploymentId: "dep_prev",
     });
+
+    const supersededActiveDeployment = createDeploymentRecord({
+      id: "dep_active",
+      createdAt: "2026-01-01T00:00:02.000Z",
+      status: "canceled",
+      includeDependencyBindingReference: true,
+      triggerKind: DeploymentTriggerKindValue.rollback(),
+      sourceDeploymentId: "dep_failed",
+      rollbackCandidateDeploymentId: "dep_prev",
+      supersedesDeploymentId: "dep_prev",
+      supersededByDeploymentId: "dep_next",
+    });
+    const supersedeUpdate = await deploymentRepository.updateOne(
+      context,
+      supersededActiveDeployment,
+      UpsertDeploymentSpec.fromDeployment(supersededActiveDeployment),
+    );
+    expect(supersedeUpdate.isOk()).toBe(true);
+
+    const storedSupersededDeployment = await deploymentRepository.findOne(
+      context,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
+    );
+    expect(storedSupersededDeployment?.toState().supersededByDeploymentId?.value).toBe("dep_next");
 
     await database.db
       .updateTable("deployments")
