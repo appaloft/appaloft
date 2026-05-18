@@ -31,6 +31,7 @@ import {
 } from "@appaloft/adapter-runtime";
 import {
   AllowAllOperationGuardPort,
+  AllowAllOperationScopePort,
   type AppLogger,
   type CertificateHttpChallengeToken,
   type CertificateHttpChallengeTokenStore,
@@ -1668,6 +1669,9 @@ export function registerRuntimeDependencies(
 
   container.register(tokens.operationGuardPort, {
     useFactory: instanceCachingFactory(() => new AllowAllOperationGuardPort()),
+  });
+  container.register(tokens.operationScopePort, {
+    useFactory: instanceCachingFactory(() => new AllowAllOperationScopePort()),
   });
 
   container.register(tokens.commandBus, {

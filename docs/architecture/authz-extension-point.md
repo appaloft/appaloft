@@ -6,6 +6,8 @@ The public implementation does not depend on a specific policy engine or commerc
 
 This guard is separate from transport/session access metadata. The operation catalog may describe whether a route needs a product session before dispatch; that metadata preserves existing transport behavior and is not a policy engine contract.
 
+Query visibility is a separate concern from operation admission. Appaloft also exposes a neutral operation scope port for read paths where a caller is allowed to run the query but should only see part of the result set. Scope decisions can return unrestricted, none, or constrained visibility. Constrained visibility uses structured constraints such as organization or project ids; it does not expose SQL, ORM predicates, or a concrete policy engine. Scope evaluation runs inside an application trace span and may attach additional trace attributes.
+
 ## Request Shape
 
 An operation check request carries:
@@ -24,6 +26,7 @@ Project-scoped checks should use the public project ownership read model instead
 
 - Operation checks run at the application command/query boundary, not only in HTTP middleware.
 - The guard is operation-level and policy-engine-neutral.
+- Query scope is policy-engine-neutral and should be translated by read models into structured filters. A scope result of `none` returns an empty query result rather than an authorization error.
 - Individual checks are composable. A deployment can register authorization, entitlement, quota, or validation checks behind the same public result shape.
 - Public Appaloft must not import private distribution packages.
 - The existing `ProductOrganizationRole` compatibility role may remain, but execution context preserves the full organization team role: `owner`, `admin`, `billing`, `developer`, or `viewer`.
@@ -33,4 +36,4 @@ Project-scoped checks should use the public project ownership read model instead
 
 Projects carry an organization id so policy adapters can decide whether an actor is a member of the project's organization. Existing local projects are backfilled to the self-hosted default organization id during migration.
 
-Queries should filter by known organization scope where practical, and resource-scoped commands should pass project, environment, resource, or server ids to the guard so adapters can resolve ownership.
+Queries should filter by known organization scope where practical. Read paths that need role-aware partial visibility should ask the operation scope port and apply the returned constraints in the read model. Resource-scoped commands should pass project, environment, resource, or server ids to the guard so adapters can resolve ownership.

@@ -52,7 +52,14 @@ function toProjectSummary(
 export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async list(context: RepositoryContext, input?: { organizationId?: string }) {
+  async list(
+    context: RepositoryContext,
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("project", "list"),
@@ -68,6 +75,12 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
           .where("lifecycle_status", "!=", "deleted");
         if (input?.organizationId) {
           query = query.where("organization_id", "=", input.organizationId);
+        }
+        if (input?.organizationIds?.length) {
+          query = query.where("organization_id", "in", [...input.organizationIds]);
+        }
+        if (input?.projectIds?.length) {
+          query = query.where("id", "in", [...input.projectIds]);
         }
 
         return query

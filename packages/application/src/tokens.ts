@@ -5,6 +5,8 @@ export const tokens = {
   eventBus: Symbol.for("appaloft.event_bus"),
   operationGuardPort: Symbol.for("appaloft.operation_guard_port"),
   operationAuthorizationPort: Symbol.for("appaloft.operation_guard_port"),
+  operationScopePort: Symbol.for("appaloft.operation_scope_port"),
+  operationVisibilityPort: Symbol.for("appaloft.operation_scope_port"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),

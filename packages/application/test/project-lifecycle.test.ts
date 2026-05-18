@@ -8,6 +8,7 @@ import {
   DescriptionText,
   type DomainErrorDetails,
   type DomainEvent,
+  OrganizationId,
   ok,
   Project,
   ProjectByIdSpec,
@@ -32,6 +33,7 @@ import {
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
+  type OperationScopePort,
   toRepositoryContext,
 } from "../src";
 import {
@@ -40,6 +42,7 @@ import {
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
   DeleteProjectUseCase,
+  ListProjectsQueryService,
   RenameProjectUseCase,
   RestoreProjectUseCase,
   SetProjectDescriptionUseCase,
@@ -53,9 +56,11 @@ function projectFixture(input?: {
   lifecycleStatus?: "active" | "archived";
   archivedAt?: string;
   archiveReason?: string;
+  organizationId?: string;
 }): Project {
   return Project.rehydrate({
     id: ProjectId.rehydrate(input?.id ?? "prj_demo"),
+    organizationId: OrganizationId.rehydrate(input?.organizationId ?? "org_self_hosted"),
     name: ProjectName.rehydrate(input?.name ?? "Demo Project"),
     slug: ProjectSlug.rehydrate(input?.slug ?? "demo-project"),
     description: DescriptionText.rehydrate("Demo project"),
@@ -183,6 +188,63 @@ describe("project lifecycle operations", () => {
       archivedAt: "2026-01-01T00:00:05.000Z",
       archiveReason: "Retired",
     });
+  });
+
+  test("[PROJ-LIFE-SCOPE-001] list projects applies generic constrained visibility", async () => {
+    const { context, projectReadModel } = await createHarness([
+      projectFixture({
+        id: "prj_visible",
+        name: "Visible",
+        slug: "visible",
+        organizationId: "org_product",
+      }),
+      projectFixture({
+        id: "prj_hidden_same_org",
+        name: "Hidden Same Org",
+        slug: "hidden-same-org",
+        organizationId: "org_product",
+      }),
+      projectFixture({
+        id: "prj_hidden_other_org",
+        name: "Hidden Other Org",
+        slug: "hidden-other-org",
+        organizationId: "org_other",
+      }),
+    ]);
+    const scopePort: OperationScopePort = {
+      scopeOperation: async () => ({
+        effect: "allow",
+        visibility: "constrained",
+        reason: "test-project-visibility",
+        constraints: [
+          { kind: "organization", operator: "in", values: ["org_product"] },
+          { kind: "project", operator: "in", values: ["prj_visible"] },
+        ],
+      }),
+    };
+    const service = new ListProjectsQueryService(projectReadModel, scopePort);
+
+    const result = await service.execute(context);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().items.map((project) => project.id)).toEqual(["prj_visible"]);
+  });
+
+  test("[PROJ-LIFE-SCOPE-002] list projects returns an empty result for none visibility", async () => {
+    const { context, projectReadModel } = await createHarness();
+    const scopePort: OperationScopePort = {
+      scopeOperation: async () => ({
+        effect: "allow",
+        visibility: "none",
+        reason: "test-no-visible-projects",
+      }),
+    };
+    const service = new ListProjectsQueryService(projectReadModel, scopePort);
+
+    const result = await service.execute(context);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ items: [] });
   });
 
   test("[PROJ-LIFE-RENAME-001] renames an active project and publishes project-renamed", async () => {
