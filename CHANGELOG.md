@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1-rc.8](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.8...v1.0.1-rc.8) (2026-05-18)
+
+
+### Bug Fixes
+
+* carry source package credentials into detached deployments ([a14870f](https://github.com/appaloft/appaloft/commit/a14870f2c644314a2078f4f1bd0e12dee4866f69))
+
 ## [1.0.0-rc.8](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.7...v1.0.0-rc.8) (2026-05-18)
 
 
