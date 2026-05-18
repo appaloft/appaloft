@@ -21,6 +21,7 @@ import {
   type EnvironmentReadModel,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ExecutionProviderAccessTokens,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   type IdGenerator,
@@ -212,9 +213,7 @@ export interface AppaloftServerOptions {
 }
 
 interface RequestContextRunnerOptions {
-  providerAccessTokens?: {
-    github?: string | undefined;
-  };
+  providerAccessTokens?: ExecutionProviderAccessTokens;
 }
 
 interface RequestContextRunner extends IntegrationAuthPort {

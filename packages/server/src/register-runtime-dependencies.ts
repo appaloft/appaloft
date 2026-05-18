@@ -51,6 +51,7 @@ import {
   type ExecutionContext,
   eventHandlerTypesFor,
   type FirstAdminPasswordIssuer,
+  getExecutionAuthProviderAccessToken,
   type IdGenerator,
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
@@ -761,6 +762,11 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
     context: ExecutionContext,
     providerKey: "github",
   ): Promise<string | null> {
+    const contextAccessToken = getExecutionAuthProviderAccessToken(context, providerKey);
+    if (contextAccessToken) {
+      return contextAccessToken;
+    }
+
     const scope = this.storage.getStore();
 
     if (!scope) {
