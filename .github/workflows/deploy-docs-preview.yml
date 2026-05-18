@@ -162,6 +162,15 @@ jobs:
           printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
           chmod 600 "$key_file"
 
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
           APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE="$PREVIEW_URL" bun run --cwd apps/docs build
 
           artifact_dir="$RUNNER_TEMP/appaloft-docs-artifact"
