@@ -81,6 +81,7 @@ import { resourceHealthObservationsMigration } from "./migrations/072_resource_h
 import { projectDeleteTombstoneMigration } from "./migrations/073_project_delete_tombstone";
 import { deploymentArchivePruneMigration } from "./migrations/074_deployment_archive_prune";
 import { projectOrganizationOwnershipMigration } from "./migrations/075_project_organization_ownership";
+import { deploymentSupersededForwardReferenceMigration } from "./migrations/076_deployment_superseded_forward_reference";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -252,6 +253,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "073_project_delete_tombstone": projectDeleteTombstoneMigration,
       "074_deployment_archive_prune": deploymentArchivePruneMigration,
       "075_project_organization_ownership": projectOrganizationOwnershipMigration,
+      "076_deployment_superseded_forward_reference": deploymentSupersededForwardReferenceMigration,
     };
   }
 }
