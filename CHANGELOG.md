@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.1-rc.5](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.5...v1.0.1-rc.5) (2026-05-18)
+## [1.0.0-rc.6](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-05-18)
 
 
 ### Bug Fixes
