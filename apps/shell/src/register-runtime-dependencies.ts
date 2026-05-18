@@ -29,6 +29,8 @@ import {
   StorageRuntimeCleanerAdapter,
 } from "@appaloft/adapter-runtime";
 import {
+  AllowAllOperationGuardPort,
+  AllowAllOperationScopePort,
   type AppLogger,
   type CertificateHttpChallengeToken,
   type CertificateHttpChallengeTokenStore,
@@ -54,6 +56,7 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
+  type OperationGuardPort,
   type PreviewFeedbackWriter,
   type PreviewFeedbackWriterInput,
   type PreviewFeedbackWriterResult,
@@ -1679,16 +1682,31 @@ export function registerRuntimeDependencies(
     }),
   });
 
+  container.register(tokens.operationGuardPort, {
+    useFactory: instanceCachingFactory(() => new AllowAllOperationGuardPort()),
+  });
+  container.register(tokens.operationScopePort, {
+    useFactory: instanceCachingFactory(() => new AllowAllOperationScopePort()),
+  });
+
   container.register(tokens.commandBus, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new CommandBus(dependencyContainer, dependencyContainer.resolve(tokens.logger)),
+        new CommandBus(
+          dependencyContainer,
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve<OperationGuardPort>(tokens.operationGuardPort),
+        ),
     ),
   });
   container.register(tokens.queryBus, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new QueryBus(dependencyContainer, dependencyContainer.resolve(tokens.logger)),
+        new QueryBus(
+          dependencyContainer,
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve<OperationGuardPort>(tokens.operationGuardPort),
+        ),
     ),
   });
 }

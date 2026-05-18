@@ -10,6 +10,9 @@ import {
   type OperationCheckResourceRefs,
   type OperationGuardDecision,
   type OperationGuardPort,
+  type OperationScopeConstraint,
+  type OperationScopeDecision,
+  type OperationScopePort,
 } from "./ports";
 
 const resourceRefKeys = [
@@ -134,3 +137,93 @@ export async function checkOperationGuards(input: {
 
 export const createOperationAuthorizationRequest = createOperationCheckRequest;
 export const authorizeOperation = checkOperationGuards;
+
+export function operationScopeDeniedError(
+  request: OperationCheckRequest,
+  decision: Extract<OperationScopeDecision, { effect: "deny" }>,
+) {
+  return domainError.operationCheckDenied("Operation scope denied", {
+    operationKey: request.operationKey,
+    operationName: request.operationName,
+    reason: decision.reason,
+    ...(decision.deniedBy?.checkKey ? { checkKey: decision.deniedBy.checkKey } : {}),
+    ...(decision.deniedBy?.kind ? { checkKind: decision.deniedBy.kind } : {}),
+    ...(request.organizationId ? { organizationId: request.organizationId } : {}),
+    ...(request.resourceRefs?.projectId ? { projectId: request.resourceRefs.projectId } : {}),
+    ...(request.resourceRefs?.environmentId
+      ? { environmentId: request.resourceRefs.environmentId }
+      : {}),
+    ...(request.resourceRefs?.resourceId ? { resourceId: request.resourceRefs.resourceId } : {}),
+    ...(request.resourceRefs?.serverId ? { serverId: request.resourceRefs.serverId } : {}),
+    ...(decision.details ?? {}),
+  });
+}
+
+export async function scopeOperation(input: {
+  context: ExecutionContext;
+  entry: OperationCatalogEntry;
+  message?: unknown;
+  operationScopePort: OperationScopePort;
+  organizationId?: string;
+  resourceRefs?: OperationCheckResourceRefs;
+}): Promise<Result<OperationScopeDecision>> {
+  const request = createOperationCheckRequest(input);
+  const decision = await input.context.tracer.startActiveSpan(
+    operationScopeSpanName(request.operationKey),
+    {
+      attributes: {
+        "appaloft.operation.key": request.operationKey,
+        "appaloft.operation.name": request.operationName,
+        "appaloft.operation.scope.kind": request.kind,
+        ...(request.organizationId ? { "appaloft.organization.id": request.organizationId } : {}),
+      },
+    },
+    async (span) => {
+      const scoped = await input.operationScopePort.scopeOperation(input.context, request);
+      span.setAttribute("appaloft.operation.scope.effect", scoped.effect);
+      span.setAttribute("appaloft.operation.scope.reason", scoped.reason);
+      if (scoped.effect === "allow") {
+        span.setAttribute("appaloft.operation.scope.visibility", scoped.visibility);
+        span.setStatus("ok", scoped.reason);
+      } else {
+        span.setStatus("error", scoped.reason);
+      }
+      if (scoped.traceAttributes) {
+        span.setAttributes(scoped.traceAttributes);
+      }
+      return scoped;
+    },
+  );
+
+  if (decision.effect === "deny") {
+    return err(operationScopeDeniedError(request, decision));
+  }
+
+  return ok(decision);
+}
+
+export function constraintsByKind(
+  constraints: readonly OperationScopeConstraint[] | undefined,
+  kind: OperationScopeConstraint["kind"],
+): string[] | undefined {
+  const values = constraints
+    ?.filter((constraint) => constraint.kind === kind && constraint.operator === "in")
+    .flatMap((constraint) => constraint.values)
+    .filter((value) => value.trim().length > 0);
+
+  if (!values?.length) {
+    return undefined;
+  }
+
+  return [...new Set(values)];
+}
+
+export const scopeOperationVisibility = scopeOperation;
+
+function operationScopeSpanName(operationKey: string): string {
+  return `appaloft.operation_scope.${operationKey
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase()}`;
+}

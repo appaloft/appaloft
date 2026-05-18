@@ -6456,6 +6456,84 @@ export interface OperationGuardPort {
   ): Promise<OperationGuardDecision>;
 }
 
+export type OperationScopeConstraintKind =
+  | "organization"
+  | "project"
+  | "resource"
+  | "environment"
+  | "server"
+  | "destination"
+  | (string & {});
+
+export type OperationScopeConstraintOperator = "in";
+
+export interface OperationScopeConstraint {
+  kind: OperationScopeConstraintKind;
+  operator: OperationScopeConstraintOperator;
+  values: readonly string[];
+}
+
+export type OperationScopeVisibility = "constrained" | "none" | "unrestricted";
+
+export type OperationScopeDecision =
+  | {
+      effect: "allow";
+      reason: string;
+      visibility: "unrestricted";
+      constraints?: undefined;
+      details?: DomainErrorDetails;
+      traceAttributes?: TraceAttributes;
+    }
+  | {
+      effect: "allow";
+      reason: string;
+      visibility: "none";
+      constraints?: undefined;
+      details?: DomainErrorDetails;
+      traceAttributes?: TraceAttributes;
+    }
+  | {
+      effect: "allow";
+      constraints: readonly OperationScopeConstraint[];
+      reason: string;
+      visibility: "constrained";
+      details?: DomainErrorDetails;
+      traceAttributes?: TraceAttributes;
+    }
+  | {
+      effect: "deny";
+      reason: string;
+      deniedBy?: {
+        checkKey: string;
+        kind: OperationCheckKind;
+      };
+      details?: DomainErrorDetails;
+      traceAttributes?: TraceAttributes;
+    };
+
+export interface OperationScopePort {
+  scopeOperation(
+    context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationScopeDecision>;
+}
+
+export class AllowAllOperationScopePort implements OperationScopePort {
+  async scopeOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationScopeDecision> {
+    return {
+      effect: "allow",
+      reason: "community-compatibility-unrestricted-scope",
+      visibility: "unrestricted",
+      details: {
+        operationKey: request.operationKey,
+      },
+    };
+  }
+}
+
 export class AllowAllOperationGuardPort implements OperationGuardPort {
   async checkOperation(
     _context: ExecutionContext,
@@ -6545,6 +6623,12 @@ export interface OperationAuthorizationPort extends OperationGuardPort {}
 export class AllowAllOperationAuthorizationPort
   extends AllowAllOperationGuardPort
   implements OperationAuthorizationPort {}
+export type OperationVisibilityConstraint = OperationScopeConstraint;
+export type OperationVisibilityDecision = OperationScopeDecision;
+export interface OperationVisibilityPort extends OperationScopePort {}
+export class AllowAllOperationVisibilityPort
+  extends AllowAllOperationScopePort
+  implements OperationVisibilityPort {}
 
 export interface DeployTokenMaterial {
   token: string;
@@ -7112,7 +7196,14 @@ export interface PreviewPolicyDecisionReadModel {
 }
 
 export interface ProjectReadModel {
-  list(context: RepositoryContext, input?: { organizationId?: string }): Promise<ProjectSummary[]>;
+  list(
+    context: RepositoryContext,
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;
 }
 
