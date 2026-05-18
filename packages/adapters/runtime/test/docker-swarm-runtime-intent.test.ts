@@ -571,10 +571,16 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       "traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.rule=Host(`pr-1.example.com`)",
     );
     expect(plan.routeLabels).toContain(
+      "traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.tls.certresolver=appaloft",
+    );
+    expect(plan.routeLabels).toContain(
       "traefik.http.services.appaloft-res-api-dst-prod-dep-123-web-svc.loadbalancer.server.port=3000",
     );
     expect(promoteCommand).toContain(
       "--label-add 'traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.rule=Host(`pr-1.example.com`)'",
+    );
+    expect(promoteCommand).toContain(
+      "--label-add 'traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.tls.certresolver=appaloft'",
     );
     expect(promoteCommand).toContain(
       "--label-add 'traefik.http.services.appaloft-res-api-dst-prod-dep-123-web-svc.loadbalancer.server.port=3000'",
