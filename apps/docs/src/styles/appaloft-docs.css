@@ -1,8 +1,11 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../");
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-openapi/css/preset.css";
 @import "@appaloft/design/styles/docs.css";
+
+@source "../../node_modules/fumadocs-ui/dist";
+@source "../../node_modules/fumadocs-openapi/dist";
 
 .fd-page article img[src*="/diagrams/"] {
   border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
