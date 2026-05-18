@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-rc.6](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deploy:** apply action source package runtime ref ([3d0334f](https://github.com/appaloft/appaloft/commit/3d0334f2f7252dc4c912991791a5abfe6f0aa08e))
+* **deploy:** apply action source package runtime ref ([ee496e3](https://github.com/appaloft/appaloft/commit/ee496e38c2a0799ddcf4aedfc5ad36b35d7ca5e8))
+
 ## [1.0.0-rc.5](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-05-17)
 
 
