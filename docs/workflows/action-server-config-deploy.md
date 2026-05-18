@@ -155,6 +155,23 @@ type ActionServerConfigDeployResponse = {
 The response means the deployment request has been accepted, not that runtime execution or route
 verification has completed.
 
+## Runtime Environment Boundary
+
+The runtime adapter must not forward the control-plane process environment wholesale into workload
+containers. Workloads may receive only explicit runtime inputs:
+
+- deployment context variables owned by Appaloft, such as `APPALOFT_DEPLOYMENT_ID`,
+  `APPALOFT_PROJECT_ID`, `APPALOFT_ENVIRONMENT_ID`, `APPALOFT_RESOURCE_ID`, and
+  `APPALOFT_DESTINATION_ID`;
+- variables and secrets present in the deployment environment snapshot;
+- dependency binding target variables;
+- runtime port variables such as `PORT`.
+
+Control-plane configuration such as database URLs, bootstrap output files, installer secrets, auth
+provider settings, deploy-token material, and server-only operational flags must stay in the
+control-plane process and must not leak into deployed workloads unless they are explicitly present
+in the deployment snapshot.
+
 ## Source Package Manifest
 
 The source package manifest must be safe to persist and display:

@@ -67,7 +67,10 @@ import {
   cleanupGeneratedDockerBuildAssets,
   writeGeneratedDockerBuildAssets,
 } from "./generated-docker-build-assets";
-import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
+import {
+  isAppaloftManagedRuntimeEnvironmentKey,
+  resolveDependencyRuntimeEnvironment,
+} from "./dependency-runtime-secrets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
@@ -1930,7 +1933,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
         key === "PORT" ||
-        key.startsWith("APPALOFT_") ||
+        isAppaloftManagedRuntimeEnvironmentKey(key) ||
         dependencyTargetNames.has(key) ||
         state.environmentSnapshot.variables.some((variable) => variable.key === key),
       )
