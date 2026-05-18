@@ -108,6 +108,13 @@ async function recordRetryDeploymentProcessAttempt(input: {
         : {}),
       ...(executionMetadata.phase ? { failurePhase: executionMetadata.phase } : {}),
       ...(executionMetadata.step ? { failureStep: executionMetadata.step } : {}),
+      ...(executionMetadata.message ? { failureMessage: executionMetadata.message } : {}),
+      ...(executionMetadata.publicRouteFailureKind
+        ? { publicRouteFailureKind: executionMetadata.publicRouteFailureKind }
+        : {}),
+      ...(executionMetadata.url && executionMetadata.phase === "public-route-verification"
+        ? { publicRouteUrl: executionMetadata.url }
+        : {}),
       ...(executionMetadata.safeAdapterErrorCode
         ? { safeAdapterErrorCode: executionMetadata.safeAdapterErrorCode }
         : {}),

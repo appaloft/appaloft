@@ -290,7 +290,7 @@ function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
-interface HttpHealthCheckOptions {
+export interface HttpHealthCheckOptions {
   method: string;
   expectedStatusCode: number;
   expectedResponseText?: string;
@@ -298,7 +298,25 @@ interface HttpHealthCheckOptions {
   timeoutMs: number;
   retries: number;
   startPeriodMs: number;
+  tlsVerification?: "strict" | "allow-untrusted";
 }
+
+export type HealthFailureKind = "timeout" | "http-status" | "tls-certificate" | "fetch-error";
+
+type HealthFetchInit = RequestInit & { tls?: { rejectUnauthorized?: boolean } };
+export type HealthFetch = (url: string, init: HealthFetchInit) => Promise<Response>;
+
+export type HealthCheckResult =
+  | {
+      ok: true;
+      tlsVerification: "strict" | "untrusted";
+      strictTlsFailureReason?: string;
+    }
+  | {
+      ok: false;
+      reason: string;
+      failureKind: HealthFailureKind;
+    };
 
 function httpHealthCheckOptions(
   execution: RuntimeExecutionPlan,
@@ -320,11 +338,72 @@ function httpHealthCheckOptions(
   };
 }
 
-async function waitForHealth(
+function classifyHealthFailureReason(reason: string): HealthFailureKind {
+  const normalized = reason.toLowerCase();
+  if (normalized.includes("abort")) {
+    return "timeout";
+  }
+  if (
+    normalized.includes("certificate") ||
+    normalized.includes("self-signed") ||
+    normalized.includes("local issuer") ||
+    normalized.includes("unable to verify") ||
+    normalized.includes("cert_")
+  ) {
+    return "tls-certificate";
+  }
+  return "fetch-error";
+}
+
+async function fetchHealthOnce(input: {
+  url: string;
+  options: HttpHealthCheckOptions;
+  signal: AbortSignal;
+  fetchImpl: HealthFetch;
+  rejectUnauthorized?: boolean;
+}): Promise<HealthCheckResult> {
+  try {
+    const response = await input.fetchImpl(input.url, {
+      method: input.options.method,
+      signal: input.signal,
+      ...(input.rejectUnauthorized === false
+        ? { tls: { rejectUnauthorized: false } }
+        : {}),
+    });
+    const responseText = input.options.expectedResponseText ? await response.text() : "";
+    if (
+      response.status === input.options.expectedStatusCode &&
+      (!input.options.expectedResponseText ||
+        responseText.includes(input.options.expectedResponseText))
+    ) {
+      return {
+        ok: true,
+        tlsVerification: input.rejectUnauthorized === false ? "untrusted" : "strict",
+      };
+    }
+    return {
+      ok: false,
+      failureKind: "http-status",
+      reason: `last response was HTTP ${response.status} ${response.statusText}`,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown fetch error";
+    return {
+      ok: false,
+      failureKind: classifyHealthFailureReason(reason),
+      reason,
+    };
+  }
+}
+
+export async function waitForHealth(
   url: string,
   options: HttpHealthCheckOptions,
-): Promise<{ ok: boolean; reason?: string }> {
+  input: { fetchImpl?: HealthFetch } = {},
+): Promise<HealthCheckResult> {
   let lastFailure = "health check timed out";
+  let lastFailureKind: HealthFailureKind = "timeout";
+  const fetchImpl: HealthFetch = input.fetchImpl ?? ((target, init) => fetch(target, init));
 
   if (options.startPeriodMs > 0) {
     await Bun.sleep(options.startPeriodMs);
@@ -335,20 +414,42 @@ async function waitForHealth(
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
 
     try {
-      const response = await fetch(url, {
-        method: options.method,
+      const strictHealth = await fetchHealthOnce({
+        url,
+        options,
         signal: controller.signal,
+        fetchImpl,
       });
-      const responseText = options.expectedResponseText ? await response.text() : "";
-      if (
-        response.status === options.expectedStatusCode &&
-        (!options.expectedResponseText || responseText.includes(options.expectedResponseText))
-      ) {
-        return { ok: true };
+      if (strictHealth.ok) {
+        return strictHealth;
       }
-      lastFailure = `last response was HTTP ${response.status} ${response.statusText}`;
+
+      if (
+        options.tlsVerification === "allow-untrusted" &&
+        strictHealth.failureKind === "tls-certificate"
+      ) {
+        const untrustedTlsHealth = await fetchHealthOnce({
+          url,
+          options,
+          signal: controller.signal,
+          fetchImpl,
+          rejectUnauthorized: false,
+        });
+        if (untrustedTlsHealth.ok) {
+          return {
+            ...untrustedTlsHealth,
+            strictTlsFailureReason: strictHealth.reason,
+          };
+        }
+        lastFailure = `${strictHealth.reason}; untrusted TLS retry failed: ${untrustedTlsHealth.reason}`;
+        lastFailureKind = untrustedTlsHealth.failureKind;
+      } else {
+        lastFailure = strictHealth.reason;
+        lastFailureKind = strictHealth.failureKind;
+      }
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : "unknown fetch error";
+      lastFailureKind = classifyHealthFailureReason(lastFailure);
     } finally {
       clearTimeout(timeout);
     }
@@ -356,7 +457,7 @@ async function waitForHealth(
     await Bun.sleep(options.intervalMs);
   }
 
-  return { ok: false, reason: lastFailure };
+  return { ok: false, reason: lastFailure, failureKind: lastFailureKind };
 }
 
 function normalizeHealthCheckPath(path: string | undefined): string {
@@ -394,6 +495,16 @@ function publicHealthUrl(input: {
   const path = joinRouteAndHealthPath(input.route.pathPrefix, input.healthPath);
 
   return `${scheme}://${domain}${path}`;
+}
+
+function publicRouteHealthErrorCode(result: Extract<HealthCheckResult, { ok: false }>): string {
+  if (result.failureKind === "tls-certificate") {
+    return "ssh_public_route_tls_certificate_untrusted";
+  }
+  if (result.failureKind === "timeout") {
+    return "ssh_public_route_health_check_timeout";
+  }
+  return "ssh_public_route_health_check_failed";
 }
 
 function defaultVerificationSteps(accessRoutes: AccessRoute[]): Array<RuntimeVerificationStep["kind"]> {
@@ -2308,9 +2419,10 @@ export class SshExecutionBackend implements ExecutionBackend {
           ? state.runtimePlan.execution.verificationSteps.map((step) => step.kind)
           : defaultVerificationSteps(accessRoutes);
       const internalUrl = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
-      const publicUrls = accessRoutes.map((route) =>
-        publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
-      );
+      const publicRouteHealthChecks = accessRoutes.map((route) => ({
+        route,
+        url: publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
+      }));
       const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
       if (!healthOptions) {
         this.report(context, {
@@ -2416,7 +2528,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         if (step === "public-http") {
-          if (publicUrls.length === 0) {
+          if (publicRouteHealthChecks.length === 0) {
             const message = "SSH public route health check requested without access routes";
             logs.push(phaseLog("verify", message, "error"));
             return ok({
@@ -2438,14 +2550,21 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
           }
 
-          for (const publicUrl of publicUrls) {
+          for (const publicRouteHealthCheck of publicRouteHealthChecks) {
+            const { route, url: publicUrl } = publicRouteHealthCheck;
             this.report(context, {
               deploymentId: state.id.value,
               phase: "verify",
               status: "running",
               message: `Checking public access route ${publicUrl}`,
             });
-            const publicHealth = await waitForHealth(publicUrl, healthOptions);
+            const publicHealth = await waitForHealth(publicUrl, {
+              ...healthOptions,
+              tlsVerification:
+                route.proxyKind !== "none" && route.tlsMode === "auto"
+                  ? "allow-untrusted"
+                  : "strict",
+            });
 
             if (!publicHealth.ok) {
               await this.pushRemoteDockerContainerDiagnostics(logs, {
@@ -2465,11 +2584,12 @@ export class SshExecutionBackend implements ExecutionBackend {
               const message = `SSH public route health check failed for ${publicUrl}${
                 publicHealth.reason ? `: ${publicHealth.reason}` : ""
               }`;
+              const errorCode = publicRouteHealthErrorCode(publicHealth);
               logs.push(phaseLog("verify", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
                   logs,
-                  errorCode: "ssh_public_route_health_check_failed",
+                  errorCode,
                   retryable: true,
                   metadata: {
                     host: target.host,
@@ -2480,13 +2600,25 @@ export class SshExecutionBackend implements ExecutionBackend {
                     internalUrl,
                     url: publicUrl,
                     phase: "public-route-verification",
+                    message,
+                    publicRouteFailureKind: publicHealth.failureKind,
                     ...prepared.source.metadata,
                   },
                 }),
               });
             }
 
-            logs.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
+            if (publicHealth.tlsVerification === "untrusted") {
+              logs.push(
+                phaseLog(
+                  "verify",
+                  `SSH public route is reachable at ${publicUrl} with untrusted TLS; certificate readiness remains separate`,
+                  "warn",
+                ),
+              );
+            } else {
+              logs.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
+            }
           }
         }
       }
@@ -2512,6 +2644,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         );
       }
 
+      const firstPublicUrl = publicRouteHealthChecks[0]?.url;
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({
@@ -2525,9 +2658,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             containerName,
             port: String(port),
             publishedPort: String(publishedHostPort),
-            url: publicUrls[0] ?? internalUrl,
+            url: firstPublicUrl ?? internalUrl,
             internalUrl,
-            ...(publicUrls.length > 0 ? { publicUrl: publicUrls[0] } : {}),
+            ...(firstPublicUrl ? { publicUrl: firstPublicUrl } : {}),
             ...prepared.source.metadata,
           },
         }),

@@ -438,6 +438,13 @@ worker should prefer edge-proxy route checks that connect to the known edge addr
 intended `Host` header when possible. This keeps deployment replacement independent from external
 DNS propagation delay.
 
+For `tlsMode = auto`, public route reachability is also separate from certificate trust readiness.
+The runtime route check may accept an untrusted or proxy default certificate when the request still
+reaches the workload and returns the expected health response. Certificate issuance, renewal, and
+trusted-chain failures remain visible through the certificate/domain readiness lifecycle and route
+diagnostics instead of causing a healthy candidate runtime to be removed solely because the
+certificate is still pending.
+
 Deployment planning must include deployable durable domain bindings for the same
 project/environment/resource/server/destination in the runtime access-route snapshot. This is what
 turns a confirmed binding into proxy configuration on the next deployment or redeploy. Bindings in
