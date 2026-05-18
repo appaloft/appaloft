@@ -29,10 +29,14 @@ dist
 *.bun-build
 .svelte-kit
 **/.astro
+**/.next
+**/.source
+**/.fumadocs
 apps/web/.svelte-kit
 apps/web/playwright-report
 apps/web/test-results
 apps/web/package
+apps/docs/out
 apps/desktop/out
 apps/desktop/dist
 runtime/logs/*

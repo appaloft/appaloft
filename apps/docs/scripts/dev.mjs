@@ -1,7 +1,11 @@
 const docsHost = Bun.env.APPALOFT_DEV_DOCS_HOST || "127.0.0.1";
-const docsPort = Bun.env.APPALOFT_DEV_DOCS_PORT || "4322";
+const docsPort = Bun.env.APPALOFT_DEV_DOCS_PORT || "3002";
 
-const child = Bun.spawn(["bun", "astro", "dev", "--host", docsHost, "--port", docsPort], {
+await import("./generate-openapi.mjs").then(({ writeAppaloftOpenApiSchema }) =>
+  writeAppaloftOpenApiSchema(),
+);
+
+const child = Bun.spawn(["bun", "next", "dev", "--hostname", docsHost, "--port", docsPort], {
   stdin: "inherit",
   stdout: "inherit",
   stderr: "inherit",

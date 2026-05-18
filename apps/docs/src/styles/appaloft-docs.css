@@ -1,12 +1,19 @@
+@import "tailwindcss" source("../");
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumadocs-openapi/css/preset.css";
 @import "@appaloft/design/styles/docs.css";
 
-.sl-markdown-content img[src*="/diagrams/"] {
+@source "../../node_modules/fumadocs-ui/dist";
+@source "../../node_modules/fumadocs-openapi/dist";
+
+.fd-page article img[src*="/diagrams/"] {
   border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius);
   box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
   margin-block: 1.5rem;
 }
 
-.sl-markdown-content pre {
+.fd-page article pre {
   box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
 }
