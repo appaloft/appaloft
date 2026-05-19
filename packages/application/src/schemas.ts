@@ -7,6 +7,14 @@ export {
   type GetAuthBootstrapStatusQueryInput,
   getAuthBootstrapStatusQueryInputSchema,
 } from "./operations/auth/get-auth-bootstrap-status.query";
+export type {
+  QueryCapabilitiesInput,
+  QueryCapabilitiesResponse,
+} from "./operations/capabilities/query-capabilities.query";
+export {
+  queryCapabilitiesInputSchema,
+  queryCapabilitiesResponseSchema,
+} from "./operations/capabilities/query-capabilities.schema";
 export * from "./operations/certificates/delete-certificate.schema";
 export * from "./operations/certificates/import-certificate.schema";
 export * from "./operations/certificates/issue-or-renew-certificate.schema";

@@ -10,6 +10,7 @@ export * from "./operations/audit-events/show-audit-event.query-service";
 export * from "./operations/audit-events/show-audit-event-archive.query-service";
 export * from "./operations/auth/bootstrap-first-admin.use-case";
 export * from "./operations/auth/get-auth-bootstrap-status.query-service";
+export * from "./operations/capabilities/query-capabilities.query-service";
 export * from "./operations/certificates/certificate-retry-scheduler";
 export * from "./operations/certificates/delete-certificate.use-case";
 export * from "./operations/certificates/import-certificate.use-case";
