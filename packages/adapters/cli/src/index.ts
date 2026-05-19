@@ -21,6 +21,15 @@ export {
   type SshRemoteStateTarget,
   sshRemoteStateTargetFromDecision,
 } from "./commands/deployment-ssh-remote-state.js";
+export {
+  createServerStateBackendMarker,
+  parseServerStateBackendMarker,
+  type ServerStateBackendMarker,
+  serverStateBackendMarkerFile,
+  serverStateBackendMarkerSchemaVersion,
+  serverStateBackendMismatchError,
+  serverStateBackendMismatchReason,
+} from "./commands/deployment-state.js";
 export { buildSshRemoteStateDiagnosticsCommand } from "./commands/remote-state.js";
 export {
   findControlPlaneOperation,

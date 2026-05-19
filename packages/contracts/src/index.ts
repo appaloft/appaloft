@@ -1259,6 +1259,9 @@ export const runtimeTargetCapacityPruneSummarySchema = z.object({
   skippedCount: z.number(),
   excludedCount: z.number(),
   reclaimedBytes: z.number(),
+  reportedCandidateCount: z.number().optional(),
+  omittedCandidateCount: z.number().optional(),
+  outputLimit: z.number().optional(),
 });
 
 export const pruneServerCapacityResponseSchema = z.object({

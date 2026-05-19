@@ -34,6 +34,14 @@ SSH-server PGlite in this workflow. It is a trigger and package handoff client o
 composite wrapper setup may still install the released binary before dispatch, but this workflow
 does not use it as the deployment executor.
 
+When this workflow targets a console-managed server, the authoritative state backend is
+`postgres-control-plane`. It must not keep an SSH-server PGlite mirror, run
+remote-pglite-state-sync, or create `state/backups/sync-*` recovery archives during deploy. If a
+compatibility check discovers that the target SSH state root is already marked `ssh-pglite`, the
+workflow must return `server_state_backend_mismatch` with reason
+`SERVER_STATE_BACKEND_MISMATCH` and require an explicit future adopt/migrate workflow instead of
+silently switching ownership.
+
 ## Global References
 
 This workflow inherits:

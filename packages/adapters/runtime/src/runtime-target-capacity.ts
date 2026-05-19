@@ -212,6 +212,17 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     `APPALOFT_PRUNE_BEFORE=${shellQuote(input.before)}`,
     `APPALOFT_PRUNE_CATEGORIES=${shellQuote(categories)}`,
     `APPALOFT_PRUNE_DRY_RUN=${input.dryRun ? "1" : "0"}`,
+    "APPALOFT_PRUNE_CANDIDATE_LIMIT=${APPALOFT_PRUNE_CANDIDATE_LIMIT:-200}",
+    'APPALOFT_PRUNE_TMP="${TMPDIR:-/tmp}/appaloft-capacity-prune-$$"',
+    "APPALOFT_PRUNE_INSPECTED=0",
+    "APPALOFT_PRUNE_MATCHED=0",
+    "APPALOFT_PRUNE_PRUNED=0",
+    "APPALOFT_PRUNE_SKIPPED=0",
+    "APPALOFT_PRUNE_EXCLUDED=0",
+    "APPALOFT_PRUNE_RECLAIMABLE_BYTES=0",
+    "APPALOFT_PRUNE_REPORTED=0",
+    'cleanup_prune_tmp() { rm -f "$APPALOFT_PRUNE_TMP".*; }',
+    "trap cleanup_prune_tmp EXIT",
     "printf 'APPALOFT_CAPACITY_PRUNE_V1\\n'",
     "has_category() {",
     "  case \",$APPALOFT_PRUNE_CATEGORIES,\" in",
@@ -226,11 +237,27 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     "}",
     "emit_candidate() {",
     "  category=\"$1\"; id=\"$2\"; target=\"$3\"; updated_at=\"$4\"; size_bytes=\"$5\"; action=\"$6\"; reason=\"$7\"",
-    "  printf 'PRUNE_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$category\" \"$id\" \"$target\" \"$updated_at\" \"$size_bytes\" \"$action\" \"$reason\"",
+    "  case \"${size_bytes:-0}\" in ''|*[!0-9]*) normalized_size=0 ;; *) normalized_size=\"$size_bytes\" ;; esac",
+    "  APPALOFT_PRUNE_INSPECTED=$((APPALOFT_PRUNE_INSPECTED + 1))",
+    "  case \"$action\" in",
+    "    matched) APPALOFT_PRUNE_MATCHED=$((APPALOFT_PRUNE_MATCHED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;",
+    "    pruned) APPALOFT_PRUNE_PRUNED=$((APPALOFT_PRUNE_PRUNED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;",
+    "    skipped) APPALOFT_PRUNE_SKIPPED=$((APPALOFT_PRUNE_SKIPPED + 1)) ;;",
+    "    excluded) APPALOFT_PRUNE_EXCLUDED=$((APPALOFT_PRUNE_EXCLUDED + 1)) ;;",
+    "  esac",
+    "  if [ \"$APPALOFT_PRUNE_REPORTED\" -lt \"$APPALOFT_PRUNE_CANDIDATE_LIMIT\" ]; then",
+    "    printf 'PRUNE_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$category\" \"$id\" \"$target\" \"$updated_at\" \"$normalized_size\" \"$action\" \"$reason\"",
+    "    APPALOFT_PRUNE_REPORTED=$((APPALOFT_PRUNE_REPORTED + 1))",
+    "  fi",
+    "}",
+    "emit_prune_summary() {",
+    "  omitted=$((APPALOFT_PRUNE_INSPECTED - APPALOFT_PRUNE_REPORTED))",
+    "  printf 'PRUNE_SUMMARY\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$APPALOFT_PRUNE_INSPECTED\" \"$APPALOFT_PRUNE_MATCHED\" \"$APPALOFT_PRUNE_PRUNED\" \"$APPALOFT_PRUNE_SKIPPED\" \"$APPALOFT_PRUNE_EXCLUDED\" \"$APPALOFT_PRUNE_RECLAIMABLE_BYTES\" \"$APPALOFT_PRUNE_REPORTED\" \"$omitted\" \"$APPALOFT_PRUNE_CANDIDATE_LIMIT\"",
     "}",
     "if has_category stopped-containers; then",
     "  if command -v docker >/dev/null 2>&1; then",
-    "    docker ps -a --filter label=appaloft.managed=true --format '{{.ID}}\\t{{.Names}}\\t{{.Status}}' 2>/dev/null | while IFS='	' read -r cid cname cstatus; do",
+    "    docker ps -a --filter label=appaloft.managed=true --format '{{.ID}}\\t{{.Names}}\\t{{.Status}}' 2>/dev/null > \"$APPALOFT_PRUNE_TMP.containers\"",
+    "    while IFS='	' read -r cid cname cstatus; do",
     "      [ -n \"$cid\" ] || continue",
     "      ccreated=$(docker inspect -f '{{.Created}}' \"$cid\" 2>/dev/null)",
     "      case \"$cstatus\" in",
@@ -248,7 +275,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     "          fi",
     "          ;;",
     "      esac",
-    "    done",
+    "    done < \"$APPALOFT_PRUNE_TMP.containers\"",
     "  else",
     "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
     "  fi",
@@ -279,7 +306,8 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     "fi",
     "if has_category preview-workspaces || has_category source-workspaces; then",
     "  if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
-    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
+    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null > \"$APPALOFT_PRUNE_TMP.workspaces\"",
+    "    while IFS= read -r workspace; do",
     "      name=$(basename \"$workspace\")",
     "      case \"$workspace\" in",
     "        \"$APPALOFT_STATE_ROOT\"|\"$APPALOFT_STATE_ROOT\"/*|\"$APPALOFT_RUNTIME_ROOT/state\"|\"$APPALOFT_RUNTIME_ROOT/state\"/*)",
@@ -306,7 +334,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     "      else",
     "        emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped cutoff-not-reached",
     "      fi",
-    "    done",
+    "    done < \"$APPALOFT_PRUNE_TMP.workspaces\"",
     "  fi",
     "fi",
     "if has_category remote-state-markers; then",
@@ -342,6 +370,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     "fi",
     "emit_candidate source-workspaces state-root \"$APPALOFT_STATE_ROOT\" \"\" \"0\" excluded state-root-excluded",
     "emit_candidate source-workspaces volumes docker-volumes \"\" \"0\" excluded volume-excluded",
+    "emit_prune_summary",
   ].join("\n");
 }
 
@@ -788,6 +817,19 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
 
   const candidates: RuntimeTargetCapacityPruneCandidate[] = [];
   const warnings: RuntimeTargetCapacityWarning[] = [];
+  let emittedSummary:
+    | {
+        inspectedCount: number;
+        matchedCount: number;
+        prunedCount: number;
+        skippedCount: number;
+        excludedCount: number;
+        reclaimedBytes: number;
+        reportedCandidateCount: number;
+        omittedCandidateCount: number;
+        outputLimit: number;
+      }
+    | undefined;
 
   for (const line of input.stdout.split(/\r?\n/)) {
     const parts = line.split("\t");
@@ -823,6 +865,31 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
         ),
       );
     }
+
+    if (tag === "PRUNE_SUMMARY") {
+      const [
+        inspectedCount,
+        matchedCount,
+        prunedCount,
+        skippedCount,
+        excludedCount,
+        reclaimedBytes,
+        reportedCandidateCount,
+        omittedCandidateCount,
+        outputLimit,
+      ] = parts.slice(1).map((part) => parseNumber(part) ?? 0);
+      emittedSummary = {
+        inspectedCount: inspectedCount ?? 0,
+        matchedCount: matchedCount ?? 0,
+        prunedCount: prunedCount ?? 0,
+        skippedCount: skippedCount ?? 0,
+        excludedCount: excludedCount ?? 0,
+        reclaimedBytes: reclaimedBytes ?? 0,
+        reportedCandidateCount: reportedCandidateCount ?? 0,
+        omittedCandidateCount: omittedCandidateCount ?? 0,
+        outputLimit: outputLimit ?? 0,
+      };
+    }
   }
 
   if (input.timedOut) {
@@ -842,7 +909,21 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
   }
 
   const prunedCandidates = candidates.filter((candidate) => candidate.action === "pruned");
-  const reclaimedBytes = prunedCandidates.reduce((sum, candidate) => sum + (candidate.size ?? 0), 0);
+  const matchedCandidates = candidates.filter((candidate) => candidate.action === "matched");
+  const reclaimedBytes =
+    emittedSummary?.reclaimedBytes ??
+    (input.dryRun ? matchedCandidates : prunedCandidates).reduce(
+      (sum, candidate) => sum + (candidate.size ?? 0),
+      0,
+    );
+  const summary = emittedSummary ?? {
+    inspectedCount: candidates.length,
+    matchedCount: matchedCandidates.length,
+    prunedCount: prunedCandidates.length,
+    skippedCount: candidates.filter((candidate) => candidate.action === "skipped").length,
+    excludedCount: candidates.filter((candidate) => candidate.action === "excluded").length,
+    reclaimedBytes,
+  };
 
   return ok({
     schemaVersion: "servers.capacity.prune/v1",
@@ -859,11 +940,7 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
     dryRun: input.dryRun,
     prunedAt: input.prunedAt,
     summary: {
-      inspectedCount: candidates.length,
-      matchedCount: candidates.filter((candidate) => candidate.action === "matched").length,
-      prunedCount: prunedCandidates.length,
-      skippedCount: candidates.filter((candidate) => candidate.action === "skipped").length,
-      excludedCount: candidates.filter((candidate) => candidate.action === "excluded").length,
+      ...summary,
       reclaimedBytes,
     },
     candidates,

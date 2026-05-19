@@ -41,9 +41,52 @@ describe("CLI remote state lifecycle", () => {
       expect(await readJson<{ version: number }>(join(root, "schema-version.json"))).toMatchObject({
         version: 1,
       });
+      expect(
+        await readJson<{ schemaVersion: string; stateBackend: string }>(join(root, "backend.json")),
+      ).toMatchObject({
+        schemaVersion: "server-state-backend/v1",
+        stateBackend: "ssh-pglite",
+      });
 
       const released = await prepared.value.release();
       expect(released.isOk()).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-015] remote state lifecycle rejects a different backend marker", async () => {
+    const root = await tempStateRoot();
+    try {
+      await writeFile(
+        join(root, "backend.json"),
+        JSON.stringify({
+          schemaVersion: "server-state-backend/v1",
+          stateBackend: "postgres-control-plane",
+          updatedAt: "2026-05-19T00:00:00.000Z",
+        }),
+      );
+
+      const prepared = await new FileSystemRemoteStateLifecycle({
+        dataRoot: root,
+      }).prepare();
+
+      expect(prepared.isErr()).toBe(true);
+      if (prepared.isOk()) {
+        throw new Error("Expected state backend mismatch");
+      }
+      expect(prepared.error).toMatchObject({
+        code: "server_state_backend_mismatch",
+        retryable: false,
+        details: {
+          phase: "server-state-backend",
+          reason: "SERVER_STATE_BACKEND_MISMATCH",
+          expectedStateBackend: "ssh-pglite",
+          actualStateBackend: "postgres-control-plane",
+          dataRoot: root,
+        },
+      });
+      expect(await remoteStatePathExists(join(root, "locks", "mutation.lock"))).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

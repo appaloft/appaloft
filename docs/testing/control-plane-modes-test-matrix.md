@@ -44,6 +44,15 @@ This matrix inherits:
 | CONTROL-PLANE-MODE-008 | integration | Control-plane secret fields rejected | Config contains token, database URL, SSH key, certificate material, or raw credential under `controlPlane` | Workflow stops before mutation and diagnostics are sanitized | `validation_error`, phase `control-plane-config` or `config-secret-validation` | No write commands |
 | CONTROL-PLANE-MODE-009 | integration | Unsafe control-plane URL rejected | Config `controlPlane.url` is malformed, non-HTTPS when policy requires HTTPS, contains credentials, or contains path/query fragments not accepted by policy | Workflow stops before mutation | `validation_error`, phase `control-plane-config` | No write commands |
 
+## State Backend Ownership Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONTROL-PLANE-STATE-001 | unit/integration | SSH PGlite remains authoritative in standalone mode | A deploy/source-link/preview-cleanup command targets SSH with no control-plane URL or database URL | Resolver selects `ssh-pglite`, prepares remote state, writes `backend.json`, uses remote PGlite/source-links/server-applied-routes, and applies sync-back retention | None | Resolve backend -> SSH state marker/lock -> remote PGlite sync -> command -> retained sync backup cleanup |
+| CONTROL-PLANE-STATE-002 | unit | Postgres control plane skips remote PGlite backup | A deploy command selects `postgres-control-plane` through flag/env and includes an SSH host for compatibility context | The workflow may read `backend.json`, returns no remote PGlite sync session, creates no `state/backups/sync-*`, and does not archive/upload PGlite/source-links/routes | None | Resolve backend -> optional marker read -> no remote PGlite sync |
+| CONTROL-PLANE-STATE-003 | unit/integration | Backend marker mismatch is structured | Console/Postgres path discovers SSH state root marker `stateBackend: ssh-pglite` | Workflow stops before dual-write, backup, source-link mutation, route mutation, or deploy mutation | `server_state_backend_mismatch`, phase `server-state-backend`, reason `SERVER_STATE_BACKEND_MISMATCH` | Marker read -> structured reject -> no mutation |
+| CONTROL-PLANE-STATE-004 | integration | Preview cleanup preserves standalone live PGlite state | A preview cleanup or runtime marker prune runs against an SSH standalone server with live `state/pglite`, source links, routes, locks, and sync revision | Cleanup removes only preview-owned runtime/route/source artifacts or old marker archives; live PGlite state remains present | None | Preview/source fingerprint cleanup or explicit marker prune -> live state excluded |
+
 ## Handshake Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -166,8 +175,12 @@ docs deployment opts into `server-config-deploy: true` for self-hosted mode and 
 CLI fallback separate.
 
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
-the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
-extended with the IDs above during Phase 1 Code Round.
+the older `postgres-control-plane` backend selection branch. `remote-pglite-state-sync.test.ts`,
+`deployment-remote-state.test.ts`, `deployment-ssh-remote-state.test.ts`, and
+`runtime-target-capacity-prune.test.ts` now cover the first state backend ownership slice:
+standalone `ssh-pglite` marker initialization and remote sync retention, Postgres control-plane
+deploy paths skipping remote PGlite backups, stable `SERVER_STATE_BACKEND_MISMATCH` errors, and
+live standalone PGlite state protection during explicit marker prune.
 
 `packages/adapters/cli/test/control-plane-client.test.ts` now covers the CLI remote control-plane
 client bridge:

@@ -16,6 +16,8 @@ Tests must prove:
   preview retargets;
 - cleanup removes preview-owned inert runtime artifacts and materialized workspaces when ownership
   can be proven without touching active runtime, rollback candidates, volumes, or remote state;
+- cleanup does not treat standalone `ssh-pglite` as obsolete state and must preserve live PGlite,
+  source-link, server-applied-route, lock, revision, and backend marker files;
 - runtime cleanup failure stops later cleanup stages;
 - CLI preview cleanup derives the same fingerprint/state-backend context as preview deploy.
 
@@ -57,6 +59,8 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-006 | integration | SSH final upload merges disjoint preview cleanup state changes | `ssh-pglite` preview cleanup runs against a local mirror and another command advances the remote revision for a different logical scope with disjoint authoritative rows | Cleanup still completes after final upload retries against the fresher remote snapshot | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-007 | integration | Preview artifact/workspace cleanup is ownership-scoped | Preview link exists, runtime cleanup succeeds, and target has preview-owned source workspaces, stopped preview containers, unused preview images, and unrelated volumes/state | Cleanup removes or marks cleaned the preview-owned inert artifacts/workspaces, preserves Docker volumes, remote Appaloft state, active runtime, and retained rollback candidates, then proceeds to route/link deletion | None, or `runtime_target_resource_exhausted` with `cleanupStage = artifact-cleanup` when target capacity prevents safe inspection/removal |
 | DEPLOYMENTS-CLEANUP-PREVIEW-008 | integration | Cleaned preview route is not current access | Preview resource remains as history/audit, but the preview source link has been removed by cleanup | Resource access summary does not project that historical preview route as current/ready; deployment history remains visible | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-009 | integration | Closed preview cleanup does not stop a newer live deployment | A preview source link still points at a resource whose latest deployment no longer carries the preview fingerprint, while older preview deployments still carry the closed preview fingerprint | Cleanup skips the newer live deployment, cleans only deployments carrying the preview fingerprint, then removes preview route/source-link state idempotently | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-010 | integration | Preview cleanup preserves standalone SSH live state | Cleanup runs for a closed preview on a server whose selected backend is `ssh-pglite` | Cleanup may remove preview-owned runtime, route, and selected source-link state, but it does not delete live `pglite`, locks, unrelated source links/routes, `sync-revision.txt`, or backend marker files | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001 | HTTP/oRPC | HTTP preview cleanup dispatches command | `POST /api/deployments/cleanup-preview` receives a preview-scoped source fingerprint | HTTP returns `202` with cleanup result and dispatches `CleanupPreviewCommand` with the same source fingerprint | Domain error mapped through standard HTTP/oRPC error contract |
 
 ## CLI Matrix
@@ -67,7 +71,8 @@ This matrix inherits:
 
 ## Current Implementation Notes And Governed Follow-Ups
 
-`DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-004` have application
+`DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-004` and
+`DEPLOYMENTS-CLEANUP-PREVIEW-009` have application
 coverage in `packages/application/test/cleanup-preview.test.ts`.
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-008` has route/access read-model coverage in
@@ -90,6 +95,10 @@ coverage proves that preview cleanup preserves `artifact-cleanup` failure classi
 only generated preview workspaces under Appaloft-owned runtime roots, skips local user workspaces
 and prebuilt images, and never invokes Docker volume deletion. Build-cache pruning remains governed
 by `servers.capacity.prune` opt-in categories rather than preview cleanup.
+`DEPLOYMENTS-CLEANUP-PREVIEW-010` is covered at the shell/state-backend lifecycle by
+`apps/shell/test/remote-pglite-state-sync.test.ts`, and remote-state marker preservation is covered
+in `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`. Preview cleanup itself
+delegates live state ownership to the selected state backend.
 
 Source-link unlink and server-applied route desired-state delete-by-target and
 delete-by-source-fingerprint coverage also live in

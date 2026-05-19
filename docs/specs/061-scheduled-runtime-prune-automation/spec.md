@@ -34,6 +34,7 @@ the same safety, dry-run, audit, and operator-work visibility guarantees as manu
 | RT-CAP-SCHED-005 | Retry and dead-letter visibility | a scheduled prune worker fails after acceptance | retry policy allows or rejects retry | operator work shows failed, retry-scheduled, canceled, recovered, or dead-lettered state without raw runtime output or secrets. |
 | RT-CAP-SCHED-006 | Audit output matches manual prune | destructive scheduled prune deletes candidates | command completes | Appaloft records the same aggregate-scoped audit row shape as manual destructive prune, with safe counts/categories only. |
 | RT-CAP-SCHED-007 | Entrypoints remain CQRS-thin | shell scheduler, HTTP, CLI, or future tools interact with scheduled prune | work is selected or observed | scheduler code dispatches commands/queries through buses and never calls runtime adapters, repositories, or prune use cases directly. |
+| RT-CAP-SCHED-008 | Preview-oriented categories are explicit | a scheduled policy is intended for preview-oriented target cleanup | the policy is configured and dispatched | the policy may explicitly include stopped containers, preview/source workspaces, Docker cache, unused images, and remote-state markers; remote-state markers remain out of default categories and require explicit policy selection. |
 
 ## Domain Ownership
 
@@ -70,8 +71,10 @@ the same safety, dry-run, audit, and operator-work visibility guarantees as manu
 ## Non-Goals
 
 - Docker volume prune or broad `docker system prune`.
-- Appaloft state-root, remote-state backup, migration journal, audit/event, log, route, deployment
-  snapshot, resource, server, dependency, or storage-volume retention.
+- Appaloft state-root, live remote-state, audit/event, log, route, deployment snapshot, resource,
+  server, dependency, or storage-volume retention. Bounded cleanup of old remote-state marker
+  archives is limited to explicit `remote-state-markers` selection and SSH PGlite sync backup
+  recovery-window retention.
 - Legal holds, immutable archives, global audit/event export, organization-wide audit defaults, or
   domain event stream retention.
 - A generic retention scheduler for every Appaloft retention boundary in the first slice.

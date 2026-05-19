@@ -698,6 +698,7 @@ Config-file errors use stable codes and phases:
 | `control_plane_handshake_failed` | `control-plane-handshake` | Conditional | Selected Cloud/self-hosted control plane is reachable but client/API/schema/feature/auth compatibility failed. |
 | `control_plane_unsupported` | `control-plane-capability` | No | Selected control-plane behavior is not implemented or the endpoint lacks the requested capability. |
 | `control_plane_adoption_required` | `control-plane-resolution` | No | A server adoption marker indicates control-plane ownership, but the entrypoint attempted uncoordinated direct SSH state mutation. |
+| `server_state_backend_mismatch` | `server-state-backend` | No | The selected state backend conflicts with the server's backend marker, for example a console/Postgres path discovering an existing `ssh-pglite` state root. The operator must run an explicit adopt/migrate workflow before switching backends. Details include reason `SERVER_STATE_BACKEND_MISMATCH`, expected backend, and actual backend. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
 | `infra_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend; safe details should include target host/port, exit code, and remote stderr when available. |
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |

@@ -56,6 +56,7 @@ describe("resolveConfig", () => {
     expect(config.dataDir).toBe(expectedDefaultDataDir());
     expect(config.pgliteDataDir).toBe(join(expectedDefaultDataDir(), "pglite"));
     expect(config.remoteRuntimeRoot).toBe("/var/lib/appaloft/runtime");
+    expect(config.remotePgliteSyncBackupRetentionDays).toBe(7);
   });
 
   test("[CONFIG-FILE-ENTRY-008] headless CI defaults to embedded pglite without DATABASE_URL", () => {
@@ -132,6 +133,16 @@ describe("resolveConfig", () => {
     });
 
     expect(config.remoteRuntimeRoot).toBe("/srv/appaloft/runtime");
+  });
+
+  test("[CONFIG-FILE-STATE-013] allows overriding the remote PGlite sync backup recovery window", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS: "14",
+      },
+    });
+
+    expect(config.remotePgliteSyncBackupRetentionDays).toBe(14);
   });
 
   test("allows overriding Web and docs static asset directories independently", () => {

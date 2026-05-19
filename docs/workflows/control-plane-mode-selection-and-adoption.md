@@ -19,6 +19,24 @@ control-plane/state owner
   = none | cloud | self-hosted | external-postgres
 ```
 
+The resolved server/runtime state backend is a mutually exclusive ownership marker:
+
+- `ssh-pglite`: standalone CLI/SSH mode. The SSH server's remote PGlite, source links,
+  server-applied routes, sync revision, and `state/backups/sync-*` recovery archives are the
+  authoritative state for that server.
+- `postgres-control-plane`: console-managed mode. The control plane's PostgreSQL state is
+  authoritative for deployment/source-link/route workflows. Deploy paths in this mode must not
+  maintain an SSH-server PGlite mirror or create remote PGlite sync backups as a side effect.
+- `local-pglite`: local development or test mode. State is local to the process/workstation and is
+  not a server authority.
+
+An Appaloft server must belong to one state backend at a time. The SSH state root records
+`backend.json` with schema `server-state-backend/v1` when `ssh-pglite` is initialized. If a
+console-managed entrypoint reads an SSH target that is already marked `ssh-pglite`, it must stop
+with `server_state_backend_mismatch` and details reason `SERVER_STATE_BACKEND_MISMATCH`. Switching
+from `ssh-pglite` to `postgres-control-plane` requires a future explicit adopt/migrate workflow;
+normal deploy, preview cleanup, or server-config deploy must not auto-migrate or silently dual-write.
+
 The resolver must choose these dimensions before:
 
 - remote state ensure/lock/migration;
@@ -66,6 +84,11 @@ config/flags/env
 
 No Cloud token, control-plane URL, `DATABASE_URL`, or Appaloft project id is required.
 
+Standalone SSH mode remains a first-class mode: users can init, deploy, list, and inspect status
+without running a console. Remote PGlite sync backups are retained according to the configured
+recovery window, while live `pglite`, `locks`, `source-links`, `server-applied-routes`, and
+`sync-revision.txt` are not cleanup-marker candidates.
+
 ### `auto`
 
 `auto` means the entrypoint may connect to a control plane only when a trusted control-plane source
@@ -112,6 +135,10 @@ trusted secret/token/OIDC/login source outside committed config.
 
 The first production self-hosted contract uses PostgreSQL. Embedded PGlite is allowed only for
 single-process/dev/portable installs.
+
+Self-hosted or console-managed deploy paths use `postgres-control-plane` state. They may inspect an
+SSH target's backend marker for compatibility, but they must not create or refresh a remote PGlite
+state copy during each deploy.
 
 After a self-hosted control plane adopts a target with existing SSH-server PGlite state, GitHub
 Actions and CLI should use the control-plane API. Direct SSH PGlite mutation after adoption is

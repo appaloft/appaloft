@@ -1,3 +1,5 @@
+import { type DomainError } from "@appaloft/core";
+
 export type DeploymentStateBackendKind = "ssh-pglite" | "local-pglite" | "postgres-control-plane";
 
 export type DeploymentStateStorageScope = "remote-ssh" | "local-process" | "control-plane";
@@ -26,6 +28,93 @@ export interface DeploymentStateBackendDecision {
   requiresRemoteStateLifecycle: boolean;
   reason: string;
   trustedSshTarget?: TrustedSshTargetInput;
+}
+
+export const serverStateBackendMarkerFile = "backend.json";
+export const serverStateBackendMarkerSchemaVersion = "server-state-backend/v1";
+export const serverStateBackendMismatchReason = "SERVER_STATE_BACKEND_MISMATCH";
+
+export interface ServerStateBackendMarker {
+  schemaVersion: typeof serverStateBackendMarkerSchemaVersion;
+  stateBackend: DeploymentStateBackendKind;
+  updatedAt?: string;
+  owner?: string;
+}
+
+export function isDeploymentStateBackendKind(value: unknown): value is DeploymentStateBackendKind {
+  return value === "ssh-pglite" || value === "local-pglite" || value === "postgres-control-plane";
+}
+
+export function parseServerStateBackendMarker(
+  value: string | undefined,
+): ServerStateBackendMarker | null {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as {
+      schemaVersion?: unknown;
+      stateBackend?: unknown;
+      updatedAt?: unknown;
+      owner?: unknown;
+    };
+    if (
+      parsed.schemaVersion !== serverStateBackendMarkerSchemaVersion ||
+      !isDeploymentStateBackendKind(parsed.stateBackend)
+    ) {
+      return null;
+    }
+
+    return {
+      schemaVersion: serverStateBackendMarkerSchemaVersion,
+      stateBackend: parsed.stateBackend,
+      ...(typeof parsed.updatedAt === "string" ? { updatedAt: parsed.updatedAt } : {}),
+      ...(typeof parsed.owner === "string" ? { owner: parsed.owner } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function createServerStateBackendMarker(input: {
+  stateBackend: DeploymentStateBackendKind;
+  updatedAt: string;
+  owner?: string;
+}): ServerStateBackendMarker {
+  return {
+    schemaVersion: serverStateBackendMarkerSchemaVersion,
+    stateBackend: input.stateBackend,
+    updatedAt: input.updatedAt,
+    ...(input.owner ? { owner: input.owner } : {}),
+  };
+}
+
+export function serverStateBackendMismatchError(input: {
+  expectedStateBackend: DeploymentStateBackendKind;
+  actualStateBackend: DeploymentStateBackendKind | "unknown";
+  phase: string;
+  host?: string;
+  port?: string | number;
+  dataRoot?: string;
+}): DomainError {
+  return {
+    code: "server_state_backend_mismatch",
+    category: "user",
+    message:
+      "Server state backend marker does not match the selected backend; use an explicit adopt or migrate workflow before switching backends.",
+    retryable: false,
+    details: {
+      phase: input.phase,
+      reason: serverStateBackendMismatchReason,
+      expectedStateBackend: input.expectedStateBackend,
+      actualStateBackend: input.actualStateBackend,
+      stateBackend: input.actualStateBackend,
+      ...(input.host ? { host: input.host } : {}),
+      ...(input.port === undefined ? {} : { port: String(input.port) }),
+      ...(input.dataRoot ? { dataRoot: input.dataRoot } : {}),
+    },
+  };
 }
 
 export type SourceFingerprintScope =
