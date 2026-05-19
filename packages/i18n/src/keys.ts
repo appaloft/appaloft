@@ -367,6 +367,8 @@ export const i18nKeys = {
       progressStepFallback: "console:deployments.progressStepFallback",
       progressStreamDisconnected: "console:deployments.progressStreamDisconnected",
       progressTitle: "console:deployments.progressTitle",
+      progressTraceAction: "console:deployments.progressTraceAction",
+      progressTraceLabel: "console:deployments.progressTraceLabel",
       progressWaiting: "console:deployments.progressWaiting",
       records: "console:deployments.records",
       recoveryAvailable: "console:deployments.recoveryAvailable",

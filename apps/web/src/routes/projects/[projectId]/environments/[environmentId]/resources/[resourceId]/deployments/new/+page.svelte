@@ -71,6 +71,7 @@
   let deploymentProgressStreamError = $state("");
   let deploymentProgressDeploymentId = $state("");
   let deploymentProgressRequestId = $state("");
+  let deploymentProgressTraceLink = $state("");
   let deploymentPlanPending = $state(false);
   let deploymentPlanPreview = $state<DeploymentPlanResponse | null>(null);
   let deploymentPlanError = $state("");
@@ -149,6 +150,7 @@
     deploymentProgressStreamError = "";
     deploymentProgressDeploymentId = "";
     deploymentProgressRequestId = "";
+    deploymentProgressTraceLink = "";
 
     try {
       const result = await createDeploymentWithProgress(input, appendDeploymentProgressEvent, {
@@ -157,6 +159,9 @@
         },
         onStreamError: (message) => {
           deploymentProgressStreamError = message;
+        },
+        onTraceLink: (traceLink) => {
+          deploymentProgressTraceLink = traceLink;
         },
       });
       deploymentProgressDeploymentId = result.id;
@@ -655,6 +660,7 @@
   streamError={deploymentProgressStreamError}
   deploymentId={deploymentProgressDeploymentId}
   requestId={deploymentProgressRequestId}
+  traceLink={deploymentProgressTraceLink}
   title={$t(i18nKeys.console.deployments.progressTitle)}
   description={$t(i18nKeys.console.deployments.progressDescription)}
   onClose={() => {
