@@ -265,6 +265,73 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[CONFIG-FILE-STATE-014] fresh postgres-control-plane mode writes a server backend marker", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      const prepared = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "deploy",
+          ".",
+          "--server-host",
+          "127.0.0.1",
+          "--state-backend",
+          "postgres-control-plane",
+        ],
+        config: testConfig(dataDir, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      expect(prepared.isOk()).toBe(true);
+      if (prepared.isErr()) {
+        throw new Error(prepared.error.message);
+      }
+      expect(prepared.value).toBeNull();
+      expect(
+        JSON.parse(await readFile(join(remoteStateRoot, "backend.json"), "utf8")),
+      ).toMatchObject({
+        schemaVersion: "server-state-backend/v1",
+        stateBackend: "postgres-control-plane",
+        owner: "appaloft-control-plane",
+      });
+      expect(await readdir(remoteStateRoot)).toEqual(["backend.json"]);
+
+      const sshPglite = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "deploy",
+          ".",
+          "--server-host",
+          "127.0.0.1",
+          "--state-backend",
+          "ssh-pglite",
+        ],
+        config: testConfig(dataDir, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      expect(sshPglite.isErr()).toBe(true);
+      if (sshPglite.isOk()) {
+        throw new Error("Expected ssh-pglite to reject a postgres-control-plane marker");
+      }
+      expect(sshPglite.error).toMatchObject({
+        code: "server_state_backend_mismatch",
+        details: {
+          phase: "server-state-backend",
+          reason: "SERVER_STATE_BACKEND_MISMATCH",
+          expectedStateBackend: "ssh-pglite",
+          actualStateBackend: "postgres-control-plane",
+        },
+      });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-015] postgres-control-plane mode rejects an ssh-pglite server marker", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     try {
@@ -311,6 +378,161 @@ describe("remote PGlite state sync", () => {
           port: "2222",
         },
       });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-015] postgres-control-plane mode rejects invalid server backend markers", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      await mkdir(remoteStateRoot, { recursive: true });
+      await writeFile(join(remoteStateRoot, "backend.json"), "not-json\n");
+
+      const prepared = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "deploy",
+          ".",
+          "--server-host",
+          "127.0.0.1",
+          "--state-backend",
+          "postgres-control-plane",
+        ],
+        config: testConfig(dataDir, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      expect(prepared.isErr()).toBe(true);
+      if (prepared.isOk()) {
+        throw new Error("Expected invalid state backend marker rejection");
+      }
+      expect(prepared.error).toMatchObject({
+        code: "server_state_backend_mismatch",
+        details: {
+          phase: "server-state-backend",
+          reason: "SERVER_STATE_BACKEND_MISMATCH",
+          expectedStateBackend: "postgres-control-plane",
+          actualStateBackend: "unknown",
+        },
+      });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-015] postgres-control-plane mode rejects a local-pglite server marker", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    try {
+      const prepared = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "deploy",
+          ".",
+          "--server-host",
+          "203.0.113.10",
+          "--state-backend",
+          "postgres-control-plane",
+        ],
+        config: testConfig(dataDir),
+        runner: {
+          run() {
+            return {
+              exitCode: 0,
+              stdout: new TextEncoder().encode(
+                '{"schemaVersion":"server-state-backend/v1","stateBackend":"local-pglite"}\n',
+              ),
+              stderr: "",
+              failed: false,
+            };
+          },
+        },
+      });
+
+      expect(prepared.isErr()).toBe(true);
+      if (prepared.isOk()) {
+        throw new Error("Expected local-pglite state backend marker rejection");
+      }
+      expect(prepared.error).toMatchObject({
+        code: "server_state_backend_mismatch",
+        details: {
+          phase: "server-state-backend",
+          reason: "SERVER_STATE_BACKEND_MISMATCH",
+          expectedStateBackend: "postgres-control-plane",
+          actualStateBackend: "local-pglite",
+        },
+      });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-010] explicit ssh-pglite state backend wins over ambient control-plane env", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    const calls: RemotePgliteArchiveRunnerInput[] = [];
+    try {
+      const session = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "deploy",
+          ".",
+          "--server-host",
+          "203.0.113.10",
+          "--state-backend",
+          "ssh-pglite",
+        ],
+        env: {
+          APPALOFT_DATABASE_URL: "postgres://postgres:postgres@example.test/appaloft",
+        },
+        config: testConfig(dataDir),
+        runner: {
+          run(input) {
+            calls.push(input);
+
+            if (input.command === "tar") {
+              return {
+                exitCode: 0,
+                stdout: new Uint8Array(),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            const joinedArgs = input.args.join(" ");
+            if (joinedArgs.includes("sync-revision.txt")) {
+              return {
+                exitCode: 0,
+                stdout: new TextEncoder().encode("0\n"),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            return {
+              exitCode: 0,
+              stdout: new TextEncoder().encode("archive"),
+              stderr: "",
+              failed: false,
+            };
+          },
+        },
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected explicit ssh-pglite remote sync session");
+      }
+      expect(calls.map((call) => call.args.join(" ")).join("\n")).not.toContain(
+        "postgres-control-plane",
+      );
+      expect(calls.map((call) => call.command)).toContain("tar");
+
+      const released = await session.value.releaseForCliRuntime();
+      expect(released.isOk()).toBe(true);
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }

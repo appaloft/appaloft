@@ -7,6 +7,7 @@ import {
   SshRemoteStateLifecycle,
   type SshRemoteStateTarget,
   serverStateBackendMarkerFile,
+  serverStateBackendMarkerSchemaVersion,
   serverStateBackendMismatchError,
 } from "@appaloft/adapter-cli";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
@@ -231,13 +232,15 @@ function remoteRevisionReadCommand(dataRoot: string): string {
   ].join("; ");
 }
 
-function remoteBackendMarkerReadCommand(dataRoot: string): string {
+function remoteControlPlaneBackendMarkerEnsureCommand(dataRoot: string): string {
   const quotedDataRoot = shellQuote(dataRoot);
 
   return [
     `data_root=${quotedDataRoot}`,
     `backend_marker="$data_root/${serverStateBackendMarkerFile}"`,
-    '[ -f "$backend_marker" ] || exit 0',
+    'mkdir -p "$data_root"',
+    'if [ ! -f "$backend_marker" ]; then now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; printf \'{"schemaVersion":"%s","stateBackend":"postgres-control-plane","updatedAt":"%s","owner":"appaloft-control-plane"}\\n\' ' +
+      `${shellQuote(serverStateBackendMarkerSchemaVersion)} "$now" > "$backend_marker"; fi`,
     'cat "$backend_marker"',
   ].join("; ");
 }
@@ -382,7 +385,10 @@ export function resolveRemotePgliteStateSyncPlan(
     return ok(null);
   }
 
-  if (env.APPALOFT_DATABASE_URL || env.APPALOFT_CONTROL_PLANE_URL) {
+  if (
+    stateBackend !== "ssh-pglite" &&
+    (env.APPALOFT_DATABASE_URL || env.APPALOFT_CONTROL_PLANE_URL)
+  ) {
     return ok(null);
   }
 
@@ -424,10 +430,16 @@ function shouldVerifyControlPlaneBackendMarker(
     return false;
   }
 
-  return (
-    readOption(argv, "--state-backend") === "postgres-control-plane" ||
-    Boolean(env.APPALOFT_DATABASE_URL || env.APPALOFT_CONTROL_PLANE_URL)
-  );
+  const stateBackend = readOption(argv, "--state-backend");
+  if (stateBackend === "postgres-control-plane") {
+    return true;
+  }
+
+  if (stateBackend) {
+    return false;
+  }
+
+  return Boolean(env.APPALOFT_DATABASE_URL || env.APPALOFT_CONTROL_PLANE_URL);
 }
 
 async function verifyControlPlaneRemoteStateBackend(input: {
@@ -449,7 +461,10 @@ async function verifyControlPlaneRemoteStateBackend(input: {
   const runner = input.runner ?? defaultRunner();
   const remoteMarker = runner.run({
     command: "ssh",
-    args: [...buildSshRemoteStateProcessArgs(target), remoteBackendMarkerReadCommand(dataRoot)],
+    args: [
+      ...buildSshRemoteStateProcessArgs(target),
+      remoteControlPlaneBackendMarkerEnsureCommand(dataRoot),
+    ],
     redactions: target.identityFile ? [target.identityFile] : [],
   });
 
@@ -467,12 +482,26 @@ async function verifyControlPlaneRemoteStateBackend(input: {
     );
   }
 
-  const marker = parseServerStateBackendMarker(new TextDecoder().decode(remoteMarker.stdout));
-  if (marker?.stateBackend === "ssh-pglite") {
+  const markerText = new TextDecoder().decode(remoteMarker.stdout);
+  const marker = parseServerStateBackendMarker(markerText);
+  if (!marker && markerText.trim()) {
     return err(
       serverStateBackendMismatchError({
         expectedStateBackend: "postgres-control-plane",
-        actualStateBackend: "ssh-pglite",
+        actualStateBackend: "unknown",
+        phase: "server-state-backend",
+        host: target.host,
+        port: target.port ?? 22,
+        dataRoot,
+      }),
+    );
+  }
+
+  if (marker && marker.stateBackend !== "postgres-control-plane") {
+    return err(
+      serverStateBackendMismatchError({
+        expectedStateBackend: "postgres-control-plane",
+        actualStateBackend: marker.stateBackend,
         phase: "server-state-backend",
         host: target.host,
         port: target.port ?? 22,

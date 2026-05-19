@@ -92,7 +92,7 @@ export function createServerStateBackendMarker(input: {
 
 export function serverStateBackendMismatchError(input: {
   expectedStateBackend: DeploymentStateBackendKind;
-  actualStateBackend: DeploymentStateBackendKind;
+  actualStateBackend: DeploymentStateBackendKind | "unknown";
   phase: string;
   host?: string;
   port?: string | number;
