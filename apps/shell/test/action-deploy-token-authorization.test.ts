@@ -138,6 +138,13 @@ describe("StaticActionDeployTokenAuthorizationPort", () => {
         id: "dtok_static_self_hosted",
         label: "Self-hosted deploy token",
       },
+      scope: {
+        environmentIds: [],
+        projectIds: [],
+        repositoryFullNames: [],
+        resourceIds: [],
+        serverIds: [],
+      },
     });
   });
 
@@ -202,6 +209,13 @@ describe("PersistedActionDeployTokenAuthorizationPort", () => {
         label: "GitHub Action",
       },
       organizationId: "org_demo",
+      scope: {
+        environmentIds: [],
+        projectIds: ["prj_allowed"],
+        repositoryFullNames: ["owner/repo"],
+        resourceIds: [],
+        serverIds: [],
+      },
     });
     expect(repository.updateCount).toBe(1);
   });
@@ -230,8 +244,13 @@ describe("PersistedActionDeployTokenAuthorizationPort", () => {
     expect(result._unsafeUnwrapErr()).toMatchObject({
       code: "action_auth_forbidden",
       details: {
-        missingScope: "scope",
+        deniedScope: "project",
+        missingScope: "project",
         phase: "action-authorization",
+        projectId: "prj_blocked",
+        reasonCode: "scope_value_not_allowed",
+        repositoryFullName: "owner/repo",
+        workflow: "source-link-deploy",
       },
     });
     expect(repository.updateCount).toBe(0);

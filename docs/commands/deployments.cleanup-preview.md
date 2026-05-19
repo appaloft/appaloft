@@ -95,16 +95,29 @@ It is not:
 ```ts
 type CleanupPreviewCommandInput = {
   sourceFingerprint: string;
+  trustedContext?: {
+    repositoryFullName?: string;
+    repositoryId?: string;
+    ref?: string;
+    revision?: string;
+  };
 };
 ```
 
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `sourceFingerprint` | Required | Stable preview-scoped source identity that resolves the preview environment/resource/server context. |
+| `trustedContext.repositoryFullName` | Optional Action context | Trusted repository full name used by Action deploy-token authorization to satisfy repository-scoped token checks. |
+| `trustedContext.repositoryId` | Optional Action context | Trusted provider repository id carried for audit and future scope checks. |
+| `trustedContext.ref` | Optional Action context | Trusted Git ref that participated in source fingerprint construction. |
+| `trustedContext.revision` | Optional Action context | Trusted Git revision for the cleanup workflow run. |
 
-The command input is intentionally minimal. Pull request number, preview mode, config path,
-repository identity, and source root are entry-workflow concerns that must be normalized into a
-canonical preview source fingerprint before dispatch.
+The cleanup target remains intentionally minimal. Pull request number, preview mode, config path,
+and source root are entry-workflow concerns that must be normalized into a canonical preview source
+fingerprint before dispatch. Action-server entrypoints may additionally send trusted repository
+context so repository-scoped deploy tokens can be checked before command dispatch; project,
+environment, resource, server, and destination cleanup scope is still resolved from source-link
+state, not from client-supplied cleanup target ids.
 
 ## Cleanup Boundary
 
@@ -173,8 +186,8 @@ The command must not:
 | Entrypoint | Contract |
 | --- | --- |
 | CLI | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` derives the preview fingerprint from trusted source/config/preview context, resolves the selected state backend, and dispatches this command. |
-| GitHub Actions | A user-authored `pull_request.closed` workflow may run the same CLI path directly or through a thin wrapper that maps trusted preview inputs to the same CLI command. |
-| API/oRPC | `POST /api/deployments/cleanup-preview` accepts the same command schema for hosted/self-hosted control planes, authorizes Action-server `preview-cleanup` calls with deploy-token scope before command dispatch, and returns the cleanup result. |
+| GitHub Actions | A user-authored `pull_request.closed` workflow may run the same CLI path directly or through a thin wrapper that maps trusted preview inputs and repository context to the same cleanup request. |
+| API/oRPC | `POST /api/deployments/cleanup-preview` accepts the same command schema for hosted/self-hosted control planes, authorizes Action-server `preview-cleanup` calls with deploy-token scope before command dispatch, uses `trustedContext.repositoryFullName` for repository-scoped deploy-token checks, and returns the cleanup result. |
 | Web | Product-grade preview Web deletion uses `preview-environments.delete`, which delegates to the preview cleanup service for one preview environment while preserving deployment history. It does not expose raw `sourceFingerprint` cleanup input. |
 
 ## Error Contract

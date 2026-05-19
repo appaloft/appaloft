@@ -41,6 +41,22 @@ export function nonEmptyTrimmedString(label: string) {
   return z.string().trim().min(1, `${label} is required`);
 }
 
+export const actionDeploymentTrustedContextSchema = z
+  .object({
+    projectId: nonEmptyTrimmedString("Project id").optional(),
+    environmentId: nonEmptyTrimmedString("Environment id").optional(),
+    resourceId: nonEmptyTrimmedString("Resource id").optional(),
+    serverId: nonEmptyTrimmedString("Server id").optional(),
+    destinationId: nonEmptyTrimmedString("Destination id").optional(),
+    repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
+    repositoryId: nonEmptyTrimmedString("Repository id").optional(),
+    ref: nonEmptyTrimmedString("Source ref").optional(),
+    revision: nonEmptyTrimmedString("Source revision").optional(),
+  })
+  .strict();
+
+export type ActionDeploymentTrustedContext = z.output<typeof actionDeploymentTrustedContextSchema>;
+
 export function trimToUndefined(value?: string | null): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
