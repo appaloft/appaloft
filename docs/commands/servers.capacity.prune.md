@@ -59,7 +59,8 @@ The command must:
 6. Ask the runtime target pruner to inspect and optionally prune candidates.
 7. When `dryRun` is `false` and at least one candidate was pruned, record one audit row scoped to
    the server id.
-8. Return bounded diagnostic facts including matched, pruned, skipped, and excluded counts.
+8. Return bounded diagnostic facts including matched, pruned, skipped, excluded, reported,
+   omitted, and estimated reclaimable-byte counts.
 
 ## Safety Rules
 
@@ -74,6 +75,14 @@ The command must:
 - `remote-state-markers` must be explicitly selected and may remove only old files or directories
   under `state/journals/*.json`, `state/backups/*`, `state/recovery/*.json`, and
   `state/locks/recovered/*`.
+- Standalone SSH `ssh-pglite` remains supported. Marker cleanup may remove bounded recovery
+  archives after the recovery window, but it must not delete live `state/pglite`, `state/locks`,
+  `state/source-links`, `state/server-applied-routes`, `state/sync-revision.txt`, or
+  `state/backend.json`.
+- Large dry-runs must keep returned candidate details bounded while still returning complete
+  summary counts and estimated reclaimable bytes.
+- Remote PGlite upload safety backups under `state/backups/sync-*` must remain protected by the
+  configured recovery window before explicit marker cleanup can remove them.
 - The adapter must never run broad `docker system prune`.
 - Unused image pruning must rely on Docker image prune safety rather than direct image id, tag, or
   digest removal.
@@ -122,6 +131,8 @@ At minimum, Code Round coverage must prove:
 - CLI and HTTP/oRPC dispatch use the shared command schema.
 - remote-state marker cleanup is opt-in, dry-run-first, and preserves the state root and live
   `ssh-pglite` data.
+- large marker dry-runs return bounded candidate details plus summary counts and estimated
+  reclaimable bytes.
 
 ## Current Implementation Notes And Governed Follow-Ups
 

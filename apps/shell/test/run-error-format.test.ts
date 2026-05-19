@@ -101,6 +101,7 @@ describe("shell domain error formatting", () => {
       dataRoot: "/var/lib/appaloft/runtime/state",
       localDataRoot: dataRoot,
       localPgliteDataDir: pgliteDir,
+      backupRetentionDays: 7,
       target: {
         host: "203.0.113.10",
         port: 22,

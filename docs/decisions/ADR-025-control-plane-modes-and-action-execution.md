@@ -372,6 +372,12 @@ This decision governs:
 Current implementation has a state backend resolver that treats `APPALOFT_CONTROL_PLANE_URL` or
 `APPALOFT_DATABASE_URL` as a `postgres-control-plane` backend and skips SSH remote PGlite sync.
 That is the scoped CLI state-backend baseline for the current control-plane mode slice.
+SSH standalone mode writes a neutral `server-state-backend/v1` marker under the SSH state root and
+continues to treat remote PGlite/source-links/server-applied-routes as authoritative for
+`ssh-pglite`. Console/Postgres paths may read that marker for compatibility, but must not create a
+remote PGlite mirror or per-deploy remote PGlite backup. A backend marker mismatch returns
+`server_state_backend_mismatch` with reason `SERVER_STATE_BACKEND_MISMATCH`; explicit adopt/migrate
+remains a governed follow-up.
 
 The config parser accepts `controlPlane.mode` and non-secret `controlPlane.url`, rejects identity and
 secret fields under `controlPlane`, and normalizes safe self-hosted URLs.

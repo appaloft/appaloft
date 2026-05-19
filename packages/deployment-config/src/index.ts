@@ -306,6 +306,7 @@ const runtimePruneCategorySchema = z.enum([
   "source-workspaces",
   "docker-build-cache",
   "unused-images",
+  "remote-state-markers",
 ]);
 
 export const appaloftDeploymentRetentionConfigSchema = z

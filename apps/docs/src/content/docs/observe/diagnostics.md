@@ -175,6 +175,12 @@ appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --c
 appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category remote-state-markers
 ```
 
+大型 dry-run 会返回有界候选详情，以及 summary counts 和 estimated reclaimable bytes。对 SSH
+PGlite state 而言，live `pglite`、`locks`、`source-links`、`server-applied-routes` 和
+`sync-revision.txt` 都不是 remote-state marker candidates。`ssh-pglite` 仍然是 standalone
+SSH 的权威 state backend；console/Postgres-managed deploy 不会创建 remote PGlite sync
+backups。`state/backups/sync-*` upload safety backups 会按配置的恢复窗口保留，超过窗口后才可能被显式 marker cleanup 选中。
+
 破坏性 prune 仍然需要 `--dry-run false`。这个命令不会运行 broad `docker system prune`，
 也不会执行 Docker volume prune；它会保留 Appaloft state roots、active runtimes、rollback
 candidates、live remote state、deployment snapshots、audit/events、logs 和业务状态。
@@ -197,7 +203,10 @@ appaloft server capacity policy configure \
 
 policy 默认 enabled，失败后会 retry，并且因为 `--destructive` 默认为 `false`，scheduler 会以
 dry-run 方式运行。只有先通过 dry-run 确认候选项符合预期后，才添加 `--destructive true`。
-Docker build cache 和 unused image 清理仍然必须显式选择 category。
+Docker build cache、unused image 清理和 remote-state markers 仍然必须显式选择 category。
+preview-oriented policy 可以同时覆盖 stopped containers、preview/source workspaces、Docker
+cache、unused images 和 remote-state markers，但默认 category set 不会隐式包含
+remote-state markers。
 
 查看 scheduler 当前能读取的 policy：
 

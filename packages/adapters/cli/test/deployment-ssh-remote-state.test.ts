@@ -51,6 +51,9 @@ describe("CLI SSH remote state lifecycle", () => {
       identityFile: "/home/runner/.ssh/appaloft",
     });
     expect(commands[0]?.command).toContain("mkdir -p");
+    expect(commands[0]?.command).toContain("backend.json");
+    expect(commands[0]?.command).toContain("server-state-backend/v1");
+    expect(commands[0]?.command).toContain("ssh-pglite");
     expect(commands[0]?.command).toContain("schema-version.json");
     expect(commands[0]?.command).toContain("mutation.lock");
     expect(commands[0]?.command).toContain("lastHeartbeatAt");
@@ -74,6 +77,47 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands).toHaveLength(2);
     expect(commands[1]?.command).toContain("rm -rf");
     expect(commands[1]?.command).toContain("mutation.lock");
+  });
+
+  test("[CONFIG-FILE-STATE-015] SSH adapter returns structured backend mismatch", async () => {
+    const lifecycle = new SshRemoteStateLifecycle({
+      dataRoot: "/var/lib/appaloft/runtime/state",
+      target: {
+        host: "203.0.113.10",
+        port: 22,
+        username: "deploy",
+      },
+      heartbeatIntervalMs: null,
+      lockAcquireTimeoutMs: 0,
+      runner: {
+        run: async () => ({
+          exitCode: 77,
+          stdout: "",
+          stderr:
+            '{"phase":"server-state-backend","reason":"SERVER_STATE_BACKEND_MISMATCH","expectedStateBackend":"ssh-pglite","actualStateBackend":"postgres-control-plane"}',
+          failed: true,
+        }),
+      },
+    });
+
+    const prepared = await lifecycle.prepare();
+
+    expect(prepared.isErr()).toBe(true);
+    if (prepared.isOk()) {
+      throw new Error("Expected backend mismatch failure");
+    }
+    expect(prepared.error).toMatchObject({
+      code: "server_state_backend_mismatch",
+      retryable: false,
+      details: {
+        phase: "server-state-backend",
+        reason: "SERVER_STATE_BACKEND_MISMATCH",
+        expectedStateBackend: "ssh-pglite",
+        actualStateBackend: "postgres-control-plane",
+        host: "203.0.113.10",
+        port: "22",
+      },
+    });
   });
 
   test("[CONFIG-FILE-STATE-003] SSH adapter maps remote lock conflicts", async () => {

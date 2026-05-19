@@ -8,6 +8,12 @@ import {
   ok,
   type Result,
 } from "@appaloft/core";
+import {
+  createServerStateBackendMarker,
+  parseServerStateBackendMarker,
+  serverStateBackendMarkerFile,
+  serverStateBackendMismatchError,
+} from "./deployment-state.js";
 
 export interface RemoteStateLifecycleOptions {
   dataRoot: string;
@@ -503,6 +509,11 @@ export class FileSystemRemoteStateLifecycle {
   async prepare(): Promise<Result<RemoteStateSession>> {
     try {
       await this.ensureDirectories();
+      const backendMarker = await this.ensureStateBackendMarker();
+      if (backendMarker.isErr()) {
+        return err(backendMarker.error);
+      }
+
       const lockResult = await this.acquireLockWithRetry();
       if (lockResult.isErr()) {
         return err(lockResult.error);
@@ -566,6 +577,36 @@ export class FileSystemRemoteStateLifecycle {
     for (const directory of stateDirectories) {
       await mkdir(join(this.dataRoot, directory), { recursive: true });
     }
+  }
+
+  private async ensureStateBackendMarker(): Promise<Result<void>> {
+    const markerPath = join(this.dataRoot, serverStateBackendMarkerFile);
+    const rawMarker = await readJsonFile<unknown>(markerPath);
+    const marker =
+      rawMarker === null ? null : parseServerStateBackendMarker(JSON.stringify(rawMarker));
+
+    if (marker && marker.stateBackend !== "ssh-pglite") {
+      return err(
+        serverStateBackendMismatchError({
+          expectedStateBackend: "ssh-pglite",
+          actualStateBackend: marker.stateBackend,
+          phase: "server-state-backend",
+          dataRoot: this.dataRoot,
+        }),
+      );
+    }
+
+    await writeFile(
+      markerPath,
+      jsonStringify(
+        createServerStateBackendMarker({
+          stateBackend: "ssh-pglite",
+          updatedAt: this.now().toISOString(),
+          owner: this.owner,
+        }),
+      ),
+    );
+    return ok(undefined);
   }
 
   private async acquireLockWithRetry(): Promise<Result<void>> {

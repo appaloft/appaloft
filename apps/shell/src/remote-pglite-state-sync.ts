@@ -3,8 +3,11 @@ import { cp, mkdir, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import {
   buildSshRemoteStateProcessArgs,
+  parseServerStateBackendMarker,
   SshRemoteStateLifecycle,
   type SshRemoteStateTarget,
+  serverStateBackendMarkerFile,
+  serverStateBackendMismatchError,
 } from "@appaloft/adapter-cli";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
@@ -14,6 +17,7 @@ export interface RemotePgliteStateSyncPlan {
   dataRoot: string;
   localDataRoot: string;
   localPgliteDataDir: string;
+  backupRetentionDays: number;
   target: SshRemoteStateTarget;
 }
 
@@ -137,6 +141,24 @@ function safeTargetKey(target: SshRemoteStateTarget): string {
     .replace(/^-|-$/g, "");
 }
 
+function sshTargetFromArgv(argv: readonly string[]): SshRemoteStateTarget | null {
+  const host = readOption(argv, "--server-host");
+  if (!host) {
+    return null;
+  }
+
+  const port = normalizePort(readOption(argv, "--server-port"));
+  const username = readOption(argv, "--server-ssh-username");
+  const identityFile = readOption(argv, "--server-ssh-private-key-file");
+
+  return {
+    host,
+    ...(port === undefined ? {} : { port }),
+    ...(username ? { username } : {}),
+    ...(identityFile ? { identityFile } : {}),
+  };
+}
+
 function errorDetails(input: {
   phase: string;
   target: SshRemoteStateTarget;
@@ -209,10 +231,22 @@ function remoteRevisionReadCommand(dataRoot: string): string {
   ].join("; ");
 }
 
+function remoteBackendMarkerReadCommand(dataRoot: string): string {
+  const quotedDataRoot = shellQuote(dataRoot);
+
+  return [
+    `data_root=${quotedDataRoot}`,
+    `backend_marker="$data_root/${serverStateBackendMarkerFile}"`,
+    '[ -f "$backend_marker" ] || exit 0',
+    'cat "$backend_marker"',
+  ].join("; ");
+}
+
 function remoteExtractCommand(input: {
   dataRoot: string;
   expectedRevision: number;
   nextRevision: number;
+  backupRetentionDays: number;
 }): string {
   const quotedDataRoot = shellQuote(input.dataRoot);
 
@@ -220,12 +254,15 @@ function remoteExtractCommand(input: {
     `data_root=${quotedDataRoot}`,
     `expected_revision=${shellQuote(String(input.expectedRevision))}`,
     `next_revision=${shellQuote(String(input.nextRevision))}`,
+    `backup_retention_days=${shellQuote(String(input.backupRetentionDays))}`,
     'backup_dir="$data_root/backups/sync-$(date +%Y%m%d%H%M%S)-$$"',
     'incoming_dir="$data_root/.incoming-sync-$$"',
     'recovery_file="$data_root/recovery/remote-sync-upload.json"',
     'revision_file="$data_root/sync-revision.txt"',
     'restore_backup() { rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes"; [ ! -d "$backup_dir/pglite" ] || cp -a "$backup_dir/pglite" "$data_root/pglite"; [ ! -d "$backup_dir/source-links" ] || cp -a "$backup_dir/source-links" "$data_root/source-links"; [ ! -d "$backup_dir/server-applied-routes" ] || cp -a "$backup_dir/server-applied-routes" "$data_root/server-applied-routes"; }',
     'write_recovery() { printf \'{"phase":"remote-state-sync-upload","backup":"%s"}\\n\' "$backup_dir" > "$recovery_file"; }',
+    'path_mtime_epoch() { date -r "$1" +%s 2>/dev/null || stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf ""; }',
+    'prune_old_sync_backups() { [ -d "$data_root/backups" ] || return 0; now_epoch=$(date +%s); retention_seconds=$((backup_retention_days * 86400)); for candidate in "$data_root"/backups/sync-*; do [ -d "$candidate" ] || continue; [ "$candidate" != "$backup_dir" ] || continue; updated_epoch=$(path_mtime_epoch "$candidate"); [ -n "$updated_epoch" ] || continue; age_seconds=$((now_epoch - updated_epoch)); [ "$age_seconds" -gt "$retention_seconds" ] || continue; rm -rf "$candidate"; done; }',
     'mkdir -p "$data_root" "$data_root/backups" "$data_root/recovery"',
     "current_revision=0",
     'if [ -f "$revision_file" ]; then current_revision="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
@@ -234,7 +271,7 @@ function remoteExtractCommand(input: {
     'rm -rf "$incoming_dir"',
     'mkdir -p "$incoming_dir"',
     'if [ -d "$data_root/pglite" ] || [ -d "$data_root/source-links" ] || [ -d "$data_root/server-applied-routes" ]; then mkdir -p "$backup_dir"; [ ! -d "$data_root/pglite" ] || cp -a "$data_root/pglite" "$backup_dir/pglite"; [ ! -d "$data_root/source-links" ] || cp -a "$data_root/source-links" "$backup_dir/source-links"; [ ! -d "$data_root/server-applied-routes" ] || cp -a "$data_root/server-applied-routes" "$backup_dir/server-applied-routes"; fi',
-    'if tar -xzf - -C "$incoming_dir" && [ -d "$incoming_dir/pglite" ] && [ -d "$incoming_dir/source-links" ] && [ -d "$incoming_dir/server-applied-routes" ] && rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes" && mv "$incoming_dir/pglite" "$data_root/pglite" && mv "$incoming_dir/source-links" "$data_root/source-links" && mv "$incoming_dir/server-applied-routes" "$data_root/server-applied-routes" && printf "%s\\n" "$next_revision" > "$revision_file"; then rm -rf "$incoming_dir"; else status=$?; rm -rf "$incoming_dir"; restore_backup; write_recovery; exit "$status"; fi',
+    'if tar -xzf - -C "$incoming_dir" && [ -d "$incoming_dir/pglite" ] && [ -d "$incoming_dir/source-links" ] && [ -d "$incoming_dir/server-applied-routes" ] && rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes" && mv "$incoming_dir/pglite" "$data_root/pglite" && mv "$incoming_dir/source-links" "$data_root/source-links" && mv "$incoming_dir/server-applied-routes" "$data_root/server-applied-routes" && printf "%s\\n" "$next_revision" > "$revision_file"; then rm -rf "$incoming_dir"; prune_old_sync_backups; else status=$?; rm -rf "$incoming_dir"; restore_backup; write_recovery; exit "$status"; fi',
   ].join("; ");
 }
 
@@ -349,8 +386,8 @@ export function resolveRemotePgliteStateSyncPlan(
     return ok(null);
   }
 
-  const host = readOption(argv, "--server-host");
-  if (!host) {
+  const target = sshTargetFromArgv(argv);
+  if (!target) {
     if (stateBackend === "ssh-pglite") {
       return err(
         domainError.validation("SSH remote PGlite state requires --server-host", {
@@ -363,15 +400,6 @@ export function resolveRemotePgliteStateSyncPlan(
     return ok(null);
   }
 
-  const port = normalizePort(readOption(argv, "--server-port"));
-  const username = readOption(argv, "--server-ssh-username");
-  const identityFile = readOption(argv, "--server-ssh-private-key-file");
-  const target: SshRemoteStateTarget = {
-    host,
-    ...(port === undefined ? {} : { port }),
-    ...(username ? { username } : {}),
-    ...(identityFile ? { identityFile } : {}),
-  };
   const dataRoot = `${config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
   const localPgliteDataDir = resolve(
     env.APPALOFT_PGLITE_DATA_DIR ??
@@ -383,8 +411,77 @@ export function resolveRemotePgliteStateSyncPlan(
     dataRoot,
     localDataRoot,
     localPgliteDataDir,
+    backupRetentionDays: config.remotePgliteSyncBackupRetentionDays,
     target,
   });
+}
+
+function shouldVerifyControlPlaneBackendMarker(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+): boolean {
+  if (!requiresRemotePgliteStateCommand(argv)) {
+    return false;
+  }
+
+  return (
+    readOption(argv, "--state-backend") === "postgres-control-plane" ||
+    Boolean(env.APPALOFT_DATABASE_URL || env.APPALOFT_CONTROL_PLANE_URL)
+  );
+}
+
+async function verifyControlPlaneRemoteStateBackend(input: {
+  argv: readonly string[];
+  env: NodeJS.ProcessEnv;
+  config: AppConfig;
+  runner?: RemotePgliteArchiveRunner;
+}): Promise<Result<void>> {
+  if (!shouldVerifyControlPlaneBackendMarker(input.argv, input.env)) {
+    return ok(undefined);
+  }
+
+  const target = sshTargetFromArgv(input.argv);
+  if (!target) {
+    return ok(undefined);
+  }
+
+  const dataRoot = `${input.config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
+  const runner = input.runner ?? defaultRunner();
+  const remoteMarker = runner.run({
+    command: "ssh",
+    args: [...buildSshRemoteStateProcessArgs(target), remoteBackendMarkerReadCommand(dataRoot)],
+    redactions: target.identityFile ? [target.identityFile] : [],
+  });
+
+  if (remoteMarker.failed) {
+    return err(
+      domainError.infra(
+        "SSH remote state backend marker could not be read",
+        errorDetails({
+          phase: "server-state-backend",
+          target,
+          exitCode: remoteMarker.exitCode,
+          stderr: remoteMarker.stderr,
+        }),
+      ),
+    );
+  }
+
+  const marker = parseServerStateBackendMarker(new TextDecoder().decode(remoteMarker.stdout));
+  if (marker?.stateBackend === "ssh-pglite") {
+    return err(
+      serverStateBackendMismatchError({
+        expectedStateBackend: "postgres-control-plane",
+        actualStateBackend: "ssh-pglite",
+        phase: "server-state-backend",
+        host: target.host,
+        port: target.port ?? 22,
+        dataRoot,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 export class RemotePgliteArchiveSync {
@@ -546,6 +643,7 @@ export class RemotePgliteArchiveSync {
           dataRoot: this.plan.dataRoot,
           expectedRevision,
           nextRevision,
+          backupRetentionDays: this.plan.backupRetentionDays,
         }),
       ],
       stdin: archive.stdout,
@@ -599,7 +697,19 @@ export class RemotePgliteArchiveSync {
 export async function prepareRemotePgliteStateSync(
   input: PrepareRemotePgliteStateSyncInput,
 ): Promise<Result<RemotePgliteStateSyncSession | null>> {
-  const plan = resolveRemotePgliteStateSyncPlan(input.argv, input.env ?? process.env, input.config);
+  const env = input.env ?? process.env;
+  const config = input.config ?? resolveConfig({ env });
+  const controlPlaneBackend = await verifyControlPlaneRemoteStateBackend({
+    argv: input.argv,
+    env,
+    config,
+    ...(input.runner ? { runner: input.runner } : {}),
+  });
+  if (controlPlaneBackend.isErr()) {
+    return err(controlPlaneBackend.error);
+  }
+
+  const plan = resolveRemotePgliteStateSyncPlan(input.argv, env, config);
   if (plan.isErr()) {
     return err(plan.error);
   }
