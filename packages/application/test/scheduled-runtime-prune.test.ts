@@ -619,6 +619,65 @@ describe("scheduled runtime prune", () => {
     });
   });
 
+  test("[RT-CAP-SCHED-008] preview-oriented scheduled policy can explicitly cover remote-state markers", async () => {
+    const commandBus = new RecordingCommandBus(
+      ok(
+        pruneResult({
+          dryRun: false,
+          categories: [
+            "stopped-containers",
+            "preview-workspaces",
+            "source-workspaces",
+            "docker-build-cache",
+            "unused-images",
+            "remote-state-markers",
+          ],
+        }),
+      ),
+    );
+    const service = createService({ commandBus });
+
+    const result = await service.run(
+      createExecutionContext({
+        requestId: "req_scheduled_runtime_prune_preview_policy",
+        entrypoint: "system",
+      }),
+      {
+        policy: {
+          id: "rpp_preview",
+          version: "v1",
+          scope: "project",
+          serverId: "srv_primary",
+          retentionDays: 7,
+          destructive: true,
+          categories: [
+            "stopped-containers",
+            "preview-workspaces",
+            "source-workspaces",
+            "docker-build-cache",
+            "unused-images",
+            "remote-state-markers",
+          ],
+        },
+        scheduledAt: "2026-01-31T00:00:00.000Z",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect((commandBus.commands[0] as PruneServerCapacityCommand).input).toMatchObject({
+      serverId: "srv_primary",
+      dryRun: false,
+      categories: [
+        "stopped-containers",
+        "preview-workspaces",
+        "source-workspaces",
+        "docker-build-cache",
+        "unused-images",
+        "remote-state-markers",
+      ],
+    });
+  });
+
   test("[RT-CAP-SCHED-006] destructive scheduled prune reuses manual prune audit output", async () => {
     const auditRecorder = new MemoryAuditEventRecorder();
     const commandBus = new PruneServerCapacityUseCaseCommandBus(

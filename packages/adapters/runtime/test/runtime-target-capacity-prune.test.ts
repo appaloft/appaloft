@@ -273,6 +273,113 @@ describe("runtime target capacity prune adapter", () => {
     expect(explicitScript).not.toContain("pglite");
   });
 
+  test("[RT-CAP-PRUNE-011] remote-state marker dry-run output is bounded and reports estimated reclaimable bytes", () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-markers-"));
+    const stateRoot = join(runtimeRoot, "state");
+    const backupsRoot = join(stateRoot, "backups");
+    mkdirSync(backupsRoot, { recursive: true });
+    for (let index = 0; index < 205; index += 1) {
+      const marker = join(backupsRoot, `sync-20260101000000-${String(index).padStart(3, "0")}`);
+      mkdirSync(marker, { recursive: true });
+      writeFileSync(join(marker, "backup.txt"), "backup marker\n");
+    }
+
+    try {
+      const script = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["remote-state-markers"],
+        dryRun: true,
+      });
+      const output = Bun.spawnSync(["sh", "-lc", script], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      expect(output.exitCode).toBe(0);
+      const parsed = parseRuntimeTargetCapacityPruneOutput({
+        stdout: output.stdout.toString(),
+        stderr: output.stderr.toString(),
+        server: serverState(),
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["remote-state-markers"],
+        dryRun: true,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+
+      expect(parsed.isOk()).toBe(true);
+      const result = parsed._unsafeUnwrap();
+      expect(result.candidates).toHaveLength(200);
+      expect(result.summary).toMatchObject({
+        inspectedCount: 208,
+        matchedCount: 205,
+        prunedCount: 0,
+        excludedCount: 3,
+        reportedCandidateCount: 200,
+        omittedCandidateCount: 8,
+        outputLimit: 200,
+      });
+      expect(result.summary.reclaimedBytes).toBeGreaterThan(0);
+      expect(result.candidates.every((candidate) => candidate.target.includes("sync-"))).toBe(true);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[RT-CAP-REMOTE-STATE-002] remote-state marker prune preserves live standalone PGlite state", () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-live-state-"));
+    const stateRoot = join(runtimeRoot, "state");
+    const backupRoot = join(stateRoot, "backups", "sync-20260101000000-old");
+    const pgliteRoot = join(stateRoot, "pglite");
+    const sourceLinksRoot = join(stateRoot, "source-links");
+    const routesRoot = join(stateRoot, "server-applied-routes");
+
+    mkdirSync(backupRoot, { recursive: true });
+    mkdirSync(pgliteRoot, { recursive: true });
+    mkdirSync(sourceLinksRoot, { recursive: true });
+    mkdirSync(routesRoot, { recursive: true });
+    writeFileSync(join(backupRoot, "backup.txt"), "old sync backup\n");
+    writeFileSync(join(pgliteRoot, "live.txt"), "standalone ssh pglite state\n");
+    writeFileSync(join(sourceLinksRoot, "link.json"), "{}\n");
+    writeFileSync(join(routesRoot, "route.json"), "{}\n");
+    writeFileSync(join(stateRoot, "sync-revision.txt"), "7\n");
+
+    try {
+      const script = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["remote-state-markers"],
+        dryRun: false,
+      });
+      const output = Bun.spawnSync(["sh", "-lc", script], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      expect(output.exitCode).toBe(0);
+      const parsed = parseRuntimeTargetCapacityPruneOutput({
+        stdout: output.stdout.toString(),
+        stderr: output.stderr.toString(),
+        server: serverState(),
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["remote-state-markers"],
+        dryRun: false,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+
+      expect(parsed.isOk()).toBe(true);
+      expect(existsSync(backupRoot)).toBe(false);
+      expect(readFileSync(join(pgliteRoot, "live.txt"), "utf8")).toBe(
+        "standalone ssh pglite state\n",
+      );
+      expect(readFileSync(join(sourceLinksRoot, "link.json"), "utf8")).toBe("{}\n");
+      expect(readFileSync(join(routesRoot, "route.json"), "utf8")).toBe("{}\n");
+      expect(readFileSync(join(stateRoot, "sync-revision.txt"), "utf8")).toBe("7\n");
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   if (!localCapacityPruneEnabled) {
     test.skip("[RT-CAP-PRUNE-008] local explicit real local target prune requires APPALOFT_E2E_CAPACITY_PRUNE_LOCAL=true", () => {});
   } else {

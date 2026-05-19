@@ -66,6 +66,7 @@ environments，或已经记录为 retry-scheduled 的 cleanup attempts。
 | `APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS` | `3600` | `terminal-session expire` 未传明确 cutoff 时使用的、会随输入/resize/输出刷新的 active terminal session 年龄上限。 |
 | `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | `65536` | active terminal transport 重连时只在内存中回放的有界终端输出尾部；设为 `0` 可关闭回放。 |
 | `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` | retained monitoring raw samples 的默认保留小时数。 |
+| `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | `7` | SSH remote PGlite `state/backups/sync-*` upload backups 的恢复窗口。 |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED` | `false` | 扫描已过期且仍 active 的 preview environments，并通过 preview cleanup 边界发起清理。 |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS` | `300` | expired preview cleanup scan 轮询间隔。 |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE` | `25` | 每次 tick 最多扫描的 expired active preview environments。 |

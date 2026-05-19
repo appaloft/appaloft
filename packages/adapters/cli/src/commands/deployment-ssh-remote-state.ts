@@ -3,6 +3,11 @@ import { resolvePublicDocsErrorKnowledge } from "@appaloft/docs-registry";
 import { type RemoteStateSession } from "./deployment-remote-state.js";
 import {
   type DeploymentStateBackendDecision,
+  isDeploymentStateBackendKind,
+  serverStateBackendMarkerFile,
+  serverStateBackendMarkerSchemaVersion,
+  serverStateBackendMismatchError,
+  serverStateBackendMismatchReason,
   type TrustedSshTargetInput,
 } from "./deployment-state.js";
 
@@ -56,6 +61,7 @@ const defaultLockRetryIntervalMs = 1_000;
 const lockConflictExitCode = 73;
 const migrationFailureExitCode = 74;
 const lockOwnershipExitCode = 75;
+const stateBackendMismatchExitCode = 77;
 
 interface RemoteStateLockMetadata {
   owner?: string;
@@ -103,6 +109,26 @@ function parseLockMetadata(stderr: string): RemoteStateLockMetadata | null {
   try {
     const parsed = JSON.parse(trimmedValue) as RemoteStateLockMetadata;
     return typeof parsed === "object" && parsed !== null ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseStateBackendMismatch(stderr: string): {
+  actualStateBackend?: DeploymentStateBackendDecision["kind"];
+} | null {
+  const trimmedValue = stderr.trim();
+  if (!trimmedValue.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedValue) as { actualStateBackend?: unknown };
+    return {
+      ...(isDeploymentStateBackendKind(parsed.actualStateBackend)
+        ? { actualStateBackend: parsed.actualStateBackend }
+        : {}),
+    };
   } catch {
     return null;
   }
@@ -173,6 +199,16 @@ function remotePrepareCommand(input: {
     'stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"',
     'mkdir -p "$data_root"',
     'mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"',
+    `backend_marker="$data_root/${serverStateBackendMarkerFile}"`,
+    'actual_backend=""',
+    'if [ -f "$backend_marker" ]; then',
+    '  actual_backend="$(sed -n \'s/.*"stateBackend"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$backend_marker" | head -n 1 || true)"',
+    "fi",
+    'if [ -n "$actual_backend" ] && [ "$actual_backend" != "ssh-pglite" ]; then',
+    `  printf '{"phase":"server-state-backend","reason":${jsonString(serverStateBackendMismatchReason)},"expectedStateBackend":"ssh-pglite","actualStateBackend":"%s"}\\n' "$actual_backend" >&2`,
+    `  exit ${stateBackendMismatchExitCode}`,
+    "fi",
+    `printf '{"schemaVersion":${jsonString(serverStateBackendMarkerSchemaVersion)},"stateBackend":"ssh-pglite","updatedAt":"%s","owner":%s}\\n' "$now" ${shellQuote(jsonString(input.owner))} > "$backend_marker"`,
     'lock_dir="$data_root/locks/mutation.lock"',
     'owner_file="$lock_dir/owner.json"',
     'if ! mkdir "$lock_dir"; then',
@@ -308,6 +344,10 @@ function phaseForPrepareFailure(result: SshRemoteCommandResult): string {
 
   if (result.exitCode === migrationFailureExitCode) {
     return "remote-state-migration";
+  }
+
+  if (result.exitCode === stateBackendMismatchExitCode) {
+    return "server-state-backend";
   }
 
   return "remote-state-resolution";
@@ -531,6 +571,20 @@ export class SshRemoteStateLifecycle {
       }
 
       const phase = phaseForPrepareFailure(result);
+      if (phase === "server-state-backend") {
+        const mismatch = parseStateBackendMismatch(result.stderr);
+        return err(
+          serverStateBackendMismatchError({
+            expectedStateBackend: "ssh-pglite",
+            actualStateBackend: mismatch?.actualStateBackend ?? "postgres-control-plane",
+            phase,
+            host: this.target.host,
+            port: normalizePort(this.target.port),
+            dataRoot: this.dataRoot,
+          }),
+        );
+      }
+
       const error =
         phase === "remote-state-lock"
           ? remoteStateLockError("SSH remote state mutation lock is already held", {

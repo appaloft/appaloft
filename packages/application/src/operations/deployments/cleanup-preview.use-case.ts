@@ -85,6 +85,12 @@ function deploymentSourceFingerprint(summary: DeploymentSummary): string | undef
   return metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"];
 }
 
+function deploymentRuntimeSourceFingerprint(deployment: Deployment): string | undefined {
+  const metadata = deployment.toState().runtimePlan.execution.metadata ?? {};
+
+  return metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"];
+}
+
 function cleanupStageFromError(error: DomainError, fallback: string): string {
   const cleanupStage = error.details?.cleanupStage;
   return typeof cleanupStage === "string" ? cleanupStage : fallback;
@@ -230,7 +236,13 @@ export class CleanupPreviewUseCase {
           const runtimeCleanupCandidates = new Map<string, Deployment>();
 
           if (latestDeployment) {
-            runtimeCleanupCandidates.set(latestDeployment.toState().id.value, latestDeployment);
+            const latestSourceFingerprint = deploymentRuntimeSourceFingerprint(latestDeployment);
+            if (
+              latestSourceFingerprint === input.sourceFingerprint ||
+              latestSourceFingerprint === undefined
+            ) {
+              runtimeCleanupCandidates.set(latestDeployment.toState().id.value, latestDeployment);
+            }
           }
 
           const previewDeployments = yield* await listProjectDeployments(repositoryContext, {

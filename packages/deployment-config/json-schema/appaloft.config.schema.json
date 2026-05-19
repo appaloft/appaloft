@@ -281,7 +281,8 @@
                   "preview-workspaces",
                   "source-workspaces",
                   "docker-build-cache",
-                  "unused-images"
+                  "unused-images",
+                  "remote-state-markers"
                 ]
               }
             },

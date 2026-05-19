@@ -698,4 +698,92 @@ describe("CleanupPreviewUseCase", () => {
     expect(routeRepository.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
     expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
   });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-007] skips the latest live deployment when closing an older preview", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      destinationId: "dst_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository(ok(true), ok(1));
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel([
+      createDeploymentSummary({
+        deploymentId: "dep_preview_old",
+        planId: "plan_preview_old",
+        createdAt: "2026-04-20T23:00:00.000Z",
+        generatedAt: "2026-04-20T23:00:00.000Z",
+        metadata: {
+          "access.sourceFingerprint": previewSourceFingerprint,
+          "preview.id": "pr-14",
+          "preview.mode": "pull-request",
+        },
+      }),
+    ]);
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_preserve_live",
+    });
+    const liveDeployment = createSucceededDeployment({
+      deploymentId: "dep_live_current",
+      planId: "plan_live_current",
+      generatedAt: "2026-04-21T00:10:00.000Z",
+      domain: "www.example.com",
+      metadata: {
+        "access.routeSource": "server-applied-config-domain",
+        "access.sourceFingerprint":
+          "source-fingerprint:v1:branch%3Amain:github:repo:.:appaloft.yml",
+      },
+    });
+    const oldPreviewDeployment = createSucceededDeployment({
+      deploymentId: "dep_preview_old",
+      planId: "plan_preview_old",
+      createdAt: "2026-04-20T23:00:00.000Z",
+      generatedAt: "2026-04-20T23:00:00.000Z",
+      metadata: {
+        "access.sourceFingerprint": previewSourceFingerprint,
+        "preview.id": "pr-14",
+        "preview.mode": "pull-request",
+      },
+    });
+    await deployments.insertOne(
+      toRepositoryContext(context),
+      oldPreviewDeployment,
+      UpsertDeploymentSpec.fromDeployment(oldPreviewDeployment),
+    );
+    await deployments.insertOne(
+      toRepositoryContext(context),
+      liveDeployment,
+      UpsertDeploymentSpec.fromDeployment(liveDeployment),
+    );
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceFingerprint: previewSourceFingerprint,
+      status: "cleaned",
+      cleanedRuntime: true,
+      removedServerAppliedRoute: true,
+      removedSourceLink: true,
+      deploymentId: "dep_preview_old",
+    });
+    expect(executionBackend.canceledDeploymentIds).toEqual(["dep_preview_old"]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
 });

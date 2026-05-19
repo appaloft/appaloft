@@ -181,6 +181,14 @@ Old SSH remote-state marker archives are also explicit opt-in:
 appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --category remote-state-markers
 ```
 
+Large dry-runs return bounded candidate details plus summary counts and estimated reclaimable
+bytes. For SSH PGlite state, live `pglite`, `locks`, `source-links`, `server-applied-routes`, and
+`sync-revision.txt` are not remote-state marker candidates. The `ssh-pglite` backend remains the
+authoritative standalone SSH state mode; console/Postgres-managed deploys do not create remote
+PGlite sync backups. Upload safety backups under
+`state/backups/sync-*` are retained for the configured recovery window before they become eligible
+for explicit marker cleanup.
+
 Destructive prune still requires `--dry-run false`. Appaloft never runs broad `docker system prune`
 or Docker volume prune from this command, and it preserves Appaloft state roots, active runtimes,
 live remote state, rollback candidates, deployment snapshots, audit/events, logs, and business
@@ -205,7 +213,10 @@ appaloft server capacity policy configure \
 
 The default policy is enabled, retries on failure, and runs as dry-run because `--destructive`
 defaults to `false`. Add `--destructive true` only after a dry-run has shown the expected
-candidates. Docker build cache and unused image cleanup remain explicit categories.
+candidates. Docker build cache, unused image cleanup, and remote-state markers remain explicit
+categories. A preview-oriented policy can include stopped containers, preview/source workspaces,
+Docker cache, unused images, and remote-state markers, but remote-state markers are never implied by
+the default category set.
 
 List configured policies when checking what the scheduler can read:
 

@@ -39,6 +39,9 @@ audit rows, or accept scheduled work.
   private key material, provider responses, or environment values.
 - Destructive scheduled prune remains opt-in through `destructive = true`.
 - Category values must reuse the `servers.capacity.prune` category schema.
+- `remote-state-markers` is allowed only by explicit category selection; it is not implied by the
+  default policy category set. Preview-oriented policies may explicitly include stopped containers,
+  preview/source workspaces, Docker cache, unused images, and remote-state markers together.
 - Policy readback is available through `scheduled-runtime-prune-policies.show` and
   `scheduled-runtime-prune-policies.list`.
 - Repository deployment config may carry `retention.runtimePrune`; deployment config bootstrap

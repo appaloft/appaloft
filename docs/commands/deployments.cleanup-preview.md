@@ -158,6 +158,10 @@ The command must not:
   unused preview images, build cache, and materialized source workspaces that are not referenced by
   active runtime, retained rollback candidates, diagnostic capture, Docker volumes, or remote
   Appaloft state.
+- Preview cleanup must not delete standalone SSH `ssh-pglite` live state, including `state/pglite`,
+  locks, source links for other fingerprints, server-applied routes for other fingerprints,
+  `sync-revision.txt`, or the backend marker. Console/Postgres-managed cleanup must not create a
+  remote PGlite backup as a side effect.
 - Inability to prove or complete inert artifact cleanup must be surfaced as
   `cleanedArtifacts = false` or a future diagnostic warning, but must not keep preview routes or
   source links live after runtime cleanup succeeded.
@@ -179,6 +183,7 @@ The command must not:
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Source fingerprint is missing or malformed. |
 | `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical preview-lifecycle coordination scope within the bounded wait window. |
+| `server_state_backend_mismatch` | `server-state-backend` | No | The selected state backend conflicts with the server backend marker; explicit adopt/migrate is required before switching between `ssh-pglite` and `postgres-control-plane`. |
 | `infra_error` | `preview-cleanup` | Conditional | State backend read/write, route-state deletion, source-link unlink, or runtime cleanup failed. |
 | `provider_error` | `preview-cleanup` | Conditional | Runtime backend/provider rejected preview runtime cleanup. |
 | `runtime_target_resource_exhausted` | `preview-cleanup` | Yes after cleanup, prune, or target resize | Target disk, inode, Docker image, or build-cache capacity prevented safe runtime/artifact cleanup or inspection. Details should include `cleanupStage = artifact-cleanup` when available. |

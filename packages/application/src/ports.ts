@@ -2111,6 +2111,9 @@ export interface RuntimeTargetCapacityPruneSummary {
   skippedCount: number;
   excludedCount: number;
   reclaimedBytes: number;
+  reportedCandidateCount?: number;
+  omittedCandidateCount?: number;
+  outputLimit?: number;
 }
 
 export interface RuntimeTargetCapacityPruneResult {
@@ -7806,7 +7809,8 @@ export type DeploymentConfiguredRuntimePruneCategory =
   | "preview-workspaces"
   | "source-workspaces"
   | "docker-build-cache"
-  | "unused-images";
+  | "unused-images"
+  | "remote-state-markers";
 
 export interface DeploymentConfiguredRuntimePrunePolicy {
   retentionDays: number;

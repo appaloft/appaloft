@@ -29,7 +29,14 @@ describe("Appaloft deployment config schema", () => {
         runtimePrune: {
           retentionDays: 14,
           destructive: true,
-          categories: ["stopped-containers", "preview-workspaces"],
+          categories: [
+            "stopped-containers",
+            "preview-workspaces",
+            "source-workspaces",
+            "docker-build-cache",
+            "unused-images",
+            "remote-state-markers",
+          ],
           retryOnFailure: false,
           enabled: true,
         },
@@ -60,7 +67,14 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.retention?.runtimePrune).toEqual({
         retentionDays: 14,
         destructive: true,
-        categories: ["stopped-containers", "preview-workspaces"],
+        categories: [
+          "stopped-containers",
+          "preview-workspaces",
+          "source-workspaces",
+          "docker-build-cache",
+          "unused-images",
+          "remote-state-markers",
+        ],
         retryOnFailure: false,
         enabled: true,
       });
