@@ -62,6 +62,7 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-009 | integration | Closed preview cleanup does not stop a newer live deployment | A preview source link still points at a resource whose latest deployment no longer carries the preview fingerprint, while older preview deployments still carry the closed preview fingerprint | Cleanup skips the newer live deployment, cleans only deployments carrying the preview fingerprint, then removes preview route/source-link state idempotently | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-010 | integration | Preview cleanup preserves standalone SSH live state | Cleanup runs for a closed preview on a server whose selected backend is `ssh-pglite` | Cleanup may remove preview-owned runtime, route, and selected source-link state, but it does not delete live `pglite`, locks, unrelated source links/routes, `sync-revision.txt`, or backend marker files | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001 | HTTP/oRPC | HTTP preview cleanup dispatches command | `POST /api/deployments/cleanup-preview` receives a preview-scoped source fingerprint | HTTP returns `202` with cleanup result and dispatches `CleanupPreviewCommand` with the same source fingerprint | Domain error mapped through standard HTTP/oRPC error contract |
+| DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-002 | HTTP/oRPC | Action preview cleanup carries trusted repository scope | `POST /api/deployments/cleanup-preview` is marked with `x-appaloft-action-command: preview-cleanup` and the deploy token is repository-scoped | HTTP passes `trustedContext.repositoryFullName` to deploy-token authorization before dispatch; missing or mismatched repository context is rejected before command dispatch | `action_auth_forbidden`, phase `action-authorization`, reason `scope_value_missing` or `scope_value_not_allowed` |
 
 ## CLI Matrix
 
@@ -82,7 +83,7 @@ coverage in `packages/application/test/cleanup-preview.test.ts`.
 `DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001` has CLI integration coverage in
 `packages/adapters/cli/test/preview-command.test.ts`.
 
-`DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001` has HTTP/oRPC coverage in
+`DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001` and `DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-002` have HTTP/oRPC coverage in
 `packages/orpc/test/deployment-create.http.test.ts`.
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-006` currently relies on the shared shell-level SSH mirror coverage in

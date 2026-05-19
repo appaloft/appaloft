@@ -1,20 +1,6 @@
 import { z } from "zod";
 
-import { nonEmptyTrimmedString } from "../shared-schema";
-
-const actionDeploymentTrustedContextSchema = z
-  .object({
-    projectId: nonEmptyTrimmedString("Project id").optional(),
-    environmentId: nonEmptyTrimmedString("Environment id").optional(),
-    resourceId: nonEmptyTrimmedString("Resource id").optional(),
-    serverId: nonEmptyTrimmedString("Server id").optional(),
-    destinationId: nonEmptyTrimmedString("Destination id").optional(),
-    repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
-    repositoryId: nonEmptyTrimmedString("Repository id").optional(),
-    ref: nonEmptyTrimmedString("Source ref").optional(),
-    revision: nonEmptyTrimmedString("Source revision").optional(),
-  })
-  .strict();
+import { actionDeploymentTrustedContextSchema, nonEmptyTrimmedString } from "../shared-schema";
 
 const actionDeployTokenResolvedScopeSchema = z
   .object({
