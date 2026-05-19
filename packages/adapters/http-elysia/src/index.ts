@@ -218,6 +218,25 @@ function appendVaryHeader(headers: MutableHeaders, value: string): void {
   }
 }
 
+function appendCsvHeader(headers: MutableHeaders, name: string, values: string[]): void {
+  const existingKey = Object.keys(headers).find((key) => key.toLowerCase() === name.toLowerCase());
+  const current = existingKey ? headers[existingKey] : undefined;
+  const currentValues = (current ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const normalized = new Set(currentValues.map((entry) => entry.toLowerCase()));
+
+  for (const value of values) {
+    if (!normalized.has(value.toLowerCase())) {
+      currentValues.push(value);
+      normalized.add(value.toLowerCase());
+    }
+  }
+
+  headers[existingKey ?? name] = currentValues.join(", ");
+}
+
 function readHeader(headers: MutableHeaders, name: string): string | undefined {
   const normalizedName = name.toLowerCase();
   const match = Object.entries(headers).find(([key]) => key.toLowerCase() === normalizedName);
@@ -414,6 +433,7 @@ function applyCorsHeaders(
   headers["access-control-allow-methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
   headers["access-control-allow-headers"] =
     request.headers.get("access-control-request-headers") ?? "content-type, authorization";
+  appendCsvHeader(headers, "access-control-expose-headers", ["traceparent", "Link"]);
   appendVaryHeader(headers, "Origin");
   appendVaryHeader(headers, "Access-Control-Request-Headers");
 }

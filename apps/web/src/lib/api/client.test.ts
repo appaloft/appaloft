@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { readErrorMessage, request } from "./client";
+import { readErrorMessage, request, requestWithMetadata } from "./client";
 
 describe("api client helpers", () => {
   afterEach(() => {
@@ -29,6 +29,31 @@ describe("api client helpers", () => {
       status: "ok",
       service: "appaloft",
     });
+  });
+
+  test("returns trace metadata from API response headers", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ id: "dep_demo" }), {
+        headers: {
+          link: '<https://assets.example/preload>; rel="preload", <http://jaeger/trace/abc>; rel="trace"',
+          traceparent: "00-abc00000000000000000000000000000-def0000000000000-01",
+        },
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const metadataSpy = vi.fn();
+    const result = await requestWithMetadata<{ id: string }>("/api/deployments", undefined, {
+      onMetadata: metadataSpy,
+    });
+
+    expect(result.data).toEqual({ id: "dep_demo" });
+    expect(result.metadata.trace).toEqual({
+      traceLink: "http://jaeger/trace/abc",
+      traceparent: "00-abc00000000000000000000000000000-def0000000000000-01",
+    });
+    expect(metadataSpy).toHaveBeenCalledWith(result.metadata);
   });
 
   test("extracts readable request errors", async () => {

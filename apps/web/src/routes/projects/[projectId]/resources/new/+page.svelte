@@ -133,6 +133,7 @@
   let deploymentProgressDeploymentId = $state("");
   let deploymentProgressResourceId = $state("");
   let deploymentProgressRequestId = $state("");
+  let deploymentProgressTraceLink = $state("");
   let feedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -221,6 +222,7 @@
     deploymentProgressDeploymentId = "";
     deploymentProgressResourceId = "";
     deploymentProgressRequestId = "";
+    deploymentProgressTraceLink = "";
 
     let createdResourceId = "";
 
@@ -259,6 +261,9 @@
           },
           onStreamError: (message) => {
             deploymentProgressStreamError = message;
+          },
+          onTraceLink: (traceLink) => {
+            deploymentProgressTraceLink = traceLink;
           },
         },
       );
@@ -1185,6 +1190,7 @@
   streamError={deploymentProgressStreamError}
   deploymentId={deploymentProgressDeploymentId}
   requestId={deploymentProgressRequestId}
+  traceLink={deploymentProgressTraceLink}
   title={$t(i18nKeys.console.deployments.progressTitle)}
   description={$t(i18nKeys.console.deployments.progressDescription)}
   onClose={() => {

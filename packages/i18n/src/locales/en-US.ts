@@ -388,6 +388,8 @@ export const enUS = {
       progressStreamDisconnected:
         "The deployment progress connection was interrupted. The deployment request may still be running in the background.",
       progressTitle: "Deployment progress",
+      progressTraceAction: "Open trace",
+      progressTraceLabel: "trace",
       progressWaiting: "Waiting for deployment progress...",
       records: "Deployment records",
       recoveryAvailable: "Available",

@@ -442,6 +442,10 @@ account identity must never come from committed config.
 | `console-image` | config or `ghcr.io/appaloft/appaloft` | Appaloft console image repository or full image reference passed to the self-hosted console installer. |
 | `console-installer-url` | empty | Override URL for the self-hosted `install.sh` used by `command: install-console`. |
 | `console-skip-docker-install` | `false` | Require Docker Engine to already exist on the SSH host during `command: install-console`. |
+| `console-trace` | config or `none` | Optional trace collector for `command: install-console`; `none` or `jaeger`. |
+| `console-jaeger-image` | empty | Jaeger all-in-one image passed to the installer when `console-trace` is `jaeger`. |
+| `console-jaeger-ui-host` | empty | Jaeger UI bind host passed to the installer when `console-trace` is `jaeger`. |
+| `console-jaeger-ui-port` | empty | Jaeger UI host port passed to the installer when `console-trace` is `jaeger`. |
 | `server-provider` | `generic-ssh` | Server provider key for pure SSH deployments. |
 | `server-proxy-kind` | empty | Server proxy kind such as `traefik` or `caddy`. |
 | `state-backend` | empty | Explicit state backend. SSH targets default to `ssh-pglite`. |

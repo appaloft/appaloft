@@ -52,6 +52,15 @@ test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow exposes Docker orchest
   expect(workflow).toContain(`console-swarm-init: ${expression("inputs.swarm_init")}`);
 });
 
+test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow exposes optional Jaeger tracing", () => {
+  expect(workflow).toContain("trace:");
+  expect(workflow).toContain("Optional trace collector to install with the console.");
+  expect(workflow).toContain("- jaeger");
+  expect(workflow).toContain(`console-trace: ${expression("inputs.trace")}`);
+  expect(workflow).toContain(`console-jaeger-ui-host: ${expression("inputs.jaeger_ui_host")}`);
+  expect(workflow).toContain(`console-jaeger-ui-port: ${expression("inputs.jaeger_ui_port")}`);
+});
+
 test("[CONTROL-PLANE-INSTALL-002] deploy-console workflow keeps secrets out of repository config", () => {
   expect(workflow).not.toContain("APPALOFT_POSTGRES_PASSWORD");
   expect(workflow).not.toContain("APPALOFT_DATABASE_URL");

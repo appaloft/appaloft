@@ -213,6 +213,7 @@ describe("deployment progress helpers", () => {
     );
 
     const progressEvents: DeploymentProgressEvent[] = [];
+    const traceLinkSpy = vi.fn();
     const input: CreateDeploymentInput = {
       projectId: "prj_demo",
       environmentId: "env_demo",
@@ -220,9 +221,15 @@ describe("deployment progress helpers", () => {
       serverId: "srv_demo",
     };
 
-    const resultPromise = createDeploymentWithProgress(input, (event) => {
-      progressEvents.push(event);
-    });
+    const resultPromise = createDeploymentWithProgress(
+      input,
+      (event) => {
+        progressEvents.push(event);
+      },
+      {
+        onTraceLink: traceLinkSpy,
+      },
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(MockEventSource.instances).toHaveLength(1);
@@ -250,10 +257,16 @@ describe("deployment progress helpers", () => {
         JSON.stringify({
           id: "dep_demo",
         }),
+        {
+          headers: {
+            link: '<http://localhost:16686/trace/abc123>; rel="trace"',
+          },
+        },
       ),
     );
 
     await expect(resultPromise).resolves.toEqual({ id: "dep_demo" });
+    expect(traceLinkSpy).toHaveBeenCalledWith("http://localhost:16686/trace/abc123");
 
     expect(eventsMock).toHaveBeenCalledWith({
       deploymentId: "dep_demo",

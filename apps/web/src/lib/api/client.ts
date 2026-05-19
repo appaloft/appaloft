@@ -27,7 +27,49 @@ export function buildApiUrl(path: string): string {
   return `${API_BASE}${normalizedPath}`;
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export type ApiTraceMetadata = {
+  traceLink?: string;
+  traceparent?: string;
+};
+
+export type ApiResponseMetadata = {
+  trace: ApiTraceMetadata;
+};
+
+export function readTraceLinkHeader(linkHeader: string | null): string | undefined {
+  if (!linkHeader) {
+    return undefined;
+  }
+
+  for (const match of linkHeader.matchAll(/<([^>]+)>\s*(?:;\s*[^,]*)*;\s*rel="?trace"?/gi)) {
+    const url = match[1]?.trim();
+    if (url) {
+      return url;
+    }
+  }
+
+  return undefined;
+}
+
+export function readApiResponseMetadata(response: Response): ApiResponseMetadata {
+  const traceLink = readTraceLinkHeader(response.headers.get("link"));
+  const traceparent = response.headers.get("traceparent") ?? undefined;
+
+  return {
+    trace: {
+      ...(traceLink ? { traceLink } : {}),
+      ...(traceparent ? { traceparent } : {}),
+    },
+  };
+}
+
+export async function requestWithMetadata<T>(
+  path: string,
+  init?: RequestInit,
+  options: {
+    onMetadata?: (metadata: ApiResponseMetadata) => void;
+  } = {},
+): Promise<{ data: T; metadata: ApiResponseMetadata }> {
   const headers = new Headers(init?.headers);
   for (const [key, value] of Object.entries(localeHeaders())) {
     headers.set(key, value);
@@ -37,6 +79,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers,
   });
+  const metadata = readApiResponseMetadata(response);
+  options.onMetadata?.(metadata);
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -56,10 +100,16 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (response.status === 204) {
-    return null as T;
+    return { data: null as T, metadata };
   }
 
-  return (await response.json()) as T;
+  return { data: (await response.json()) as T, metadata };
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data } = await requestWithMetadata<T>(path, init);
+
+  return data;
 }
 
 export function readErrorMessage(error: unknown): string {

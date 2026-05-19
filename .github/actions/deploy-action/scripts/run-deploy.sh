@@ -725,6 +725,12 @@ append_step_summary() {
     if [ "$wrapper_command" = "install-console" ] && [ -n "${console_proxy:-}" ]; then
       printf -- '- Proxy: `%s`\n' "$console_proxy"
     fi
+    if [ "$wrapper_command" = "install-console" ] && [ "${console_trace:-none}" != "none" ]; then
+      printf -- '- Trace: `%s`\n' "$console_trace"
+      if [ "$console_trace" = "jaeger" ] && [ -n "${console_jaeger_ui_port:-}" ]; then
+        printf -- '- Jaeger UI: `http://%s:%s`\n' "${console_jaeger_ui_host:-127.0.0.1}" "$console_jaeger_ui_port"
+      fi
+    fi
     if [ -n "${deployment_id:-}" ]; then
       if [ -n "${deployment_url:-}" ]; then
         printf -- '- Deployment: [%s](%s)\n' "$deployment_id" "$deployment_url"
@@ -799,6 +805,30 @@ validate_console_install_inputs() {
       fi
       ;;
   esac
+
+  case "$console_trace" in
+    ""|none|jaeger)
+      ;;
+    *)
+      error "console-trace must be none or jaeger"
+      exit 1
+      ;;
+  esac
+
+  if [ -n "$console_jaeger_ui_port" ]; then
+    case "$console_jaeger_ui_port" in
+      ''|*[!0-9]*)
+        error "console-jaeger-ui-port must be a positive integer"
+        exit 1
+        ;;
+      *)
+        if [ "$console_jaeger_ui_port" -le 0 ]; then
+          error "console-jaeger-ui-port must be a positive integer"
+          exit 1
+        fi
+        ;;
+    esac
+  fi
 }
 
 run_console_install() {
@@ -855,6 +885,18 @@ run_console_install() {
   fi
   if truthy "$console_skip_docker_install"; then
     install_args="$install_args --skip-docker-install"
+  fi
+  if [ -n "$console_trace" ] && [ "$console_trace" != "none" ]; then
+    install_args="$install_args --trace $(shell_quote "$console_trace")"
+  fi
+  if [ "$console_trace" = "jaeger" ] && [ -n "$console_jaeger_image" ]; then
+    install_args="$install_args --jaeger-image $(shell_quote "$console_jaeger_image")"
+  fi
+  if [ "$console_trace" = "jaeger" ] && [ -n "$console_jaeger_ui_host" ]; then
+    install_args="$install_args --jaeger-ui-host $(shell_quote "$console_jaeger_ui_host")"
+  fi
+  if [ "$console_trace" = "jaeger" ] && [ -n "$console_jaeger_ui_port" ]; then
+    install_args="$install_args --jaeger-ui-port $(shell_quote "$console_jaeger_ui_port")"
   fi
 
   if truthy "${APPALOFT_DEPLOY_ACTION_DRY_RUN:-false}"; then
@@ -1063,6 +1105,10 @@ console_swarm_advertise_addr="${INPUT_CONSOLE_SWARM_ADVERTISE_ADDR:-}"
 console_image="${INPUT_CONSOLE_IMAGE:-}"
 console_installer_url="${INPUT_CONSOLE_INSTALLER_URL:-}"
 console_skip_docker_install="${INPUT_CONSOLE_SKIP_DOCKER_INSTALL:-}"
+console_trace="${INPUT_CONSOLE_TRACE:-}"
+console_jaeger_image="${INPUT_CONSOLE_JAEGER_IMAGE:-}"
+console_jaeger_ui_host="${INPUT_CONSOLE_JAEGER_UI_HOST:-}"
+console_jaeger_ui_port="${INPUT_CONSOLE_JAEGER_UI_PORT:-}"
 state_backend="${INPUT_STATE_BACKEND:-}"
 environment_variables="${INPUT_ENVIRONMENT_VARIABLES:-}"
 secret_variables="${INPUT_SECRET_VARIABLES:-}"
@@ -1110,6 +1156,10 @@ if [ -n "$selected_config_path" ] && [ -f "$selected_config_path" ]; then
   config_console_image="$(read_control_plane_install_value "$selected_config_path" image)"
   config_console_installer_url="$(read_control_plane_install_value "$selected_config_path" installerUrl)"
   config_console_skip_docker_install="$(read_control_plane_install_value "$selected_config_path" skipDockerInstall)"
+  config_console_trace="$(read_control_plane_install_value "$selected_config_path" trace)"
+  config_console_jaeger_image="$(read_control_plane_install_value "$selected_config_path" jaegerImage)"
+  config_console_jaeger_ui_host="$(read_control_plane_install_value "$selected_config_path" jaegerUiHost)"
+  config_console_jaeger_ui_port="$(read_control_plane_install_value "$selected_config_path" jaegerUiPort)"
   config_project_id="$(read_control_plane_deployment_context_value "$selected_config_path" projectId)"
   config_environment_id="$(read_control_plane_deployment_context_value "$selected_config_path" environmentId)"
   config_resource_id="$(read_control_plane_deployment_context_value "$selected_config_path" resourceId)"
@@ -1140,6 +1190,10 @@ console_swarm_advertise_addr="${console_swarm_advertise_addr:-${config_console_s
 console_image="${console_image:-${config_console_image:-ghcr.io/appaloft/appaloft}}"
 console_installer_url="${console_installer_url:-${config_console_installer_url:-}}"
 console_skip_docker_install="${console_skip_docker_install:-${config_console_skip_docker_install:-false}}"
+console_trace="${console_trace:-${config_console_trace:-none}}"
+console_jaeger_image="${console_jaeger_image:-${config_console_jaeger_image:-}}"
+console_jaeger_ui_host="${console_jaeger_ui_host:-${config_console_jaeger_ui_host:-}}"
+console_jaeger_ui_port="${console_jaeger_ui_port:-${config_console_jaeger_ui_port:-}}"
 project_id="${project_id:-${config_project_id:-}}"
 environment_id="${environment_id:-${config_environment_id:-}}"
 resource_id="${resource_id:-${config_resource_id:-}}"

@@ -68,7 +68,9 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.exam
 安装时如果需要 trace，可以传 `--trace jaeger`。安装器会启动一个 Jaeger all-in-one 容器，把
 Appaloft 的 OTLP endpoint 指到内部 collector `http://jaeger:4318`，并把 trace link 写回
 Jaeger UI。UI 默认绑定在 `127.0.0.1:16686`；需要从运维网络直接访问时，可以用 SSH tunnel，
-或显式覆盖 `--jaeger-ui-host` 和 `--jaeger-ui-port`。
+或显式覆盖 `--jaeger-ui-host` 和 `--jaeger-ui-port`。Console 发起部署时会读取响应里的 trace
+link，并在部署进度弹窗里显示可打开的 Jaeger 链接；如果 Jaeger 通过其它域名公开，请把
+`APPALOFT_TRACE_LINK_BASE_URL` 设为这个外部 URL。
 
 首次安装后，使用安装器创建本地管理员并登录 console。管理员 email、生成的一次性密码、OAuth
 可选配置和恢复步骤见 [First admin bootstrap](/docs/self-hosting/first-admin-bootstrap/)。

@@ -73,7 +73,9 @@ For install-time tracing, pass `--trace jaeger`. The installer starts a Jaeger a
 sets Appaloft's OTLP endpoint to the internal collector at `http://jaeger:4318`, and writes trace
 links back to the Jaeger UI. The UI binds to `127.0.0.1:16686` by default; use an SSH tunnel or
 override `--jaeger-ui-host` and `--jaeger-ui-port` when an operator network should reach it
-directly.
+directly. Console deployment requests read the trace link from the response and show an openable
+Jaeger link in the deployment progress dialog; if Jaeger is exposed through another domain, set
+`APPALOFT_TRACE_LINK_BASE_URL` to that external URL.
 
 After the first install, create a local admin and log in to the console. See
 [First admin bootstrap](/docs/en/self-hosting/first-admin-bootstrap/) for admin email, generated

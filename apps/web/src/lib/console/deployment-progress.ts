@@ -6,7 +6,7 @@ import {
   type DeploymentSummary,
 } from "@appaloft/contracts";
 
-import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+import { API_BASE, readErrorMessage, requestWithMetadata } from "$lib/api/client";
 import { i18nKeys, translate } from "$lib/i18n";
 import { orpcClient } from "$lib/orpc";
 
@@ -79,6 +79,7 @@ type CreateDeploymentProgressStreamOptions = {
   requestId?: string;
   onRequestId?: (requestId: string) => void;
   onStreamError?: (message: string) => void;
+  onTraceLink?: (traceLink: string) => void;
 };
 
 export function groupDeploymentProgressEvents(
@@ -165,7 +166,7 @@ export async function* createDeploymentProgressStream(
   options.onRequestId?.(requestId);
 
   if (typeof EventSource === "undefined") {
-    return await createDeploymentRequest(input, requestId);
+    return await createDeploymentRequest(input, requestId, options);
   }
 
   const source = new EventSource(
@@ -207,7 +208,7 @@ export async function* createDeploymentProgressStream(
       source.close();
     };
 
-    const command = createDeploymentRequest(input, requestId).finally(() => {
+    const command = createDeploymentRequest(input, requestId, options).finally(() => {
       commandDone = true;
       notify();
     });
@@ -233,15 +234,26 @@ export async function* createDeploymentProgressStream(
 function createDeploymentRequest(
   input: CreateDeploymentInput,
   requestId: string,
+  options: CreateDeploymentProgressStreamOptions,
 ): Promise<CreateDeploymentResponse> {
-  return request<CreateDeploymentResponse>("/api/deployments", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-request-id": requestId,
+  return requestWithMetadata<CreateDeploymentResponse>(
+    "/api/deployments",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": requestId,
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  });
+    {
+      onMetadata(metadata) {
+        if (metadata.trace.traceLink) {
+          options.onTraceLink?.(metadata.trace.traceLink);
+        }
+      },
+    },
+  ).then((response) => response.data);
 }
 
 function deploymentIsNewer(candidate: DeploymentSummary, current: DeploymentSummary): boolean {

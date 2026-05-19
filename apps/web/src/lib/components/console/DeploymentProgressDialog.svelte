@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ExternalLink } from "@lucide/svelte";
   import type { DeploymentProgressEvent } from "@appaloft/contracts";
   import { tick } from "svelte";
 
@@ -19,6 +20,7 @@
     streamError?: string;
     requestId?: string;
     deploymentId?: string;
+    traceLink?: string;
     title?: string;
     description?: string;
     onClose?: () => void;
@@ -32,6 +34,7 @@
     streamError = "",
     requestId = "",
     deploymentId = "",
+    traceLink = "",
     title,
     description,
     onClose,
@@ -137,8 +140,26 @@
               · {$t(i18nKeys.console.deployments.progressDeploymentLabel)} {deploymentId}
             {/if}
           </p>
+          {#if traceLink}
+            <p class="max-w-full break-all font-mono text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
+            </p>
+          {/if}
         </div>
         <div class="flex gap-2">
+          {#if traceLink}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              href={traceLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink />
+              {$t(i18nKeys.console.deployments.progressTraceAction)}
+            </Button>
+          {/if}
           {#if deploymentId && onOpenDeployment}
             <Button type="button" size="sm" variant="outline" onclick={() => onOpenDeployment?.()}>
               {$t(i18nKeys.common.actions.viewDeployment)}

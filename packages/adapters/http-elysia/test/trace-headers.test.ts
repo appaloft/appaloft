@@ -66,13 +66,19 @@ describe("Elysia trace headers", () => {
         throw new Error("HTTP test server did not expose a port");
       }
 
-      const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+      const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
+        headers: {
+          origin: "http://localhost:4173",
+        },
+      });
       const traceparent = response.headers.get("traceparent");
       const link = response.headers.get("link");
+      const exposedHeaders = response.headers.get("access-control-expose-headers");
 
       expect(response.status).toBe(200);
       expect(traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/);
       expect(link).toMatch(/^<http:\/\/localhost:16686\/trace\/[0-9a-f]{32}>; rel="trace"$/);
+      expect(exposedHeaders).toBe("traceparent, Link");
     } finally {
       app.server?.stop(true);
     }

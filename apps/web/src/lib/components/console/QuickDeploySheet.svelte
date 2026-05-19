@@ -386,6 +386,7 @@
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
+  let workflowDeploymentTraceLink = $state("");
   let lastAccessUrl = $state("");
   let diagnosticSummaryLoading = $state(false);
   let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
@@ -1803,6 +1804,7 @@
     workflowProgressItems = [];
     workflowProgressError = "";
     workflowDeploymentProgressEvents = [];
+    workflowDeploymentTraceLink = "";
   }
 
   function resetDiagnosticSummaryCopy(): void {
@@ -2000,7 +2002,15 @@
       case "deployments.create": {
         deploymentCreateInFlight = true;
         try {
-          return await createDeploymentWithProgress(step.input, appendWorkflowDeploymentProgressEvent);
+          return await createDeploymentWithProgress(
+            step.input,
+            appendWorkflowDeploymentProgressEvent,
+            {
+              onTraceLink: (traceLink) => {
+                workflowDeploymentTraceLink = traceLink;
+              },
+            },
+          );
         } finally {
           deploymentCreateInFlight = false;
         }
@@ -3711,6 +3721,7 @@
   progressError={workflowProgressError}
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
+  traceLink={workflowDeploymentTraceLink}
   onClose={() => {
     workflowProgressDialogOpen = false;
   }}

@@ -102,6 +102,22 @@ inputs:
     description: Require Docker Engine to already exist on the SSH host when command=install-console. Defaults to controlPlane.install.skipDockerInstall or false.
     required: false
     default: ""
+  console-trace:
+    description: Optional trace collector installed with command=install-console. Defaults to controlPlane.install.trace or none.
+    required: false
+    default: ""
+  console-jaeger-image:
+    description: Jaeger all-in-one image passed to the self-hosted console installer when console-trace=jaeger.
+    required: false
+    default: ""
+  console-jaeger-ui-host:
+    description: Jaeger UI bind host passed to the self-hosted console installer when console-trace=jaeger.
+    required: false
+    default: ""
+  console-jaeger-ui-port:
+    description: Jaeger UI host port passed to the self-hosted console installer when console-trace=jaeger.
+    required: false
+    default: ""
   server-provider:
     description: Server provider key.
     required: false
@@ -265,6 +281,10 @@ runs:
         INPUT_CONSOLE_IMAGE: ${{ inputs.console-image }}
         INPUT_CONSOLE_INSTALLER_URL: ${{ inputs.console-installer-url }}
         INPUT_CONSOLE_SKIP_DOCKER_INSTALL: ${{ inputs.console-skip-docker-install }}
+        INPUT_CONSOLE_TRACE: ${{ inputs.console-trace }}
+        INPUT_CONSOLE_JAEGER_IMAGE: ${{ inputs.console-jaeger-image }}
+        INPUT_CONSOLE_JAEGER_UI_HOST: ${{ inputs.console-jaeger-ui-host }}
+        INPUT_CONSOLE_JAEGER_UI_PORT: ${{ inputs.console-jaeger-ui-port }}
         INPUT_SERVER_PROVIDER: ${{ inputs.server-provider }}
         INPUT_SERVER_PROXY_KIND: ${{ inputs.server-proxy-kind }}
         INPUT_STATE_BACKEND: ${{ inputs.state-backend }}
