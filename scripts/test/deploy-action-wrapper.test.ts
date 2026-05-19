@@ -23,6 +23,7 @@ function runDeploy(input: Record<string, string | undefined>, files?: Record<str
   const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-test-"));
   const argvPath = join(workspace, "argv.txt");
   const outputPath = join(workspace, "github-output.txt");
+  const summaryPath = join(workspace, "github-step-summary.md");
   for (const [path, content] of Object.entries(files ?? {})) {
     writeFileSync(join(workspace, path), content);
   }
@@ -32,6 +33,7 @@ function runDeploy(input: Record<string, string | undefined>, files?: Record<str
     APPALOFT_DEPLOY_ACTION_DRY_RUN: "true",
     APPALOFT_BIN: "/opt/appaloft/appaloft",
     GITHUB_OUTPUT: outputPath,
+    GITHUB_STEP_SUMMARY: summaryPath,
     RUNNER_TEMP: workspace,
     ...input,
   };
@@ -46,10 +48,13 @@ function runDeploy(input: Record<string, string | undefined>, files?: Record<str
   const argv = result.exitCode === 0 ? readFileSync(argvPath, "utf8").trim().split("\n") : [];
   const output =
     result.exitCode === 0 && existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "";
+  const summary =
+    result.exitCode === 0 && existsSync(summaryPath) ? readFileSync(summaryPath, "utf8") : "";
 
   return {
     argv,
     output,
+    summary,
     stderr: result.stderr.toString(),
     stdout: result.stdout.toString(),
     exitCode: result.exitCode,
@@ -744,6 +749,29 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONTROL-PLANE-INSTALL-003] install-console can pass Jaeger tracing to the installer", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_VERSION: "latest",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_URL: "https://console.example.com",
+      INPUT_CONSOLE_TRACE: "jaeger",
+      INPUT_CONSOLE_JAEGER_UI_HOST: "0.0.0.0",
+      INPUT_CONSOLE_JAEGER_UI_PORT: "16687",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(result.argv[2]).toContain("--trace 'jaeger'");
+      expect(result.argv[2]).toContain("--jaeger-ui-host '0.0.0.0'");
+      expect(result.argv[2]).toContain("--jaeger-ui-port '16687'");
+      expect(result.summary).toContain("Trace: `jaeger`");
+      expect(result.summary).toContain("Jaeger UI: `http://0.0.0.0:16687`");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[CONTROL-PLANE-INSTALL-003] install-console inputs override config defaults", () => {
     const result = runDeploy(
       {
@@ -831,6 +859,21 @@ describe("deploy-action wrapper reference", () => {
     try {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("console-proxy must be traefik or none");
+    } finally {
+      rmSync(result.workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONTROL-PLANE-INSTALL-002] install-console rejects unknown trace stacks before SSH", () => {
+    const result = runDeploy({
+      INPUT_COMMAND: "install-console",
+      INPUT_SSH_HOST: "203.0.113.10",
+      INPUT_CONSOLE_TRACE: "zipkin",
+    });
+
+    try {
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("console-trace must be none or jaeger");
     } finally {
       rmSync(result.workspace, { recursive: true, force: true });
     }

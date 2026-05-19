@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CheckCircle2, LoaderCircle, ShieldCheck } from "@lucide/svelte";
+  import { CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck } from "@lucide/svelte";
   import type { DeploymentProgressEvent, QuickDeployWorkflowStep } from "@appaloft/contracts";
   import { tick } from "svelte";
 
@@ -30,6 +30,7 @@
     progressError?: string;
     feedback?: QuickDeployFeedback;
     deploymentId?: string;
+    traceLink?: string;
     onClose?: () => void;
     onOpenDeployment?: () => void;
   };
@@ -42,6 +43,7 @@
     progressError = "",
     feedback = null,
     deploymentId = "",
+    traceLink = "",
     onClose,
     onOpenDeployment,
   }: Props = $props();
@@ -210,8 +212,26 @@
               {$t(i18nKeys.console.deployments.progressDeploymentLabel)} {deploymentId}
             </p>
           {/if}
+          {#if traceLink}
+            <p class="max-w-full break-all font-mono text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
+            </p>
+          {/if}
         </div>
         <div class="flex gap-2">
+          {#if traceLink}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              href={traceLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink />
+              {$t(i18nKeys.console.deployments.progressTraceAction)}
+            </Button>
+          {/if}
           {#if deploymentId && onOpenDeployment}
             <Button type="button" size="sm" variant="outline" onclick={() => onOpenDeployment?.()}>
               {$t(i18nKeys.common.actions.viewDeployment)}

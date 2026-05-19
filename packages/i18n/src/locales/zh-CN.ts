@@ -379,6 +379,8 @@ export const zhCN = {
       progressStepFallback: "部署步骤",
       progressStreamDisconnected: "部署进度连接中断，部署请求仍可能在后台继续。",
       progressTitle: "部署进度",
+      progressTraceAction: "打开 trace",
+      progressTraceLabel: "trace",
       progressWaiting: "正在等待部署进度...",
       records: "部署记录",
       recoveryAvailable: "可用",

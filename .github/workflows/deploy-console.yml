@@ -29,6 +29,24 @@ on:
         required: false
         default: false
         type: boolean
+      trace:
+        description: Optional trace collector to install with the console.
+        required: false
+        default: none
+        type: choice
+        options:
+          - none
+          - jaeger
+      jaeger_ui_host:
+        description: Jaeger UI bind host when trace=jaeger.
+        required: false
+        default: 127.0.0.1
+        type: string
+      jaeger_ui_port:
+        description: Jaeger UI host port when trace=jaeger.
+        required: false
+        default: "16686"
+        type: string
       swarm_init:
         description: Initialize a single-node Docker Swarm manager when orchestrator=swarm.
         required: false
@@ -122,3 +140,6 @@ jobs:
           console-swarm-init: ${{ inputs.swarm_init }}
           console-swarm-advertise-addr: ${{ vars.APPALOFT_CONSOLE_SWARM_ADVERTISE_ADDR }}
           console-skip-docker-install: ${{ inputs.skip_docker_install }}
+          console-trace: ${{ inputs.trace }}
+          console-jaeger-ui-host: ${{ inputs.jaeger_ui_host }}
+          console-jaeger-ui-port: ${{ inputs.jaeger_ui_port }}
