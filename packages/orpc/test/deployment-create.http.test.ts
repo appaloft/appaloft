@@ -2879,6 +2879,151 @@ describe("deployment create HTTP route", () => {
     expect(capturedCommand).toBeUndefined();
   });
 
+  test("[SELF-AUTH-ACTION-004][SELF-AUTH-ACTION-007] Action preview cleanup rejects repository-scoped tokens without trusted repository context", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedRequestedRepositoryFullName: string | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ status: "cleaned" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort = {
+      authorize: async (_context, input) => {
+        capturedRequestedRepositoryFullName = input.requestedScope?.repositoryFullName;
+        return err({
+          code: "action_auth_forbidden",
+          category: "user",
+          message: "Action deploy token is not authorized for this request",
+          retryable: false,
+          details: {
+            deniedScope: "repository",
+            endpoint: input.path,
+            phase: "action-authorization",
+            reasonCode: "scope_value_missing",
+            workflow: input.workflow,
+          },
+        });
+      },
+    };
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionDeployTokenAuthorizationPort,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/cleanup-preview", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+          "x-appaloft-action-command": "preview-cleanup",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.text();
+    expect(body).toContain("action_auth_forbidden");
+    expect(body).toContain("scope_value_missing");
+    expect(capturedRequestedRepositoryFullName).toBeUndefined();
+    expect(capturedCommand).toBeUndefined();
+  });
+
+  test("[SELF-AUTH-ACTION-007] Action preview cleanup forwards trusted repository scope to deploy token auth", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedRequestedRepositoryFullName: string | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+          status: "cleaned",
+          cleanedRuntime: true,
+          cleanedArtifacts: true,
+          removedServerAppliedRoute: true,
+          removedSourceLink: true,
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort = {
+      authorize: async (_context, input) => {
+        capturedRequestedRepositoryFullName = input.requestedScope?.repositoryFullName;
+        if (input.requestedScope?.repositoryFullName !== "appaloft/www") {
+          return err({
+            code: "action_auth_forbidden",
+            category: "user",
+            message: "Action deploy token is not authorized for this request",
+            retryable: false,
+            details: {
+              deniedScope: "repository",
+              endpoint: input.path,
+              phase: "action-authorization",
+              reasonCode: "scope_value_missing",
+              workflow: input.workflow,
+            },
+          });
+        }
+
+        return ok({
+          actor: {
+            kind: "deploy-token",
+            id: "dtok_repo_scoped",
+            label: "Repo scoped deploy token",
+          },
+        });
+      },
+    };
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionDeployTokenAuthorizationPort,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/cleanup-preview", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+          "x-appaloft-action-command": "preview-cleanup",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
+          trustedContext: {
+            repositoryFullName: "appaloft/www",
+            repositoryId: "123456",
+            ref: "refs/pull/42/merge",
+            revision: "abc123",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(capturedRequestedRepositoryFullName).toBe("appaloft/www");
+    expect(capturedCommand).toBeInstanceOf(CleanupPreviewCommand);
+  });
+
   test("[SELF-AUTH-ACTION-007] Action preview cleanup dispatches after deploy token auth", async () => {
     let capturedCommand: Command<unknown> | undefined;
     let capturedContext: ExecutionContext | undefined;

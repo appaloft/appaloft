@@ -1373,7 +1373,7 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
         payload="${payload},\"destinationId\":\"$(json_escape "$destination_id")\""
       fi
     fi
-    if [ "$wrapper_command" = "deploy" ] && { [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; }; then
+    if { [ "$wrapper_command" = "deploy" ] || [ "$wrapper_command" = "preview-cleanup" ]; } && { [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; }; then
       payload="${payload},\"trustedContext\":{"
       separator=""
       if [ -n "${GITHUB_REPOSITORY:-}" ]; then payload="${payload}${separator}\"repositoryFullName\":\"$(json_escape "$GITHUB_REPOSITORY")\""; separator=","; fi

@@ -1810,6 +1810,15 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       });
     case "action_auth_missing":
     case "action_auth_invalid":
+      return new ORPCError("UNAUTHORIZED", {
+        message,
+        status: 401,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
+        },
+      });
     case "first_admin_bootstrap_required":
     case "product_auth_invalid":
     case "product_auth_missing":
@@ -1822,6 +1831,15 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         },
       });
     case "action_auth_forbidden":
+      return new ORPCError("FORBIDDEN", {
+        message,
+        status: 403,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
+        },
+      });
     case "product_auth_forbidden":
     case "operation_authorization_denied":
     case "operation_check_denied":
@@ -4145,10 +4163,12 @@ export const cleanupPreviewProcedure = base
   .handler(async ({ input, context }) => {
     const request = context.currentRequest;
     if (request?.headers.get("x-appaloft-action-command")?.trim() === "preview-cleanup") {
+      const requestedScope = cleanupPreviewRequestedScope(input);
       const authorized = await authorizeActionDeployToken({
         context,
         executionContext: context.executionContext,
         request,
+        ...(requestedScope ? { requestedScope } : {}),
         workflow: "preview-cleanup",
       });
       if (authorized.isErr()) {
@@ -5639,6 +5659,16 @@ function actionServerConfigDeploymentRequestedScope(
   }
 
   return compactActionDeployTokenRequestedScope(scope);
+}
+
+function cleanupPreviewRequestedScope(
+  body: z.output<typeof cleanupPreviewCommandInputSchema>,
+): ActionDeployTokenRequestedScope | undefined {
+  return compactActionDeployTokenRequestedScope({
+    ...(body.trustedContext?.repositoryFullName
+      ? { repositoryFullName: body.trustedContext.repositoryFullName }
+      : {}),
+  });
 }
 
 async function actionSourceLinkDeploymentRequestedScopeFromRequest(
