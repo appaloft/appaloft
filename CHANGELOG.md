@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-rc.12](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.11...v1.0.0-rc.12) (2026-05-19)
+
+
+### Features
+
+* **authz:** add operation scope visibility port ([#302](https://github.com/appaloft/appaloft/issues/302)) ([fe618c8](https://github.com/appaloft/appaloft/commit/fe618c8d66b46bbd387ec2c1d9d93d85dba8d4ae))
+* expose console jaeger tracing links ([#303](https://github.com/appaloft/appaloft/issues/303)) ([cd5f95a](https://github.com/appaloft/appaloft/commit/cd5f95a75a5c7898135e0f04fe39622f47034c7e))
+
+
+### Bug Fixes
+
+* **action:** authorize preview cleanup repository scope ([#305](https://github.com/appaloft/appaloft/issues/305)) ([d2a5097](https://github.com/appaloft/appaloft/commit/d2a5097a1d8a9cd09445083802c4d6e76feb30b5))
+
 ## [1.0.0-rc.10](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.9...v1.0.0-rc.10) (2026-05-18)
 
 
