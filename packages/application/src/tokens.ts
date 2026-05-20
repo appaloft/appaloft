@@ -10,6 +10,7 @@ export const tokens = {
   operationCapabilityPort: Symbol.for("appaloft.operation_capability_port"),
   tenantContextResolver: Symbol.for("appaloft.tenant_context_resolver"),
   entitlementPort: Symbol.for("appaloft.entitlement_port"),
+  usageIntentPort: Symbol.for("appaloft.usage_intent_port"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
@@ -207,6 +208,10 @@ export const tokens = {
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   queryCapabilitiesQueryService: Symbol.for("appaloft.query_capabilities_query_service"),
   queryEntitlementsQueryService: Symbol.for("appaloft.query_entitlements_query_service"),
+  recordUsageIntentUseCase: Symbol.for("appaloft.record_usage_intent_use_case"),
+  listUsageIntentRecordsQueryService: Symbol.for(
+    "appaloft.list_usage_intent_records_query_service",
+  ),
   checkProjectDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_project_delete_safety_query_service",
   ),
