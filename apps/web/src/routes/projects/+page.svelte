@@ -113,7 +113,7 @@
       </div>
     </div>
   {:else if projects.length === 0}
-    <section class="grid gap-6 py-2 xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <section class="max-w-4xl space-y-6 py-2">
       <div class="space-y-5">
         <Badge class="console-page-kicker" variant="outline">
           {$t(i18nKeys.console.shell.noProjects)}
@@ -126,31 +126,9 @@
             {$t(i18nKeys.console.projects.emptyBody)}
           </p>
         </div>
-        <div class="console-subtle-panel max-w-2xl p-4">
-          <div class="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <p class="font-medium">{$t(i18nKeys.common.domain.environments)}</p>
-              <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                {$t(i18nKeys.console.projects.createProjectEnvironmentHint)}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium">{$t(i18nKeys.common.domain.resources)}</p>
-              <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                {$t(i18nKeys.console.projects.createProjectResourceHint)}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium">{$t(i18nKeys.common.domain.deployments)}</p>
-              <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                {$t(i18nKeys.console.projects.createProjectDeploymentHint)}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <form class="console-panel h-fit p-5" onsubmit={submitProjectCreate}>
+      <form class="console-panel max-w-3xl p-5" onsubmit={submitProjectCreate}>
         <div class="space-y-1.5">
           <h2 class="text-base font-semibold">
             {$t(i18nKeys.console.projects.createProjectTitle)}
@@ -210,7 +188,7 @@
         {/if}
 
         <div class="console-action-row mt-5">
-          <Button type="submit" size="lg" disabled={!canCreateProject || createProjectMutation.isPending}>
+          <Button type="submit" disabled={!canCreateProject || createProjectMutation.isPending}>
             <Plus class="size-4" />
             {createProjectMutation.isPending
               ? $t(i18nKeys.console.projects.createProjectSubmitting)
@@ -218,6 +196,29 @@
           </Button>
         </div>
       </form>
+
+      <div class="console-subtle-panel max-w-3xl p-4">
+        <div class="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <p class="font-medium">{$t(i18nKeys.common.domain.environments)}</p>
+            <p class="mt-1 text-xs leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.projects.createProjectEnvironmentHint)}
+            </p>
+          </div>
+          <div>
+            <p class="font-medium">{$t(i18nKeys.common.domain.resources)}</p>
+            <p class="mt-1 text-xs leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.projects.createProjectResourceHint)}
+            </p>
+          </div>
+          <div>
+            <p class="font-medium">{$t(i18nKeys.common.domain.deployments)}</p>
+            <p class="mt-1 text-xs leading-5 text-muted-foreground">
+              {$t(i18nKeys.console.projects.createProjectDeploymentHint)}
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
   {:else}
     <div class="space-y-8">
