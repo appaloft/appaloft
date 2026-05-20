@@ -6878,6 +6878,136 @@ export class DefaultDeploymentOverlayPort implements DeploymentOverlayPort {
   }
 }
 
+export type RouteSurfaceDecisionStatus = "enabled" | "skipped" | "rejected" | "unknown";
+export type RouteSurfaceKind =
+  | "routing"
+  | "static-artifact"
+  | "domain"
+  | "access-route"
+  | (string & {});
+export type RouteSurfaceDetails = Record<string, unknown>;
+
+export interface RouteSurfaceActorRef {
+  kind?: ExecutionActor["kind"] | (string & {}) | undefined;
+  id?: string | undefined;
+  userId?: string | undefined;
+  email?: string | undefined;
+}
+
+export interface RouteSurfaceResourceRefs {
+  organizationId?: string | undefined;
+  projectId?: string | undefined;
+  environmentId?: string | undefined;
+  resourceId?: string | undefined;
+  serverId?: string | undefined;
+  destinationId?: string | undefined;
+  deploymentId?: string | undefined;
+  domainBindingId?: string | undefined;
+  domainId?: string | undefined;
+  routeId?: string | undefined;
+  staticArtifactId?: string | undefined;
+  [key: string]: string | undefined;
+}
+
+export interface RouteSurfaceEvaluateInput {
+  operationKey: string;
+  source: string;
+  surfaceKind: RouteSurfaceKind;
+  actor?: RouteSurfaceActorRef | undefined;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  resourceRefs?: RouteSurfaceResourceRefs | undefined;
+  capabilityKey?: string | undefined;
+  attributes?: RouteSurfaceDetails | undefined;
+}
+
+export interface RouteSurfaceDecisionRecord {
+  schemaVersion: "route-surface.decision/v1";
+  id?: string | undefined;
+  operationKey: string;
+  decision: RouteSurfaceDecisionStatus;
+  reason: string;
+  source: string;
+  surfaceKind: RouteSurfaceKind;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  actor?: RouteSurfaceActorRef | undefined;
+  resourceRefs?: RouteSurfaceResourceRefs | undefined;
+  capabilityKey?: string | undefined;
+  decidedAt: string;
+  attributes?: RouteSurfaceDetails | undefined;
+  details?: RouteSurfaceDetails | undefined;
+}
+
+export interface RouteSurfaceDecisionResult {
+  operationKey: string;
+  decision: RouteSurfaceDecisionStatus;
+  allowed: boolean;
+  reason: string;
+  source: string;
+  surfaceKind: RouteSurfaceKind;
+  record?: RouteSurfaceDecisionRecord | undefined;
+  details?: RouteSurfaceDetails | undefined;
+}
+
+export interface ListRouteSurfaceDecisionsInput {
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  operationKey?: string | undefined;
+  capabilityKey?: string | undefined;
+  source?: string | undefined;
+  surfaceKind?: RouteSurfaceKind | undefined;
+  limit?: number | undefined;
+}
+
+export interface RouteSurfacePort {
+  evaluateRouteSurface(
+    context: ExecutionContext,
+    input: RouteSurfaceEvaluateInput,
+  ): Promise<RouteSurfaceDecisionResult>;
+
+  listRouteSurfaceDecisions(
+    context: ExecutionContext,
+    input?: ListRouteSurfaceDecisionsInput,
+  ): Promise<readonly RouteSurfaceDecisionRecord[]>;
+}
+
+export class DefaultRouteSurfacePort implements RouteSurfacePort {
+  async evaluateRouteSurface(
+    context: ExecutionContext,
+    input: RouteSurfaceEvaluateInput,
+  ): Promise<RouteSurfaceDecisionResult> {
+    const tenantId = input.tenantId ?? context.tenant?.tenantId;
+    const accountId = input.accountId ?? context.tenant?.accountId;
+    const organizationId = input.organizationId ?? context.tenant?.organizationId;
+
+    return {
+      operationKey: input.operationKey,
+      decision: "skipped",
+      allowed: true,
+      reason: "route-surface-default-noop",
+      source: "default",
+      surfaceKind: input.surfaceKind,
+      details: {
+        operationKey: input.operationKey,
+        source: input.source,
+        surfaceKind: input.surfaceKind,
+        ...(input.capabilityKey ? { capabilityKey: input.capabilityKey } : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(accountId ? { accountId } : {}),
+        ...(organizationId ? { organizationId } : {}),
+      },
+    };
+  }
+
+  async listRouteSurfaceDecisions(): Promise<readonly RouteSurfaceDecisionRecord[]> {
+    return [];
+  }
+}
+
 export class AllowAllOperationScopePort implements OperationScopePort {
   async scopeOperation(
     _context: ExecutionContext,

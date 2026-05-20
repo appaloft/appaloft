@@ -49,6 +49,8 @@ export * from "./resource-handlers";
 export * from "./resource-messages";
 export * from "./retention-default-handlers";
 export * from "./retention-default-messages";
+export * from "./route-surface-handlers";
+export * from "./route-surface-messages";
 export * from "./runtime-topology";
 export * from "./runtime-usage-handlers";
 export * from "./runtime-usage-messages";
