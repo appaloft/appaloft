@@ -1,6 +1,5 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
   import { CheckCircle2, KeyRound, ShieldCheck } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
@@ -83,9 +82,21 @@
   }
 
   function openLogin(): void {
-    if (browser) {
-      void goto(loginUrl);
+    if (!browser) {
+      return;
     }
+
+    const url = new URL(loginUrl, window.location.origin);
+    const currentIsLocal =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const targetIsLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+
+    if (url.origin === window.location.origin || (currentIsLocal && targetIsLocal)) {
+      window.location.assign(`${window.location.origin}${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+
+    window.location.assign(url.toString());
   }
 </script>
 
@@ -231,8 +242,10 @@
             {/if}
 
             <div class="grid gap-4 sm:grid-cols-2">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.authBootstrap.emailLabel)}</span>
+              <label class="appaloft-field-stack">
+                <span class="appaloft-field-label">
+                  {$t(i18nKeys.console.authBootstrap.emailLabel)}
+                </span>
                 <Input
                   bind:value={email}
                   type="email"
@@ -241,8 +254,10 @@
                   placeholder={$t(i18nKeys.console.authBootstrap.emailPlaceholder)}
                 />
               </label>
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.authBootstrap.displayNameLabel)}</span>
+              <label class="appaloft-field-stack">
+                <span class="appaloft-field-label">
+                  {$t(i18nKeys.console.authBootstrap.displayNameLabel)}
+                </span>
                 <Input
                   bind:value={displayName}
                   autocomplete="name"
@@ -252,29 +267,35 @@
               </label>
             </div>
 
-            <label class="space-y-1.5 text-sm font-medium">
-              <span>{$t(i18nKeys.console.authBootstrap.passwordLabel)}</span>
+            <label class="appaloft-field-stack">
+              <span class="appaloft-field-label">
+                {$t(i18nKeys.console.authBootstrap.passwordLabel)}
+              </span>
               <Input
                 bind:value={password}
                 type="password"
                 autocomplete="new-password"
                 placeholder={$t(i18nKeys.console.authBootstrap.passwordPlaceholder)}
               />
-              <span class="block text-xs font-normal text-muted-foreground">
+              <span class="appaloft-field-help block text-xs font-normal leading-5 text-muted-foreground">
                 {$t(i18nKeys.console.authBootstrap.passwordHint)}
               </span>
             </label>
 
             <div class="grid gap-4 sm:grid-cols-2">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.authBootstrap.organizationNameLabel)}</span>
+              <label class="appaloft-field-stack">
+                <span class="appaloft-field-label">
+                  {$t(i18nKeys.console.authBootstrap.organizationNameLabel)}
+                </span>
                 <Input
                   bind:value={organizationName}
                   placeholder={$t(i18nKeys.console.authBootstrap.organizationNamePlaceholder)}
                 />
               </label>
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.authBootstrap.organizationSlugLabel)}</span>
+              <label class="appaloft-field-stack">
+                <span class="appaloft-field-label">
+                  {$t(i18nKeys.console.authBootstrap.organizationSlugLabel)}
+                </span>
                 <Input
                   bind:value={organizationSlug}
                   placeholder={$t(i18nKeys.console.authBootstrap.organizationSlugPlaceholder)}

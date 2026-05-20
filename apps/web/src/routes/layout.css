@@ -161,6 +161,73 @@
     flex: 0 0 auto;
   }
 
+  .appaloft-field-stack,
+  .console-field-stack {
+    display: grid;
+    min-width: 0;
+    gap: 0.625rem;
+  }
+
+  .appaloft-field-stack > .appaloft-field-help,
+  .appaloft-field-stack > .console-field-help,
+  .console-field-stack > .appaloft-field-help,
+  .console-field-stack > .console-field-help {
+    margin-top: -0.125rem;
+  }
+
+  .appaloft-action-row,
+  .console-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625rem;
+  }
+
+  .appaloft-field-label {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  [data-console-main]
+    :where(label:has([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"])) {
+    gap: 0.625rem;
+  }
+
+  [data-console-main]
+    :where([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) {
+    border-color: color-mix(in oklch, var(--border) 86%, var(--foreground));
+    background: color-mix(in oklch, var(--muted) 12%, var(--card));
+  }
+
+  [data-console-main]
+    :where(
+      [data-slot="input"]:hover,
+      [data-slot="textarea"]:hover,
+      [data-slot="select-trigger"]:hover
+    ) {
+    border-color: color-mix(in oklch, var(--ring) 42%, var(--border));
+  }
+
+  [data-console-main]
+    :where([data-slot="input"]::placeholder, [data-slot="textarea"]::placeholder) {
+    color: color-mix(in oklch, var(--muted-foreground) 76%, transparent);
+  }
+
+  [data-console-main] :where([data-slot="button"]) {
+    letter-spacing: 0;
+  }
+
+  [data-console-main] :where([data-slot="button"][class*="border-border"]) {
+    background: color-mix(in oklch, var(--muted) 14%, var(--card));
+  }
+
   .console-page-kicker {
     display: inline-flex;
     width: fit-content;
