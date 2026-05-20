@@ -2287,30 +2287,30 @@
           <p class="text-sm text-muted-foreground">{activeStepDetails.description}</p>
         </div>
         <div class="space-y-6">
-          <div class="grid grid-cols-2 gap-1.5 rounded-md border border-border/70 bg-card px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
+          <div class="console-stepper grid grid-cols-2 gap-1.5 rounded-md border border-border/70 px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
             {#each deploymentSteps as step, index (step.key)}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                class={`h-8 min-w-0 justify-start gap-1.5 rounded-md px-2.5 text-xs sm:w-auto ${
+                class={`console-stepper-button h-8 min-w-0 justify-start gap-1.5 rounded-md px-2.5 text-xs sm:w-auto ${
                   activeStep === step.key
-                    ? "border border-primary/45 bg-primary/5 text-foreground shadow-xs"
+                    ? "is-active"
                     : stepIsComplete(step.key)
-                      ? "text-foreground hover:bg-primary/5"
-                      : "text-muted-foreground hover:bg-muted/70"
+                      ? "is-complete"
+                      : "is-idle"
                 } ${canVisitStep(index) ? "" : "cursor-not-allowed opacity-40"}`}
                 disabled={!canVisitStep(index)}
                 aria-current={activeStep === step.key ? "step" : undefined}
                 title={step.description}
                 onclick={() => goToStep(step.key, index)}
               >
-                <span class={`flex size-4 items-center justify-center rounded-sm border text-[10px] font-medium ${
+                <span class={`console-stepper-marker flex size-4 items-center justify-center rounded-sm border text-[10px] font-medium ${
                   activeStep === step.key
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? "is-active"
                     : stepIsComplete(step.key)
-                      ? "border-primary/20 bg-primary/10 text-primary"
-                      : "border-border bg-secondary text-muted-foreground"
+                      ? "is-complete"
+                      : "is-idle"
                 }`}>
                   {#if stepIsComplete(step.key)}
                     <CheckCircle2 class="size-3" />

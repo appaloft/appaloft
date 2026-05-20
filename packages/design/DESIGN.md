@@ -43,15 +43,14 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 
 ## Color Roles
 
-- Console canvas: `#fcfeff` for the page background and main workspace outside object panels. It
-  should read as almost white with only a tiny Appaloft-blue cast, never heavy gray-blue, cream,
-  sand, beige, or yellow.
+- Console canvas: `#ffffff` for the page background and main workspace outside object panels. It
+  should read as white, not light blue, heavy gray-blue, cream, sand, beige, or yellow.
 - Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.
 - Console ink: `#1b2738` for primary text and active tab text. Do not use pure black as the brand
   fill for primary actions.
 - Appaloft blue: `#4e84ff`, taken from the canonical logo asset, for primary actions, selected
   states, links, focus rings, and running/planning status. Use it sparingly.
-- Appaloft soft blue: `#eef5ff` and `#f6f9ff` for selected row, subtle callout, and low-emphasis
+- Appaloft soft blue: `#f2f7ff` and `#f8fbff` for selected row, subtle callout, and low-emphasis
   CTA backgrounds.
 - Quiet border: `#d9e2f2` for panel boundaries, table rows, input borders, and dividers.
 - Input hairline: `#a8bdd8` for form controls so fields stay visible without heavy outlines.

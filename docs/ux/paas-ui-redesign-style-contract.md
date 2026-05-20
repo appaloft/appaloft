@@ -10,6 +10,8 @@
   non-error secondary states in the deploy flow.
 - Feedback pass: tightened deploy surfaces so list wells, review cards, and the side summary use
   white owner panels plus soft Appaloft-blue tints instead of gray-blue nested blocks.
+- Feedback pass: moved the main canvas to white and made deploy stepper states explicit so non-error
+  steps cannot inherit red or pink fills.
 
 ## Visual Direction Summary
 

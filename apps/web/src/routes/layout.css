@@ -86,7 +86,7 @@
   .console-subtle-panel {
     border: 0;
     border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--muted) 34%, var(--card));
+    background: color-mix(in oklch, var(--muted) 24%, var(--card));
     box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--border) 44%, transparent);
   }
 
@@ -385,5 +385,57 @@
 
   [data-console-main] :where(thead) {
     background: color-mix(in oklch, var(--muted) 46%, var(--card));
+  }
+}
+
+@layer utilities {
+  .console-stepper {
+    background: var(--card);
+  }
+
+  .console-stepper-button {
+    border-color: transparent;
+    background: var(--card);
+    color: var(--muted-foreground);
+  }
+
+  .console-stepper-button:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--primary) 4%, var(--card));
+    color: var(--foreground);
+  }
+
+  .console-stepper-button.is-active {
+    border-color: color-mix(in oklch, var(--primary) 45%, var(--border));
+    background: color-mix(in oklch, var(--primary) 5%, var(--card));
+    color: var(--foreground);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .console-stepper-button.is-complete {
+    background: var(--card);
+    color: var(--foreground);
+  }
+
+  .console-stepper-button:disabled {
+    background: var(--card);
+    color: var(--muted-foreground);
+  }
+
+  .console-stepper-marker {
+    border-color: var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+  }
+
+  .console-stepper-marker.is-active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .console-stepper-marker.is-complete {
+    border-color: color-mix(in oklch, var(--primary) 28%, var(--border));
+    background: color-mix(in oklch, var(--primary) 8%, var(--card));
+    color: var(--primary);
   }
 }
