@@ -4,6 +4,8 @@
 
 - Phase 0 started: read `DESIGN.md` and the canonical `packages/design/DESIGN.md`.
 - Phase 0 completed: locked the implementation contract for the PaaS console redesign.
+- Feedback pass: replaced the warm/yellow and black-primary direction with a logo-blue, cool-white
+  system inspired by Stripe's compact product rhythm without copying Stripe's purple identity.
 
 ## Visual Direction Summary
 
@@ -13,8 +15,8 @@ resource, deployment, server, health, access, logs, diagnostics, and terminal st
 scan without turning the UI into a noisy monitoring wall.
 
 The design language is operational and restrained. It uses IBM Plex Sans for product UI, IBM Plex Mono
-only for technical values, Fraunces only for rare product identity moments, warm neutral surfaces,
-compact rectangular controls, dense tables, semantic status badges, named console surfaces, and
+only for technical values, Fraunces only for rare product identity moments, cool-white product
+surfaces, compact rectangular controls, dense tables, semantic status badges, named console surfaces, and
 minimal depth. The interface should feel designed through hierarchy, spacing, copy, and state clarity,
 not through decorative gradients, heavy shadows, or default component styling.
 
@@ -25,7 +27,7 @@ this redesign.
 ## 1. What This UI Should Feel Like
 
 - A serious infrastructure control plane for deployment operators.
-- Calm, warm, precise, trustworthy, and product-grade.
+- Calm, precise, trustworthy, lightly branded, and product-grade.
 - Dense enough for frequent use, but not cramped.
 - Opinionated through clear resource hierarchy, stable navigation, compact status language, and
   strong operational feedback.
@@ -40,6 +42,7 @@ this redesign.
 - Modal-heavy creation/configuration flows.
 - Spinner-only deployment, DNS, TLS, or server operations.
 - Decorative gradients, rainbow status color, and accent color used as filler.
+- Warm yellow/sand canvases, deep navy-heavy chrome, and black primary buttons.
 
 ## 3. Allowed Visual Patterns
 
@@ -82,9 +85,10 @@ this redesign.
 
 ## 6. Restrained Brand Personality
 
-- Express brand through operational order, warm neutrals, crisp typography, compact status semantics,
-  and direct product copy.
-- Use focus blue sparingly for active navigation, links, selected state, and running/planning work.
+- Express brand through operational order, logo-aligned Appaloft blue, crisp typography, compact
+  status semantics, and direct product copy.
+- Use Appaloft blue sparingly for primary actions, active navigation, links, selected state, and
+  running/planning work.
 - Use semantic green, amber, and red only for real status meaning.
 - Use Appaloft's wordmark/editorial font only in rare identity moments, not as dashboard decoration.
 - Let icons clarify resource type, navigation, status, and action meaning without becoming ornament.
