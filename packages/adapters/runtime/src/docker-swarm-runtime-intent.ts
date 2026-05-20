@@ -10,6 +10,7 @@ import {
   type RuntimePlanState,
   type Result,
 } from "@appaloft/core";
+import type { ResourceAccessFailureRendererTarget } from "@appaloft/application";
 import {
   type DockerStorageVolumeRealization,
   dockerStorageMountsFromRuntimeMetadata,
@@ -35,6 +36,7 @@ export interface DockerSwarmRuntimeIntentInput {
   dependencyBindingReferences?: readonly DeploymentDependencyBindingReferenceState[];
   identity: DockerSwarmRuntimeIdentityInput;
   edgeNetworkName?: string;
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
 }
 
 export interface DockerSwarmImageWorkloadIntent {
@@ -118,6 +120,7 @@ export interface DockerSwarmRuntimeIntent {
   volumeRealizations: DockerStorageVolumeRealization[];
   health?: DockerSwarmHealthIntent;
   routes: DockerSwarmRouteIntent[];
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
   labels: Record<string, string>;
   warnings: string[];
 }
@@ -674,11 +677,66 @@ function traefikRule(route: DockerSwarmRouteIntent): string {
     : `(${hostRule}) && PathPrefix(\`${route.pathPrefix}\`)`;
 }
 
+function safeTraefikName(input: string | undefined, fallback: string): string {
+  const normalized = input?.replace(/[^a-zA-Z0-9-]/g, "-").replace(/^-+|-+$/g, "");
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
+function safeRendererServiceUrl(input: string | undefined): string | null {
+  if (!input) {
+    return null;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function accessFailureMiddlewareLabels(
+  renderer: ResourceAccessFailureRendererTarget | undefined,
+):
+  | {
+      labels: string[];
+      middlewareName: string;
+    }
+  | undefined {
+  const serviceUrl = safeRendererServiceUrl(renderer?.url);
+  if (!renderer || !serviceUrl) {
+    return undefined;
+  }
+
+  const middlewareName = safeTraefikName(
+    renderer.middlewareName,
+    "appaloft-resource-access-errors",
+  );
+  const serviceName = safeTraefikName(renderer.serviceName, "appaloft-diagnostic-renderer");
+
+  return {
+    middlewareName,
+    labels: [
+      `traefik.http.middlewares.${middlewareName}.errors.status=404,502,503,504`,
+      `traefik.http.middlewares.${middlewareName}.errors.service=${serviceName}`,
+      `traefik.http.middlewares.${middlewareName}.errors.query=/.appaloft/resource-access-failure?status={status}`,
+      `traefik.http.services.${serviceName}.loadbalancer.server.url=${serviceUrl}`,
+      `traefik.http.services.${serviceName}.loadbalancer.passhostheader=false`,
+    ],
+  };
+}
+
 function routeLabels(input: {
   serviceName: string;
   targetPort?: number;
   routes: readonly DockerSwarmRouteIntent[];
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
 }): string[] {
+  const accessFailureMiddleware = accessFailureMiddlewareLabels(input.resourceAccessFailureRenderer);
   const labels = input.routes.flatMap((route, index) => {
     if (
       route.proxyKind !== "traefik" ||
@@ -702,6 +760,9 @@ function routeLabels(input: {
       `traefik.docker.network=${route.networkName}`,
       `traefik.http.routers.${router}.rule=${traefikRule(route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
+      ...(accessFailureMiddleware
+        ? [`traefik.http.routers.${router}.middlewares=${accessFailureMiddleware.middlewareName}`]
+        : []),
       ...(route.tlsMode === "auto"
         ? [
             `traefik.http.routers.${router}.tls=true`,
@@ -710,6 +771,7 @@ function routeLabels(input: {
         : []),
       `traefik.http.routers.${router}.service=${service}`,
       `traefik.http.services.${service}.loadbalancer.server.port=${targetPort}`,
+      ...(accessFailureMiddleware ? accessFailureMiddleware.labels : []),
       "appaloft.route-target=active",
     ];
   });
@@ -771,6 +833,9 @@ export function renderDockerSwarmRuntimeIntent(
     volumeRealizations: volumeRealizations.value,
     ...(health ? { health } : {}),
     routes: renderRoutes({ execution, networkName }),
+    ...(input.resourceAccessFailureRenderer
+      ? { resourceAccessFailureRenderer: input.resourceAccessFailureRenderer }
+      : {}),
     labels: runtimeIdentityLabels(input.identity),
     warnings: [],
   });
@@ -811,6 +876,9 @@ export function renderDockerSwarmApplyPlan(
       ? { targetPort: intent.workload.port }
       : {}),
     routes: intent.routes,
+    ...(intent.resourceAccessFailureRenderer
+      ? { resourceAccessFailureRenderer: intent.resourceAccessFailureRenderer }
+      : {}),
   });
   const createStep =
     intent.workload.kind === "image"

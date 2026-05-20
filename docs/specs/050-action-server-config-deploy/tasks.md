@@ -31,6 +31,9 @@
   persisting raw tokens.
 - [x] `CONTROL-PLANE-INSTALL-003`: `command=install-console` reads non-secret console install
   settings from repository config while keeping SSH host/key and secrets in trusted workflow inputs.
+- [x] `CONTROL-PLANE-HANDSHAKE-021` / `CONFIG-FILE-ENTRY-029`: server config pull request preview
+  accepts partial trusted placement hints and completes the target through preview policy instead
+  of requiring a shared explicit resource id.
 
 ## Source Of Truth
 

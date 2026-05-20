@@ -77,6 +77,7 @@ This matrix inherits:
 | CONTROL-PLANE-HANDSHAKE-018 | application/HTTP contract | Action target resolves without ids | Source-link deploy or server-config deploy is called with no Appaloft ids and either an existing source link or a deploy token whose scope uniquely identifies project/environment/resource/server | Application target resolution succeeds, may persist the source link after admission when token scope supplied the missing target, and final deployment dispatch remains ids-only | None | Auth -> source-link target command -> existing link or token-scope target -> `deployments.create` -> optional source-link upsert |
 | CONTROL-PLANE-HANDSHAKE-019 | application/HTTP contract | Action unresolved target fails safely | Source-link deploy or server-config deploy is called with no Appaloft ids, no existing source link, no unique token-scoped target, and no accepted source/repository binding | Request fails before config/profile/route/deployment mutation with safe next actions to create/link a source binding, run source-link relink, or pass one-time bootstrap ids | `action_deployment_target_unresolved`, phase `source-link-resolution` | Auth -> source-link target command -> unresolved -> no mutation |
 | CONTROL-PLANE-HANDSHAKE-020 | application/HTTP contract | Explicit bootstrap ids conflict-check | Explicit Action ids or `controlPlane.deploymentContext` are supplied and an existing source link or deploy-token scope selects a different target | Request fails before deployment, profile, route, or source-link mutation; ids outside token scope return 403 | `action_deployment_target_conflict`, phase `source-link-resolution`, or `action_auth_forbidden`, phase `action-authorization` | Auth -> source-link target command -> conflict reject -> no mutation |
+| CONTROL-PLANE-HANDSHAKE-021 | wrapper + HTTP contract | Server config preview target from policy without explicit resource id | `server-config-deploy=true`, `preview=pull-request`, trusted repository/base-ref context, and optional project/environment/server hints are supplied, but no explicit resource id is supplied | Wrapper calls `/api/action/deployments/from-config-package` without requiring a resource id; server-side preview policy resolves the complete preview target before ids-only deployment admission | Missing repository/base-ref or unmatched preview policy falls back to structured target-resolution failure before mutation | Wrapper payload -> preview policy query -> complete target command -> config bootstrap -> `deployments.create` |
 
 ## CLI Remote Client Matrix
 
@@ -170,6 +171,10 @@ are written as preview-scoped
 server-applied route desired state and must be present in the resulting runtime plan before the
 Action publishes `preview-url`. Unsupported source fields still fail before mutation with
 `profile-application`; unsupported secret resolvers fail with `config-secret-resolution`.
+`scripts/test/deploy-action-wrapper.test.ts` and
+`packages/orpc/test/deployment-create.http.test.ts` cover `CONTROL-PLANE-HANDSHAKE-021`, proving
+server-config pull request previews can forward partial placement hints and let server-side preview
+policy complete the resource target before deployment admission.
 `scripts/test/deploy-docs-workflow.test.ts` covers the main repository dogfood path: production
 docs deployment opts into `server-config-deploy: true` for self-hosted mode and keeps the pure SSH
 CLI fallback separate.

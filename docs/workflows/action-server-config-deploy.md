@@ -132,10 +132,14 @@ type ActionServerConfigDeployRequest = {
 GitHub repository/ref/revision facts and no Appaloft deployment ids. The deploy-action wrapper may
 derive project/environment/resource/server/destination ids from explicit workflow inputs or from
 the selected config file's non-secret `controlPlane.deploymentContext` only for one-time bootstrap,
-advanced override, relink, or support/debug workflows. If any explicit deployment identity field is
-supplied, project/environment/resource/server must all be present, and the server must
-conflict-check those ids against existing source-link state, deploy-token scope, and trusted
-repository facts before package/config/profile/route/deployment mutation.
+advanced override, relink, or support/debug workflows. Outside pull request server-config preview
+policy resolution, if any explicit deployment identity field is supplied,
+project/environment/resource/server must all be present, and the server must conflict-check those
+ids against existing source-link state, deploy-token scope, and trusted repository facts before
+package/config/profile/route/deployment mutation. In pull request server-config preview requests,
+partial project/environment/server placement hints are allowed only as trusted preview policy
+inputs; the server must complete the resource/destination target through preview policy before
+dispatching target resolution and deployment admission.
 
 `resolvedSecrets` is a transient Action-to-server payload keyed by trusted `ci-env:` environment
 name. It is allowed only to satisfy matching `secrets.KEY.from: ci-env:NAME` entries from the
@@ -252,7 +256,9 @@ For pull-request previews, server-config deploy first honors existing source-lin
 targets. If neither resolves a target and the Action request includes repository and base-ref
 context, the server may use the same neutral preview/source-event policy reader that product-grade
 preview ingestion uses, then bootstrap the preview-scoped source link with the resolved
-project/environment/resource/server target.
+project/environment/resource/server target. When the request already carries partial
+project/environment/server hints but no complete resource target, the server skips the incomplete
+explicit bootstrap attempt and uses preview policy to produce the complete target first.
 
 When a package/config is valid but the selected resource has protected profile drift, the workflow
 must follow the existing resource profile drift contract instead of silently overwriting resource

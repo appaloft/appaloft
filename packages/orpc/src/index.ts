@@ -6895,10 +6895,18 @@ async function resolveActionServerConfigDeploymentTarget(input: {
   body: ActionServerConfigDeployBody;
   request: Request;
 }): Promise<Result<ResolveActionServerConfigDeploymentTargetResponse>> {
-  const firstAttempt = await executeActionServerConfigTargetResolution(input, {
-    ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
-  });
-  if (firstAttempt.isOk() || firstAttempt.error.code !== "action_deployment_target_unresolved") {
+  const shouldTryPreviewPolicyFirst =
+    input.body.preview?.kind === "pull-request" &&
+    hasPartialTrustedDeploymentContext(input.body.trustedContext);
+  const firstAttempt = shouldTryPreviewPolicyFirst
+    ? undefined
+    : await executeActionServerConfigTargetResolution(input, {
+        ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+      });
+  if (
+    firstAttempt &&
+    (firstAttempt.isOk() || firstAttempt.error.code !== "action_deployment_target_unresolved")
+  ) {
     return firstAttempt;
   }
 
@@ -6907,12 +6915,39 @@ async function resolveActionServerConfigDeploymentTarget(input: {
     return err(previewTrustedContext.error);
   }
   if (!previewTrustedContext.value) {
-    return firstAttempt;
+    return (
+      firstAttempt ??
+      executeActionServerConfigTargetResolution(input, {
+        ...(input.body.trustedContext ? { trustedContext: input.body.trustedContext } : {}),
+      })
+    );
   }
 
   return executeActionServerConfigTargetResolution(input, {
     trustedContext: previewTrustedContext.value,
   });
+}
+
+function hasPartialTrustedDeploymentContext(
+  trustedContext: ActionServerConfigDeployBody["trustedContext"] | undefined,
+): boolean {
+  const hasAnyDeploymentId = Boolean(
+    trustedContext?.projectId ||
+      trustedContext?.environmentId ||
+      trustedContext?.resourceId ||
+      trustedContext?.serverId ||
+      trustedContext?.destinationId,
+  );
+  if (!hasAnyDeploymentId) {
+    return false;
+  }
+
+  return !(
+    trustedContext?.projectId &&
+    trustedContext.environmentId &&
+    trustedContext.resourceId &&
+    trustedContext.serverId
+  );
 }
 
 async function executeActionServerConfigTargetResolution(

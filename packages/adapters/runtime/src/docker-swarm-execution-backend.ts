@@ -21,6 +21,7 @@ import {
 import {
   type DependencyResourceSecretStore,
   type ExecutionContext,
+  type ResourceAccessFailureRendererTarget,
   type RuntimeTargetBackend,
   type RuntimeTargetBackendDescriptor,
   type RuntimeTargetCapability,
@@ -59,6 +60,7 @@ export interface DockerSwarmShellCommandRunnerOptions {
 
 export interface DockerSwarmExecutionBackendOptions {
   edgeNetworkName?: string;
+  resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
 
 type SwarmExecutionPhase = "deploy" | "verify" | "rollback";
@@ -276,12 +278,14 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
 
     const runtimeEnv = runtimeEnvResult.value;
     const redactions = [...deploymentSecretRedactions(deployment), ...runtimeEnv.redactions];
+    const resourceAccessFailureRenderer = this.options.resourceAccessFailureRenderer?.();
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: state.runtimePlan,
       environmentSnapshot: state.environmentSnapshot,
       dependencyBindingReferences: state.dependencyBindingReferences,
       identity,
       ...(this.options.edgeNetworkName ? { edgeNetworkName: this.options.edgeNetworkName } : {}),
+      ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
     });
     if (intentResult.isErr()) {
       const message = safeFailureMessage(intentResult.error.message, redactions);
