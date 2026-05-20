@@ -110,6 +110,7 @@ import {
   DefaultDeploymentOverlayPort,
   DefaultEntitlementPort,
   DefaultOperationCapabilityPort,
+  DefaultRouteSurfacePort,
   DefaultTenantContextResolver,
   DefaultUsageIntentPort,
   DeleteCertificateCommandHandler,
@@ -157,6 +158,8 @@ import {
   EnvironmentEffectivePrecedenceQueryService,
   EvaluateDeploymentOverlayCommandHandler,
   EvaluateDeploymentOverlayUseCase,
+  EvaluateRouteSurfaceCommandHandler,
+  EvaluateRouteSurfaceUseCase,
   type ExecutionContext,
   ExpireTerminalSessionsCommandHandler,
   ExportAuditEventsQueryHandler,
@@ -227,6 +230,8 @@ import {
   ListResourcesQueryService,
   ListRetentionDefaultsQueryHandler,
   ListRetentionDefaultsQueryService,
+  ListRouteSurfaceDecisionsQueryHandler,
+  ListRouteSurfaceDecisionsQueryService,
   ListRuntimeMonitoringSamplesQueryHandler,
   ListScheduledRuntimePrunePoliciesQueryHandler,
   ListScheduledRuntimePrunePoliciesQueryService,
@@ -1501,6 +1506,8 @@ export function registerApplicationServices(
   container.registerSingleton(ListUsageIntentRecordsQueryHandler);
   container.registerSingleton(EvaluateDeploymentOverlayCommandHandler);
   container.registerSingleton(ListDeploymentOverlayDecisionsQueryHandler);
+  container.registerSingleton(EvaluateRouteSurfaceCommandHandler);
+  container.registerSingleton(ListRouteSurfaceDecisionsQueryHandler);
   container.registerSingleton(CheckInstanceUpgradeQueryHandler);
   container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
@@ -1735,6 +1742,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.entitlementPort, DefaultEntitlementPort);
   container.registerSingleton(tokens.usageIntentPort, DefaultUsageIntentPort);
   container.registerSingleton(tokens.deploymentOverlayPort, DefaultDeploymentOverlayPort);
+  container.registerSingleton(tokens.routeSurfacePort, DefaultRouteSurfacePort);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
   container.registerSingleton(tokens.queryEntitlementsQueryService, QueryEntitlementsQueryService);
@@ -1750,6 +1758,11 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.listDeploymentOverlayDecisionsQueryService,
     ListDeploymentOverlayDecisionsQueryService,
+  );
+  container.registerSingleton(tokens.evaluateRouteSurfaceUseCase, EvaluateRouteSurfaceUseCase);
+  container.registerSingleton(
+    tokens.listRouteSurfaceDecisionsQueryService,
+    ListRouteSurfaceDecisionsQueryService,
   );
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);

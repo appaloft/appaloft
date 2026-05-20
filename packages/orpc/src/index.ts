@@ -152,6 +152,7 @@ import {
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
   EvaluateDeploymentOverlayCommand,
+  EvaluateRouteSurfaceCommand,
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -163,6 +164,8 @@ import {
   environmentEffectivePrecedenceQueryInputSchema,
   evaluateDeploymentOverlayInputSchema,
   evaluateDeploymentOverlayResponseSchema,
+  evaluateRouteSurfaceInputSchema,
+  evaluateRouteSurfaceResponseSchema,
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
@@ -217,6 +220,7 @@ import {
   ListResourceSecretReferencesQuery,
   ListResourcesQuery,
   ListRetentionDefaultsQuery,
+  ListRouteSurfaceDecisionsQuery,
   ListRuntimeMonitoringSamplesQuery,
   ListScheduledRuntimePrunePoliciesQuery,
   ListScheduledTaskRunsQuery,
@@ -253,6 +257,8 @@ import {
   listResourceSecretReferencesQueryInputSchema,
   listResourcesQueryInputSchema,
   listRetentionDefaultsQueryInputSchema,
+  listRouteSurfaceDecisionsInputSchema,
+  listRouteSurfaceDecisionsResponseSchema,
   listRuntimeMonitoringSamplesQueryInputSchema,
   listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
@@ -2460,6 +2466,30 @@ export const listDeploymentOverlayDecisionsProcedure = base
   .output(listDeploymentOverlayDecisionsResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ListDeploymentOverlayDecisionsQuery.create(input)),
+  );
+
+export const evaluateRouteSurfaceProcedure = base
+  .route({
+    method: "POST",
+    path: "/route-surfaces",
+    successStatus: 202,
+  })
+  .input(evaluateRouteSurfaceInputSchema)
+  .output(evaluateRouteSurfaceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, EvaluateRouteSurfaceCommand.create(input)),
+  );
+
+export const listRouteSurfaceDecisionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/route-surfaces",
+    successStatus: 200,
+  })
+  .input(listRouteSurfaceDecisionsInputSchema)
+  .output(listRouteSurfaceDecisionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListRouteSurfaceDecisionsQuery.create(input)),
   );
 
 export const createDeployTokenProcedure = base
@@ -5253,6 +5283,10 @@ export const appaloftOrpcRouter = {
     evaluate: evaluateDeploymentOverlayProcedure,
     list: listDeploymentOverlayDecisionsProcedure,
   },
+  routeSurfaces: {
+    evaluate: evaluateRouteSurfaceProcedure,
+    list: listRouteSurfaceDecisionsProcedure,
+  },
   deployTokens: {
     create: createDeployTokenProcedure,
     list: listDeployTokensProcedure,
@@ -7638,6 +7672,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/entitlements/query",
     "/api/usage-intents",
     "/api/deployment-overlays",
+    "/api/route-surfaces",
     "/api/deploy-tokens",
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",

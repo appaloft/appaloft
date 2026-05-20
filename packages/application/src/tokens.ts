@@ -12,6 +12,7 @@ export const tokens = {
   entitlementPort: Symbol.for("appaloft.entitlement_port"),
   usageIntentPort: Symbol.for("appaloft.usage_intent_port"),
   deploymentOverlayPort: Symbol.for("appaloft.deployment_overlay_port"),
+  routeSurfacePort: Symbol.for("appaloft.route_surface_port"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
@@ -216,6 +217,10 @@ export const tokens = {
   evaluateDeploymentOverlayUseCase: Symbol.for("appaloft.evaluate_deployment_overlay_use_case"),
   listDeploymentOverlayDecisionsQueryService: Symbol.for(
     "appaloft.list_deployment_overlay_decisions_query_service",
+  ),
+  evaluateRouteSurfaceUseCase: Symbol.for("appaloft.evaluate_route_surface_use_case"),
+  listRouteSurfaceDecisionsQueryService: Symbol.for(
+    "appaloft.list_route_surface_decisions_query_service",
   ),
   checkProjectDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_project_delete_safety_query_service",
