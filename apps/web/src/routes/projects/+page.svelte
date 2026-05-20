@@ -189,7 +189,7 @@
 
         {#if createProjectFeedback}
           <div
-            class={`mt-4 flex gap-2 rounded-[calc(var(--radius-lg)-2px)] border p-3 text-sm ${
+            class={`mt-4 flex gap-2 rounded-md border p-3 text-sm ${
               createProjectFeedback.kind === "success"
                 ? "border-chart-2/30 bg-chart-2/10 text-foreground"
                 : "border-destructive/30 bg-destructive/10 text-foreground"
