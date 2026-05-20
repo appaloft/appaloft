@@ -128,7 +128,9 @@
       <section class="nothing-hero-grid">
         <div class="nothing-hero-primary dot-grid-subtle">
           <p class="nothing-label">{$t(i18nKeys.console.home.latestDeploymentTitle)}</p>
-          <p class="nothing-display">{latestDeployment?.status ?? $t(i18nKeys.common.status.unknown)}</p>
+          <p class="nothing-display">
+            {latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}
+          </p>
           <div class="nothing-hero-meta">
             {#if latestDeployment}
               <span>{latestDeployment.runtimePlan.source.displayName}</span>
@@ -299,7 +301,7 @@
 <style>
   .nothing-console-home {
     display: grid;
-    gap: 48px;
+    gap: 28px;
   }
 
   .nothing-label {
@@ -322,7 +324,7 @@
 
   .nothing-hero-grid {
     display: grid;
-    gap: 24px;
+    gap: 20px;
   }
 
   @media (min-width: 1024px) {
@@ -339,13 +341,13 @@
   .nothing-inline-alert,
   .nothing-empty-state {
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     background: var(--surface);
     padding: 24px;
   }
 
   .nothing-hero-primary {
-    min-height: 340px;
+    min-height: 260px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -354,20 +356,18 @@
   .nothing-hero-primary h1 {
     max-width: 46rem;
     color: var(--text-display);
-    font-size: clamp(38px, 7vw, 82px);
-    font-weight: 300;
+    font-size: clamp(32px, 4.6vw, 56px);
+    font-weight: 500;
     letter-spacing: 0;
-    line-height: 0.95;
+    line-height: 1.05;
   }
 
   .nothing-display {
     color: var(--text-display);
-    font-family: var(--font-mono);
-    font-size: clamp(52px, 11vw, 118px);
-    font-weight: 700;
+    font-size: clamp(30px, 4.2vw, 52px);
+    font-weight: 600;
     letter-spacing: 0;
-    line-height: 0.9;
-    text-transform: uppercase;
+    line-height: 1.05;
   }
 
   .nothing-hero-meta {
@@ -382,18 +382,18 @@
 
   :global(.nothing-button),
   :global(.nothing-button-secondary) {
-    border-radius: 999px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .nothing-flow-panel,
   .nothing-instrument-panel {
     display: grid;
     align-content: start;
-    gap: 24px;
+    gap: 18px;
   }
 
   .nothing-feature-strip {
@@ -432,7 +432,7 @@
   .nothing-feature-actions strong {
     color: var(--text-display);
     font-family: var(--font-mono);
-    font-size: 48px;
+    font-size: 36px;
     font-weight: 400;
     line-height: 1;
   }
@@ -520,7 +520,7 @@
   }
 
   .nothing-segment-bar span.is-filled {
-    background: var(--text-display);
+    background: var(--primary);
   }
 
   .nothing-segment-bar span.is-good {
@@ -532,7 +532,7 @@
     display: grid;
     overflow: hidden;
     border: 1px solid var(--border-visible);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     background: var(--surface);
   }
 
@@ -566,7 +566,7 @@
   .nothing-metric-cell strong {
     color: var(--text-display);
     font-family: var(--font-mono);
-    font-size: 48px;
+    font-size: 34px;
     font-weight: 400;
     line-height: 1;
   }
@@ -583,6 +583,13 @@
     display: grid;
     gap: 8px;
     margin-bottom: 24px;
+  }
+
+  .nothing-section .nothing-empty-state {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
   }
 
   .nothing-record-row {

@@ -28,6 +28,7 @@
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
+  import OperationProgressPanel from "$lib/components/console/OperationProgressPanel.svelte";
   import ResourceSourceOption from "$lib/components/console/ResourceSourceOption.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -242,7 +243,7 @@
 
       createdResourceId = createdResource.id;
       deploymentProgressResourceId = createdResource.id;
-      deploymentProgressDialogOpen = true;
+      deploymentProgressDialogOpen = false;
       deploymentProgressDialogStatus = "running";
 
       const deploymentInput: CreateDeploymentInput = {
@@ -1179,6 +1180,22 @@
           </section>
         </aside>
       </form>
+
+      {#if deploymentCreatePending || deploymentProgressEvents.length > 0 || deploymentProgressStreamError}
+        <OperationProgressPanel
+          status={deploymentProgressDialogStatus}
+          events={deploymentProgressEvents}
+          streamError={deploymentProgressStreamError}
+          deploymentId={deploymentProgressDeploymentId}
+          requestId={deploymentProgressRequestId}
+          traceLink={deploymentProgressTraceLink}
+          title={$t(i18nKeys.console.deployments.progressTitle)}
+          description={$t(i18nKeys.console.deployments.progressDescription)}
+          onOpenDeployment={() => {
+            void goto(deploymentProgressHref());
+          }}
+        />
+      {/if}
     </div>
   {/if}
 </ConsoleShell>

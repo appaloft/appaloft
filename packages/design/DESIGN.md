@@ -43,21 +43,27 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 
 ## Color Roles
 
-- Console canvas: `oklch(1 0 0)` for page background and main workspace surface.
-- Console ink: `oklch(0.205 0 0)` for primary text, primary action fill, and active tab text.
-- Subtle surface: `oklch(0.985 0 0)` for sidebars, empty states, low-emphasis tool surfaces, and
-  row hover background.
-- Quiet border: `oklch(0.922 0 0)` for panel boundaries, table rows, input borders, and dividers.
-- Focus blue: `oklch(0.57 0.19 255)` for focus rings, links, active navigation accents, and
-  running/planning status.
+- Console canvas: `#ffffff` for the page background and main workspace outside object panels. It
+  should read as white, not light blue, heavy gray-blue, cream, sand, beige, or yellow.
+- Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.
+- Console ink: `#1b2738` for primary text and active tab text. Do not use pure black as the brand
+  fill for primary actions.
+- Appaloft blue: `#4e84ff`, taken from the canonical logo asset, for primary actions, selected
+  states, links, focus rings, and running/planning status. Use it sparingly.
+- Appaloft soft blue: `#f2f7ff` and `#f8fbff` for selected row, subtle callout, and low-emphasis
+  CTA backgrounds.
+- Quiet border: `#d9e2f2` for panel boundaries, table rows, input borders, and dividers.
+- Input hairline: `#a8bdd8` for form controls so fields stay visible without heavy outlines.
 - Ready green: `oklch(0.58 0.18 145)` for healthy, ready, succeeded, or configured-positive
   states.
 - Failure red: `oklch(0.61 0.21 27)` for failed, unhealthy, destructive, or unsafe actions.
 - Warning amber: `oklch(0.66 0.16 75)` for delayed readiness, warnings, or pending verification.
-- Muted text: `oklch(0.45 0 0)` for secondary labels, timestamps, descriptions, and placeholders.
+- Muted text: `#64748d` for secondary labels, timestamps, descriptions, and placeholders.
 
 Avoid gradient backgrounds in the console. Depth comes from spacing, borders, typography, and
-restrained shadows. Semantic colors are only for real workflow meaning.
+restrained shadows. Semantic colors are only for real workflow meaning. Avoid warm yellow canvases,
+deep navy-heavy chrome, black primary buttons, and generic shadcn neutral gray as the product
+identity.
 
 ## Typography
 
@@ -81,7 +87,14 @@ restrained shadows. Semantic colors are only for real workflow meaning.
 - Component styling belongs in Tailwind utility classes.
 - Global CSS is limited to design tokens, Tailwind theme mapping, base typography, and framework
   adapters.
-- Buttons are compact rectangular controls with gently rounded 6px corners.
+- Buttons are compact rectangular controls with gently rounded 6px corners. Default product buttons
+  are 32px tall on desktop, use Appaloft blue for the single primary action, and avoid oversized
+  pills.
+- Form controls are 32px tall by default, with a consistent 4px label-to-control gap and visible
+  input hairlines.
+- Default console borders use one quiet 1px hairline for inputs, primary panels, secondary panels,
+  metric strips, and data display rows. Show hierarchy with spacing, typography, and surface tint;
+  reserve stronger border color for hover, focus, selected, warning, and destructive states.
 - Cards frame repeated object tiles, framed tools, and empty states. Avoid nested cards.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.
@@ -100,6 +113,10 @@ area uses one named surface:
 - `console-record-list` and `console-record-row`: repeated operational records.
 - `console-metric-strip`: compact related counters.
 - danger surface: destructive action plus readiness or blocker evidence.
+
+`console-subtle-panel` must use the same border strength as inputs and other console containers. Do
+not use pale inset-shadow borders for data rows inside panels because they make the product feel like
+multiple visual systems.
 
 Use modal dialogs only for destructive confirmation or short blocking review. Routine configuration
 stays inline.

@@ -30,7 +30,9 @@
   class={`h-auto min-h-20 items-start justify-start gap-3 whitespace-normal px-3 py-3 text-left ${className}`}
   onclick={onselect}
 >
-  <span class="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground">
+  <span class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
+    selected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+  }`}>
     <Icon class="size-3.5" />
   </span>
   <span class="min-w-0 space-y-1">
