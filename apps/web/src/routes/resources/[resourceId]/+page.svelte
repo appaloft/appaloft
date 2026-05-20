@@ -72,6 +72,8 @@
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
+  import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -374,6 +376,82 @@
   const resource = $derived(resourceDetail ? resourceSummaryFromDetail(resourceDetail) : null);
   const resourceProjectId = $derived(resource?.projectId ?? "");
   const resourceEnvironmentId = $derived(resource?.environmentId ?? "");
+  const resourceCapabilityRefs = $derived(
+    resource ? { projectId: resource.projectId, resourceId: resource.id } : undefined,
+  );
+  const resourceCapabilityQueries = $derived<CapabilityQuery[]>(
+    resourceCapabilityRefs
+      ? [
+          {
+            operationKey: "resources.configure-runtime",
+            resourceRefs: resourceCapabilityRefs,
+          },
+          { operationKey: "resources.runtime.stop", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "resources.runtime.start", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "resources.runtime.restart", resourceRefs: resourceCapabilityRefs },
+        ]
+      : [],
+  );
+  const resourceCapabilityLoadKey = $derived(resourceCapabilityQueries.map(capabilityKey).join("\n"));
+  const configureRuntimeCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "resources.configure-runtime",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const stopRuntimeCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({ operationKey: "resources.runtime.stop", resourceRefs: resourceCapabilityRefs })
+      : "",
+  );
+  const startRuntimeCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({ operationKey: "resources.runtime.start", resourceRefs: resourceCapabilityRefs })
+      : "",
+  );
+  const restartRuntimeCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "resources.runtime.restart",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const canConfigureRuntimeByCapability = $derived(
+    configureRuntimeCapabilityKey
+      ? $capabilities.capabilities[configureRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canStopRuntimeByCapability = $derived(
+    stopRuntimeCapabilityKey
+      ? $capabilities.capabilities[stopRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canStartRuntimeByCapability = $derived(
+    startRuntimeCapabilityKey
+      ? $capabilities.capabilities[startRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canRestartRuntimeByCapability = $derived(
+    restartRuntimeCapabilityKey
+      ? $capabilities.capabilities[restartRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  let loadedResourceCapabilityLoadKey = $state("");
+  $effect(() => {
+    if (
+      !browser ||
+      resourceCapabilityQueries.length === 0 ||
+      resourceCapabilityLoadKey === loadedResourceCapabilityLoadKey
+    ) {
+      return;
+    }
+
+    loadedResourceCapabilityLoadKey = resourceCapabilityLoadKey;
+    void capabilities.fetch(resourceCapabilityQueries);
+  });
   const storageVolumesQuery = createQuery(() =>
     queryOptions({
       queryKey: [
@@ -975,6 +1053,7 @@
   const canConfigureRuntime = $derived(
     Boolean(
       resource &&
+        canConfigureRuntimeByCapability &&
         !isResourceArchived &&
         runtimeStrategy &&
         (runtimeStrategy !== "static" || runtimePublishDirectory.trim()) &&
@@ -3134,8 +3213,18 @@
     });
   }
 
+  function canControlResourceRuntime(operation: "stop" | "start" | "restart"): boolean {
+    if (operation === "stop") {
+      return canStopRuntimeByCapability;
+    }
+    if (operation === "start") {
+      return canStartRuntimeByCapability;
+    }
+    return canRestartRuntimeByCapability;
+  }
+
   function controlResourceRuntime(operation: "stop" | "start" | "restart"): void {
-    if (!resource || isResourceArchived || runtimeControlPending) {
+    if (!resource || isResourceArchived || !canControlResourceRuntime(operation) || runtimeControlPending) {
       return;
     }
 
@@ -5904,14 +5993,23 @@
                   {/if}
 
                   <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canConfigureRuntime || configureResourceRuntimeMutation.isPending}
+                    <CapabilityGate
+                      operationKey="resources.configure-runtime"
+                      resourceRefs={{ projectId: resource.projectId, resourceId: resource.id }}
                     >
-                      {configureResourceRuntimeMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
-                    </Button>
+                      {#snippet children({ disabled })}
+                        <Button
+                          type="submit"
+                          disabled={disabled ||
+                            !canConfigureRuntime ||
+                            configureResourceRuntimeMutation.isPending}
+                        >
+                          {configureResourceRuntimeMutation.isPending
+                            ? $t(i18nKeys.common.actions.saving)
+                            : $t(i18nKeys.common.actions.save)}
+                        </Button>
+                      {/snippet}
+                    </CapabilityGate>
                   </div>
                 </form>
 
@@ -9129,29 +9227,50 @@
                   {/if}
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    onclick={() => controlResourceRuntime("stop")}
-                    disabled={isResourceArchived || runtimeControlPending}
+                  <CapabilityGate
+                    operationKey="resources.runtime.stop"
+                    resourceRefs={{ projectId: resource.projectId, resourceId: resource.id }}
                   >
-                    <Square class="size-4" />
-                    {$t(i18nKeys.console.resources.runtimeControlStop)}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onclick={() => controlResourceRuntime("start")}
-                    disabled={isResourceArchived || runtimeControlPending}
+                    {#snippet children({ disabled })}
+                      <Button
+                        variant="outline"
+                        onclick={() => controlResourceRuntime("stop")}
+                        disabled={disabled || isResourceArchived || runtimeControlPending}
+                      >
+                        <Square class="size-4" />
+                        {$t(i18nKeys.console.resources.runtimeControlStop)}
+                      </Button>
+                    {/snippet}
+                  </CapabilityGate>
+                  <CapabilityGate
+                    operationKey="resources.runtime.start"
+                    resourceRefs={{ projectId: resource.projectId, resourceId: resource.id }}
                   >
-                    <Play class="size-4" />
-                    {$t(i18nKeys.console.resources.runtimeControlStart)}
-                  </Button>
-                  <Button
-                    onclick={() => controlResourceRuntime("restart")}
-                    disabled={isResourceArchived || runtimeControlPending}
+                    {#snippet children({ disabled })}
+                      <Button
+                        variant="outline"
+                        onclick={() => controlResourceRuntime("start")}
+                        disabled={disabled || isResourceArchived || runtimeControlPending}
+                      >
+                        <Play class="size-4" />
+                        {$t(i18nKeys.console.resources.runtimeControlStart)}
+                      </Button>
+                    {/snippet}
+                  </CapabilityGate>
+                  <CapabilityGate
+                    operationKey="resources.runtime.restart"
+                    resourceRefs={{ projectId: resource.projectId, resourceId: resource.id }}
                   >
-                    <RotateCw class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
-                    {$t(i18nKeys.console.resources.runtimeControlRestart)}
-                  </Button>
+                    {#snippet children({ disabled })}
+                      <Button
+                        onclick={() => controlResourceRuntime("restart")}
+                        disabled={disabled || isResourceArchived || runtimeControlPending}
+                      >
+                        <RotateCw class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
+                        {$t(i18nKeys.console.resources.runtimeControlRestart)}
+                      </Button>
+                    {/snippet}
+                  </CapabilityGate>
                 </div>
               </div>
               {#if runtimeControlFeedback}

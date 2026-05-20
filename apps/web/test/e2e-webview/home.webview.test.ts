@@ -1141,6 +1141,22 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         ],
       },
     },
+    "/api/rpc/capabilities/query": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        queries?: Array<{ operationKey?: string }>;
+      } | null;
+      return {
+        json: {
+          capabilities: (input?.queries ?? []).map((query) => ({
+            operationKey: query.operationKey ?? "unknown",
+            allowed: true,
+            mode: "unrestricted",
+            hint: "enabled",
+            reason: "webview-capability-allowed",
+          })),
+        },
+      };
+    },
     "/api/rpc/projects/show": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
       return {
