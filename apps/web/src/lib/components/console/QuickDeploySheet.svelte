@@ -2287,7 +2287,7 @@
           <p class="text-sm text-muted-foreground">{activeStepDetails.description}</p>
         </div>
         <div class="space-y-6">
-          <div class="grid grid-cols-2 gap-1.5 bg-muted/20 px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
+          <div class="grid grid-cols-2 gap-1.5 rounded-md border border-border/70 bg-card px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
             {#each deploymentSteps as step, index (step.key)}
               <Button
                 type="button"
@@ -2295,18 +2295,22 @@
                 size="sm"
                 class={`h-8 min-w-0 justify-start gap-1.5 rounded-md px-2.5 text-xs sm:w-auto ${
                   activeStep === step.key
-                    ? "border border-primary/70 bg-background text-foreground shadow-sm"
+                    ? "border border-primary/45 bg-primary/5 text-foreground shadow-xs"
                     : stepIsComplete(step.key)
-                      ? "text-foreground hover:bg-background"
-                      : "text-muted-foreground hover:bg-background/70"
+                      ? "text-foreground hover:bg-primary/5"
+                      : "text-muted-foreground hover:bg-muted/70"
                 } ${canVisitStep(index) ? "" : "cursor-not-allowed opacity-40"}`}
                 disabled={!canVisitStep(index)}
                 aria-current={activeStep === step.key ? "step" : undefined}
                 title={step.description}
                 onclick={() => goToStep(step.key, index)}
               >
-                <span class={`flex size-4 items-center justify-center rounded-sm text-[10px] font-medium ${
-                  stepIsComplete(step.key) ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                <span class={`flex size-4 items-center justify-center rounded-sm border text-[10px] font-medium ${
+                  activeStep === step.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : stepIsComplete(step.key)
+                      ? "border-primary/20 bg-primary/10 text-primary"
+                      : "border-border bg-secondary text-muted-foreground"
                 }`}>
                   {#if stepIsComplete(step.key)}
                     <CheckCircle2 class="size-3" />
@@ -2563,14 +2567,14 @@
                 {/if}
               </div>
               {#if authIdentity}
-                <div class="bg-muted/30 px-3 py-3 text-sm">
+                <div class="console-subtle-panel px-3 py-3 text-sm">
                   <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentIdentity)}</span>
                   <span class="ml-2 font-medium">{authIdentity}</span>
                 </div>
               {/if}
 
               {#if !githubProvider?.configured}
-                <div class="bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.githubOAuthNotConfigured)}
                 </div>
               {:else if !githubConnected}
@@ -2581,7 +2585,7 @@
               {:else}
                 <div class="space-y-3">
                   <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
-                  <div class="max-h-64 space-y-2 overflow-auto bg-muted/20 p-2">
+                  <div class="console-subtle-panel max-h-64 space-y-2 overflow-auto p-2">
                     {#if githubRepositoriesQuery.isPending}
                       {#each Array.from({ length: 4 }) as _, index (index)}
                         <Skeleton class="h-14 w-full" />
@@ -2644,12 +2648,12 @@
                 </Button>
               </div>
             {:else}
-              <div class="bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+              <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.noProjectOptions)}
               </div>
             {/if}
             {#if projectMode === "existing" && projects.length > 0}
-              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                 {#each projects as project (project.id)}
                   <Button
                     class="w-full justify-start"
@@ -2716,7 +2720,7 @@
               </Button>
             </div>
             {#if serverMode === "existing"}
-              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                 {#if servers.length > 0}
                   {#each servers as server (server.id)}
                     <Button
@@ -2780,7 +2784,7 @@
               </Button>
             </div>
             {#if environmentMode === "existing"}
-              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                 {#if filteredEnvironments.length > 0}
                   {#each filteredEnvironments as environment (environment.id)}
                     <Button
@@ -2876,45 +2880,45 @@
                 </p>
               </div>
               <div class="grid min-w-0 gap-3 text-sm md:grid-cols-2">
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                   <p class="mt-1 break-all font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
                   <p class="mt-1 break-words font-medium">{projectSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                   <p class="mt-1 break-words font-medium">{serverSummary}</p>
                   <p class="mt-1 break-words text-xs text-muted-foreground">{serverCredentialSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
                   <p class="mt-1 break-words font-medium">{environmentSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
                   <p class="mt-1 break-words font-medium">{resourceSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">
                     {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
                   </p>
                   <p class="mt-1 break-words font-medium">{resourceHealthCheckSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
                   <p class="mt-1 break-all font-medium">{domainBindingSummary}</p>
                 </div>
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
                   <p class="mt-1 break-words font-medium">{variableSummary}</p>
                 </div>
               </div>
 
               <div class="space-y-3">
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
@@ -2953,7 +2957,7 @@
                         </Button>
                       </div>
                       {#if projectMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                           {#if projects.length > 0}
                             {#each projects as project (project.id)}
                               <Button
@@ -2981,7 +2985,7 @@
                   {/if}
                 </div>
 
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
@@ -3026,7 +3030,7 @@
                         </Button>
                       </div>
                       {#if environmentMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                           {#if filteredEnvironments.length > 0}
                             {#each filteredEnvironments as environment (environment.id)}
                               <Button
@@ -3066,7 +3070,7 @@
                   {/if}
                 </div>
 
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
@@ -3111,7 +3115,7 @@
                         </Button>
                       </div>
                       {#if resourceMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
+                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
                           {#if resourcesQuery.isPending}
                             {#each Array.from({ length: 3 }) as _, index (index)}
                               <Skeleton class="h-10 w-full" />
@@ -3250,7 +3254,7 @@
                           </div>
                         </div>
                         {#if resourceHealthCheckEnabled}
-                          <div class="grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
+                          <div class="console-subtle-panel grid gap-3 p-3 sm:grid-cols-3">
                             <div class="space-y-1">
                               <label class="text-xs font-medium text-muted-foreground" for="resource-health-path">
                                 {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
@@ -3400,7 +3404,7 @@
                       </div>
                     </div>
                     {#if resourceHealthCheckEnabled}
-                      <div class="mt-3 grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
+                      <div class="console-subtle-panel mt-3 grid gap-3 p-3 sm:grid-cols-3">
                         <div class="space-y-1">
                           <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-path">
                             {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
@@ -3477,7 +3481,7 @@
                   {/if}
                 </div>
 
-                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
@@ -3548,17 +3552,17 @@
   </div>
 
   <aside class="min-w-0 space-y-5 xl:sticky xl:top-5 xl:self-start">
-      <section class="min-w-0 space-y-4 rounded-md border bg-background p-4">
+      <section class="console-side-panel min-w-0 space-y-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
           <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</p>
         </div>
         <div class="space-y-3 text-sm">
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
             <span class="min-w-0 break-words text-right font-medium">{$t(selectedSourceOption.labelKey)}</span>
           </div>
-          <div class="min-w-0 rounded-md border bg-muted/10 px-3 py-3">
+          <div class="console-subtle-panel min-w-0 px-3 py-3">
             <div class="mb-2 flex items-center justify-between gap-3">
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
@@ -3575,33 +3579,33 @@
               {/each}
             </div>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
             <span class="min-w-0 break-words text-right font-medium">{projectSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
             <span class="min-w-0 break-words text-right font-medium">{serverSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</span>
             <span class="min-w-0 break-words text-right font-medium">{environmentSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
             <span class="min-w-0 break-words text-right font-medium">{resourceSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">
               {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
             </span>
             <span class="min-w-0 break-words text-right font-medium">{resourceHealthCheckSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</span>
             <span class="min-w-0 break-all text-right font-medium">{domainBindingSummary}</span>
           </div>
-          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+          <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
             <span class="min-w-0 break-words text-right font-medium">{variableSummary}</span>
           </div>
@@ -3689,7 +3693,7 @@
                 <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
               {/if}
               {#if diagnosticSummaryCopyFallback}
-                <div class="mt-3 space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
+                <div class="console-subtle-panel mt-3 space-y-2 border-dashed p-3">
                   <div class="space-y-1">
                     <p class="text-sm font-medium">
                       {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}

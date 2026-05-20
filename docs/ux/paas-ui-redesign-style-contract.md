@@ -6,6 +6,10 @@
 - Phase 0 completed: locked the implementation contract for the PaaS console redesign.
 - Feedback pass: replaced the warm/yellow and black-primary direction with a logo-blue, cool-white
   system inspired by Stripe's compact product rhythm without copying Stripe's purple identity.
+- Feedback pass: lifted the canvas from gray-blue to near-white and removed red/pink from
+  non-error secondary states in the deploy flow.
+- Feedback pass: tightened deploy surfaces so list wells, review cards, and the side summary use
+  white owner panels plus soft Appaloft-blue tints instead of gray-blue nested blocks.
 
 ## Visual Direction Summary
 
@@ -42,7 +46,8 @@ this redesign.
 - Modal-heavy creation/configuration flows.
 - Spinner-only deployment, DNS, TLS, or server operations.
 - Decorative gradients, rainbow status color, and accent color used as filler.
-- Warm yellow/sand canvases, deep navy-heavy chrome, and black primary buttons.
+- Warm yellow/sand canvases, heavy gray-blue canvases, deep navy-heavy chrome, black primary
+  buttons, and red/pink secondary accents outside error or danger states.
 
 ## 3. Allowed Visual Patterns
 

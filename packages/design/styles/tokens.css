@@ -7,7 +7,7 @@
     monospace;
   --appaloft-font-serif: "Fraunces", ui-serif, Georgia, serif;
   --appaloft-control-density: 0.875;
-  --background: #f6f9fc;
+  --background: #fcfeff;
   --foreground: #1b2738;
   --card: #ffffff;
   --card-foreground: #1b2738;
@@ -15,11 +15,11 @@
   --popover-foreground: #1b2738;
   --primary: #4e84ff;
   --primary-foreground: #ffffff;
-  --secondary: #eef4ff;
+  --secondary: #f6f9ff;
   --secondary-foreground: #273951;
-  --muted: #f0f5fb;
+  --muted: #f8fbff;
   --muted-foreground: #64748d;
-  --accent: #e8f0ff;
+  --accent: #eef5ff;
   --accent-foreground: #2857c8;
   --destructive: oklch(0.61 0.21 27);
   --destructive-foreground: #ffffff;
@@ -31,11 +31,11 @@
   --chart-3: oklch(0.61 0.21 27);
   --chart-4: oklch(0.66 0.16 75);
   --chart-5: #7aa4ff;
-  --sidebar: #f8fbff;
+  --sidebar: #fcfeff;
   --sidebar-foreground: #243247;
   --sidebar-primary: #4e84ff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eaf2ff;
+  --sidebar-accent: #f2f7ff;
   --sidebar-accent-foreground: #274061;
   --sidebar-border: #dce6f4;
   --sidebar-ring: #4e84ff;
