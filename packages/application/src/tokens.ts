@@ -8,6 +8,8 @@ export const tokens = {
   operationScopePort: Symbol.for("appaloft.operation_scope_port"),
   operationVisibilityPort: Symbol.for("appaloft.operation_scope_port"),
   operationCapabilityPort: Symbol.for("appaloft.operation_capability_port"),
+  tenantContextResolver: Symbol.for("appaloft.tenant_context_resolver"),
+  entitlementPort: Symbol.for("appaloft.entitlement_port"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
@@ -204,6 +206,7 @@ export const tokens = {
   ),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   queryCapabilitiesQueryService: Symbol.for("appaloft.query_capabilities_query_service"),
+  queryEntitlementsQueryService: Symbol.for("appaloft.query_entitlements_query_service"),
   checkProjectDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_project_delete_safety_query_service",
   ),

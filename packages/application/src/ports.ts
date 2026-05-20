@@ -100,6 +100,7 @@ import {
 import {
   type ExecutionActor,
   type ExecutionContext,
+  type ExecutionTenantContext,
   type RepositoryContext,
   type TraceAttributes,
 } from "./execution-context";
@@ -6546,6 +6547,96 @@ export interface OperationCapabilityPort {
       queries: readonly OperationCapabilityQuery[];
     },
   ): Promise<readonly OperationCapabilityResult[]>;
+}
+
+export type EntitlementStatus = "entitled" | "not_entitled" | "unknown";
+export type EntitlementDecisionMode = "restricted" | "unrestricted" | "unknown";
+export type EntitlementDetails = Record<string, unknown>;
+
+export interface EntitlementActorRef {
+  kind?: ExecutionActor["kind"] | (string & {}) | undefined;
+  id?: string | undefined;
+  userId?: string | undefined;
+  email?: string | undefined;
+}
+
+export interface EntitlementResourceRefs {
+  organizationId?: string | undefined;
+  projectId?: string | undefined;
+  environmentId?: string | undefined;
+  resourceId?: string | undefined;
+  serverId?: string | undefined;
+  destinationId?: string | undefined;
+  deploymentId?: string | undefined;
+  [key: string]: string | undefined;
+}
+
+export interface EntitlementQuery {
+  capabilityKey: string;
+  actor?: EntitlementActorRef | undefined;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  resourceRefs?: EntitlementResourceRefs | undefined;
+  attributes?: EntitlementDetails | undefined;
+}
+
+export interface EntitlementDecision {
+  capabilityKey: string;
+  entitled: boolean;
+  status: EntitlementStatus;
+  mode: EntitlementDecisionMode;
+  hint: string;
+  reason: string;
+  source: string;
+  details?: EntitlementDetails;
+}
+
+export interface EntitlementPort {
+  checkEntitlements(
+    context: ExecutionContext,
+    input: {
+      queries: readonly EntitlementQuery[];
+    },
+  ): Promise<readonly EntitlementDecision[]>;
+}
+
+export interface TenantContextResolver {
+  resolveTenantContext(context: ExecutionContext): Promise<ExecutionTenantContext | undefined>;
+}
+
+export class DefaultTenantContextResolver implements TenantContextResolver {
+  async resolveTenantContext(
+    context: ExecutionContext,
+  ): Promise<ExecutionTenantContext | undefined> {
+    return context.tenant;
+  }
+}
+
+export class DefaultEntitlementPort implements EntitlementPort {
+  async checkEntitlements(
+    context: ExecutionContext,
+    input: { queries: readonly EntitlementQuery[] },
+  ): Promise<readonly EntitlementDecision[]> {
+    return input.queries.map((query) => ({
+      capabilityKey: query.capabilityKey,
+      entitled: true,
+      status: "entitled",
+      mode: "unrestricted",
+      hint: "enabled",
+      reason: "entitlement-default-allow",
+      source: "default",
+      details: {
+        capabilityKey: query.capabilityKey,
+        ...((query.organizationId ?? context.tenant?.organizationId)
+          ? { organizationId: query.organizationId ?? context.tenant?.organizationId }
+          : {}),
+        ...((query.tenantId ?? context.tenant?.tenantId)
+          ? { tenantId: query.tenantId ?? context.tenant?.tenantId }
+          : {}),
+      },
+    }));
+  }
 }
 
 export class AllowAllOperationScopePort implements OperationScopePort {

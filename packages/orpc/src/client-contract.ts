@@ -103,6 +103,8 @@ import {
   type PruneSourceEventsCommandInput,
   type QueryCapabilitiesInput,
   type QueryCapabilitiesResponse,
+  type QueryEntitlementsInput,
+  type QueryEntitlementsResponse,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
@@ -464,6 +466,14 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       QueryCapabilitiesInput,
       QueryCapabilitiesResponse,
+      AppaloftClientError
+    >;
+  };
+  entitlements: {
+    query: Client<
+      AppaloftClientContext,
+      QueryEntitlementsInput,
+      QueryEntitlementsResponse,
       AppaloftClientError
     >;
   };

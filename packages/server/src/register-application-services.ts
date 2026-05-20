@@ -107,7 +107,9 @@ import {
   DeactivateServerUseCase,
   DeadLetterOperatorWorkCommandHandler,
   DeadLetterOperatorWorkUseCase,
+  DefaultEntitlementPort,
   DefaultOperationCapabilityPort,
+  DefaultTenantContextResolver,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
@@ -285,6 +287,8 @@ import {
   PruneServerCapacityUseCase,
   QueryCapabilitiesQueryHandler,
   QueryCapabilitiesQueryService,
+  QueryEntitlementsQueryHandler,
+  QueryEntitlementsQueryService,
   RedeployDeploymentCommandHandler,
   RedeployDeploymentUseCase,
   RegisterServerUseCase,
@@ -1482,6 +1486,7 @@ export function registerApplicationServices(
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(QueryCapabilitiesQueryHandler);
+  container.registerSingleton(QueryEntitlementsQueryHandler);
   container.registerSingleton(CheckInstanceUpgradeQueryHandler);
   container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
@@ -1712,8 +1717,11 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.rotateDeployTokenUseCase, RotateDeployTokenUseCase);
   container.registerSingleton(tokens.showDeployTokenQueryService, ShowDeployTokenQueryService);
   container.registerSingleton(tokens.operationCapabilityPort, DefaultOperationCapabilityPort);
+  container.registerSingleton(tokens.tenantContextResolver, DefaultTenantContextResolver);
+  container.registerSingleton(tokens.entitlementPort, DefaultEntitlementPort);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
+  container.registerSingleton(tokens.queryEntitlementsQueryService, QueryEntitlementsQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);
