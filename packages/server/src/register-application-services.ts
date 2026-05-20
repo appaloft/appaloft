@@ -107,6 +107,7 @@ import {
   DeactivateServerUseCase,
   DeadLetterOperatorWorkCommandHandler,
   DeadLetterOperatorWorkUseCase,
+  DefaultOperationCapabilityPort,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
@@ -282,6 +283,8 @@ import {
   PruneResourceRuntimeLogArchivesUseCase,
   PruneServerCapacityCommandHandler,
   PruneServerCapacityUseCase,
+  QueryCapabilitiesQueryHandler,
+  QueryCapabilitiesQueryService,
   RedeployDeploymentCommandHandler,
   RedeployDeploymentUseCase,
   RegisterServerUseCase,
@@ -1478,6 +1481,7 @@ export function registerApplicationServices(
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(QueryCapabilitiesQueryHandler);
   container.registerSingleton(CheckInstanceUpgradeQueryHandler);
   container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
@@ -1707,7 +1711,9 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.revokeDeployTokenUseCase, RevokeDeployTokenUseCase);
   container.registerSingleton(tokens.rotateDeployTokenUseCase, RotateDeployTokenUseCase);
   container.registerSingleton(tokens.showDeployTokenQueryService, ShowDeployTokenQueryService);
+  container.registerSingleton(tokens.operationCapabilityPort, DefaultOperationCapabilityPort);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
+  container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);

@@ -3401,6 +3401,12 @@ export const publicDocsOperationCoverage = [
     topicId: "self-hosting.first-admin-bootstrap",
   },
   {
+    operationKey: "capabilities.query",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+    note: "Neutral capability readback for role-aware Web, SDK, and API surfaces.",
+  },
+  {
     operationKey: "organizations.current-context",
     status: "documented",
     topicId: "self-hosting.organization-team-management",

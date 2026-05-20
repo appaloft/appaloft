@@ -2146,6 +2146,11 @@ describe("public docs operation coverage", () => {
       status: "documented",
       topicId: "self-hosting.first-admin-bootstrap",
     });
+    expect(getPublicDocsOperationCoverage("capabilities.query")).toMatchObject({
+      operationKey: "capabilities.query",
+      status: "documented",
+      topicId: "self-hosting.organization-team-management",
+    });
     expect(topic.surfaces).toEqual(expect.arrayContaining(["web", "cli", "http-api", "mcp"]));
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([

@@ -290,6 +290,9 @@ import {
   pruneSourceEventsCommandInputSchema,
   type Query,
   type QueryBus,
+  QueryCapabilitiesQuery,
+  queryCapabilitiesInputSchema,
+  queryCapabilitiesResponseSchema,
   RedeployDeploymentCommand,
   RegisterServerCommand,
   ReleaseAuditEventLegalHoldCommand,
@@ -2370,6 +2373,18 @@ export const authBootstrapFirstAdminProcedure = base
   .output(bootstrapFirstAdminResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, BootstrapFirstAdminCommand.create(input)),
+  );
+
+export const queryCapabilitiesProcedure = base
+  .route({
+    method: "POST",
+    path: "/capabilities/query",
+    successStatus: 200,
+  })
+  .input(queryCapabilitiesInputSchema)
+  .output(queryCapabilitiesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, QueryCapabilitiesQuery.create(input)),
   );
 
 export const createDeployTokenProcedure = base
@@ -5149,6 +5164,9 @@ export const appaloftOrpcRouter = {
     bootstrapStatus: authBootstrapStatusProcedure,
     bootstrapFirstAdmin: authBootstrapFirstAdminProcedure,
   },
+  capabilities: {
+    query: queryCapabilitiesProcedure,
+  },
   deployTokens: {
     create: createDeployTokenProcedure,
     list: listDeployTokensProcedure,
@@ -7495,6 +7513,7 @@ export function mountAppaloftOrpcRoutes(
   const routes = [
     "/api/bootstrap/auth/status",
     "/api/bootstrap/auth/first-admin",
+    "/api/capabilities/query",
     "/api/deploy-tokens",
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",

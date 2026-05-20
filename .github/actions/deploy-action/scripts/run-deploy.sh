@@ -637,8 +637,8 @@ source_package_payload_for_action() {
   local source_package_github_token
 
   payload="{\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\",\"sourcePackage\":{\"transport\":\"server-github-fetch\",\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
-  if [ -n "${GITHUB_SHA:-}" ]; then
-    payload="${payload},\"revision\":\"$(json_escape "$GITHUB_SHA")\""
+  if [ -n "$source_revision" ]; then
+    payload="${payload},\"revision\":\"$(json_escape "$source_revision")\""
   fi
   if [ -n "${GITHUB_REPOSITORY:-}" ]; then
     payload="${payload},\"repositoryFullName\":\"$(json_escape "$GITHUB_REPOSITORY")\""
@@ -651,7 +651,7 @@ source_package_payload_for_action() {
   if [ -n "$source_package_github_token" ]; then
     payload="${payload},\"sourcePackageCredentials\":{\"githubToken\":\"$(json_escape "$source_package_github_token")\"}"
   fi
-  if [ -n "$project_id" ] || [ -n "$environment_id" ] || [ -n "$resource_id" ] || [ -n "$server_id" ] || [ -n "$destination_id" ] || [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; then
+  if [ -n "$project_id" ] || [ -n "$environment_id" ] || [ -n "$resource_id" ] || [ -n "$server_id" ] || [ -n "$destination_id" ] || [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "$source_revision" ]; then
     payload="${payload},\"trustedContext\":{"
     local separator=""
     if [ -n "$project_id" ]; then payload="${payload}${separator}\"projectId\":\"$(json_escape "$project_id")\""; separator=","; fi
@@ -662,7 +662,7 @@ source_package_payload_for_action() {
     if [ -n "${GITHUB_REPOSITORY:-}" ]; then payload="${payload}${separator}\"repositoryFullName\":\"$(json_escape "$GITHUB_REPOSITORY")\""; separator=","; fi
     if [ -n "${GITHUB_REPOSITORY_ID:-}" ]; then payload="${payload}${separator}\"repositoryId\":\"$(json_escape "$GITHUB_REPOSITORY_ID")\""; separator=","; fi
     if [ -n "${GITHUB_REF:-}" ]; then payload="${payload}${separator}\"ref\":\"$(json_escape "$GITHUB_REF")\""; separator=","; fi
-    if [ -n "${GITHUB_SHA:-}" ]; then payload="${payload}${separator}\"revision\":\"$(json_escape "$GITHUB_SHA")\""; fi
+    if [ -n "$source_revision" ]; then payload="${payload}${separator}\"revision\":\"$(json_escape "$source_revision")\""; fi
     payload="${payload}}"
   fi
   if [ "$preview" = "pull-request" ]; then
@@ -672,8 +672,8 @@ source_package_payload_for_action() {
     if [ -n "$pr_number" ]; then
       payload="${payload},\"pullRequestNumber\":${pr_number}"
     fi
-    if [ -n "${GITHUB_SHA:-}" ]; then
-      payload="${payload},\"headSha\":\"$(json_escape "$GITHUB_SHA")\""
+    if [ -n "$source_revision" ]; then
+      payload="${payload},\"headSha\":\"$(json_escape "$source_revision")\""
     fi
     if [ -n "${GITHUB_BASE_REF:-}" ]; then
       payload="${payload},\"baseRef\":\"$(json_escape "$GITHUB_BASE_REF")\""
@@ -1081,6 +1081,7 @@ appaloft_bin="${APPALOFT_BIN:-appaloft}"
 wrapper_command="${INPUT_COMMAND:-deploy}"
 input_version="${INPUT_VERSION:-latest}"
 source_locator="${INPUT_SOURCE:-.}"
+source_revision="${INPUT_SOURCE_REVISION:-${GITHUB_SHA:-}}"
 config_path="${INPUT_CONFIG:-}"
 input_control_plane_mode="${INPUT_CONTROL_PLANE_MODE:-}"
 control_plane_mode="$input_control_plane_mode"
@@ -1343,6 +1344,9 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
         else
           printf 'POST %s/api/action/deployments/from-source-link\n' "$control_plane_url"
         fi
+        if [ -n "$source_revision" ]; then
+          printf 'SOURCE_REVISION %s\n' "$source_revision"
+        fi
       } > "$APPALOFT_DEPLOY_ACTION_ARGV_PATH"
     else
       printf 'GET %s/api/version\n' "$control_plane_url"
@@ -1352,6 +1356,9 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
         printf 'POST %s/api/action/deployments/from-config-package\n' "$control_plane_url"
       else
         printf 'POST %s/api/action/deployments/from-source-link\n' "$control_plane_url"
+      fi
+      if [ -n "$source_revision" ]; then
+        printf 'SOURCE_REVISION %s\n' "$source_revision"
       fi
     fi
   else
@@ -1373,13 +1380,13 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
         payload="${payload},\"destinationId\":\"$(json_escape "$destination_id")\""
       fi
     fi
-    if { [ "$wrapper_command" = "deploy" ] || [ "$wrapper_command" = "preview-cleanup" ]; } && { [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "${GITHUB_SHA:-}" ]; }; then
+    if { [ "$wrapper_command" = "deploy" ] || [ "$wrapper_command" = "preview-cleanup" ]; } && { [ -n "${GITHUB_REPOSITORY:-}" ] || [ -n "${GITHUB_REPOSITORY_ID:-}" ] || [ -n "${GITHUB_REF:-}" ] || [ -n "$source_revision" ]; }; then
       payload="${payload},\"trustedContext\":{"
       separator=""
       if [ -n "${GITHUB_REPOSITORY:-}" ]; then payload="${payload}${separator}\"repositoryFullName\":\"$(json_escape "$GITHUB_REPOSITORY")\""; separator=","; fi
       if [ -n "${GITHUB_REPOSITORY_ID:-}" ]; then payload="${payload}${separator}\"repositoryId\":\"$(json_escape "$GITHUB_REPOSITORY_ID")\""; separator=","; fi
       if [ -n "${GITHUB_REF:-}" ]; then payload="${payload}${separator}\"ref\":\"$(json_escape "$GITHUB_REF")\""; separator=","; fi
-      if [ -n "${GITHUB_SHA:-}" ]; then payload="${payload}${separator}\"revision\":\"$(json_escape "$GITHUB_SHA")\""; fi
+      if [ -n "$source_revision" ]; then payload="${payload}${separator}\"revision\":\"$(json_escape "$source_revision")\""; fi
       payload="${payload}}"
     fi
     payload="${payload}}"

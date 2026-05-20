@@ -6461,11 +6461,17 @@ export interface OperationGuardPort {
 
 export type OperationScopeConstraintKind =
   | "organization"
+  | "organizationId"
   | "project"
+  | "projectId"
   | "resource"
+  | "resourceId"
   | "environment"
+  | "environmentId"
   | "server"
+  | "serverId"
   | "destination"
+  | "destinationId"
   | (string & {});
 
 export type OperationScopeConstraintOperator = "in";
@@ -6476,21 +6482,13 @@ export interface OperationScopeConstraint {
   values: readonly string[];
 }
 
-export type OperationScopeVisibility = "constrained" | "none" | "unrestricted";
+export type OperationScopeVisibility = "constrained" | "denied" | "unrestricted";
 
 export type OperationScopeDecision =
   | {
       effect: "allow";
       reason: string;
       visibility: "unrestricted";
-      constraints?: undefined;
-      details?: DomainErrorDetails;
-      traceAttributes?: TraceAttributes;
-    }
-  | {
-      effect: "allow";
-      reason: string;
-      visibility: "none";
       constraints?: undefined;
       details?: DomainErrorDetails;
       traceAttributes?: TraceAttributes;
@@ -6506,6 +6504,7 @@ export type OperationScopeDecision =
   | {
       effect: "deny";
       reason: string;
+      visibility: "denied";
       deniedBy?: {
         checkKey: string;
         kind: OperationCheckKind;
@@ -6519,6 +6518,34 @@ export interface OperationScopePort {
     context: ExecutionContext,
     request: OperationCheckRequest,
   ): Promise<OperationScopeDecision>;
+}
+
+export type OperationCapabilityMode = OperationScopeVisibility;
+
+export interface OperationCapabilityQuery {
+  operationKey: string;
+  actor?: ExecutionActor;
+  organizationId?: string | undefined;
+  resourceRefs?: Record<string, string | undefined> | undefined;
+  contextAttributes?: DomainErrorDetails | undefined;
+}
+
+export interface OperationCapabilityResult {
+  operationKey: string;
+  allowed: boolean;
+  mode: OperationCapabilityMode;
+  hint: string;
+  reason: string;
+  details?: DomainErrorDetails | undefined;
+}
+
+export interface OperationCapabilityPort {
+  checkCapabilities(
+    context: ExecutionContext,
+    input: {
+      queries: readonly OperationCapabilityQuery[];
+    },
+  ): Promise<readonly OperationCapabilityResult[]>;
 }
 
 export class AllowAllOperationScopePort implements OperationScopePort {

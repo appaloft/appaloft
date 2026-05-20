@@ -38,10 +38,6 @@ export class ListProjectsQueryService {
       }
 
       const decision = scoped.value;
-      if (decision.effect === "allow" && decision.visibility === "none") {
-        return ok({ items: [] });
-      }
-
       if (decision.effect === "allow" && decision.visibility === "constrained") {
         const organizationIds = constraintsByKind(decision.constraints, "organization");
         const projectIds = constraintsByKind(decision.constraints, "project");

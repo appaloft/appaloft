@@ -6,7 +6,9 @@ The public implementation does not depend on a specific policy engine or commerc
 
 This guard is separate from transport/session access metadata. The operation catalog may describe whether a route needs a product session before dispatch; that metadata preserves existing transport behavior and is not a policy engine contract.
 
-Query visibility is a separate concern from operation admission. Appaloft also exposes a neutral operation scope port for read paths where a caller is allowed to run the query but should only see part of the result set. Scope decisions can return unrestricted, none, or constrained visibility. Constrained visibility uses structured constraints such as organization or project ids; it does not expose SQL, ORM predicates, or a concrete policy engine. Scope evaluation runs inside an application trace span and may attach additional trace attributes.
+Query visibility is a separate concern from operation admission. Appaloft also exposes a neutral operation scope port for read paths where a caller is allowed to run the query but should only see part of the result set. Scope decisions return `unrestricted`, `constrained`, or `denied` visibility. Constrained visibility uses structured constraints such as `organizationId`, `projectId`, `resourceId`, and `serverId`; it does not expose SQL, ORM predicates, or a concrete policy engine. Scope evaluation runs inside an application trace span and may attach additional trace attributes.
+
+Capability readback is the neutral UI-facing projection of the same operation boundary. A client can batch operation keys with actor/context/resource references and receive `operationKey`, `allowed`, `mode`, `hint`, `reason`, and `details`. This readback does not expose CASL, OPA, Cedar, roles from private distributions, billing, pricing, or entitlement strategy.
 
 ## Request Shape
 
@@ -26,8 +28,9 @@ Project-scoped checks should use the public project ownership read model instead
 
 - Operation checks run at the application command/query boundary, not only in HTTP middleware.
 - The guard is operation-level and policy-engine-neutral.
-- Query scope is policy-engine-neutral and should be translated by read models into structured filters. A scope result of `none` returns an empty query result rather than an authorization error.
+- Query scope is policy-engine-neutral and should be translated by read models into structured filters. List-style query use cases should apply `constrained` filters when the returned constraints can be translated safely. If a read path cannot safely filter the query, it must return the stable `operation_check_denied` scope error instead of leaking unscoped data.
 - Individual checks are composable. A deployment can register authorization, entitlement, quota, or validation checks behind the same public result shape.
+- Capability readback is advisory UI state. Commands and queries must still pass the application operation guard and query scope at execution time.
 - Public Appaloft must not import private distribution packages.
 - The existing `ProductOrganizationRole` compatibility role may remain, but execution context preserves the full organization team role: `owner`, `admin`, `billing`, `developer`, or `viewer`.
 - Community defaults keep local/self-hosted behavior compatible; stricter deployments should supply a fail-closed adapter.

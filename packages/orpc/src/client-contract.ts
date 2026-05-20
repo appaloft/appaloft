@@ -101,6 +101,8 @@ import {
   type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
   type PruneSourceEventsCommandInput,
+  type QueryCapabilitiesInput,
+  type QueryCapabilitiesResponse,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
@@ -454,6 +456,14 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       BootstrapFirstAdminCommandInput,
       BootstrapFirstAdminResponse,
+      AppaloftClientError
+    >;
+  };
+  capabilities: {
+    query: Client<
+      AppaloftClientContext,
+      QueryCapabilitiesInput,
+      QueryCapabilitiesResponse,
       AppaloftClientError
     >;
   };

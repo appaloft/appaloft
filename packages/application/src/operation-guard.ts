@@ -182,8 +182,8 @@ export async function scopeOperation(input: {
       const scoped = await input.operationScopePort.scopeOperation(input.context, request);
       span.setAttribute("appaloft.operation.scope.effect", scoped.effect);
       span.setAttribute("appaloft.operation.scope.reason", scoped.reason);
+      span.setAttribute("appaloft.operation.scope.visibility", scoped.visibility);
       if (scoped.effect === "allow") {
-        span.setAttribute("appaloft.operation.scope.visibility", scoped.visibility);
         span.setStatus("ok", scoped.reason);
       } else {
         span.setStatus("error", scoped.reason);
@@ -206,8 +206,9 @@ export function constraintsByKind(
   constraints: readonly OperationScopeConstraint[] | undefined,
   kind: OperationScopeConstraint["kind"],
 ): string[] | undefined {
+  const aliases = constraintKindAliases(kind);
   const values = constraints
-    ?.filter((constraint) => constraint.kind === kind && constraint.operator === "in")
+    ?.filter((constraint) => aliases.includes(constraint.kind) && constraint.operator === "in")
     .flatMap((constraint) => constraint.values)
     .filter((value) => value.trim().length > 0);
 
@@ -219,6 +220,30 @@ export function constraintsByKind(
 }
 
 export const scopeOperationVisibility = scopeOperation;
+
+function constraintKindAliases(
+  kind: OperationScopeConstraint["kind"],
+): OperationScopeConstraint["kind"][] {
+  if (kind === "organization" || kind === "organizationId") {
+    return ["organization", "organizationId"];
+  }
+  if (kind === "project" || kind === "projectId") {
+    return ["project", "projectId"];
+  }
+  if (kind === "resource" || kind === "resourceId") {
+    return ["resource", "resourceId"];
+  }
+  if (kind === "environment" || kind === "environmentId") {
+    return ["environment", "environmentId"];
+  }
+  if (kind === "server" || kind === "serverId") {
+    return ["server", "serverId"];
+  }
+  if (kind === "destination" || kind === "destinationId") {
+    return ["destination", "destinationId"];
+  }
+  return [kind];
+}
 
 function operationScopeSpanName(operationKey: string): string {
   return `appaloft.operation_scope.${operationKey
