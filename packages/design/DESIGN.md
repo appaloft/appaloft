@@ -92,6 +92,9 @@ identity.
   pills.
 - Form controls are 32px tall by default, with a consistent 4px label-to-control gap and visible
   input hairlines.
+- Default console borders use one quiet 1px hairline for inputs, primary panels, secondary panels,
+  metric strips, and data display rows. Show hierarchy with spacing, typography, and surface tint;
+  reserve stronger border color for hover, focus, selected, warning, and destructive states.
 - Cards frame repeated object tiles, framed tools, and empty states. Avoid nested cards.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.
@@ -110,6 +113,10 @@ area uses one named surface:
 - `console-record-list` and `console-record-row`: repeated operational records.
 - `console-metric-strip`: compact related counters.
 - danger surface: destructive action plus readiness or blocker evidence.
+
+`console-subtle-panel` must use the same border strength as inputs and other console containers. Do
+not use pale inset-shadow borders for data rows inside panels because they make the product feel like
+multiple visual systems.
 
 Use modal dialogs only for destructive confirmation or short blocking review. Routine configuration
 stays inline.

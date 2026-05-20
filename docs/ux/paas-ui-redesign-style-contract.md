@@ -63,6 +63,8 @@ this redesign.
 - Full pages or wizards for complex creation, server connection, domain/TLS, and deployment setup.
 - Named console surfaces: `console-panel`, `console-subtle-panel`, `console-side-panel`,
   `console-record-list`, `console-record-row`, and `console-metric-strip`.
+- One quiet 1px border strength across inputs, display rows, panels, metric strips, and side summaries;
+  hierarchy comes from layout and typography, not mismatched border darkness.
 - Subtle dividers, surface contrast, restrained shadows only for layered UI such as drawers, popovers,
   dropdowns, modals, and floating bars.
 
@@ -74,6 +76,8 @@ this redesign.
 - Global CSS for component-specific styling beyond tokens, theme mapping, base typography, or framework
   adapters.
 - Raw `bg-background` blocks and loose borders as the main ownership model.
+- Pale inset-shadow borders or locally darkened input borders that make nested cards and controls look
+  like different products.
 - Icon-only destructive actions.
 - Green-on-black hacker log treatment or decorative prompt chrome.
 - Vague status labels like "Good" or "OK" when the actual infrastructure state is known.

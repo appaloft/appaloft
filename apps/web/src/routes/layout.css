@@ -31,7 +31,7 @@
   .console-panel {
     position: relative;
     overflow: hidden;
-    border: 1px solid var(--border);
+    border: 1px solid var(--input);
     border-radius: var(--radius-lg);
     background: var(--card);
     box-shadow: var(--shadow-2xs);
@@ -84,14 +84,14 @@
   }
 
   .console-subtle-panel {
-    border: 0;
+    border: 1px solid var(--input);
     border-radius: var(--radius-md);
     background: color-mix(in oklch, var(--muted) 24%, var(--card));
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--border) 44%, transparent);
+    box-shadow: none;
   }
 
   .console-side-panel {
-    border: 1px solid var(--border);
+    border: 1px solid var(--input);
     border-radius: var(--radius-lg);
     background: var(--card);
     padding: 1rem;
@@ -103,20 +103,20 @@
   }
 
   .console-section {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--input);
     padding-top: 1.25rem;
   }
 
   .console-record-list {
     overflow: hidden;
-    border: 1px solid var(--border);
+    border: 1px solid var(--input);
     border-radius: var(--radius-lg);
     background: var(--card);
     box-shadow: var(--shadow-2xs);
   }
 
   .console-record-list > :not([hidden]) ~ :not([hidden]) {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--input);
   }
 
   .console-record-row {
@@ -145,7 +145,7 @@
   .console-metric-strip {
     display: grid;
     overflow: hidden;
-    border: 1px solid var(--border);
+    border: 1px solid var(--input);
     border-radius: var(--radius-lg);
     background: var(--card);
     box-shadow: var(--shadow-2xs);
@@ -158,20 +158,20 @@
 
   @media (min-width: 768px) {
     .console-metric-strip > * + * {
-      border-left: 1px solid var(--border);
+      border-left: 1px solid var(--input);
     }
   }
 
   @media (max-width: 767px) {
     .console-metric-strip > * + * {
-      border-top: 1px solid var(--border);
+      border-top: 1px solid var(--input);
     }
   }
 
   .console-form-section {
     display: grid;
     gap: 1rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--input);
     padding-top: 1.25rem;
   }
 
@@ -236,7 +236,7 @@
 
   [data-console-main]
     :where([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) {
-    border-color: color-mix(in oklch, var(--border) 88%, var(--foreground));
+    border-color: var(--input);
     background: var(--card);
   }
 
@@ -329,7 +329,7 @@
   }
 
   [data-console-header] {
-    border-bottom-color: var(--border);
+    border-bottom-color: var(--input);
     background: var(--card);
   }
 
@@ -361,6 +361,7 @@
 
   [data-console-main] :where([class~="rounded-md"][class~="border"]) {
     border-radius: var(--radius-md);
+    border-color: var(--input);
   }
 
   [data-console-main] :where([class~="rounded-md"][class~="border"][class*="destructive"]) {
