@@ -18,6 +18,27 @@
   const canSubmit = $derived(email.trim().length > 0 && password.length > 0 && !submitting);
   const returnTo = $derived(page.url.searchParams.get("next") || "/");
 
+  function errorMessageFromResponseBody(body: string): string {
+    const trimmed = body.trim();
+    if (trimmed.length === 0) {
+      return "";
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (parsed && typeof parsed === "object") {
+        const message = (parsed as Record<string, unknown>).message;
+        if (typeof message === "string" && message.trim().length > 0) {
+          return message.trim();
+        }
+      }
+    } catch {
+      return trimmed;
+    }
+
+    return trimmed;
+  }
+
   async function submitLogin(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canSubmit) {
@@ -43,7 +64,7 @@
 
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).trim();
-        throw new Error(detail || `${response.status}`);
+        throw new Error(errorMessageFromResponseBody(detail) || `${response.status}`);
       }
 
       if (browser) {
@@ -62,10 +83,12 @@
 </svelte:head>
 
 <main class="min-h-screen bg-background p-4 text-foreground md:p-8">
-  <div class="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-md items-center justify-center md:min-h-[calc(100vh-4rem)]">
-    <section class="w-full rounded-lg border bg-card p-6 shadow-sm">
-      <div class="flex items-center gap-3">
-        <img src={appaloftIcon} alt={$t(i18nKeys.common.app.productName)} class="size-8" />
+  <div class="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-lg items-center justify-center md:min-h-[calc(100vh-4rem)]">
+    <section class="console-panel w-full p-6 md:p-8">
+      <div class="flex items-center gap-3.5">
+        <div class="flex size-10 items-center justify-center rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30">
+          <img src={appaloftIcon} alt={$t(i18nKeys.common.app.productName)} class="size-7" />
+        </div>
         <div>
           <p class="text-sm font-medium">{$t(i18nKeys.common.app.productName)}</p>
           <p class="text-xs text-muted-foreground">
@@ -86,25 +109,25 @@
         </p>
       </div>
 
-      <form class="mt-6 space-y-4" onsubmit={submitLogin}>
+      <form class="mt-7 grid gap-5" onsubmit={submitLogin}>
         {#if loginError}
-          <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
             <p class="font-medium">{$t(i18nKeys.console.authBootstrap.loginFailed)}</p>
-            <p class="mt-1 text-muted-foreground">{loginError}</p>
+            <p class="mt-1.5 break-words text-muted-foreground">{loginError}</p>
           </div>
         {/if}
 
-        <label class="space-y-1.5 text-sm font-medium">
-          <span>{$t(i18nKeys.console.authBootstrap.loginEmailLabel)}</span>
+        <label class="appaloft-field-stack">
+          <span class="appaloft-field-label">{$t(i18nKeys.console.authBootstrap.loginEmailLabel)}</span>
           <Input bind:value={email} type="email" autocomplete="email" required />
         </label>
 
-        <label class="space-y-1.5 text-sm font-medium">
-          <span>{$t(i18nKeys.console.authBootstrap.loginPasswordLabel)}</span>
+        <label class="appaloft-field-stack">
+          <span class="appaloft-field-label">{$t(i18nKeys.console.authBootstrap.loginPasswordLabel)}</span>
           <Input bind:value={password} type="password" autocomplete="current-password" required />
         </label>
 
-        <div class="flex flex-wrap gap-2">
+        <div class="appaloft-action-row justify-start pt-1">
           <Button type="submit" disabled={!canSubmit}>
             <LogIn class="size-4" />
             {submitting
