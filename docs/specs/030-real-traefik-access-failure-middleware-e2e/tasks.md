@@ -55,6 +55,8 @@ Verification notes:
 
 - `RES-ACCESS-DIAG-REAL-001` is covered by
   `packages/providers/edge-proxy-traefik/test/provider.test.ts`.
+- `RES-ACCESS-DIAG-ROUTE-005` is covered by
+  `packages/adapters/runtime/test/docker-swarm-runtime-intent.test.ts`.
 - `RES-ACCESS-DIAG-REAL-002` is covered by
   `packages/adapters/http-elysia/test/resource-access-failure-diagnostics.test.ts`.
 - `RES-ACCESS-DIAG-REAL-003` and `ROUTE-TLS-BOUNDARY-009` are covered by the opt-in Docker target

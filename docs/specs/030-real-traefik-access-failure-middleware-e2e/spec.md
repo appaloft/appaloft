@@ -34,11 +34,12 @@ renderer surfaces to explain ownership without provider-native raw payloads.
 | REAL-TRAEFIK-ACCESS-SPEC-001 | Real Traefik served-route upstream failure | Traefik runs with an Appaloft-rendered served route, safe renderer target, and safe applied route context | The route matches a request but the upstream target returns a gateway-generated 502/503/504 class failure | Traefik invokes the Appaloft renderer and returns a `resource-access-failure/v1` diagnostic with the request id, stable code/phase/status, affected host/path, and safe route context. |
 | REAL-TRAEFIK-ACCESS-SPEC-002 | Request-id evidence lookup after real edge capture | The renderer captured the real Traefik diagnostic into short-retention evidence | An operator looks up the request id through the existing lookup surface | The lookup returns the same safe envelope and related ids without raw Traefik labels, provider logs, headers, cookies, sensitive query strings, SSH credentials, or route mutation. |
 | REAL-TRAEFIK-ACCESS-SPEC-003 | Real edge route-not-found fallback remains safe | Traefik runs with the provider-rendered low-priority route-not-found fallback and a safe renderer target | No served or redirect router matches the request host/path | The fallback invokes the renderer with `resource_access_route_not_found` and safe affected request data, while ACME challenge paths remain excluded. |
+| REAL-TRAEFIK-ACCESS-SPEC-004 | Docker Swarm route labels preserve diagnostics | Docker Swarm runtime renders Traefik labels directly for a served route and the Appaloft backend exposes a safe renderer target | The route matches but the Swarm workload is unavailable or returns a gateway-generated failure | The Swarm service labels attach the same diagnostic `errors` middleware for 404/502/503/504 responses so users see the Appaloft resource access failure page instead of a bare Traefik gateway page. |
 
 ## Domain Ownership
 
 - Bounded context: Workload Delivery / Resource access observation with Runtime Topology provider
-  realization.
+  realization, including direct Docker Swarm Traefik label rendering.
 - Aggregate/resource owner: none. This is adapter/read-model observation, not aggregate state.
 - Upstream/downstream contexts: Traefik provider rendering, local/SSH runtime route realization,
   HTTP diagnostic renderer, short-retention evidence lookup, automatic/applied route context

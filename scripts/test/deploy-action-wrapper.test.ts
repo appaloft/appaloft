@@ -1109,6 +1109,92 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
+  test("[CONTROL-PLANE-HANDSHAKE-021] self-hosted server config preview allows partial placement hints for preview policy", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-server-preview-hints-"));
+    const outputPath = join(workspace, "github-output.txt");
+    const payloadPath = join(workspace, "payload.json");
+    const binDir = join(workspace, "bin");
+    const fakeCurl = join(binDir, "curl");
+    mkdirSync(binDir);
+    writeFileSync(
+      fakeCurl,
+      [
+        "#!/usr/bin/env bash",
+        'case "$*" in',
+        '  *"/api/version"*)',
+        '    printf \'{"apiVersion":"v1","features":{"sourcePackage":true,"serverSideConfigBootstrap":true}}\'',
+        "    ;;",
+        '  *"/api/action/deployments/from-config-package"*)',
+        '    payload=""',
+        '    previous=""',
+        '    for arg in "$@"; do',
+        '      if [ "$previous" = "--data-binary" ]; then',
+        '        payload="$arg"',
+        "      fi",
+        '      previous="$arg"',
+        "    done",
+        "    payload_file=\"$(printf '%s' \"$payload\" | sed 's/^@//')\"",
+        '    cat "$payload_file" > "$APPALOFT_CAPTURED_PAYLOAD"',
+        '    printf \'{"id":"dep_server_preview","deploymentHref":"/deployments/dep_server_preview","previewUrl":"http://pr-42.preview.example.com"}\'',
+        "    ;;",
+        "  *)",
+        "    echo 'unexpected curl call' >&2",
+        "    exit 22",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeCurl, 0o755);
+
+    const result = Bun.spawnSync(["bash", runDeployScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_BIN: "/opt/appaloft/appaloft",
+        APPALOFT_CAPTURED_PAYLOAD: payloadPath,
+        GITHUB_BASE_REF: "main",
+        GITHUB_OUTPUT: outputPath,
+        GITHUB_REPOSITORY: "appaloft/www",
+        GITHUB_REPOSITORY_ID: "123456",
+        GITHUB_SHA: "abc123",
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_CONTROL_PLANE_MODE: "self-hosted",
+        INPUT_CONTROL_PLANE_URL: "https://console.example.com/",
+        INPUT_ENVIRONMENT_ID: "env_preview",
+        INPUT_PREVIEW: "pull-request",
+        INPUT_PREVIEW_ID: "pr-42",
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: "pr-42.preview.example.com",
+        INPUT_PROJECT_ID: "prj_www",
+        INPUT_SERVER_CONFIG_DEPLOY: "true",
+        INPUT_SERVER_ID: "srv_prod",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+      expect(payload.trustedContext).toMatchObject({
+        projectId: "prj_www",
+        environmentId: "env_preview",
+        serverId: "srv_prod",
+        repositoryFullName: "appaloft/www",
+        repositoryId: "123456",
+        revision: "abc123",
+      });
+      expect(payload.trustedContext).not.toHaveProperty("resourceId");
+      expect(readFileSync(outputPath, "utf8")).toContain(
+        "preview-url=http://pr-42.preview.example.com",
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   test("[SELF-AUTH-ACTION-004] self-hosted deploy surfaces structured action auth denial details", () => {
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-auth-denied-"));
     const outputPath = join(workspace, "github-output.txt");
