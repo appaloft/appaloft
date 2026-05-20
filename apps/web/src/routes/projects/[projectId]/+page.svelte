@@ -31,6 +31,8 @@
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
+  import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -101,6 +103,50 @@
       isProjectArchived &&
       projectDeleteSafety?.eligible === true &&
       !projectDeleteSafetyQuery.isPending,
+  );
+  const projectCapabilityQueries = $derived<CapabilityQuery[]>(
+    project
+      ? [
+          { operationKey: "projects.rename", resourceRefs: { projectId: project.id } },
+          { operationKey: "projects.archive", resourceRefs: { projectId: project.id } },
+          { operationKey: "projects.restore", resourceRefs: { projectId: project.id } },
+          { operationKey: "projects.delete", resourceRefs: { projectId: project.id } },
+          { operationKey: "resources.create", resourceRefs: { projectId: project.id } },
+        ]
+      : [],
+  );
+  const projectCapabilityLoadKey = $derived(projectCapabilityQueries.map(capabilityKey).join("\n"));
+  const projectRenameCapabilityKey = $derived(
+    project ? capabilityKey({ operationKey: "projects.rename", resourceRefs: { projectId: project.id } }) : "",
+  );
+  const projectArchiveCapabilityKey = $derived(
+    project ? capabilityKey({ operationKey: "projects.archive", resourceRefs: { projectId: project.id } }) : "",
+  );
+  const projectRestoreCapabilityKey = $derived(
+    project ? capabilityKey({ operationKey: "projects.restore", resourceRefs: { projectId: project.id } }) : "",
+  );
+  const projectDeleteCapabilityKey = $derived(
+    project ? capabilityKey({ operationKey: "projects.delete", resourceRefs: { projectId: project.id } }) : "",
+  );
+  const canRenameProjectByCapability = $derived(
+    projectRenameCapabilityKey
+      ? $capabilities.capabilities[projectRenameCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canArchiveProjectByCapability = $derived(
+    projectArchiveCapabilityKey
+      ? $capabilities.capabilities[projectArchiveCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canRestoreProjectByCapability = $derived(
+    projectRestoreCapabilityKey
+      ? $capabilities.capabilities[projectRestoreCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canDeleteProjectByCapability = $derived(
+    projectDeleteCapabilityKey
+      ? $capabilities.capabilities[projectDeleteCapabilityKey]?.allowed === true
+      : false,
   );
   const projectEnvironments = $derived(
     project ? environments.filter((environment) => environment.projectId === project.id) : [],
@@ -192,6 +238,7 @@
   let renameEnvironmentNames = $state<Record<string, string>>({});
   const canRenameProject = $derived(
     Boolean(project) &&
+      canRenameProjectByCapability &&
       !isProjectArchived &&
       projectName.trim().length > 0 &&
       projectName.trim() !== project?.name,
@@ -256,6 +303,7 @@
       };
     },
   }));
+  let loadedProjectCapabilityLoadKey = $state("");
   const deleteProjectMutation = createMutation(() => ({
     mutationFn: (input: DeleteProjectInput) => orpcClient.projects.delete(input),
     onSuccess: (result) => {
@@ -401,6 +449,19 @@
     lifecycleFeedback = null;
   });
 
+  $effect(() => {
+    if (
+      !browser ||
+      projectCapabilityQueries.length === 0 ||
+      projectCapabilityLoadKey === loadedProjectCapabilityLoadKey
+    ) {
+      return;
+    }
+
+    loadedProjectCapabilityLoadKey = projectCapabilityLoadKey;
+    void capabilities.fetch(projectCapabilityQueries);
+  });
+
   function cloneEnvironmentName(environmentId: string): string {
     return cloneEnvironmentNames[environmentId] ?? "";
   }
@@ -436,7 +497,13 @@
   }
 
   function archiveProject(): void {
-    if (!browser || !project || isProjectArchived || archiveProjectMutation.isPending) {
+    if (
+      !browser ||
+      !project ||
+      isProjectArchived ||
+      !canArchiveProjectByCapability ||
+      archiveProjectMutation.isPending
+    ) {
       return;
     }
 
@@ -451,7 +518,13 @@
   }
 
   function restoreProject(): void {
-    if (!browser || !project || !isProjectArchived || restoreProjectMutation.isPending) {
+    if (
+      !browser ||
+      !project ||
+      !isProjectArchived ||
+      !canRestoreProjectByCapability ||
+      restoreProjectMutation.isPending
+    ) {
       return;
     }
 
@@ -466,7 +539,13 @@
   }
 
   function deleteProject(): void {
-    if (!browser || !project || !canDeleteProject || deleteProjectMutation.isPending) {
+    if (
+      !browser ||
+      !project ||
+      !canDeleteProject ||
+      !canDeleteProjectByCapability ||
+      deleteProjectMutation.isPending
+    ) {
       return;
     }
 
@@ -679,10 +758,17 @@
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <Button href={projectCreateResourceHref(project.id)} disabled={isProjectArchived}>
-              <Plus class="size-4" />
-              {$t(i18nKeys.common.actions.createResource)}
-            </Button>
+            <CapabilityGate operationKey="resources.create" resourceRefs={{ projectId: project.id }}>
+              {#snippet children({ disabled })}
+                <Button
+                  href={projectCreateResourceHref(project.id)}
+                  disabled={disabled || isProjectArchived}
+                >
+                  <Plus class="size-4" />
+                  {$t(i18nKeys.common.actions.createResource)}
+                </Button>
+              {/snippet}
+            </CapabilityGate>
             <Button href={`/deployments?projectId=${project.id}`} variant="outline">
               {$t(i18nKeys.common.actions.viewDeployments)}
             </Button>
@@ -874,48 +960,69 @@
           </div>
           {#if isProjectArchived}
             <div class="flex flex-wrap gap-2">
-              <Button
-                id="project-restore-button"
-                type="button"
-                disabled={restoreProjectMutation.isPending}
-                onclick={restoreProject}
+              <CapabilityGate
+                operationKey="projects.restore"
+                resourceRefs={{ projectId: project.id }}
               >
-                <RotateCcw class="size-4" />
-                {restoreProjectMutation.isPending
-                  ? $t(i18nKeys.common.actions.saving)
-                  : $t(i18nKeys.console.projects.restoreAction)}
-              </Button>
-              <Button
-                id="project-delete-button"
-                type="button"
-                variant="destructive"
-                disabled={!canDeleteProject || deleteProjectMutation.isPending}
-                title={projectDeleteBlockerCount > 0
-                  ? $t(i18nKeys.console.projects.deleteBlocked, {
-                      count: projectDeleteBlockerCount,
-                    })
-                  : undefined}
-                onclick={deleteProject}
+                {#snippet children({ disabled })}
+                  <Button
+                    id="project-restore-button"
+                    type="button"
+                    disabled={disabled || restoreProjectMutation.isPending}
+                    onclick={restoreProject}
+                  >
+                    <RotateCcw class="size-4" />
+                    {restoreProjectMutation.isPending
+                      ? $t(i18nKeys.common.actions.saving)
+                      : $t(i18nKeys.console.projects.restoreAction)}
+                  </Button>
+                {/snippet}
+              </CapabilityGate>
+              <CapabilityGate
+                operationKey="projects.delete"
+                resourceRefs={{ projectId: project.id }}
               >
-                <Trash2 class="size-4" />
-                {deleteProjectMutation.isPending
-                  ? $t(i18nKeys.common.actions.saving)
-                  : $t(i18nKeys.console.projects.deleteAction)}
-              </Button>
+                {#snippet children({ disabled })}
+                  <Button
+                    id="project-delete-button"
+                    type="button"
+                    variant="destructive"
+                    disabled={disabled || !canDeleteProject || deleteProjectMutation.isPending}
+                    title={projectDeleteBlockerCount > 0
+                      ? $t(i18nKeys.console.projects.deleteBlocked, {
+                          count: projectDeleteBlockerCount,
+                        })
+                      : undefined}
+                    onclick={deleteProject}
+                  >
+                    <Trash2 class="size-4" />
+                    {deleteProjectMutation.isPending
+                      ? $t(i18nKeys.common.actions.saving)
+                      : $t(i18nKeys.console.projects.deleteAction)}
+                  </Button>
+                {/snippet}
+              </CapabilityGate>
             </div>
           {:else}
-            <Button
-              id="project-archive-button"
-              type="button"
-              variant="destructive"
-              disabled={archiveProjectMutation.isPending}
-              onclick={archiveProject}
+            <CapabilityGate
+              operationKey="projects.archive"
+              resourceRefs={{ projectId: project.id }}
             >
-              <Archive class="size-4" />
-              {archiveProjectMutation.isPending
-                ? $t(i18nKeys.common.actions.saving)
-                : $t(i18nKeys.console.projects.archiveAction)}
-            </Button>
+              {#snippet children({ disabled })}
+                <Button
+                  id="project-archive-button"
+                  type="button"
+                  variant="destructive"
+                  disabled={disabled || archiveProjectMutation.isPending}
+                  onclick={archiveProject}
+                >
+                  <Archive class="size-4" />
+                  {archiveProjectMutation.isPending
+                    ? $t(i18nKeys.common.actions.saving)
+                    : $t(i18nKeys.console.projects.archiveAction)}
+                </Button>
+              {/snippet}
+            </CapabilityGate>
           {/if}
         </div>
 
@@ -955,16 +1062,23 @@
               disabled={isProjectArchived || renameProjectMutation.isPending}
             />
           </label>
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={!canRenameProject || renameProjectMutation.isPending}
+          <CapabilityGate
+            operationKey="projects.rename"
+            resourceRefs={{ projectId: project.id }}
           >
-            <Save class="size-4" />
-            {renameProjectMutation.isPending
-              ? $t(i18nKeys.common.actions.saving)
-              : $t(i18nKeys.common.actions.save)}
-          </Button>
+            {#snippet children({ disabled })}
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={disabled || !canRenameProject || renameProjectMutation.isPending}
+              >
+                <Save class="size-4" />
+                {renameProjectMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.common.actions.save)}
+              </Button>
+            {/snippet}
+          </CapabilityGate>
         </form>
       </section>
 
@@ -977,14 +1091,21 @@
                 {$t(i18nKeys.console.projects.resourcesDescription)}
               </p>
             </div>
-            <Button
-              href={projectCreateResourceHref(project.id)}
-              variant="outline"
-              disabled={isProjectArchived}
+            <CapabilityGate
+              operationKey="resources.create"
+              resourceRefs={{ projectId: project.id }}
             >
-              <Plus class="size-4" />
-              {$t(i18nKeys.common.actions.createResource)}
-            </Button>
+              {#snippet children({ disabled })}
+                <Button
+                  href={projectCreateResourceHref(project.id)}
+                  variant="outline"
+                  disabled={disabled || isProjectArchived}
+                >
+                  <Plus class="size-4" />
+                  {$t(i18nKeys.common.actions.createResource)}
+                </Button>
+              {/snippet}
+            </CapabilityGate>
           </div>
 
           <div class="console-record-list">
@@ -1286,14 +1407,21 @@
                   <p class="text-sm text-muted-foreground">
                     {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
                   </p>
-                  <Button
-                    size="sm"
-                    href={projectCreateResourceHref(project.id)}
-                    disabled={isProjectArchived}
+                  <CapabilityGate
+                    operationKey="resources.create"
+                    resourceRefs={{ projectId: project.id }}
                   >
-                    <Play class="size-4" />
-                    {$t(i18nKeys.common.actions.deploy)}
-                  </Button>
+                    {#snippet children({ disabled })}
+                      <Button
+                        size="sm"
+                        href={projectCreateResourceHref(project.id)}
+                        disabled={disabled || isProjectArchived}
+                      >
+                        <Play class="size-4" />
+                        {$t(i18nKeys.common.actions.deploy)}
+                      </Button>
+                    {/snippet}
+                  </CapabilityGate>
                 </div>
               </div>
             </div>
