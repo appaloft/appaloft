@@ -1458,6 +1458,138 @@ describe("deployment create HTTP route", () => {
     });
   });
 
+  test("[CONFIG-FILE-ENTRY-029] Action server config endpoint treats partial preview ids as policy hints", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const targetCommands: ResolveActionServerConfigDeploymentTargetCommand[] = [];
+    let previewContextQuery: ResolvePreviewPullRequestContextQuery | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          targetCommands.push(command);
+          return ok({
+            sourceFingerprint: command.sourceFingerprint,
+            projectId: command.trustedContext?.projectId,
+            environmentId: command.trustedContext?.environmentId,
+            resourceId: command.trustedContext?.resourceId,
+            serverId: command.trustedContext?.serverId,
+            destinationId: command.trustedContext?.destinationId,
+            updatedAt: "2026-05-08T00:00:00.000Z",
+            reason: "github-action-preview-policy",
+          } as T);
+        }
+
+        capturedCommands.push(command as Command<unknown>);
+        return ok({ id: "dep_preview_policy_hints" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        if (query instanceof ResolvePreviewPullRequestContextQuery) {
+          previewContextQuery = query;
+          return ok({
+            projectId: "prj_cloud",
+            environmentId: "env_preview",
+            resourceId: "res_cloud_preview",
+            serverId: "srv_yundu",
+            destinationId: "dst_yundu",
+            sourceBindingFingerprint: "source-binding:github:appaloft/appaloft-cloud",
+          } as T);
+        }
+
+        return ok({} as T);
+      },
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "runtime:",
+            "  strategy: dockerfile",
+            "network:",
+            "  internalPort: 3001",
+            "  exposureMode: reverse-proxy",
+          ].join("\n"),
+          fileName: "appaloft.cloud-preview.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:preview%3Apr%3A1:github:provider-repository%3A123456:.:appaloft.cloud-preview.yml",
+          configPath: "appaloft.cloud-preview.yml",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:preview%3Apr%3A1:github:provider-repository%3A123456:.:appaloft.cloud-preview.yml",
+            configPath: "appaloft.cloud-preview.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/appaloft-cloud",
+            repositoryId: "123456",
+          },
+          preview: {
+            kind: "pull-request",
+            previewId: "cloud-pr-1",
+            pullRequestNumber: 1,
+            baseRef: "main",
+            headRef: "fix/preview",
+          },
+          trustedContext: {
+            repositoryFullName: "appaloft/appaloft-cloud",
+            repositoryId: "123456",
+            ref: "refs/pull/1/merge",
+            revision: "abc123",
+            projectId: "prj_cloud",
+            environmentId: "env_preview",
+            serverId: "srv_yundu",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(previewContextQuery).toMatchObject({
+      repositoryFullName: "appaloft/appaloft-cloud",
+      providerRepositoryId: "123456",
+      baseRef: "main",
+    });
+    expect(targetCommands).toHaveLength(1);
+    expect(targetCommands[0]).toMatchObject({
+      trustedContext: {
+        repositoryFullName: "appaloft/appaloft-cloud",
+        repositoryId: "123456",
+        projectId: "prj_cloud",
+        environmentId: "env_preview",
+        resourceId: "res_cloud_preview",
+        serverId: "srv_yundu",
+        destinationId: "dst_yundu",
+      },
+    });
+    expect(capturedCommands.at(-1)).toBeInstanceOf(CreateDeploymentCommand);
+    expect(capturedCommands.at(-1)).toMatchObject({
+      projectId: "prj_cloud",
+      environmentId: "env_preview",
+      resourceId: "res_cloud_preview",
+      serverId: "srv_yundu",
+      destinationId: "dst_yundu",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-028] Action server config endpoint bootstraps source-link context from trusted ids", async () => {
     let capturedCommand: Command<unknown> | undefined;
     let targetCommand: ResolveActionServerConfigDeploymentTargetCommand | undefined;

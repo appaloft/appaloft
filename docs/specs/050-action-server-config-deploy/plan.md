@@ -52,8 +52,8 @@
 
 ## Testing Strategy
 
-- Matrix ids: `CONTROL-PLANE-HANDSHAKE-013` through `CONTROL-PLANE-HANDSHAKE-017` and
-  `CONFIG-FILE-ENTRY-028`.
+- Matrix ids: `CONTROL-PLANE-HANDSHAKE-013` through `CONTROL-PLANE-HANDSHAKE-017`,
+  `CONTROL-PLANE-HANDSHAKE-021`, `CONFIG-FILE-ENTRY-028`, and `CONFIG-FILE-ENTRY-029`.
 - Test-first rows:
   - wrapper rejects server config deploy when handshake lacks the required feature;
   - wrapper does not invoke CLI/SSH/state-backend in server config mode;
@@ -66,6 +66,8 @@
   - server-side config bootstrap dispatches resource/environment commands before ids-only
     deployment;
   - preview server config deploy uses preview-scoped source fingerprints.
+  - preview server config deploy forwards partial project/environment/server placement hints and
+    lets server-side preview policy resolve the complete preview resource target.
 - Contract/integration: start with hermetic wrapper tests and HTTP route tests using fake command
   bus/source package adapter/source link repository.
 - Acceptance/e2e: add a self-hosted PGlite server smoke only after source package storage and

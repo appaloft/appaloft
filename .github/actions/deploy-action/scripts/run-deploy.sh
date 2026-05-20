@@ -1287,10 +1287,12 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
   fi
   if [ "$wrapper_command" = "deploy" ] && $has_any_explicit_context; then
     has_explicit_deployment_context=true
-    require_input "project-id" "$project_id"
-    require_input "environment-id" "$environment_id"
-    require_input "resource-id" "$resource_id"
-    require_input "server-id" "$server_id"
+    if ! truthy "$server_config_deploy" || [ "$preview" != "pull-request" ]; then
+      require_input "project-id" "$project_id"
+      require_input "environment-id" "$environment_id"
+      require_input "resource-id" "$resource_id"
+      require_input "server-id" "$server_id"
+    fi
   fi
 
   if [ "$wrapper_command" = "preview-cleanup" ] && $has_any_explicit_context; then

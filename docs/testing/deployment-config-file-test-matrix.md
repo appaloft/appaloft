@@ -225,6 +225,7 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-028 | integration | Self-hosted Action server config deploy keeps config non-secret | A `control-plane-mode: self-hosted` server config deploy submits a source package/config path to the self-hosted server | Server-side config bootstrap accepts only non-secret repository config fields, resolves identity from trusted Action/server/source-link/token-scope context, and rejects committed broad identity or secret fields before mutation. |
 | CONFIG-FILE-ENTRY-028A | integration | Self-hosted Action server config deploy does not require ids in the common path | `server-config-deploy=true` supplies control-plane URL, deploy token, config path, and trusted GitHub repository/ref/revision/preview context, but no project/environment/resource/server ids | Server-side target resolution reuses an existing source link or complete deploy-token scope, then applies config/profile/env/domain commands and dispatches ids-only `deployments.create`; no ids are required in the workflow for the steady-state path. |
 | CONFIG-FILE-ENTRY-028B | integration | Self-hosted Action bootstrap ids are narrow advanced context | `server-config-deploy=true` supplies explicit ids through Action inputs or `controlPlane.deploymentContext` | The ids are completeness-checked and conflict-checked against source-link state, deploy-token scope, and trusted repository facts; missing or conflicting context fails before config/profile/route/deployment mutation. |
+| CONFIG-FILE-ENTRY-029 | integration | Self-hosted Action server config preview policy completes partial placement hints | `server-config-deploy=true` and `preview=pull-request` supply trusted repository/base-ref context plus optional project/environment/server hints but no explicit resource id | The wrapper forwards the partial trusted context, the server resolves the complete preview target through preview policy, and deployment admission remains ids-only. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -376,11 +377,13 @@ repository.
 
 `scripts/test/deploy-action-wrapper.test.ts`, `packages/orpc/test/deployment-create.http.test.ts`,
 and `packages/application/test/action-source-link-deployment.test.ts` now cover
-`CONFIG-FILE-ENTRY-028` through `CONFIG-FILE-ENTRY-028B` for the active self-hosted server-config
+`CONFIG-FILE-ENTRY-028` through `CONFIG-FILE-ENTRY-029` for the active self-hosted server-config
 deploy path: the wrapper can call the config package API without project/environment/resource/server
 ids, repository/ref/revision facts travel as trusted context, the server validates package/config
-before mutation, existing source links and complete deploy-token scope can resolve the target, and
-explicit bootstrap ids are narrow advanced context that conflict-checks before mutation.
+before mutation, existing source links and complete deploy-token scope can resolve the target,
+explicit bootstrap ids are narrow advanced context that conflict-checks before mutation, and pull
+request preview policy can complete a target when the Action supplies partial placement hints but no
+resource id.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,

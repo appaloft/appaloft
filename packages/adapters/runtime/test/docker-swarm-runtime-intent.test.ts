@@ -591,6 +591,40 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(plan.steps[3]?.command ?? "").toContain("appaloft.runtime-target=docker-swarm");
   });
 
+  test("[RES-ACCESS-DIAG-ROUTE-003][SWARM-TARGET-APPLY-001] renders Traefik access failure middleware for Swarm routes", () => {
+    const intent = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(),
+      identity: {
+        resourceId: "res_api",
+        deploymentId: "dep_123",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+      resourceAccessFailureRenderer: {
+        url: "http://host.docker.internal:3001",
+      },
+    })._unsafeUnwrap();
+
+    const plan = renderDockerSwarmApplyPlan(intent)._unsafeUnwrap();
+    const router = "appaloft-res-api-dst-prod-dep-123-web";
+
+    expect(plan.routeLabels).toContain(
+      `traefik.http.routers.${router}.middlewares=appaloft-resource-access-errors`,
+    );
+    expect(plan.routeLabels).toContain(
+      "traefik.http.middlewares.appaloft-resource-access-errors.errors.status=404,502,503,504",
+    );
+    expect(plan.routeLabels).toContain(
+      "traefik.http.middlewares.appaloft-resource-access-errors.errors.query=/.appaloft/resource-access-failure?status={status}",
+    );
+    expect(plan.routeLabels).toContain(
+      "traefik.http.services.appaloft-diagnostic-renderer.loadbalancer.server.url=http://host.docker.internal:3001",
+    );
+    expect(plan.steps[2]?.command ?? "").toContain(
+      "--label-add 'traefik.http.routers.appaloft-res-api-dst-prod-dep-123-web.middlewares=appaloft-resource-access-errors'",
+    );
+  });
+
   test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] renders Compose stack apply plan with storage mounts", () => {
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: composeRuntimePlan({
