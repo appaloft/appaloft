@@ -36,7 +36,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
-  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
+  import ResourceListTable from "$lib/components/console/ResourceListTable.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -55,9 +55,7 @@
     deploymentDetailHref,
     findProject,
     formatTime,
-    latestResourceDeployment,
     projectCreateResourceHref,
-    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -1108,42 +1106,17 @@
             </CapabilityGate>
           </div>
 
-          <div class="console-record-list">
-            {#if projectResources.length > 0}
-              {#each projectResources as resource (resource.id)}
-                {@const latestDeployment = latestResourceDeployment(resource, deployments)}
-                <a
-                  href={resourceDetailHref(resource)}
-                  class="console-record-row group sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:items-center"
-                >
-                  <div class="min-w-0 space-y-2">
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
-                      <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
-                      <h3 class="truncate font-medium">{resource.name}</h3>
-                      <Badge variant="secondary">{resource.kind}</Badge>
-                    </div>
-                    <p class="line-clamp-1 text-sm text-muted-foreground">
-                      {resource.description ?? resource.slug}
-                    </p>
-                  </div>
-
-                  <div class="grid gap-1 text-sm text-muted-foreground sm:grid-cols-1">
-                    <span>{resource.services.length} {$t(i18nKeys.common.domain.services)}</span>
-                    <span>{resource.deploymentCount} {$t(i18nKeys.common.domain.deployments)}</span>
-                    <span class="truncate">
-                      {latestDeployment ? formatTime(latestDeployment.createdAt) : $t(i18nKeys.console.projects.noDeploymentShort)}
-                    </span>
-                  </div>
-
-                  <ArrowRight class="hidden size-4 self-center text-muted-foreground transition-colors group-hover:text-foreground sm:block" />
-                </a>
-              {/each}
-            {:else}
-              <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.projects.noResources)}
-              </div>
-            {/if}
-          </div>
+          <ResourceListTable
+            resources={projectResources}
+            {deployments}
+            environments={projectEnvironments}
+            emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
+            emptyDescription={$t(i18nKeys.console.projects.noResources)}
+            createHref={projectCreateResourceHref(project.id)}
+            createLabel={$t(i18nKeys.common.actions.createResource)}
+            createDisabled={isProjectArchived}
+            showEnvironment
+          />
         </section>
 
         <aside class="console-side-panel space-y-8 xl:sticky xl:top-24 xl:self-start">

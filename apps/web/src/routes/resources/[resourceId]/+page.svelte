@@ -11,6 +11,7 @@
     Clipboard,
     Copy,
     Database,
+    Gauge,
     HardDrive,
     Globe2,
     Link2,
@@ -74,7 +75,9 @@
   import { readErrorMessage } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
@@ -115,6 +118,7 @@
     runtimeMonitoringTimestampInObservationWindow,
   } from "$lib/console/runtime-usage";
   import {
+    deploymentDetailHref,
     findEnvironment,
     findProject,
     findServer,
@@ -139,6 +143,7 @@
       appaloftDesktop?: AppaloftDesktopBridge;
     };
   type ResourceDetailTab =
+    | "overview"
     | "settings"
     | "deployments"
     | "scheduled-tasks"
@@ -218,6 +223,7 @@
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = [
+    "overview",
     "settings",
     "deployments",
     "scheduled-tasks",
@@ -3829,7 +3835,7 @@
   function parseResourceDetailTab(value: string | null): ResourceDetailTab {
     return resourceDetailTabs.includes(value as ResourceDetailTab)
       ? (value as ResourceDetailTab)
-      : "settings";
+      : "overview";
   }
 
   function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
@@ -3841,9 +3847,10 @@
   function resourceTabHref(tab: ResourceDetailTab): string {
     const params = new URLSearchParams(page.url.searchParams);
 
-    if (tab === "settings") {
+    if (tab === "overview") {
       params.delete("tab");
       params.delete("deploymentId");
+      params.delete("section");
     } else {
       params.set("tab", tab);
       params.delete("section");
@@ -3863,6 +3870,8 @@
 
   function resourceTabLabel(tab: ResourceDetailTab): string {
     switch (tab) {
+      case "overview":
+        return $t(i18nKeys.console.resources.overviewTitle);
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
       case "scheduled-tasks":
@@ -3928,7 +3937,8 @@
 
   function resourceSettingsSectionHref(section: ResourceSettingsSection): string {
     const params = new URLSearchParams(page.url.searchParams);
-    params.delete("tab");
+    params.set("tab", "settings");
+    params.delete("deploymentId");
 
     if (section === "profile") {
       params.delete("section");
@@ -4778,6 +4788,244 @@
             </Tabs.Trigger>
           {/each}
         </Tabs.List>
+
+        <Tabs.Content value="overview" class="mt-0">
+          <section id="resource-overview" class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.overviewTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.overviewDescription)}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {#if primaryAccessHref}
+                  <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
+                    <Globe2 class="size-4" />
+                    {$t(i18nKeys.console.resources.openGeneratedAccess)}
+                  </Button>
+                {/if}
+                <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
+                  <Plus class="size-4" />
+                  {$t(i18nKeys.common.actions.newDeployment)}
+                </Button>
+              </div>
+            </div>
+
+            <dl class="console-metric-strip sm:grid-cols-4">
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.resources.healthTitle)}
+                </dt>
+                <dd class="mt-2 flex items-center gap-2 text-sm font-semibold">
+                  <ResourceStatusDot status={resourceHealthOverall} />
+                  {resourceHealthStatusLabel(resourceHealthOverall)}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.deployments)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resourceDeployments.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.domainBindings)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resourceDomainBindings.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.services)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resource.services.length}</dd>
+              </div>
+            </dl>
+
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+              <div class="space-y-5">
+                <section id="resource-current-access-overview" class="console-panel p-5">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 space-y-2">
+                      <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Link2 class="size-4" />
+                        {$t(i18nKeys.console.resources.accessUrlTitle)}
+                      </p>
+                      {#if primaryAccessHref}
+                        <a
+                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                          href={primaryAccessHref}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {primaryAccessHref}
+                        </a>
+                        <div class="flex flex-wrap items-center gap-2">
+                          {#if primaryAccessKind}
+                            <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
+                          {/if}
+                          {#if primaryDomainBinding}
+                            <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                              {domainBindingStatusLabel(primaryDomainBinding.status)}
+                            </Badge>
+                          {:else}
+                            <Badge
+                              variant={resourceAccessStatusVariant(
+                                resource.accessSummary?.proxyRouteStatus,
+                              )}
+                            >
+                              {resourceAccessStatusLabel(resource.accessSummary?.proxyRouteStatus)}
+                            </Badge>
+                          {/if}
+                          {#if primaryAccessRoute?.targetPort}
+                            <Badge variant="secondary">
+                              {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
+                            </Badge>
+                          {/if}
+                        </div>
+                      {:else}
+                        <ConsoleStatePanel
+                          title={$t(i18nKeys.console.resources.overviewNoAccessTitle)}
+                          description={$t(i18nKeys.console.resources.overviewNoAccessDescription)}
+                          actionHref={resourceSettingsSectionHref("domains")}
+                          actionLabel={$t(i18nKeys.common.actions.bindDomain)}
+                          actionDisabled={isResourceArchived}
+                          class="mt-3"
+                        />
+                      {/if}
+                    </div>
+
+                    {#if primaryAccessHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-label={accessUrlCopyLabel}
+                        title={accessUrlCopyLabel}
+                        onclick={handleCopyAccessUrl}
+                      >
+                        {#if accessUrlCopyState === "copied"}
+                          <Check class="size-4" />
+                        {:else}
+                          <Copy class="size-4" />
+                        {/if}
+                        {accessUrlCopyLabel}
+                      </Button>
+                    {/if}
+                  </div>
+
+                  {#if latestAccessFailure}
+                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-medium text-destructive">
+                          {$t(i18nKeys.console.resources.accessFailureTitle)}
+                        </p>
+                        <Badge variant="destructive">{latestAccessFailure.code}</Badge>
+                      </div>
+                      <p class="mt-2 break-words text-xs text-muted-foreground">
+                        {latestAccessFailure.nextAction}
+                      </p>
+                    </div>
+                  {/if}
+                </section>
+
+                <ResourceProfileSummary
+                  {resource}
+                  projectName={project?.name ?? resource.projectId}
+                  environmentName={environment?.name ?? resource.environmentId}
+                  destinationId={defaultDestinationId}
+                />
+              </div>
+
+              <aside class="space-y-5">
+                <section class="console-side-panel space-y-4">
+                  <div>
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.resources.healthLatestDeployment)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.deploymentsDescription)}
+                    </p>
+                  </div>
+                  {#if latestDeployment}
+                    <div class="space-y-3">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <DeploymentStatusBadge status={latestDeployment.status} />
+                        <Badge variant="outline">{latestDeployment.runtimePlan.buildStrategy}</Badge>
+                      </div>
+                      <div class="space-y-1">
+                        <p class="truncate text-sm font-medium">
+                          {latestDeployment.runtimePlan.source.displayName}
+                        </p>
+                        <p class="break-all font-mono text-xs text-muted-foreground">
+                          {latestDeployment.runtimePlan.source.locator}
+                        </p>
+                      </div>
+                      <dl class="grid gap-2 text-xs">
+                        <div>
+                          <dt class="text-muted-foreground">
+                            {$t(i18nKeys.common.domain.createdAt)}
+                          </dt>
+                          <dd class="font-medium">{formatTime(latestDeployment.createdAt)}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-muted-foreground">
+                            {$t(i18nKeys.common.domain.server)}
+                          </dt>
+                          <dd class="font-medium">
+                            {findServer(servers, latestDeployment.serverId)?.name ??
+                              latestDeployment.serverId}
+                          </dd>
+                        </div>
+                      </dl>
+                      <Button
+                        href={deploymentDetailHref(latestDeployment)}
+                        variant="outline"
+                        class="w-full"
+                      >
+                        {$t(i18nKeys.common.actions.viewDeployment)}
+                      </Button>
+                    </div>
+                  {:else}
+                    <ConsoleStatePanel
+                      title={$t(i18nKeys.console.resources.overviewNoDeploymentTitle)}
+                      description={$t(i18nKeys.console.resources.overviewNoDeploymentDescription)}
+                      actionHref={resourceDeploymentHref()}
+                      actionLabel={$t(i18nKeys.common.actions.newDeployment)}
+                      actionDisabled={isResourceArchived}
+                    />
+                  {/if}
+                </section>
+
+                <section class="console-side-panel space-y-4">
+                  <div>
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.resources.runtimeControlsTitle)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeControlsDescription)}
+                    </p>
+                  </div>
+                  <div class="grid gap-2">
+                    <Button href={resourceTabHref("logs")} variant="outline">
+                      <Terminal class="size-4" />
+                      {$t(i18nKeys.console.resources.logsTab)}
+                    </Button>
+                    <Button href={resourceTabHref("monitor")} variant="outline">
+                      <Gauge class="size-4" />
+                      {$t(i18nKeys.console.runtimeUsage.monitorTab)}
+                    </Button>
+                    <Button href={resourceSettingsSectionHref("domains")} variant="outline">
+                      <Route class="size-4" />
+                      {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                    </Button>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </section>
+        </Tabs.Content>
 
         <Tabs.Content value="deployments" class="mt-0">
           <section id="resource-deployments" class="space-y-4">

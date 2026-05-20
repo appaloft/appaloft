@@ -1334,6 +1334,15 @@ export const enUS = {
       healthSourceIssues: "Source issues",
       healthTitle: "Resource health",
       logsTab: "Logs",
+      overviewDescription:
+        "Current access, health, latest deployment, and runtime shape for this resource.",
+      overviewNoAccessDescription:
+        "Deploy the resource or bind a custom domain to create an operator-facing address.",
+      overviewNoAccessTitle: "No access URL is available yet.",
+      overviewNoDeploymentDescription:
+        "Create a deployment to materialize this resource on a server and capture logs.",
+      overviewNoDeploymentTitle: "No deployment has run yet.",
+      overviewTitle: "Resource overview",
       networkDirectPortDeferred:
         "Direct host-port exposure is not available here yet. Reverse proxy changes apply to future deployments and route planning.",
       networkExposureDirectPort: "Direct port",

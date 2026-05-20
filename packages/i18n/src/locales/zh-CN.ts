@@ -1272,6 +1272,12 @@ export const zhCN = {
       healthSourceIssues: "来源问题",
       healthTitle: "资源健康",
       logsTab: "日志",
+      overviewDescription: "展示这个资源当前的访问、健康、最新部署和运行形态。",
+      overviewNoAccessDescription: "部署资源或绑定自定义域名后，会生成可供运维打开的访问地址。",
+      overviewNoAccessTitle: "暂无访问地址。",
+      overviewNoDeploymentDescription: "创建一次部署，把这个资源物化到服务器并捕获日志。",
+      overviewNoDeploymentTitle: "还没有运行过部署。",
+      overviewTitle: "资源概览",
       networkDirectPortDeferred:
         "这里暂不提供直接主机端口暴露。反向代理配置会用于后续部署和访问路由规划。",
       networkExposureDirectPort: "直接端口",
