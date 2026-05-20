@@ -69,6 +69,7 @@ import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings
 import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
 import { showDomainBindingQueryInputSchema } from "./operations/domain-bindings/show-domain-binding.query";
 import { pruneDomainEventsCommandInputSchema } from "./operations/domain-events/prune-domain-events.command";
+import { queryEntitlementsInputSchema } from "./operations/entitlements/query-entitlements.schema";
 import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
@@ -234,6 +235,7 @@ type OperationDomain =
   | "deploy-tokens"
   | "auth"
   | "capabilities"
+  | "entitlements"
   | "audit-events"
   | "domain-events"
   | "provider-job-logs"
@@ -336,6 +338,24 @@ export const operationCatalog = [
     },
     transports: {
       orpc: { method: "POST", path: "/api/capabilities/query" },
+    },
+  },
+  {
+    key: "entitlements.query",
+    kind: "query",
+    domain: "entitlements",
+    messageName: "QueryEntitlementsQuery",
+    handlerName: "QueryEntitlementsQueryHandler",
+    serviceName: "QueryEntitlementsQueryService",
+    inputSchema: queryEntitlementsInputSchema,
+    serviceToken: tokens.queryEntitlementsQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "POST", path: "/api/entitlements/query" },
     },
   },
   {

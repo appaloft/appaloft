@@ -291,8 +291,11 @@ import {
   type Query,
   type QueryBus,
   QueryCapabilitiesQuery,
+  QueryEntitlementsQuery,
   queryCapabilitiesInputSchema,
   queryCapabilitiesResponseSchema,
+  queryEntitlementsInputSchema,
+  queryEntitlementsResponseSchema,
   RedeployDeploymentCommand,
   RegisterServerCommand,
   ReleaseAuditEventLegalHoldCommand,
@@ -2385,6 +2388,18 @@ export const queryCapabilitiesProcedure = base
   .output(queryCapabilitiesResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, QueryCapabilitiesQuery.create(input)),
+  );
+
+export const queryEntitlementsProcedure = base
+  .route({
+    method: "POST",
+    path: "/entitlements/query",
+    successStatus: 200,
+  })
+  .input(queryEntitlementsInputSchema)
+  .output(queryEntitlementsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, QueryEntitlementsQuery.create(input)),
   );
 
 export const createDeployTokenProcedure = base
@@ -5167,6 +5182,9 @@ export const appaloftOrpcRouter = {
   capabilities: {
     query: queryCapabilitiesProcedure,
   },
+  entitlements: {
+    query: queryEntitlementsProcedure,
+  },
   deployTokens: {
     create: createDeployTokenProcedure,
     list: listDeployTokensProcedure,
@@ -7514,6 +7532,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/bootstrap/auth/status",
     "/api/bootstrap/auth/first-admin",
     "/api/capabilities/query",
+    "/api/entitlements/query",
     "/api/deploy-tokens",
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",

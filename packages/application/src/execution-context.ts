@@ -29,6 +29,17 @@ export interface ExecutionOrganizationRoleContext {
   productRole?: ExecutionProductOrganizationRole;
 }
 
+export type ExecutionContextMode = "hosted" | "local-development" | "self-hosted" | (string & {});
+
+export interface ExecutionTenantContext {
+  tenantId?: string;
+  accountId?: string;
+  organizationId?: string;
+  subjectId?: string;
+  mode?: ExecutionContextMode;
+  source?: string;
+}
+
 export interface ExecutionPrincipal {
   kind: ExecutionActor["kind"];
   actorId: string;
@@ -72,6 +83,7 @@ export interface ExecutionContext {
   locale: AppaloftLocale;
   principal?: ExecutionPrincipal;
   requestId: string;
+  tenant?: ExecutionTenantContext;
   t: AppaloftTranslate;
   tracer: AppTracer;
 }
@@ -81,6 +93,7 @@ export interface RepositoryContext {
   locale: AppaloftLocale;
   principal?: ExecutionPrincipal;
   requestId: string;
+  tenant?: ExecutionTenantContext;
   t: AppaloftTranslate;
   tracer: AppTracer;
   transaction?: unknown;
@@ -94,6 +107,7 @@ export interface ExecutionContextFactory {
     locale?: string;
     principal?: ExecutionPrincipal;
     requestId?: string;
+    tenant?: ExecutionTenantContext;
   }): ExecutionContext;
 }
 
@@ -127,6 +141,7 @@ export function createExecutionContext(input: {
   locale?: string;
   principal?: ExecutionPrincipal;
   requestId?: string;
+  tenant?: ExecutionTenantContext;
   tracer?: AppTracer;
   t?: AppaloftTranslate;
 }): ExecutionContext {
@@ -142,6 +157,7 @@ export function createExecutionContext(input: {
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.auth ? { auth: input.auth } : {}),
     ...(input.principal ? { principal: input.principal } : {}),
+    ...(input.tenant ? { tenant: input.tenant } : {}),
   };
 }
 

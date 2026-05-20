@@ -87,6 +87,7 @@ export * from "./operations/domain-bindings/mark-domain-route-failed-on-deployme
 export * from "./operations/domain-bindings/retry-domain-binding-verification.use-case";
 export * from "./operations/domain-bindings/show-domain-binding.query-service";
 export * from "./operations/domain-events/prune-domain-events.use-case";
+export * from "./operations/entitlements/query-entitlements.query-service";
 export * from "./operations/environments/archive-environment.use-case";
 export * from "./operations/environments/clone-environment.use-case";
 export * from "./operations/environments/create-environment.use-case";

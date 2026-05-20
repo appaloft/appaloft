@@ -83,6 +83,14 @@ export * from "./operations/domain-bindings/delete-domain-binding.schema";
 export * from "./operations/domain-bindings/list-domain-bindings.schema";
 export * from "./operations/domain-bindings/retry-domain-binding-verification.schema";
 export * from "./operations/domain-bindings/show-domain-binding.schema";
+export type {
+  QueryEntitlementsInput,
+  QueryEntitlementsResponse,
+} from "./operations/entitlements/query-entitlements.query";
+export {
+  queryEntitlementsInputSchema,
+  queryEntitlementsResponseSchema,
+} from "./operations/entitlements/query-entitlements.schema";
 export * from "./operations/environments/archive-environment.schema";
 export * from "./operations/environments/clone-environment.schema";
 export * from "./operations/environments/create-environment.schema";
