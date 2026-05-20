@@ -2531,6 +2531,46 @@ Candidate sequencing:
   identity/policy decisions and must not reserve a `0.x` version while it remains post-`1.0.0`
   work.
 
+## Future External Edge Access And DNS Track
+
+Target: post-`1.0.0` planning by default.
+
+This track records future external provider orchestration for public access. It does not authorize
+current implementation, does not expand the GA blocker set, and does not reserve a `0.x` version.
+If maintainers deliberately pull this before GA, first retarget this roadmap with an explicit
+pre-GA phase and identify which existing GA blocker is being replaced or deferred.
+
+Governing planning artifact:
+- [External Edge Access And DNS](./specs/075-external-edge-access-and-dns/spec.md)
+
+Roadmap principles:
+- [ ] Treat DNS management as narrow Appaloft-managed access intent, verification, certificate
+  challenge, observation, and diagnostics, not as a general DNS zone editor.
+- [ ] Treat CDN/cache/proxy behavior as external provider orchestration, not an Appaloft-owned CDN
+  network, hosted asset service, or global traffic platform.
+- [ ] Preserve current access boundaries: `DomainBinding` owns durable custom-domain lifecycle,
+  `DeploymentTarget` owns target-local proxy intent/readiness, Resource profiles own upstream
+  access intent, deployments snapshot resolved route state, and provider packages own concrete
+  external provider APIs.
+- [ ] Keep `deployments.create` ids-only; external DNS, cache, proxy, TLS, provider connection,
+  and purge mutation must use explicit future operations after ADR/spec/test gates.
+- [ ] Require unmanaged-record protection, provider raw payload redaction, scoped purge safety,
+  read-only preview, diagnostics, and rollback-safe route snapshot semantics before Code Round.
+
+Candidate sequencing:
+- [ ] Post-1.0 Edge Track 1: ADR for external edge access, DNS ownership, provider connection
+  lifecycle, edge delivery policy placement, DNS record adoption, async apply/verify/purge
+  attempts, and rollback snapshot use.
+- [ ] Post-1.0 Edge Track 2: Provider connection lifecycle with masked credential/capability
+  readback and deletion safety.
+- [ ] Post-1.0 Edge Track 3: DomainBinding edge delivery configuration, DNS intent/adoption guards,
+  and provider-neutral route apply/verify workflow.
+- [ ] Post-1.0 Edge Track 4: Read-only external edge configuration preview, DNS/provider
+  diagnostics, and drift status.
+- [ ] Post-1.0 Edge Track 5: Explicit scoped cache purge and safe purge receipts.
+- [ ] Post-1.0 Edge Track 6: Rollback participation through Appaloft-owned external edge route
+  snapshots when provider capability and ownership evidence allow it.
+
 ## Resource And Internal State Coverage Ledger
 
 This ledger is the horizontal closure checklist. Each resource or internal state needs the unchecked
@@ -2838,6 +2878,11 @@ External baseline research points to this practical minimum:
   MCP product surface exists. Deploy remains an internal subprotocol of the full Appaloft skill.
   Governed by
   [Appaloft Agent Deploy Skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
+- [ ] External edge access and DNS provider orchestration for managed public access, scoped cache
+  purge, DNS/provider diagnostics, and rollback-safe route snapshots. This is post-`1.0.0` by
+  default and must remain external provider orchestration, not Appaloft-owned CDN infrastructure or
+  a general DNS zone editor. Governed by
+  [External Edge Access And DNS](./specs/075-external-edge-access-and-dns/spec.md).
 
 ## Immediate Spec-Round Todo
 
@@ -2850,6 +2895,10 @@ Recommended next Spec Rounds before broad Code Rounds:
   MCP, define the safe deploy protocol and outcome packet, and keep it mapped to existing CLI/API
   operations in
   [docs/specs/072-appaloft-agent-deploy-skill](./specs/072-appaloft-agent-deploy-skill/spec.md).
+- [x] External edge access and DNS: position external provider DNS/proxy/cache/TLS orchestration as
+  a post-`1.0.0` future track, define hard non-goals for Appaloft-owned CDN infrastructure and
+  general DNS zone editing, and record the required ADR/spec/test gates in
+  [docs/specs/075-external-edge-access-and-dns](./specs/075-external-edge-access-and-dns/spec.md).
 - [ ] Resource profile lifecycle: reset/delete policy semantics and remaining profile/config drift
   redaction coverage after source/runtime/network/access profile configuration. Resource profile
   drift visibility now has a Spec Round artifact at
