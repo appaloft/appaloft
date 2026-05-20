@@ -268,6 +268,18 @@ Transport compatibility note:
   backend. File-backed SSH remote-state mirrors may move this state across a CLI process boundary,
   but PostgreSQL/PGlite backends must persist it through a dedicated persistence adapter rather
   than a `Resource` repository, `DomainBinding`, `Certificate`, or deployment aggregate field.
+- future external edge access and DNS work is provider orchestration outside the selected
+  deployment target, not Appaloft-owned CDN infrastructure and not a general DNS zone editor. The
+  governed future model is recorded in
+  [External Edge Access And DNS](./specs/075-external-edge-access-and-dns/spec.md). It must keep
+  `DomainBinding` as the durable custom-domain owner, `DeploymentTarget` as the target-local edge
+  proxy intent/readiness owner, deployment/runtime plan snapshots as immutable route history, and
+  provider-specific DNS/proxy/cache/TLS/purge APIs behind concrete external edge provider packages.
+  DNS mutation is allowed only for Appaloft-managed access records, verification records, and
+  certificate-challenge records accepted by explicit workflows; arbitrary zone editing, unmanaged
+  record deletion, hidden `deployments.create` DNS changes, provider raw payload exposure, edge
+  compute, WAF/security-rule products, and Appaloft-operated CDN infrastructure are out of scope
+  until separately governed.
 - source fingerprint links map a normalized source identity to trusted project/environment/resource
   and optional target placement. They are not resource profile fields and must be changed only
   through explicit relink behavior, not by editing `appaloft.yml`.
