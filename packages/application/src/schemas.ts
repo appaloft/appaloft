@@ -200,6 +200,7 @@ export * from "./operations/resources/show-resource.schema";
 export * from "./operations/resources/show-resource-dependency-binding.schema";
 export * from "./operations/resources/unbind-resource-dependency.schema";
 export * from "./operations/resources/unset-resource-variable.schema";
+export * from "./operations/route-surfaces/route-surface.schema";
 export * from "./operations/runtime-monitoring/runtime-monitoring.schema";
 export * from "./operations/runtime-usage/inspect-runtime-usage.schema";
 export * from "./operations/scheduled-tasks/scheduled-task.schema";
