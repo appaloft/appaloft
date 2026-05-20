@@ -20,7 +20,7 @@
   }
 
   ::selection {
-    background: color-mix(in oklch, var(--accent) 58%, transparent);
-    color: var(--accent-foreground);
+    background: color-mix(in oklch, var(--ring) 54%, var(--background));
+    color: var(--foreground);
   }
 }

@@ -59,7 +59,7 @@
 </script>
 
 <div class="min-h-screen bg-background text-foreground">
-  <header class="sticky top-0 z-20 border-b bg-background/92 backdrop-blur-md">
+  <header data-console-header class="sticky top-0 z-20 border-b backdrop-blur-md">
     <div class="flex h-14 w-full items-center justify-between gap-3 px-4 md:px-6">
       <a class="flex min-w-0 items-center gap-3" href="/">
         <img

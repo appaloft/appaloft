@@ -11,6 +11,7 @@
     Clipboard,
     Copy,
     Database,
+    Gauge,
     HardDrive,
     Globe2,
     Link2,
@@ -74,7 +75,9 @@
   import { readErrorMessage } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
@@ -115,6 +118,7 @@
     runtimeMonitoringTimestampInObservationWindow,
   } from "$lib/console/runtime-usage";
   import {
+    deploymentDetailHref,
     findEnvironment,
     findProject,
     findServer,
@@ -139,13 +143,16 @@
       appaloftDesktop?: AppaloftDesktopBridge;
     };
   type ResourceDetailTab =
-    | "settings"
+    | "overview"
     | "deployments"
+    | "logs"
+    | "domains"
+    | "environment"
     | "scheduled-tasks"
     | "source-events"
     | "previews"
     | "monitor"
-    | "logs"
+    | "settings"
     | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
@@ -218,13 +225,16 @@
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = [
-    "settings",
+    "overview",
     "deployments",
+    "logs",
+    "domains",
+    "environment",
+    "monitor",
     "scheduled-tasks",
     "source-events",
     "previews",
-    "monitor",
-    "logs",
+    "settings",
     "terminal",
   ] as const;
   const resourceSettingsSections = [
@@ -660,9 +670,21 @@
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
   const activeTab = $derived(parseResourceDetailTab(page.url.searchParams.get("tab")));
-  const activeSettingsSection = $derived(
-    parseResourceSettingsSection(page.url.searchParams.get("section")),
+  const activeResourceContentTab = $derived(
+    activeTab === "domains" || activeTab === "environment" ? "settings" : activeTab,
   );
+  const showSettingsNavigation = $derived(activeTab === "settings");
+  const activeSettingsSection = $derived.by(() => {
+    if (activeTab === "domains") {
+      return "domains";
+    }
+
+    if (activeTab === "environment") {
+      return "configuration";
+    }
+
+    return parseResourceSettingsSection(page.url.searchParams.get("section"));
+  });
 
   let serverId = $state("");
   let destinationId = $state("");
@@ -3829,7 +3851,7 @@
   function parseResourceDetailTab(value: string | null): ResourceDetailTab {
     return resourceDetailTabs.includes(value as ResourceDetailTab)
       ? (value as ResourceDetailTab)
-      : "settings";
+      : "overview";
   }
 
   function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
@@ -3841,9 +3863,10 @@
   function resourceTabHref(tab: ResourceDetailTab): string {
     const params = new URLSearchParams(page.url.searchParams);
 
-    if (tab === "settings") {
+    if (tab === "overview") {
       params.delete("tab");
       params.delete("deploymentId");
+      params.delete("section");
     } else {
       params.set("tab", tab);
       params.delete("section");
@@ -3863,8 +3886,16 @@
 
   function resourceTabLabel(tab: ResourceDetailTab): string {
     switch (tab) {
+      case "overview":
+        return $t(i18nKeys.console.resources.overviewTitle);
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
+      case "logs":
+        return $t(i18nKeys.console.resources.logsTab);
+      case "domains":
+        return $t(i18nKeys.console.resources.domainBindingsTitle);
+      case "environment":
+        return $t(i18nKeys.common.domain.environment);
       case "scheduled-tasks":
         return $t(i18nKeys.console.resources.scheduledTasksTab);
       case "source-events":
@@ -3873,8 +3904,6 @@
         return $t(i18nKeys.console.resources.previewEnvironmentsTab);
       case "monitor":
         return $t(i18nKeys.console.runtimeUsage.monitorTab);
-      case "logs":
-        return $t(i18nKeys.console.resources.logsTab);
       case "settings":
         return $t(i18nKeys.console.resources.settingsTab);
       case "terminal":
@@ -3928,7 +3957,8 @@
 
   function resourceSettingsSectionHref(section: ResourceSettingsSection): string {
     const params = new URLSearchParams(page.url.searchParams);
-    params.delete("tab");
+    params.set("tab", "settings");
+    params.delete("deploymentId");
 
     if (section === "profile") {
       params.delete("section");
@@ -4295,6 +4325,44 @@
     }
   }
 
+  function domainDnsObservationStatusLabel(
+    status: NonNullable<DomainBindingSummary["dnsObservation"]>["status"] | undefined,
+  ): string {
+    switch (status) {
+      case "matched":
+        return $t(i18nKeys.console.domainBindings.dnsMatched);
+      case "mismatch":
+        return $t(i18nKeys.console.domainBindings.dnsMismatch);
+      case "unresolved":
+        return $t(i18nKeys.console.domainBindings.dnsUnresolved);
+      case "lookup_failed":
+        return $t(i18nKeys.console.domainBindings.dnsLookupFailed);
+      case "skipped":
+        return $t(i18nKeys.console.domainBindings.dnsSkipped);
+      case "pending":
+      case undefined:
+        return $t(i18nKeys.console.domainBindings.dnsPending);
+    }
+  }
+
+  function domainDnsObservationStatusVariant(
+    status: NonNullable<DomainBindingSummary["dnsObservation"]>["status"] | undefined,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "matched":
+        return "default";
+      case "mismatch":
+      case "unresolved":
+      case "lookup_failed":
+        return "destructive";
+      case "skipped":
+        return "outline";
+      case "pending":
+      case undefined:
+        return "secondary";
+    }
+  }
+
   function latestCertificateForBinding(bindingId: string): CertificateSummary | null {
     const bindingCertificates = resourceCertificates.filter(
       (certificate) => certificate.domainBindingId === bindingId,
@@ -4602,32 +4670,6 @@
                 {/if}
               </p>
             {/if}
-            {#if archiveFeedback}
-              <div
-                class={[
-                  "max-w-3xl rounded-md border px-3 py-2 text-sm",
-                  archiveFeedback.kind === "success"
-                    ? "border-primary/25 bg-primary/5"
-                    : "border-destructive/30 bg-destructive/5 text-destructive",
-                ]}
-              >
-                <p class="font-medium">{archiveFeedback.title}</p>
-                <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
-              </div>
-            {/if}
-            {#if deleteFeedback}
-              <div
-                class={[
-                  "max-w-3xl rounded-md border px-3 py-2 text-sm",
-                  deleteFeedback.kind === "success"
-                    ? "border-primary/25 bg-primary/5"
-                    : "border-destructive/30 bg-destructive/5 text-destructive",
-                ]}
-              >
-                <p class="font-medium">{deleteFeedback.title}</p>
-                <p class="mt-1 break-all text-xs">{deleteFeedback.detail}</p>
-              </div>
-            {/if}
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2">
@@ -4720,64 +4762,269 @@
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.newDeployment)}
             </Button>
-            {#if isPreviewEnvironmentResource}
-              <Button
-                id="resource-delete-action"
-                type="button"
-                variant="destructive"
-                disabled={deletePreviewResourceMutation.isPending}
-                onclick={deletePreviewResource}
-              >
-                <Trash2 class="size-4" />
-                {deletePreviewResourceMutation.isPending
-                  ? $t(i18nKeys.common.actions.saving)
-                  : $t(i18nKeys.console.resources.deleteAction)}
-              </Button>
-            {:else}
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={isResourceArchived || archiveResourceMutation.isPending}
-                onclick={archiveResource}
-              >
-                <Archive class="size-4" />
-                {archiveResourceMutation.isPending
-                  ? $t(i18nKeys.common.actions.saving)
-                  : $t(i18nKeys.console.resources.archiveAction)}
-              </Button>
-              {#if isResourceArchived}
-                <Button
-                  id="resource-delete-action"
-                  type="button"
-                  variant="destructive"
-                  disabled={deleteResourceMutation.isPending}
-                  onclick={deleteResource}
-                >
-                  <Trash2 class="size-4" />
-                  {deleteResourceMutation.isPending
-                    ? $t(i18nKeys.common.actions.saving)
-                    : $t(i18nKeys.console.resources.deleteAction)}
-                </Button>
-              {/if}
-            {/if}
           </div>
         </div>
       </section>
 
-      <Tabs.Root value={activeTab} class="space-y-5">
-        <Tabs.List
-          class="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0"
+      <Tabs.Root value={activeResourceContentTab} class="space-y-5">
+        <nav
+          aria-label={$t(i18nKeys.console.resources.overviewTitle)}
+          class="flex w-full justify-start gap-6 overflow-x-auto border-b"
         >
           {#each resourceDetailTabs as tab (tab)}
-            <Tabs.Trigger
-              value={tab}
-              class="h-11 flex-none rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-0 shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            <a
+              href={resourceTabHref(tab)}
+              class={[
+                "flex h-11 flex-none items-center border-b-2 px-0 text-sm font-medium transition-colors",
+                activeTab === tab
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              ]}
+              aria-current={activeTab === tab ? "page" : undefined}
               onclick={(event) => selectResourceTab(tab, event)}
             >
               {resourceTabLabel(tab)}
-            </Tabs.Trigger>
+            </a>
           {/each}
-        </Tabs.List>
+        </nav>
+
+        <Tabs.Content value="overview" class="mt-0">
+          <section id="resource-overview" class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.overviewTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.overviewDescription)}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {#if primaryAccessHref}
+                  <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
+                    <Globe2 class="size-4" />
+                    {$t(i18nKeys.console.resources.openGeneratedAccess)}
+                  </Button>
+                {/if}
+                <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
+                  <Plus class="size-4" />
+                  {$t(i18nKeys.common.actions.newDeployment)}
+                </Button>
+              </div>
+            </div>
+
+            <dl class="console-metric-strip sm:grid-cols-4">
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.resources.healthTitle)}
+                </dt>
+                <dd class="mt-2 flex items-center gap-2 text-sm font-semibold">
+                  <ResourceStatusDot status={resourceHealthOverall} />
+                  {resourceHealthStatusLabel(resourceHealthOverall)}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.deployments)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resourceDeployments.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.domainBindings)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resourceDomainBindings.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.common.domain.services)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{resource.services.length}</dd>
+              </div>
+            </dl>
+
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+              <div class="space-y-5">
+                <section id="resource-current-access-overview" class="console-panel p-5">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 space-y-2">
+                      <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Link2 class="size-4" />
+                        {$t(i18nKeys.console.resources.accessUrlTitle)}
+                      </p>
+                      {#if primaryAccessHref}
+                        <a
+                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                          href={primaryAccessHref}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {primaryAccessHref}
+                        </a>
+                        <div class="flex flex-wrap items-center gap-2">
+                          {#if primaryAccessKind}
+                            <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
+                          {/if}
+                          {#if primaryDomainBinding}
+                            <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                              {domainBindingStatusLabel(primaryDomainBinding.status)}
+                            </Badge>
+                          {:else}
+                            <Badge
+                              variant={resourceAccessStatusVariant(
+                                resource.accessSummary?.proxyRouteStatus,
+                              )}
+                            >
+                              {resourceAccessStatusLabel(resource.accessSummary?.proxyRouteStatus)}
+                            </Badge>
+                          {/if}
+                          {#if primaryAccessRoute?.targetPort}
+                            <Badge variant="secondary">
+                              {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
+                            </Badge>
+                          {/if}
+                        </div>
+                      {:else}
+                        <ConsoleStatePanel
+                          title={$t(i18nKeys.console.resources.overviewNoAccessTitle)}
+                          description={$t(i18nKeys.console.resources.overviewNoAccessDescription)}
+                          actionHref={resourceTabHref("domains")}
+                          actionLabel={$t(i18nKeys.common.actions.bindDomain)}
+                          actionDisabled={isResourceArchived}
+                          class="mt-3"
+                        />
+                      {/if}
+                    </div>
+
+                    {#if primaryAccessHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-label={accessUrlCopyLabel}
+                        title={accessUrlCopyLabel}
+                        onclick={handleCopyAccessUrl}
+                      >
+                        {#if accessUrlCopyState === "copied"}
+                          <Check class="size-4" />
+                        {:else}
+                          <Copy class="size-4" />
+                        {/if}
+                        {accessUrlCopyLabel}
+                      </Button>
+                    {/if}
+                  </div>
+
+                  {#if latestAccessFailure}
+                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-medium text-destructive">
+                          {$t(i18nKeys.console.resources.accessFailureTitle)}
+                        </p>
+                        <Badge variant="destructive">{latestAccessFailure.code}</Badge>
+                      </div>
+                      <p class="mt-2 break-words text-xs text-muted-foreground">
+                        {latestAccessFailure.nextAction}
+                      </p>
+                    </div>
+                  {/if}
+                </section>
+
+                <ResourceProfileSummary
+                  {resource}
+                  projectName={project?.name ?? resource.projectId}
+                  environmentName={environment?.name ?? resource.environmentId}
+                  destinationId={defaultDestinationId}
+                />
+              </div>
+
+              <aside class="space-y-5">
+                <section class="console-side-panel space-y-4">
+                  <div>
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.resources.healthLatestDeployment)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.deploymentsDescription)}
+                    </p>
+                  </div>
+                  {#if latestDeployment}
+                    <div class="space-y-3">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <DeploymentStatusBadge status={latestDeployment.status} />
+                        <Badge variant="outline">{latestDeployment.runtimePlan.buildStrategy}</Badge>
+                      </div>
+                      <div class="space-y-1">
+                        <p class="truncate text-sm font-medium">
+                          {latestDeployment.runtimePlan.source.displayName}
+                        </p>
+                        <p class="break-all font-mono text-xs text-muted-foreground">
+                          {latestDeployment.runtimePlan.source.locator}
+                        </p>
+                      </div>
+                      <dl class="grid gap-2 text-xs">
+                        <div>
+                          <dt class="text-muted-foreground">
+                            {$t(i18nKeys.common.domain.createdAt)}
+                          </dt>
+                          <dd class="font-medium">{formatTime(latestDeployment.createdAt)}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-muted-foreground">
+                            {$t(i18nKeys.common.domain.server)}
+                          </dt>
+                          <dd class="font-medium">
+                            {findServer(servers, latestDeployment.serverId)?.name ??
+                              latestDeployment.serverId}
+                          </dd>
+                        </div>
+                      </dl>
+                      <Button
+                        href={deploymentDetailHref(latestDeployment)}
+                        variant="outline"
+                        class="w-full"
+                      >
+                        {$t(i18nKeys.common.actions.viewDeployment)}
+                      </Button>
+                    </div>
+                  {:else}
+                    <ConsoleStatePanel
+                      title={$t(i18nKeys.console.resources.overviewNoDeploymentTitle)}
+                      description={$t(i18nKeys.console.resources.overviewNoDeploymentDescription)}
+                      actionHref={resourceDeploymentHref()}
+                      actionLabel={$t(i18nKeys.common.actions.newDeployment)}
+                      actionDisabled={isResourceArchived}
+                    />
+                  {/if}
+                </section>
+
+                <section class="console-side-panel space-y-4">
+                  <div>
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.resources.runtimeControlsTitle)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeControlsDescription)}
+                    </p>
+                  </div>
+                  <div class="grid gap-2">
+                    <Button href={resourceTabHref("logs")} variant="outline">
+                      <Terminal class="size-4" />
+                      {$t(i18nKeys.console.resources.logsTab)}
+                    </Button>
+                    <Button href={resourceTabHref("monitor")} variant="outline">
+                      <Gauge class="size-4" />
+                      {$t(i18nKeys.console.runtimeUsage.monitorTab)}
+                    </Button>
+                    <Button href={resourceTabHref("domains")} variant="outline">
+                      <Route class="size-4" />
+                      {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                    </Button>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </section>
+        </Tabs.Content>
 
         <Tabs.Content value="deployments" class="mt-0">
           <section id="resource-deployments" class="space-y-4">
@@ -5520,47 +5767,55 @@
         </Tabs.Content>
 
         <Tabs.Content value="settings" class="mt-0">
-          <div class="grid gap-6 lg:grid-cols-[10.5rem_minmax(0,1fr)]">
-            <aside class="border-b pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
-              <nav aria-label={$t(i18nKeys.console.resources.settingsTab)}>
-                <div role="tablist" class="flex gap-1 overflow-x-auto lg:flex-col">
-                  {#each resourceSettingsSections as section (section)}
-                    <a
-                      href={resourceSettingsSectionHref(section)}
-                      role="tab"
-                      aria-selected={activeSettingsSection === section}
-                      class={[
-                        "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
-                        activeSettingsSection === section
-                          ? "border-border bg-muted/60 text-foreground shadow-xs"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                      ]}
-                      onclick={(event) => selectResourceSettingsSection(section, event)}
-                    >
-                      {resourceSettingsSectionLabel(section)}
-                    </a>
-                  {/each}
-                </div>
-              </nav>
-            </aside>
+          <div
+            class={showSettingsNavigation
+              ? "grid gap-6 lg:grid-cols-[10.5rem_minmax(0,1fr)]"
+              : "space-y-6"}
+          >
+            {#if showSettingsNavigation}
+              <aside class="border-b pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
+                <nav aria-label={$t(i18nKeys.console.resources.settingsTab)}>
+                  <div role="tablist" class="flex gap-1 overflow-x-auto lg:flex-col">
+                    {#each resourceSettingsSections as section (section)}
+                      <a
+                        href={resourceSettingsSectionHref(section)}
+                        role="tab"
+                        aria-selected={activeSettingsSection === section}
+                        class={[
+                          "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
+                          activeSettingsSection === section
+                            ? "border-border bg-muted/60 text-foreground shadow-xs"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        ]}
+                        onclick={(event) => selectResourceSettingsSection(section, event)}
+                      >
+                        {resourceSettingsSectionLabel(section)}
+                      </a>
+                    {/each}
+                  </div>
+                </nav>
+              </aside>
+            {/if}
 
             <div class="space-y-8">
-              <div
-                class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
-                role="note"
-              >
-                <div class="flex gap-3">
-                  <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <div class="min-w-0">
-                    <p class="font-medium text-foreground">
-                      {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
-                    </p>
-                    <p class="mt-1 leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
-                    </p>
+              {#if showSettingsNavigation}
+                <div
+                  class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
+                  role="note"
+                >
+                  <div class="flex gap-3">
+                    <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <div class="min-w-0">
+                      <p class="font-medium text-foreground">
+                        {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
+                      </p>
+                      <p class="mt-1 leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              {/if}
 
               {#if activeSettingsSection === "profile"}
               <div id="resource-overview-profile" class="space-y-4">
@@ -8442,6 +8697,102 @@
                             </p>
                           </div>
                         </div>
+                        <div class="mt-4 console-subtle-panel p-3">
+                          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p class="text-sm font-medium">
+                                {$t(i18nKeys.console.domainBindings.lifecycleGuideTitle)}
+                              </p>
+                              {#if binding.dnsObservation?.message}
+                                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                                  {binding.dnsObservation.message}
+                                </p>
+                              {/if}
+                            </div>
+                            <Badge variant={domainBindingStatusVariant(binding.status)}>
+                              {domainBindingStatusLabel(binding.status)}
+                            </Badge>
+                          </div>
+
+                          <div class="mt-3 grid gap-3 lg:grid-cols-3">
+                            <div class="rounded-md bg-background px-3 py-2">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-xs font-medium text-muted-foreground">
+                                  {$t(i18nKeys.console.domainBindings.dnsStepTitle)}
+                                </p>
+                                <Badge
+                                  variant={domainDnsObservationStatusVariant(
+                                    binding.dnsObservation?.status,
+                                  )}
+                                >
+                                  {domainDnsObservationStatusLabel(binding.dnsObservation?.status)}
+                                </Badge>
+                              </div>
+                              <dl class="mt-2 space-y-1 text-xs">
+                                <div>
+                                  <dt class="text-muted-foreground">
+                                    {$t(i18nKeys.console.domainBindings.dnsExpectedTargets)}
+                                  </dt>
+                                  <dd class="mt-0.5 break-all font-mono">
+                                    {binding.dnsObservation?.expectedTargets.length
+                                      ? binding.dnsObservation.expectedTargets.join(", ")
+                                      : "-"}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt class="text-muted-foreground">
+                                    {$t(i18nKeys.console.domainBindings.dnsObservedTargets)}
+                                  </dt>
+                                  <dd class="mt-0.5 break-all font-mono">
+                                    {binding.dnsObservation?.observedTargets.length
+                                      ? binding.dnsObservation.observedTargets.join(", ")
+                                      : "-"}
+                                  </dd>
+                                </div>
+                                {#if binding.dnsObservation?.checkedAt}
+                                  <div>
+                                    <dt class="text-muted-foreground">
+                                      {$t(i18nKeys.console.domainBindings.dnsCheckedAt)}
+                                    </dt>
+                                    <dd class="mt-0.5">{formatTime(binding.dnsObservation.checkedAt)}</dd>
+                                  </div>
+                                {/if}
+                              </dl>
+                            </div>
+
+                            <div class="rounded-md bg-background px-3 py-2">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-xs font-medium text-muted-foreground">
+                                  {$t(i18nKeys.console.domainBindings.tlsStepTitle)}
+                                </p>
+                                {#if bindingCertificate}
+                                  <Badge variant={certificateStatusVariant(bindingCertificate.status)}>
+                                    {certificateStatusLabel(bindingCertificate.status)}
+                                  </Badge>
+                                {:else}
+                                  <Badge variant="outline">{binding.certificatePolicy}</Badge>
+                                {/if}
+                              </div>
+                              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                                {binding.tlsMode} · {binding.certificatePolicy}
+                              </p>
+                            </div>
+
+                            <div class="rounded-md bg-background px-3 py-2">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-xs font-medium text-muted-foreground">
+                                  {$t(i18nKeys.console.domainBindings.routeReadiness)}
+                                </p>
+                                <Badge variant={domainBindingStatusVariant(binding.status)}>
+                                  {domainBindingStatusLabel(binding.status)}
+                                </Badge>
+                              </div>
+                              <p class="mt-2 break-all font-mono text-xs text-muted-foreground">
+                                {domainBindingHref(binding)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <div class="mt-4 rounded-md border bg-muted/15 p-3">
                           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -9173,6 +9524,99 @@
                   {/if}
                 </div>
               </section>
+              {/if}
+
+              {#if showSettingsNavigation}
+                <section
+                  id="resource-danger-zone"
+                  class="console-panel space-y-4 border-destructive/25 bg-destructive/5 p-5"
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="space-y-1">
+                      <h2 class="text-lg font-semibold text-destructive">
+                        {$t(i18nKeys.console.resources.dangerZoneTitle)}
+                      </h2>
+                      <p class="text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dangerZoneDescription)}
+                      </p>
+                    </div>
+                    <Badge variant={isResourceArchived ? "destructive" : "outline"}>
+                      {isResourceArchived
+                        ? $t(i18nKeys.console.resources.archived)
+                        : $t(i18nKeys.common.status.active)}
+                    </Badge>
+                  </div>
+
+                  {#if archiveFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        archiveFeedback.kind === "success"
+                          ? "border-primary/25 bg-background"
+                          : "border-destructive/30 bg-background text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{archiveFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
+                    </div>
+                  {/if}
+                  {#if deleteFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        deleteFeedback.kind === "success"
+                          ? "border-primary/25 bg-background"
+                          : "border-destructive/30 bg-background text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{deleteFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{deleteFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="flex flex-wrap gap-2">
+                    {#if isPreviewEnvironmentResource}
+                      <Button
+                        id="resource-delete-action"
+                        type="button"
+                        variant="destructive"
+                        disabled={deletePreviewResourceMutation.isPending}
+                        onclick={deletePreviewResource}
+                      >
+                        <Trash2 class="size-4" />
+                        {deletePreviewResourceMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.deleteAction)}
+                      </Button>
+                    {:else}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={isResourceArchived || archiveResourceMutation.isPending}
+                        onclick={archiveResource}
+                      >
+                        <Archive class="size-4" />
+                        {archiveResourceMutation.isPending
+                          ? $t(i18nKeys.common.actions.saving)
+                          : $t(i18nKeys.console.resources.archiveAction)}
+                      </Button>
+                      {#if isResourceArchived}
+                        <Button
+                          id="resource-delete-action"
+                          type="button"
+                          variant="destructive"
+                          disabled={deleteResourceMutation.isPending}
+                          onclick={deleteResource}
+                        >
+                          <Trash2 class="size-4" />
+                          {deleteResourceMutation.isPending
+                            ? $t(i18nKeys.common.actions.saving)
+                            : $t(i18nKeys.console.resources.deleteAction)}
+                        </Button>
+                      {/if}
+                    {/if}
+                  </div>
+                </section>
               {/if}
             </div>
           </div>

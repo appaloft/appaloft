@@ -54,9 +54,9 @@
 </script>
 
 <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-  <article class="rounded-md border bg-background p-4">
+  <article class="console-panel p-4">
     <div class="flex items-start gap-3">
-      <div class="rounded-md border bg-muted p-2">
+      <div class="rounded-md border bg-muted/40 p-2">
         <profileTone.icon class="size-4" />
       </div>
       <div class="min-w-0">
@@ -69,28 +69,28 @@
     </div>
 
     <div class="mt-5 grid gap-3 sm:grid-cols-2">
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.name)}</p>
         <p class="mt-1 truncate text-sm font-medium">{resource.name}</p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.slug)}</p>
         <p class="mt-1 truncate text-sm font-medium">{resource.slug}</p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
         <p class="mt-1 truncate text-sm font-medium">{projectName}</p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
         <p class="mt-1 truncate text-sm font-medium">{environmentName}</p>
       </div>
     </div>
   </article>
 
-  <article class="rounded-md border bg-background p-4">
+  <article class="console-panel p-4">
     <div class="flex items-start gap-3">
-      <div class="rounded-md border bg-muted p-2">
+      <div class="rounded-md border bg-muted/40 p-2">
         <Waypoints class="size-4" />
       </div>
       <div>
@@ -104,30 +104,30 @@
     </div>
 
     <div class="mt-5 grid gap-3">
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.port)}</p>
         <p class="mt-1 truncate text-sm font-medium">
           {resource.networkProfile?.internalPort ?? "-"}
         </p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.protocol)}</p>
         <p class="mt-1 truncate text-sm font-medium">
           {resource.networkProfile?.upstreamProtocol ?? "-"}
         </p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.exposure)}</p>
         <p class="mt-1 truncate text-sm font-medium">
           {resource.networkProfile?.exposureMode ?? "-"}
         </p>
       </div>
-      <div class="rounded-md bg-muted/30 px-3 py-2">
+      <div class="console-subtle-panel px-3 py-2">
         <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.destination)}</p>
         <p class="mt-1 truncate text-sm font-medium">{destinationId || "-"}</p>
       </div>
       {#if resource.networkProfile?.targetServiceName}
-        <div class="rounded-md bg-muted/30 px-3 py-2">
+        <div class="console-subtle-panel px-3 py-2">
           <p class="text-xs text-muted-foreground">
             {$t(i18nKeys.console.resources.targetServiceName)}
           </p>
@@ -140,7 +140,7 @@
   </article>
 </section>
 
-<section class="rounded-md border bg-background">
+<section class="console-panel overflow-hidden">
   <div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
       <h2 class="text-lg font-semibold">
