@@ -6764,6 +6764,120 @@ export class DefaultUsageIntentPort implements UsageIntentPort {
   }
 }
 
+export type DeploymentOverlayDecisionStatus = "enabled" | "skipped" | "rejected" | "unknown";
+export type DeploymentOverlayDetails = Record<string, unknown>;
+
+export interface DeploymentOverlayActorRef {
+  kind?: ExecutionActor["kind"] | (string & {}) | undefined;
+  id?: string | undefined;
+  userId?: string | undefined;
+  email?: string | undefined;
+}
+
+export interface DeploymentOverlayResourceRefs {
+  organizationId?: string | undefined;
+  projectId?: string | undefined;
+  environmentId?: string | undefined;
+  resourceId?: string | undefined;
+  serverId?: string | undefined;
+  destinationId?: string | undefined;
+  deploymentId?: string | undefined;
+  [key: string]: string | undefined;
+}
+
+export interface DeploymentOverlayEvaluateInput {
+  operationKey: string;
+  source: string;
+  actor?: DeploymentOverlayActorRef | undefined;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  resourceRefs?: DeploymentOverlayResourceRefs | undefined;
+  capabilityKey?: string | undefined;
+  attributes?: DeploymentOverlayDetails | undefined;
+}
+
+export interface DeploymentOverlayDecisionRecord {
+  schemaVersion: "deployment-overlay.decision/v1";
+  id?: string | undefined;
+  operationKey: string;
+  decision: DeploymentOverlayDecisionStatus;
+  reason: string;
+  source: string;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  actor?: DeploymentOverlayActorRef | undefined;
+  resourceRefs?: DeploymentOverlayResourceRefs | undefined;
+  capabilityKey?: string | undefined;
+  decidedAt: string;
+  attributes?: DeploymentOverlayDetails | undefined;
+  details?: DeploymentOverlayDetails | undefined;
+}
+
+export interface DeploymentOverlayDecisionResult {
+  operationKey: string;
+  decision: DeploymentOverlayDecisionStatus;
+  allowed: boolean;
+  reason: string;
+  source: string;
+  record?: DeploymentOverlayDecisionRecord | undefined;
+  details?: DeploymentOverlayDetails | undefined;
+}
+
+export interface ListDeploymentOverlayDecisionsInput {
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  operationKey?: string | undefined;
+  capabilityKey?: string | undefined;
+  source?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface DeploymentOverlayPort {
+  evaluateDeploymentOverlay(
+    context: ExecutionContext,
+    input: DeploymentOverlayEvaluateInput,
+  ): Promise<DeploymentOverlayDecisionResult>;
+
+  listDeploymentOverlayDecisions(
+    context: ExecutionContext,
+    input?: ListDeploymentOverlayDecisionsInput,
+  ): Promise<readonly DeploymentOverlayDecisionRecord[]>;
+}
+
+export class DefaultDeploymentOverlayPort implements DeploymentOverlayPort {
+  async evaluateDeploymentOverlay(
+    context: ExecutionContext,
+    input: DeploymentOverlayEvaluateInput,
+  ): Promise<DeploymentOverlayDecisionResult> {
+    const tenantId = input.tenantId ?? context.tenant?.tenantId;
+    const accountId = input.accountId ?? context.tenant?.accountId;
+    const organizationId = input.organizationId ?? context.tenant?.organizationId;
+
+    return {
+      operationKey: input.operationKey,
+      decision: "skipped",
+      allowed: true,
+      reason: "deployment-overlay-default-noop",
+      source: "default",
+      details: {
+        operationKey: input.operationKey,
+        source: input.source,
+        ...(input.capabilityKey ? { capabilityKey: input.capabilityKey } : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(accountId ? { accountId } : {}),
+        ...(organizationId ? { organizationId } : {}),
+      },
+    };
+  }
+
+  async listDeploymentOverlayDecisions(): Promise<readonly DeploymentOverlayDecisionRecord[]> {
+    return [];
+  }
+}
+
 export class AllowAllOperationScopePort implements OperationScopePort {
   async scopeOperation(
     _context: ExecutionContext,

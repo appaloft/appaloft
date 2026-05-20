@@ -11,6 +11,7 @@ export const tokens = {
   tenantContextResolver: Symbol.for("appaloft.tenant_context_resolver"),
   entitlementPort: Symbol.for("appaloft.entitlement_port"),
   usageIntentPort: Symbol.for("appaloft.usage_intent_port"),
+  deploymentOverlayPort: Symbol.for("appaloft.deployment_overlay_port"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
@@ -211,6 +212,10 @@ export const tokens = {
   recordUsageIntentUseCase: Symbol.for("appaloft.record_usage_intent_use_case"),
   listUsageIntentRecordsQueryService: Symbol.for(
     "appaloft.list_usage_intent_records_query_service",
+  ),
+  evaluateDeploymentOverlayUseCase: Symbol.for("appaloft.evaluate_deployment_overlay_use_case"),
+  listDeploymentOverlayDecisionsQueryService: Symbol.for(
+    "appaloft.list_deployment_overlay_decisions_query_service",
   ),
   checkProjectDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_project_delete_safety_query_service",
