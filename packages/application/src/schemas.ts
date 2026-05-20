@@ -60,6 +60,7 @@ export {
   type ShowDeployTokenQueryInput,
   showDeployTokenQueryInputSchema,
 } from "./operations/deploy-tokens/show-deploy-token.schema";
+export * from "./operations/deployment-overlays/deployment-overlay.schema";
 export * from "./operations/deployments/archive-deployment.schema";
 export * from "./operations/deployments/cancel-deployment.schema";
 export * from "./operations/deployments/cleanup-preview.schema";

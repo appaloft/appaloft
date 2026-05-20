@@ -151,6 +151,7 @@ import {
   detachResourceStorageCommandInputSchema,
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
+  EvaluateDeploymentOverlayCommand,
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -160,6 +161,8 @@ import {
   ExportAuditEventsQuery,
   ExportGlobalAuditEventsQuery,
   environmentEffectivePrecedenceQueryInputSchema,
+  evaluateDeploymentOverlayInputSchema,
+  evaluateDeploymentOverlayResponseSchema,
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
@@ -196,6 +199,7 @@ import {
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
+  ListDeploymentOverlayDecisionsQuery,
   ListDeploymentsQuery,
   ListDeployTokensQuery,
   ListDomainBindingsQuery,
@@ -233,6 +237,8 @@ import {
   listDependencyResourceBackupPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
   listDependencyResourcesQueryInputSchema,
+  listDeploymentOverlayDecisionsInputSchema,
+  listDeploymentOverlayDecisionsResponseSchema,
   listDeploymentsQueryInputSchema,
   listDeployTokensQueryInputSchema,
   listDomainBindingsQueryInputSchema,
@@ -2430,6 +2436,30 @@ export const listUsageIntentRecordsProcedure = base
   .output(listUsageIntentRecordsResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ListUsageIntentRecordsQuery.create(input)),
+  );
+
+export const evaluateDeploymentOverlayProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployment-overlays",
+    successStatus: 202,
+  })
+  .input(evaluateDeploymentOverlayInputSchema)
+  .output(evaluateDeploymentOverlayResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, EvaluateDeploymentOverlayCommand.create(input)),
+  );
+
+export const listDeploymentOverlayDecisionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployment-overlays",
+    successStatus: 200,
+  })
+  .input(listDeploymentOverlayDecisionsInputSchema)
+  .output(listDeploymentOverlayDecisionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDeploymentOverlayDecisionsQuery.create(input)),
   );
 
 export const createDeployTokenProcedure = base
@@ -5219,6 +5249,10 @@ export const appaloftOrpcRouter = {
     record: recordUsageIntentProcedure,
     list: listUsageIntentRecordsProcedure,
   },
+  deploymentOverlays: {
+    evaluate: evaluateDeploymentOverlayProcedure,
+    list: listDeploymentOverlayDecisionsProcedure,
+  },
   deployTokens: {
     create: createDeployTokenProcedure,
     list: listDeployTokensProcedure,
@@ -7603,6 +7637,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/capabilities/query",
     "/api/entitlements/query",
     "/api/usage-intents",
+    "/api/deployment-overlays",
     "/api/deploy-tokens",
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",
