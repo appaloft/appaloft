@@ -260,6 +260,7 @@ describe("operation guard extension boundary", () => {
     const scopePort: OperationScopePort = {
       scopeOperation: async () => ({
         effect: "deny",
+        visibility: "denied",
         deniedBy: {
           checkKey: "test.visibility",
           kind: "authorization",

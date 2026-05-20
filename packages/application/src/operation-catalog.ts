@@ -14,6 +14,7 @@ import { showAuditEventArchiveQueryInputSchema } from "./operations/audit-events
 import { showAuditEventLegalHoldQueryInputSchema } from "./operations/audit-events/show-audit-event-legal-hold.query";
 import { bootstrapFirstAdminCommandInputSchema } from "./operations/auth/bootstrap-first-admin.schema";
 import { getAuthBootstrapStatusQueryInputSchema } from "./operations/auth/get-auth-bootstrap-status.query";
+import { queryCapabilitiesInputSchema } from "./operations/capabilities/query-capabilities.schema";
 import { deleteCertificateCommandInputSchema } from "./operations/certificates/delete-certificate.command";
 import { importCertificateCommandInputSchema } from "./operations/certificates/import-certificate.command";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
@@ -232,6 +233,7 @@ type OperationDomain =
   | "storage-volumes"
   | "deploy-tokens"
   | "auth"
+  | "capabilities"
   | "audit-events"
   | "domain-events"
   | "provider-job-logs"
@@ -316,6 +318,24 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft auth bootstrap-first-admin",
       orpc: { method: "POST", path: "/api/bootstrap/auth/first-admin" },
+    },
+  },
+  {
+    key: "capabilities.query",
+    kind: "query",
+    domain: "capabilities",
+    messageName: "QueryCapabilitiesQuery",
+    handlerName: "QueryCapabilitiesQueryHandler",
+    serviceName: "QueryCapabilitiesQueryService",
+    inputSchema: queryCapabilitiesInputSchema,
+    serviceToken: tokens.queryCapabilitiesQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "POST", path: "/api/capabilities/query" },
     },
   },
   {

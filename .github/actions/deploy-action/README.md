@@ -177,6 +177,7 @@ jobs:
           appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
           server-config-deploy: true
           config: appaloft.yml
+          source-revision: ${{ github.sha }}
           secret-variables: |
             APP_SECRET=ci-env:APP_SECRET
 ```
@@ -192,6 +193,11 @@ mode the action sends that token as a transient source-package credential so the
 can read the committed config file for the checked-out revision and materialize the deployment
 source through the same request-scoped provider credential. The token is not written into resource
 profiles or deployment state.
+
+For pull request workflows, set `source-revision` to
+`${{ github.event.pull_request.head.sha }}` when the checkout uses the pull request head commit.
+GitHub's default `GITHUB_SHA` can point at a temporary merge ref, which is useful for tests but is
+not always reachable from the head branch that the runtime source profile uses.
 
 `control-plane-url` is how you select the Appaloft instance. It is not inferred by scanning the SSH
 target. `appaloft-token` is required for self-hosted Action mutation endpoints and is sent as an
@@ -319,6 +325,7 @@ Self-hosted server-config preview uses the same control-plane API boundary:
     appaloft-token: ${{ secrets.APPALOFT_TOKEN }}
     server-config-deploy: true
     config: appaloft.preview.yml
+    source-revision: ${{ github.event.pull_request.head.sha }}
     preview: pull-request
     preview-id: pr-${{ github.event.pull_request.number }}
     preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
@@ -421,6 +428,7 @@ account identity must never come from committed config.
 | `version` | `latest` | Appaloft release tag such as `v0.9.0`. Used for CLI install and self-hosted console install. |
 | `config` | empty | Optional Appaloft config path. If omitted, `appaloft.yml` is used only when present. |
 | `source` | `.` | Source path or locator passed to the CLI. |
+| `source-revision` | `GITHUB_SHA` | Explicit revision for self-hosted server config deploy source packages. Use the PR head SHA when deploying a checked-out pull request head. |
 | `runtime-name` | empty | Trusted runtime name override for pure SSH deploy. |
 | `ssh-host` | empty | SSH target host for pure SSH deployments. |
 | `ssh-user` | empty | SSH username. |

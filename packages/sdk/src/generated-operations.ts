@@ -257,6 +257,22 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "capabilities.query",
+    operationGroup: "capabilities",
+    operationMethod: "query",
+    operationId: "capabilities.query",
+    kind: "query",
+    domain: "capabilities",
+    messageName: "QueryCapabilitiesQuery",
+    route: {
+      method: "POST",
+      path: "/capabilities/query",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "certificates.delete",
     operationGroup: "certificates",
     operationMethod: "delete",

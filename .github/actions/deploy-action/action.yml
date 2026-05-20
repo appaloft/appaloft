@@ -18,6 +18,10 @@ inputs:
     description: Source path or locator passed to appaloft deploy.
     required: false
     default: "."
+  source-revision:
+    description: Explicit source revision used for self-hosted server config deploy source packages. Defaults to the GitHub Actions GITHUB_SHA.
+    required: false
+    default: ""
   runtime-name:
     description: Trusted runtime name override.
     required: false
@@ -260,6 +264,7 @@ runs:
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_SOURCE_REVISION: ${{ inputs.source-revision }}
         INPUT_RUNTIME_NAME: ${{ inputs.runtime-name }}
         INPUT_SSH_HOST: ${{ inputs.ssh-host }}
         INPUT_SSH_USER: ${{ inputs.ssh-user }}

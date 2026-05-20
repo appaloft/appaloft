@@ -230,21 +230,33 @@ describe("project lifecycle operations", () => {
     expect(result._unsafeUnwrap().items.map((project) => project.id)).toEqual(["prj_visible"]);
   });
 
-  test("[PROJ-LIFE-SCOPE-002] list projects returns an empty result for none visibility", async () => {
+  test("[PROJ-LIFE-SCOPE-002] list projects returns stable denial when scope cannot be filtered safely", async () => {
     const { context, projectReadModel } = await createHarness();
     const scopePort: OperationScopePort = {
       scopeOperation: async () => ({
-        effect: "allow",
-        visibility: "none",
-        reason: "test-no-visible-projects",
+        effect: "deny",
+        visibility: "denied",
+        reason: "test-no-safe-project-scope",
+        deniedBy: {
+          checkKey: "test.scope",
+          kind: "authorization",
+        },
       }),
     };
     const service = new ListProjectsQueryService(projectReadModel, scopePort);
 
     const result = await service.execute(context);
 
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toEqual({ items: [] });
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.scope",
+        checkKind: "authorization",
+        operationKey: "projects.list",
+        reason: "test-no-safe-project-scope",
+      },
+    });
   });
 
   test("[PROJ-LIFE-RENAME-001] renames an active project and publishes project-renamed", async () => {
