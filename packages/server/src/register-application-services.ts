@@ -110,6 +110,7 @@ import {
   DefaultEntitlementPort,
   DefaultOperationCapabilityPort,
   DefaultTenantContextResolver,
+  DefaultUsageIntentPort,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
@@ -235,6 +236,8 @@ import {
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
   ListTerminalSessionsQueryHandler,
+  ListUsageIntentRecordsQueryHandler,
+  ListUsageIntentRecordsQueryService,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
   type ManagedPostgresDeleteInput,
@@ -289,6 +292,8 @@ import {
   QueryCapabilitiesQueryService,
   QueryEntitlementsQueryHandler,
   QueryEntitlementsQueryService,
+  RecordUsageIntentCommandHandler,
+  RecordUsageIntentUseCase,
   RedeployDeploymentCommandHandler,
   RedeployDeploymentUseCase,
   RegisterServerUseCase,
@@ -1487,6 +1492,8 @@ export function registerApplicationServices(
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(QueryCapabilitiesQueryHandler);
   container.registerSingleton(QueryEntitlementsQueryHandler);
+  container.registerSingleton(RecordUsageIntentCommandHandler);
+  container.registerSingleton(ListUsageIntentRecordsQueryHandler);
   container.registerSingleton(CheckInstanceUpgradeQueryHandler);
   container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
@@ -1719,9 +1726,15 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.operationCapabilityPort, DefaultOperationCapabilityPort);
   container.registerSingleton(tokens.tenantContextResolver, DefaultTenantContextResolver);
   container.registerSingleton(tokens.entitlementPort, DefaultEntitlementPort);
+  container.registerSingleton(tokens.usageIntentPort, DefaultUsageIntentPort);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
   container.registerSingleton(tokens.queryEntitlementsQueryService, QueryEntitlementsQueryService);
+  container.registerSingleton(tokens.recordUsageIntentUseCase, RecordUsageIntentUseCase);
+  container.registerSingleton(
+    tokens.listUsageIntentRecordsQueryService,
+    ListUsageIntentRecordsQueryService,
+  );
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);

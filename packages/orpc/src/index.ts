@@ -223,6 +223,7 @@ import {
   ListSshCredentialsQuery,
   ListStorageVolumesQuery,
   ListTerminalSessionsQuery,
+  ListUsageIntentRecordsQuery,
   LockEnvironmentCommand,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
@@ -255,6 +256,8 @@ import {
   listSshCredentialsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   listTerminalSessionsQueryInputSchema,
+  listUsageIntentRecordsInputSchema,
+  listUsageIntentRecordsResponseSchema,
   lockEnvironmentCommandInputSchema,
   MarkOperatorWorkRecoveredCommand,
   markOperatorWorkRecoveredCommandInputSchema,
@@ -296,6 +299,7 @@ import {
   queryCapabilitiesResponseSchema,
   queryEntitlementsInputSchema,
   queryEntitlementsResponseSchema,
+  RecordUsageIntentCommand,
   RedeployDeploymentCommand,
   RegisterServerCommand,
   ReleaseAuditEventLegalHoldCommand,
@@ -338,6 +342,8 @@ import {
   RotateSshCredentialCommand,
   RunScheduledTaskNowCommand,
   RuntimeMonitoringRollupQuery,
+  recordUsageIntentInputSchema,
+  recordUsageIntentResponseSchema,
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   releaseAuditEventLegalHoldCommandInputSchema,
@@ -2400,6 +2406,30 @@ export const queryEntitlementsProcedure = base
   .output(queryEntitlementsResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, QueryEntitlementsQuery.create(input)),
+  );
+
+export const recordUsageIntentProcedure = base
+  .route({
+    method: "POST",
+    path: "/usage-intents",
+    successStatus: 202,
+  })
+  .input(recordUsageIntentInputSchema)
+  .output(recordUsageIntentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RecordUsageIntentCommand.create(input)),
+  );
+
+export const listUsageIntentRecordsProcedure = base
+  .route({
+    method: "GET",
+    path: "/usage-intents",
+    successStatus: 200,
+  })
+  .input(listUsageIntentRecordsInputSchema)
+  .output(listUsageIntentRecordsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListUsageIntentRecordsQuery.create(input)),
   );
 
 export const createDeployTokenProcedure = base
@@ -5185,6 +5215,10 @@ export const appaloftOrpcRouter = {
   entitlements: {
     query: queryEntitlementsProcedure,
   },
+  usageIntents: {
+    record: recordUsageIntentProcedure,
+    list: listUsageIntentRecordsProcedure,
+  },
   deployTokens: {
     create: createDeployTokenProcedure,
     list: listDeployTokensProcedure,
@@ -7533,6 +7567,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/bootstrap/auth/first-admin",
     "/api/capabilities/query",
     "/api/entitlements/query",
+    "/api/usage-intents",
     "/api/deploy-tokens",
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",

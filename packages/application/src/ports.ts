@@ -6639,6 +6639,131 @@ export class DefaultEntitlementPort implements EntitlementPort {
   }
 }
 
+export type UsageIntentStatus = "accepted" | "duplicate" | "rejected" | "unknown_capability";
+export type UsageIntentDetails = Record<string, unknown>;
+
+export interface UsageIntentActorRef {
+  kind?: ExecutionActor["kind"] | (string & {}) | undefined;
+  id?: string | undefined;
+  userId?: string | undefined;
+  email?: string | undefined;
+}
+
+export interface UsageIntentResourceRefs {
+  organizationId?: string | undefined;
+  projectId?: string | undefined;
+  environmentId?: string | undefined;
+  resourceId?: string | undefined;
+  serverId?: string | undefined;
+  destinationId?: string | undefined;
+  deploymentId?: string | undefined;
+  [key: string]: string | undefined;
+}
+
+export interface UsageIntentQuantity {
+  value: number;
+  unit: string;
+}
+
+export interface UsageIntentInput {
+  idempotencyKey: string;
+  capabilityKey: string;
+  actor?: UsageIntentActorRef | undefined;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  resourceRefs?: UsageIntentResourceRefs | undefined;
+  quantity?: UsageIntentQuantity | undefined;
+  source: string;
+  occurredAt?: string | undefined;
+  attributes?: UsageIntentDetails | undefined;
+}
+
+export interface UsageIntentRecord {
+  schemaVersion: "usage-intent.record/v1";
+  id: string;
+  idempotencyKey: string;
+  capabilityKey: string;
+  status: UsageIntentStatus;
+  reason: string;
+  source: string;
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  actor?: UsageIntentActorRef | undefined;
+  resourceRefs?: UsageIntentResourceRefs | undefined;
+  quantity?: UsageIntentQuantity | undefined;
+  occurredAt: string;
+  recordedAt: string;
+  attributes?: UsageIntentDetails | undefined;
+  details?: UsageIntentDetails | undefined;
+}
+
+export interface UsageIntentRecordResult {
+  idempotencyKey: string;
+  capabilityKey: string;
+  accepted: boolean;
+  duplicate: boolean;
+  status: UsageIntentStatus;
+  reason: string;
+  source: string;
+  record?: UsageIntentRecord | undefined;
+  details?: UsageIntentDetails | undefined;
+}
+
+export interface ListUsageIntentRecordsInput {
+  tenantId?: string | undefined;
+  accountId?: string | undefined;
+  organizationId?: string | undefined;
+  capabilityKey?: string | undefined;
+  source?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface UsageIntentPort {
+  recordUsageIntent(
+    context: ExecutionContext,
+    input: UsageIntentInput,
+  ): Promise<UsageIntentRecordResult>;
+
+  listUsageIntentRecords(
+    context: ExecutionContext,
+    input?: ListUsageIntentRecordsInput,
+  ): Promise<readonly UsageIntentRecord[]>;
+}
+
+export class DefaultUsageIntentPort implements UsageIntentPort {
+  async recordUsageIntent(
+    context: ExecutionContext,
+    input: UsageIntentInput,
+  ): Promise<UsageIntentRecordResult> {
+    const tenantId = input.tenantId ?? context.tenant?.tenantId;
+    const accountId = input.accountId ?? context.tenant?.accountId;
+    const organizationId = input.organizationId ?? context.tenant?.organizationId;
+
+    return {
+      idempotencyKey: input.idempotencyKey,
+      capabilityKey: input.capabilityKey,
+      accepted: true,
+      duplicate: false,
+      status: "accepted",
+      reason: "usage-intent-default-noop",
+      source: "default",
+      details: {
+        capabilityKey: input.capabilityKey,
+        source: input.source,
+        ...(tenantId ? { tenantId } : {}),
+        ...(accountId ? { accountId } : {}),
+        ...(organizationId ? { organizationId } : {}),
+      },
+    };
+  }
+
+  async listUsageIntentRecords(): Promise<readonly UsageIntentRecord[]> {
+    return [];
+  }
+}
+
 export class AllowAllOperationScopePort implements OperationScopePort {
   async scopeOperation(
     _context: ExecutionContext,
