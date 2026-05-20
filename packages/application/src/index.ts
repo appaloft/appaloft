@@ -15,6 +15,8 @@ export * from "./deploy-token-handlers";
 export * from "./deploy-token-messages";
 export * from "./deployment-handlers";
 export * from "./deployment-messages";
+export * from "./deployment-overlay-handlers";
+export * from "./deployment-overlay-messages";
 export * from "./deployment-progress";
 export * from "./domain-binding-handlers";
 export * from "./domain-binding-messages";

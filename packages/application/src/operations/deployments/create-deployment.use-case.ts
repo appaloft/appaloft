@@ -25,6 +25,7 @@ import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mut
 import {
   type AppLogger,
   type DependencyResourceSecretStore,
+  type DeploymentOverlayPort,
   type DeploymentProgressReporter,
   type DeploymentRepository,
   type DomainRouteBindingCandidate,
@@ -47,6 +48,7 @@ import {
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
+import { evaluateDeploymentOverlayWithPort } from "../deployment-overlays/evaluate-deployment-overlay.use-case";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 import {
@@ -600,6 +602,8 @@ export class CreateDeploymentUseCase {
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.deploymentOverlayPort)
+    private readonly deploymentOverlayPort?: DeploymentOverlayPort,
   ) {}
 
   private async persistDeployment(
@@ -748,6 +752,7 @@ export class CreateDeploymentUseCase {
       resourceDependencyBindingReadModel,
       runtimeTargetBackendRegistry,
       processAttemptRecorder,
+      deploymentOverlayPort,
       deploymentProgressReporter,
       dependencyResourceSecretStore,
       runtimePlanResolutionInputBuilder,
@@ -758,6 +763,28 @@ export class CreateDeploymentUseCase {
     const persistDeployment = this.persistDeployment.bind(this);
     const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
     const repositoryContext = toRepositoryContext(context);
+    const overlayResult = await evaluateDeploymentOverlayWithPort({
+      context,
+      deploymentOverlayPort,
+      input: {
+        operationKey: recovery?.ownerLabel ?? "deployments.create",
+        source: "deployment-flow",
+        resourceRefs: {
+          projectId: input.projectId,
+          serverId: input.serverId,
+          environmentId: input.environmentId,
+          resourceId: input.resourceId,
+          ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+        },
+        attributes: {
+          executionMode: input.executionMode ?? "synchronous",
+          ...(recovery?.triggerKind ? { triggerKind: recovery.triggerKind } : {}),
+        },
+      },
+    });
+    if (overlayResult.isErr()) {
+      return err(overlayResult.error);
+    }
 
     return safeTry(async function* () {
       reportDeploymentProgress(deploymentProgressReporter, context, {
