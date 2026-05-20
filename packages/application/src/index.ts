@@ -65,5 +65,7 @@ export * from "./system-messages";
 export * from "./terminal-session-handlers";
 export * from "./terminal-session-messages";
 export * from "./tokens";
+export * from "./usage-intent-handlers";
+export * from "./usage-intent-messages";
 export * from "./use-cases";
 export * from "./workspace";
