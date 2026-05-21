@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "..");
 const bunVersionPath = resolve(root, ".bun-version");
 const packageJsonPath = resolve(root, "package.json");
+const dockerfilePath = resolve(root, "Dockerfile");
 const runtimeHelperPath = resolve(
   root,
   "packages",
@@ -13,9 +14,16 @@ const runtimeHelperPath = resolve(
   "bun.ts",
 );
 
+type PackageJson = Record<string, unknown> & {
+  devDependencies?: Record<string, string>;
+  engines?: Record<string, string>;
+  packageManager?: string;
+};
+
 const checkOnly = Bun.argv.includes("--check");
 const bunVersion = (await Bun.file(bunVersionPath).text()).trim();
-const packageJson = (await Bun.file(packageJsonPath).json()) as Record<string, unknown>;
+const packageJson = (await Bun.file(packageJsonPath).json()) as PackageJson;
+const dockerfile = await Bun.file(dockerfilePath).text();
 
 if (!/^\d+\.\d+\.\d+$/u.test(bunVersion)) {
   throw new Error(`Expected .bun-version to contain an exact semantic version, got: ${bunVersion}`);
@@ -28,13 +36,21 @@ export const pinnedBunAlpineImage = \`oven/bun:\${pinnedBunVersion}-alpine\`;
 
 const currentRuntimeHelper = await Bun.file(runtimeHelperPath).text();
 const nextPackageManager = `bun@${bunVersion}`;
-const currentPackageManager =
-  typeof packageJson.packageManager === "string" ? packageJson.packageManager : undefined;
+const nextBunTypes = `^${bunVersion}`;
+const nextEngineBun = `>=${bunVersion}`;
+const nextDockerfile = dockerfile.replaceAll(
+  /^ARG BUN_VERSION=\d+\.\d+\.\d+$/gmu,
+  `ARG BUN_VERSION=${bunVersion}`,
+);
 
-const packageManagerNeedsUpdate = currentPackageManager !== nextPackageManager;
+const packageJsonNeedsUpdate =
+  packageJson.packageManager !== nextPackageManager ||
+  packageJson.devDependencies?.["bun-types"] !== nextBunTypes ||
+  packageJson.engines?.bun !== nextEngineBun;
 const runtimeHelperNeedsUpdate = currentRuntimeHelper !== nextRuntimeHelper;
+const dockerfileNeedsUpdate = dockerfile !== nextDockerfile;
 
-if (!packageManagerNeedsUpdate && !runtimeHelperNeedsUpdate) {
+if (!packageJsonNeedsUpdate && !runtimeHelperNeedsUpdate && !dockerfileNeedsUpdate) {
   console.log(`Bun version sync is up to date at ${bunVersion}.`);
   process.exit(0);
 }
@@ -45,12 +61,24 @@ if (checkOnly) {
   );
 }
 
-if (packageManagerNeedsUpdate) {
+if (packageJsonNeedsUpdate) {
   const nextPackageJson = {
     ...packageJson,
+    devDependencies: {
+      ...packageJson.devDependencies,
+      "bun-types": nextBunTypes,
+    },
+    engines: {
+      ...packageJson.engines,
+      bun: nextEngineBun,
+    },
     packageManager: nextPackageManager,
   };
   await Bun.write(packageJsonPath, `${JSON.stringify(nextPackageJson, null, 2)}\n`);
+}
+
+if (dockerfileNeedsUpdate) {
+  await Bun.write(dockerfilePath, nextDockerfile);
 }
 
 if (runtimeHelperNeedsUpdate) {
