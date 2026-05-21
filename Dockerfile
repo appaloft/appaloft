@@ -1,10 +1,10 @@
-ARG BUN_VERSION=1.3.13
+ARG BUN_VERSION=1.3.14
 
 FROM node:24-bookworm AS node-runtime
 
 FROM oven/bun:${BUN_VERSION}-debian AS builder
 WORKDIR /app
-ARG BUN_VERSION=1.3.13
+ARG BUN_VERSION=1.3.14
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN bun --version | grep -x "${BUN_VERSION}"
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
