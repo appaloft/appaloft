@@ -103,7 +103,7 @@ Internal governing sources:
 - [x] [Quick Deploy Test Matrix](./testing/quick-deploy-test-matrix.md)
 - [x] [Deployment Runtime Substrate Plan](./implementation/deployment-runtime-substrate-plan.md)
 - [x] [Static Site Deployment Plan](./implementation/static-site-deployment-plan.md)
-- [x] [AI-Native Resource Template And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
+- [x] [AI-Native Blueprint And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Product constraints:
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.
@@ -2472,59 +2472,59 @@ Exit criteria:
 - [ ] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
   recovery without private workarounds.
 
-## Future AI-Native Resource Template And MCP Tracks
+## Future AI-Native Blueprint And MCP Tracks
 
 Target: post-`1.0.0` planning by default.
 
 The v1 Appaloft Agent Deploy Skill is not part of this post-`1.0.0` track set. It is a GA readiness
 item above because it is a documentation/skill entry experience over existing CLI/API operations,
-not a new MCP transport or template capability.
+not a new MCP transport or Blueprint capability.
 
 These tracks are recorded so future Spec Rounds do not model MCP servers, AI tool servers, or
-template-backed software as a separate deployment engine. They are not current release blockers and
+Blueprint-backed software as a separate deployment engine. They are not current release blockers and
 do not authorize runtime code before their own ADR/spec/test gates.
 
 Governing planning document:
-- [AI-Native Skill, Resource Template, And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
+- [AI-Native Skill, Blueprint, And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Roadmap principles:
 - [ ] Preserve Appaloft's existing Resource, Workload, ResourceInstance, ResourceBinding,
   Deployment, RuntimePlan, EnvironmentSnapshot, Provider, Strategy, Integration, Plugin, command/
   query, and operation-catalog boundaries.
-- [ ] Define a generic Resource Template / Workload Profile foundation before MCP-specific
-  behavior. Templates describe deployable intent and must not be Docker Compose-only.
-- [ ] Resolve template/profile deployment into existing application operations and deployment
+- [ ] Define a generic Blueprint format and local registry foundation before MCP-specific
+  behavior. Blueprints describe portable deployable topology intent and must not be Docker Compose-only.
+- [ ] Resolve Blueprint instantiation into existing application operations and deployment
   planning instead of bypassing the application layer.
-- [ ] Add a template catalog/registry layer for local, repository, git, official, private, and
-  licensed distribution modes without making curated catalogs a prerequisite for community use.
-- [ ] Treat AI tool-server / MCP support as capability/profile metadata, generated outputs, docs,
+- [ ] Add a Blueprint catalog/local registry layer for local files, repository folders, Git sources,
+  neutral built-in examples, and plugin-provided packs without making remote or curated catalogs a prerequisite for community use.
+- [ ] Treat AI tool-server / MCP support as Blueprint capability metadata, generated outputs, docs,
   safe defaults, and gateway compatibility over the generic foundation.
 - [ ] Plan Appaloft-as-MCP as a future interface over existing operations, using the same operation
   catalog, command/query schemas, neverthrow errors, operation ids, and correlation ids as CLI,
   HTTP/oRPC, and Web.
-- [ ] Plan Appaloft-hosted MCP server templates as deployable Resources or dependency-backed
+- [ ] Plan MCP Server Blueprints as deployable Resources or dependency-backed
   workloads on user-owned infrastructure, not as a new MCP-specific deployment path.
-- [ ] Defer MCP Gateway / Tool Gateway governance until template/tool-server foundations exist; the
+- [ ] Defer MCP Gateway / Tool Gateway governance until Blueprint/tool-server foundations exist; the
   gateway is a policy, audit, identity, rate-limit, approval, redaction, and correlation layer above
-  hosted tool servers.
+  installed tool servers.
 - [ ] Keep AI-native observability, AgentOps, cost governance, eval hooks, model gateway, and agent
-  runtime as long-term themes rather than initial template/MCP dependencies.
+  runtime as long-term themes rather than initial Blueprint/MCP dependencies.
 
 Candidate sequencing:
-- [ ] Post-1.0 Track 1: Resource Template / Workload Profile Foundation. If maintainers deliberately
+- [ ] Post-1.0 Track 1: Blueprint Format And Local Registry Foundation. If maintainers deliberately
   pull this before GA, first update the version plan with an explicit pre-GA phase and explain which
   existing GA blocker is being replaced or deferred.
-- [ ] Post-1.0 Track 2: Template Resolution And Deployment Planning. This depends on Track 1 being
+- [ ] Post-1.0 Track 2: Blueprint Instantiation And Deployment Planning. This depends on Track 1 being
   specified and must not reserve a `0.x` version while it remains post-`1.0.0` work.
-- [ ] Post-1.0 Track 3: Template Catalog / Registry. This depends on resolution semantics and must
+- [ ] Post-1.0 Track 3: Blueprint Catalog / Registry. This depends on instantiation semantics and must
   not reserve a `0.x` version while it remains post-`1.0.0` work.
-- [ ] Post-1.0 Track 4: AI Tool Server / MCP Capability. This is capability/profile metadata over
-  the generic template layer and must not reserve a `0.x` version while it remains post-`1.0.0`
+- [ ] Post-1.0 Track 4: AI Tool Server / MCP Capability. This is capability metadata over
+  the generic Blueprint layer and must not reserve a `0.x` version while it remains post-`1.0.0`
   work.
 - [ ] Post-1.0 Track 5: Appaloft-as-MCP Interface Planning. This goes through the existing operation
   catalog and application buses and must not reserve a `0.x` version while it remains post-`1.0.0`
   work.
-- [ ] Post-1.0 Track 6: Curated AI Tool Server Templates. This depends on edition, trust, secret,
+- [ ] Post-1.0 Track 6: Curated AI Tool Server Blueprints. This depends on trust, secret,
   health, docs, and generated-client-config decisions and must not reserve a `0.x` version while it
   remains post-`1.0.0` work.
 - [ ] Post-1.0 Track 7: MCP Gateway / Tool Gateway. This depends on gateway audit/redaction/
