@@ -139,6 +139,9 @@ const healthPathOption = Options.text("health-path").pipe(Options.optional);
 const envOption = Options.text("env").pipe(Options.repeated);
 const secretOption = Options.text("secret").pipe(Options.repeated);
 const optionalSecretOption = Options.text("optional-secret").pipe(Options.repeated);
+const acknowledgeResourceProfileDriftOption = Options.boolean(
+  "acknowledge-resource-profile-drift",
+).pipe(Options.withDefault(false));
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
 const followEventsOption = Options.boolean("follow").pipe(Options.withDefault(false));
 const deploymentEventsJsonOption = Options.boolean("json").pipe(Options.withDefault(false));
@@ -1220,10 +1223,12 @@ export const deployCommand = EffectCommand.make(
     env: envOption,
     secret: secretOption,
     optionalSecret: optionalSecretOption,
+    acknowledgeResourceProfileDrift: acknowledgeResourceProfileDriftOption,
     stateBackend: stateBackendOption,
     appLogLines: appLogLinesOption,
   },
   ({
+    acknowledgeResourceProfileDrift,
     appLogLines,
     build,
     buildTarget,
@@ -1562,7 +1567,9 @@ export const deployCommand = EffectCommand.make(
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
-        ...(configResolution ? { profileDriftPreflight: true } : {}),
+        ...(configResolution && !acknowledgeResourceProfileDrift
+          ? { profileDriftPreflight: true }
+          : {}),
       };
 
       const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
