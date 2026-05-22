@@ -106,7 +106,9 @@ function renderDockerRunContainerCommand(
     "--name",
     options.quote(spec.containerName.value),
     spec.networkName ? `--network ${options.quote(spec.networkName.value)}` : "",
-    ...spec.publishedPorts.map((port) => renderPublishedPort(port.mode, port.containerPort.value)),
+    ...spec.publishedPorts.map((port) =>
+      renderPublishedPort(port.mode, port.containerPort.value, port.hostPort?.value),
+    ),
     ...spec.mounts.map((mount) => renderMount(mount, options)),
     ...spec.env.map((variable) => renderEnvFlag(variable, options)),
     ...spec.labels.map((label) =>
@@ -227,9 +229,10 @@ function renderEnvFlag(
 function renderPublishedPort(
   mode: "loopback-ephemeral" | "host-same-port",
   containerPort: number,
+  hostPort?: number,
 ): string {
   if (mode === "host-same-port") {
-    return `-p ${containerPort}:${containerPort}`;
+    return `-p ${hostPort ?? containerPort}:${containerPort}`;
   }
 
   return `-p 127.0.0.1::${containerPort}`;

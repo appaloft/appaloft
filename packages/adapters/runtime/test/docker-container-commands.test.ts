@@ -16,6 +16,13 @@ describe("docker container command helpers", () => {
     expect(dockerPublishedPortFlag({ containerPort: 3000, exposureMode: "direct-port" })).toBe(
       "-p 3000:3000",
     );
+    expect(
+      dockerPublishedPortFlag({
+        containerPort: 3001,
+        exposureMode: "direct-port",
+        hostPort: 80,
+      }),
+    ).toBe("-p 80:3001");
   });
 
   test("publishes reverse-proxy resources on a loopback ephemeral host port", () => {

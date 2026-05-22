@@ -8058,6 +8058,7 @@ export interface RequestedDeploymentConfig {
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;
   exposureMode?: ResourceExposureMode;
+  hostPort?: number;
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: RequestedDeploymentAccessContext;
   runtimeMetadata?: Record<string, string>;

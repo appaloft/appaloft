@@ -243,9 +243,10 @@ export function dockerRemoveResourceContainersCommand(input: {
 export function dockerPublishedPortFlag(input: {
   containerPort: number;
   exposureMode?: string | undefined;
+  hostPort?: number | undefined;
 }): string {
   if (input.exposureMode === "direct-port") {
-    return `-p ${input.containerPort}:${input.containerPort}`;
+    return `-p ${input.hostPort ?? input.containerPort}:${input.containerPort}`;
   }
 
   return `-p 127.0.0.1::${input.containerPort}`;

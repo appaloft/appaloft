@@ -615,6 +615,11 @@ function supersededDeploymentIdsForCleanup(input: {
   return input.supersedesDeploymentId ? [input.supersedesDeploymentId.value] : [];
 }
 
+function parseOptionalPort(value: string | undefined): number | undefined {
+  const port = Number(value);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+}
+
 interface SshTarget {
   host: string;
   publicHost: string;
@@ -2202,6 +2207,9 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       const usesDirectHostPort =
         state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+      const directHostPort = parseOptionalPort(
+        state.runtimePlan.execution.metadata?.["resource.hostPort"],
+      );
       const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
       const removeSupersededResourceContainersSpec =
         dockerCommandBuilder.removeResourceContainers({
@@ -2229,6 +2237,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             dockerCommandBuilder.publishPort({
               containerPort: port,
               mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
+              ...(usesDirectHostPort && directHostPort ? { hostPort: directHostPort } : {}),
             }),
           ],
         }),

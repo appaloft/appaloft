@@ -1512,6 +1512,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? {
             exposureMode: networkProfile.exposureMode.value,
             upstreamProtocol: networkProfile.upstreamProtocol.value,
+            ...(networkProfile.hostPort ? { hostPort: networkProfile.hostPort.value } : {}),
             ...(accessProfile?.generatedAccessMode.isDisabled()
               ? {}
               : {
