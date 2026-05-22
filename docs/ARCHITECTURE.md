@@ -134,6 +134,19 @@ flowchart TD
 - `MCP`
   - remains a future interface that must call the same application layer
 
+## Blueprint Boundary
+
+Blueprints are a future portable topology input above the existing Resource and Deployment planning
+model. A BlueprintVersion can be instantiated with user inputs and a target environment/profile to
+produce Resource profile changes, ResourceDesiredState, WorkloadSpec, RuntimeProfile,
+ResourceBinding intent, route intent, and deployment planning input. Provider-specific rendering
+stays in adapters, providers, plugins, and runtime target backends.
+
+Community Appaloft's Blueprint boundary is open, file-first, and local-registry friendly: copied
+`*.blueprint.json` files and optional `*.blueprint.yaml` authoring files should be able to define
+local Blueprints without a hosted catalog. See
+[ADR-065: Blueprint Format And Local Registry Boundary](./decisions/ADR-065-blueprint-format-and-local-registry-boundary.md).
+
 ## Core Business Surface
 
 - the human-facing and AI-facing business capability contract lives in

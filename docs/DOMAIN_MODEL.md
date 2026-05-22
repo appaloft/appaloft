@@ -38,6 +38,13 @@ project, deployment target/server, environment, resource, and deployment input c
 dispatching explicit operations. The final deployment write remains `deployments.create`; see
 [ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
 
+Blueprint is not a domain aggregate in the current model. It is a portable, versioned, instantiable
+application or service topology definition that can compile into existing resource profile,
+dependency binding, runtime, route, and deployment planning concepts. Blueprint is not a Deployment,
+not a Project, not a Resource, and not a Catalog Listing. The Community boundary is open,
+file-first, and local-registry friendly; see
+[ADR-065: Blueprint Format And Local Registry Boundary](./decisions/ADR-065-blueprint-format-and-local-registry-boundary.md).
+
 ## Core Principles
 
 - aggregate boundaries follow invariants, not UI screens
