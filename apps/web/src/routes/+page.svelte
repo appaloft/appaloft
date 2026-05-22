@@ -6,6 +6,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import { Button } from "$lib/components/ui/button";
+  import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     countProjectEnvironments,
@@ -17,8 +18,7 @@
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
 
-  const { consoleOverviewQuery } = createConsoleQueries(browser, {
-    authSession: false,
+  const { authSessionQuery, consoleOverviewQuery } = createConsoleQueries(browser, {
     certificates: false,
     deployments: false,
     domainBindings: false,
@@ -35,7 +35,7 @@
     queryOptions({
       queryKey: ["dependency-resources", "home"],
       queryFn: () => orpcClient.dependencyResources.list({}),
-      enabled: browser,
+      enabled: browser && canRunProductQueries(authSessionQuery.data),
       staleTime: 5_000,
     }),
   );

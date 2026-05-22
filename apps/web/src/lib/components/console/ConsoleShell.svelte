@@ -10,6 +10,7 @@
     Gauge,
     GitBranch,
     Globe2,
+    LogIn,
     Moon,
     LogOut,
     Package,
@@ -165,6 +166,8 @@
   );
   const githubConnected = $derived(Boolean(githubProvider?.connected));
   const authIdentity = $derived(readSessionIdentity(authSession.session));
+  const loginRequired = $derived(authSession.loginRequired && !authSession.session);
+  const loginHref = $derived(`/login?next=${encodeURIComponent(pathname)}`);
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
   const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
   const appVersion = $derived(version?.version ?? healthQuery.data?.version ?? "");
@@ -618,7 +621,27 @@
           </div>
         </section>
       {:else}
-        {@render children()}
+        {#if loginRequired}
+          <section class="console-panel flex max-w-xl flex-col gap-4 p-6">
+            <div class="flex items-start gap-3">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30">
+                <ShieldCheck class="size-5 text-primary" />
+              </div>
+              <div class="space-y-1.5">
+                <h2 class="text-lg font-semibold">{$t(i18nKeys.console.authBootstrap.loginTitle)}</h2>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.authBootstrap.loginBody)}
+                </p>
+              </div>
+            </div>
+            <Button href={loginHref} class="w-fit">
+              <LogIn class="size-4" />
+              {$t(i18nKeys.console.authBootstrap.signIn)}
+            </Button>
+          </section>
+        {:else}
+          {@render children()}
+        {/if}
       {/if}
     </main>
   </SidebarInset>
