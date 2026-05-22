@@ -248,6 +248,15 @@ runs:
         INPUT_CONTROL_PLANE_URL: ${{ inputs.control-plane-url }}
       run: bash "$GITHUB_ACTION_PATH/scripts/resolve-control-plane.sh"
 
+    - id: resolve-preview
+      shell: bash
+      env:
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_PREVIEW_ID: ${{ inputs.preview-id }}
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: ${{ inputs.preview-domain-template }}
+        INPUT_PREVIEW_TLS_MODE: ${{ inputs.preview-tls-mode }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/resolve-preview.sh"
+
     - id: install
       if: ${{ steps.resolve.outputs.control-plane-mode == 'none' && inputs.command != 'install-console' }}
       shell: bash
@@ -297,8 +306,8 @@ runs:
         INPUT_SECRET_VARIABLES: ${{ inputs.secret-variables }}
         INPUT_PREVIEW: ${{ inputs.preview }}
         INPUT_PREVIEW_ID: ${{ inputs.preview-id }}
-        INPUT_PREVIEW_DOMAIN_TEMPLATE: ${{ inputs.preview-domain-template }}
-        INPUT_PREVIEW_TLS_MODE: ${{ inputs.preview-tls-mode }}
+        INPUT_PREVIEW_DOMAIN_TEMPLATE: ${{ steps.resolve-preview.outputs.preview-domain-template }}
+        INPUT_PREVIEW_TLS_MODE: ${{ steps.resolve-preview.outputs.preview-tls-mode }}
         INPUT_REQUIRE_PREVIEW_URL: ${{ inputs.require-preview-url }}
         INPUT_PR_COMMENT: ${{ inputs.pr-comment }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}

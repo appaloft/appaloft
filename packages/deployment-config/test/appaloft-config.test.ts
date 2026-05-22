@@ -52,6 +52,12 @@ describe("Appaloft deployment config schema", () => {
           from: "server-credential:ssh_prod",
         },
       },
+      preview: {
+        pullRequest: {
+          domainTemplate: "preview-{pr_number}.example.com",
+          tlsMode: "auto",
+        },
+      },
     });
 
     expect(parsed.success).toBe(true);
@@ -64,6 +70,10 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.runtime?.dockerComposeFilePath).toBe("deploy/compose.yaml");
       expect(parsed.data.runtime?.buildTarget).toBe("runtime");
       expect(parsed.data.network?.internalPort).toBe(4310);
+      expect(parsed.data.preview?.pullRequest?.domainTemplate).toBe(
+        "preview-{pr_number}.example.com",
+      );
+      expect(parsed.data.preview?.pullRequest?.tlsMode).toBe("auto");
       expect(parsed.data.retention?.runtimePrune).toEqual({
         retentionDays: 14,
         destructive: true,

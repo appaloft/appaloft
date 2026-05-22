@@ -310,9 +310,16 @@ The default example skips fork pull requests before deployment credentials are e
 previews need an explicit reduced-credential policy.
 
 Use `appaloft.preview.yml` when the root config is production-oriented. Preview route intent should
-come from generated/default access, trusted `preview-domain-template`, or an explicitly selected
-preview config file. Production `access.domains[]` should not be reinterpreted as pull request
-preview hostnames.
+come from generated/default access, trusted `preview-domain-template`, or
+`preview.pullRequest.domainTemplate` in an explicitly selected preview config file. Production
+`access.domains[]` should not be reinterpreted as pull request preview hostnames.
+
+```yaml
+preview:
+  pullRequest:
+    domainTemplate: pr-{pr_number}.preview.example.com
+    tlsMode: disabled
+```
 
 Self-hosted server-config preview uses the same control-plane API boundary:
 
@@ -328,8 +335,6 @@ Self-hosted server-config preview uses the same control-plane API boundary:
     source-revision: ${{ github.event.pull_request.head.sha }}
     preview: pull-request
     preview-id: pr-${{ github.event.pull_request.number }}
-    preview-domain-template: pr-${{ github.event.pull_request.number }}.preview.example.com
-    preview-tls-mode: disabled
     require-preview-url: true
     environment-variables: |
       HOST=0.0.0.0
