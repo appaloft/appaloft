@@ -17,6 +17,7 @@ import {
 import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
 import { request } from "$lib/api/client";
+import { canRunProductQueries } from "$lib/console/auth-query-gate";
 import { orpcClient } from "$lib/orpc";
 
 export const defaultAuthSession: AuthSessionResponse = {
@@ -80,11 +81,13 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
       enabled: queryEnabled("authSession"),
     }),
   );
+  const productQueryEnabled = (key: ConsoleQueryKey) =>
+    queryEnabled(key) && canRunProductQueries(authSessionQuery.data);
   const consoleOverviewQuery = createQuery(() =>
     queryOptions({
       queryKey: ["console", "overview"],
       queryFn: () => request<ConsoleOverviewResponse>("/api/console-overview"),
-      enabled: queryEnabled("consoleOverview"),
+      enabled: productQueryEnabled("consoleOverview"),
       refetchInterval: 10_000,
     }),
   );
@@ -92,63 +95,63 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
     queryOptions({
       queryKey: ["projects"],
       queryFn: () => orpcClient.projects.list(),
-      enabled: queryEnabled("projects"),
+      enabled: productQueryEnabled("projects"),
     }),
   );
   const serversQuery = createQuery(() =>
     queryOptions({
       queryKey: ["servers"],
       queryFn: () => orpcClient.servers.list(),
-      enabled: queryEnabled("servers"),
+      enabled: productQueryEnabled("servers"),
     }),
   );
   const environmentsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["environments"],
       queryFn: () => orpcClient.environments.list({}),
-      enabled: queryEnabled("environments"),
+      enabled: productQueryEnabled("environments"),
     }),
   );
   const resourcesQuery = createQuery(() =>
     queryOptions({
       queryKey: ["resources"],
       queryFn: () => orpcClient.resources.list({}),
-      enabled: queryEnabled("resources"),
+      enabled: productQueryEnabled("resources"),
     }),
   );
   const deploymentsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["deployments"],
       queryFn: () => orpcClient.deployments.list({}),
-      enabled: queryEnabled("deployments"),
+      enabled: productQueryEnabled("deployments"),
     }),
   );
   const previewEnvironmentsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["preview-environments"],
       queryFn: () => orpcClient.previewEnvironments.list({}),
-      enabled: queryEnabled("previewEnvironments"),
+      enabled: productQueryEnabled("previewEnvironments"),
     }),
   );
   const domainBindingsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["domain-bindings"],
       queryFn: () => orpcClient.domainBindings.list({}),
-      enabled: queryEnabled("domainBindings"),
+      enabled: productQueryEnabled("domainBindings"),
     }),
   );
   const certificatesQuery = createQuery(() =>
     queryOptions({
       queryKey: ["certificates"],
       queryFn: () => orpcClient.certificates.list({}),
-      enabled: queryEnabled("certificates"),
+      enabled: productQueryEnabled("certificates"),
     }),
   );
   const providersQuery = createQuery(() =>
     queryOptions({
       queryKey: ["providers"],
       queryFn: () => orpcClient.providers.list(),
-      enabled: queryEnabled("providers"),
+      enabled: productQueryEnabled("providers"),
     }),
   );
 
