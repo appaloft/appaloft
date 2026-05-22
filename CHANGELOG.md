@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-rc.14](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.13...v1.0.0-rc.14) (2026-05-22)
+
+
+### Bug Fixes
+
+* bound console list queries ([#322](https://github.com/appaloft/appaloft/issues/322)) ([9a3d06c](https://github.com/appaloft/appaloft/commit/9a3d06c4810b5b747645d8c7ee2c93fff11d1718))
+* **web:** gate product queries behind auth session ([#321](https://github.com/appaloft/appaloft/issues/321)) ([d20358c](https://github.com/appaloft/appaloft/commit/d20358c25a146e394eb88c21f913b8c4aea5db57))
+
 ## [1.0.0-rc.13](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.12...v1.0.0-rc.13) (2026-05-22)
 
 
