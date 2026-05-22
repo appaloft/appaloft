@@ -30,7 +30,7 @@ export class ListRouteSurfaceDecisionsQueryService {
     const tenantContext = await (
       this.tenantContextResolver ?? new DefaultTenantContextResolver()
     ).resolveTenantContext(context);
-    const effectiveContext = tenantContext ? { ...context, tenant: tenantContext } : context;
+    const effectiveContext = { ...context, tenant: tenantContext };
     const records = await (
       this.routeSurfacePort ?? new DefaultRouteSurfacePort()
     ).listRouteSurfaceDecisions(effectiveContext, query.input);

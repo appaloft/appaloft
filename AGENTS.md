@@ -67,6 +67,9 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 ## CQRS Rules
 
 - business operations exposed through CLI or HTTP must dispatch from an explicit `Command` or `Query` message
+- list/read-model queries must be bounded by default in the backend handler, use case, query service, or read model; no caller omission may result in loading an entire table
+- tenant context is a required backend execution concept; `ExecutionContext` must always carry a tenant context, product-session tenants are resolved from the authenticated session/current organization, and Web or ordinary API callers must never supply tenant input explicitly
+- tenant context must flow from `ExecutionContext` into `RepositoryContext`; adapters and Web surfaces must not make users or callers select or pass their own tenant id for ordinary product-session operations
 - the human-facing and AI-facing source of truth for business operation relationships, workflow sequencing, event progression, and rebuild gates is [docs/BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md)
 - the human-facing and AI-facing source of truth for business operations is [docs/CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md)
 - the human-facing and AI-facing source of truth for domain boundaries and aggregate names is [docs/DOMAIN_MODEL.md](/Users/nichenqin/projects/appaloft/docs/DOMAIN_MODEL.md)

@@ -2,6 +2,7 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import { type DeploymentReadModel } from "../../ports";
 import { tokens } from "../../tokens";
+import { boundedListLimit } from "../shared-schema";
 
 @injectable()
 export class ListDeploymentsQueryService {
@@ -15,8 +16,16 @@ export class ListDeploymentsQueryService {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<DeploymentReadModel["list"]>> }> {
-    return { items: await this.readModel.list(toRepositoryContext(context), input) };
+    return {
+      items: await this.readModel.list(toRepositoryContext(context), {
+        ...(input?.projectId ? { projectId: input.projectId } : {}),
+        ...(input?.resourceId ? { resourceId: input.resourceId } : {}),
+        ...(input?.includeArchived !== undefined ? { includeArchived: input.includeArchived } : {}),
+        limit: boundedListLimit(input?.limit),
+      }),
+    };
   }
 }

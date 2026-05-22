@@ -23,13 +23,10 @@
     Sun,
     UserRound,
   } from "@lucide/svelte";
-  import type { ResourceSummary } from "@appaloft/contracts";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
-  import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
@@ -59,9 +56,6 @@
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
     SidebarProvider,
     SidebarRail,
     SidebarTrigger,
@@ -71,7 +65,6 @@
     initials,
     projectDetailHref,
     readSessionIdentity,
-    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
 
@@ -119,12 +112,12 @@
     versionQuery,
     authSessionQuery,
     projectsQuery,
-    resourcesQuery,
-    deploymentsQuery,
   } = createConsoleQueries(browser, {
     readiness: false,
     servers: false,
     environments: false,
+    resources: false,
+    deployments: false,
     domainBindings: false,
     previewEnvironments: false,
     certificates: false,
@@ -135,8 +128,6 @@
   const version = $derived(versionQuery.data ?? null);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
   const projects = $derived(projectsQuery.data?.items ?? []);
-  const resources = $derived(resourcesQuery.data?.items ?? []);
-  const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
     if (!query) {
@@ -148,17 +139,7 @@
         (value) => value.toLowerCase().includes(query),
       );
 
-      if (projectMatches) {
-        return true;
-      }
-
-      return resources.some(
-        (resource) =>
-          resource.projectId === project.id &&
-          [resource.name, resource.slug, resource.description ?? "", resource.kind].some((value) =>
-            value.toLowerCase().includes(query),
-          ),
-      );
+      return projectMatches;
     });
   });
   const githubProvider = $derived(
@@ -180,27 +161,9 @@
       ? $t(i18nKeys.common.actions.switchToLightMode)
       : $t(i18nKeys.common.actions.switchToDarkMode),
   );
-  const activeDeploymentId = $derived.by(() => {
-    const match = pathname.match(/\/deployments\/([^/]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : "";
-  });
-  const activeResourceId = $derived.by(() => {
-    const match = pathname.match(/\/resources\/([^/]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : "";
-  });
   const activeProjectId = $derived.by(() => {
     const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
-    if (projectMatch?.[1]) {
-      return decodeURIComponent(projectMatch[1]);
-    }
-
-    const activeResource = resources.find((resource) => resource.id === activeResourceId);
-    if (activeResource) {
-      return activeResource.projectId;
-    }
-
-    const activeDeployment = deployments.find((deployment) => deployment.id === activeDeploymentId);
-    return activeDeployment?.projectId ?? "";
+    return projectMatch?.[1] ? decodeURIComponent(projectMatch[1]) : "";
   });
 
   $effect(() => {
@@ -324,10 +287,6 @@
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  function projectResources(projectId: string): ResourceSummary[] {
-    return resources.filter((resource) => resource.projectId === projectId);
-  }
-
   function toggleColorMode(): void {
     colorMode = colorMode === "dark" ? "light" : "dark";
   }
@@ -391,8 +350,7 @@
           <SidebarMenu>
             {#if filteredProjects.length > 0}
               {#each filteredProjects.slice(0, 8) as project (project.id)}
-                {@const childResources = projectResources(project.id)}
-                {@const projectIsActive = activeDeploymentId === "" && activeProjectId === project.id}
+                {@const projectIsActive = activeProjectId === project.id}
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     class={[
@@ -411,28 +369,6 @@
                       </a>
                     {/snippet}
                   </SidebarMenuButton>
-                  {#if childResources.length > 0}
-                    <SidebarMenuSub class="!mx-0 !ml-2 !translate-x-0 !border-l-0 !px-0 !py-1">
-                      {#each childResources.slice(0, 8) as resource (resource.id)}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            class="h-7 !translate-x-0 px-1.5 text-sidebar-foreground/80 data-[active=true]:!bg-sidebar-primary/5 data-[active=true]:!text-sidebar-foreground data-[active=true]:!shadow-none data-[active=true]:hover:!bg-sidebar-primary/10"
-                            isActive={activeResourceId === resource.id}
-                          >
-                            {#snippet child({ props })}
-                              <a href={resourceDetailHref(resource)} {...props}>
-                                <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
-                                <span class="min-w-0 flex-1 truncate">
-                                  {resource.name}
-                                </span>
-                                <ResourceHealthLabel resourceId={resource.id} />
-                              </a>
-                            {/snippet}
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      {/each}
-                    </SidebarMenuSub>
-                  {/if}
                 </SidebarMenuItem>
               {/each}
             {:else}

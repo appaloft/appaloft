@@ -155,6 +155,8 @@ import {
   type StorageVolumeSelectionSpec,
 } from "@appaloft/core";
 
+const defaultReadModelListLimit = 100;
+
 export class FixedClock implements Clock {
   constructor(private value = "2026-01-01T00:00:00.000Z") {}
 
@@ -562,6 +564,7 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      limit?: number;
     },
   ): Promise<ProjectSummary[]> {
     void context;
@@ -587,7 +590,8 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
         }
 
         return [summary];
-      });
+      })
+      .slice(0, input?.limit ?? defaultReadModelListLimit);
   }
 
   async findOne(
@@ -704,32 +708,34 @@ function memoryServerEdgeProxySummary(
 export class MemoryServerReadModel implements ServerReadModel {
   constructor(private readonly repository: MemoryServerRepository) {}
 
-  async list(context: RepositoryContext) {
+  async list(context: RepositoryContext, input?: { limit?: number }) {
     void context;
-    return [...this.repository.items.values()].flatMap((server) => {
-      const state = server.toState();
-      if (state.lifecycleStatus.isDeleted()) {
-        return [];
-      }
+    return [...this.repository.items.values()]
+      .flatMap((server) => {
+        const state = server.toState();
+        if (state.lifecycleStatus.isDeleted()) {
+          return [];
+        }
 
-      return [
-        {
-          id: state.id.value,
-          name: state.name.value,
-          host: state.host.value,
-          port: state.port.value,
-          providerKey: state.providerKey.value,
-          targetKind: state.targetKind.value,
-          lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
-          ...memoryServerEdgeProxySummary(state),
-          ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
-          ...(state.deactivationReason
-            ? { deactivationReason: state.deactivationReason.value }
-            : {}),
-          createdAt: state.createdAt.value,
-        },
-      ];
-    });
+        return [
+          {
+            id: state.id.value,
+            name: state.name.value,
+            host: state.host.value,
+            port: state.port.value,
+            providerKey: state.providerKey.value,
+            targetKind: state.targetKind.value,
+            lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
+            ...memoryServerEdgeProxySummary(state),
+            ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
+            ...(state.deactivationReason
+              ? { deactivationReason: state.deactivationReason.value }
+              : {}),
+            createdAt: state.createdAt.value,
+          },
+        ];
+      })
+      .slice(0, input?.limit ?? defaultReadModelListLimit);
   }
 
   async findOne(context: RepositoryContext, spec: Parameters<ServerReadModel["findOne"]>[1]) {
@@ -866,11 +872,13 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
     private readonly secretMask = "****",
   ) {}
 
-  async list(context: RepositoryContext, projectId?: string) {
+  async list(context: RepositoryContext, input?: { projectId?: string; limit?: number }) {
     void context;
     return [...this.repository.items.values()]
       .map((environment) => environment.toState())
-      .filter((environment) => (projectId ? environment.projectId.value === projectId : true))
+      .filter((environment) =>
+        input?.projectId ? environment.projectId.value === input.projectId : true,
+      )
       .map(
         (environment): EnvironmentSummary => ({
           id: environment.id.value,
@@ -896,7 +904,8 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
             kind: variable.kind as EnvironmentSummary["maskedVariables"][number]["kind"],
           })),
         }),
-      );
+      )
+      .slice(0, input?.limit ?? defaultReadModelListLimit);
   }
 
   async findOne(context: RepositoryContext, spec: Parameters<EnvironmentReadModel["findOne"]>[1]) {
@@ -1104,6 +1113,8 @@ export class MemoryResourceReadModel implements ResourceReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      includePreviewResources?: boolean;
+      limit?: number;
     },
   ) {
     void context;
@@ -1116,7 +1127,8 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       .filter((resource) =>
         input?.environmentId ? resource.environmentId.value === input.environmentId : true,
       )
-      .map((resource): ResourceSummary => this.toSummary(resource));
+      .map((resource): ResourceSummary => this.toSummary(resource))
+      .slice(0, input?.limit ?? defaultReadModelListLimit);
   }
 
   async findOne(context: RepositoryContext, spec: Parameters<ResourceReadModel["findOne"]>[1]) {
@@ -1544,7 +1556,12 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
 
   async list(
     context: RepositoryContext,
-    input?: { projectId?: string; environmentId?: string; kind?: "postgres" | "redis" },
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      kind?: "postgres" | "redis";
+      limit?: number;
+    },
   ): Promise<DependencyResourceSummary[]> {
     void context;
     return [...this.repository.items.values()]
@@ -1560,7 +1577,8 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
       .filter((dependencyResource) =>
         input?.kind ? dependencyResource.toState().kind.value === input.kind : true,
       )
-      .map((dependencyResource) => this.toSummary(dependencyResource));
+      .map((dependencyResource) => this.toSummary(dependencyResource))
+      .slice(0, input?.limit ?? defaultReadModelListLimit);
   }
 
   async findOne(
@@ -2291,6 +2309,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      limit?: number;
     },
   ) {
     void context;
@@ -2303,6 +2322,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
         input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
       )
       .filter((deployment) => (input?.includeArchived ? true : !deployment.archivedAt))
+      .slice(0, input?.limit ?? defaultReadModelListLimit)
       .map((deployment): DeploymentSummary => {
         const executionMetadata = deployment.runtimePlan.execution.metadata ?? {};
         const sourceMetadata = deployment.runtimePlan.source.metadata ?? {};

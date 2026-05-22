@@ -13,6 +13,7 @@ import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
 import {
+  defaultReadModelListLimit,
   type EnvironmentVariableRow,
   normalizeTimestamp,
   resolveRepositoryExecutor,
@@ -108,7 +109,13 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
     return grouped;
   }
 
-  async list(context: RepositoryContext, projectId?: string) {
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      limit?: number;
+    },
+  ) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("environment", "list"),
@@ -120,9 +127,11 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
       async () => {
         let query = executor.selectFrom("environments").selectAll().orderBy("created_at", "desc");
 
-        if (projectId) {
-          query = query.where("project_id", "=", projectId);
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
         }
+
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
 
         const rows = await query.execute();
         const variableMap = await this.loadVariables(

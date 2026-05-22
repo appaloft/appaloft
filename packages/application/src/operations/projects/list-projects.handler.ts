@@ -22,7 +22,6 @@ export class ListProjectsQueryHandler
     context: ExecutionContext,
     query: ListProjectsQuery,
   ): Promise<Result<{ items: ProjectSummary[] }>> {
-    void query;
-    return this.queryService.execute(context);
+    return this.queryService.execute(context, query);
   }
 }
