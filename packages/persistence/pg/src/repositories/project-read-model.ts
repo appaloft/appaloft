@@ -13,7 +13,7 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import { defaultReadModelListLimit, normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
 type ProjectSelectionQuery = SelectQueryBuilder<
   Database,
@@ -58,6 +58,7 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      limit?: number;
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -82,6 +83,7 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
         if (input?.projectIds?.length) {
           query = query.where("id", "in", [...input.projectIds]);
         }
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
 
         return query
           .orderBy("created_at", "desc")

@@ -15,10 +15,12 @@
     formatTime,
     projectDetailHref,
   } from "$lib/console/utils";
+  import { request } from "$lib/api/client";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
+  import type { ReadinessResponse, VersionResponse } from "@appaloft/contracts";
 
-  const { authSessionQuery, consoleOverviewQuery } = createConsoleQueries(browser, {
+  const { authSessionQuery } = createConsoleQueries(browser, {
     certificates: false,
     deployments: false,
     domainBindings: false,
@@ -31,37 +33,105 @@
     servers: false,
     version: false,
   });
-  const dependencyResourcesQuery = createQuery(() =>
+  const homeListLimit = 100;
+  const productQueryEnabled = $derived(browser && canRunProductQueries(authSessionQuery.data));
+
+  const projectsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["dependency-resources", "home"],
-      queryFn: () => orpcClient.dependencyResources.list({}),
-      enabled: browser && canRunProductQueries(authSessionQuery.data),
+      queryKey: ["projects", "home"],
+      queryFn: () => orpcClient.projects.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
   );
-
-  const overview = $derived(consoleOverviewQuery.data ?? null);
-  const dependencyResourceCount = $derived(dependencyResourcesQuery.data?.items.length ?? 0);
-  const projects = $derived(overview?.projects ?? []);
-  const servers = $derived(overview?.deploymentTargets ?? []);
-  const environments = $derived(overview?.environments ?? []);
-  const resources = $derived(overview?.resources ?? []);
-  const deployments = $derived(overview?.recentDeployments ?? []);
-  const counts = $derived(overview?.counts ?? null);
-  const readiness = $derived(overview?.readiness ?? null);
-  const version = $derived(overview?.version ?? null);
-  const pageLoading = $derived(consoleOverviewQuery.isPending && !overview);
-  const hasNoDeploymentBase = $derived(projects.length === 0 && deployments.length === 0);
-  const hasProjectsWithoutDeployments = $derived(
-    projects.length > 0 && (counts?.deployments ?? 0) === 0,
+  const serversQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["servers", "home"],
+      queryFn: () => orpcClient.servers.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
+      staleTime: 5_000,
+    }),
   );
-  const latestDeployment = $derived(overview?.latestDeployment ?? null);
+  const environmentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["environments", "home"],
+      queryFn: () => orpcClient.environments.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
+      staleTime: 5_000,
+    }),
+  );
+  const resourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "home"],
+      queryFn: () => orpcClient.resources.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
+      staleTime: 5_000,
+    }),
+  );
+  const deploymentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "home"],
+      queryFn: () => orpcClient.deployments.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
+      refetchInterval: 10_000,
+    }),
+  );
+  const dependencyResourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["dependency-resources", "home"],
+      queryFn: () => orpcClient.dependencyResources.list({ limit: homeListLimit }),
+      enabled: productQueryEnabled,
+      staleTime: 5_000,
+    }),
+  );
+  const readinessQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system", "readiness", "home"],
+      queryFn: () => request<ReadinessResponse>("/api/readiness"),
+      enabled: browser,
+      staleTime: 5_000,
+    }),
+  );
+  const versionQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system", "version", "home"],
+      queryFn: () => request<VersionResponse>("/api/version"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+
+  const dependencyResourceCount = $derived(dependencyResourcesQuery.data?.items.length ?? 0);
+  const projects = $derived(projectsQuery.data?.items ?? []);
+  const servers = $derived(serversQuery.data?.items ?? []);
+  const environments = $derived(environmentsQuery.data?.items ?? []);
+  const resources = $derived(resourcesQuery.data?.items ?? []);
+  const deployments = $derived(deploymentsQuery.data?.items.slice(0, 5) ?? []);
+  const readiness = $derived(readinessQuery.data ?? null);
+  const version = $derived(versionQuery.data ?? null);
+  const deploymentBaseLoaded = $derived(
+    Boolean(projectsQuery.data) && Boolean(deploymentsQuery.data),
+  );
+  const hasNoDeploymentBase = $derived(
+    deploymentBaseLoaded && projects.length === 0 && deployments.length === 0,
+  );
+  const hasProjectsWithoutDeployments = $derived(
+    deploymentBaseLoaded && projects.length > 0 && deployments.length === 0,
+  );
+  const latestDeployment = $derived(deployments[0] ?? null);
   const latestProject = $derived(
     latestDeployment ? findProject(projects, latestDeployment.projectId) : null,
   );
-  const deploymentTotal = $derived(counts?.deployments ?? 0);
-  const activeDeployments = $derived(counts?.activeDeployments ?? 0);
-  const failedDeployments = $derived(counts?.failedDeployments ?? 0);
+  const deploymentTotal = $derived(deploymentsQuery.data?.items.length ?? 0);
+  const activeDeployments = $derived(
+    (deploymentsQuery.data?.items ?? []).filter((deployment) =>
+      ["created", "planning", "planned", "running", "cancel-requested"].includes(deployment.status),
+    ).length,
+  );
+  const failedDeployments = $derived(
+    (deploymentsQuery.data?.items ?? []).filter((deployment) => deployment.status === "failed")
+      .length,
+  );
   const healthyDeployments = $derived(Math.max(0, deploymentTotal - failedDeployments));
   const activeSegments = $derived(
     deploymentTotal > 0 ? Math.max(1, Math.round((activeDeployments / deploymentTotal) * 12)) : 0,
@@ -83,16 +153,6 @@
 </svelte:head>
 
 <ConsoleShell title={$t(i18nKeys.console.home.pageTitle)} description={$t(i18nKeys.console.home.pageDescription)}>
-  {#if pageLoading}
-    <section class="nothing-empty-state">
-      <p class="nothing-label">[{$t(i18nKeys.common.status.loading)}]</p>
-      <div class="nothing-segment-bar mt-4" aria-hidden="true">
-        {#each Array.from({ length: 12 }) as _, index (index)}
-          <span class={index < 4 ? "is-filled" : ""}></span>
-        {/each}
-      </div>
-    </section>
-  {:else}
     <div class="nothing-console-home">
       {#if hasNoDeploymentBase}
         <section class="nothing-hero-grid">
@@ -204,22 +264,22 @@
       <section class="nothing-metric-grid">
         <a href="/projects" class="nothing-metric-cell">
           <span>{$t(i18nKeys.common.domain.projects)}</span>
-          <strong>{counts?.projects ?? 0}</strong>
+          <strong>{projectsQuery.isPending ? "-" : projects.length}</strong>
           <small>{$t(i18nKeys.common.actions.viewProjects)}</small>
         </a>
         <a href="/servers" class="nothing-metric-cell">
           <span>{$t(i18nKeys.common.domain.servers)}</span>
-          <strong>{counts?.deploymentTargets ?? 0}</strong>
+          <strong>{serversQuery.isPending ? "-" : servers.length}</strong>
           <small>{servers.length > 0 ? $t(i18nKeys.console.home.serverAvailableTarget) : $t(i18nKeys.console.home.serverCreatedDuringDeployment)}</small>
         </a>
         <div class="nothing-metric-cell">
           <span>{$t(i18nKeys.common.domain.environments)}</span>
-          <strong>{counts?.environments ?? 0}</strong>
+          <strong>{environmentsQuery.isPending ? "-" : environments.length}</strong>
           <small>{environments.length > 0 ? $t(i18nKeys.console.home.environmentSnapshotEntry) : $t(i18nKeys.console.home.environmentCreatedDuringDeployment)}</small>
         </div>
         <a href="/deployments" class="nothing-metric-cell">
           <span>{$t(i18nKeys.common.domain.resources)}</span>
-          <strong>{counts?.resources ?? 0}</strong>
+          <strong>{resourcesQuery.isPending ? "-" : resources.length}</strong>
           <small>{$t(i18nKeys.common.actions.viewDeployments)}</small>
         </a>
       </section>
@@ -295,7 +355,6 @@
         </div>
       </section>
     </div>
-  {/if}
 </ConsoleShell>
 
 <style>

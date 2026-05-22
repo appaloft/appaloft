@@ -48,7 +48,12 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransaction } from "./shared";
+import {
+  defaultReadModelListLimit,
+  normalizeTimestamp,
+  resolveRepositoryExecutor,
+  withRepositoryTransaction,
+} from "./shared";
 
 type DependencyResourceSelectionQuery = SelectQueryBuilder<
   Database,
@@ -526,7 +531,12 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
 
   async list(
     context: RepositoryContext,
-    input?: { projectId?: string; environmentId?: string; kind?: "postgres" | "redis" },
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      kind?: "postgres" | "redis";
+      limit?: number;
+    },
   ): Promise<DependencyResourceSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
@@ -551,6 +561,7 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
         if (input?.kind) {
           query = query.where("kind", "=", input.kind);
         }
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
         const rows = await query.execute();
         const summaries: DependencyResourceSummary[] = [];
         for (const row of rows) {

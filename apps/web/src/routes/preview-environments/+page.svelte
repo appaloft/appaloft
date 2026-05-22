@@ -26,7 +26,6 @@
       health: false,
       readiness: false,
       version: false,
-      consoleOverview: false,
       authSession: false,
       servers: false,
       deployments: false,

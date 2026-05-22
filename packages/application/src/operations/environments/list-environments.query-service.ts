@@ -2,6 +2,7 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import { type EnvironmentReadModel } from "../../ports";
 import { tokens } from "../../tokens";
+import { boundedListLimit } from "../shared-schema";
 
 @injectable()
 export class ListEnvironmentsQueryService {
@@ -13,8 +14,14 @@ export class ListEnvironmentsQueryService {
     context: ExecutionContext,
     input?: {
       projectId?: string;
+      limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<EnvironmentReadModel["list"]>> }> {
-    return { items: await this.readModel.list(toRepositoryContext(context), input?.projectId) };
+    return {
+      items: await this.readModel.list(toRepositoryContext(context), {
+        ...(input?.projectId ? { projectId: input.projectId } : {}),
+        limit: boundedListLimit(input?.limit),
+      }),
+    };
   }
 }

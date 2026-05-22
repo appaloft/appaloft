@@ -58,7 +58,11 @@
   import { Badge } from "$lib/components/ui/badge";
   import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
-  import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
+  import {
+    defaultAuthSession,
+    defaultConsoleListLimit,
+    type ProviderSummary,
+  } from "$lib/console/queries";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
     createQuickDeployServerCredential,
@@ -222,22 +226,22 @@
   );
   const projectsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["projects"],
-      queryFn: () => orpcClient.projects.list(),
+      queryKey: ["projects", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.projects.list({ limit: defaultConsoleListLimit }),
       enabled: browser && enabled,
     }),
   );
   const serversQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["servers"],
-      queryFn: () => orpcClient.servers.list(),
+      queryKey: ["servers", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.servers.list({ limit: defaultConsoleListLimit }),
       enabled: browser && enabled,
     }),
   );
   const environmentsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["environments"],
-      queryFn: () => orpcClient.environments.list({}),
+      queryKey: ["environments", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.environments.list({ limit: defaultConsoleListLimit }),
       enabled: browser && enabled,
     }),
   );

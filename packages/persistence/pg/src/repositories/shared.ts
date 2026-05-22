@@ -511,6 +511,8 @@ export interface SerializedImportedCertificateSecretRefs extends Record<string, 
 
 export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
 
+export const defaultReadModelListLimit = 100;
+
 function isRepositoryExecutor(value: unknown): value is RepositoryExecutor {
   return Boolean(
     value &&

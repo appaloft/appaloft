@@ -82,12 +82,14 @@ import {
   type ListOrganizationInvitationsQueryInput,
   type ListOrganizationMembersQueryInput,
   type ListPreviewEnvironmentsQueryInput,
+  type ListProjectsQueryInput,
   type ListResourceDependencyBindingsQueryInput,
   type ListResourceSecretReferencesQueryInput,
   type ListResourcesQueryInput,
   type ListRuntimeMonitoringSamplesQueryInput,
   type ListScheduledTaskRunsQueryInput,
   type ListScheduledTasksQueryInput,
+  type ListServersQueryInput,
   type ListSourceEventsQueryInput,
   type ListSourceLinksQueryInput,
   type ListSshCredentialsQueryInput,
@@ -554,7 +556,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   projects: {
-    list: Client<AppaloftClientContext, undefined, ListProjectsResponse, AppaloftClientError>;
+    list: Client<
+      AppaloftClientContext,
+      ListProjectsQueryInput,
+      ListProjectsResponse,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       CreateProjectCommandInput,
@@ -605,7 +612,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   servers: {
-    list: Client<AppaloftClientContext, undefined, ListServersResponse, AppaloftClientError>;
+    list: Client<
+      AppaloftClientContext,
+      ListServersQueryInput,
+      ListServersResponse,
+      AppaloftClientError
+    >;
     show: Client<
       AppaloftClientContext,
       ShowServerQueryInput,

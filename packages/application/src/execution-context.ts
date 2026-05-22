@@ -32,7 +32,7 @@ export interface ExecutionOrganizationRoleContext {
 export type ExecutionContextMode = "hosted" | "local-development" | "self-hosted" | (string & {});
 
 export interface ExecutionTenantContext {
-  tenantId?: string;
+  tenantId: string;
   accountId?: string;
   organizationId?: string;
   subjectId?: string;
@@ -111,6 +111,24 @@ export interface ExecutionContextFactory {
   }): ExecutionContext;
 }
 
+export function tenantContextForPrincipal(principal: ExecutionPrincipal): ExecutionTenantContext {
+  const organizationId = principal.activeOrganization?.organizationId;
+
+  return {
+    tenantId: organizationId ?? principal.actorId,
+    ...(organizationId ? { organizationId } : {}),
+    subjectId: principal.userId ?? principal.actorId,
+    source: "product-session",
+  };
+}
+
+export function defaultExecutionTenantContext(): ExecutionTenantContext {
+  return {
+    tenantId: "tenant_instance",
+    source: "instance-default",
+  };
+}
+
 const defaultTranslate = createAppaloftTranslator({ locale: defaultAppaloftLocale });
 
 export const translateKey = (key: TranslationKey, values?: TranslationValues): string =>
@@ -147,17 +165,22 @@ export function createExecutionContext(input: {
 }): ExecutionContext {
   const locale = normalizeAppaloftLocale(input.locale);
   const t = input.t ?? createAppaloftTranslator({ locale });
+  const tenant =
+    input.tenant ??
+    (input.principal
+      ? tenantContextForPrincipal(input.principal)
+      : defaultExecutionTenantContext());
 
   return {
     entrypoint: input.entrypoint,
     locale,
     requestId: input.requestId ?? createRequestId(),
+    tenant,
     t,
     tracer: input.tracer ?? noopTracer,
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.auth ? { auth: input.auth } : {}),
     ...(input.principal ? { principal: input.principal } : {}),
-    ...(input.tenant ? { tenant: input.tenant } : {}),
   };
 }
 
@@ -268,6 +291,7 @@ export function toRepositoryContext(
     tracer: context.tracer,
     ...(context.actor ? { actor: context.actor } : {}),
     ...(context.principal ? { principal: context.principal } : {}),
+    ...(context.tenant ? { tenant: context.tenant } : {}),
     ...(input?.transaction ? { transaction: input.transaction } : {}),
   };
 }

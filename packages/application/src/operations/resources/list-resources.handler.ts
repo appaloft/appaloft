@@ -25,10 +25,11 @@ export class ListResourcesQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.projectId || query.environmentId
+        query.projectId || query.environmentId || query.limit
           ? {
               ...(query.projectId ? { projectId: query.projectId } : {}),
               ...(query.environmentId ? { environmentId: query.environmentId } : {}),
+              ...(query.limit ? { limit: query.limit } : {}),
             }
           : undefined,
       ),

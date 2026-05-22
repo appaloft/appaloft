@@ -68,11 +68,11 @@ class StaticEnvironmentReadModel implements EnvironmentReadModel {
 
   async list(
     _context: ReturnType<typeof toRepositoryContext>,
-    projectId?: string,
+    input?: { projectId?: string },
   ): Promise<EnvironmentSummary[]> {
     this.listCalls += 1;
-    return projectId
-      ? this.environments.filter((environment) => environment.projectId === projectId)
+    return input?.projectId
+      ? this.environments.filter((environment) => environment.projectId === input.projectId)
       : this.environments;
   }
 

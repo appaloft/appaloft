@@ -10,6 +10,8 @@ import {
   type ProjectSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { boundedListLimit } from "../shared-schema";
+import { type ListProjectsQuery } from "./list-projects.query";
 
 const listProjectsOperation = findOperationCatalogEntryByKey("projects.list");
 const defaultOperationScopePort = new AllowAllOperationScopePort();
@@ -22,8 +24,12 @@ export class ListProjectsQueryService {
     private readonly operationScopePort?: OperationScopePort,
   ) {}
 
-  async execute(context: ExecutionContext): Promise<Result<{ items: ProjectSummary[] }>> {
+  async execute(
+    context: ExecutionContext,
+    query?: ListProjectsQuery,
+  ): Promise<Result<{ items: ProjectSummary[] }>> {
     const organizationId = context.principal?.activeOrganization?.organizationId;
+    const limit = boundedListLimit(query?.limit);
     const operationScopePort = this.operationScopePort ?? defaultOperationScopePort;
     if (listProjectsOperation) {
       const scoped = await scopeOperation({
@@ -49,6 +55,7 @@ export class ListProjectsQueryService {
           items: await this.readModel.list(toRepositoryContext(context), {
             ...(organizationIds ? { organizationIds } : {}),
             ...(projectIds ? { projectIds } : {}),
+            limit,
           }),
         });
       }
@@ -57,6 +64,7 @@ export class ListProjectsQueryService {
     return ok({
       items: await this.readModel.list(toRepositoryContext(context), {
         ...(organizationId ? { organizationId } : {}),
+        limit,
       }),
     });
   }

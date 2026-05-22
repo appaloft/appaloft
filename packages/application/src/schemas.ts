@@ -165,6 +165,10 @@ export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/check-project-delete-safety.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/delete-project.schema";
+export {
+  type ListProjectsQueryInput,
+  listProjectsQueryInputSchema,
+} from "./operations/projects/list-projects.query";
 export * from "./operations/projects/rename-project.schema";
 export * from "./operations/projects/restore-project.schema";
 export * from "./operations/projects/set-project-description.schema";
@@ -220,6 +224,10 @@ export {
   type InspectServerCapacityQueryInput,
   inspectServerCapacityQueryInputSchema,
 } from "./operations/servers/inspect-server-capacity.schema";
+export {
+  type ListServersQueryInput,
+  listServersQueryInputSchema,
+} from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.schema";
 export {
   type PruneServerCapacityCommandInput,

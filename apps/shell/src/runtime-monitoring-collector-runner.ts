@@ -153,7 +153,7 @@ async function collectTargets(
   const environments = (
     await Promise.all(
       activeProjects.map((project) =>
-        input.environmentReadModel.list(repositoryContext, project.id),
+        input.environmentReadModel.list(repositoryContext, { projectId: project.id }),
       ),
     )
   ).flat();

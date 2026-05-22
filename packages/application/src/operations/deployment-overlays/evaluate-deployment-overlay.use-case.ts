@@ -1,7 +1,7 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext } from "../../execution-context";
+import { type ExecutionContext, type ExecutionTenantContext } from "../../execution-context";
 import {
   DefaultDeploymentOverlayPort,
   DefaultTenantContextResolver,
@@ -52,9 +52,7 @@ export async function evaluateDeploymentOverlayWithPort(input: {
   const tenantContext = await (
     input.tenantContextResolver ?? new DefaultTenantContextResolver()
   ).resolveTenantContext(input.context);
-  const effectiveContext = tenantContext
-    ? { ...input.context, tenant: tenantContext }
-    : input.context;
+  const effectiveContext = { ...input.context, tenant: tenantContext };
   const result = await (
     input.deploymentOverlayPort ?? new DefaultDeploymentOverlayPort()
   ).evaluateDeploymentOverlay(
@@ -78,21 +76,21 @@ export async function evaluateDeploymentOverlayWithPort(input: {
 
 function cleanDeploymentOverlayInput(
   input: DeploymentOverlayEvaluateInput,
-  tenantContext: ExecutionContext["tenant"],
+  tenantContext: ExecutionTenantContext,
 ): DeploymentOverlayEvaluateInput {
   const resourceRefs = cleanResourceRefs(input.resourceRefs);
 
   return {
     operationKey: input.operationKey,
     ...(input.actor ? { actor: input.actor } : {}),
-    ...((input.tenantId ?? tenantContext?.tenantId)
-      ? { tenantId: input.tenantId ?? tenantContext?.tenantId }
+    ...((input.tenantId ?? tenantContext.tenantId)
+      ? { tenantId: input.tenantId ?? tenantContext.tenantId }
       : {}),
-    ...((input.accountId ?? tenantContext?.accountId)
-      ? { accountId: input.accountId ?? tenantContext?.accountId }
+    ...((input.accountId ?? tenantContext.accountId)
+      ? { accountId: input.accountId ?? tenantContext.accountId }
       : {}),
-    ...((input.organizationId ?? tenantContext?.organizationId)
-      ? { organizationId: input.organizationId ?? tenantContext?.organizationId }
+    ...((input.organizationId ?? tenantContext.organizationId)
+      ? { organizationId: input.organizationId ?? tenantContext.organizationId }
       : {}),
     ...(resourceRefs ? { resourceRefs } : {}),
     ...(input.capabilityKey ? { capabilityKey: input.capabilityKey } : {}),

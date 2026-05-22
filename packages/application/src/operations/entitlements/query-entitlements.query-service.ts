@@ -1,7 +1,7 @@
 import { ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext } from "../../execution-context";
+import { type ExecutionContext, type ExecutionTenantContext } from "../../execution-context";
 import {
   DefaultEntitlementPort,
   DefaultTenantContextResolver,
@@ -31,7 +31,7 @@ export class QueryEntitlementsQueryService {
     const tenantContext = await (
       this.tenantContextResolver ?? new DefaultTenantContextResolver()
     ).resolveTenantContext(context);
-    const effectiveContext = tenantContext ? { ...context, tenant: tenantContext } : context;
+    const effectiveContext = { ...context, tenant: tenantContext };
     const entitlements = await (
       this.entitlementPort ?? new DefaultEntitlementPort()
     ).checkEntitlements(effectiveContext, {
@@ -46,21 +46,21 @@ export class QueryEntitlementsQueryService {
 
 function cleanEntitlementQuery(
   input: EntitlementQuery,
-  tenantContext: ExecutionContext["tenant"],
+  tenantContext: ExecutionTenantContext,
 ): EntitlementQuery {
   const resourceRefs = cleanResourceRefs(input.resourceRefs);
 
   return {
     capabilityKey: input.capabilityKey,
     ...(input.actor ? { actor: input.actor } : {}),
-    ...((input.tenantId ?? tenantContext?.tenantId)
-      ? { tenantId: input.tenantId ?? tenantContext?.tenantId }
+    ...((input.tenantId ?? tenantContext.tenantId)
+      ? { tenantId: input.tenantId ?? tenantContext.tenantId }
       : {}),
-    ...((input.accountId ?? tenantContext?.accountId)
-      ? { accountId: input.accountId ?? tenantContext?.accountId }
+    ...((input.accountId ?? tenantContext.accountId)
+      ? { accountId: input.accountId ?? tenantContext.accountId }
       : {}),
-    ...((input.organizationId ?? tenantContext?.organizationId)
-      ? { organizationId: input.organizationId ?? tenantContext?.organizationId }
+    ...((input.organizationId ?? tenantContext.organizationId)
+      ? { organizationId: input.organizationId ?? tenantContext.organizationId }
       : {}),
     ...(resourceRefs ? { resourceRefs } : {}),
     ...(input.attributes ? { attributes: input.attributes } : {}),

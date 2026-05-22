@@ -2,7 +2,7 @@ import { type Result } from "@appaloft/core";
 
 import { Query } from "../../cqrs";
 import { type ResourceSummary } from "../../ports";
-import { parseOperationInput, trimToUndefined } from "../shared-schema";
+import { boundedListLimit, parseOperationInput, trimToUndefined } from "../shared-schema";
 import {
   type ListResourcesQueryInput,
   listResourcesQueryInputSchema,
@@ -17,6 +17,7 @@ export class ListResourcesQuery extends Query<{ items: ResourceSummary[] }> {
   constructor(
     public readonly projectId?: string,
     public readonly environmentId?: string,
+    public readonly limit: number = boundedListLimit(),
   ) {
     super();
   }
@@ -27,6 +28,7 @@ export class ListResourcesQuery extends Query<{ items: ResourceSummary[] }> {
         new ListResourcesQuery(
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.environmentId),
+          boundedListLimit(parsed.limit),
         ),
     );
   }

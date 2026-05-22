@@ -82,10 +82,9 @@ describe("HTTP readiness endpoints", () => {
       },
     });
 
-    const overviewResponse = await app.handle(new Request("http://localhost/api/console-overview"));
-    const overviewText = await overviewResponse.text();
+    const readinessText = JSON.stringify(readiness);
 
-    expect(overviewText).not.toContain("databaseLocation");
-    expect(overviewText).not.toContain("secret@postgres");
+    expect(readinessText).not.toContain("databaseLocation");
+    expect(readinessText).not.toContain("secret@postgres");
   });
 });

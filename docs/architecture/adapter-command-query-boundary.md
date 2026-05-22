@@ -47,6 +47,12 @@ Examples:
 their schemas, and transport verifier interfaces. It must dispatch through `CommandBus` or
 `QueryBus`.
 
+`ExecutionContext` must always carry a tenant context. Product-session operations derive that
+tenant from the authenticated session/current organization before dispatch. The Web console and
+ordinary API callers do not pass tenant ids for product-session operations. Backend query handlers,
+query services, use cases, and read models must apply bounded defaults for list/read-model queries
+so an omitted transport `limit` can never load an entire table.
+
 `packages/adapters/http-elysia` composes HTTP middleware and mounts oRPC/static assets. It may pass
 the buses and transport verifier ports into oRPC. It must not pass repository ports into oRPC.
 

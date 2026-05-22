@@ -81,8 +81,8 @@
   });
   const dependencyResourcesQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["dependency-resources"],
-      queryFn: () => orpcClient.dependencyResources.list({}),
+      queryKey: ["dependency-resources", { limit: 100 }],
+      queryFn: () => orpcClient.dependencyResources.list({ limit: 100 }),
       enabled: browser,
       staleTime: 5_000,
     }),

@@ -2,7 +2,7 @@ import { type Result } from "@appaloft/core";
 
 import { Query } from "../../cqrs";
 import { type DeploymentSummary } from "../../ports";
-import { parseOperationInput, trimToUndefined } from "../shared-schema";
+import { boundedListLimit, parseOperationInput, trimToUndefined } from "../shared-schema";
 import {
   type ListDeploymentsQueryInput,
   listDeploymentsQueryInputSchema,
@@ -18,6 +18,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
     public readonly projectId?: string,
     public readonly resourceId?: string,
     public readonly includeArchived = false,
+    public readonly limit: number = boundedListLimit(),
   ) {
     super();
   }
@@ -29,6 +30,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.resourceId),
           parsed.includeArchived,
+          boundedListLimit(parsed.limit),
         ),
     );
   }

@@ -30,7 +30,7 @@ export class ListUsageIntentRecordsQueryService {
     const tenantContext = await (
       this.tenantContextResolver ?? new DefaultTenantContextResolver()
     ).resolveTenantContext(context);
-    const effectiveContext = tenantContext ? { ...context, tenant: tenantContext } : context;
+    const effectiveContext = { ...context, tenant: tenantContext };
     const records = await (
       this.usageIntentPort ?? new DefaultUsageIntentPort()
     ).listUsageIntentRecords(effectiveContext, query.input);

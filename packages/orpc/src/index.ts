@@ -252,6 +252,7 @@ import {
   listOrganizationInvitationsQueryInputSchema,
   listOrganizationMembersQueryInputSchema,
   listPreviewEnvironmentsQueryInputSchema,
+  listProjectsQueryInputSchema,
   listResourceDependencyBindingsQueryInputSchema,
   listResourceRuntimeLogArchivesQueryInputSchema,
   listResourceSecretReferencesQueryInputSchema,
@@ -263,6 +264,7 @@ import {
   listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
+  listServersQueryInputSchema,
   listSourceEventsQueryInputSchema,
   listSourceLinksQueryInputSchema,
   listSshCredentialsQueryInputSchema,
@@ -473,6 +475,7 @@ import {
   streamDeploymentEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   TestServerConnectivityCommand,
+  tenantContextForPrincipal,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
   UnbindResourceDependencyCommand,
@@ -2352,6 +2355,7 @@ function createRequestExecutionContext(
   return executionContextFactory.create({
     ...(actor ? { actor } : {}),
     ...(principal ? { principal } : {}),
+    ...(principal ? { tenant: tenantContextForPrincipal(principal) } : {}),
     ...(authorizationHeader || cookieHeader
       ? {
           auth: {
@@ -2372,8 +2376,9 @@ export const listProjectsProcedure = base
     path: "/projects",
     successStatus: 200,
   })
+  .input(listProjectsQueryInputSchema)
   .output(listProjectsResponseSchema)
-  .handler(async ({ context }) => executeQuery(context, ListProjectsQuery.create()));
+  .handler(async ({ input, context }) => executeQuery(context, ListProjectsQuery.create(input)));
 
 export const authBootstrapStatusProcedure = base
   .route({
@@ -2742,8 +2747,9 @@ export const listServersProcedure = base
     path: "/servers",
     successStatus: 200,
   })
+  .input(listServersQueryInputSchema)
   .output(listServersResponseSchema)
-  .handler(async ({ context }) => executeQuery(context, ListServersQuery.create()));
+  .handler(async ({ input, context }) => executeQuery(context, ListServersQuery.create(input)));
 
 export const showServerProcedure = base
   .route({
