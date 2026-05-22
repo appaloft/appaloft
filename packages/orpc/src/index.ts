@@ -705,6 +705,7 @@ export interface AppaloftOrpcContext {
   executionContextFactory: ExecutionContextFactory;
   queryBus: QueryBus;
   logger: AppLogger;
+  orpcRouterContributions?: readonly AppaloftOrpcRouterContribution[];
   deploymentProgressObserver?: DeploymentProgressObserver;
   sourceEventVerificationPort?: SourceEventVerificationPort;
   githubSourceEventWebhookVerifier?: GitHubSourceEventWebhookVerifier;
@@ -5590,12 +5591,50 @@ export const appaloftOrpcRouter = {
 
 export type AppaloftOrpcRouter = typeof appaloftOrpcRouter;
 
-export function createAppaloftOpenApiHandler() {
-  return new OpenAPIHandler(appaloftOrpcRouter);
+export type AppaloftOrpcRouterContribution = Readonly<Record<string, unknown>>;
+
+export interface AppaloftOrpcRouterOptions {
+  readonly orpcRouterContributions?: readonly AppaloftOrpcRouterContribution[];
 }
 
-export function createAppaloftRpcHandler() {
-  return new RPCHandler(appaloftOrpcRouter);
+export function createAppaloftOrpcRouter(
+  options: AppaloftOrpcRouterOptions = {},
+): AppaloftOrpcRouter & AppaloftOrpcRouterContribution {
+  const contributions = options.orpcRouterContributions ?? [];
+  if (contributions.length === 0) {
+    return appaloftOrpcRouter;
+  }
+
+  return mergeAppaloftOrpcRouterContributions(
+    appaloftOrpcRouter,
+    contributions,
+  ) as AppaloftOrpcRouter & AppaloftOrpcRouterContribution;
+}
+
+export function createAppaloftOpenApiHandler(options: AppaloftOrpcRouterOptions = {}) {
+  return new OpenAPIHandler(createAppaloftOrpcRouter(options) as AppaloftOrpcRouter);
+}
+
+export function createAppaloftRpcHandler(options: AppaloftOrpcRouterOptions = {}) {
+  return new RPCHandler(createAppaloftOrpcRouter(options) as AppaloftOrpcRouter);
+}
+
+function mergeAppaloftOrpcRouterContributions(
+  router: AppaloftOrpcRouterContribution,
+  contributions: readonly AppaloftOrpcRouterContribution[],
+): AppaloftOrpcRouterContribution {
+  const merged: Record<string, unknown> = { ...router };
+
+  for (const contribution of contributions) {
+    for (const [key, value] of Object.entries(contribution)) {
+      if (key in merged) {
+        throw new Error(`Appaloft oRPC router contribution conflicts at "${key}".`);
+      }
+      merged[key] = value;
+    }
+  }
+
+  return merged;
 }
 
 function createRequestRunner(
@@ -7433,8 +7472,13 @@ export function mountAppaloftOrpcRoutes(
     requestContextRunner?: RequestContextRunner;
   },
 ): Elysia {
-  const openApiHandler = createAppaloftOpenApiHandler();
-  const rpcHandler = createAppaloftRpcHandler();
+  const routerOptions: AppaloftOrpcRouterOptions = {
+    ...(context.orpcRouterContributions
+      ? { orpcRouterContributions: context.orpcRouterContributions }
+      : {}),
+  };
+  const openApiHandler = createAppaloftOpenApiHandler(routerOptions);
+  const rpcHandler = createAppaloftRpcHandler(routerOptions);
 
   const openApiRouteHandler = async ({ request }: { request: Request }) => {
     const executionContext = createRequestExecutionContext(
