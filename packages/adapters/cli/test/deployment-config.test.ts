@@ -878,6 +878,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(queries.map((query) => query.constructor.name)).toEqual([
       "ListProjectsQuery",
       "ListServersQuery",
+      "ListDeploymentsQuery",
     ]);
     expect(operations).toEqual([
       "PrepareState:ssh-pglite",
@@ -889,6 +890,7 @@ describe("CLI deployment config entry workflow", () => {
       "CreateResourceCommand",
       "UpsertServerAppliedRoutes",
       "CreateDeploymentCommand",
+      "ListDeploymentsQuery",
       "ReleaseState:ssh-pglite",
     ]);
     expect(desiredRoutes).toHaveLength(1);
@@ -2336,6 +2338,79 @@ describe("CLI deployment config entry workflow", () => {
       expect(errorText).toContain('"reason":"deployment_failed"');
       expect(errorText).toContain("failureLogCount");
       expect(errorText).toContain("docker build failed: process killed");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-024C] synchronous deploy fails when runtime execution records terminal failure", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-sync-deploy-failed-"));
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "failed",
+          logs: [
+            {
+              timestamp: "2026-05-22T10:12:00.000Z",
+              source: "runtime",
+              phase: "package",
+              level: "error",
+              message: "client_loop: send disconnect: Broken pipe",
+            },
+            {
+              timestamp: "2026-05-22T10:12:01.000Z",
+              source: "runtime",
+              phase: "package",
+              level: "error",
+              message: "SSH Docker image build failed",
+            },
+          ],
+          runtimePlan: {
+            execution: {
+              accessRoutes: [],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      const result = await withMutedProcessOutput(async () =>
+        harness.program
+          .parseAsync([
+            "node",
+            "appaloft",
+            "deploy",
+            workspace,
+            "--method",
+            "workspace-commands",
+            "--start",
+            "bun run start",
+            "--port",
+            "4321",
+            "--server-host",
+            "203.0.113.10",
+            "--server-provider",
+            "generic-ssh",
+          ])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected synchronous failed deployment to fail");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"phase":"runtime-execution"');
+      expect(errorText).toContain('"reason":"deployment_failed"');
+      expect(errorText).toContain("client_loop: send disconnect: Broken pipe");
+      expect(errorText).toContain("SSH Docker image build failed");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

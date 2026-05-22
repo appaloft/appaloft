@@ -837,6 +837,8 @@ interface PreviewAccessResolution {
   previewUrls: string[];
 }
 
+const unsuccessfulSynchronousDeploymentStatuses = new Set(["failed", "canceled", "rolled-back"]);
+
 function deploymentFailureLogTailDetails(deployment: DeploymentSummary) {
   const logs = deployment.logs ?? [];
   if (logs.length === 0) {
@@ -889,6 +891,45 @@ function previewOutputFileText(input: {
   return `${lines.join("\n")}\n`;
 }
 
+function readDeploymentSummary(input: { deploymentId: string; resourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(
+      ListDeploymentsQuery.create({ resourceId: input.resourceId }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const deployments = yield* resultToEffect(result);
+    return deployments.items.find((item) => item.id === input.deploymentId);
+  });
+}
+
+function failIfSynchronousDeploymentDidNotSucceed(deployment: DeploymentSummary | undefined) {
+  return Effect.gen(function* () {
+    if (!deployment || !unsuccessfulSynchronousDeploymentStatuses.has(deployment.status)) {
+      return;
+    }
+
+    const details = deploymentFailureLogTailDetails(deployment);
+    const failureLogTail = Array.isArray(details.failureLogTail)
+      ? details.failureLogTail.join("\n")
+      : undefined;
+
+    return yield* Effect.fail(
+      domainError.infra("Deployment execution failed", {
+        phase: "runtime-execution",
+        reason: "deployment_failed",
+        deploymentId: deployment.id,
+        resourceId: deployment.resourceId,
+        status: deployment.status,
+        ...(typeof details.failureLogCount === "number"
+          ? { failureLogCount: details.failureLogCount }
+          : {}),
+        ...(failureLogTail ? { failureLogTail } : {}),
+      }),
+    );
+  });
+}
+
 function writePreviewOutputFile(input: {
   filePath: string;
   previewId?: string;
@@ -919,13 +960,10 @@ function resolvePreviewAccessForDeployment(input: {
   requirePreviewUrl: boolean;
 }) {
   return Effect.gen(function* () {
-    const cli = yield* CliRuntime;
-    const query = yield* resultToEffect(
-      ListDeploymentsQuery.create({ resourceId: input.resourceId }),
-    );
-    const result = yield* Effect.promise(() => cli.executeQuery(query));
-    const deployments = yield* resultToEffect(result);
-    const deployment = deployments.items.find((item) => item.id === input.deploymentId);
+    const deployment = yield* readDeploymentSummary({
+      deploymentId: input.deploymentId,
+      resourceId: input.resourceId,
+    });
 
     if (!deployment) {
       if (input.requirePreviewUrl) {
@@ -996,6 +1034,10 @@ function runCreateDeploymentCommand(
     const output = yield* runDeploymentCommandResult(CreateDeploymentCommand.create(input), {
       appLogLines: options.appLogLines,
     });
+    const deployment = yield* readDeploymentSummary({
+      deploymentId: output.id,
+      resourceId: input.resourceId,
+    });
 
     if (options.requirePreviewUrl || options.previewOutputFile) {
       const resolution = yield* resolvePreviewAccessForDeployment({
@@ -1011,6 +1053,10 @@ function runCreateDeploymentCommand(
           resolution,
         });
       }
+    }
+
+    if (input.executionMode !== "detached") {
+      yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
     }
   });
 }

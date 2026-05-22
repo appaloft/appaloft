@@ -66,6 +66,82 @@ resolve_latest_version() {
     head -n 1
 }
 
+resolve_source_root() {
+  if [ -n "${APPALOFT_DEPLOY_ACTION_SOURCE_ROOT:-}" ]; then
+    printf '%s\n' "$APPALOFT_DEPLOY_ACTION_SOURCE_ROOT"
+    return 0
+  fi
+
+  if [ -n "${GITHUB_ACTION_PATH:-}" ] && command -v git >/dev/null 2>&1; then
+    git -C "$GITHUB_ACTION_PATH" rev-parse --show-toplevel 2>/dev/null || true
+  fi
+}
+
+install_from_source() {
+  local source_root
+  local source_sha
+  local source_version
+  local target
+  local bundle_dir
+  local appaloft_bin
+  source_root="$(resolve_source_root)"
+
+  if [ -z "$source_root" ] || [ ! -f "$source_root/package.json" ] || [ ! -f "$source_root/scripts/release/build-binary-bundle.ts" ]; then
+    error "version=source requires this action to run from a checked-out Appaloft source tree"
+    exit 1
+  fi
+
+  if ! command -v bun >/dev/null 2>&1; then
+    error "version=source requires Bun on PATH before the deploy action runs"
+    exit 1
+  fi
+
+  target="$(detect_target)"
+  if command -v git >/dev/null 2>&1; then
+    source_sha="$(git -C "$source_root" rev-parse --short=12 HEAD 2>/dev/null || true)"
+  else
+    source_sha=""
+  fi
+  source_version="0.0.0-source"
+  if [ -n "$source_sha" ]; then
+    source_version="${source_version}-${source_sha}"
+  fi
+  bundle_dir="${install_root}/source-binary-bundle"
+
+  (
+    cd "$source_root"
+    bun install --frozen-lockfile
+    bun run package:binary-bundle -- --version "$source_version" --out-dir "$bundle_dir"
+  )
+
+  appaloft_bin="${bundle_dir}/appaloft"
+  if [ ! -f "$appaloft_bin" ]; then
+    error "Source build did not produce ${appaloft_bin}"
+    exit 1
+  fi
+
+  chmod +x "$appaloft_bin"
+
+  if [ -n "${GITHUB_PATH:-}" ]; then
+    echo "$bundle_dir" >> "$GITHUB_PATH"
+  fi
+
+  {
+    echo "appaloft-bin=$appaloft_bin"
+    echo "appaloft-version=source${source_sha:+-$source_sha}"
+    echo "appaloft-target=$target"
+  } >> "${GITHUB_OUTPUT:-/dev/null}"
+
+  echo "Built Appaloft source${source_sha:+ $source_sha} for ${target}"
+}
+
+case "$version" in
+  source)
+    install_from_source
+    exit 0
+    ;;
+esac
+
 if [ "$version" = "latest" ]; then
   version="$(resolve_latest_version)"
 fi
