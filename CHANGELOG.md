@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.1.0-rc.12](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.12...v1.1.0-rc.12) (2026-05-22)
+
+
+### Features
+
+* add capability query scope primitives ([#306](https://github.com/appaloft/appaloft/issues/306)) ([7490da9](https://github.com/appaloft/appaloft/commit/7490da9ac22d1496f42fe8278209742b657aec43))
+* add deployment overlay extension point ([#313](https://github.com/appaloft/appaloft/issues/313)) ([088a8b6](https://github.com/appaloft/appaloft/commit/088a8b6e92a3cd999e6e58f53c9317cf36729d69))
+* add extension router and preview config hooks ([#317](https://github.com/appaloft/appaloft/issues/317)) ([941f798](https://github.com/appaloft/appaloft/commit/941f798f8197c66cd23b75507e844fcadc1ee3aa))
+* add neutral entitlement extension point ([#309](https://github.com/appaloft/appaloft/issues/309)) ([ccb7e3b](https://github.com/appaloft/appaloft/commit/ccb7e3b77633ffba0773721f2e5e7732e1c0c706))
+* add route surface extension point ([#314](https://github.com/appaloft/appaloft/issues/314)) ([37c47e1](https://github.com/appaloft/appaloft/commit/37c47e10ad9e744b11632aae338a9efa94fe269e))
+* **application:** add usage intent extension point ([#311](https://github.com/appaloft/appaloft/issues/311)) ([146ebed](https://github.com/appaloft/appaloft/commit/146ebed26216f1d392207bd5ca20452c60789822))
+* **web:** gate console controls by capabilities ([#308](https://github.com/appaloft/appaloft/issues/308)) ([8730250](https://github.com/appaloft/appaloft/commit/8730250224311d9da69d3d7ce90f3ac53ac5d476))
+
+
+### Bug Fixes
+
+* cap remote pglite sync backups ([#319](https://github.com/appaloft/appaloft/issues/319)) ([40d2bc7](https://github.com/appaloft/appaloft/commit/40d2bc729576aa521bc7c7e20f4449b9ce93948c))
+* **preview:** resolve server config preview targets ([#310](https://github.com/appaloft/appaloft/issues/310)) ([33fc1ef](https://github.com/appaloft/appaloft/commit/33fc1ef252eb3e85dd7eccceb89f09e87b803ea2))
+
+
+### Documentation
+
+* add external edge access planning ([#315](https://github.com/appaloft/appaloft/issues/315)) ([ff21b22](https://github.com/appaloft/appaloft/commit/ff21b224ae258a3616ca0ae084170ca5749f8f63))
+* establish Blueprint boundary ([#318](https://github.com/appaloft/appaloft/issues/318)) ([d98d302](https://github.com/appaloft/appaloft/commit/d98d3020210e0a99490ea8b0458b9b42dc400c02))
+
+
+### Miscellaneous
+
+* update bun to 1.3.14 ([#316](https://github.com/appaloft/appaloft/issues/316)) ([e732b16](https://github.com/appaloft/appaloft/commit/e732b167c19519920165dbe41787618448aaa94a))
+
 ## [1.0.0-rc.12](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.11...v1.0.0-rc.12) (2026-05-19)
 
 
