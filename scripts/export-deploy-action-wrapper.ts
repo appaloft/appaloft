@@ -10,6 +10,7 @@ const files = [
   "scripts/install-appaloft.sh",
   "scripts/run-deploy.sh",
   "scripts/resolve-control-plane.sh",
+  "scripts/resolve-preview.sh",
 ] as const;
 
 async function copyFile(relativePath: (typeof files)[number], outputRoot: string): Promise<void> {

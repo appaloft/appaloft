@@ -50,6 +50,8 @@ const controlPlaneUrlError =
   "control_plane_config: controlPlane.url must be an http(s) URL without credentials, query, or fragment";
 const controlPlaneInstallerUrlError =
   "control_plane_config: controlPlane.install.installerUrl must be an http(s) URL without credentials, query, or fragment";
+const previewDomainTemplateError =
+  "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -457,6 +459,46 @@ export const appaloftDeploymentAccessConfigSchema = z
   })
   .describe("Access intent resolved outside deployments.create.");
 
+function isSafePreviewDomainTemplate(value: string): boolean {
+  const trimmed = value.trim().toLowerCase();
+  if (
+    trimmed.length > 253 ||
+    trimmed.includes("://") ||
+    trimmed.includes("/") ||
+    trimmed.includes(":") ||
+    trimmed.includes("*") ||
+    trimmed.includes("${{") ||
+    trimmed.includes("}}") ||
+    trimmed.endsWith(".")
+  ) {
+    return false;
+  }
+
+  const rendered = trimmed
+    .replaceAll("{preview_id}", "preview-123")
+    .replaceAll("{pr_number}", "123");
+  if (/[{}]/.test(rendered)) {
+    return false;
+  }
+
+  return isDomainName(rendered);
+}
+
+export const appaloftDeploymentPreviewConfigSchema = z
+  .object({
+    pullRequest: z
+      .object({
+        domainTemplate: nonEmptyStringSchema
+          .refine(isSafePreviewDomainTemplate, previewDomainTemplateError)
+          .optional(),
+        tlsMode: z.enum(["auto", "disabled"]).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("Preview deployment policy read by trusted entrypoints such as GitHub Actions.");
+
 const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const appaloftDeploymentSecretReferenceSchema = z
@@ -571,6 +613,7 @@ export const appaloftDeploymentConfigSchema = z
     retention: appaloftDeploymentRetentionConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
+    preview: appaloftDeploymentPreviewConfigSchema.optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })

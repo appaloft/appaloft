@@ -17,6 +17,7 @@ const actionYaml = readFileSync(join(actionRoot, "action.yml"), "utf8");
 const readme = readFileSync(join(actionRoot, "README.md"), "utf8");
 const publicCiWorkflow = readFileSync(join(actionRoot, ".github/workflows/ci.yml"), "utf8");
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
+const resolvePreviewScript = join(actionRoot, "scripts/resolve-preview.sh");
 const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
 
 function runDeploy(input: Record<string, string | undefined>, files?: Record<string, string>) {
@@ -67,6 +68,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("using: composite");
     expect(actionYaml).toContain("scripts/install-appaloft.sh");
     expect(actionYaml).toContain("scripts/run-deploy.sh");
+    expect(actionYaml).toContain("scripts/resolve-preview.sh");
     expect(actionYaml).toContain("command:");
     expect(actionYaml).toContain("install-console");
     expect(actionYaml).toContain("console-domain");
@@ -102,6 +104,7 @@ describe("deploy-action wrapper reference", () => {
         "scripts/install-appaloft.sh",
         "scripts/run-deploy.sh",
         "scripts/resolve-control-plane.sh",
+        "scripts/resolve-preview.sh",
       ]) {
         expect(readFileSync(join(outputRoot, file), "utf8")).toBe(
           readFileSync(join(actionRoot, file), "utf8"),
@@ -112,6 +115,7 @@ describe("deploy-action wrapper reference", () => {
       expect(
         statSync(join(outputRoot, "scripts/resolve-control-plane.sh")).mode & 0o111,
       ).toBeTruthy();
+      expect(statSync(join(outputRoot, "scripts/resolve-preview.sh")).mode & 0o111).toBeTruthy();
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
@@ -119,7 +123,7 @@ describe("deploy-action wrapper reference", () => {
 
   test("[CONFIG-FILE-ENTRY-009] exported public CI validates wrapper layout and dry-run preview mapping", () => {
     expect(publicCiWorkflow).toContain(
-      "bash -n scripts/install-appaloft.sh scripts/run-deploy.sh scripts/resolve-control-plane.sh",
+      "bash -n scripts/install-appaloft.sh scripts/run-deploy.sh scripts/resolve-control-plane.sh scripts/resolve-preview.sh",
     );
     expect(publicCiWorkflow).toContain("APPALOFT_DEPLOY_ACTION_DRY_RUN");
     expect(publicCiWorkflow).toContain("INPUT_PREVIEW: pull-request");
@@ -140,6 +144,44 @@ describe("deploy-action wrapper reference", () => {
     expect(publicCiWorkflow).toContain("Opt-in exact-version install smoke");
     expect(publicCiWorkflow).toContain("APPALOFT_INSTALL_SMOKE_VERSION");
     expect(publicCiWorkflow).not.toContain("APPALOFT_SSH_PRIVATE_KEY");
+  });
+
+  test("[CONFIG-FILE-ENTRY-027] resolves PR preview route policy from repository config", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-config-resolve-"));
+    const outputPath = join(workspace, "github-output.txt");
+    writeFileSync(
+      join(workspace, "appaloft.preview.yml"),
+      [
+        "preview:",
+        "  pullRequest:",
+        "    domainTemplate: cloud-pr-{pr_number}.preview.example.com",
+        "    tlsMode: disabled",
+        "",
+      ].join("\n"),
+    );
+
+    const result = Bun.spawnSync(["bash", resolvePreviewScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        GITHUB_OUTPUT: outputPath,
+        INPUT_CONFIG: "appaloft.preview.yml",
+        INPUT_PREVIEW_ID: "cloud-pr-42",
+        INPUT_PULL_REQUEST_NUMBER: "42",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("preview-domain-template=cloud-pr-42.preview.example.com");
+      expect(output).toContain("preview-tls-mode=disabled");
+      expect(output).toContain("preview-url=http://cloud-pr-42.preview.example.com");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   test("[CONFIG-FILE-ENTRY-010][CONFIG-FILE-ENTRY-015] maps trusted action inputs to CLI preview flags", () => {

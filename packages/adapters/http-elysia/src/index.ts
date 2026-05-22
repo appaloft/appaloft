@@ -51,6 +51,7 @@ import {
 } from "@appaloft/observability";
 import {
   type ActionSourcePackageConfigReader,
+  type AppaloftOrpcRouterContribution,
   mountAppaloftOrpcRoutes,
   type RequestContextRunnerOptions,
 } from "@appaloft/orpc";
@@ -555,6 +556,7 @@ export function createHttpApp(input: {
   pluginRuntime?: SystemPluginRuntime;
   authRuntime?: AuthRuntime;
   requestContextRunner?: RequestContextRunner;
+  orpcRouterContributions?: readonly AppaloftOrpcRouterContribution[];
   embeddedStaticAssets?: EmbeddedStaticAssets;
   embeddedWebAssets?: EmbeddedStaticAssets;
   embeddedDocsAssets?: EmbeddedStaticAssets;
@@ -1363,6 +1365,11 @@ export function createHttpApp(input: {
     executionContextFactory: input.executionContextFactory,
     queryBus: input.queryBus,
     logger: input.logger,
+    ...(input.orpcRouterContributions
+      ? {
+          orpcRouterContributions: input.orpcRouterContributions,
+        }
+      : {}),
     ...(input.sourceEventVerificationPort
       ? {
           sourceEventVerificationPort: input.sourceEventVerificationPort,

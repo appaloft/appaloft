@@ -152,8 +152,11 @@ export interface AppaloftRemotePgliteStateSyncSession {
   refreshLocalMirror(): Promise<Result<void>>;
 }
 
+export type AppaloftServerOrpcRouterContribution = Readonly<Record<string, unknown>>;
+
 export interface AppaloftServerHttpExtension {
   middlewares?: readonly SystemPluginHttpMiddleware[];
+  orpcRouterContributions?: readonly AppaloftServerOrpcRouterContribution[];
   routes?: readonly SystemPluginHttpRoute[];
   webExtensions?: readonly SystemPluginWebExtension[];
 }
@@ -172,6 +175,7 @@ export interface AppaloftServerAuthRuntimeContext extends AppaloftServerComposit
 export interface AppaloftServerHttpContext extends AppaloftServerAuthRuntimeContext {
   http: {
     middlewares: SystemPluginHttpMiddleware[];
+    orpcRouterContributions: AppaloftServerOrpcRouterContribution[];
     routes: SystemPluginHttpRoute[];
     systemPlugins: SystemPluginDefinition[];
     webExtensions: SystemPluginWebExtension[];
@@ -456,6 +460,7 @@ async function configureServerExtensions(input: {
 }): Promise<AppaloftServerHttpContext["http"]> {
   const http: AppaloftServerHttpContext["http"] = {
     middlewares: [],
+    orpcRouterContributions: [],
     routes: [],
     systemPlugins: [...input.systemPlugins],
     webExtensions: [],
@@ -464,6 +469,7 @@ async function configureServerExtensions(input: {
   for (const extension of input.extensions) {
     http.systemPlugins.push(...(extension.systemPlugins ?? []));
     http.middlewares.push(...(extension.http?.middlewares ?? []));
+    http.orpcRouterContributions.push(...(extension.http?.orpcRouterContributions ?? []));
     http.routes.push(...(extension.http?.routes ?? []));
     http.webExtensions.push(...(extension.http?.webExtensions ?? []));
     await extension.configureHttp?.({
@@ -844,6 +850,9 @@ export async function createAppaloftServer(
     logger,
     executionContextFactory,
     deploymentProgressObserver: deploymentProgressReporter,
+    ...(httpExtensions.orpcRouterContributions.length > 0
+      ? { orpcRouterContributions: httpExtensions.orpcRouterContributions }
+      : {}),
     terminalSessionGateway,
     certificateHttpChallengeTokenStore,
     resourceAccessFailureEvidenceRecorder,
