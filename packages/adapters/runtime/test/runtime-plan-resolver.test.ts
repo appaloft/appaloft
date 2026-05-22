@@ -1814,6 +1814,7 @@ describe("DefaultRuntimePlanResolver", () => {
         method: "prebuilt-image",
         port: 4314,
         exposureMode: "direct-port",
+        hostPort: 80,
       },
       generatedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -1832,6 +1833,12 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(route?.domains).toEqual([]);
     expect(route?.proxyKind).toBe("none");
     expect(route?.targetPort).toBe(4314);
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "resource.exposureMode": "direct-port",
+        "resource.hostPort": "80",
+      }),
+    );
   });
 
   test("adds access routes when public domains are requested", async () => {

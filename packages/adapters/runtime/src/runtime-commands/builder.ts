@@ -161,10 +161,12 @@ export class DockerCommandBuilder {
   publishPort(input: {
     containerPort: number;
     mode: DockerPortPublishMode;
+    hostPort?: number | undefined;
   }): DockerPublishedPortSpec {
     return {
       containerPort: PortNumber.rehydrate(input.containerPort),
       mode: input.mode,
+      ...(input.hostPort ? { hostPort: PortNumber.rehydrate(input.hostPort) } : {}),
     };
   }
 }

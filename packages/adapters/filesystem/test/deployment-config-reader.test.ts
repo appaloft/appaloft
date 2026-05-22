@@ -49,6 +49,8 @@ describe("FileSystemDeploymentConfigReader", () => {
         "  startCommand: bun run start",
         "network:",
         "  internalPort: 4310",
+        "  exposureMode: direct-port",
+        "  hostPort: 80",
         "retention:",
         "  runtimePrune:",
         "    retentionDays: 14",
@@ -74,6 +76,8 @@ describe("FileSystemDeploymentConfigReader", () => {
       buildCommand: "bun run build",
       startCommand: "bun run start",
       port: 4310,
+      exposureMode: "direct-port",
+      hostPort: 80,
     });
     expect(snapshot?.retention?.runtimePrune).toEqual({
       retentionDays: 14,

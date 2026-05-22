@@ -478,6 +478,9 @@ function executionMetadataFor(
     ...(requestedDeployment.exposureMode
       ? { "resource.exposureMode": requestedDeployment.exposureMode }
       : {}),
+    ...(requestedDeployment.hostPort
+      ? { "resource.hostPort": String(requestedDeployment.hostPort) }
+      : {}),
     ...(requestedDeployment.upstreamProtocol
       ? { "resource.upstreamProtocol": requestedDeployment.upstreamProtocol }
       : {}),

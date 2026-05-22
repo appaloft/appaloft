@@ -1,4 +1,5 @@
 import {
+  ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
@@ -30,6 +31,7 @@ import {
   ShowResourceQuery,
 } from "@appaloft/application";
 import {
+  type ConfigureResourceNetworkInput,
   type ConfigureResourceRuntimeInput,
   type CreateProjectInput,
   type CreateResourceInput,
@@ -114,6 +116,7 @@ type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
 type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
 type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
+type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["networkProfile"];
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
@@ -813,6 +816,23 @@ function configureResourceRuntime(input: {
   });
 }
 
+function configureResourceNetwork(input: {
+  resourceId: string;
+  networkProfile: ResourceNetworkProfileInput;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceNetworkCommand.create({
+        resourceId: input.resourceId,
+        networkProfile: input.networkProfile,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function showResource(resourceId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -920,6 +940,42 @@ function runtimeProfileUpdateForReusedResource(input: {
   }
 
   return effectiveDesired;
+}
+
+function networkProfilesMatch(input: {
+  current: ResourceDetail["networkProfile"] | undefined;
+  desired: ResourceNetworkProfileInput;
+}): boolean {
+  return JSON.stringify(input.current) === JSON.stringify(input.desired);
+}
+
+function shouldConfigureReusableResourceNetwork(seed: DeploymentPromptSeed): boolean {
+  return Boolean(
+    seed.port ||
+      seed.upstreamProtocol ||
+      seed.exposureMode ||
+      seed.targetServiceName ||
+      seed.hostPort,
+  );
+}
+
+function resolveReusableResourceNetworkProfile(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+  networkProfile: ResourceNetworkProfileInput;
+}) {
+  return Effect.gen(function* () {
+    if (!shouldConfigureReusableResourceNetwork(input.seed)) {
+      return undefined;
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    if (networkProfilesMatch({ current: resource.networkProfile, desired: input.networkProfile })) {
+      return undefined;
+    }
+
+    return input.networkProfile satisfies ConfigurableResourceNetworkProfileInput;
+  });
 }
 
 function shouldConfigureReusableResourceRuntime(seed: DeploymentPromptSeed): boolean {
@@ -1209,10 +1265,16 @@ function resolveResource(input: {
             resourceId: resource.id,
             runtimeProfile: input.runtimeProfile,
           });
+          const networkProfile = yield* resolveReusableResourceNetworkProfile({
+            seed: input.seed,
+            resourceId: resource.id,
+            networkProfile: input.networkProfile,
+          });
           return {
             reference: {
               mode: "existing",
               id: resource.id,
+              ...(networkProfile ? { configureNetwork: { networkProfile } } : {}),
               ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
             },
             label: resource.label,
@@ -1898,6 +1960,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return createResource(step.input);
     case "resources.configureRuntime":
       return configureResourceRuntime(step.input);
+    case "resources.configureNetwork":
+      return configureResourceNetwork(step.input);
     case "environments.setVariable":
       return setEnvironmentVariable(step.input);
     case "deployments.create":

@@ -106,6 +106,22 @@ describe("runtime command builder", () => {
     expect(command).toContain("docker run -d --name 'appaloft-dep_1' -p 8080:8080 'app:latest'");
   });
 
+  test("renders direct host port mappings when host and container ports differ", () => {
+    const spec = RuntimeCommandBuilder.docker().runContainer({
+      image: "app:latest",
+      containerName: "appaloft-dep_2",
+      publishedPorts: [
+        RuntimeCommandBuilder.docker().publishPort({
+          containerPort: 3001,
+          mode: "host-same-port",
+          hostPort: 80,
+        }),
+      ],
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toContain("-p 80:3001");
+  });
+
   test("renders Compose up with an executor working directory", () => {
     const spec = RuntimeCommandBuilder.docker().composeUp({
       composeFile: "/srv/app/docker-compose.yml",

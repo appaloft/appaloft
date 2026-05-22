@@ -689,6 +689,42 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-WF-010B]",
+      name: "shared workflow configures existing resource network profile before ids-only deployment",
+      input: workflowInput({
+        resource: {
+          mode: "existing",
+          id: "res_existing",
+          configureNetwork: {
+            networkProfile: {
+              internalPort: 3001,
+              upstreamProtocol: "http",
+              exposureMode: "direct-port",
+              hostPort: 80,
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.configureNetwork", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureNetwork").input).toEqual({
+          resourceId: "res_existing",
+          networkProfile: {
+            internalPort: 3001,
+            upstreamProtocol: "http",
+            exposureMode: "direct-port",
+            hostPort: 80,
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+        });
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-WF-039]",
       name: "workflow executor can report per-step progress and stop on failed steps",
       input: workflowInput({ resource: { mode: "create", input: resourceInput() } }),
@@ -1408,6 +1444,8 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
     case "environments.create":
       return { id: "env_1" };
     case "resources.create":
+      return { id: "res_1" };
+    case "resources.configureNetwork":
       return { id: "res_1" };
     case "resources.configureRuntime":
       return { id: "res_1" };

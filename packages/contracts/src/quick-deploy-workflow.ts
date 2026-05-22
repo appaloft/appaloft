@@ -1,6 +1,7 @@
 import { customAlphabet } from "nanoid";
 
 import {
+  type ConfigureResourceNetworkInput,
   type ConfigureResourceRuntimeInput,
   type ConfigureServerCredentialInput,
   type CreateDeploymentInput,
@@ -81,6 +82,7 @@ export type QuickDeployResourceReference =
   | {
       mode: "existing";
       id: string;
+      configureNetwork?: Omit<ConfigureResourceNetworkInput, "resourceId">;
       configureRuntime?: Omit<ConfigureResourceRuntimeInput, "resourceId">;
     }
   | {
@@ -173,6 +175,10 @@ export type QuickDeployWorkflowStep =
   | {
       kind: "resources.create";
       input: CreateResourceInput;
+    }
+  | {
+      kind: "resources.configureNetwork";
+      input: ConfigureResourceNetworkInput;
     }
   | {
       kind: "resources.configureRuntime";
@@ -314,6 +320,16 @@ export function* quickDeployWorkflow(
       input: {
         resourceId,
         ...input.resource.configureRuntime,
+      },
+    };
+  }
+
+  if (input.resource.mode === "existing" && input.resource.configureNetwork) {
+    yield {
+      kind: "resources.configureNetwork",
+      input: {
+        resourceId,
+        ...input.resource.configureNetwork,
       },
     };
   }
