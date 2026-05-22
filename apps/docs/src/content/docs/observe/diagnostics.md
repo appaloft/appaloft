@@ -179,7 +179,7 @@ appaloft server capacity prune srv_primary --before 2026-01-01T00:00:00.000Z --c
 PGlite state 而言，live `pglite`、`locks`、`source-links`、`server-applied-routes` 和
 `sync-revision.txt` 都不是 remote-state marker candidates。`ssh-pglite` 仍然是 standalone
 SSH 的权威 state backend；console/Postgres-managed deploy 不会创建 remote PGlite sync
-backups。`state/backups/sync-*` upload safety backups 会按配置的恢复窗口保留，超过窗口后才可能被显式 marker cleanup 选中。
+backups。`state/backups/sync-*` upload safety backups 会按配置的恢复窗口和数量上限保留，超过窗口或数量上限后才会被 sync retention 或显式 marker cleanup 选中。
 
 破坏性 prune 仍然需要 `--dry-run false`。这个命令不会运行 broad `docker system prune`，
 也不会执行 Docker volume prune；它会保留 Appaloft state roots、active runtimes、rollback
