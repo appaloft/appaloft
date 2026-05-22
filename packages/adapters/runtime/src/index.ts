@@ -434,7 +434,7 @@ function createAccessRoutes(input: {
       return ok([]);
     }
 
-    const targetPort = input.fallbackPort;
+    const targetPort = input.requestedDeployment.hostPort ?? input.fallbackPort;
 
     return safeTry(function* () {
       const route = yield* AccessRoute.create({
