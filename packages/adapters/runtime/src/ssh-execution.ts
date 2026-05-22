@@ -992,6 +992,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       "BatchMode=yes",
       "-o",
       "StrictHostKeyChecking=accept-new",
+      "-o",
+      "ServerAliveInterval=30",
+      "-o",
+      "ServerAliveCountMax=20",
       target.host,
     ];
   }
