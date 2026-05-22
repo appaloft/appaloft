@@ -34,6 +34,7 @@ function testConfig(
     pgliteDataDir: join(dataDir, "pglite"),
     remoteRuntimeRoot: overrides?.remoteRuntimeRoot ?? "/var/lib/appaloft/runtime",
     remotePgliteSyncBackupRetentionDays: 7,
+    remotePgliteSyncBackupMaxCount: 20,
     logLevel: "info" as const,
     environment: "test",
     otelEnabled: false,
@@ -624,6 +625,7 @@ describe("remote PGlite state sync", () => {
           localDataRoot: dataDir,
           localPgliteDataDir: join(dataDir, "pglite"),
           backupRetentionDays: 7,
+          backupMaxCount: 20,
           target: {
             host: "203.0.113.10",
             port: 22,
@@ -680,6 +682,7 @@ describe("remote PGlite state sync", () => {
           localDataRoot: dataDir,
           localPgliteDataDir: join(dataDir, "pglite"),
           backupRetentionDays: 7,
+          backupMaxCount: 20,
           target: {
             host: "203.0.113.10",
             port: 22,
@@ -744,6 +747,7 @@ describe("remote PGlite state sync", () => {
           localDataRoot: dataDir,
           localPgliteDataDir: join(dataDir, "pglite"),
           backupRetentionDays: 7,
+          backupMaxCount: 20,
           target: {
             host: "203.0.113.10",
             port: 22,
@@ -837,6 +841,7 @@ describe("remote PGlite state sync", () => {
           localDataRoot,
           localPgliteDataDir: join(localDataRoot, "pglite"),
           backupRetentionDays: 1,
+          backupMaxCount: 20,
           target: {
             host: "127.0.0.1",
           },
@@ -855,6 +860,65 @@ describe("remote PGlite state sync", () => {
         "local-state",
       );
       expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("1\n");
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-013] upload caps sync backup archive count within the recovery window", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const backupRoot = join(remoteStateRoot, "backups");
+    const oldestBackup = join(backupRoot, "sync-20990101000000-oldest");
+    const middleBackup = join(backupRoot, "sync-20990101000100-middle");
+    const newestBackup = join(backupRoot, "sync-20990101000200-newest");
+    const manualBackup = join(backupRoot, "manual-keep");
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "local.txt"), "local-state");
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(oldestBackup, { recursive: true });
+      await mkdir(middleBackup, { recursive: true });
+      await mkdir(newestBackup, { recursive: true });
+      await mkdir(manualBackup, { recursive: true });
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "0\n");
+      await writeFile(join(remoteStateRoot, "pglite", "remote.txt"), "remote-state");
+
+      const now = Date.now();
+      await utimes(oldestBackup, new Date(now - 180_000), new Date(now - 180_000));
+      await utimes(middleBackup, new Date(now - 120_000), new Date(now - 120_000));
+      await utimes(newestBackup, new Date(now - 60_000), new Date(now - 60_000));
+
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 30,
+          backupMaxCount: 2,
+          target: {
+            host: "127.0.0.1",
+          },
+        },
+        createLocalSshArchiveRunner(),
+      );
+
+      const uploaded = await sync.syncToRemote();
+      const backups = await readdir(backupRoot);
+      const syncBackups = backups.filter((name) => name.startsWith("sync-"));
+
+      expect(uploaded.isOk()).toBe(true);
+      expect(syncBackups).toHaveLength(2);
+      expect(backups).not.toContain("sync-20990101000000-oldest");
+      expect(backups).not.toContain("sync-20990101000100-middle");
+      expect(backups).toContain("manual-keep");
     } finally {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });

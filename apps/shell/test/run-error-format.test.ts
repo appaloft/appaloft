@@ -102,6 +102,7 @@ describe("shell domain error formatting", () => {
       localDataRoot: dataRoot,
       localPgliteDataDir: pgliteDir,
       backupRetentionDays: 7,
+      backupMaxCount: 20,
       target: {
         host: "203.0.113.10",
         port: 22,

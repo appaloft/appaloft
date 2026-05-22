@@ -141,6 +141,7 @@ export interface AppConfig {
   pgliteDataDir: string;
   remoteRuntimeRoot: string;
   remotePgliteSyncBackupRetentionDays: number;
+  remotePgliteSyncBackupMaxCount: number;
   logLevel: "debug" | "info" | "warn" | "error";
   environment: string;
   otelEnabled: boolean;
@@ -191,6 +192,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   databaseUrl: "postgres://postgres:postgres@localhost:5432/appaloft",
   remoteRuntimeRoot: "/var/lib/appaloft/runtime",
   remotePgliteSyncBackupRetentionDays: 7,
+  remotePgliteSyncBackupMaxCount: 20,
   logLevel: "info",
   environment: "development",
   otelEnabled: false,
@@ -634,6 +636,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(source.flags?.remotePgliteSyncBackupRetentionDays) ??
     parsePositiveInteger(fileConfig.remotePgliteSyncBackupRetentionDays) ??
     defaults.remotePgliteSyncBackupRetentionDays;
+  const remotePgliteSyncBackupMaxCount =
+    parsePositiveInteger(env.APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT) ??
+    parsePositiveInteger(source.flags?.remotePgliteSyncBackupMaxCount) ??
+    parsePositiveInteger(fileConfig.remotePgliteSyncBackupMaxCount) ??
+    defaults.remotePgliteSyncBackupMaxCount;
   const resourceAccessFailureRendererUrl = normalizeHttpUrl(
     source.flags?.resourceAccessFailureRendererUrl ??
       env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
@@ -881,6 +888,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       fileConfig.remoteRuntimeRoot ??
       defaults.remoteRuntimeRoot,
     remotePgliteSyncBackupRetentionDays,
+    remotePgliteSyncBackupMaxCount,
     logLevel:
       source.flags?.logLevel ??
       (env.APPALOFT_LOG_LEVEL as AppConfig["logLevel"] | undefined) ??
