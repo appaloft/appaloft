@@ -18,6 +18,7 @@ import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 import { type Database } from "../schema";
 import { rowToRuntimeControlAttempt } from "./resource-runtime-control-attempts";
 import {
+  defaultReadModelListLimit,
   normalizeTimestamp,
   resolveRepositoryExecutor,
   type SerializedResourceAccessProfile,
@@ -233,6 +234,7 @@ export class PgResourceReadModel implements ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      limit?: number;
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -265,6 +267,8 @@ export class PgResourceReadModel implements ResourceReadModel {
         if (input?.environmentId) {
           query = query.where("environment_id", "=", input.environmentId);
         }
+
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
 
         const rows = await query.execute();
         const deploymentRows =

@@ -91,17 +91,18 @@
     "terminal",
     "danger",
   ] as const;
+  const serverDetailListLimit = 100;
   const projectsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["projects"],
-      queryFn: () => orpcClient.projects.list(),
+      queryKey: ["projects", { limit: serverDetailListLimit }],
+      queryFn: () => orpcClient.projects.list({ limit: serverDetailListLimit }),
       enabled: browser,
     }),
   );
   const deploymentsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["deployments"],
-      queryFn: () => orpcClient.deployments.list({}),
+      queryKey: ["deployments", { limit: serverDetailListLimit }],
+      queryFn: () => orpcClient.deployments.list({ limit: serverDetailListLimit }),
       enabled: browser,
     }),
   );

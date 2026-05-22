@@ -16,11 +16,6 @@ import {
   GetAuthBootstrapStatusQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
-  ListDeploymentsQuery,
-  ListEnvironmentsQuery,
-  ListProjectsQuery,
-  ListResourcesQuery,
-  ListServersQuery,
   type ProductSessionAuthorizationPort,
   type QueryBus,
   type ResourceAccessFailureEvidenceRecorder,
@@ -30,11 +25,7 @@ import {
   toRepositoryContext,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
-import {
-  apiVersion,
-  type ConsoleOverviewResponse,
-  type ReadinessResponse,
-} from "@appaloft/contracts";
+import { apiVersion, type ReadinessResponse } from "@appaloft/contracts";
 import { type Result } from "@appaloft/core";
 import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
@@ -183,12 +174,6 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function isActiveDeploymentStatus(
-  status: NonNullable<ConsoleOverviewResponse["latestDeployment"]>["status"],
-): boolean {
-  return ["created", "planning", "planned", "running", "cancel-requested"].includes(status);
 }
 
 function normalizePluginRouteResult(
@@ -607,68 +592,6 @@ export function createHttpApp(input: {
     });
 
     unwrapResult(context, result);
-  }
-
-  async function consoleOverview(request: Request): Promise<ConsoleOverviewResponse> {
-    const requestId = request.headers.get("x-request-id");
-    const context = input.executionContextFactory.create({
-      entrypoint: "http",
-      locale: resolveAppaloftLocaleFromHeaders(request.headers),
-      ...(requestId ? { requestId } : {}),
-    });
-
-    const [
-      doctorResult,
-      projectsResult,
-      environmentsResult,
-      resourcesResult,
-      serversResult,
-      deploymentsResult,
-    ] = await Promise.all([
-      input.queryBus.execute(context, unwrapResult(context, DoctorQuery.create())),
-      input.queryBus.execute(context, unwrapResult(context, ListProjectsQuery.create())),
-      input.queryBus.execute(context, unwrapResult(context, ListEnvironmentsQuery.create({}))),
-      input.queryBus.execute(context, unwrapResult(context, ListResourcesQuery.create({}))),
-      input.queryBus.execute(context, unwrapResult(context, ListServersQuery.create())),
-      input.queryBus.execute(context, unwrapResult(context, ListDeploymentsQuery.create({}))),
-    ]);
-    const readiness = publicReadiness(unwrapResult(context, doctorResult).readiness);
-    const projects = unwrapResult(context, projectsResult).items;
-    const environments = unwrapResult(context, environmentsResult).items;
-    const resources = unwrapResult(context, resourcesResult).items;
-    const deploymentTargets = unwrapResult(context, serversResult).items;
-    const deployments = unwrapResult(context, deploymentsResult).items;
-    const latestDeployment = deployments[0];
-
-    return {
-      schemaVersion: "console.overview/v1",
-      generatedAt: new Date().toISOString(),
-      counts: {
-        projects: projects.length,
-        environments: environments.length,
-        resources: resources.length,
-        deploymentTargets: deploymentTargets.length,
-        deployments: deployments.length,
-        activeDeployments: deployments.filter((deployment) =>
-          isActiveDeploymentStatus(deployment.status),
-        ).length,
-        failedDeployments: deployments.filter((deployment) => deployment.status === "failed")
-          .length,
-      },
-      readiness,
-      version: {
-        name: input.config.appName,
-        version: input.config.appVersion,
-        apiVersion,
-        mode: input.config.runtimeMode,
-      },
-      ...(latestDeployment ? { latestDeployment } : {}),
-      recentDeployments: deployments.slice(0, 5),
-      projects,
-      environments,
-      resources,
-      deploymentTargets,
-    };
   }
 
   function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
@@ -1213,7 +1136,6 @@ export function createHttpApp(input: {
       const result = await input.commandBus.execute(context, command);
       return unwrapResult(context, result);
     })
-    .get("/api/console-overview", ({ request }) => consoleOverview(request))
     .get("/.well-known/acme-challenge/:token", ({ request, params }) =>
       serveHttpChallenge(request, params.token),
     )

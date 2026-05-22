@@ -98,6 +98,7 @@ import {
   type VariableKind,
 } from "@appaloft/core";
 import {
+  defaultExecutionTenantContext,
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionTenantContext,
@@ -6602,14 +6603,12 @@ export interface EntitlementPort {
 }
 
 export interface TenantContextResolver {
-  resolveTenantContext(context: ExecutionContext): Promise<ExecutionTenantContext | undefined>;
+  resolveTenantContext(context: ExecutionContext): Promise<ExecutionTenantContext>;
 }
 
 export class DefaultTenantContextResolver implements TenantContextResolver {
-  async resolveTenantContext(
-    context: ExecutionContext,
-  ): Promise<ExecutionTenantContext | undefined> {
-    return context.tenant;
+  async resolveTenantContext(context: ExecutionContext): Promise<ExecutionTenantContext> {
+    return context.tenant ?? defaultExecutionTenantContext();
   }
 }
 
@@ -7692,6 +7691,7 @@ export interface ProjectReadModel {
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      limit?: number;
     },
   ): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;
@@ -7712,7 +7712,7 @@ export interface ProjectOwnershipReadModel {
 }
 
 export interface ServerReadModel {
-  list(context: RepositoryContext): Promise<ServerSummary[]>;
+  list(context: RepositoryContext, input?: { limit?: number }): Promise<ServerSummary[]>;
   findOne(context: RepositoryContext, spec: ServerSelectionSpec): Promise<ServerSummary | null>;
 }
 
@@ -7732,7 +7732,10 @@ export interface SshCredentialUsageReader {
 }
 
 export interface EnvironmentReadModel {
-  list(context: RepositoryContext, projectId?: string): Promise<EnvironmentSummary[]>;
+  list(
+    context: RepositoryContext,
+    input?: { projectId?: string; limit?: number },
+  ): Promise<EnvironmentSummary[]>;
   findOne(
     context: RepositoryContext,
     spec: EnvironmentSelectionSpec,
@@ -7746,6 +7749,7 @@ export interface ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      limit?: number;
     },
   ): Promise<ResourceSummary[]>;
   findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<ResourceSummary | null>;
@@ -7773,6 +7777,7 @@ export interface DependencyResourceReadModel {
       projectId?: string;
       environmentId?: string;
       kind?: DependencyResourceKind;
+      limit?: number;
     },
   ): Promise<DependencyResourceSummary[]>;
   findOne(
@@ -7983,6 +7988,7 @@ export interface DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      limit?: number;
     },
   ): Promise<DeploymentSummary[]>;
   findOne(

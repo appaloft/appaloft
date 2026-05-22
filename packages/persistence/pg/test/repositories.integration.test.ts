@@ -280,7 +280,7 @@ describe("postgres persistence integration", () => {
       )
     )._unsafeUnwrap();
 
-    const environments = await environmentReadModel.list(context, `prj_${suffix}`);
+    const environments = await environmentReadModel.list(context, { projectId: `prj_${suffix}` });
     const deployments = await deploymentReadModel.list(context, { projectId: `prj_${suffix}` });
 
     expect(environments[0]?.maskedVariables).toEqual([

@@ -1154,7 +1154,7 @@ describe("pglite persistence integration", () => {
       const deploymentReadModel = new PgDeploymentReadModel(reopened.db);
       const resourceReadModel = new PgResourceReadModel(reopened.db);
 
-      const environments = await environmentReadModel.list(context, `prj_${suffix}`);
+      const environments = await environmentReadModel.list(context, { projectId: `prj_${suffix}` });
       const deployments = await deploymentReadModel.list(context, { projectId: `prj_${suffix}` });
       const persistedResource = await reopenedResourceRepository.findOne(
         context,

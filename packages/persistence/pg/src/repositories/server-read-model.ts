@@ -12,7 +12,7 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import { defaultReadModelListLimit, normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
 type ServerSelectionQuery = SelectQueryBuilder<
   Database,
@@ -111,7 +111,7 @@ function toServerSummary(
 export class PgServerReadModel implements ServerReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async list(context: RepositoryContext) {
+  async list(context: RepositoryContext, input?: { limit?: number }) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("server", "list"),
@@ -120,16 +120,19 @@ export class PgServerReadModel implements ServerReadModel {
           [appaloftTraceAttributes.readModelName]: "server",
         },
       },
-      async () =>
-        executor
+      async () => {
+        let query = executor
           .selectFrom("servers")
           .leftJoin("ssh_credentials", "ssh_credentials.id", "servers.credential_id")
           .selectAll("servers")
           .select("ssh_credentials.name as credential_name")
           .where("servers.lifecycle_status", "!=", "deleted")
-          .orderBy("created_at", "desc")
-          .execute()
-          .then((rows) => rows.map(toServerSummary)),
+          .orderBy("created_at", "desc");
+
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
+
+        return query.execute().then((rows) => rows.map(toServerSummary));
+      },
     );
   }
 

@@ -25,7 +25,12 @@ export class ListEnvironmentsQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.projectId ? { projectId: query.projectId } : undefined,
+        query.projectId || query.limit
+          ? {
+              ...(query.projectId ? { projectId: query.projectId } : {}),
+              ...(query.limit ? { limit: query.limit } : {}),
+            }
+          : undefined,
       ),
     );
   }

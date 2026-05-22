@@ -1,7 +1,6 @@
 import {
   type AuthSessionResponse,
   type CertificateSummary,
-  type ConsoleOverviewResponse,
   type DeploymentSummary,
   type DomainBindingSummary,
   type EnvironmentSummary,
@@ -20,6 +19,8 @@ import { request } from "$lib/api/client";
 import { canRunProductQueries } from "$lib/console/auth-query-gate";
 import { orpcClient } from "$lib/orpc";
 
+export const defaultConsoleListLimit = 100;
+
 export const defaultAuthSession: AuthSessionResponse = {
   enabled: false,
   provider: "none",
@@ -35,7 +36,6 @@ type ConsoleQueryKey =
   | "health"
   | "readiness"
   | "version"
-  | "consoleOverview"
   | "authSession"
   | "projects"
   | "servers"
@@ -83,46 +83,38 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
   );
   const productQueryEnabled = (key: ConsoleQueryKey) =>
     queryEnabled(key) && canRunProductQueries(authSessionQuery.data);
-  const consoleOverviewQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["console", "overview"],
-      queryFn: () => request<ConsoleOverviewResponse>("/api/console-overview"),
-      enabled: productQueryEnabled("consoleOverview"),
-      refetchInterval: 10_000,
-    }),
-  );
   const projectsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["projects"],
-      queryFn: () => orpcClient.projects.list(),
+      queryKey: ["projects", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.projects.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("projects"),
     }),
   );
   const serversQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["servers"],
-      queryFn: () => orpcClient.servers.list(),
+      queryKey: ["servers", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.servers.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("servers"),
     }),
   );
   const environmentsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["environments"],
-      queryFn: () => orpcClient.environments.list({}),
+      queryKey: ["environments", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.environments.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("environments"),
     }),
   );
   const resourcesQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["resources"],
-      queryFn: () => orpcClient.resources.list({}),
+      queryKey: ["resources", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.resources.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("resources"),
     }),
   );
   const deploymentsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["deployments"],
-      queryFn: () => orpcClient.deployments.list({}),
+      queryKey: ["deployments", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.deployments.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("deployments"),
     }),
   );
@@ -159,7 +151,6 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
     healthQuery,
     readinessQuery,
     versionQuery,
-    consoleOverviewQuery,
     authSessionQuery,
     projectsQuery,
     serversQuery,

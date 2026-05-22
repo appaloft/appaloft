@@ -15,6 +15,7 @@ import {
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { boundedListLimit } from "../shared-schema";
 
 @injectable()
 export class ListResourcesQueryService {
@@ -34,10 +35,18 @@ export class ListResourcesQueryService {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<ResourceReadModel["list"]>> }> {
     const repositoryContext = toRepositoryContext(context);
-    const resources = await this.readModel.list(repositoryContext, input);
+    const resources = await this.readModel.list(repositoryContext, {
+      ...(input?.projectId ? { projectId: input.projectId } : {}),
+      ...(input?.environmentId ? { environmentId: input.environmentId } : {}),
+      ...(input?.includePreviewResources !== undefined
+        ? { includePreviewResources: input.includePreviewResources }
+        : {}),
+      limit: boundedListLimit(input?.limit),
+    });
     const items = await Promise.all(
       resources.map(async (resource) => {
         const accessSummary = {

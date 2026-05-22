@@ -76,6 +76,10 @@ contracts, Web, CLI, or public docs.
 - Better Auth-compatible organization, member, and invitation tables already exist in persistence.
 - Product-session authorization gates already protect product mutations through an Appaloft-owned
   port, and deploy-token lifecycle HTTP/oRPC/CLI routes are admin-protected.
+- `ExecutionContext` always carries tenant context. Product-session operations resolve that tenant
+  from the authenticated session/current organization and attach it to backend execution/repository
+  context. Web, CLI, HTTP/oRPC callers, and future MCP callers must not provide tenant ids for
+  ordinary product-session operations.
 - Organization/team command/query specs, application ports, application handlers/use cases/query
   services, operation-catalog entries, core role/removal behavior, and the `@appaloft/auth-better`
   organization/team port implementation are active.

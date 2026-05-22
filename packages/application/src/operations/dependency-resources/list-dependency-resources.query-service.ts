@@ -8,6 +8,7 @@ import {
   type ListDependencyResourcesResult,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { boundedListLimit } from "../shared-schema";
 import { type ListDependencyResourcesQuery } from "./list-dependency-resources.query";
 
 @injectable()
@@ -27,6 +28,7 @@ export class ListDependencyResourcesQueryService {
       ...(query.projectId ? { projectId: query.projectId } : {}),
       ...(query.environmentId ? { environmentId: query.environmentId } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
+      limit: boundedListLimit(query.limit),
     });
 
     return ok({

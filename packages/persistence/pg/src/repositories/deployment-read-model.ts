@@ -14,6 +14,7 @@ import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
 import {
+  defaultReadModelListLimit,
   normalizeTimestamp,
   resolveRepositoryExecutor,
   type SerializedDeploymentDependencyBindingReference,
@@ -284,6 +285,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      limit?: number;
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -308,6 +310,8 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
         if (!input?.includeArchived) {
           query = query.where("archived_at", "is", null);
         }
+
+        query = query.limit(input?.limit ?? defaultReadModelListLimit);
 
         const rows = await query.execute();
         return rows.map(toDeploymentSummary);

@@ -80,7 +80,11 @@ class CapturingEnvironmentReadModel implements Pick<EnvironmentReadModel, "list"
 
   constructor(private readonly environments: EnvironmentSummary[] = []) {}
 
-  async list(context: RepositoryContext, projectId?: string): Promise<EnvironmentSummary[]> {
+  async list(
+    context: RepositoryContext,
+    input?: { projectId?: string },
+  ): Promise<EnvironmentSummary[]> {
+    const projectId = input?.projectId;
     this.calls.push({ context, ...(projectId ? { projectId } : {}) });
     return projectId
       ? this.environments.filter((environment) => environment.projectId === projectId)

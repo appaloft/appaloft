@@ -22,7 +22,6 @@ export class ListServersQueryHandler
     context: ExecutionContext,
     query: ListServersQuery,
   ): Promise<Result<{ items: ServerSummary[] }>> {
-    void query;
-    return ok(await this.queryService.execute(context));
+    return ok(await this.queryService.execute(context, query));
   }
 }
