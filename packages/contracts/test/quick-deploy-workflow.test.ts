@@ -98,6 +98,39 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-WF-042]",
+      name: "existing resource source update is applied before deployment",
+      input: workflowInput({
+        resource: {
+          mode: "existing",
+          id: "res_existing",
+          configureSource: {
+            source: {
+              kind: "docker-image",
+              locator: "ghcr.io/acme/api@sha256:abc",
+              displayName: "api",
+              imageName: "ghcr.io/acme/api",
+              imageDigest: "sha256:abc",
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.configureSource", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureSource").input).toMatchObject({
+          resourceId: "res_existing",
+          source: {
+            kind: "docker-image",
+            locator: "ghcr.io/acme/api@sha256:abc",
+            imageDigest: "sha256:abc",
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toMatchObject({
+          resourceId: "res_existing",
+        });
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-WF-002]",
       name: "existing project and server defaults do not create replacement context",
       input: workflowInput({
@@ -1444,6 +1477,8 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
     case "environments.create":
       return { id: "env_1" };
     case "resources.create":
+      return { id: "res_1" };
+    case "resources.configureSource":
       return { id: "res_1" };
     case "resources.configureNetwork":
       return { id: "res_1" };

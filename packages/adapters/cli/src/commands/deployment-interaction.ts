@@ -1,6 +1,7 @@
 import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
+  ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
@@ -115,6 +116,7 @@ type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
 type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
 type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
 type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
+type ConfigurableResourceSourceInput = ResourceSourceInput;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
 type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["networkProfile"];
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
@@ -816,6 +818,23 @@ function configureResourceRuntime(input: {
   });
 }
 
+function configureResourceSource(input: {
+  resourceId: string;
+  source: ConfigurableResourceSourceInput;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceSourceCommand.create({
+        resourceId: input.resourceId,
+        source: input.source,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function configureResourceNetwork(input: {
   resourceId: string;
   networkProfile: ResourceNetworkProfileInput;
@@ -846,6 +865,69 @@ function showResource(resourceId: string) {
     );
     const result = yield* Effect.promise(() => cli.executeQuery(message));
     return yield* resultToEffect(result);
+  });
+}
+
+function sourceProfilesMatch(input: {
+  current: ResourceDetail["source"] | undefined;
+  desired: ConfigurableResourceSourceInput;
+}): boolean {
+  if (!input.current) {
+    return false;
+  }
+
+  const current = {
+    kind: input.current.kind,
+    locator: input.current.locator,
+    displayName: input.current.displayName,
+    ...(input.current.gitRef ? { gitRef: input.current.gitRef } : {}),
+    ...(input.current.commitSha ? { commitSha: input.current.commitSha } : {}),
+    ...(input.current.baseDirectory ? { baseDirectory: input.current.baseDirectory } : {}),
+  };
+  const desired = {
+    kind: input.desired.kind,
+    locator: input.desired.locator,
+    displayName: input.desired.displayName,
+    ...(input.desired.gitRef ? { gitRef: input.desired.gitRef } : {}),
+    ...(input.desired.commitSha ? { commitSha: input.desired.commitSha } : {}),
+    ...(input.desired.baseDirectory ? { baseDirectory: input.desired.baseDirectory } : {}),
+  };
+
+  return JSON.stringify(current) === JSON.stringify(desired);
+}
+
+function shouldConfigureReusableResourceSource(input: {
+  seed: DeploymentPromptSeed;
+  sourceLocator: string;
+  deploymentMethod: DeploymentMethod;
+}): boolean {
+  return Boolean(
+    input.deploymentMethod === "prebuilt-image" ||
+      isRemoteOrImageSource(input.sourceLocator) ||
+      input.seed.sourceProfile?.gitRef ||
+      input.seed.sourceProfile?.commitSha ||
+      input.seed.sourceProfile?.baseDirectory,
+  );
+}
+
+function resolveReusableResourceSource(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+  sourceLocator: string;
+  deploymentMethod: DeploymentMethod;
+  source: ConfigurableResourceSourceInput;
+}) {
+  return Effect.gen(function* () {
+    if (!shouldConfigureReusableResourceSource(input)) {
+      return undefined;
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    if (sourceProfilesMatch({ current: resource.source, desired: input.source })) {
+      return undefined;
+    }
+
+    return input.source;
   });
 }
 
@@ -1260,6 +1342,17 @@ function resolveResource(input: {
     Effect.gen(function* () {
       const reuseResolvedResource = (resource: { id: string; label: string }) =>
         Effect.gen(function* () {
+          const source = yield* resolveReusableResourceSource({
+            seed: input.seed,
+            resourceId: resource.id,
+            sourceLocator: input.sourceLocator,
+            deploymentMethod: input.deploymentMethod,
+            source: sourceBindingForDeploymentInput(
+              input.sourceLocator,
+              input.deploymentMethod,
+              input.seed.sourceProfile,
+            ),
+          });
           const runtimeProfile = yield* resolveReusableResourceRuntimeProfile({
             seed: input.seed,
             resourceId: resource.id,
@@ -1274,6 +1367,7 @@ function resolveResource(input: {
             reference: {
               mode: "existing",
               id: resource.id,
+              ...(source ? { configureSource: { source } } : {}),
               ...(networkProfile ? { configureNetwork: { networkProfile } } : {}),
               ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
             },
@@ -1958,6 +2052,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return createEnvironment(step.input);
     case "resources.create":
       return createResource(step.input);
+    case "resources.configureSource":
+      return configureResourceSource(step.input);
     case "resources.configureRuntime":
       return configureResourceRuntime(step.input);
     case "resources.configureNetwork":
