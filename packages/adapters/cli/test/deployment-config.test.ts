@@ -1767,6 +1767,111 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-IMAGE-001] acknowledged existing resource deploy updates source before prebuilt image deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-image-profile-"));
+    const configPath = join(workspace, "appaloft.image.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: prebuilt-image",
+        "network:",
+        "  internalPort: 3001",
+        "  upstreamProtocol: http",
+        "  exposureMode: direct-port",
+        "  hostPort: 80",
+        "",
+      ].join("\n"),
+    );
+    const imageLocator = "docker://ghcr.io/acme/api@sha256:abc";
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
+        runtimeProfile: {
+          strategy: "dockerfile",
+          dockerfilePath: "Dockerfile",
+        },
+        networkProfile: {
+          internalPort: 3001,
+          upstreamProtocol: "http",
+          exposureMode: "direct-port",
+          hostPort: 80,
+        },
+      },
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_existing",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+      ],
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          imageLocator,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+          "--acknowledge-resource-profile-drift",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceSourceCommand",
+      ),
+    ).toMatchObject({
+      resourceId: "res_existing",
+      source: {
+        kind: "docker-image",
+        locator: imageLocator,
+      },
+    });
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toMatchObject({
+      resourceId: "res_existing",
+      runtimeProfile: {
+        strategy: "prebuilt-image",
+      },
+    });
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+      serverId: "srv_existing",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-015D] deploy action resolves explicit config and source from nested shell cwd", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-explicit-config-shell-cwd-"));
