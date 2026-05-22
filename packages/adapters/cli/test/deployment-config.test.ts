@@ -1605,6 +1605,168 @@ describe("CLI deployment config entry workflow", () => {
     ).toBeUndefined();
   });
 
+  test("[RES-PROFILE-DRIFT-004] deploy action can explicitly acknowledge resource profile drift", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-config-profile-ack-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  buildCommand: bun run build",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 4310",
+        "env:",
+        "  API_URL: https://entry.example.test",
+        "secrets:",
+        "  DATABASE_URL:",
+        "    from: ci-env:DATABASE_URL",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          buildCommand: "bun run build",
+          startCommand: "bun run start",
+        },
+        networkProfile: {
+          internalPort: 4310,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+      },
+      resourceEffectiveConfig: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_existing",
+        environmentId: "env_existing",
+        ownedEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        effectiveEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        overrides: [],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-05-16T00:00:00.000Z",
+      },
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_existing",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          DATABASE_URL: "postgres://entry-user:entry-pass@example.test/app",
+          GITHUB_HEAD_REF: undefined,
+          GITHUB_REF: undefined,
+          GITHUB_REPOSITORY: undefined,
+          GITHUB_REPOSITORY_ID: undefined,
+          GITHUB_SHA: undefined,
+          GITHUB_WORKSPACE: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--method",
+              "workspace-commands",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+              "--acknowledge-resource-profile-drift",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.queries.map((query) => query.constructor.name)).toContain("ShowResourceQuery");
+    expect(harness.queries.map((query) => query.constructor.name)).not.toContain(
+      "ResourceEffectiveConfigQuery",
+    );
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+      ),
+    ).toBeDefined();
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+      serverId: "srv_existing",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-015D] deploy action resolves explicit config and source from nested shell cwd", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-explicit-config-shell-cwd-"));
