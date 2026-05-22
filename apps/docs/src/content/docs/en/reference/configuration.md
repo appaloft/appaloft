@@ -68,6 +68,7 @@ ticking them.
 | `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | `65536` | Bounded in-memory terminal output tail replayed only when an active terminal transport reconnects; `0` disables replay. |
 | `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` | Default retention hours for retained monitoring raw samples. |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | `7` | Recovery window for SSH remote PGlite `state/backups/sync-*` upload backups. |
+| `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` | `20` | Maximum count for SSH remote PGlite `state/backups/sync-*` upload backups; the newest backups are retained. |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_ENABLED` | `false` | Scans expired active preview environments and dispatches cleanup through the preview cleanup boundary. |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_INTERVAL_SECONDS` | `300` | Poll interval for expired preview cleanup scans. |
 | `APPALOFT_PREVIEW_EXPIRY_CLEANUP_SCHEDULER_BATCH_SIZE` | `25` | Maximum expired active preview environments scanned per tick. |

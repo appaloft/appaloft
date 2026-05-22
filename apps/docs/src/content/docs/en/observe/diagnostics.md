@@ -186,8 +186,8 @@ bytes. For SSH PGlite state, live `pglite`, `locks`, `source-links`, `server-app
 `sync-revision.txt` are not remote-state marker candidates. The `ssh-pglite` backend remains the
 authoritative standalone SSH state mode; console/Postgres-managed deploys do not create remote
 PGlite sync backups. Upload safety backups under
-`state/backups/sync-*` are retained for the configured recovery window before they become eligible
-for explicit marker cleanup.
+`state/backups/sync-*` are retained within the configured recovery window and sync-backup count cap
+before older archives become eligible for sync retention or explicit marker cleanup.
 
 Destructive prune still requires `--dry-run false`. Appaloft never runs broad `docker system prune`
 or Docker volume prune from this command, and it preserves Appaloft state roots, active runtimes,

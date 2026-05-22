@@ -19,6 +19,7 @@ export interface RemotePgliteStateSyncPlan {
   localDataRoot: string;
   localPgliteDataDir: string;
   backupRetentionDays: number;
+  backupMaxCount: number;
   target: SshRemoteStateTarget;
 }
 
@@ -250,6 +251,7 @@ function remoteExtractCommand(input: {
   expectedRevision: number;
   nextRevision: number;
   backupRetentionDays: number;
+  backupMaxCount: number;
 }): string {
   const quotedDataRoot = shellQuote(input.dataRoot);
 
@@ -258,6 +260,7 @@ function remoteExtractCommand(input: {
     `expected_revision=${shellQuote(String(input.expectedRevision))}`,
     `next_revision=${shellQuote(String(input.nextRevision))}`,
     `backup_retention_days=${shellQuote(String(input.backupRetentionDays))}`,
+    `backup_max_count=${shellQuote(String(input.backupMaxCount))}`,
     'backup_dir="$data_root/backups/sync-$(date +%Y%m%d%H%M%S)-$$"',
     'incoming_dir="$data_root/.incoming-sync-$$"',
     'recovery_file="$data_root/recovery/remote-sync-upload.json"',
@@ -265,7 +268,7 @@ function remoteExtractCommand(input: {
     'restore_backup() { rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes"; [ ! -d "$backup_dir/pglite" ] || cp -a "$backup_dir/pglite" "$data_root/pglite"; [ ! -d "$backup_dir/source-links" ] || cp -a "$backup_dir/source-links" "$data_root/source-links"; [ ! -d "$backup_dir/server-applied-routes" ] || cp -a "$backup_dir/server-applied-routes" "$data_root/server-applied-routes"; }',
     'write_recovery() { printf \'{"phase":"remote-state-sync-upload","backup":"%s"}\\n\' "$backup_dir" > "$recovery_file"; }',
     'path_mtime_epoch() { date -r "$1" +%s 2>/dev/null || stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf ""; }',
-    'prune_old_sync_backups() { [ -d "$data_root/backups" ] || return 0; now_epoch=$(date +%s); retention_seconds=$((backup_retention_days * 86400)); for candidate in "$data_root"/backups/sync-*; do [ -d "$candidate" ] || continue; [ "$candidate" != "$backup_dir" ] || continue; updated_epoch=$(path_mtime_epoch "$candidate"); [ -n "$updated_epoch" ] || continue; age_seconds=$((now_epoch - updated_epoch)); [ "$age_seconds" -gt "$retention_seconds" ] || continue; rm -rf "$candidate"; done; }',
+    'prune_old_sync_backups() { [ -d "$data_root/backups" ] || return 0; now_epoch=$(date +%s); retention_seconds=$((backup_retention_days * 86400)); for candidate in "$data_root"/backups/sync-*; do [ -d "$candidate" ] || continue; [ "$candidate" != "$backup_dir" ] || continue; updated_epoch=$(path_mtime_epoch "$candidate"); [ -n "$updated_epoch" ] || continue; age_seconds=$((now_epoch - updated_epoch)); [ "$age_seconds" -gt "$retention_seconds" ] || continue; rm -rf "$candidate"; done; count=0; for candidate in $(ls -1dt "$data_root"/backups/sync-* 2>/dev/null); do [ -d "$candidate" ] || continue; count=$((count + 1)); [ "$count" -le "$backup_max_count" ] && continue; [ "$candidate" != "$backup_dir" ] || continue; rm -rf "$candidate"; done; }',
     'mkdir -p "$data_root" "$data_root/backups" "$data_root/recovery"',
     "current_revision=0",
     'if [ -f "$revision_file" ]; then current_revision="$(cat "$revision_file" 2>/dev/null || printf "0")"; fi',
@@ -418,6 +421,7 @@ export function resolveRemotePgliteStateSyncPlan(
     localDataRoot,
     localPgliteDataDir,
     backupRetentionDays: config.remotePgliteSyncBackupRetentionDays,
+    backupMaxCount: config.remotePgliteSyncBackupMaxCount,
     target,
   });
 }
@@ -673,6 +677,7 @@ export class RemotePgliteArchiveSync {
           expectedRevision,
           nextRevision,
           backupRetentionDays: this.plan.backupRetentionDays,
+          backupMaxCount: this.plan.backupMaxCount,
         }),
       ],
       stdin: archive.stdout,

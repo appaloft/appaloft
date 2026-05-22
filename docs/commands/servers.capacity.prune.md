@@ -82,7 +82,8 @@ The command must:
 - Large dry-runs must keep returned candidate details bounded while still returning complete
   summary counts and estimated reclaimable bytes.
 - Remote PGlite upload safety backups under `state/backups/sync-*` must remain protected by the
-  configured recovery window before explicit marker cleanup can remove them.
+  configured recovery window and bounded sync-backup count before explicit marker cleanup can remove
+  older remaining archives.
 - The adapter must never run broad `docker system prune`.
 - Unused image pruning must rely on Docker image prune safety rather than direct image id, tag, or
   digest removal.
