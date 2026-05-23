@@ -2416,12 +2416,15 @@ export const authBootstrapFirstAdminProcedure = base
     path: "/bootstrap/auth/first-admin",
     successStatus: 201,
   })
+  .use(async ({ context, next }) => {
+    await assertFirstAdminBootstrapOpen(context);
+    return next();
+  })
   .input(bootstrapFirstAdminCommandInputSchema)
   .output(bootstrapFirstAdminResponseSchema)
-  .handler(async ({ input, context }) => {
-    await assertFirstAdminBootstrapOpen(context);
-    return executeCommand(context, BootstrapFirstAdminCommand.create(input));
-  });
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BootstrapFirstAdminCommand.create(input)),
+  );
 
 export const queryCapabilitiesProcedure = base
   .route({
