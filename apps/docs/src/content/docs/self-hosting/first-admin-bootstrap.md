@@ -51,6 +51,19 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
 安装器不会把你提供的密码回显到输出里。不要把密码写进仓库配置、shell history、CI 日志、issue、
 PR 评论或部署输出。
 
+容器或自托管运行时也可以通过受信任的环境变量在启动时自动创建首次管理员，而不写 handoff 文件：
+
+```sh
+APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin
+APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME="Self-hosted Appaloft"
+APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG=self-hosted-appaloft
+APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+启动时 bootstrap 只会在同时配置 email 和 password 时自动执行；如果没有提供 password，必须配置
+`APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`，这样生成的一次性密码才有受信任的 handoff 输出。
+
 如果安装器没有收到 first-admin email，安装后打开打印出来的 console URL 即可。console 会检查
 bootstrap status，并把首次访问者引导到 `/bootstrap/auth/first-admin`。你也可以直接打开这个设置路径。
 该页面会先读取 bootstrap status；如果实例已经有管理员，会引导你去 `/login` 登录，而不会再次创建账号。

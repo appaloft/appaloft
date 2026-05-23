@@ -24,6 +24,7 @@ by session and organization-role authorization.
 | FIRST-ADMIN-BOOTSTRAP-003 | application/integration | Bootstrap idempotency | A first admin or organization owner already exists | No new user, organization, member, or password output is created | `first_admin_bootstrap_disabled` or safe complete status | Status check -> no-op |
 | FIRST-ADMIN-BOOTSTRAP-004 | auth-adapter | Better Auth implementation boundary | `@appaloft/auth-better` implements the Appaloft bootstrap port | Better Auth creates email/password user plus organization owner without Better Auth types leaking into application | None | Appaloft port -> Better Auth API |
 | FIRST-ADMIN-BOOTSTRAP-005 | config/auth-adapter | Optional OAuth provider configuration | GitHub, Google, or OIDC config is incomplete, then complete | Provider login remains disabled until client id, client secret, callback URL, and trusted origin are all configured; first-admin local login remains available | None or `oauth_provider_unavailable` | Config read -> Appaloft auth status -> safe login method summary |
+| FIRST-ADMIN-BOOTSTRAP-006 | shell/server startup | Startup config bootstrap | Trusted runtime config supplies `APPALOFT_FIRST_ADMIN_EMAIL` and `APPALOFT_FIRST_ADMIN_PASSWORD` without a handoff file | Startup checks status, creates the first admin and initial organization when required, returns safe status, and never echoes or writes the supplied password | None or `first_admin_bootstrap_failed` | Status check -> bootstrap command -> safe result |
 | FIRST-ADMIN-NAV-001 | HTTP/adapter contract | First-admin navigation gate before SPA boot | No first admin exists and a browser requests a console document route | The HTTP adapter redirects to `/bootstrap/auth/first-admin` before serving Web static fallback; API, docs, static assets, ACME, and the first-admin setup route are not redirected | None or bootstrap-status lookup failure falls back to ordinary static routing | Document request -> bootstrap status query -> redirect or static routing |
 | SELF-HOSTED-AUTH-ARCH-001 | architecture/unit | Auth provider dependency boundary | Core and application source code are scanned | `packages/core/src` and `packages/application/src` contain only Appaloft-owned auth abstractions and no Better Auth package/type markers | None | Source scan -> boundary assertion |
 | PRODUCT-AUTH-GATE-001 | HTTP/oRPC contract | Missing product session | Protected mutation endpoint receives no session | Request rejects before command dispatch | `product_auth_missing`, `401` | Parse request -> auth reject -> no command dispatch |
@@ -70,11 +71,14 @@ by session and organization-role authorization.
 - `PgAuthBootstrapStatusReader` now reads Better Auth-compatible `user`, `organization`, and
   `member` tables through `packages/persistence/pg` and reports safe bootstrap-required/complete
   status for `FIRST-ADMIN-STATUS-001`.
-- Shell composition now supports `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`,
-  `APPALOFT_FIRST_ADMIN_EMAIL`, `APPALOFT_FIRST_ADMIN_DISPLAY_NAME`, and
-  `APPALOFT_FIRST_ADMIN_PASSWORD` as trusted runtime config for first-admin handoff output. It
-  writes a one-time generated password only when the application command generated one, does not
-  echo supplied passwords, and no-ops when the first admin already exists.
+- Shell/server composition now supports `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`,
+  `APPALOFT_FIRST_ADMIN_EMAIL`, `APPALOFT_FIRST_ADMIN_DISPLAY_NAME`,
+  `APPALOFT_FIRST_ADMIN_PASSWORD`, `APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME`, and
+  `APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG` as trusted runtime config for first-admin bootstrap. It
+  writes a one-time generated password only when a trusted output file is configured and the
+  application command generated one, can bootstrap directly from supplied startup email/password
+  without a handoff file, does not echo supplied passwords, and no-ops when the first admin already
+  exists.
 - `install.sh` now passes first-admin bootstrap settings into Compose/Swarm app containers, reads
   the first-admin handoff output after health readiness, prints generated passwords only from that
   trusted output, suppresses supplied-password echo, and keeps deploy-token output as the separate
