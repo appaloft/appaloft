@@ -35,6 +35,7 @@ role-aware product mutations.
 | FIRST-ADMIN-SPEC-006 | Admin gate foundation | A product mutation endpoint is not explicitly public | Request lacks a valid product session | The adapter returns `401` before dispatch; if a session exists but lacks organization role, it returns `403`. |
 | FIRST-ADMIN-SPEC-007 | Navigation gate before console boot | A self-hosted instance has no first admin | A browser requests a console document route such as `/` or a project/resource deep link | The HTTP adapter redirects directly to `/bootstrap/auth/first-admin` before serving the SPA shell; API endpoints, docs routes, static assets, ACME challenges, and the first-admin route itself are not redirected. |
 | FIRST-ADMIN-SPEC-008 | Startup config bootstrap | Trusted runtime config supplies first-admin email and password | Appaloft server starts | The server checks bootstrap status during startup, creates the first local admin and initial organization when required, suppresses password output, and no-ops after an admin or organization owner exists. |
+| FIRST-ADMIN-SPEC-009 | Completed bootstrap hides setup surfaces | A first admin or organization owner already exists | A browser opens the login page, visits the first-admin setup page, or calls the first-admin setup endpoint | Login uses ordinary account language, the login page does not show a create-admin action, the setup page redirects to login unless it just created the account in the current flow, and the setup endpoint returns `404` without dispatching the create command. |
 
 ## Domain Ownership
 
@@ -46,8 +47,9 @@ role-aware product mutations.
 
 ## Public Surfaces
 
-- API: bootstrap status and first-admin bootstrap are documented public bootstrap endpoints until
-  setup is complete. They dispatch Appaloft messages.
+- API: bootstrap status is a documented public endpoint. First-admin bootstrap is public only while
+  setup is incomplete; after a first admin or organization owner exists, the setup endpoint must
+  return `404` before dispatching the create command.
 - CLI/installer: `install.sh` may pass trusted first-admin config and print console URL, bootstrap
   status, configured login methods, and generated one-time password when applicable. Operators can
   also call `appaloft auth bootstrap-status` and `appaloft auth bootstrap-first-admin` through the
@@ -61,7 +63,8 @@ role-aware product mutations.
   an explicit startup bootstrap request; supplying email without password still requires a trusted
   output file so generated passwords are not lost.
 - Public docs/help: explain first install login, local admin bootstrap, optional OAuth, and recovery
-  without exposing Better Auth internals.
+  without exposing Better Auth internals. Login copy must use ordinary account language after setup
+  and must not tell users to use an administrator account.
 
 ## Non-Goals
 

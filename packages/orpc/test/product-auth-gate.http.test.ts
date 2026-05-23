@@ -806,8 +806,9 @@ describe("product auth gate HTTP/oRPC routes", () => {
     expect(capturedQuery).toBeInstanceOf(GetAuthBootstrapStatusQuery);
   });
 
-  test("first-admin bootstrap endpoint stays public and relies on application idempotency", async () => {
+  test("first-admin bootstrap endpoint stays public only while bootstrap is required", async () => {
     let capturedCommand: Command<unknown> | undefined;
+    let capturedQuery: Query<unknown> | undefined;
     const commandBus = {
       execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
         capturedCommand = command as Command<unknown>;
@@ -829,6 +830,18 @@ describe("product auth gate HTTP/oRPC routes", () => {
         } as T);
       },
     } as CommandBus;
+    const bootstrapRequiredQueryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          bootstrapRequired: true,
+          firstAdminConfigured: false,
+          organizationConfigured: false,
+          loginMethods: [{ key: "local-password", configured: true, enabled: true }],
+          nextSteps: ["create-first-admin"],
+        } as T);
+      },
+    } as QueryBus;
     const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
       authorizeProductSession: async () => {
         throw new Error("product auth gate must not run for first-admin bootstrap");
@@ -837,7 +850,7 @@ describe("product auth gate HTTP/oRPC routes", () => {
     const app = mountProductAuthGateRoutes({
       commandBus,
       productSessionAuthorizationPort,
-      queryBus,
+      queryBus: bootstrapRequiredQueryBus,
     });
 
     const response = await app.handle(
@@ -861,10 +874,70 @@ describe("product auth gate HTTP/oRPC routes", () => {
       email: "admin@example.com",
       organizationId: "org_self_hosted",
     });
+    expect(capturedQuery).toBeInstanceOf(GetAuthBootstrapStatusQuery);
     expect(capturedCommand).toBeInstanceOf(BootstrapFirstAdminCommand);
     expect(capturedCommand).toMatchObject({
       email: "admin@example.com",
       displayName: "Admin User",
     });
+  });
+
+  test("[FIRST-ADMIN-BOOTSTRAP-007] first-admin bootstrap endpoint is hidden after setup", async () => {
+    let commandDispatched = false;
+    const commandBus = {
+      execute: async () => {
+        commandDispatched = true;
+        throw new Error("command bus must not dispatch after first-admin bootstrap is complete");
+      },
+    } as unknown as CommandBus;
+    const completeBootstrapQueryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        expect(query).toBeInstanceOf(GetAuthBootstrapStatusQuery);
+        return ok({
+          bootstrapRequired: false,
+          firstAdminConfigured: true,
+          organizationConfigured: true,
+          loginMethods: [{ key: "local-password", configured: true, enabled: true }],
+          firstAdminEmail: "admin@example.com",
+          loginUrl: "http://localhost:3721/login",
+          organizationId: "org_self_hosted",
+          organizationSlug: "self-hosted-appaloft",
+          nextSteps: ["sign-in"],
+        } as T);
+      },
+    } as QueryBus;
+    const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+      authorizeProductSession: async () => {
+        throw new Error("product auth gate must not run for disabled first-admin bootstrap");
+      },
+    };
+    const app = mountProductAuthGateRoutes({
+      commandBus,
+      productSessionAuthorizationPort,
+      queryBus: completeBootstrapQueryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/bootstrap/auth/first-admin", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "admin@example.com",
+          displayName: "Admin User",
+          password: "local-admin-password",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      code: "NOT_FOUND",
+      data: {
+        domainCode: "first_admin_bootstrap_disabled",
+      },
+    });
+    expect(commandDispatched).toBe(false);
   });
 });

@@ -86,7 +86,7 @@ appaloft auth bootstrap-first-admin \
 The installer prints the console URL. Without a domain, it is usually the server's `3721` port. With
 `--domain`, use that HTTPS domain.
 
-Log in with the first-admin email and password. After login, Appaloft recognizes your user session
+Log in with the configured account email and password. After login, Appaloft recognizes your user session
 and protects product mutations by organization role. A mutation without a session returns
 `401 product_auth_missing`; a logged-in user outside the organization or without enough role returns
 `403 product_auth_forbidden`.
@@ -108,9 +108,11 @@ When the status says a first admin is required, a setup flow can call the setup 
 POST /api/bootstrap/auth/first-admin
 ```
 
-These bootstrap endpoints are intentionally public; they do not require an existing product session.
-Safety comes from the one-time and idempotent setup rule: after an admin or organization owner
-exists, setup does not create another admin or return a password.
+Bootstrap status is intentionally public. The setup endpoint is available only until first setup is
+complete. After an admin or organization owner exists, Web no longer shows a create-admin action,
+direct setup-page visitors return to login, and the setup endpoint returns
+`404 first_admin_bootstrap_disabled` without dispatching the create command, creating another admin,
+or returning a password.
 
 <h2 id="self-hosting-first-admin-oauth">OAuth is optional</h2>
 

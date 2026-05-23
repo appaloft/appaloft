@@ -200,11 +200,11 @@ export const zhCN = {
   },
   console: {
     authBootstrap: {
-      alreadyConfiguredBody: "已经存在首次管理员或 organization owner。请前往登录页继续。",
-      alreadyConfiguredTitle: "首次管理员已配置。",
+      alreadyConfiguredBody: "这个实例已经完成配置。请前往登录页继续。",
+      alreadyConfiguredTitle: "设置已完成。",
       bootstrapFailed: "首次管理员创建失败",
       bootstrapSucceeded: "首次管理员已创建",
-      completedDescription: "本地管理员和初始 organization 已就绪。请用管理员 email 和密码登录。",
+      completedDescription: "账号和初始 organization 已就绪。请使用配置的 email 和密码登录。",
       completedTitle: "Bootstrap 已完成",
       createAdmin: "创建管理员",
       creatingAdmin: "正在创建",
@@ -221,7 +221,7 @@ export const zhCN = {
       loadingStatus: "正在检查 bootstrap 状态...",
       localPasswordBadge: "本地密码",
       loginAction: "前往登录",
-      loginBody: "使用安装或 bootstrap 时创建的本地首次管理员账号。",
+      loginBody: "使用你的 Appaloft 账号登录。",
       loginEmailLabel: "Email",
       loginFailed: "登录失败",
       loginPasswordLabel: "密码",

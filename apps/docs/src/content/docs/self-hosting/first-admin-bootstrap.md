@@ -82,7 +82,7 @@ appaloft auth bootstrap-first-admin \
 安装器会打印 console URL。没有配置域名时，通常是服务器的 `3721` 端口；配置了 `--domain` 时，
 使用对应的 HTTPS 域名。
 
-用 first-admin email 和密码登录。登录后，Appaloft 会把你识别为用户会话，并按 organization role
+用已配置账号的 email 和密码登录。登录后，Appaloft 会把你识别为用户会话，并按 organization role
 保护产品 mutation。没有 session 的 mutation 会返回 `401 product_auth_missing`；已登录但不属于目标
 organization 或 role 不足时，会返回 `403 product_auth_forbidden`。
 
@@ -103,9 +103,9 @@ GET /api/bootstrap/auth/status
 POST /api/bootstrap/auth/first-admin
 ```
 
-这些 bootstrap endpoints 是刻意公开的；它们不要求已有产品 session。安全性来自一次性/idempotent
-setup 规则：一旦已经存在管理员或 organization owner，后续 setup 不会再创建新管理员，也不会返回
-密码。
+bootstrap status 是刻意公开的；setup endpoint 只在首次配置未完成时可用。一旦已经存在管理员或
+organization owner，Web 不再显示创建管理员入口，直接访问 setup page 会回到登录页，setup endpoint
+会返回 `404 first_admin_bootstrap_disabled`，不会 dispatch 创建命令、创建新管理员或返回密码。
 
 <h2 id="self-hosting-first-admin-oauth">OAuth 是可选项</h2>
 

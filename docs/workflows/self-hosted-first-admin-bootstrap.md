@@ -24,6 +24,9 @@ installer/runtime config
 - Bootstrap status is safe to expose publicly; it must not expose passwords, session tokens, account
   ids beyond safe user/organization metadata, or provider secrets.
 - First-admin bootstrap itself is only valid while no product admin/organization owner exists.
+- After a product admin or organization owner exists, Web must not show create-admin affordances on
+  the login page, the setup page should send ordinary visitors to `/login`, and the setup endpoint
+  must return `404` before dispatching the create command.
 - User/session/provider implementation details stay behind application-owned ports.
 - OAuth configuration is additive and optional. Missing OAuth never blocks local first-admin login.
 - Existing first-admin state makes bootstrap idempotent and suppresses raw password output.

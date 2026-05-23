@@ -11,6 +11,7 @@ import {
   ArchiveResourceCommand,
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
+  type AuthBootstrapStatus,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
@@ -1775,6 +1776,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
   switch (error.code) {
     case "not_found":
     case "source_event_not_found":
+    case "first_admin_bootstrap_disabled":
       return new ORPCError("NOT_FOUND", {
         message,
         status: 404,
@@ -2157,6 +2159,24 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
   return unwrapResult(executionContext, await context.queryBus.execute(executionContext, query));
 }
 
+async function assertFirstAdminBootstrapOpen(context: AppaloftOrpcRequestContext): Promise<void> {
+  const status = await executeQuery<GetAuthBootstrapStatusQuery, AuthBootstrapStatus>(
+    context,
+    GetAuthBootstrapStatusQuery.create({}),
+  );
+
+  if (!status.bootstrapRequired) {
+    throw new ORPCError("NOT_FOUND", {
+      message: "First admin bootstrap is not available",
+      status: 404,
+      data: {
+        domainCode: "first_admin_bootstrap_disabled",
+        locale: context.executionContext.locale,
+      },
+    });
+  }
+}
+
 function createDeploymentStream(
   context: AppaloftOrpcRequestContext,
   input: CreateDeploymentCommandInput,
@@ -2398,9 +2418,10 @@ export const authBootstrapFirstAdminProcedure = base
   })
   .input(bootstrapFirstAdminCommandInputSchema)
   .output(bootstrapFirstAdminResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, BootstrapFirstAdminCommand.create(input)),
-  );
+  .handler(async ({ input, context }) => {
+    await assertFirstAdminBootstrapOpen(context);
+    return executeCommand(context, BootstrapFirstAdminCommand.create(input));
+  });
 
 export const queryCapabilitiesProcedure = base
   .route({
