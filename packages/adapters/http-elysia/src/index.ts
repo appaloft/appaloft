@@ -133,6 +133,7 @@ interface StaticAssetSource {
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
 const loginPath = "/login";
+const signUpPath = "/sign-up";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};
@@ -301,6 +302,10 @@ function isLoginPath(pathname: string): boolean {
   return pathname === loginPath || pathname.startsWith(`${loginPath}/`);
 }
 
+function isSignUpPath(pathname: string): boolean {
+  return pathname === signUpPath || pathname.startsWith(`${signUpPath}/`);
+}
+
 function hasStaticAssetExtension(pathname: string): boolean {
   return (pathname.split("/").pop() ?? "").includes(".");
 }
@@ -321,6 +326,7 @@ function isConsoleNavigationPath(pathname: string): boolean {
     isDocsPath(pathname) ||
     isFirstAdminBootstrapPath(pathname) ||
     isLoginPath(pathname) ||
+    isSignUpPath(pathname) ||
     pathname.startsWith("/_app/") ||
     pathname.startsWith("/.well-known/acme-challenge/") ||
     pathname === "/.appaloft/resource-access-failure" ||
