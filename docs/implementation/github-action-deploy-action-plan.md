@@ -489,4 +489,17 @@ Remaining public wrapper release follow-ups:
   should be smoke-tested from CI;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
-- add structured CLI deploy output if action outputs need deployment/resource ids.
+- add structured CLI deploy output if action outputs need deployment/resource ids;
+- add a neutral workflow scaffolding capability for repositories that want Appaloft-managed GitHub
+  Actions YAML. The generated workflow should select Pure SSH Action by default when only an SSH
+  target is configured, support exact release and trusted `version: source` installs, reference
+  secrets by name instead of materializing values, and leave paid/external resource creation outside
+  generated YAML;
+- improve Action progress output for Dockerfile deploys by relaying the CLI/runtime milestones
+  defined by the runtime substrate plan: source/context size, upload, Docker build/cache status,
+  image id/size, runtime replace, health verification, route realization, deployment id/resource id
+  when structured output exists, and sanitized rollback target;
+- keep Action failure semantics strict: broken pipes, failed SSH commands, failed Docker builds,
+  missing health readiness, route failures, and cleanup failures must fail the Action step unless the
+  user explicitly selected a documented asynchronous/control-plane mode that accepts work before
+  terminal verification.
