@@ -23,7 +23,6 @@ export const zhCN = {
       createResource: "创建资源",
       createServer: "创建服务器",
       creating: "创建中",
-      newDeployment: "新部署",
       next: "下一步",
       openDocs: "打开相关文档",
       openDocumentation: "文档中心",
@@ -32,6 +31,7 @@ export const zhCN = {
       openResource: "打开资源",
       openTerminal: "打开终端",
       previous: "上一步",
+      quickDeploy: "快速部署",
       redeploy: "重新部署",
       redeploying: "重新部署中",
       reconnect: "重新连接",
@@ -538,7 +538,7 @@ export const zhCN = {
       workerStatusEnabled: "启用",
     },
     nav: {
-      deploy: "新部署",
+      deploy: "快速部署",
       dependencyResources: "依赖资源",
       domainBindings: "域名绑定",
       deployments: "部署",
@@ -1040,10 +1040,10 @@ export const zhCN = {
       applicationProfileTitle: "应用入口",
       archiveAction: "归档",
       archiveConfirm:
-        "确定归档这个资源吗？归档后不能修改档案或创建新部署，已有部署、日志、路由和绑定仍会保留。",
+        "确定归档这个资源吗？归档后不能修改档案或发起快速部署，已有部署、日志、路由和绑定仍会保留。",
       archiveFailed: "资源归档失败",
       archiveNotice:
-        "这个资源已经归档，不能修改档案或创建新部署，已有部署、日志、路由和绑定仍会保留。",
+        "这个资源已经归档，不能修改档案或发起快速部署，已有部署、日志、路由和绑定仍会保留。",
       archiveSucceeded: "资源已归档",
       archived: "已归档",
       archivedAt: "归档时间",
@@ -1905,7 +1905,7 @@ export const zhCN = {
       rotateCredentialUsageUnavailable: "使用情况无法安全读取。请重试后再轮换这个凭据。",
       rotateCredentialUsernameLabel: "默认用户名",
       rotateCredentialUsernamePlaceholder: "可选的替换用户名",
-      emptyBody: "新部署流程可以自动创建本地服务器，也可以先在 CLI 中注册远端 SSH 目标。",
+      emptyBody: "快速部署流程可以自动创建本地服务器，也可以先在 CLI 中注册远端 SSH 目标。",
       emptyTitle: "还没有服务器目标。",
       focusDescription:
         "服务器是运行时放置关系，不是项目归属关系；部署时会把项目、环境、资源和服务器串起来。",

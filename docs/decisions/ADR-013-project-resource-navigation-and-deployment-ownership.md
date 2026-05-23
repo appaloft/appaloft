@@ -16,7 +16,7 @@ Project
 
 `Project` is the top-level workspace and resource collection boundary. It is not the owner of deployment actions.
 
-`Resource` is the deployable unit. New deployment, deployment history, source/runtime/network
+`Resource` is the deployable unit. Quick Deploy entrypoints, deployment history, source/runtime/network
 configuration, current health observation, generated access observation, runtime logs, diagnostic
 summary, resource-scoped domains, and resource-scoped environment/configuration affordances belong
 primarily on the resource surface. Public redeploy behavior is not part of the v1 deployment
@@ -57,7 +57,7 @@ The console currently needs a clearer product-facing model:
 
 ### Option A: Project-Centered Deployment Actions
 
-This keeps "new deployment" and "view deployments" as primary project-page actions.
+This keeps "Quick Deploy" and "view deployments" as primary project-page actions.
 
 This option is rejected as the target model because it makes deployment appear project-owned and keeps source/runtime setup detached from the deployable resource that should own it.
 
@@ -81,7 +81,7 @@ Project surfaces must prioritize resource collection:
 - show resources as the primary list;
 - provide a create-resource action;
 - provide a project-level all-deployments rollup only as a secondary read view;
-- avoid presenting project-level "new deployment" as the primary action unless it is explicitly labeled as Quick Deploy or another entry workflow that will select/create a resource before deployment admission.
+- avoid presenting project-level Quick Deploy as a direct deployment command unless it is explicitly modeled as an entry workflow that will select/create a resource before deployment admission.
 
 Resource surfaces must own deployment actions:
 
@@ -106,7 +106,7 @@ Resource surfaces must own deployment actions:
 - show current resource health status when available;
 - show latest deployment status as contextual history;
 - show deployment history for that resource;
-- provide new deployment actions for that resource;
+- provide Quick Deploy actions for that resource;
 - provide redeploy actions only after a future redeploy command is accepted and implemented under ADR-016;
 - provide resource-scoped domain binding and TLS affordances;
 - show generated default access route status when ADR-017 route snapshots/read models are available;
@@ -139,7 +139,7 @@ The project page becomes a management surface for a group of resources rather th
 
 The resource page becomes the natural place for:
 
-- new deployment;
+- Quick Deploy;
 - future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - domains and TLS;
@@ -181,7 +181,7 @@ must not trust sidebar/read-model status as the sole invariant guard.
 
 ## Superseded Open Questions
 
-- Should "new deployment" be a primary project-page action or a resource-owned action?
+- Should Quick Deploy be a primary project-page action or a resource-owned action?
 - Should project pages primarily show deployment lists or resource lists?
 - Should source selection during create-resource belong to project, deployment, or resource language?
 - Should internal application listener port belong to project, deployment, generic runtime setup, or resource network profile language?

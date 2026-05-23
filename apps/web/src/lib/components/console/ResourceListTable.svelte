@@ -134,7 +134,7 @@
                   href={resourceNewDeploymentHref(resource)}
                   size="sm"
                   variant="outline"
-                  aria-label={$t(i18nKeys.common.actions.newDeployment)}
+                  aria-label={$t(i18nKeys.common.actions.quickDeploy)}
                 >
                   <Plus class="size-4" />
                 </Button>

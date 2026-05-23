@@ -1151,7 +1151,7 @@
 
           <div class="mt-4">
             <Button href="/deploy" variant="outline">
-              {$t(i18nKeys.common.actions.newDeployment)}
+              {$t(i18nKeys.common.actions.quickDeploy)}
               <ArrowRight class="size-4" />
             </Button>
           </div>

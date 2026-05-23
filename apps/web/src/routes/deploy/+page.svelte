@@ -5,9 +5,9 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.common.actions.newDeployment)} · Appaloft</title>
+  <title>{$t(i18nKeys.common.actions.quickDeploy)} · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell title={$t(i18nKeys.common.actions.newDeployment)} description={$t(i18nKeys.console.deployments.description)}>
+<ConsoleShell title={$t(i18nKeys.common.actions.quickDeploy)} description={$t(i18nKeys.console.deployments.description)}>
   <QuickDeploySheet />
 </ConsoleShell>
