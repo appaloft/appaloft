@@ -291,6 +291,15 @@ describe("HTTP static assets", () => {
       expect(loginPage.status).toBe(200);
       expect(await loginPage.text()).toBe("web-spa-fallback");
 
+      const signUpPage = await fetch(`${baseUrl}/sign-up`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(signUpPage.status).toBe(200);
+      expect(await signUpPage.text()).toBe("web-spa-fallback");
+
       const asset = await fetch(`${baseUrl}/_app/immutable/app.js`, {
         headers: {
           accept: "text/html",
@@ -307,6 +316,20 @@ describe("HTTP static assets", () => {
         redirect: "manual",
       });
       expect(health.status).toBe(200);
+
+      const signUpApi = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "user@example.com",
+          name: "User",
+          password: "password-1234",
+        }),
+      });
+      expect(signUpApi.status).toBe(200);
+      expect(await signUpApi.text()).toBe("auth-runtime");
     });
 
     expect(authChecks).toEqual(["/", "/projects/prj_1"]);

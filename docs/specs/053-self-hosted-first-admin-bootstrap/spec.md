@@ -37,6 +37,7 @@ role-aware product mutations.
 | FIRST-ADMIN-SPEC-008 | Startup config bootstrap | Trusted runtime config supplies first-admin email and password | Appaloft server starts | The server checks bootstrap status during startup, creates the first local admin and initial organization when required, suppresses password output, and no-ops after an admin or organization owner exists. |
 | FIRST-ADMIN-SPEC-009 | Completed bootstrap hides setup surfaces | A first admin or organization owner already exists | A browser opens the login page, visits the first-admin setup page, or calls the first-admin setup endpoint | Login uses ordinary account language, the login page does not show a create-admin action, the setup page redirects to login unless it just created the account in the current flow, and the setup endpoint returns `404` before input validation or command dispatch. |
 | FIRST-ADMIN-SPEC-010 | Product session navigation gate | A first admin exists and a browser has no product session | A browser requests a console document route such as `/`, `/projects`, or `/servers` | The HTTP adapter redirects to `/login?next=...` before serving the SPA shell; login, API endpoints, docs routes, static assets, ACME challenges, and first-admin setup routes are not redirected. |
+| FIRST-ADMIN-SPEC-011 | Product account signup stays separate from first-admin bootstrap | Product signup is enabled for ordinary users | A browser opens `/sign-up` or calls `/api/auth/sign-up/email` | The signup page and signup API stay public, are not redirected by the console navigation gate, create an ordinary product account, and start organization setup without exposing first-admin bootstrap controls or language. |
 
 ## Domain Ownership
 
@@ -58,8 +59,10 @@ role-aware product mutations.
 - Web/UI: first-admin onboarding is a Phase 8 Web surface and must use i18n keys. Production
   console document navigation is gated by the backend before the SPA shell is served. Before
   bootstrap, the gate sends operators to first-admin setup; after bootstrap, missing product
-  sessions are sent to `/login?next=...`. Local Vite dev/preview uses the same bootstrap-status
-  endpoint as a server middleware gate.
+  sessions are sent to `/login?next=...`. `/login` and `/sign-up` are ordinary account surfaces,
+  not console document routes, and signup starts ordinary organization setup rather than first-admin
+  bootstrap. Local Vite dev/preview uses the same bootstrap-status endpoint as a server middleware
+  gate.
 - Config: local first-admin email/name/password, optional initial organization name/slug, optional
   output file, OAuth provider settings, and trusted browser origin are runtime config only. Password
   values and OAuth client secrets are secrets. Supplying email and password without an output file is

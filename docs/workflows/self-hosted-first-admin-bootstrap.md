@@ -43,6 +43,10 @@ installer/runtime config
 - After bootstrap is complete, the HTTP adapter gates console document navigation by product
   session before serving the SPA shell. Missing sessions redirect to `/login?next=...`; API
   endpoints continue to return product-auth `401`/`403` rather than HTML redirects.
+- Ordinary account signup is separate from first-admin bootstrap. `/sign-up` and
+  `/api/auth/sign-up/email` remain public account surfaces after bootstrap, and signup-created users
+  start organization setup through ordinary auth-runtime organization creation rather than the
+  first-admin bootstrap command.
 
 ## Error Phases
 
