@@ -3,50 +3,30 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
-    BookOpen,
     Database,
-    ChevronUp,
     FolderOpen,
     Gauge,
-    GitBranch,
     Globe2,
     LogIn,
     Moon,
-    LogOut,
     Package,
     Play,
     Rocket,
     Server,
     ServerCrash,
     ShieldCheck,
-    Settings2,
     Sun,
-    UserRound,
   } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
-  import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
+  import { API_BASE, readErrorMessage } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
-  import { webDocsHrefs } from "$lib/console/docs-help";
-  import { queryClient } from "$lib/query-client";
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-  } from "$lib/components/ui/dropdown-menu";
   import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
@@ -61,12 +41,8 @@
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
-  import {
-    initials,
-    projectDetailHref,
-    readSessionIdentity,
-  } from "$lib/console/utils";
-  import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
+  import { projectDetailHref } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   type BreadcrumbItem = {
     label: string;
@@ -104,8 +80,6 @@
   let colorModeReady = $state(false);
   let sidebarOpen = $state(false);
   let sidebarReady = $state(false);
-  let signOutError = $state("");
-  let signingOut = $state(false);
 
   const {
     healthQuery,
@@ -141,11 +115,6 @@
       return projectMatches;
     });
   });
-  const githubProvider = $derived(
-    authSession.providers.find((provider) => provider.key === "github") ?? null,
-  );
-  const githubConnected = $derived(Boolean(githubProvider?.connected));
-  const authIdentity = $derived(readSessionIdentity(authSession.session));
   const loginRequired = $derived(authSession.loginRequired && !authSession.session);
   const loginHref = $derived(`/login?next=${encodeURIComponent(pathname)}`);
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
@@ -215,64 +184,9 @@
     };
   });
 
-  async function connectGitHub(): Promise<void> {
-    const response = await request<{ redirect: boolean; url?: string }>(
-      authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          provider: "github",
-          callbackURL: browser ? window.location.href : API_BASE,
-          scopes: ["repo", "read:user"],
-          disableRedirect: true,
-        }),
-      },
-    );
-
-    if (response.url && browser) {
-      window.location.href = response.url;
-    }
-  }
-
-  async function signOut(): Promise<void> {
-    if (!browser || signingOut) {
-      return;
-    }
-
-    signingOut = true;
-    signOutError = "";
-
-    try {
-      await request<{ success: boolean }>("/api/auth/sign-out", {
-        method: "POST",
-      });
-      queryClient.clear();
-      await goto("/login");
-    } catch (error) {
-      signOutError = readErrorMessage(error);
-    } finally {
-      signingOut = false;
-    }
-  }
-
   function openHealthCheck(): void {
     if (browser) {
       window.open(`${API_BASE}/api/health`, "_blank");
-    }
-  }
-
-  function openDocumentation(): void {
-    if (browser) {
-      window.open(webDocsHrefs.docsHome, "_blank", "noreferrer");
-    }
-  }
-
-  function navigateTo(path: string): void {
-    if (browser) {
-      void goto(path);
     }
   }
 
@@ -381,88 +295,6 @@
       </SidebarGroup>
     </SidebarContent>
 
-    <SidebarFooter>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          data-console-user-menu-trigger
-          class="flex w-full items-center gap-2 px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-        >
-          <Avatar size="sm">
-            <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
-          </Avatar>
-          <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
-            <span class="block truncate text-xs text-muted-foreground">
-              GitHub {githubConnected ? $t(i18nKeys.common.status.connected) : authIdentity ? $t(i18nKeys.common.status.pendingAuthorization) : $t(i18nKeys.common.status.onDemandAuthorization)}
-            </span>
-          </span>
-          <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" class="w-56">
-          <DropdownMenuLabel>
-            <div class="flex items-center gap-2">
-              <UserRound class="size-4" />
-              <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
-            <GitBranch class="size-4" />
-            {githubConnected ? `GitHub ${$t(i18nKeys.common.status.connected)}` : $t(i18nKeys.common.actions.connectGitHub)}
-          </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/organization")}>
-            <UserRound class="size-4" />
-            {$t(i18nKeys.console.nav.organization)}
-          </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/instance")}>
-            <Settings2 class="size-4" />
-            {$t(i18nKeys.console.nav.instance)}
-          </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
-            <Rocket class="size-4" />
-            {$t(i18nKeys.console.deployments.records)}
-          </DropdownMenuItem>
-          <DropdownMenuItem onclick={openDocumentation}>
-            <BookOpen class="size-4" />
-            {$t(i18nKeys.common.actions.openDocumentation)}
-          </DropdownMenuItem>
-          {#if authSession.session}
-            <DropdownMenuSeparator />
-            {#if signOutError}
-              <DropdownMenuLabel>
-                <span class="block text-xs font-normal text-destructive">{signOutError}</span>
-              </DropdownMenuLabel>
-            {/if}
-            <DropdownMenuItem data-console-sign-out-action disabled={signingOut} onclick={signOut}>
-              <LogOut class="size-4" />
-              {signingOut ? $t(i18nKeys.common.actions.signingOut) : $t(i18nKeys.common.actions.signOut)}
-            </DropdownMenuItem>
-          {/if}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={$locale}>
-            <DropdownMenuRadioItem value="zh-CN" onclick={() => setLocale("zh-CN")}>
-              {$t(i18nKeys.common.language.simplifiedChinese)}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="en-US" onclick={() => setLocale("en-US")}>
-              {$t(i18nKeys.common.language.english)}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {#if authSession.session}
-        <Button
-          data-console-sign-out-action
-          class="w-full justify-start group-data-[collapsible=icon]:hidden"
-          variant="ghost"
-          disabled={signingOut}
-          onclick={signOut}
-        >
-          <LogOut class="size-4" />
-          {signingOut ? $t(i18nKeys.common.actions.signingOut) : $t(i18nKeys.common.actions.signOut)}
-        </Button>
-      {/if}
-    </SidebarFooter>
     <SidebarRail />
   </Sidebar>
 
