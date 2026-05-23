@@ -11,8 +11,12 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   GetAuthBootstrapStatusQuery,
+  ListCertificatesQuery,
+  ListDependencyResourcesQuery,
+  ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
+  ListProvidersQuery,
   ListResourcesQuery,
   ListServersQuery,
   type ProductSessionAuthorizationPort,
@@ -744,8 +748,92 @@ describe("product auth gate HTTP/oRPC routes", () => {
       );
       const text = await response.text();
 
-      expect(response.status, text).toBe(200);
+      expect(
+        response.status,
+        `${testCase.routePath} ${capturedQuery?.constructor.name ?? "no-query"} ${text}`,
+      ).toBe(200);
       expect(JSON.parse(text)).toEqual({ items: [] });
+      expect(capturedAuthorizationRequest).toMatchObject({
+        path: testCase.routePath,
+        requiredRole: "member",
+      });
+      expect(capturedQuery).toBeInstanceOf(testCase.queryType);
+    }
+  });
+
+  test("[PRODUCT-AUTH-READ-001] catalog-backed oRPC inventory queries use member-level product authorization", async () => {
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    let capturedQuery: Query<unknown> | undefined;
+    let capturedAuthorizationRequest:
+      | Parameters<ProductSessionAuthorizationPort["authorizeProductSession"]>[1]
+      | undefined;
+    const readQueryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({ items: [] } as T);
+      },
+    } as QueryBus;
+    const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+      authorizeProductSession: async (_context, input) => {
+        capturedAuthorizationRequest = input;
+        expect(input.requiredRole).toBe("member");
+        return ok({
+          actor: {
+            kind: "user",
+            id: "usr_member",
+            label: "member@example.com",
+          },
+          email: "member@example.com",
+          organizationId: "org_self_hosted",
+          role: input.requiredRole,
+          userId: "usr_member",
+        });
+      },
+    };
+    const app = mountProductAuthGateRoutes({
+      commandBus,
+      productSessionAuthorizationPort,
+      queryBus: readQueryBus,
+    });
+    const cases = [
+      {
+        path: "http://localhost/api/rpc/dependencyResources/list",
+        routePath: "/api/rpc/dependencyResources/list",
+        queryType: ListDependencyResourcesQuery,
+      },
+      {
+        path: "http://localhost/api/rpc/domainBindings/list",
+        routePath: "/api/rpc/domainBindings/list",
+        queryType: ListDomainBindingsQuery,
+      },
+      {
+        path: "http://localhost/api/rpc/certificates/list",
+        routePath: "/api/rpc/certificates/list",
+        queryType: ListCertificatesQuery,
+      },
+      {
+        path: "http://localhost/api/rpc/providers/list",
+        routePath: "/api/rpc/providers/list",
+        queryType: ListProvidersQuery,
+      },
+    ];
+
+    for (const testCase of cases) {
+      capturedQuery = undefined;
+      capturedAuthorizationRequest = undefined;
+      await app.handle(
+        new Request(testCase.path, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: "better-auth.session_token=test-member-session",
+          },
+          body: JSON.stringify({ json: {} }),
+        }),
+      );
       expect(capturedAuthorizationRequest).toMatchObject({
         path: testCase.routePath,
         requiredRole: "member",

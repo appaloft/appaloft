@@ -2055,6 +2055,9 @@ function productRequiredRoleForMessage(
   if (productSession) {
     return productSession.minRole;
   }
+  if (entry && kind === "query") {
+    return "member";
+  }
   if (kind === "command") {
     return productMutationRequiredRole;
   }
@@ -2088,31 +2091,6 @@ function productRequiredRoleForQuery(query: Query<unknown>): ProductOrganization
   const catalogRole = productRequiredRoleForMessage(query.constructor.name, "query");
   if (catalogRole !== undefined) {
     return catalogRole;
-  }
-
-  if (
-    query instanceof GetCurrentOrganizationContextQuery ||
-    query instanceof ListProjectsQuery ||
-    query instanceof ShowProjectQuery ||
-    query instanceof ListEnvironmentsQuery ||
-    query instanceof ShowEnvironmentQuery ||
-    query instanceof ListResourcesQuery ||
-    query instanceof ShowResourceQuery ||
-    query instanceof ListServersQuery ||
-    query instanceof ShowServerQuery ||
-    query instanceof ListDeploymentsQuery ||
-    query instanceof ShowDeploymentQuery
-  ) {
-    return "member";
-  }
-
-  if (
-    query instanceof ListDeployTokensQuery ||
-    query instanceof ShowDeployTokenQuery ||
-    query instanceof ListOrganizationMembersQuery ||
-    query instanceof ListOrganizationInvitationsQuery
-  ) {
-    return productMutationRequiredRole;
   }
 
   return null;
