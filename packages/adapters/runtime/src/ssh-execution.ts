@@ -58,6 +58,7 @@ import {
 } from "./git-source-submodules";
 import {
   dockerPublishedPortCommand,
+  dockerRemoveConflictingRouteContainersCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
@@ -2446,6 +2447,19 @@ export class SshExecutionBackend implements ExecutionBackend {
         route,
         url: publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
       }));
+      const routeConflictCleanupCommand = !usesDirectHostPort
+        ? dockerRemoveConflictingRouteContainersCommand({
+            deploymentId: state.id.value,
+            accessRoutes: accessRoutes.flatMap((route) =>
+              route.domains.map((host) => ({
+                host,
+                pathPrefix: route.pathPrefix,
+              })),
+            ),
+            quote: shellQuote,
+          })
+        : "";
+      let routeConflictCleanupAttempted = false;
       const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
       if (!healthOptions) {
         this.report(context, {
@@ -2551,6 +2565,25 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         if (step === "public-http") {
+          if (routeConflictCleanupCommand.length > 0 && !routeConflictCleanupAttempted) {
+            routeConflictCleanupAttempted = true;
+            const cleanup = await this.runRemoteCommand({
+              target,
+              command: routeConflictCleanupCommand,
+              cwd: runtimeDir,
+              env,
+            });
+            logs.push(
+              phaseLog(
+                "deploy",
+                cleanup.failed
+                  ? "Failed to release SSH containers with conflicting access routes"
+                  : "Released SSH containers with conflicting access routes",
+                cleanup.failed ? "warn" : "info",
+              ),
+            );
+          }
+
           if (publicRouteHealthChecks.length === 0) {
             const message = "SSH public route health check requested without access routes";
             logs.push(phaseLog("verify", message, "error"));

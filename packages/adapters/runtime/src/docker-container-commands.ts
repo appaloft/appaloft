@@ -37,6 +37,7 @@ export interface DockerContainerIdentity {
   runtimeArtifactIntent?: string | undefined;
   routeSource?: string | undefined;
   accessHostname?: string | undefined;
+  accessPathPrefix?: string | undefined;
   accessScheme?: string | undefined;
   accessHosts?: readonly string[] | undefined;
   previewId?: string | undefined;
@@ -149,6 +150,7 @@ export function appaloftDockerContainerLabels(identity: DockerContainerIdentity)
     dockerLabel("appaloft.artifact-intent", identity.runtimeArtifactIntent),
     dockerLabel("appaloft.route-source", identity.routeSource),
     dockerLabel("appaloft.access-host", identity.accessHostname),
+    dockerLabel("appaloft.access-path-prefix", identity.accessPathPrefix),
     dockerLabel("appaloft.access-scheme", identity.accessScheme),
     dockerLabel("appaloft.access-hosts", accessHostsLabelValue(identity.accessHosts)),
   ]);
@@ -200,6 +202,7 @@ export function appaloftDockerContainerLabelsForDeployment(
     runtimeArtifactIntent: runtimePlan.runtimeArtifact?.intent,
     routeSource: metadata["access.routeSource"],
     accessHostname: metadata["access.hostname"] ?? accessHosts[0],
+    accessPathPrefix: execution.accessRoutes[0]?.pathPrefix,
     accessScheme: metadata["access.scheme"],
     accessHosts,
     previewId: metadata["preview.id"],
@@ -234,6 +237,43 @@ export function dockerRemoveResourceContainersCommand(input: {
         `docker ps -aq --filter ${resourceLabelFilter} --filter ${deploymentLabelFilter}`,
         "| while read -r container_id; do",
         'docker rm -f "$container_id";',
+        "done",
+      ].join(" ");
+    })
+    .join(" && ");
+}
+
+export function dockerRemoveConflictingRouteContainersCommand(input: {
+  deploymentId: string;
+  accessRoutes: readonly { host: string; pathPrefix: string }[];
+  quote: (value: string) => string;
+}): string {
+  const routeKeys = uniqueValues(
+    input.accessRoutes.map((route) => `${route.host.trim()}\u0000${route.pathPrefix.trim()}`),
+  );
+  if (routeKeys.length === 0) {
+    return "";
+  }
+
+  const managedLabelFilter = input.quote("label=appaloft.managed=true");
+  const currentDeploymentId = input.quote(input.deploymentId);
+
+  return routeKeys
+    .map((routeKey) => {
+      const [accessHost = "", pathPrefix = "/"] = routeKey.split("\u0000");
+      const quotedAccessHost = input.quote(accessHost);
+      const quotedPathPrefix = input.quote(pathPrefix || "/");
+      const quotedDelimitedAccessHost = input.quote(`,${accessHost},`);
+      return [
+        `docker ps -aq --filter ${managedLabelFilter}`,
+        "| while read -r container_id; do",
+        'deployment_id="$(docker inspect -f \'{{ index .Config.Labels "appaloft.deployment-id" }}\' "$container_id" 2>/dev/null || true)";',
+        'access_host="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-host" }}\' "$container_id" 2>/dev/null || true)";',
+        'access_hosts="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-hosts" }}\' "$container_id" 2>/dev/null || true)";',
+        'access_path_prefix="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-path-prefix" }}\' "$container_id" 2>/dev/null || true)";',
+        `host_matches=0; if [ "$access_host" = ${quotedAccessHost} ] || printf '%s' ",$access_hosts," | grep -F ${quotedDelimitedAccessHost} >/dev/null 2>&1; then host_matches=1; fi;`,
+        `path_matches=0; if [ "$access_path_prefix" = ${quotedPathPrefix} ] || { [ ${quotedPathPrefix} = "/" ] && [ -z "$access_path_prefix" ]; }; then path_matches=1; fi;`,
+        `if [ "$deployment_id" != ${currentDeploymentId} ] && [ "$host_matches" = "1" ] && [ "$path_matches" = "1" ]; then docker rm -f "$container_id"; fi;`,
         "done",
       ].join(" ");
     })
