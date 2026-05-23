@@ -86,7 +86,7 @@ install_from_source() {
   local appaloft_bin
   source_root="$(resolve_source_root)"
 
-  if [ -z "$source_root" ] || [ ! -f "$source_root/package.json" ] || [ ! -f "$source_root/scripts/release/build-binary-bundle.ts" ]; then
+  if [ -z "$source_root" ] || [ ! -f "$source_root/package.json" ] || [ ! -f "$source_root/scripts/release/build-deploy-cli-bundle.ts" ]; then
     error "version=source requires this action to run from a checked-out Appaloft source tree"
     exit 1
   fi
@@ -111,7 +111,7 @@ install_from_source() {
   (
     cd "$source_root"
     bun install --frozen-lockfile
-    bun run package:binary-bundle -- --version "$source_version" --out-dir "$bundle_dir"
+    bun run package:deploy-cli-bundle -- --version "$source_version" --out-dir "$bundle_dir"
   )
 
   appaloft_bin="${bundle_dir}/appaloft"
