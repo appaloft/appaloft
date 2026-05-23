@@ -15,6 +15,7 @@ import {
   type QueryBus,
 } from "@appaloft/application";
 import { resolveConfig } from "@appaloft/config";
+import { type AuthSessionResponse } from "@appaloft/contracts";
 import { ok } from "@appaloft/core";
 import { createHttpApp } from "../src";
 
@@ -38,10 +39,12 @@ async function createTempDir(): Promise<string> {
 }
 
 function createTestApp(input?: {
+  authSessionStatus?: AuthSessionResponse;
   authBootstrapStatus?: AuthBootstrapStatus;
   docsStaticDir?: string;
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
+  onAuthSessionStatus?: (request: Request) => void;
   onQuery?: (query: Query<unknown>) => void;
   webStaticDir?: string;
 }) {
@@ -77,6 +80,32 @@ function createTestApp(input?: {
         return createExecutionContext(contextInput);
       },
     },
+    ...(input?.authSessionStatus
+      ? {
+          authRuntime: {
+            authorizeProductSession: async () =>
+              ok({
+                actor: {
+                  type: "user" as const,
+                  userId: "usr_test",
+                },
+                principal: {
+                  type: "user" as const,
+                  userId: "usr_test",
+                  organizationId: "org_test",
+                  organizationRole: "owner" as const,
+                  productRole: "owner" as const,
+                },
+              }),
+            getProviderAccessToken: async () => null,
+            getSessionStatus: async (request: Request) => {
+              input.onAuthSessionStatus?.(request);
+              return input.authSessionStatus as AuthSessionResponse;
+            },
+            handle: async () => new Response("auth-runtime"),
+          },
+        }
+      : {}),
     ...(input?.embeddedWebAssets ? { embeddedWebAssets: input.embeddedWebAssets } : {}),
     ...(input?.embeddedDocsAssets ? { embeddedDocsAssets: input.embeddedDocsAssets } : {}),
   });
@@ -208,6 +237,110 @@ describe("HTTP static assets", () => {
 
       expect(queries).toHaveLength(1);
       expect(queries[0]).toBeInstanceOf(GetAuthBootstrapStatusQuery);
+    });
+  });
+
+  test("[PRODUCT-AUTH-NAV-001] redirects anonymous console navigation to login before serving SPA", async () => {
+    const authChecks: string[] = [];
+    const app = createTestApp({
+      authSessionStatus: {
+        enabled: true,
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: true,
+        session: null,
+        providers: [],
+      },
+      embeddedWebAssets: {
+        "/200.html": new Blob(["web-spa-fallback"]),
+        "/_app/immutable/app.js": new Blob(["console-asset"]),
+      },
+      onAuthSessionStatus: (request) => authChecks.push(new URL(request.url).pathname),
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const rootResponse = await fetch(`${baseUrl}/`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+
+      expect(rootResponse.status).toBe(302);
+      expect(rootResponse.headers.get("location")).toBe("/login?next=%2F");
+      expect(rootResponse.headers.get("cache-control")).toBe("no-store");
+
+      const deepLinkResponse = await fetch(`${baseUrl}/projects/prj_1?tab=logs`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+
+      expect(deepLinkResponse.status).toBe(302);
+      expect(deepLinkResponse.headers.get("location")).toBe(
+        "/login?next=%2Fprojects%2Fprj_1%3Ftab%3Dlogs",
+      );
+
+      const loginPage = await fetch(`${baseUrl}/login`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(loginPage.status).toBe(200);
+      expect(await loginPage.text()).toBe("web-spa-fallback");
+
+      const asset = await fetch(`${baseUrl}/_app/immutable/app.js`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(asset.status).toBe(200);
+      expect(await asset.text()).toBe("console-asset");
+
+      const health = await fetch(`${baseUrl}/api/health`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(health.status).toBe(200);
+    });
+
+    expect(authChecks).toEqual(["/", "/projects/prj_1"]);
+  });
+
+  test("[PRODUCT-AUTH-NAV-001] serves console navigation when a product session exists", async () => {
+    const app = createTestApp({
+      authSessionStatus: {
+        enabled: true,
+        provider: "better-auth",
+        loginRequired: false,
+        deferredAuth: true,
+        session: {
+          user: {
+            id: "usr_test",
+          },
+        },
+        providers: [],
+      },
+      embeddedWebAssets: {
+        "/200.html": new Blob(["web-spa-fallback"]),
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/projects/prj_1`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("web-spa-fallback");
     });
   });
 

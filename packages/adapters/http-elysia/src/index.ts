@@ -132,6 +132,7 @@ interface StaticAssetSource {
 }
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
+const loginPath = "/login";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};
@@ -296,6 +297,10 @@ function isFirstAdminBootstrapPath(pathname: string): boolean {
   return pathname === firstAdminBootstrapPath || pathname.startsWith(`${firstAdminBootstrapPath}/`);
 }
 
+function isLoginPath(pathname: string): boolean {
+  return pathname === loginPath || pathname.startsWith(`${loginPath}/`);
+}
+
 function hasStaticAssetExtension(pathname: string): boolean {
   return (pathname.split("/").pop() ?? "").includes(".");
 }
@@ -315,6 +320,7 @@ function isConsoleNavigationPath(pathname: string): boolean {
     isApiPath(pathname) ||
     isDocsPath(pathname) ||
     isFirstAdminBootstrapPath(pathname) ||
+    isLoginPath(pathname) ||
     pathname.startsWith("/_app/") ||
     pathname.startsWith("/.well-known/acme-challenge/") ||
     pathname === "/.appaloft/resource-access-failure" ||
@@ -334,11 +340,29 @@ function shouldGateFirstAdminBootstrapNavigation(request: Request): boolean {
   return isHtmlNavigationRequest(request) && isConsoleNavigationPath(readRequestPathname(request));
 }
 
+function shouldGateProductSessionNavigation(request: Request): boolean {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+
+  return isHtmlNavigationRequest(request) && isConsoleNavigationPath(readRequestPathname(request));
+}
+
 function readRequestPathname(request: Request): string {
   try {
     return new URL(request.url).pathname;
   } catch {
     return "/";
+  }
+}
+
+function loginRedirectLocation(request: Request): string {
+  try {
+    const url = new URL(request.url);
+    const next = `${url.pathname}${url.search}`;
+    return `${loginPath}?next=${encodeURIComponent(next || "/")}`;
+  } catch {
+    return `${loginPath}?next=%2F`;
   }
 }
 
@@ -754,10 +778,43 @@ export function createHttpApp(input: {
     );
   }
 
+  async function productSessionRedirectResponse(request: Request): Promise<Response | null> {
+    if (!input.authRuntime || !shouldGateProductSessionNavigation(request)) {
+      return null;
+    }
+
+    try {
+      const status = await input.authRuntime.getSessionStatus(request);
+
+      if (!status.enabled || !status.loginRequired || status.session) {
+        return null;
+      }
+    } catch (error) {
+      input.logger.warn("product_session_navigation_gate_failed", {
+        requestId: request.headers.get("x-request-id") ?? undefined,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: loginRedirectLocation(request),
+        "cache-control": "no-store",
+        vary: "Accept, Cookie, Sec-Fetch-Mode",
+      },
+    });
+  }
+
   async function webConsoleResponse(request: Request, fallback: Response): Promise<Response> {
     const redirect = await firstAdminBootstrapRedirectResponse(request);
     if (redirect) {
       return redirect;
+    }
+
+    const authRedirect = await productSessionRedirectResponse(request);
+    if (authRedirect) {
+      return authRedirect;
     }
 
     return webStaticResponse(new URL(request.url).pathname) ?? fallback;

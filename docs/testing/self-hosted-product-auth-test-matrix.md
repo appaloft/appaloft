@@ -31,6 +31,7 @@ by session and organization-role authorization.
 | PRODUCT-AUTH-GATE-001 | HTTP/oRPC contract | Missing product session | Protected mutation endpoint receives no session | Request rejects before command dispatch | `product_auth_missing`, `401` | Parse request -> auth reject -> no command dispatch |
 | PRODUCT-AUTH-GATE-002 | HTTP/oRPC contract | Insufficient role | Authenticated user lacks target organization role | Request rejects before mutation | `product_auth_forbidden`, `403` | Session verify -> role reject -> no command dispatch |
 | PRODUCT-AUTH-GATE-003 | HTTP/oRPC contract | Explicit public endpoints | Health/version/readiness/bootstrap status are requested | Requests remain public and do not require product session | None | Route -> public response |
+| PRODUCT-AUTH-NAV-001 | HTTP/adapter contract | Product session navigation gate before SPA boot | Bootstrap is complete and a browser without product session requests a console document route | The HTTP adapter redirects to `/login?next=...` before serving Web static fallback; login, API endpoints, docs routes, static assets, ACME, and first-admin setup routes are not redirected | None or auth-session lookup failure falls back to the login redirect | Document request -> auth session status -> redirect or static routing |
 | PRODUCT-AUTH-SESSION-001 | installer contract | Stable product auth session secret | `install.sh` writes or repairs a self-hosted stack | A strong product auth session secret is generated on first install, reused from `.env` on rerun, passed to the app container, and never printed to installer stdout | None | Read existing `.env` -> generate or reuse auth secret -> write `.env` -> compose env injection |
 | PRODUCT-AUTH-READ-001 | HTTP/oRPC contract | Role-aware product read authorization | Project, environment, resource, deployment target, deployment, or deploy-token read models are requested over HTTP/oRPC | Missing product sessions reject before query dispatch; authenticated members can read safe project/environment/resource/deployment-target/deployment metadata with a user actor; deploy-token read models remain admin-only | `product_auth_missing`, `401`, or `product_auth_forbidden`, `403` | Parse request -> session/role verify -> query dispatch |
 | PRODUCT-AUTH-DOCS-001 | docs/help | First install login docs | First-admin bootstrap is user-visible | Docs/help explain local admin bootstrap, generated password, OAuth optionality, login URL, and recovery | None | Docs registry/help lookup |
@@ -97,6 +98,10 @@ by session and organization-role authorization.
   environment, resource, deployment-target, and deployment read models before `QueryBus` dispatch,
   while deploy-token and organization/team read models remain admin-only. This is covered by
   `packages/orpc/test/product-auth-gate.http.test.ts` for `PRODUCT-AUTH-READ-001`.
+- After bootstrap is complete, the HTTP adapter now checks product session status before serving
+  console document navigation and redirects missing sessions to `/login?next=...` before the SPA
+  shell is returned. This keeps API 401/403 semantics on API routes while preventing anonymous
+  browser navigations from briefly rendering the console shell, covering `PRODUCT-AUTH-NAV-001`.
 - `auth.bootstrap-status` is exposed as the public `GET /api/bootstrap/auth/status` endpoint.
   `auth.bootstrap-first-admin` is exposed as the public `POST /api/bootstrap/auth/first-admin`
   setup endpoint only while bootstrap is required. It bypasses the product session gate

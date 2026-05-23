@@ -40,6 +40,9 @@ installer/runtime config
   SPA shell. The gate redirects browser document requests for console routes to
   `/bootstrap/auth/first-admin` and must not redirect API endpoints, docs routes, static assets,
   ACME challenges, or the first-admin route itself.
+- After bootstrap is complete, the HTTP adapter gates console document navigation by product
+  session before serving the SPA shell. Missing sessions redirect to `/login?next=...`; API
+  endpoints continue to return product-auth `401`/`403` rather than HTML redirects.
 
 ## Error Phases
 
