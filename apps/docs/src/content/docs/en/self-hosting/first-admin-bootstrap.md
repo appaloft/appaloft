@@ -51,6 +51,21 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
 The installer does not echo a supplied password. Do not place passwords in repository config, shell
 history, CI logs, issues, pull request comments, or deployment output.
 
+Containers and self-hosted runtimes can also create the first admin during startup from trusted
+environment variables without writing a handoff file:
+
+```sh
+APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin
+APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME="Self-hosted Appaloft"
+APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG=self-hosted-appaloft
+APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+Startup bootstrap only runs automatically when both email and password are configured. If no
+password is supplied, configure `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE` so the generated
+one-time password has a trusted handoff destination.
+
 If the installer did not receive a first-admin email, open the printed console URL after install.
 The console checks bootstrap status and sends first-time visitors to
 `/bootstrap/auth/first-admin`. You can also open that setup path directly. The page reads bootstrap

@@ -27,6 +27,10 @@ installer/runtime config
 - User/session/provider implementation details stay behind application-owned ports.
 - OAuth configuration is additive and optional. Missing OAuth never blocks local first-admin login.
 - Existing first-admin state makes bootstrap idempotent and suppresses raw password output.
+- Runtime startup may bootstrap directly from `APPALOFT_FIRST_ADMIN_EMAIL` and
+  `APPALOFT_FIRST_ADMIN_PASSWORD` without a handoff file. This path must not echo or persist the raw
+  supplied password in output. If no supplied password exists, startup must not generate an
+  inaccessible password unless a trusted first-admin output file is configured.
 - Public product health/version/readiness endpoints remain public; ordinary product mutations become
   protected by product-session and organization-role policy after this gate is implemented.
 - When bootstrap is required, the HTTP adapter gates console document navigation before serving the
