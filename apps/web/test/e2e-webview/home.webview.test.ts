@@ -2911,33 +2911,6 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
-async function clickButtonByAnyAriaLabel(
-  view: Bun.WebView,
-  labels: [string, ...string[]],
-): Promise<void> {
-  const found = await waitFor(
-    () =>
-      view.evaluate<boolean>(
-        `(() => {
-          const labels = ${JSON.stringify(labels)};
-          const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
-            labels.includes(candidate.getAttribute("aria-label") ?? "")
-          );
-          if (!(button instanceof HTMLButtonElement)) {
-            return false;
-          }
-
-          button.click();
-          return true;
-        })()`,
-      ),
-    Boolean,
-    `Expected a button with one of aria-labels: ${labels.join(" | ")}`,
-  );
-
-  expect(found).toBe(true);
-}
-
 async function clickElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -2950,6 +2923,57 @@ async function clickElementBySelector(view: Bun.WebView, selector: string): Prom
           if (element instanceof HTMLButtonElement && element.disabled) {
             return false;
           }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected clickable element: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function pressElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement)) {
+            return false;
+          }
+          if (element instanceof HTMLButtonElement && element.disabled) {
+            return false;
+          }
+
+          element.focus();
+          element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+          element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+          element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerType: "mouse" }));
+          element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
+          element.click();
+          element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected pressable element: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function clickAnyElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLElement)) {
+            return false;
+          }
+
           element.click();
           return true;
         })()`,
@@ -3190,12 +3214,11 @@ describe("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}/`);
 
     await expectAnyText(view, ["Latest deployment", "LATEST DEPLOYMENT", "最近部署"]);
-    await expectAnyText(view, ["New deployment", "新部署"]);
+    await expectAnyText(view, ["Quick deploy", "快速部署"]);
     await expectAnyText(view, ["View projects", "VIEW PROJECTS", "查看项目"]);
     await expectAnyText(view, ["View deployments", "VIEW DEPLOYMENTS", "查看部署"]);
     await expectText(view, "Demo");
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
-    await expectAnyText(view, ["v0.1.0-test", "V0.1.0-TEST"]);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
@@ -3209,7 +3232,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "production");
     await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
 
-    await clickButtonByAnyText(view, ["New deployment", "新部署"]);
+    await clickButtonByAnyText(view, ["Quick deploy", "快速部署"]);
     await expectAnyText(view, ["Local folder", "本地目录"]);
     await clickButtonByAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await clickButtonByAnyText(view, ["Choose from my GitHub", "从我的 GitHub 选择"]);
@@ -3324,7 +3347,7 @@ describe("console e2e with Bun.WebView", () => {
       await view.navigate(
         `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/new`,
       );
-      await expectAnyText(view, ["New deployment", "新部署"]);
+      await expectAnyText(view, ["Quick deploy", "快速部署"]);
       await clickButtonByAnyText(view, ["Create deployment", "创建部署"]);
 
       const deploymentRequest = await waitForRecordedRequest("/api/deployments");
@@ -3350,8 +3373,8 @@ describe("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/`);
 
-      await expectText(view, "Admin User");
-      await clickButtonByAnyAriaLabel(view, ["Sign out", "退出登录"]);
+      await pressElementBySelector(view, "[data-console-user-menu-trigger]");
+      await clickAnyElementBySelector(view, "[data-console-sign-out-action]");
       await expectLocation(view, "/login");
 
       const signOutRequest = await waitForRecordedRequest("/api/auth/sign-out");

@@ -455,9 +455,9 @@ Not allowed:
 - UI steps becoming domain invariants;
 - source detection, runtime plan resolution, or deployment state progression living in transport code.
 
-Project-level deployment lists are read-model rollups. Project-level "new deployment" entrypoints
+Project-level deployment lists are read-model rollups. Project-level Quick Deploy entrypoints
 must behave as Quick Deploy or another entry workflow that selects or creates a resource before
-dispatching `deployments.create`. Resource-level new deployment entrypoints are the preferred
+dispatching `deployments.create`. Resource-level Quick Deploy entrypoints are the preferred
 owner-scoped surfaces.
 
 ## Current Implementation Notes And Governed Follow-Ups

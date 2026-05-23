@@ -97,7 +97,7 @@
         </Button>
         <Button href="/deploy" size="sm" variant="outline">
           <Play class="size-4" />
-          {$t(i18nKeys.common.actions.newDeployment)}
+          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
       </div>
     </div>

@@ -91,7 +91,7 @@ Then:
 | Test ID | Preferred automation | Entrypoint | Case | Expected behavior |
 | --- | --- | --- | --- | --- |
 | DEP-SHOW-ENTRY-001 | e2e-preferred | Web deployment detail | User opens `/deployments/{id}` | Page resolves `deployments.show` for overview/timeline/snapshot and keeps logs on `deployments.logs`. |
-| DEP-SHOW-ENTRY-002 | e2e-preferred | Web resource history | User clicks a deployment row from resource history | Navigation reaches deployment detail backed by `deployments.show`; resource page remains owner of new deployment/current health. |
+| DEP-SHOW-ENTRY-002 | e2e-preferred | Web resource history | User clicks a deployment row from resource history | Navigation reaches deployment detail backed by `deployments.show`; resource page remains owner of Quick Deploy/current health. |
 | DEP-SHOW-ENTRY-003 | e2e-preferred | CLI | `appaloft deployments show <deploymentId> --json` | Prints canonical `DeploymentDetail` JSON from the query result. |
 | DEP-SHOW-ENTRY-004 | e2e-preferred | API/oRPC | HTTP query | Reuses the shared query schema and returns `deployments.show/v1`. |
 | DEP-SHOW-ENTRY-005 | e2e-preferred | Quick Deploy completion | Completion links to deployment detail after accepted deploy | Follows the shared deployment-detail query instead of a private completion-only payload. |

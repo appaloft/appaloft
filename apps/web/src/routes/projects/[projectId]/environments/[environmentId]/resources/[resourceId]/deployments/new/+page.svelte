@@ -242,11 +242,11 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.common.actions.newDeployment)} · Appaloft</title>
+  <title>{$t(i18nKeys.common.actions.quickDeploy)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell
-  title={$t(i18nKeys.common.actions.newDeployment)}
+  title={$t(i18nKeys.common.actions.quickDeploy)}
   description={$t(i18nKeys.console.resources.newDeploymentDescription)}
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.home), href: "/" },
@@ -260,7 +260,7 @@
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
       href: resource ? resourceDetailHref(resource) : undefined,
     },
-    { label: $t(i18nKeys.common.actions.newDeployment) },
+    { label: $t(i18nKeys.common.actions.quickDeploy) },
   ]}
 >
   {#if pageLoading}
@@ -301,7 +301,7 @@
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">
-                {$t(i18nKeys.common.actions.newDeployment)}
+                {$t(i18nKeys.common.actions.quickDeploy)}
               </h1>
               <p class="text-sm leading-6 text-muted-foreground">
                 {$t(i18nKeys.console.resources.newDeploymentDescription)}
