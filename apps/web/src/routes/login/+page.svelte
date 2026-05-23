@@ -134,9 +134,6 @@
               ? $t(i18nKeys.console.authBootstrap.signingIn)
               : $t(i18nKeys.console.authBootstrap.signIn)}
           </Button>
-          <Button href="/bootstrap/auth/first-admin" variant="outline">
-            {$t(i18nKeys.console.authBootstrap.createAdmin)}
-          </Button>
         </div>
       </form>
     </section>

@@ -194,13 +194,12 @@ export const enUS = {
   },
   console: {
     authBootstrap: {
-      alreadyConfiguredBody:
-        "A first admin or organization owner already exists. Use the login page to continue.",
-      alreadyConfiguredTitle: "First admin is already configured.",
+      alreadyConfiguredBody: "This instance is already configured. Use the login page to continue.",
+      alreadyConfiguredTitle: "Setup is already complete.",
       bootstrapFailed: "First admin setup failed",
       bootstrapSucceeded: "First admin created",
       completedDescription:
-        "The local admin and initial organization are ready. Sign in with the admin email and password.",
+        "The account and initial organization are ready. Sign in with the configured email and password.",
       completedTitle: "Bootstrap complete",
       createAdmin: "Create admin",
       creatingAdmin: "Creating admin",
@@ -218,7 +217,7 @@ export const enUS = {
       loadingStatus: "Checking bootstrap status...",
       localPasswordBadge: "Local password",
       loginAction: "Go to login",
-      loginBody: "Use the local first-admin account created during install or bootstrap.",
+      loginBody: "Sign in with your Appaloft account.",
       loginEmailLabel: "Email",
       loginFailed: "Login failed",
       loginPasswordLabel: "Password",
