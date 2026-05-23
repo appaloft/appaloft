@@ -71,7 +71,7 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("scripts/run-deploy.sh");
     expect(actionYaml).toContain("scripts/resolve-preview.sh");
     expect(actionYaml).toContain(
-      "source to build the CLI from the checked-out Appaloft source tree",
+      "source to build the deploy CLI from the checked-out Appaloft source tree",
     );
     expect(actionYaml).toContain("command:");
     expect(actionYaml).toContain("install-console");
@@ -213,7 +213,7 @@ describe("deploy-action wrapper reference", () => {
     }
   });
 
-  test("[CONFIG-FILE-ENTRY-009] version=source builds the CLI from the checked-out source tree", () => {
+  test("[CONFIG-FILE-ENTRY-009] version=source builds the deploy CLI from the checked-out source tree", () => {
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-source-install-"));
     const sourceRoot = join(workspace, "appaloft-source");
     const binDir = join(workspace, "bin");
@@ -223,14 +223,14 @@ describe("deploy-action wrapper reference", () => {
     mkdirSync(join(sourceRoot, "scripts/release"), { recursive: true });
     mkdirSync(binDir);
     writeFileSync(join(sourceRoot, "package.json"), '{"name":"appaloft"}\n');
-    writeFileSync(join(sourceRoot, "scripts/release/build-binary-bundle.ts"), "");
+    writeFileSync(join(sourceRoot, "scripts/release/build-deploy-cli-bundle.ts"), "");
     writeFileSync(
       fakeBun,
       [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         'printf "%s\\n" "$*" >> "$APPALOFT_TEST_BUN_LOG"',
-        'if [ "$1" = "run" ] && [ "$2" = "package:binary-bundle" ]; then',
+        'if [ "$1" = "run" ] && [ "$2" = "package:deploy-cli-bundle" ]; then',
         '  out_dir=""',
         '  while [ "$#" -gt 0 ]; do',
         '    if [ "$1" = "--out-dir" ]; then',
@@ -270,7 +270,7 @@ describe("deploy-action wrapper reference", () => {
       expect(output).toContain("source-binary-bundle/appaloft");
       const bunLog = readFileSync(bunLogPath, "utf8");
       expect(bunLog).toContain("install --frozen-lockfile");
-      expect(bunLog).toContain("run package:binary-bundle");
+      expect(bunLog).toContain("run package:deploy-cli-bundle");
       expect(bunLog).toContain("--out-dir");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
