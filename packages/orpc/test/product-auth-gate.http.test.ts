@@ -925,7 +925,6 @@ describe("product auth gate HTTP/oRPC routes", () => {
         },
         body: JSON.stringify({
           email: "admin@example.com",
-          displayName: "Admin User",
           password: "local-admin-password",
         }),
       }),
