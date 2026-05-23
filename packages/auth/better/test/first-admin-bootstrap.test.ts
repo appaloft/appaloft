@@ -19,6 +19,25 @@ const context = {
 } as ExecutionContext;
 
 describe("Better Auth first-admin bootstrap adapter", () => {
+  test("[AUTH-SESSION-001] requires a login when better-auth is enabled and no session exists", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const status = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session"),
+    );
+
+    expect(status).toMatchObject({
+      enabled: true,
+      provider: "better-auth",
+      loginRequired: true,
+      session: null,
+    });
+  });
+
   test("[FIRST-ADMIN-BOOTSTRAP-004] creates local user and organization through Appaloft port", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,

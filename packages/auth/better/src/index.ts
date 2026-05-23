@@ -247,7 +247,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     return {
       enabled: true,
       provider: "better-auth",
-      loginRequired: false,
+      loginRequired: !session,
       deferredAuth: true,
       session,
       providers: providerStatuses(
