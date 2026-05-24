@@ -38,6 +38,7 @@ const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
 const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const storageKeyPattern = dependencyKeyPattern;
 const scheduledTaskKeyPattern = dependencyKeyPattern;
+const configProfileKeyPattern = dependencyKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 const appaloftDeploymentMonitoringSignals = [
   "cpu",
@@ -958,6 +959,19 @@ export const appaloftDeploymentPreviewProfileConfigSchema = z
   .strict()
   .describe("Selected PR preview profile overlay fields.");
 
+export const appaloftDeploymentNamedProfileConfigSchema = z
+  .object({
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentAccessConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+  })
+  .strict()
+  .describe("Trusted-entrypoint-selected named config profile overlay fields.");
+
 export const appaloftDeploymentPreviewConfigSchema = z
   .object({
     pullRequest: z
@@ -1078,6 +1092,17 @@ export const appaloftDeploymentConfigSchema = z
     access: appaloftDeploymentAccessConfigSchema.optional(),
     monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),
+    profiles: z
+      .record(
+        z
+          .string()
+          .regex(
+            configProfileKeyPattern,
+            "config_profile_resolution: profile keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentNamedProfileConfigSchema,
+      )
+      .optional(),
     dependencies: z
       .record(
         z
@@ -1121,14 +1146,15 @@ export const appaloftDeploymentConfigSchema = z
 export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
 export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
 
-export function applyAppaloftDeploymentPreviewProfile(
-  config: AppaloftDeploymentConfig,
-): AppaloftDeploymentConfig {
-  const profile = config.preview?.pullRequest?.profile;
-  if (!profile) {
-    return config;
-  }
+type AppaloftDeploymentConfigProfileOverlay = Pick<
+  Partial<AppaloftDeploymentConfig>,
+  "runtime" | "network" | "health" | "access" | "monitoring" | "env" | "secrets"
+>;
 
+function applyAppaloftDeploymentProfileOverlay(
+  config: AppaloftDeploymentConfig,
+  profile: AppaloftDeploymentConfigProfileOverlay,
+): AppaloftDeploymentConfig {
   return normalizeDeploymentConfig({
     ...config,
     ...(profile.runtime ? { runtime: { ...config.runtime, ...profile.runtime } } : {}),
@@ -1139,6 +1165,44 @@ export function applyAppaloftDeploymentPreviewProfile(
     ...(profile.env ? { env: { ...config.env, ...profile.env } } : {}),
     ...(profile.secrets ? { secrets: { ...config.secrets, ...profile.secrets } } : {}),
   });
+}
+
+export function applyAppaloftDeploymentConfigProfile(
+  config: AppaloftDeploymentConfig,
+  profileName: string,
+): Result<AppaloftDeploymentConfig> {
+  const normalizedProfileName = profileName.trim();
+  if (!configProfileKeyPattern.test(normalizedProfileName)) {
+    return err(
+      domainError.validation("Deployment config profile key is invalid", {
+        phase: "config-profile-resolution",
+        profile: normalizedProfileName,
+      }),
+    );
+  }
+
+  const profile = config.profiles?.[normalizedProfileName];
+  if (!profile) {
+    return err(
+      domainError.validation("Deployment config profile was not found", {
+        phase: "config-profile-resolution",
+        profile: normalizedProfileName,
+      }),
+    );
+  }
+
+  return ok(applyAppaloftDeploymentProfileOverlay(config, profile));
+}
+
+export function applyAppaloftDeploymentPreviewProfile(
+  config: AppaloftDeploymentConfig,
+): AppaloftDeploymentConfig {
+  const profile = config.preview?.pullRequest?.profile;
+  if (!profile) {
+    return config;
+  }
+
+  return applyAppaloftDeploymentProfileOverlay(config, profile);
 }
 
 function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
@@ -1232,6 +1296,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "scheduledTasks" ||
     root === "autoDeploy" ||
     root === "monitoring" ||
+    root === "profiles" ||
     root === "controlPlane"
   );
 }

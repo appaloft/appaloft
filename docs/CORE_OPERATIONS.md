@@ -392,6 +392,13 @@ extension over existing profile/env/access/monitoring/health operations, not a n
 The overlay is ignored for ordinary deploys, applies only after trusted preview context selects the
 preview scope, and never adds profile fields to `deployments.create`.
 
+Repository config `profiles.<key>` is a trusted-entrypoint-selected named overlay governed by
+[ADR-075](./decisions/ADR-075-repository-config-named-profile-overlays.md) and
+[spec 084](./specs/084-repository-config-named-profile-overlays/spec.md). It is a workflow
+extension over existing profile/env/access/monitoring/health operations, not a new operation key.
+Unselected profiles are ignored; selected profiles merge before preview overlays and before
+ids-only deployment admission.
+
 Phase 7 storage operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

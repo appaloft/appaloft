@@ -23,6 +23,37 @@ Configuration files are for reviewable project, resource, environment, and deplo
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
+<h2 id="environment-config-file-named-profiles">Named config profiles</h2>
+
+Use `profiles.<key>` for reviewable variants such as staging or smoke deploys. The file declares
+the variant, but a trusted entrypoint selects it:
+
+```yaml
+runtime:
+  start:
+    command: bun run start
+
+env:
+  APP_ENV: production
+
+profiles:
+  staging:
+    runtime:
+      start:
+        command: bun run start:staging
+    access:
+      generated:
+        enabled: true
+    env:
+      APP_ENV: staging
+```
+
+Run it with `appaloft deploy --config appaloft.yml --config-profile staging`, or set
+`config-profile: staging` in the GitHub Action. Unselected profiles are ignored. A selected profile
+can overlay runtime, network, health, access, monitoring, non-secret env values, and secret
+references. It cannot choose project, environment, resource, server, destination, provider account,
+or credentials, and it cannot add fields to the final deployment command.
+
 <h2 id="environment-config-file-preview-profile">PR preview profile</h2>
 
 Use `preview.pullRequest.profile` for profile differences that should apply only to a PR preview

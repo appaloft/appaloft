@@ -74,6 +74,7 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
 - user-facing scheduled task graph declarations such as a nightly sync command;
 - non-secret environment variable declarations and required secret references;
+- trusted-entrypoint-selected named config profile overlays for staging/production/smoke variants;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
   file for identity and credentials;
 - non-secret control-plane connection policy for selecting no control plane, trusted auto
@@ -539,6 +540,7 @@ The action may expose preview inputs such as:
 | `preview-domain-template` | Optional trusted host template such as `pr-${{ github.event.pull_request.number }}.preview.example.com`; requires user-owned wildcard DNS in Action-only mode. |
 | `preview-tls-mode` | Optional TLS policy for the custom preview host. `auto` requires provider-owned certificate automation; `disabled` emits and verifies an HTTP preview URL. |
 | `require-preview-url` | Optional boolean. When true, missing generated/custom access fails before or during route resolution instead of reporting a deploy without public URL. |
+| `config-profile` | Optional trusted named config profile key. Selects `profiles.<key>` after parsing and before preview overlays; it must not select Appaloft identity. |
 
 Preview profile selection is explicit. If the repository root `appaloft.yml` contains production
 runtime choices, production environment values, or production custom domains, the workflow should
@@ -674,9 +676,11 @@ hidden deploy side effect. Relink may update link state only; it must not mutate
 source/runtime/network profile fields, deployment history, environment variables, or server
 credentials.
 
-Environment-specific config overlays are allowed only as overlays for an environment selected by
-the entrypoint or trusted link state. A committed config file must not be the only reason a
-deployment moves from `staging` to `production`.
+Environment-specific config differences use top-level named config profiles such as
+`profiles.staging`, selected by trusted entrypoint input such as `--config-profile staging` or
+Action `config-profile: staging`. A named config profile is an overlay, not an Appaloft Environment
+selector. A committed config file must not be the only reason a deployment moves from `staging` to
+`production`.
 
 The same rule applies to PR preview environments. `preview.pullRequest.profile` may adjust profile
 fields for the already selected `preview-pr-123` environment, but it must not create the preview
@@ -689,9 +693,16 @@ flags still override the merged config profile.
 Accepted config profile fields map to resource-owned or environment-owned contracts before
 deployment admission.
 
-`preview.pullRequest.profile` is a selected overlay over the same profile fields. It is ignored for
-ordinary deploys, merged for trusted PR preview deploys before prompt seed/env normalization, and
-never adds fields to `deployments.create`.
+`profiles.<key>` is selected only by trusted CLI/Action input. It is ignored when unselected,
+merged before prompt seed/env normalization when selected, and never adds fields to
+`deployments.create`. A selected named profile may overlay only runtime, network, health, access,
+monitoring, env, and secrets. Dependency, storage, scheduled task, auto-deploy, retention,
+control-plane, source, and unsupported sizing/rollout deltas remain outside named profiles until a
+later ADR defines their lifecycle behavior.
+
+`preview.pullRequest.profile` is a PR-preview-specific overlay over the same profile fields. It is
+ignored for ordinary deploys, merged after a selected named profile for trusted PR preview deploys,
+and never adds fields to `deployments.create`.
 
 | Config concern | Canonical owner | Rule |
 | --- | --- | --- |
@@ -1028,7 +1039,5 @@ work.
 
 ## Open Questions
 
-- Which general environment overlay syntax should be admitted without allowing a committed config
-  file to select identity?
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?

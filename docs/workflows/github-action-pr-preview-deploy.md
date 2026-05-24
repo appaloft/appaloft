@@ -123,6 +123,17 @@ with:
   preview-id: pr-${{ github.event.pull_request.number }}
 ```
 
+When one config file carries reviewable variants, the action may select a named config profile with
+trusted input:
+
+```yaml
+with:
+  config: appaloft.yml
+  config-profile: staging
+  preview: pull-request
+  preview-id: pr-${{ github.event.pull_request.number }}
+```
+
 Using `appaloft.yml` is valid only when that file is intentionally environment-neutral or the
 repository owner explicitly accepts it for previews. Preview docs and generated examples should not
 assume a root config is safe for PR deploys because it may contain production runtime choices,
@@ -143,16 +154,15 @@ Field precedence after a config file is selected follows the repository config b
 built-in defaults
   < source/framework detection
   < selected repository config base profile
-  < selected repository config overlay for the already-selected preview environment
+  < selected named repository config profile
+  < selected PR preview profile for the already-selected preview environment
   < trusted action inputs, workflow env, CLI flags, or future MCP parameters
 ```
 
-The current parser does not need to support preview overlays before Action preview can ship. The
-preview-safe first implementation is a separate config path such as `appaloft.preview.yml` plus
-trusted GitHub Actions environment variables and secrets. A future schema may add explicit
-environment/profile overlays, but those overlays may apply only after the PR entrypoint has selected
-`preview-pr-123`; a committed config overlay must not select or retarget the environment, project,
-resource, server, destination, or credentials.
+The parser supports `profiles.<key>` selected by trusted `config-profile` input and
+`preview.pullRequest.profile` selected only after PR preview context exists. Both overlays may apply
+only after the entrypoint has selected `preview-pr-123`; a committed config overlay must not select
+or retarget the environment, project, resource, server, destination, or credentials.
 
 Application values that differ in preview should be supplied through preview-scoped GitHub
 environment variables or secrets and referenced either from config with `ci-env:<NAME>` or from a

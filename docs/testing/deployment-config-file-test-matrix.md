@@ -342,6 +342,12 @@ This matrix inherits:
 | CONFIG-FILE-PREVIEW-OVERLAY-002 | parser/schema | Preview profile overlay rejects unsafe fields | Config declares unknown fields, identity selectors, raw secret material, provider handles, `access.domains`, dependency/storage/scheduled-task deltas, or unsupported resource sizing under `preview.pullRequest.profile` | Parser fails before mutation and diagnostics are sanitized | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
 | CONFIG-FILE-PREVIEW-OVERLAY-003 | integration | Ordinary deploy ignores preview overlay | Root config declares production runtime/env values and `preview.pullRequest.profile` declares preview-only runtime/env values | Non-preview config deploy uses the root values and does not apply preview overlay | None | Root profile operations -> `deployments.create` |
 | CONFIG-FILE-PREVIEW-OVERLAY-004 | integration | PR preview applies preview overlay | Trusted PR preview context is present and config declares `preview.pullRequest.profile` | The overlay is merged before prompt seed/env normalization, existing operations receive the merged profile, and deployment admission remains ids-only | None | Preview context resolution -> overlay merge -> profile/env operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-001 | parser/schema | Named config profile overlay accepted | Config declares `profiles.staging.runtime`, `network`, `health`, `access`, `monitoring`, `env`, or `secrets` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-NAMED-PROFILE-002 | parser/schema | Named config profile rejects unsafe fields | Config declares unknown fields, identity selectors, raw secret material, provider handles, dependency/storage/scheduled-task graph deltas, auto-deploy, control-plane, retention, source, or unsupported sizing under `profiles.<key>` | Parser fails before mutation and diagnostics are sanitized | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-NAMED-PROFILE-003 | integration | Unselected named profile is ignored | Root config declares production runtime/env values and `profiles.staging` declares staging-only runtime/env values | Config deploy without trusted profile selection uses root values and does not apply the named overlay | None | Root profile operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-004 | integration | Selected named profile applies | Trusted CLI/Action input selects `--config-profile staging` | The overlay is merged before prompt seed/env normalization, existing operations receive the merged profile, and deployment admission remains ids-only | None | Profile selection -> overlay merge -> profile/env operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-005 | integration | Missing selected named profile fails | Trusted CLI/Action input selects a profile key not present in config | Workflow fails before mutation with sanitized profile name metadata | `validation_error`, phase `config-profile-resolution` | No write commands |
+| CONFIG-FILE-NAMED-PROFILE-006 | integration | Trusted flags override named profile | Selected named profile and trusted CLI/Action flags set the same runtime/network/env/route fields | Trusted flags win over the selected profile | None | Profile selection -> overlay merge -> trusted flag merge -> profile/env operations -> `deployments.create` |
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 | CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
 | CONFIG-FILE-ENTRY-027 | contract | Deploy action optional PR comment | With `pr-comment=true`, trusted PR context, and an explicit GitHub token, the wrapper posts or updates one marker-based PR comment with available preview URL, console URL, deployment id, or cleanup status; without `pr-comment`, no GitHub comment permission is required. |
@@ -366,7 +372,8 @@ Current implemented coverage:
   `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-001` through
   `CONFIG-FILE-MONITORING-THRESHOLDS-002`, and
-  `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002` are covered in
+  `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002`, and
+  `CONFIG-FILE-NAMED-PROFILE-001` through `CONFIG-FILE-NAMED-PROFILE-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
@@ -380,7 +387,8 @@ Current implemented coverage:
   `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-003` through
   `CONFIG-FILE-MONITORING-THRESHOLDS-005`, and `CONFIG-FILE-PREVIEW-OVERLAY-003` through
-  `CONFIG-FILE-PREVIEW-OVERLAY-004` are covered in
+  `CONFIG-FILE-PREVIEW-OVERLAY-004`, and `CONFIG-FILE-NAMED-PROFILE-003` through
+  `CONFIG-FILE-NAMED-PROFILE-006` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
@@ -458,9 +466,12 @@ access eligibility and path prefix fields, and `monitoring.thresholds` with non-
 Resource-scope warning/critical rules. SSH CLI config deploy now persists
 server-applied route desired state under the selected SSH-server state backend before
 `deployments.create`; deployment planning consumes that desired state and records applied/failed
-status after deployment-finished route outcomes. Selected PR preview config deploy merges
-`preview.pullRequest.profile` for runtime/network/health/generated-access/monitoring/env/secret
-profile fields only after trusted preview context exists, and ordinary deploy ignores that overlay.
+status after deployment-finished route outcomes. Selected named config profiles merge
+`profiles.<key>` for runtime/network/health/access/monitoring/env/secret profile fields only after
+trusted CLI/Action input selects the profile. Selected PR preview config deploy merges
+`preview.pullRequest.profile` after named profiles for runtime/network/health/generated-access,
+monitoring, env, and secret profile fields only after trusted preview context exists, and ordinary
+deploy ignores that overlay.
 Resource access, health, and diagnostic summaries expose the latest server-applied route
 URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are exposed through proxy
 configuration/resource diagnostics. Control-plane managed-domain mapping remains follow-up work.
@@ -521,9 +532,10 @@ and `CONTROL-PLANE-HANDSHAKE-012`. This proves wrapper metadata,
 version/target install contract shape,
 SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
 preview cleanup command mapping, trusted multiline Action `environment-variables`/`secret-variables`
-pass-through to CLI `--env`/`--secret`, optional marker-based PR comment feedback, Marketplace README
-fork-safety/cleanup examples, no-config default behavior, unsupported control-plane input rejection,
-self-hosted preview cleanup API routing, and self-hosted preview deploy API routing in this
+pass-through to CLI `--env`/`--secret`, trusted `config-profile` mapping to CLI, optional
+marker-based PR comment feedback, Marketplace README fork-safety/cleanup examples, no-config
+default behavior, unsupported control-plane input rejection, self-hosted preview cleanup API
+routing, and self-hosted preview deploy API routing in this
 repository.
 
 `scripts/test/deploy-action-wrapper.test.ts`, `packages/orpc/test/deployment-create.http.test.ts`,
@@ -534,7 +546,8 @@ ids, repository/ref/revision facts travel as trusted context, the server validat
 before mutation, existing source links and complete deploy-token scope can resolve the target,
 explicit bootstrap ids are narrow advanced context that conflict-checks before mutation, and pull
 request preview policy can complete a target when the Action supplies partial placement hints but no
-resource id.
+resource id. The server config endpoint also applies selected `configProfile` overlays before
+resource profile/env commands.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,

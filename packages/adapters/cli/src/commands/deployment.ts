@@ -35,6 +35,7 @@ import {
   type AppaloftDeploymentConfig,
   appaloftDeploymentAccessConfigSchema,
   appaloftDeploymentConfigFileNames,
+  applyAppaloftDeploymentConfigProfile,
   applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
@@ -108,6 +109,7 @@ const resourceDescriptionOption = Options.text("resource-description").pipe(Opti
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const entryModeOption = Options.choice("as", deploymentEntryModes).pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
+const configProfileOption = Options.text("config-profile").pipe(Options.optional);
 const previewModes = ["pull-request"] as const;
 const previewOption = Options.choice("preview", previewModes).pipe(Options.optional);
 const previewIdOption = Options.text("preview-id").pipe(Options.optional);
@@ -324,6 +326,10 @@ function phaseFromConfigIssues(issues: { message: string }[]): string {
 
   if (messages.includes("config_domain_resolution")) {
     return "config-domain-resolution";
+  }
+
+  if (messages.includes("config_profile_resolution")) {
+    return "config-profile-resolution";
   }
 
   if (messages.includes("unsupported_config_field")) {
@@ -1201,6 +1207,7 @@ export const deployCommand = EffectCommand.make(
     method: methodOption,
     entryMode: entryModeOption,
     config: configOption,
+    configProfile: configProfileOption,
     preview: previewOption,
     previewId: previewIdOption,
     previewDomainTemplate: previewDomainTemplateOption,
@@ -1235,6 +1242,7 @@ export const deployCommand = EffectCommand.make(
     build,
     buildTarget,
     config,
+    configProfile,
     destination,
     dockerComposeFilePath,
     dockerfilePath,
@@ -1283,6 +1291,7 @@ export const deployCommand = EffectCommand.make(
       const requestedEntryMode = optionalValue(entryMode);
       const requestedDeploymentMethodFromFlag = optionalValue(method);
       const publishDirectoryFromFlag = optionalValue(publishDir);
+      const requestedConfigProfile = optionalValue(configProfile);
       const urlFirstEntry = yield* resultToEffect(
         normalizeUrlFirstDeploymentEntry({
           ...(requestedDeploymentMethodFromFlag
@@ -1376,6 +1385,7 @@ export const deployCommand = EffectCommand.make(
           targetServiceNameValue ||
           hostPortValue !== undefined ||
           healthCheckPath ||
+          requestedConfigProfile ||
           flagEnvironmentVariables.length > 0 ||
           previewDomainRoutes,
       );
@@ -1412,10 +1422,24 @@ export const deployCommand = EffectCommand.make(
           ...(configFilePath ? { configFilePath } : {}),
         }),
       );
-      const effectiveConfig =
-        configResolution && previewContext
-          ? applyAppaloftDeploymentPreviewProfile(configResolution.config)
+      if (requestedConfigProfile && !configResolution) {
+        return yield* Effect.fail(
+          domainError.validation("Deployment config profile requires a config file", {
+            phase: "config-profile-resolution",
+            profile: requestedConfigProfile,
+          }),
+        );
+      }
+      const selectedConfig =
+        configResolution && requestedConfigProfile
+          ? yield* resultToEffect(
+              applyAppaloftDeploymentConfigProfile(configResolution.config, requestedConfigProfile),
+            )
           : configResolution?.config;
+      const effectiveConfig =
+        selectedConfig && previewContext
+          ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
+          : selectedConfig;
       const configSeed = applyPreviewRoutePrecedence({
         configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
         ...(configResolution ? { configResolution } : {}),

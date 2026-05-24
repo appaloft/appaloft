@@ -51,8 +51,8 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, generated
   access, or monitoring threshold fields to `deployments.create`. `appaloft.yaml` declarations for
   dependencies, dependency backup policy, storage, scheduled tasks, auto-deploy policy, generated
-  access profile, runtime monitoring thresholds, Resource health policy, or
-  `preview.pullRequest.profile` overlays must reconcile through existing dependency,
+  access profile, runtime monitoring thresholds, Resource health policy, named `profiles.<key>`
+  overlays, or `preview.pullRequest.profile` overlays must reconcile through existing dependency,
   backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy, Resource access,
   runtime monitoring threshold, environment variable, and `resources.configure-health` operations
   before deployment admission.
@@ -63,6 +63,8 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   bootstrap context.
 - Apply `preview.pullRequest.profile` only after trusted PR preview context selects preview scope.
   It is a profile overlay, not a way for committed YAML to choose preview identity.
+- Apply `profiles.<key>` only when trusted CLI/Action input selects `--config-profile` or
+  `config-profile`. It is a config overlay, not an Appaloft Environment selector.
 - For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
   workflow. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
   workspace-command deployments still use the same resource and deployment operation boundary.

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   appaloftDeploymentConfigFileNames,
   appaloftDeploymentDependencyKinds,
+  applyAppaloftDeploymentConfigProfile,
   applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
@@ -264,6 +265,127 @@ describe("Appaloft deployment config schema", () => {
     });
 
     expect(lifecycleGraphDelta.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-001] accepts and applies named config profile overlays", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "workspace-commands",
+        startCommand: "bun run start",
+      },
+      network: {
+        internalPort: 3000,
+      },
+      env: {
+        APP_ENV: "production",
+      },
+      profiles: {
+        staging: {
+          runtime: {
+            start: {
+              command: "bun run start:staging",
+            },
+          },
+          network: {
+            internalPort: 3001,
+          },
+          health: {
+            path: "/staging-ready",
+          },
+          access: {
+            generated: {
+              enabled: true,
+              pathPrefix: "/",
+            },
+          },
+          monitoring: {
+            thresholds: {
+              rules: [
+                {
+                  signal: "cpu",
+                  metric: "containerCpuPercent",
+                  warning: 70,
+                },
+              ],
+            },
+          },
+          env: {
+            APP_ENV: "staging",
+          },
+          secrets: {
+            APP_SECRET: {
+              from: "ci-env:APP_SECRET",
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const effective = applyAppaloftDeploymentConfigProfile(parsed.data, "staging");
+      expect(effective.isOk()).toBe(true);
+      if (effective.isOk()) {
+        expect(effective.value.runtime?.start?.command).toBe("bun run start:staging");
+        expect(effective.value.network?.internalPort).toBe(3001);
+        expect(effective.value.health?.path).toBe("/staging-ready");
+        expect(effective.value.access?.generated?.enabled).toBe(true);
+        expect(effective.value.monitoring?.thresholds?.rules[0]?.warning).toBe(70);
+        expect(effective.value.env?.APP_ENV).toBe("staging");
+        expect(effective.value.secrets?.APP_SECRET?.from).toBe("ci-env:APP_SECRET");
+      }
+    }
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-002] rejects unsafe named config profile fields", () => {
+    const providerHandle = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          runtime: {
+            startCommand: "bun run start",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(providerHandle.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          env: {
+            DATABASE_URL: "postgres://user:password@example/db",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const lifecycleGraphDelta = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          dependencies: {
+            db: {
+              kind: "postgres",
+            },
+          },
+        },
+      },
+    });
+
+    expect(lifecycleGraphDelta.success).toBe(false);
+
+    const unsupportedSizing = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          cpu: "500m",
+        },
+      },
+    });
+
+    expect(unsupportedSizing.success).toBe(false);
   });
 
   test("[CONFIG-FILE-DEPENDENCY-001] accepts managed Postgres dependency declarations", () => {

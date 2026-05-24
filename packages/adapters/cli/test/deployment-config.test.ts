@@ -3280,6 +3280,278 @@ describe("CLI deployment config entry workflow", () => {
     expect("networkProfile" in (deployment as Record<string, unknown>)).toBe(false);
   });
 
+  test("[CONFIG-FILE-NAMED-PROFILE-003] ordinary config deploy ignores unselected named profiles", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-named-profile-unselected-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  APP_ENV: production",
+        "profiles:",
+        "  staging:",
+        "    runtime:",
+        "      startCommand: bun run staging",
+        "    network:",
+        "      internalPort: 3001",
+        "    env:",
+        "      APP_ENV: staging",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        startCommand: "bun run start",
+      },
+      networkProfile: {
+        internalPort: 3000,
+      },
+    });
+    const variable = harness.commands.find(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variable).toMatchObject({
+      key: "APP_ENV",
+      value: "production",
+      kind: "plain-config",
+    });
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-004] selected named profile applies before ids-only deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-named-profile-selected-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  APP_ENV: production",
+        "profiles:",
+        "  staging:",
+        "    runtime:",
+        "      startCommand: bun run staging",
+        "    network:",
+        "      internalPort: 3001",
+        "    health:",
+        "      path: /staging-ready",
+        "    env:",
+        "      APP_ENV: staging",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--config-profile",
+          "staging",
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        startCommand: "bun run staging",
+        healthCheckPath: "/staging-ready",
+      },
+      networkProfile: {
+        internalPort: 3001,
+      },
+    });
+    const variable = harness.commands.find(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variable).toMatchObject({
+      key: "APP_ENV",
+      value: "staging",
+      kind: "plain-config",
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect("runtimeProfile" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("networkProfile" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-005] missing selected named profile fails before mutation", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-named-profile-missing-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "profiles:",
+        "  staging:",
+        "    env:",
+        "      APP_ENV: staging",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      const result = await withMutedProcessOutput(() =>
+        harness.program
+          .parseAsync([
+            "node",
+            "appaloft",
+            "deploy",
+            workspace,
+            "--config",
+            configPath,
+            "--config-profile",
+            "production",
+            "--server-host",
+            "203.0.113.10",
+            "--server-provider",
+            "generic-ssh",
+          ])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected missing config profile to fail before mutation");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"code":"validation_error"');
+      expect(errorText).toContain('"phase":"config-profile-resolution"');
+      expect(errorText).toContain("production");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.commands).toHaveLength(0);
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-006] trusted flags override selected named profile values", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-named-profile-flag-override-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  APP_ENV: production",
+        "profiles:",
+        "  staging:",
+        "    network:",
+        "      internalPort: 3001",
+        "    env:",
+        "      APP_ENV: staging",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--config-profile",
+          "staging",
+          "--port",
+          "3002",
+          "--env",
+          "APP_ENV=flag",
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      networkProfile: {
+        internalPort: 3002,
+      },
+    });
+    const variables = harness.commands.filter(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variables.at(-1)).toMatchObject({
+      key: "APP_ENV",
+      value: "flag",
+      kind: "plain-config",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-001] config env variables dispatch before ids-only deployment input returns", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(

@@ -104,11 +104,12 @@ provider-native scheduler handles, backup policy ids, backup artifact handles, r
 source-event ids, webhook delivery ids, monitoring policy ids, metric sample ids, log payloads, or
 webhook secret values into `appaloft.yml`. Repository config may declare high-level application
 `dependencies`, `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`,
-`access.generated`, `monitoring.thresholds`, `health`, and selected
-`preview.pullRequest.profile` overlays, but deploy must reconcile them through existing operations
-before ids-only deployment admission. Resource health policy declarations use
-`resources.configure-health`; preview profile overlays apply only after trusted PR preview context
-selects preview scope; neither may be added to `deployments.create`.
+`access.generated`, `monitoring.thresholds`, `health`, selected `profiles.<key>` overlays, and
+selected `preview.pullRequest.profile` overlays, but deploy must reconcile them through existing
+operations before ids-only deployment admission. Resource health policy declarations use
+`resources.configure-health`; named config profiles apply only after trusted CLI/Action
+`config-profile` selection, preview profile overlays apply only after trusted PR preview context
+selects preview scope, and none may be added to `deployments.create`.
 
 ## Entry Selection
 

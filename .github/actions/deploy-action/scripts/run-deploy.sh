@@ -636,7 +636,11 @@ source_package_payload_for_action() {
   local preview_route_payload
   local source_package_github_token
 
-  payload="{\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\",\"sourcePackage\":{\"transport\":\"server-github-fetch\",\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
+  payload="{\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
+  if [ -n "$config_profile" ]; then
+    payload="${payload},\"configProfile\":\"$(json_escape "$config_profile")\""
+  fi
+  payload="${payload},\"sourcePackage\":{\"transport\":\"server-github-fetch\",\"sourceFingerprint\":\"$(json_escape "$source_fingerprint")\",\"configPath\":\"$(json_escape "$selected_config")\",\"sourceRoot\":\"$(json_escape "$source_root")\""
   if [ -n "$source_revision" ]; then
     payload="${payload},\"revision\":\"$(json_escape "$source_revision")\""
   fi
@@ -1083,6 +1087,7 @@ input_version="${INPUT_VERSION:-latest}"
 source_locator="${INPUT_SOURCE:-.}"
 source_revision="${INPUT_SOURCE_REVISION:-${GITHUB_SHA:-}}"
 config_path="${INPUT_CONFIG:-}"
+config_profile="${INPUT_CONFIG_PROFILE:-}"
 input_control_plane_mode="${INPUT_CONTROL_PLANE_MODE:-}"
 control_plane_mode="$input_control_plane_mode"
 control_plane_url="${INPUT_CONTROL_PLANE_URL:-}"
@@ -1305,7 +1310,7 @@ if [ "$control_plane_mode" = "self-hosted" ]; then
     exit 1
   fi
 
-  if [ "$wrapper_command" = "deploy" ] && ! truthy "$server_config_deploy" && { [ "$source_locator" != "." ] || [ -n "${INPUT_RUNTIME_NAME:-}" ] || [ -n "$preview_domain_template" ] || [ -n "$preview_tls_mode" ] || truthy "$require_preview_url" || [ -n "$environment_variables" ] || [ -n "$secret_variables" ]; }; then
+  if [ "$wrapper_command" = "deploy" ] && ! truthy "$server_config_deploy" && { [ "$source_locator" != "." ] || [ -n "$config_profile" ] || [ -n "${INPUT_RUNTIME_NAME:-}" ] || [ -n "$preview_domain_template" ] || [ -n "$preview_tls_mode" ] || truthy "$require_preview_url" || [ -n "$environment_variables" ] || [ -n "$secret_variables" ]; }; then
     error "self-hosted control-plane mode deploys an existing Appaloft resource profile; source, runtime/profile, environment, secret, and preview route inputs are not applied in this slice"
     exit 1
   fi
@@ -1473,6 +1478,7 @@ if [ -n "$config_path" ]; then
 elif [ -f "appaloft.yml" ]; then
   append_option "--config" "appaloft.yml"
 fi
+append_option "--config-profile" "$config_profile"
 
 if [ "$wrapper_command" = "deploy" ]; then
   append_option "--runtime-name" "${INPUT_RUNTIME_NAME:-}"

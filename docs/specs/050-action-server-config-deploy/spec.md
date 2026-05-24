@@ -48,7 +48,7 @@ PGlite from the runner.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token and a source package manifest includes a safe config path | The Action submits the server config deploy request with config plus trusted GitHub repository/ref/revision/preview metadata and no Appaloft ids | The server validates the package manifest and config, resolves identity from existing source-link state, deploy-token scope, accepted source/repository binding, preview-scoped source fingerprint, or explicit trusted bootstrap context, applies resource source/profile and env reference changes through explicit operations, scopes transient provider source-package credentials through the integration auth boundary for deployment source materialization, then dispatches ids-only `deployments.create`. |
+| ACTION-SERVER-CONFIG-SPEC-001 | Server applies repository config | `control-plane-mode: self-hosted` is selected, the Action has a compatible server URL/token and a source package manifest includes a safe config path | The Action submits the server config deploy request with config plus trusted GitHub repository/ref/revision/preview metadata and no Appaloft ids | The server validates the package manifest and config, applies trusted `configProfile` selection when present, resolves identity from existing source-link state, deploy-token scope, accepted source/repository binding, preview-scoped source fingerprint, or explicit trusted bootstrap context, applies resource source/profile and env reference changes through explicit operations, scopes transient provider source-package credentials through the integration auth boundary for deployment source materialization, then dispatches ids-only `deployments.create`. |
 | ACTION-SERVER-CONFIG-SPEC-002 | Runner does not mutate Appaloft state | A self-hosted server config deploy is requested | The Action runs | The Action does not invoke the CLI as the deployment executor, open SSH, select `state-backend`, or read/write SSH-server PGlite. It only performs handshake, package preparation/upload or reference handoff, API request, output, and feedback steps. Current composite wrapper setup may still install the released binary before dispatch, but this workflow does not use it as the deployment executor. |
 | ACTION-SERVER-CONFIG-SPEC-003 | Committed config can only select narrow advanced bootstrap context | `appaloft.yml` contains `controlPlane.deploymentContext` with project/environment/resource/server and optional destination ids | The Action/server parses the config | The ids are treated as non-secret one-time bootstrap/advanced context, must be complete when any id is supplied, and may bootstrap a missing source link only after authorization and conflict checks against token scope, source-link state, and repository facts. |
 | ACTION-SERVER-CONFIG-SPEC-003A | Committed config cannot select secrets or broad identity | `appaloft.yml` contains credential ids, organization ids, tenant ids, provider account ids, tokens, database URLs, or secret values | The server parses the config | The request fails before mutation with structured validation details and no source link, resource profile, route, or deployment mutation. |
@@ -92,10 +92,11 @@ PGlite from the runner.
   SSH `none` or existing self-hosted source-link trigger when selected.
 - Web/UI: Web may link to the accepted deployment detail and source package diagnostics; Web mode
   selection remains separate.
-- Config: committed config may carry non-secret profile, `ci-env:` secret references,
-  control-plane connection policy, and the narrow self-hosted `controlPlane.deploymentContext` for
-  advanced bootstrap/debug only. It must not carry credentials, org/tenant/provider account
-  identity, tokens, database URLs, broad target identity, or raw secret material.
+- Config: committed config may carry non-secret profile, selected `profiles.<key>` overlays,
+  `ci-env:` secret references, control-plane connection policy, and the narrow self-hosted
+  `controlPlane.deploymentContext` for advanced bootstrap/debug only. It must not carry
+  credentials, org/tenant/provider account identity, tokens, database URLs, broad target identity,
+  or raw secret material.
 - Events: Code Round must define any new source package accepted/rejected events or process-state
   records before adding workers.
 - Public docs/help: docs must keep distinguishing pure Action/SSH, self-hosted source-link trigger,
