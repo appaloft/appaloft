@@ -18,8 +18,9 @@ Canonical assertions:
 - trusted CLI/Action/Web/future-tool profile inputs mirror the repository config profile fields,
   override selected config values, and feed the same Quick Deploy bootstrap path without generating
   temporary config files;
-- non-secret env values and resolved secret references map to environment commands before
-  deployment;
+- non-secret env values and `ci-env:` resolved secret references map to environment commands before
+  deployment, while `resource-secret:` references check existing Resource secrets without copying
+  values;
 - `dependencies` declarations map to dependency-resource list/provision and Resource binding
   operations before deployment;
 - `dependencies.<key>.backup` declarations map to dependency-resource backup policy operations
@@ -91,7 +92,7 @@ This matrix inherits:
 | Remote state | SSH-server `ssh-pglite` default, local-only override, locking, migration, and source identity reuse. |
 | Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
-| Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
+| Environment and secret reference commands | Non-secret variables, `ci-env:` secret values, and existing `resource-secret:` requirements are handled before deployment snapshot without leaking raw secret values. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
 | Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
@@ -161,6 +162,8 @@ This matrix inherits:
 | CONFIG-FILE-SEC-008 | integration | Required CI secret reference missing | Config declares required `ci-env:API_TOKEN` but the entrypoint environment does not contain `API_TOKEN` | Workflow stops before mutation and does not include the secret key value in details | `validation_error`, phase `config-secret-resolution` | No write commands |
 | CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
 | CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
+| CONFIG-FILE-SEC-011 | integration | Existing Resource secret reference accepted | Config declares `secrets.APP_SECRET.from: resource-secret:APP_SECRET` and the selected Resource already has that runtime secret reference | Workflow verifies the masked Resource secret reference and does not copy the secret value into environment commands or deployment input | None | resource resolution -> `resources.secrets.show(resourceId, APP_SECRET)` -> `deployments.create` |
+| CONFIG-FILE-SEC-012 | integration | Required Resource secret reference missing | Config declares required `resource-secret:APP_SECRET` but the selected Resource has no matching runtime secret reference | Workflow stops before deployment with safe key/reference metadata only | `validation_error`, phase `config-secret-resolution` | `resources.secrets.show`; no `deployments.create` |
 
 ## Dependency Graph Matrix
 
@@ -404,9 +407,11 @@ Current implemented coverage:
   `CONFIG-FILE-NAMED-PROFILE-006` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
-  `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
-  proving plain env mapping, public-prefix build-time exposure, supported `ci-env:` resolution,
-  required missing-secret failure, and unsupported required resolver failure.
+  `CONFIG-FILE-SEC-010` through `CONFIG-FILE-SEC-012` are covered in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving plain env mapping,
+  public-prefix build-time exposure, supported `ci-env:` resolution, required missing-secret
+  failure, supported `resource-secret:` existence checks, and unsupported required resolver
+  failure.
 - `CONFIG-FILE-ENTRY-008` has migration coverage in `packages/config/test/index.test.ts`, proving
   the old headless CI default to embedded local PGlite without `DATABASE_URL`. After ADR-024, that
   coverage is local-only migration coverage, not the SSH target behavior.
@@ -578,7 +583,8 @@ operation sequencing through explicit apply steps using
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, and
 `resources.unset-variable`,
-stored/external secret adapters beyond `ci-env:`, operational provisioning of the external SSH e2e
+stored/external secret adapters beyond `ci-env:` and `resource-secret:`, operational provisioning of
+the external SSH e2e
 secrets/target, server-applied domain route realization e2e, managed control-plane domain mapping,
 and resource sizing support remain target coverage rows, not implemented baseline behavior.
 

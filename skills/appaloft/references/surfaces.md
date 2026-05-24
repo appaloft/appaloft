@@ -32,8 +32,9 @@ installer; that would blur the boundary between installing an agent skill and ru
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
    ordinary default mental model. High-level `dependencies`, `dependencies.<key>.backup`,
    `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`, `monitoring.thresholds`, and
-   `retention.runtimePrune` declarations must reconcile through existing operations before
-   ids-only deployment admission.
+   `retention.runtimePrune` declarations plus supported `env`/`secrets` references must reconcile
+   through existing operations before ids-only deployment admission. Supported secret resolvers are
+   `ci-env:<NAME>` and same-key `resource-secret:<KEY>`.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
 

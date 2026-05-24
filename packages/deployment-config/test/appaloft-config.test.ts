@@ -52,7 +52,7 @@ describe("Appaloft deployment config schema", () => {
       },
       secrets: {
         SSH_PRIVATE_KEY: {
-          from: "server-credential:ssh_prod",
+          from: "resource-secret:SSH_PRIVATE_KEY",
         },
       },
       preview: {
@@ -1434,7 +1434,7 @@ describe("Appaloft deployment config schema", () => {
     const reference = parseAppaloftDeploymentConfig({
       secrets: {
         DATABASE_URL: {
-          from: "environment-secret:database_url",
+          from: "resource-secret:DATABASE_URL",
         },
       },
     });

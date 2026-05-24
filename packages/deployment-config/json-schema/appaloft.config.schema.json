@@ -808,7 +808,7 @@
                       "from": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod."
+                        "description": "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET."
                       },
                       "required": {
                         "type": "boolean"
@@ -1179,7 +1179,7 @@
                 "from": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod."
+                  "description": "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET."
                 },
                 "required": {
                   "type": "boolean"
@@ -1463,7 +1463,7 @@
           "from": {
             "type": "string",
             "minLength": 1,
-            "description": "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod."
+            "description": "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET."
           },
           "required": {
             "type": "boolean"

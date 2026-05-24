@@ -107,6 +107,7 @@ async function createPreviewDeployCliHarness(
     storageVolumes?: unknown[];
     scheduledTasks?: unknown[];
     monitoringThresholdsReadback?: Record<string, unknown> | null;
+    resourceSecretReferences?: unknown[];
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -304,6 +305,30 @@ async function createPreviewDeployCliHarness(
             },
           }) as Record<string, unknown> as T,
         );
+      }
+      if (query.constructor.name === "ShowResourceSecretReferenceQuery") {
+        const secretQuery = query as unknown as {
+          resourceId: string;
+          key: string;
+          exposure: "build-time" | "runtime";
+        };
+        const secret = (input.resourceSecretReferences ?? []).find(
+          (candidate) =>
+            typeof candidate === "object" &&
+            candidate !== null &&
+            (candidate as { resourceId?: unknown }).resourceId === secretQuery.resourceId &&
+            (candidate as { key?: unknown }).key === secretQuery.key &&
+            (candidate as { exposure?: unknown }).exposure === secretQuery.exposure,
+        );
+        if (!secret) {
+          return err(domainError.notFound("resource_secret_reference", secretQuery.key));
+        }
+
+        return ok({
+          schemaVersion: "resources.secrets.show/v1",
+          secret,
+          generatedAt: "2026-05-24T00:00:00.000Z",
+        } as T);
       }
       return ok({ items: [] } as T);
     },
@@ -527,6 +552,11 @@ describe("CLI deployment config entry workflow", () => {
         events: ["push"],
         dedupeWindowSeconds: 300,
       },
+      secrets: {
+        APP_SECRET: {
+          from: "resource-secret:APP_SECRET",
+        },
+      },
       retention: {
         runtimePrune: {
           retentionDays: 14,
@@ -587,6 +617,13 @@ describe("CLI deployment config entry workflow", () => {
         retryOnFailure: true,
         enabled: true,
       },
+      resourceSecretRequirements: [
+        {
+          key: "APP_SECRET",
+          refKey: "APP_SECRET",
+          required: true,
+        },
+      ],
     });
     expect(seed.healthCheck).toMatchObject({
       enabled: true,
@@ -808,6 +845,28 @@ describe("CLI deployment config entry workflow", () => {
         isSecret: true,
       },
     ]);
+  });
+
+  test("[CONFIG-FILE-SEC-011] resource-secret references are deferred to Resource secret checks", async () => {
+    ensureReflectMetadata();
+    const { deploymentEnvironmentVariablesFromConfig } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    const result = deploymentEnvironmentVariablesFromConfig({
+      secrets: {
+        APP_SECRET: {
+          from: "resource-secret:APP_SECRET",
+          required: true,
+        },
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) {
+      throw new Error(result.error.message);
+    }
+    expect(result.value).toEqual([]);
   });
 
   test("[CONFIG-FILE-SEC-008] required ci-env secret references fail before mutation when missing", async () => {
@@ -4071,6 +4130,135 @@ describe("CLI deployment config entry workflow", () => {
     expect(deployment).not.toHaveProperty("retention");
     expect(deployment).not.toHaveProperty("runtimePrune");
     expect(deployment).not.toHaveProperty("runtimePrunePolicy");
+  });
+
+  test("[CONFIG-FILE-SEC-011] config Resource secret reference is checked before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-resource-secret-config-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "secrets:",
+        "  APP_SECRET:",
+        "    from: resource-secret:APP_SECRET",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      resourceSecretReferences: [
+        {
+          resourceId: "res_1",
+          key: "APP_SECRET",
+          value: "****",
+          scope: "resource",
+          exposure: "runtime",
+          kind: "secret",
+          isSecret: true,
+          updatedAt: "2026-05-24T00:00:00.000Z",
+        },
+      ],
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.80",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowResourceSecretReferenceQuery");
+    expect(harness.operations.indexOf("ShowResourceSecretReferenceQuery")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    expect(harness.operations).not.toContain("SetEnvironmentVariableCommand");
+    const secretQuery = harness.queries.find(
+      (query) => query.constructor.name === "ShowResourceSecretReferenceQuery",
+    ) as Record<string, unknown> | undefined;
+    expect(secretQuery).toMatchObject({
+      resourceId: "res_1",
+      key: "APP_SECRET",
+      exposure: "runtime",
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("secrets");
+  });
+
+  test("[CONFIG-FILE-SEC-012] missing required Resource secret reference fails before deployment", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceSecretReferenceQuery") {
+          return err(domainError.notFound("resource_secret_reference", "APP_SECRET"));
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            resourceSecretRequirements: [
+              {
+                key: "APP_SECRET",
+                refKey: "APP_SECRET",
+                required: true,
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected missing Resource secret reference to fail");
+    }
+    expect(result.left).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "config-secret-resolution",
+        secretKey: "APP_SECRET",
+        secretRef: "resource-secret:APP_SECRET",
+      },
+    });
+    expect(commands).not.toContain("CreateDeploymentCommand");
   });
 
   test("[CONFIG-FILE-DEPENDENCY-005] config dependencies reuse existing managed resource and binding", async () => {

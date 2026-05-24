@@ -322,11 +322,19 @@ secrets:
   APP_SECRET:
     from: ci-env:APP_SECRET
     required: true
+  EXISTING_RESOURCE_SECRET:
+    from: resource-secret:EXISTING_RESOURCE_SECRET
 ```
 
 In pull request preview deploys, non-secret `env` values may use `{pr_number}` and `{preview_id}`.
-Secret values themselves must stay in GitHub Secrets, another CI secret store, or Appaloft-managed
-secrets.
+`ci-env:<NAME>` resolves from a trusted runner environment and stores the value as a runtime
+environment secret before deployment. `resource-secret:<KEY>` declares that the selected Resource
+must already have a matching runtime Resource secret reference; config deploy verifies the masked
+reference and never reads, copies, or writes the secret value.
+
+Secret values themselves must stay in GitHub Secrets, the selected CI runner environment, or
+Resource secret commands. External secret adapters beyond `ci-env:` and `resource-secret:` are not
+repository config resolvers yet.
 
 <h2 id="environment-config-file-control-plane">Control plane</h2>
 

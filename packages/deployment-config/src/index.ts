@@ -744,7 +744,7 @@ const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boole
 export const appaloftDeploymentSecretReferenceSchema = z
   .object({
     from: nonEmptyStringSchema.describe(
-      "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod.",
+      "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET.",
     ),
     required: z.boolean().optional(),
     description: z.string().trim().min(1).optional(),

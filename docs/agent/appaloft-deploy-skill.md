@@ -58,6 +58,9 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy, Resource access,
   runtime monitoring threshold, scheduled runtime prune policy, environment variable, and
   `resources.configure-health` operations before deployment admission.
+- Treat `secrets.from` as a reference only. `ci-env:<NAME>` resolves from the trusted runner
+  environment; `resource-secret:<KEY>` only checks an existing same-key Resource runtime secret
+  reference. Do not invent external secret resolvers or put raw secret values in `appaloft.yaml`.
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - Do not ask ordinary users for project/resource/server ids as the first step of a GitHub Action

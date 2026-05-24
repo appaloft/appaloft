@@ -474,7 +474,11 @@ Recovery requirements:
 CI-provided secrets are resolver inputs, not committed config values. For GitHub Actions, the
 workflow maps GitHub secrets into runner environment variables, and the Appaloft config references
 them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
-changing the repository config contract.
+changing the repository config contract. Existing Resource-owned secret references are resolver
+requirements, not value carriers: `resource-secret:<KEY>` requires the selected Resource to already
+own a matching runtime secret reference with the same key, verifies it through
+`resources.secrets.show`, and never reads or copies the secret value into environment commands or
+`deployments.create`.
 
 Non-secret `env` values may use `{preview_id}` and `{pr_number}` placeholders only when the
 entrypoint has already established trusted pull request preview context. Missing preview context
@@ -521,7 +525,7 @@ The minimal supported action inputs are:
 - `source`, defaulting to `.`;
 - runtime/profile flags that mirror repository config fields: deployment strategy, install/build/
   start commands, publish directory, network profile, health path, non-secret env values, and
-  `ci-env:` secret references;
+  `ci-env:` / `resource-secret:` secret references;
 - `ssh-host`, `ssh-user`, `ssh-port`, and either `ssh-private-key` or `ssh-private-key-file`;
 - `server-proxy-kind` and `state-backend` as optional trusted entrypoint overrides;
 - `args` as a last-resort pass-through for CLI flags not modeled as action inputs yet.
@@ -740,7 +744,7 @@ and never adds fields to `deployments.create`.
 | `internalPort`, upstream protocol, exposure mode, target service | `ResourceNetworkProfile` | Must become resource network state; never a deployment command field. |
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. In PR preview context, `{preview_id}` and `{pr_number}` render from trusted entrypoint context before variables are applied. |
-| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
+| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. Existing Resource-owned runtime secrets support `resource-secret:<KEY>` as a same-key requirement checked through `resources.secrets.show`. |
 | `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
 | `dependencies.*.backup` | Dependency Resource backup policy operations | Describes scheduled backup policy for a managed application dependency; reconciled through dependency backup policy commands before deployment, never as deployment command fields or backup execution. |
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
@@ -795,7 +799,8 @@ Allowed secret-related declarations are:
 
 - required secret keys without values;
 - `ci-env:<NAME>` references that are resolved from the trusted CI runner environment at entry time;
-- references to secrets already stored in Appaloft or a configured external secret adapter;
+- `resource-secret:<KEY>` references that require an existing same-key Resource-owned runtime
+  secret reference and expose only masked readback;
 - references to reusable SSH credentials created through credential commands;
 - `local-ssh-agent` style credential use when the runtime target supports it;
 - generated-secret requests only after a secret-generation operation is specified.
@@ -808,6 +813,12 @@ If a required `ci-env:<NAME>` reference cannot be resolved from the entrypoint e
 admission must fail with `validation_error` in phase `config-secret-resolution` before any write
 command is dispatched. Optional unresolved references are skipped without creating an environment
 variable.
+
+If a required `resource-secret:<KEY>` reference cannot be read from the selected Resource's runtime
+secret references, admission must fail with `validation_error` in phase
+`config-secret-resolution` before `deployments.create`. Optional missing Resource secret references
+are skipped. Repository config does not create, rotate, delete, or alias Resource secrets because
+those operations require raw secret value custody outside the committed file.
 
 SSH server credentials are target credential state. The config file may declare that a deployment
 requires an SSH-capable target, but it must not register a server with an inline key or password.
@@ -987,6 +998,7 @@ Current CLI deploy supports explicit `--config` and implicit source-root discove
 config source/runtime/network/health profile fields into quick-deploy resource creation input,
 supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
 plain `env` declarations and `ci-env:` secret references into environment variable commands,
+checks `resource-secret:` requirements through Resource secret readback,
 bootstraps project/server/environment/resource records in explicit local PGlite mode when ids are
 not provided, and reconciles declared health policy through `resources.configure-health` when
 existing-resource profile apply is explicitly acknowledged, then dispatches ids-only
@@ -1010,7 +1022,8 @@ CLI/filesystem entry paths.
 
 Current executable tests prove parser safety, Git-root filesystem discovery, CLI init shape,
 profile-to-quick-deploy seed mapping, headless local PGlite defaulting, no-id non-TTY context
-bootstrap, `ci-env:` secret resolution, environment command sequencing, and ids-only
+bootstrap, `ci-env:` secret resolution, `resource-secret:` readback, environment command
+sequencing, and ids-only
 `deployments.create`. After ADR-024, local PGlite bootstrap is narrowed to explicit local-only mode.
 
 CLI resolver-level tests now cover state backend selection for `ssh-pglite`, `local-pglite`, and
@@ -1059,7 +1072,7 @@ server-applied route state. The GitHub Actions secret-gated and local explicit S
 verifies Traefik-backed server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI
 e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
-`ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
+`ci-env:` and `resource-secret:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
 history, and managed domain control-plane mapping remain follow-up work.
 

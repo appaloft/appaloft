@@ -61,6 +61,7 @@ import {
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
   ShowResourceQuery,
+  ShowResourceSecretReferenceQuery,
   ShowRuntimeMonitoringThresholdsQuery,
   type StorageVolumeSummary,
 } from "@appaloft/application";
@@ -156,6 +157,7 @@ export interface DeploymentPromptSeed {
   generatedAccessProfile?: DeploymentGeneratedAccessProfileSeed;
   monitoringThresholds?: DeploymentMonitoringThresholdsSeed;
   runtimePrunePolicy?: DeploymentRuntimePrunePolicySeed;
+  resourceSecretRequirements?: DeploymentResourceSecretRequirementSeed[];
   profileDriftPreflight?: boolean;
 }
 
@@ -226,6 +228,11 @@ export interface DeploymentMonitoringThresholdsSeed {
   rules: DeploymentMonitoringThresholdRuleSeed[];
 }
 export type DeploymentRuntimePrunePolicySeed = DeploymentConfiguredRuntimePrunePolicy;
+export interface DeploymentResourceSecretRequirementSeed {
+  key: string;
+  refKey: string;
+  required: boolean;
+}
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
@@ -279,6 +286,7 @@ const defaultApplicationInternalPort = 3000;
 const defaultStaticInternalPort = 80;
 const defaultStaticPublishDirectory = "/dist";
 const ciEnvSecretReferencePrefix = "ci-env:";
+const resourceSecretReferencePrefix = "resource-secret:";
 
 function cliRuntimeEffect<A, E>(
   effect: Effect.Effect<A, E, unknown>,
@@ -631,6 +639,22 @@ export function deploymentPromptSeedFromConfig(
         enabled: config.retention.runtimePrune.enabled,
       } satisfies DeploymentRuntimePrunePolicySeed)
     : undefined;
+  const resourceSecretRequirements = Object.entries(config.secrets ?? {})
+    .sort(compareConfigKeys)
+    .flatMap(([key, reference]) => {
+      const secretRef = reference.from.trim();
+      if (!secretRef.startsWith(resourceSecretReferencePrefix)) {
+        return [];
+      }
+
+      return [
+        {
+          key,
+          refKey: secretRef.slice(resourceSecretReferencePrefix.length).trim(),
+          required: reference.required ?? true,
+        } satisfies DeploymentResourceSecretRequirementSeed,
+      ];
+    });
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -673,6 +697,7 @@ export function deploymentPromptSeedFromConfig(
     ...(generatedAccessProfile ? { generatedAccessProfile } : {}),
     ...(monitoringThresholds ? { monitoringThresholds } : {}),
     ...(runtimePrunePolicy ? { runtimePrunePolicy } : {}),
+    ...(resourceSecretRequirements.length > 0 ? { resourceSecretRequirements } : {}),
   };
 }
 
@@ -768,6 +793,10 @@ export function deploymentEnvironmentVariablesFromConfig(
   for (const [key, reference] of Object.entries(config.secrets ?? {}).sort(compareConfigKeys)) {
     const secretRef = reference.from.trim();
     const required = reference.required ?? true;
+
+    if (secretRef.startsWith(resourceSecretReferencePrefix)) {
+      continue;
+    }
 
     if (!secretRef.startsWith(ciEnvSecretReferencePrefix)) {
       if (!required) {
@@ -1191,6 +1220,25 @@ function showResource(resourceId: string) {
         includeLatestDeployment: false,
         includeAccessSummary: false,
         includeProfileDiagnostics: false,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function showResourceSecretReference(input: {
+  resourceId: string;
+  key: string;
+  exposure: "runtime";
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowResourceSecretReferenceQuery.create({
+        resourceId: input.resourceId,
+        key: input.key,
+        exposure: input.exposure,
       }),
     );
     const result = yield* Effect.promise(() => cli.executeQuery(message));
@@ -3214,6 +3262,69 @@ function ensureRepositoryConfigRuntimePrunePolicy(input: {
   });
 }
 
+function ensureRepositoryConfigResourceSecretRequirements(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const requirements = input.seed.resourceSecretRequirements ?? [];
+    for (const requirement of requirements) {
+      const secretRef = `${resourceSecretReferencePrefix}${requirement.refKey}`;
+      if (!requirement.refKey) {
+        if (!requirement.required) {
+          continue;
+        }
+
+        return yield* Effect.fail(
+          secretResolutionError({
+            message: "Deployment config Resource secret reference is missing a secret key",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      if (requirement.refKey !== requirement.key) {
+        return yield* Effect.fail(
+          secretResolutionError({
+            message:
+              "Deployment config Resource secret references must use the same key as the target",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      const result = yield* Effect.either(
+        showResourceSecretReference({
+          resourceId: input.resourceId,
+          key: requirement.refKey,
+          exposure: "runtime",
+        }),
+      );
+      if (Either.isRight(result)) {
+        continue;
+      }
+
+      if (!requirement.required && hasDomainErrorCode(result.left, "not_found")) {
+        continue;
+      }
+
+      if (hasDomainErrorCode(result.left, "not_found")) {
+        return yield* Effect.fail(
+          secretResolutionError({
+            message: "Required deployment config Resource secret reference was not found",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      return yield* Effect.fail(result.left);
+    }
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -4358,6 +4469,10 @@ export function resolveInteractiveDeploymentInput(
         yield* ensureRepositoryConfigRuntimePrunePolicy({
           seed: resolvedSeed,
           serverId: deploymentInput.serverId,
+        });
+        yield* ensureRepositoryConfigResourceSecretRequirements({
+          seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigGeneratedAccessProfile({
           seed: resolvedSeed,
