@@ -561,10 +561,9 @@ operation sequencing through explicit apply steps using
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, and
 `resources.unset-variable`,
-stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping,
-operational provisioning of the external SSH e2e secrets/target, server-applied domain route
-realization e2e, managed control-plane domain mapping, and resource sizing support remain target
-coverage rows, not implemented baseline behavior.
+stored/external secret adapters beyond `ci-env:`, operational provisioning of the external SSH e2e
+secrets/target, server-applied domain route realization e2e, managed control-plane domain mapping,
+and resource sizing support remain target coverage rows, not implemented baseline behavior.
 
 ## Open Questions
 

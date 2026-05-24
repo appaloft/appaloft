@@ -23,6 +23,28 @@ Configuration files are for reviewable project, resource, environment, and deplo
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
+<h2 id="environment-config-file-runtime">Source and runtime</h2>
+
+Use `source` and `runtime` to describe where the app lives and how Appaloft should build or start
+it:
+
+```yaml
+source:
+  type: git
+  repository: https://github.com/acme/api
+  baseDirectory: apps/api
+
+runtime:
+  strategy: dockerfile
+  dockerfilePath: deploy/Dockerfile
+  buildTarget: runner
+```
+
+For Compose apps, use `strategy: docker-compose` with `dockerComposeFilePath`. For static sites,
+use `strategy: static` with `publishDirectory`. These paths are relative to the selected source
+root and must not escape it. Keep provider accounts, credentials, registry pull secrets, host paths,
+resource sizing, replicas, and rollout policy outside `appaloft.yaml`.
+
 <h2 id="environment-config-file-named-profiles">Named config profiles</h2>
 
 Use `profiles.<key>` for reviewable variants such as staging or smoke deploys. The file declares

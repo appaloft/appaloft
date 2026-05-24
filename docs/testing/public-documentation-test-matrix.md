@@ -82,6 +82,9 @@ Current status:
   Repository config docs now describe `controlPlane.mode`, safe `controlPlane.url` usage, and the
   narrow advanced-bootstrap role of `controlPlane.deploymentContext` under
   `environments/reference/config-file#environment-config-file-control-plane`.
+  Repository config docs now also describe source/runtime fields, including Dockerfile path,
+  Docker Compose file path, Docker build target, and static publish directory, under
+  `environments/reference/config-file#environment-config-file-runtime`.
   CLI remote control-plane client docs now describe login/profile/context storage, local fallback,
   remote typed SDK dispatch, explicit unsupported-operation behavior, and the no-adoption/no-secret
   boundary under `reference/cli#cli-remote-control-plane-login` and
