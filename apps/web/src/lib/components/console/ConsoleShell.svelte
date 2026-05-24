@@ -458,7 +458,7 @@
             {$t(i18nKeys.console.deployments.records)}
           </DropdownMenuItem>
           {#if authSession.session}
-            <DropdownMenuItem onclick={signOut}>
+            <DropdownMenuItem data-console-sign-out-action onclick={signOut}>
               <LogOut class="size-4" />
               {$t(i18nKeys.common.actions.signOut)}
             </DropdownMenuItem>
