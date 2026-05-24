@@ -115,7 +115,15 @@ const blueprintComponentSchema = z
 const blueprintResourceRequirementSchema = z
   .object({
     id: slugSchema,
-    kind: z.enum(["postgres", "redis", "volume", "object-storage"]),
+    kind: z.enum([
+      "postgres",
+      "mysql",
+      "redis",
+      "volume",
+      "object-storage",
+      "clickhouse",
+      "opensearch",
+    ]),
     label: nonEmptyString,
     optional: z.boolean().default(false),
   })

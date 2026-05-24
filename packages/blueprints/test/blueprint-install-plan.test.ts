@@ -86,4 +86,70 @@ describe("Blueprint install plan", () => {
       ]);
     }
   });
+
+  test("[CLOUD-BLUEPRINT-PUBLIC-DEPENDENCY-KINDS-022] preserves neutral dependency kinds in install plans", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-service",
+      name: "Dependency Service",
+      version: "1.0.0",
+      summary: "A deployable service with mainstream dependency kinds.",
+      resources: [
+        { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "mysql", kind: "mysql", label: "MySQL" },
+        { id: "redis", kind: "redis", label: "Redis" },
+        { id: "storage", kind: "object-storage", label: "Object storage" },
+        { id: "clickhouse", kind: "clickhouse", label: "ClickHouse" },
+        { id: "opensearch", kind: "opensearch", label: "OpenSearch" },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/appaloft/api:latest",
+          },
+          usesResources: ["postgres", "mysql", "redis", "storage", "clickhouse", "opensearch"],
+        },
+      ],
+      profiles: {
+        production: {
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) {
+      throw new Error("Expected manifest to validate");
+    }
+
+    const result = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Dependency Project",
+        environmentName: "production",
+        resourceSlugPrefix: "deps",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const dependencyKinds = result.value.operations.flatMap((operation) =>
+        operation.kind === "bind-dependency" ? [operation.requirementKind] : [],
+      );
+
+      expect(dependencyKinds).toEqual([
+        "postgres",
+        "mysql",
+        "redis",
+        "object-storage",
+        "clickhouse",
+        "opensearch",
+      ]);
+    }
+  });
 });

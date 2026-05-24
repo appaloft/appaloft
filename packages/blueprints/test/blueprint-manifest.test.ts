@@ -93,4 +93,42 @@ profiles:
       expect(result.value.id).toBe("yaml-service");
     }
   });
+
+  test("[CLOUD-BLUEPRINT-PUBLIC-DEPENDENCY-KINDS-022] validates mainstream neutral dependency kinds", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "mainstream-dependencies",
+      name: "Mainstream Dependencies",
+      version: "1.0.0",
+      summary: "Blueprint dependency vocabulary smoke.",
+      resources: [
+        { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "mysql", kind: "mysql", label: "MySQL" },
+        { id: "redis", kind: "redis", label: "Redis" },
+        { id: "storage", kind: "object-storage", label: "Object storage" },
+        { id: "clickhouse", kind: "clickhouse", label: "ClickHouse" },
+        { id: "opensearch", kind: "opensearch", label: "OpenSearch" },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/api:latest",
+          },
+          usesResources: ["postgres", "mysql", "redis", "storage", "clickhouse", "opensearch"],
+        },
+      ],
+      profiles: {
+        production: {
+          label: "Production",
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
 });
