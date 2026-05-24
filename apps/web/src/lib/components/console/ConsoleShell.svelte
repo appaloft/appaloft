@@ -11,6 +11,7 @@
     GitBranch,
     Globe2,
     LogIn,
+    LogOut,
     Moon,
     Package,
     Play,
@@ -252,6 +253,16 @@
     }
   }
 
+  async function signOut(): Promise<void> {
+    await request<{ success?: boolean }>("/api/auth/sign-out", {
+      method: "POST",
+    });
+
+    if (browser) {
+      window.location.href = "/login";
+    }
+  }
+
   function openHealthCheck(): void {
     if (browser) {
       window.open(`${API_BASE}/api/health`, "_blank");
@@ -446,6 +457,12 @@
             <Rocket class="size-4" />
             {$t(i18nKeys.console.deployments.records)}
           </DropdownMenuItem>
+          {#if authSession.session}
+            <DropdownMenuItem onclick={signOut}>
+              <LogOut class="size-4" />
+              {$t(i18nKeys.common.actions.signOut)}
+            </DropdownMenuItem>
+          {/if}
           <DropdownMenuItem onclick={openDocumentation}>
             <BookOpen class="size-4" />
             {$t(i18nKeys.common.actions.openDocumentation)}
