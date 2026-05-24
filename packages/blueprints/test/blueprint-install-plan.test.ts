@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  blueprintApplicationBundlePlanSchemaVersion,
   blueprintSchemaVersion,
   blueprintUpgradePlanSchemaVersion,
+  createBlueprintApplicationBundlePlan,
   createBlueprintInstallPlan,
   createBlueprintUpgradePlan,
   resolveBlueprintVariantManifest,
@@ -240,6 +242,116 @@ describe("Blueprint install plan", () => {
         ),
       ).toBe(true);
     }
+  });
+
+  test("[CLOUD-BLUEPRINT-INSTALLED-APPLICATION-040] groups multi-component plans into one neutral application bundle", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "multi-component-app",
+      name: "Multi Component App",
+      version: "1.0.0",
+      summary: "An app bundle with a web service, worker, and dependency resources.",
+      resources: [
+        { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "redis", kind: "redis", label: "Redis" },
+      ],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/web:latest",
+          },
+          ports: [{ name: "http", containerPort: 3000 }],
+          routes: [{ port: "http", pathPrefix: "/" }],
+          usesResources: ["postgres", "redis"],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: {
+            strategy: "container-image",
+            image: "example/worker:latest",
+          },
+          usesResources: ["redis"],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) {
+      throw new Error("Expected manifest to validate");
+    }
+
+    const installPlan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Multi Component App",
+        environmentName: "production",
+        resourceSlugPrefix: "bundle",
+      },
+    });
+    expect(installPlan.ok).toBe(true);
+    if (!installPlan.ok) {
+      throw new Error("Expected install plan to compile");
+    }
+
+    const bundlePlan = createBlueprintApplicationBundlePlan({ plan: installPlan.value });
+    expect(bundlePlan.ok).toBe(true);
+    if (!bundlePlan.ok) {
+      throw new Error("Expected bundle plan to compile");
+    }
+
+    expect(bundlePlan.value.schemaVersion).toBe(blueprintApplicationBundlePlanSchemaVersion);
+    expect(bundlePlan.value.createsExternalResources).toBe(false);
+    expect(bundlePlan.value.application).toMatchObject({
+      blueprintId: "multi-component-app",
+      projectName: "Multi Component App",
+      environmentName: "production",
+      profile: "production",
+    });
+    expect(bundlePlan.value.components.map((component) => component.componentId)).toEqual([
+      "web",
+      "worker",
+    ]);
+    expect(bundlePlan.value.dependencies.map((dependency) => dependency.kind)).toEqual([
+      "postgres",
+      "redis",
+    ]);
+    expect(bundlePlan.value.relationships).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "application-contains-component",
+          componentId: "web",
+        },
+        {
+          kind: "application-contains-component",
+          componentId: "worker",
+        },
+        {
+          kind: "component-deploys-as-resource",
+          componentId: "web",
+          resourceSlug: "bundle-web",
+        },
+        {
+          kind: "component-binds-dependency",
+          componentId: "worker",
+          requirementId: "redis",
+          requirementKind: "redis",
+        },
+      ]),
+    );
+    expect(bundlePlan.value.execution).toEqual({
+      mode: "dry-run-only",
+      requiredFollowUp: "accepted-install-command",
+    });
   });
 
   test("[CLOUD-BLUEPRINT-UPGRADE-PLAN-038] creates a dry-run upgrade plan without executing updates", () => {

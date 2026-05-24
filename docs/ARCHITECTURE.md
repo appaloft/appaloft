@@ -142,6 +142,11 @@ produce Resource profile changes, ResourceDesiredState, WorkloadSpec, RuntimePro
 ResourceBinding intent, route intent, and deployment planning input. Provider-specific rendering
 stays in adapters, providers, plugins, and runtime target backends.
 
+Blueprint instantiation can also produce a neutral ApplicationBundle plan that groups multiple
+Blueprint components and dependency-resource bindings as one application-level dry-run plan. That
+bundle is not a persisted installed application and must still execute through accepted Appaloft
+commands rather than a parallel deployment engine.
+
 Community Appaloft's Blueprint boundary is open, file-first, and local-registry friendly: copied
 `*.blueprint.json` files and optional `*.blueprint.yaml` authoring files should be able to define
 local Blueprints without a hosted catalog. See
