@@ -5,6 +5,8 @@ import { z } from "zod";
 export const blueprintSchemaVersion = "appaloft.blueprint/v1" as const;
 export const blueprintInstallPlanSchemaVersion = "appaloft.blueprint.install-plan/v1" as const;
 export const blueprintUpgradePlanSchemaVersion = "appaloft.blueprint.upgrade-plan/v1" as const;
+export const blueprintApplicationBundlePlanSchemaVersion =
+  "appaloft.blueprint.application-bundle-plan/v1" as const;
 
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
 const envKeyPattern = /^[A-Z][A-Z0-9_]{0,127}$/;
@@ -462,6 +464,92 @@ export interface BlueprintInstallPlan {
   readonly warnings: readonly string[];
 }
 
+export interface CreateBlueprintApplicationBundlePlanInput {
+  readonly plan: BlueprintInstallPlan;
+}
+
+export interface BlueprintApplicationBundleIdentity {
+  readonly blueprintId: string;
+  readonly blueprintName: string;
+  readonly blueprintVersion: string;
+  readonly blueprintVariant?: string;
+  readonly projectName: string;
+  readonly environmentName: string;
+  readonly profile: string;
+}
+
+export interface BlueprintApplicationBundleComponentPlan {
+  readonly componentId: string;
+  readonly name: string;
+  readonly kind: BlueprintComponent["kind"];
+  readonly resourceSlug: string;
+  readonly runtime?: BlueprintComponent["runtime"];
+  readonly ports: readonly BlueprintComponent["ports"][number][];
+  readonly routes: readonly BlueprintRoutePlan[];
+  readonly variables: readonly {
+    readonly key: string;
+    readonly valueSource: "literal" | "parameter";
+    readonly value: string | number | boolean;
+  }[];
+  readonly secretReferences: readonly {
+    readonly key: string;
+    readonly required: boolean;
+  }[];
+  readonly dependencyBindings: readonly {
+    readonly requirementId: string;
+    readonly requirementKind: BlueprintResourceRequirement["kind"];
+  }[];
+  readonly deploymentReason?: "blueprint-install";
+}
+
+export interface BlueprintApplicationBundleDependencyPlan {
+  readonly requirementId: string;
+  readonly kind: BlueprintResourceRequirement["kind"];
+  readonly scope: "dependency-resource";
+  readonly bindingMode: "bind-existing-or-provisioned";
+}
+
+export type BlueprintApplicationBundleRelationship =
+  | {
+      readonly kind: "application-contains-component";
+      readonly componentId: string;
+    }
+  | {
+      readonly kind: "component-deploys-as-resource";
+      readonly componentId: string;
+      readonly resourceSlug: string;
+    }
+  | {
+      readonly kind: "component-binds-dependency";
+      readonly componentId: string;
+      readonly requirementId: string;
+      readonly requirementKind: BlueprintResourceRequirement["kind"];
+    };
+
+export interface BlueprintApplicationBundlePlan {
+  readonly schemaVersion: typeof blueprintApplicationBundlePlanSchemaVersion;
+  readonly createsExternalResources: false;
+  readonly application: BlueprintApplicationBundleIdentity;
+  readonly components: readonly BlueprintApplicationBundleComponentPlan[];
+  readonly dependencies: readonly BlueprintApplicationBundleDependencyPlan[];
+  readonly relationships: readonly BlueprintApplicationBundleRelationship[];
+  readonly execution: {
+    readonly mode: "dry-run-only";
+    readonly requiredFollowUp: "accepted-install-command";
+  };
+  readonly warnings: readonly string[];
+}
+
+export interface BlueprintApplicationBundlePlanError {
+  readonly code: "missing_component_resource" | "duplicate_component_resource";
+  readonly message: string;
+  readonly componentId?: string;
+}
+
+export type BlueprintApplicationBundlePlanResult =
+  | { readonly ok: true; readonly value: BlueprintApplicationBundlePlan }
+  | { readonly ok: false; readonly error: BlueprintApplicationBundlePlanError };
+
 export type BlueprintUpgradeClassification = "non-breaking" | "potentially-breaking" | "breaking";
 
 export interface CreateBlueprintUpgradePlanInput {
@@ -836,6 +924,170 @@ export function createBlueprintInstallPlan(
   };
 }
 
+type MutableBlueprintApplicationBundleComponentPlan = {
+  componentId: string;
+  name: string;
+  kind: BlueprintComponent["kind"];
+  resourceSlug: string;
+  runtime?: BlueprintComponent["runtime"];
+  ports: BlueprintComponent["ports"][number][];
+  routes: BlueprintRoutePlan[];
+  variables: {
+    readonly key: string;
+    readonly valueSource: "literal" | "parameter";
+    readonly value: string | number | boolean;
+  }[];
+  secretReferences: { readonly key: string; readonly required: boolean }[];
+  dependencyBindings: {
+    readonly requirementId: string;
+    readonly requirementKind: BlueprintResourceRequirement["kind"];
+  }[];
+  deploymentReason?: "blueprint-install";
+};
+
+export function createBlueprintApplicationBundlePlan(
+  input: CreateBlueprintApplicationBundlePlanInput,
+): BlueprintApplicationBundlePlanResult {
+  const components = new Map<string, MutableBlueprintApplicationBundleComponentPlan>();
+  const dependencies = new Map<string, BlueprintApplicationBundleDependencyPlan>();
+  const relationships: BlueprintApplicationBundleRelationship[] = [];
+
+  for (const operation of input.plan.operations) {
+    switch (operation.kind) {
+      case "create-resource": {
+        if (components.has(operation.componentId)) {
+          return duplicateApplicationBundleComponentResource(operation.componentId);
+        }
+
+        const component: MutableBlueprintApplicationBundleComponentPlan = {
+          componentId: operation.componentId,
+          name: operation.name,
+          kind: operation.componentKind,
+          resourceSlug: operation.slug,
+          ports: [],
+          routes: [],
+          variables: [],
+          secretReferences: [],
+          dependencyBindings: [],
+        };
+        components.set(operation.componentId, component);
+        relationships.push({
+          kind: "application-contains-component",
+          componentId: operation.componentId,
+        });
+        relationships.push({
+          kind: "component-deploys-as-resource",
+          componentId: operation.componentId,
+          resourceSlug: operation.slug,
+        });
+        break;
+      }
+      case "configure-runtime": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.runtime = operation.runtime;
+        break;
+      }
+      case "configure-network": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.ports.push(...operation.ports);
+        break;
+      }
+      case "configure-access": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.routes.push(...operation.routes);
+        break;
+      }
+      case "set-variable": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.variables.push({
+          key: operation.key,
+          valueSource: operation.valueSource,
+          value: operation.value,
+        });
+        break;
+      }
+      case "create-secret-reference": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.secretReferences.push({
+          key: operation.key,
+          required: operation.required,
+        });
+        break;
+      }
+      case "bind-dependency": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        dependencies.set(operation.requirementId, {
+          requirementId: operation.requirementId,
+          kind: operation.requirementKind,
+          scope: "dependency-resource",
+          bindingMode: "bind-existing-or-provisioned",
+        });
+        component.value.dependencyBindings.push({
+          requirementId: operation.requirementId,
+          requirementKind: operation.requirementKind,
+        });
+        relationships.push({
+          kind: "component-binds-dependency",
+          componentId: operation.componentId,
+          requirementId: operation.requirementId,
+          requirementKind: operation.requirementKind,
+        });
+        break;
+      }
+      case "create-deployment": {
+        const component = requireApplicationBundleComponent(operation, components);
+        if (!component.ok) return component;
+        component.value.deploymentReason = operation.reason;
+        break;
+      }
+      case "create-project":
+      case "create-environment":
+        break;
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      schemaVersion: blueprintApplicationBundlePlanSchemaVersion,
+      createsExternalResources: false,
+      application: {
+        blueprintId: input.plan.blueprint.id,
+        blueprintName: input.plan.blueprint.name,
+        blueprintVersion: input.plan.blueprint.version,
+        ...(input.plan.blueprint.variant ? { blueprintVariant: input.plan.blueprint.variant } : {}),
+        projectName: input.plan.target.projectName,
+        environmentName: input.plan.target.environmentName,
+        profile: input.plan.profile,
+      },
+      components: [...components.values()].map((component) => ({
+        ...component,
+        ports: [...component.ports],
+        routes: [...component.routes],
+        variables: [...component.variables],
+        secretReferences: [...component.secretReferences],
+        dependencyBindings: [...component.dependencyBindings],
+      })),
+      dependencies: [...dependencies.values()],
+      relationships,
+      execution: {
+        mode: "dry-run-only",
+        requiredFollowUp: "accepted-install-command",
+      },
+      warnings: [
+        ...input.plan.warnings,
+        "This plan groups Blueprint components into one application bundle; execution remains an explicit accepted install command.",
+      ],
+    },
+  };
+}
+
 export function createBlueprintUpgradePlan(
   input: CreateBlueprintUpgradePlanInput,
 ): BlueprintResult<BlueprintUpgradePlan> {
@@ -980,6 +1232,40 @@ function maxClassification(
     (current, candidate) => (ranks[candidate] > ranks[current] ? candidate : current),
     "non-breaking",
   );
+}
+
+function requireApplicationBundleComponent(
+  operation: Extract<BlueprintInstallOperation, { readonly componentId: string }>,
+  components: ReadonlyMap<string, MutableBlueprintApplicationBundleComponentPlan>,
+):
+  | { readonly ok: true; readonly value: MutableBlueprintApplicationBundleComponentPlan }
+  | { readonly ok: false; readonly error: BlueprintApplicationBundlePlanError } {
+  const component = components.get(operation.componentId);
+  if (!component) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_component_resource",
+        message: "Blueprint install plan operation references a component before create-resource.",
+        componentId: operation.componentId,
+      },
+    };
+  }
+  return { ok: true, value: component };
+}
+
+function duplicateApplicationBundleComponentResource(
+  componentId: string,
+): BlueprintApplicationBundlePlanResult {
+  return {
+    ok: false,
+    error: {
+      code: "duplicate_component_resource",
+      message:
+        "Blueprint install plan contains duplicate create-resource operations for a component.",
+      componentId,
+    },
+  };
 }
 
 function diffComponents(
