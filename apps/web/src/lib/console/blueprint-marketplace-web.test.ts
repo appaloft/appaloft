@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
-import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
 import {
   endpointFromTemplate,
@@ -50,18 +50,17 @@ describe("Blueprint marketplace console surface", () => {
   });
 
   test("[CLOUD-BLUEPRINT-DETAIL-UX-029] keeps Marketplace inside ConsoleShell and hides raw plan JSON behind details", async () => {
-    const [listPageSource, detailPageSource, selectorSource, quickDeploySource] = await Promise.all([
-      readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
-      readFile(
-        new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../components/console/QuickDeploySheet.svelte", import.meta.url),
-        "utf8",
-      ),
-    ]);
+    const [listPageSource, detailPageSource, selectorSource, quickDeploySource] = await Promise.all(
+      [
+        readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
+        readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
+        readFile(
+          new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+      ],
+    );
 
     expect(listPageSource).toContain("ConsoleShell");
     expect(detailPageSource).toContain("ConsoleShell");
