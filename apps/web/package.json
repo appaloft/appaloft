@@ -27,6 +27,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/svelte-query": "^6.1.29",
     "@types/node": "^22",
+    "@appaloft/blueprint-marketplace-web": "workspace:*",
     "@appaloft/contracts": "workspace:*",
     "@appaloft/design": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
