@@ -2,6 +2,7 @@ import {
   AcceptDependencyResourceProvisioningPlanCommand,
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
+  ConfigureDependencyResourceBackupPolicyCommand,
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -19,8 +20,10 @@ import {
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
   compareResourceProfileDrift,
+  type DependencyResourceBackupPolicyRead,
   type DependencyResourceSummary,
   type EnvironmentSummary,
+  ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourcesQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -158,7 +161,14 @@ export interface DeploymentDependencySeed {
   kind: ManagedDependencyResourceKind;
   source: "managed";
   bindEnv: string;
+  backupPolicy?: DeploymentDependencyBackupPolicySeed;
   previewLifecycle?: "ephemeral";
+}
+export interface DeploymentDependencyBackupPolicySeed {
+  enabled: boolean;
+  intervalHours?: number;
+  retentionDays?: number;
+  retryOnFailure: boolean;
 }
 export interface DeploymentStorageSeed {
   key: string;
@@ -481,6 +491,20 @@ export function deploymentPromptSeedFromConfig(
           kind: dependency.kind,
           source: dependency.source,
           bindEnv: dependency.bind.env,
+          ...(dependency.backup
+            ? {
+                backupPolicy: {
+                  enabled: dependency.backup.enabled,
+                  ...(dependency.backup.intervalHours
+                    ? { intervalHours: dependency.backup.intervalHours }
+                    : {}),
+                  ...(dependency.backup.retentionDays
+                    ? { retentionDays: dependency.backup.retentionDays }
+                    : {}),
+                  retryOnFailure: dependency.backup.retryOnFailure,
+                },
+              }
+            : {}),
           ...(dependency.preview?.lifecycle
             ? { previewLifecycle: dependency.preview.lifecycle }
             : {}),
@@ -1508,6 +1532,170 @@ function bindRepositoryConfigDependency(input: {
   });
 }
 
+function repositoryConfigDependencyBackupPolicyId(dependencyResourceId: string): string {
+  return `dbp_cfg_${new Bun.CryptoHasher("sha256")
+    .update(`repository-config:${dependencyResourceId}`)
+    .digest("hex")
+    .slice(0, 24)}`;
+}
+
+function dependencyBackupPolicyMatchesConfig(
+  current: DependencyResourceBackupPolicyRead,
+  desired: DeploymentDependencyBackupPolicySeed,
+): boolean {
+  if (!desired.enabled) {
+    return current.enabled === false;
+  }
+  if (!desired.intervalHours || !desired.retentionDays) {
+    return false;
+  }
+  return (
+    current.enabled === true &&
+    current.scheduleIntervalHours === desired.intervalHours &&
+    current.retentionDays === desired.retentionDays &&
+    current.retryOnFailure === desired.retryOnFailure &&
+    current.providerKey === null
+  );
+}
+
+function repositoryConfigDependencyBackupPolicyConflict(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  existingPolicy: DependencyResourceBackupPolicyRead;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_backup_policy_conflict",
+    category: "user",
+    message: "Repository config dependency backup policy would mutate a manual policy",
+    retryable: false,
+    details: {
+      phase: "config-dependency-backup-resolution",
+      dependencyKey: input.dependency.key,
+      dependencyResourceId: input.dependencyResourceId,
+      existingPolicyId: input.existingPolicy.id,
+    },
+  };
+}
+
+function repositoryConfigDependencyBackupPolicyError(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  reason: string;
+}) {
+  return domainError.validation("Repository config dependency backup policy is invalid", {
+    phase: "config-dependency-backup-resolution",
+    dependencyKey: input.dependency.key,
+    dependencyResourceId: input.dependencyResourceId,
+    reason: input.reason,
+  });
+}
+
+function listDependencyBackupPoliciesForConfig(dependencyResourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListDependencyResourceBackupPoliciesQuery.create({
+        dependencyResourceId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigDependencyBackupPolicy(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  policyId: string;
+  currentPolicy?: DependencyResourceBackupPolicyRead;
+}) {
+  return Effect.gen(function* () {
+    const desired = input.dependency.backupPolicy;
+    if (!desired) {
+      return;
+    }
+    if (desired.enabled && (!desired.intervalHours || !desired.retentionDays)) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyBackupPolicyError({
+          dependency: input.dependency,
+          dependencyResourceId: input.dependencyResourceId,
+          reason: "interval_and_retention_required",
+        }),
+      );
+    }
+
+    const retentionDays = desired.enabled
+      ? (desired.retentionDays as number)
+      : input.currentPolicy?.retentionDays;
+    const scheduleIntervalHours = desired.enabled
+      ? (desired.intervalHours as number)
+      : input.currentPolicy?.scheduleIntervalHours;
+    if (!retentionDays || !scheduleIntervalHours) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureDependencyResourceBackupPolicyCommand.create({
+        policyId: input.policyId,
+        dependencyResourceId: input.dependencyResourceId,
+        retentionDays,
+        scheduleIntervalHours,
+        retryOnFailure: desired.retryOnFailure,
+        enabled: desired.enabled,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigDependencyBackupPolicy(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const desired = input.dependency.backupPolicy;
+    if (!desired) {
+      return;
+    }
+
+    const policyId = repositoryConfigDependencyBackupPolicyId(input.dependencyResourceId);
+    const policies = yield* listDependencyBackupPoliciesForConfig(input.dependencyResourceId);
+    const ownedPolicy = policies.items.find((policy) => policy.id === policyId);
+
+    if (ownedPolicy && dependencyBackupPolicyMatchesConfig(ownedPolicy, desired)) {
+      return;
+    }
+
+    if (!ownedPolicy) {
+      const matchingManualPolicy = policies.items.find((policy) =>
+        dependencyBackupPolicyMatchesConfig(policy, desired),
+      );
+      if (matchingManualPolicy || !desired.enabled) {
+        return;
+      }
+      const manualPolicy = policies.items[0];
+      if (manualPolicy) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyBackupPolicyConflict({
+            dependency: input.dependency,
+            dependencyResourceId: input.dependencyResourceId,
+            existingPolicy: manualPolicy,
+          }),
+        );
+      }
+    }
+
+    yield* configureRepositoryConfigDependencyBackupPolicy({
+      dependency: input.dependency,
+      dependencyResourceId: input.dependencyResourceId,
+      policyId,
+      ...(ownedPolicy ? { currentPolicy: ownedPolicy } : {}),
+    });
+  });
+}
+
 function buildDependencyProvenance(input: {
   sourceFingerprint: string;
   existing?: SourceLinkDependencyProvenance;
@@ -1724,6 +1912,11 @@ function ensureRepositoryConfigDependencies(input: {
           }),
         );
       }
+
+      yield* ensureRepositoryConfigDependencyBackupPolicy({
+        dependency,
+        dependencyResourceId: dependencyResource.id,
+      });
 
       const binding = activeTargetBinding
         ? { id: activeTargetBinding.id }

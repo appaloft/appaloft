@@ -15,6 +15,7 @@ GitHub pull_request event
   -> action resolves trusted PR preview context from GitHub event metadata
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
   -> repository config dependency graph provisions/reuses and binds application dependencies
+  -> repository config dependency backup policy configures owned backup policy when declared
   -> repository config storage graph creates/reuses and attaches managed storage
   -> repository config scheduled task graph creates/reuses or configures Resource scheduled tasks
   -> repository config auto-deploy policy configures or disables Resource source-event policy
@@ -165,6 +166,12 @@ declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the pre
 contains explicit repository-config provenance for the same preview fingerprint, Resource, binding,
 and dependency resource.
 
+Dependency declarations may also include `backup` policy. Config deploy reconciles that scheduled
+backup policy through `dependency-resources.backup-policies.configure` after the dependency resource
+is selected or provisioned. PR preview cleanup does not run backup or restore operations; it relies
+on dependency resource cleanup safety after provenance-marked ephemeral dependency ownership is
+proven.
+
 Application storage may be declared in the selected preview config with top-level `storage`. For
 MVP, a managed named volume mounted at a workload path such as `/app/uploads` is reconciled before
 deployment admission through existing storage-volume and Resource attachment operations. If the
@@ -241,6 +248,7 @@ resolve preview context
   -> create or select preview resource from preview-scoped link
   -> derive preview runtime name seed `preview-{pr_number}` when profile input does not override it
   -> list/provision/reuse declared managed dependency resources
+  -> list/configure declared dependency backup policies when needed
   -> list/bind Resource dependency bindings for declared env targets
   -> persist preview dependency provenance for config-owned ephemeral dependencies
   -> list/create/reuse declared managed storage volumes

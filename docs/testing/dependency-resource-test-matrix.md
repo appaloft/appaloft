@@ -38,8 +38,10 @@ backup export, or cross-resource restore.
 - [Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md)
 - [Dependency Resource Scheduled Backup Policy](../specs/070-dependency-resource-scheduled-backup-policy/spec.md)
 - [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
+- [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
 - [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
+- [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
 - [resource-dependency-binding-secret-rotated](../events/resource-dependency-binding-secret-rotated.md)
 - [dependency-resource-backup-requested](../events/dependency-resource-backup-requested.md)
 - [dependency-resource-backup-completed](../events/dependency-resource-backup-completed.md)
@@ -158,6 +160,7 @@ backup export, or cross-resource restore.
 | DEP-RES-BACKUP-POLICY-002 | `dependency-resources.backup-policies.list`; `dependency-resources.backup-policies.show` | Query/read model/contract | Policies exist across resources and due times. | Returns safe policy metadata filtered by dependency resource, enabled state, and due timestamp without raw backup artifacts or provider payloads. | `packages/application/test/dependency-resource-scheduled-backup-policy.test.ts`; `packages/persistence/pg/test/dependency-resource-backup-policy.pglite.test.ts`; `packages/contracts/test/dependency-resource-backup-policy-contract.test.ts` |
 | DEP-RES-BACKUP-POLICY-003 | scheduled dependency backup worker | Application/shell | An enabled policy is due. | The disabled-by-default runner dispatches `dependency-resources.create-backup`, records durable process-attempt visibility, advances last/next run after success, and does not call provider backup APIs directly. | `packages/application/test/dependency-resource-scheduled-backup-policy.test.ts`; `apps/shell/test/scheduled-dependency-backup-runner.test.ts` |
 | DEP-RES-BACKUP-POLICY-004 | Operation catalog / CLI / oRPC / HTTP / Web | Entrypoint/contract | Scheduled backup policy operations are public. | Entrypoints dispatch explicit command/query messages, reuse schemas, and the Web console configures policy through i18n-backed controls. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/adapters/cli/test/dependency-command.test.ts`; `packages/orpc/test/dependency-resource.http.test.ts`; `apps/web` typecheck |
+| DEP-RES-BACKUP-POLICY-005 | Repository config dependency backup policy | Parser/CLI workflow | `appaloft.yaml` declares `dependencies.db.backup` for a managed dependency. | Config deploy lists policies, configures only repository-config-owned policy ids, leaves matching policy alone, rejects manual policy drift, and keeps backup execution and `deployments.create` separate. | `packages/deployment-config/test/appaloft-config.test.ts`; `packages/adapters/cli/test/deployment-config.test.ts` |
 
 ## Required Non-Coverage Assertions
 

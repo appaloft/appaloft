@@ -478,6 +478,32 @@
             "required": ["env"],
             "additionalProperties": false
           },
+          "backup": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "intervalHours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8760
+              },
+              "retentionDays": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3650
+              },
+              "retryOnFailure": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": ["enabled", "retryOnFailure"],
+            "additionalProperties": false,
+            "description": "User-facing dependency resource scheduled backup policy declaration."
+          },
           "preview": {
             "type": "object",
             "properties": {

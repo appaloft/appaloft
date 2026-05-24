@@ -100,10 +100,11 @@ If binding is missing, prompt for one safe action:
 
 Never put tokens, SSH keys, database URLs, provider account ids, organization ids, tenant ids, raw
 secret values, credentials, host bind source paths, provider-native storage handles, task ids,
-provider-native scheduler handles, source-event ids, webhook delivery ids, or webhook secret values
-into `appaloft.yml`. Repository config may declare high-level application `dependencies`,
-`storage`, `scheduledTasks`, and `autoDeploy`, but deploy must reconcile them through existing
-operations before ids-only deployment admission.
+provider-native scheduler handles, backup policy ids, backup artifact handles, restore point ids,
+source-event ids, webhook delivery ids, or webhook secret values into `appaloft.yml`. Repository
+config may declare high-level application `dependencies`, `dependencies.<key>.backup`, `storage`,
+`scheduledTasks`, and `autoDeploy`, but deploy must reconcile them through existing operations
+before ids-only deployment admission.
 
 ## Entry Selection
 

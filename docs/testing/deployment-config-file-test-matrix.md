@@ -22,6 +22,8 @@ Canonical assertions:
   deployment;
 - `dependencies` declarations map to dependency-resource list/provision and Resource binding
   operations before deployment;
+- `dependencies.<key>.backup` declarations map to dependency-resource backup policy operations
+  before deployment without mutating manual policies;
 - `storage` declarations map to storage-volume list/create and Resource storage attachment
   operations before deployment;
 - `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
@@ -49,6 +51,7 @@ This matrix inherits:
 - [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
 - [ADR-068: Repository Config Scheduled Task Graph](../decisions/ADR-068-repository-config-scheduled-task-graph.md)
 - [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
+- [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -56,6 +59,7 @@ This matrix inherits:
 - [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
 - [Repository Config Scheduled Task Graph](../specs/077-repository-config-scheduled-task-graph/spec.md)
 - [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
+- [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -78,6 +82,7 @@ This matrix inherits:
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
 | Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
+| Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
 | Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
@@ -155,6 +160,18 @@ This matrix inherits:
 | CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-010 | parser/integration | Canonical managed dependency kinds | Config declares managed `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` dependencies with env bindings | Parser accepts canonical kinds; config deploy filters/provisions using the declared kind and records provenance with that same kind | None | Parse or `dependency-resources.list(kind)` -> `dependency-resources.provision(kind)` -> bind |
+
+## Dependency Backup Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-DEPENDENCY-BACKUP-001 | parser/schema | Managed dependency backup policy accepted | Config declares `dependencies.db.backup.enabled = true`, interval hours, retention days, and retry policy | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-BACKUP-002 | parser/schema | Unknown or unsafe backup fields rejected | Config declares provider key, policy id, backup id, restore point id, artifact handle, raw path, token, credential, or raw secret under `dependencies.db.backup` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-DEPENDENCY-BACKUP-003 | integration | Config backup policy creates before deployment | Selected/provisioned dependency resource has no repository-config-owned backup policy | Config deploy handles dependencies | Backup policies are listed and a repository-config-owned policy is configured before dependency binding and deployment admission | None | dependency resource resolution -> `dependency-resources.backup-policies.list` -> `dependency-resources.backup-policies.configure` -> `resources.bind-dependency` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-004 | integration | Backup policy idempotency | Repository-config-owned policy already matches YAML | Config deploy runs again | No duplicate configure command is dispatched | None | dependency resource resolution -> backup policy list -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-005 | integration | Owned backup policy drift | Repository-config-owned policy exists but differs from YAML | Config deploy handles dependencies | Policy is reconfigured with the same deterministic policy id before deployment | None | dependency resource resolution -> backup policy list -> configure -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-006 | integration | Manual backup policy conflict | Dependency resource has only a manually created policy with different values | Config deploy handles dependencies | Workflow fails before mutating manual policy | `repository_config_dependency_backup_policy_conflict`, phase `config-dependency-backup-resolution` | backup policy list; no configure or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-007 | integration | Backup policy disabled from config | Config declares `backup.enabled = false` and repository-config-owned policy exists | Config deploy handles dependencies | Owned policy is disabled before deployment | None | dependency resource resolution -> backup policy list -> configure(enabled=false) -> `deployments.create` |
 
 ## Storage Graph Matrix
 
@@ -307,6 +324,7 @@ Current implemented coverage:
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
   `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
+  `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
   `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
   `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002` are covered in
@@ -316,6 +334,7 @@ Current implemented coverage:
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
+  `CONFIG-FILE-DEPENDENCY-BACKUP-003` through `CONFIG-FILE-DEPENDENCY-BACKUP-007`,
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
   `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and
   `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006` are covered in

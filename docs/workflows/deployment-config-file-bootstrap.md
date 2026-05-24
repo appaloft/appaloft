@@ -17,6 +17,7 @@ source selection
   -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
      or stop with structured profile drift guidance before deployment admission
   -> provision/reuse and bind declared application dependencies through dependency-resource commands
+  -> configure declared dependency backup policies through dependency-resource backup policy commands
   -> create/reuse and attach declared managed storage through storage/resource commands
   -> create/reuse or configure declared scheduled tasks through scheduled-task commands
   -> configure or disable declared Resource auto-deploy policy through resource commands
@@ -157,6 +158,13 @@ the Resource to the requested env target, and then lets existing dependency runt
 materialize the deployment snapshot. The config workflow must not add dependency-specific fields to
 `deployments.create`.
 
+Declared dependency backup policy is reconciled after the dependency resource is selected or
+provisioned and before deployment admission. The workflow lists existing dependency backup
+policies, creates or updates the repository-config-owned policy when needed, disables that owned
+policy when `enabled: false`, and refuses to mutate drifted manual policies without provenance. The
+config workflow must not run backups, restore backups, expose backup artifact handles, or add backup
+policy fields to `deployments.create`.
+
 Declared storage is reconciled in the same entry workflow after the target Resource is known and
 before deployment admission. The workflow reads Resource storage attachments through
 `resources.show`, lists project/environment storage volumes, creates a missing managed named volume
@@ -218,6 +226,10 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
   cache:
     kind: redis
     source: managed
@@ -232,6 +244,28 @@ Managed dependency declarations support `postgres`, `redis`, `mysql`, `clickhous
 organization ids, raw connection strings, database passwords, secret values, or provider-specific
 realization settings. Those values stay in Appaloft/provider state or trusted entrypoint secret
 stores.
+
+`dependencies.<key>.backup` uses dependency backup policy language:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+      retryOnFailure: true
+```
+
+Backup policy declarations configure scheduled backup policy through
+`dependency-resources.backup-policies.configure`. Config may not include policy ids, provider keys,
+provider accounts, backup ids, restore point ids, artifact handles, raw dump paths, raw connection
+strings, credentials, or secret values. Manual backup creation and restore remain explicit
+operations outside config deploy.
 
 `storage` uses application language, not Appaloft internal object language:
 
@@ -626,6 +660,7 @@ deployment admission.
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. In PR preview context, `{preview_id}` and `{pr_number}` render from trusted entrypoint context before variables are applied. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
+| `dependencies.*.backup` | Dependency Resource backup policy operations | Describes scheduled backup policy for a managed application dependency; reconciled through dependency backup policy commands before deployment, never as deployment command fields or backup execution. |
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
 | `scheduledTasks.*` | Scheduled task operations | Describes Resource-owned recurring application jobs; reconciled through scheduled-task list/create/configure commands before deployment, never as deployment command fields. |
 | `autoDeploy` | Resource auto-deploy policy operation | Describes git-push source-event policy for the Resource; reconciled through `resources.configure-auto-deploy`, never as deployment command fields. |

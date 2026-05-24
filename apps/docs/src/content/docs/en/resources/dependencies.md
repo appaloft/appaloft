@@ -24,6 +24,9 @@ relatedOperations:
   - dependency-resources.list-backups
   - dependency-resources.show-backup
   - dependency-resources.restore-backup
+  - dependency-resources.backup-policies.configure
+  - dependency-resources.backup-policies.list
+  - dependency-resources.backup-policies.show
   - resources.bind-dependency
   - resources.unbind-dependency
   - resources.rotate-dependency-binding-secret
@@ -73,6 +76,10 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
   cache:
     kind: redis
     source: managed
@@ -95,6 +102,26 @@ control-plane installer database and is not an application dependency database.
 For PR previews, `preview.lifecycle: ephemeral` lets preview cleanup unbind and delete only the
 dependency that has explicit repository-config provenance for that preview. Shared, manually bound,
 imported, or otherwise unproven dependencies are not deleted by preview cleanup.
+
+Use `backup` when a managed dependency should have scheduled restore points:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+      retryOnFailure: true
+```
+
+Config deploy reconciles this through dependency backup policy operations. It does not run backup or
+restore work, and `appaloft.yaml` must not contain policy ids, provider keys, backup artifact
+handles, restore point ids, raw dump paths, provider accounts, credentials, or secret values.
 
 <h2 id="dependency-runtime-injection">Deploy with bound dependencies</h2>
 

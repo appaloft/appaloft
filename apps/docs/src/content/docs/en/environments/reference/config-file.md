@@ -35,6 +35,10 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
   cache:
     kind: redis
     source: managed
@@ -49,6 +53,10 @@ existing dependency binding runtime path as environment variables such as `DATAB
 `REDIS_URL`. Supported managed kinds are `postgres`, `redis`, `mysql`, `clickhouse`,
 `object-storage`, and `opensearch`. The final deployment command still contains only Appaloft ids;
 connection strings and database passwords do not belong in `appaloft.yaml`.
+
+`backup` configures scheduled backup policy for the dependency resource. It does not run a backup
+or restore during deploy. Do not commit backup policy ids, provider keys, backup artifact handles,
+restore point ids, or raw dump paths.
 
 For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup to remove only the
 dependency resource that Appaloft can prove was created and bound by this config for that preview.

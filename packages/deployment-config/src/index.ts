@@ -84,6 +84,8 @@ const autoDeployRefError =
   "config_auto_deploy_resolution: autoDeploy.refs[] must be a safe git ref";
 const autoDeployRefsRequiredError =
   "config_auto_deploy_resolution: autoDeploy.refs is required when autoDeploy is enabled";
+const dependencyBackupPolicyRequiredError =
+  "config_dependency_backup_resolution: dependencies.<key>.backup intervalHours and retentionDays are required when enabled";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -108,6 +110,12 @@ const identityConfigFields = new Set([
   "destinationId",
   "taskId",
   "scheduledTaskId",
+  "policyId",
+  "backupPolicyId",
+  "backupId",
+  "restorePointId",
+  "artifactHandle",
+  "artifactId",
   "sourceEvent",
   "sourceEventId",
   "webhookDelivery",
@@ -670,6 +678,25 @@ export const appaloftDeploymentSecretReferenceSchema = z
   })
   .strict();
 
+export const appaloftDeploymentDependencyBackupConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    intervalHours: z.number().int().min(1).max(8_760).optional(),
+    retentionDays: z.number().int().min(1).max(3_650).optional(),
+    retryOnFailure: z.boolean().optional().default(true),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.enabled && (!value.intervalHours || !value.retentionDays)) {
+      context.addIssue({
+        code: "custom",
+        path: ["intervalHours"],
+        message: dependencyBackupPolicyRequiredError,
+      });
+    }
+  })
+  .describe("User-facing dependency resource scheduled backup policy declaration.");
+
 export const appaloftDeploymentDependencyConfigSchema = z
   .object({
     kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
@@ -684,6 +711,7 @@ export const appaloftDeploymentDependencyConfigSchema = z
           .describe("Runtime environment variable target for this dependency."),
       })
       .strict(),
+    backup: appaloftDeploymentDependencyBackupConfigSchema.optional(),
     preview: z
       .object({
         lifecycle: z.literal("ephemeral").optional(),

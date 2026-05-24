@@ -113,9 +113,10 @@ Current status:
   `self-hosting.organization-team-management` help topic for HTTP/API routes, CLI commands, session
   input, safe outputs, owner-retention recovery, current organization switching, and apps/web
   `/organization` member/deploy-token management.
-  Repository config docs now cover user-facing application graphs for `dependencies`, `storage`,
-  `scheduledTasks`, and `autoDeploy`, including ids-only deployment admission, preview provenance
-  cleanup where applicable, Resource auto-deploy policy reconciliation, and the
+  Repository config docs now cover user-facing application graphs for `dependencies`,
+  `dependencies.<key>.backup`, `storage`, `scheduledTasks`, and `autoDeploy`, including ids-only
+  deployment admission, preview provenance cleanup where applicable, dependency backup policy
+  reconciliation, Resource auto-deploy policy reconciliation, and the
   no-secret/no-provider-handle boundary under
   `environments/reference/config-file#environment-config-file-dependencies`,
   `#environment-config-file-storage`, `#environment-config-file-scheduled-tasks`, and

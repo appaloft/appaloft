@@ -482,6 +482,13 @@ Current boundary:
   Preview cleanup may unbind/delete only provenance-marked ephemeral dependencies through
   `resources.unbind-dependency` and `dependency-resources.delete`; manual/shared dependencies and
   dependencies without matching provenance are preserved by design.
+- Repository config `dependencies.<key>.backup` is governed by
+  [ADR-070](./decisions/ADR-070-repository-config-dependency-backup-policy.md) and
+  [Repository Config Dependency Backup Policy](./specs/079-repository-config-dependency-backup-policy/spec.md).
+  It is a workflow/profile extension over existing dependency backup policy operations, not a new
+  operation key. Config deploy may create, update, or disable a repository-config-owned scheduled
+  backup policy for a managed dependency resource, but it does not run backups, restore backups,
+  mutate manual backup policies without provenance, or add backup fields to `deployments.create`.
 - Repository config `storage` is governed by
   [ADR-067](./decisions/ADR-067-repository-config-storage-graph.md) and
   [Repository Config Storage Graph](./specs/076-repository-config-storage-graph/spec.md). It is a

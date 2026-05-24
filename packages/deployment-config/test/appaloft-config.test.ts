@@ -143,6 +143,11 @@ describe("Appaloft deployment config schema", () => {
         "    source: managed",
         "    bind:",
         "      env: DATABASE_URL",
+        "    backup:",
+        "      enabled: true",
+        "      intervalHours: 24",
+        "      retentionDays: 7",
+        "      retryOnFailure: true",
         "    preview:",
         "      lifecycle: ephemeral",
       ].join("\n"),
@@ -160,6 +165,12 @@ describe("Appaloft deployment config schema", () => {
         source: "managed",
         bind: {
           env: "DATABASE_URL",
+        },
+        backup: {
+          enabled: true,
+          intervalHours: 24,
+          retentionDays: 7,
+          retryOnFailure: true,
         },
         preview: {
           lifecycle: "ephemeral",
@@ -189,6 +200,48 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.dependencies?.redis?.kind).toBe("redis");
       expect(parsed.data.dependencies?.object_storage?.kind).toBe("object-storage");
       expect(parsed.data.dependencies?.opensearch?.bind.env).toBe("OPENSEARCH_URL");
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-001] accepts managed dependency backup policy declarations", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+          },
+        },
+        cache: {
+          kind: "redis",
+          source: "managed",
+          bind: {
+            env: "REDIS_URL",
+          },
+          backup: {
+            enabled: false,
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.db.backup).toEqual({
+        enabled: true,
+        intervalHours: 24,
+        retentionDays: 7,
+        retryOnFailure: true,
+      });
+      expect(parsed.data.dependencies?.cache.backup).toEqual({
+        enabled: false,
+        retryOnFailure: true,
+      });
     }
   });
 
@@ -252,6 +305,98 @@ describe("Appaloft deployment config schema", () => {
         "dependencies",
         "db",
         "connectionString",
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-002] rejects unknown and unsafe dependency backup policy material", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            schedule: "0 3 * * *",
+          },
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["dependencies", "db", "backup"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            policyId: "dbp_manual",
+          },
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["dependencies", "db", "backup", "policyId"]);
+    }
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            artifactPath: "s3://secret-token@bucket/db.dump",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const missingRequired = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            enabled: true,
+            retentionDays: 7,
+          },
+        },
+      },
+    });
+
+    expect(missingRequired.success).toBe(false);
+    if (!missingRequired.success) {
+      expect(missingRequired.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "db",
+        "backup",
+        "intervalHours",
       ]);
     }
   });

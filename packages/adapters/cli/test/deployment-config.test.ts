@@ -84,6 +84,13 @@ async function withProcessCwd<T>(directory: string, callback: () => Promise<T>):
   }
 }
 
+function repositoryConfigBackupPolicyIdForTest(dependencyResourceId: string): string {
+  return `dbp_cfg_${new Bun.CryptoHasher("sha256")
+    .update(`repository-config:${dependencyResourceId}`)
+    .digest("hex")
+    .slice(0, 24)}`;
+}
+
 async function createPreviewDeployCliHarness(
   input: {
     withRouteStore?: boolean;
@@ -96,6 +103,7 @@ async function createPreviewDeployCliHarness(
     resourceEffectiveConfig?: Record<string, unknown> | null;
     dependencyResources?: unknown[];
     dependencyBindings?: unknown[];
+    dependencyBackupPolicies?: unknown[];
     storageVolumes?: unknown[];
     scheduledTasks?: unknown[];
   } = {},
@@ -160,6 +168,10 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "dep_res_db" } as T);
         case "BindResourceDependencyCommand":
           return ok({ id: "rbd_db" } as T);
+        case "ConfigureDependencyResourceBackupPolicyCommand": {
+          const backupCommand = command as unknown as { input: Record<string, unknown> };
+          return ok({ id: backupCommand.input.policyId ?? "dbp_cfg_db" } as T);
+        }
         case "CreateStorageVolumeCommand":
           return ok({ id: "stv_uploads" } as T);
         case "AttachResourceStorageCommand":
@@ -248,6 +260,9 @@ async function createPreviewDeployCliHarness(
       }
       if (query.constructor.name === "ListDependencyResourcesQuery") {
         return ok({ items: input.dependencyResources ?? [] } as T);
+      }
+      if (query.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
+        return ok({ items: input.dependencyBackupPolicies ?? [] } as T);
       }
       if (query.constructor.name === "ListResourceDependencyBindingsQuery") {
         return ok({ items: input.dependencyBindings ?? [] } as T);
@@ -3293,6 +3308,76 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-003] config dependency backup policy configures before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-dependency-backup-config-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "dependencies:",
+        "  db:",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "    backup:",
+        "      enabled: true",
+        "      intervalHours: 24",
+        "      retentionDays: 7",
+        "      retryOnFailure: false",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.78",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ListDependencyResourceBackupPoliciesQuery");
+    expect(
+      harness.operations.indexOf("ConfigureDependencyResourceBackupPolicyCommand"),
+    ).toBeLessThan(harness.operations.indexOf("BindResourceDependencyCommand"));
+    expect(harness.operations.indexOf("BindResourceDependencyCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const backupPolicy = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureDependencyResourceBackupPolicyCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(backupPolicy?.input).toMatchObject({
+      dependencyResourceId: "dep_res_db",
+      retentionDays: 7,
+      scheduleIntervalHours: 24,
+      retryOnFailure: false,
+      enabled: true,
+    });
+    expect(String(backupPolicy?.input?.policyId)).toStartWith("dbp_cfg_");
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("backup");
+    expect(deployment).not.toHaveProperty("backupPolicy");
+    expect(deployment).not.toHaveProperty("backupPolicyId");
+  });
+
   test("[CONFIG-FILE-DEPENDENCY-005] config dependencies reuse existing managed resource and binding", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(
@@ -3390,6 +3475,429 @@ describe("CLI deployment config entry workflow", () => {
     });
     expect(commands).not.toContain("ProvisionDependencyResourceCommand");
     expect(commands).not.toContain("BindResourceDependencyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-004] config dependency backup policy is idempotent for matching owned policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+    const dependencyResourceId = "dep_res_existing_db";
+    const ownedPolicyId = repositoryConfigBackupPolicyIdForTest(dependencyResourceId);
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: dependencyResourceId,
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
+          return ok({
+            items: [
+              {
+                schemaVersion: "dependency-resource-backup-policies.policy/v1",
+                id: ownedPolicyId,
+                version: "v1",
+                dependencyResourceId,
+                retentionDays: 7,
+                scheduleIntervalHours: 24,
+                providerKey: null,
+                retryOnFailure: true,
+                enabled: true,
+                lastRunAt: null,
+                nextRunAt: "2026-05-24T00:00:00.000Z",
+                updatedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
+          return ok({
+            items: [
+              {
+                id: "rbd_existing_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                resourceId: "res_existing",
+                dependencyResourceId,
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                target: {
+                  targetName: "DATABASE_URL",
+                  scope: "runtime-only",
+                  injectionMode: "env",
+                },
+                bindingReadiness: { status: "ready" },
+                snapshotReadiness: { status: "deferred" },
+                status: "active",
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          dependencyGraph: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              bindEnv: "DATABASE_URL",
+              backupPolicy: {
+                enabled: true,
+                intervalHours: 24,
+                retentionDays: 7,
+                retryOnFailure: true,
+              },
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("ConfigureDependencyResourceBackupPolicyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-005] config dependency backup policy updates owned drift", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+    const dependencyResourceId = "dep_res_existing_db";
+    const ownedPolicyId = repositoryConfigBackupPolicyIdForTest(dependencyResourceId);
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: ownedPolicyId } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: dependencyResourceId,
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
+          return ok({
+            items: [
+              {
+                schemaVersion: "dependency-resource-backup-policies.policy/v1",
+                id: ownedPolicyId,
+                version: "v1",
+                dependencyResourceId,
+                retentionDays: 3,
+                scheduleIntervalHours: 12,
+                providerKey: null,
+                retryOnFailure: true,
+                enabled: true,
+                lastRunAt: null,
+                nextRunAt: "2026-05-24T00:00:00.000Z",
+                updatedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          dependencyGraph: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              bindEnv: "DATABASE_URL",
+              backupPolicy: {
+                enabled: true,
+                intervalHours: 24,
+                retentionDays: 7,
+                retryOnFailure: false,
+              },
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    const backupPolicy = commands.find(
+      (command) => command.constructor.name === "ConfigureDependencyResourceBackupPolicyCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(backupPolicy?.input).toMatchObject({
+      policyId: ownedPolicyId,
+      dependencyResourceId,
+      retentionDays: 7,
+      scheduleIntervalHours: 24,
+      retryOnFailure: false,
+      enabled: true,
+    });
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-006] config dependency backup policy rejects manual drift", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+    const dependencyResourceId = "dep_res_existing_db";
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: dependencyResourceId,
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
+          return ok({
+            items: [
+              {
+                schemaVersion: "dependency-resource-backup-policies.policy/v1",
+                id: "dbp_manual",
+                version: "v1",
+                dependencyResourceId,
+                retentionDays: 3,
+                scheduleIntervalHours: 12,
+                providerKey: null,
+                retryOnFailure: true,
+                enabled: true,
+                lastRunAt: null,
+                nextRunAt: "2026-05-24T00:00:00.000Z",
+                updatedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            dependencyGraph: [
+              {
+                key: "db",
+                kind: "postgres",
+                source: "managed",
+                bindEnv: "DATABASE_URL",
+                backupPolicy: {
+                  enabled: true,
+                  intervalHours: 24,
+                  retentionDays: 7,
+                  retryOnFailure: true,
+                },
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected manual backup policy drift to fail");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_dependency_backup_policy_conflict",
+      details: {
+        phase: "config-dependency-backup-resolution",
+        dependencyKey: "db",
+        dependencyResourceId,
+        existingPolicyId: "dbp_manual",
+      },
+    });
+    expect(commands).not.toContain("ConfigureDependencyResourceBackupPolicyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-007] config dependency backup policy disables owned policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+    const dependencyResourceId = "dep_res_existing_db";
+    const ownedPolicyId = repositoryConfigBackupPolicyIdForTest(dependencyResourceId);
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: ownedPolicyId } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: dependencyResourceId,
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
+          return ok({
+            items: [
+              {
+                schemaVersion: "dependency-resource-backup-policies.policy/v1",
+                id: ownedPolicyId,
+                version: "v1",
+                dependencyResourceId,
+                retentionDays: 7,
+                scheduleIntervalHours: 24,
+                providerKey: null,
+                retryOnFailure: true,
+                enabled: true,
+                lastRunAt: null,
+                nextRunAt: "2026-05-24T00:00:00.000Z",
+                updatedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          dependencyGraph: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              bindEnv: "DATABASE_URL",
+              backupPolicy: {
+                enabled: false,
+                retryOnFailure: true,
+              },
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    const backupPolicy = commands.find(
+      (command) => command.constructor.name === "ConfigureDependencyResourceBackupPolicyCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(backupPolicy?.input).toMatchObject({
+      policyId: ownedPolicyId,
+      dependencyResourceId,
+      retentionDays: 7,
+      scheduleIntervalHours: 24,
+      retryOnFailure: true,
+      enabled: false,
+    });
   });
 
   test("[CONFIG-FILE-DEPENDENCY-006] config dependencies fail on env target conflicts", async () => {
