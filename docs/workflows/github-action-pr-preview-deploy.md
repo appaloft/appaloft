@@ -191,6 +191,13 @@ deployment admission. This can disable generated/default preview access for a Re
 generated route path prefix, but it does not create custom domain bindings, issue certificates,
 change default access provider policy, or add access fields to `deployments.create`.
 
+Runtime monitoring thresholds may be declared in the selected config with
+`monitoring.thresholds`. The action/CLI reconciles them through
+`runtime-monitoring.thresholds.show` and `runtime-monitoring.thresholds.configure` for the selected
+Resource before deployment admission. These thresholds are non-enforcing observation policy; they
+do not resize, scale, reject, restart, clean up, alert, bill, or add monitoring fields to
+`deployments.create`.
+
 Custom route intent for PR previews should come from one of these sources:
 
 - generated/default access;

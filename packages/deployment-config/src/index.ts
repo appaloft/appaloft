@@ -39,6 +39,38 @@ const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const storageKeyPattern = dependencyKeyPattern;
 const scheduledTaskKeyPattern = dependencyKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
+const appaloftDeploymentMonitoringSignals = [
+  "cpu",
+  "memory",
+  "disk",
+  "inode",
+  "docker",
+  "network",
+] as const;
+const appaloftDeploymentMonitoringThresholdMetrics = [
+  "containerCpuPercent",
+  "loadAverage1m",
+  "containerUsedBytes",
+  "usedBytes",
+  "attributedBytes",
+  "used",
+  "imageBytes",
+  "buildCacheBytes",
+  "containerWritableBytes",
+  "rxBytes",
+  "txBytes",
+] as const;
+const appaloftDeploymentMonitoringSignalMetrics: Record<
+  (typeof appaloftDeploymentMonitoringSignals)[number],
+  readonly (typeof appaloftDeploymentMonitoringThresholdMetrics)[number][]
+> = {
+  cpu: ["containerCpuPercent", "loadAverage1m"],
+  memory: ["containerUsedBytes", "usedBytes"],
+  disk: ["usedBytes", "attributedBytes"],
+  inode: ["used"],
+  docker: ["imageBytes", "buildCacheBytes", "containerWritableBytes"],
+  network: ["rxBytes", "txBytes"],
+};
 export const appaloftDeploymentDependencyKinds = [
   "postgres",
   "redis",
@@ -88,6 +120,12 @@ const autoDeployRefsRequiredError =
   "config_auto_deploy_resolution: autoDeploy.refs is required when autoDeploy is enabled";
 const dependencyBackupPolicyRequiredError =
   "config_dependency_backup_resolution: dependencies.<key>.backup intervalHours and retentionDays are required when enabled";
+const monitoringThresholdRuleRequiredError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[] requires warning or critical";
+const monitoringThresholdCriticalOrderError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[].critical must be greater than or equal to warning";
+const monitoringThresholdMetricError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[].metric must match signal";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -126,6 +164,15 @@ const identityConfigFields = new Set([
   "routeId",
   "domainBindingId",
   "certificateId",
+  "thresholdPolicyId",
+  "monitoringPolicyId",
+  "ruleId",
+  "scope",
+  "scopeId",
+  "sampleId",
+  "metricSampleId",
+  "containerId",
+  "runtimeId",
   "provider",
   "providerKey",
   "providerAccount",
@@ -162,6 +209,19 @@ const unsupportedConfigFields = new Set([
   "restartPolicy",
   "rollout",
   "deploymentStrategy",
+  "quota",
+  "reservation",
+  "reservations",
+  "alert",
+  "alerts",
+  "notification",
+  "notifications",
+  "billing",
+  "metricPayload",
+  "rawPayload",
+  "hostPath",
+  "log",
+  "logs",
   "registrySecret",
   "pullSecret",
   "ingress",
@@ -824,6 +884,66 @@ export const appaloftDeploymentAutoDeployConfigSchema = z
   })
   .describe("User-facing Resource auto-deploy policy declaration.");
 
+const appaloftDeploymentMonitoringThresholdRuleConfigSchema = z
+  .object({
+    signal: z.enum(appaloftDeploymentMonitoringSignals),
+    metric: z.enum(appaloftDeploymentMonitoringThresholdMetrics),
+    warning: z.number().finite().nonnegative().optional(),
+    critical: z.number().finite().nonnegative().optional(),
+    comparator: z.literal("greater-than-or-equal").optional().default("greater-than-or-equal"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.warning === undefined && value.critical === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["warning"],
+        message: monitoringThresholdRuleRequiredError,
+      });
+    }
+    if (
+      value.warning !== undefined &&
+      value.critical !== undefined &&
+      value.critical < value.warning
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["critical"],
+        message: monitoringThresholdCriticalOrderError,
+      });
+    }
+    if (!appaloftDeploymentMonitoringSignalMetrics[value.signal].includes(value.metric)) {
+      context.addIssue({
+        code: "custom",
+        path: ["metric"],
+        message: monitoringThresholdMetricError,
+      });
+    }
+  })
+  .describe("Resource runtime monitoring threshold rule.");
+
+export const appaloftDeploymentMonitoringConfigSchema = z
+  .object({
+    thresholds: z
+      .object({
+        enabled: z.boolean().optional().default(true),
+        rules: z.array(appaloftDeploymentMonitoringThresholdRuleConfigSchema).min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.thresholds) {
+      context.addIssue({
+        code: "custom",
+        path: ["thresholds"],
+        message: "config_monitoring_thresholds_resolution: monitoring requires thresholds",
+      });
+    }
+  })
+  .describe("Resource runtime monitoring config declarations.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -926,6 +1046,7 @@ export const appaloftDeploymentConfigSchema = z
     retention: appaloftDeploymentRetentionConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),
     dependencies: z
       .record(
@@ -1060,6 +1181,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "storage" ||
     root === "scheduledTasks" ||
     root === "autoDeploy" ||
+    root === "monitoring" ||
     root === "controlPlane"
   );
 }

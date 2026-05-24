@@ -8,6 +8,7 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureRuntimeMonitoringThresholdsCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
@@ -46,12 +47,17 @@ import {
   type ResourceEffectiveConfigView,
   type ResourceProfileConfigurationEntry,
   type ResourceSummary,
+  type RuntimeMonitoringSignal,
+  type RuntimeMonitoringThresholdMetric,
+  type RuntimeMonitoringThresholdRule,
+  type RuntimeMonitoringThresholdsReadback,
   resourceProfileFromResourceDetail,
   type ScheduledTaskDefinitionSummary,
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
   ShowResourceQuery,
+  ShowRuntimeMonitoringThresholdsQuery,
   type StorageVolumeSummary,
 } from "@appaloft/application";
 import {
@@ -144,6 +150,7 @@ export interface DeploymentPromptSeed {
   scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
   autoDeployPolicy?: DeploymentAutoDeploySeed;
   generatedAccessProfile?: DeploymentGeneratedAccessProfileSeed;
+  monitoringThresholds?: DeploymentMonitoringThresholdsSeed;
   profileDriftPreflight?: boolean;
 }
 
@@ -201,6 +208,17 @@ export interface DeploymentAutoDeploySeed {
 export interface DeploymentGeneratedAccessProfileSeed {
   generatedAccessMode: "inherit" | "disabled";
   pathPrefix: string;
+}
+export interface DeploymentMonitoringThresholdRuleSeed {
+  signal: RuntimeMonitoringSignal;
+  metric: RuntimeMonitoringThresholdMetric;
+  warning?: number;
+  critical?: number;
+  comparator: "greater-than-or-equal";
+}
+export interface DeploymentMonitoringThresholdsSeed {
+  enabled: boolean;
+  rules: DeploymentMonitoringThresholdRuleSeed[];
 }
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
@@ -562,6 +580,21 @@ export function deploymentPromptSeedFromConfig(
         pathPrefix: config.access.generated.pathPrefix,
       } satisfies DeploymentGeneratedAccessProfileSeed)
     : undefined;
+  const monitoringThresholds = config.monitoring?.thresholds
+    ? ({
+        enabled: config.monitoring.thresholds.enabled,
+        rules: config.monitoring.thresholds.rules.map(
+          (rule) =>
+            ({
+              signal: rule.signal,
+              metric: rule.metric,
+              ...(rule.warning !== undefined ? { warning: rule.warning } : {}),
+              ...(rule.critical !== undefined ? { critical: rule.critical } : {}),
+              comparator: rule.comparator,
+            }) satisfies DeploymentMonitoringThresholdRuleSeed,
+        ),
+      } satisfies DeploymentMonitoringThresholdsSeed)
+    : undefined;
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -602,6 +635,7 @@ export function deploymentPromptSeedFromConfig(
     ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
     ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
     ...(generatedAccessProfile ? { generatedAccessProfile } : {}),
+    ...(monitoringThresholds ? { monitoringThresholds } : {}),
   };
 }
 
@@ -1035,6 +1069,41 @@ function configureResourceAccess(input: {
   });
 }
 
+function showRuntimeMonitoringThresholds(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(
+      ShowRuntimeMonitoringThresholdsQuery.create({
+        scope: { kind: "resource", resourceId },
+      }),
+    );
+    const result = yield* Effect.promise(() =>
+      cli.executeQuery<RuntimeMonitoringThresholdsReadback>(query),
+    );
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRuntimeMonitoringThresholds(input: {
+  resourceId: string;
+  thresholds: DeploymentMonitoringThresholdsSeed;
+  policyId?: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureRuntimeMonitoringThresholdsCommand.create({
+        ...(input.policyId ? { policyId: input.policyId } : {}),
+        scope: { kind: "resource", resourceId: input.resourceId },
+        enabled: input.thresholds.enabled,
+        rules: input.thresholds.rules,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function showResource(resourceId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -1058,6 +1127,43 @@ function generatedAccessProfileMatchesConfig(input: {
   return (
     input.current?.generatedAccessMode === input.desired.generatedAccessMode &&
     input.current?.pathPrefix === input.desired.pathPrefix
+  );
+}
+
+function runtimeMonitoringRuleMatchesConfig(input: {
+  current: RuntimeMonitoringThresholdRule | undefined;
+  desired: DeploymentMonitoringThresholdRuleSeed | undefined;
+}): boolean {
+  return (
+    input.current?.signal === input.desired?.signal &&
+    input.current?.metric === input.desired?.metric &&
+    input.current?.warning === input.desired?.warning &&
+    input.current?.critical === input.desired?.critical &&
+    input.current?.comparator === input.desired?.comparator
+  );
+}
+
+function runtimeMonitoringThresholdsMatchConfig(input: {
+  current: RuntimeMonitoringThresholdsReadback["policy"] | undefined | null;
+  desired: DeploymentMonitoringThresholdsSeed;
+  resourceId: string;
+}): boolean {
+  const current = input.current;
+  if (
+    !current ||
+    current.scope.kind !== "resource" ||
+    current.scope.resourceId !== input.resourceId ||
+    current.enabled !== input.desired.enabled ||
+    current.rules.length !== input.desired.rules.length
+  ) {
+    return false;
+  }
+
+  return current.rules.every((rule, index) =>
+    runtimeMonitoringRuleMatchesConfig({
+      current: rule,
+      desired: input.desired.rules[index],
+    }),
   );
 }
 
@@ -2938,6 +3044,40 @@ function ensureRepositoryConfigGeneratedAccessProfile(input: {
   });
 }
 
+function ensureRepositoryConfigMonitoringThresholds(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const thresholds = input.seed.monitoringThresholds;
+    if (!thresholds) {
+      return;
+    }
+
+    const readback = yield* showRuntimeMonitoringThresholds(input.resourceId);
+    if (
+      runtimeMonitoringThresholdsMatchConfig({
+        current: readback.policy,
+        desired: thresholds,
+        resourceId: input.resourceId,
+      })
+    ) {
+      return;
+    }
+
+    const exactPolicy =
+      readback.policy?.scope.kind === "resource" &&
+      readback.policy.scope.resourceId === input.resourceId
+        ? readback.policy
+        : undefined;
+    yield* configureRuntimeMonitoringThresholds({
+      resourceId: input.resourceId,
+      thresholds,
+      ...(exactPolicy ? { policyId: exactPolicy.policyId } : {}),
+    });
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -4073,6 +4213,10 @@ export function resolveInteractiveDeploymentInput(
           resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigGeneratedAccessProfile({
+          seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigMonitoringThresholds({
           seed: resolvedSeed,
           resourceId: deploymentInput.resourceId,
         });

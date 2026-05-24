@@ -106,6 +106,7 @@ async function createPreviewDeployCliHarness(
     dependencyBackupPolicies?: unknown[];
     storageVolumes?: unknown[];
     scheduledTasks?: unknown[];
+    monitoringThresholdsReadback?: Record<string, unknown> | null;
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -152,6 +153,19 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "res_1" } as T);
         case "ConfigureResourceAccessCommand":
           return ok({ id: "res_1" } as T);
+        case "ConfigureRuntimeMonitoringThresholdsCommand": {
+          const thresholdCommand = command as unknown as { input: Record<string, unknown> };
+          return ok({
+            policy: {
+              schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+              policyId: thresholdCommand.input.policyId ?? "rmtp_resource",
+              scope: thresholdCommand.input.scope,
+              rules: thresholdCommand.input.rules,
+              enabled: thresholdCommand.input.enabled,
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
         case "ConfigureResourceAutoDeployCommand": {
           const autoDeployCommand = command as unknown as Record<string, unknown>;
           const policy = autoDeployCommand.policy as Record<string, unknown> | undefined;
@@ -274,6 +288,22 @@ async function createPreviewDeployCliHarness(
       }
       if (query.constructor.name === "ListScheduledTasksQuery") {
         return ok({ items: input.scheduledTasks ?? [] } as T);
+      }
+      if (query.constructor.name === "ShowRuntimeMonitoringThresholdsQuery") {
+        return ok(
+          (input.monitoringThresholdsReadback ?? {
+            schemaVersion: "runtime-monitoring-thresholds.show/v1",
+            scope: { kind: "resource", resourceId: "res_1" },
+            generatedAt: "2026-05-24T00:00:00.000Z",
+            policy: null,
+            evaluation: {
+              state: "unknown",
+              crossed: [],
+              nextActions: ["open-runtime-monitoring"],
+              sourceErrors: [],
+            },
+          }) as Record<string, unknown> as T,
+        );
       }
       return ok({ items: [] } as T);
     },
@@ -5378,6 +5408,240 @@ describe("CLI deployment config entry workflow", () => {
         pathPrefix: "/",
       },
     });
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-003] config monitoring thresholds configure before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-monitoring-thresholds-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "monitoring:",
+        "  thresholds:",
+        "    enabled: true",
+        "    rules:",
+        "      - signal: cpu",
+        "        metric: containerCpuPercent",
+        "        warning: 70",
+        "        critical: 90",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.95",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowRuntimeMonitoringThresholdsQuery");
+    expect(harness.operations.indexOf("ConfigureRuntimeMonitoringThresholdsCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const thresholds = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureRuntimeMonitoringThresholdsCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(thresholds?.input).toMatchObject({
+      scope: { kind: "resource", resourceId: "res_1" },
+      enabled: true,
+      rules: [
+        {
+          signal: "cpu",
+          metric: "containerCpuPercent",
+          warning: 70,
+          critical: 90,
+          comparator: "greater-than-or-equal",
+        },
+      ],
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("monitoring");
+    expect(deployment).not.toHaveProperty("thresholds");
+    expect(deployment).not.toHaveProperty("monitoringThresholds");
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-004] config monitoring thresholds are idempotent for exact matching policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowRuntimeMonitoringThresholdsQuery") {
+          return ok({
+            schemaVersion: "runtime-monitoring-thresholds.show/v1",
+            scope: { kind: "resource", resourceId: "res_existing" },
+            generatedAt: "2026-05-24T00:00:00.000Z",
+            policy: {
+              schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+              policyId: "rmtp_existing",
+              scope: { kind: "resource", resourceId: "res_existing" },
+              enabled: true,
+              rules: [
+                {
+                  ruleId: "rmtr_cpu",
+                  signal: "cpu",
+                  metric: "containerCpuPercent",
+                  warning: 70,
+                  critical: 90,
+                  comparator: "greater-than-or-equal",
+                },
+              ],
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+            evaluation: {
+              state: "unknown",
+              crossed: [],
+              nextActions: ["open-runtime-monitoring"],
+              sourceErrors: [],
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          monitoringThresholds: {
+            enabled: true,
+            rules: [
+              {
+                signal: "cpu",
+                metric: "containerCpuPercent",
+                warning: 70,
+                critical: 90,
+                comparator: "greater-than-or-equal",
+              },
+            ],
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("ConfigureRuntimeMonitoringThresholdsCommand");
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-005] config monitoring thresholds create exact override for inherited policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ policy: { policyId: "rmtp_resource" } } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowRuntimeMonitoringThresholdsQuery") {
+          return ok({
+            schemaVersion: "runtime-monitoring-thresholds.show/v1",
+            scope: { kind: "resource", resourceId: "res_existing" },
+            generatedAt: "2026-05-24T00:00:00.000Z",
+            policy: {
+              schemaVersion: "runtime-monitoring-thresholds.policy/v1",
+              policyId: "rmtp_parent",
+              scope: { kind: "project", projectId: "proj_existing" },
+              enabled: true,
+              rules: [
+                {
+                  ruleId: "rmtr_parent_cpu",
+                  signal: "cpu",
+                  metric: "containerCpuPercent",
+                  warning: 60,
+                  critical: 80,
+                  comparator: "greater-than-or-equal",
+                },
+              ],
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+            evaluation: {
+              state: "unknown",
+              crossed: [],
+              nextActions: ["open-runtime-monitoring"],
+              sourceErrors: [],
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          monitoringThresholds: {
+            enabled: true,
+            rules: [
+              {
+                signal: "cpu",
+                metric: "containerCpuPercent",
+                warning: 70,
+                critical: 90,
+                comparator: "greater-than-or-equal",
+              },
+            ],
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    const thresholds = commands.find(
+      (command) => command.constructor.name === "ConfigureRuntimeMonitoringThresholdsCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(thresholds?.input).toMatchObject({
+      scope: { kind: "resource", resourceId: "res_existing" },
+      enabled: true,
+    });
+    expect(thresholds?.input).not.toHaveProperty("policyId");
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {

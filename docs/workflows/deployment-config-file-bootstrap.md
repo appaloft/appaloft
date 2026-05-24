@@ -303,6 +303,27 @@ allow it. `enabled: false` disables generated default access for that Resource o
 accounts, DNS/certificate provider identity, route ids, certificate ids, server ids, destination
 ids, credentials, private keys, tokens, raw certificate material, or secret values.
 
+`monitoring.thresholds` uses runtime observation language:
+
+```yaml
+monitoring:
+  thresholds:
+    enabled: true
+    rules:
+      - signal: cpu
+        metric: containerCpuPercent
+        warning: 70
+        critical: 90
+```
+
+Monitoring threshold declarations configure an exact Resource-scope non-enforcing runtime
+monitoring threshold policy through `runtime-monitoring.thresholds.configure`.
+`runtime-monitoring.thresholds.show` is used first so an already matching exact Resource policy can
+be reused and inherited parent-scope policies are not mutated. Config may not include policy ids,
+scope ids, provider accounts, provider-native monitoring ids, container ids, sample ids, host
+paths, raw metric payloads, log lines, credentials, private keys, tokens, raw secret values, quota,
+autoscaling, alert routing, cleanup, billing, or runtime sizing fields.
+
 `scheduledTasks` uses application language, not Appaloft internal object language:
 
 ```yaml
@@ -748,6 +769,11 @@ The target repository config schema may accept provider-neutral domain intent un
 It may also accept Resource generated access intent under `access.generated`. Generated access
 intent is reconciled through `resources.configure-access` and does not create managed
 `DomainBinding` records, issue certificates, or apply proxy routes directly.
+
+It may also accept Resource runtime monitoring threshold intent under `monitoring.thresholds`.
+Threshold intent is reconciled through `runtime-monitoring.thresholds.show` and
+`runtime-monitoring.thresholds.configure`; it creates or updates only exact Resource-scope
+non-enforcing observation policy and does not add monitoring fields to `deployments.create`.
 
 Each domain entry must stay within this shape:
 

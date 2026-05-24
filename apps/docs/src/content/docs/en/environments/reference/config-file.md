@@ -109,6 +109,31 @@ or add access fields to the final deployment command. Keep provider accounts, DN
 provider credentials, route ids, certificate ids, private keys, tokens, and raw certificate material
 outside `appaloft.yaml`.
 
+<h2 id="environment-config-file-monitoring-thresholds">Runtime monitoring thresholds</h2>
+
+Use `monitoring.thresholds` when the Resource should have reviewable, non-enforcing runtime
+monitoring warning or critical thresholds:
+
+```yaml
+monitoring:
+  thresholds:
+    enabled: true
+    rules:
+      - signal: cpu
+        metric: containerCpuPercent
+        warning: 70
+        critical: 90
+```
+
+Thresholds are observation policy only. They can make resource monitoring readback show warning or
+critical state, but they do not resize, scale, reject, restart, clean up, alert, bill, or mutate the
+running workload. Config deploy creates or updates only the exact Resource-scope threshold policy;
+it does not mutate inherited server, project, environment, or deployment policies.
+
+Keep policy ids, scope ids, provider accounts, container ids, sample ids, host paths, raw metric
+payloads, log lines, credentials, private keys, tokens, and raw secret values outside
+`appaloft.yaml`.
+
 <h2 id="environment-config-file-scheduled-tasks">Scheduled tasks</h2>
 
 Use `scheduledTasks` when the application needs recurring Resource-owned jobs:

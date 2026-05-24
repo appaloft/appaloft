@@ -800,6 +800,131 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-001] accepts runtime monitoring thresholds", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "monitoring:",
+        "  thresholds:",
+        "    enabled: true",
+        "    rules:",
+        "      - signal: cpu",
+        "        metric: containerCpuPercent",
+        "        warning: 70",
+        "        critical: 90",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.monitoring?.thresholds).toEqual({
+        enabled: true,
+        rules: [
+          {
+            signal: "cpu",
+            metric: "containerCpuPercent",
+            warning: 70,
+            critical: 90,
+            comparator: "greater-than-or-equal",
+          },
+        ],
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-002] rejects unknown and unsafe monitoring threshold fields", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          policyId: "rmtp_123",
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["monitoring", "thresholds", "policyId"]);
+    }
+
+    const metricMismatch = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rules: [
+            {
+              signal: "cpu",
+              metric: "usedBytes",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(metricMismatch.success).toBe(false);
+    if (!metricMismatch.success) {
+      expect(metricMismatch.error.issues[0]?.path).toEqual([
+        "monitoring",
+        "thresholds",
+        "rules",
+        0,
+        "metric",
+      ]);
+    }
+
+    const rawPayload = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rawPayload: '{"token":"secret"}',
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(rawPayload.success).toBe(false);
+    if (!rawPayload.success) {
+      expect(rawPayload.error.issues[0]?.message).toContain("unsupported_config_field");
+      expect(rawPayload.error.issues[0]?.path).toEqual(["monitoring", "thresholds", "rawPayload"]);
+    }
+
+    const missingBoundary = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(missingBoundary.success).toBe(false);
+    if (!missingBoundary.success) {
+      expect(missingBoundary.error.issues[0]?.path).toEqual([
+        "monitoring",
+        "thresholds",
+        "rules",
+        0,
+        "warning",
+      ]);
+    }
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

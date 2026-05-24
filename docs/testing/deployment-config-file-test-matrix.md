@@ -28,6 +28,8 @@ Canonical assertions:
   operations before deployment;
 - `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
 - `access.generated` declarations map to Resource access profile configuration before deployment;
+- `monitoring.thresholds` declarations map to exact Resource-scope runtime monitoring threshold
+  policy configuration before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -54,6 +56,7 @@ This matrix inherits:
 - [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
 - [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
 - [ADR-071: Repository Config Generated Access Profile](../decisions/ADR-071-repository-config-generated-access-profile.md)
+- [ADR-072: Repository Config Runtime Monitoring Thresholds](../decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -63,6 +66,7 @@ This matrix inherits:
 - [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
 - [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
 - [Repository Config Generated Access Profile](../specs/080-repository-config-generated-access-profile/spec.md)
+- [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -89,6 +93,7 @@ This matrix inherits:
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
 | Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
 | Generated access profile | Resource generated access preference and generated route path prefix are configured before deployment admission and never become deployment fields. |
+| Monitoring thresholds | Resource-scope runtime monitoring warning/critical policy is configured before deployment admission, never becomes a deployment field, and never enforces sizing or cleanup. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -279,6 +284,16 @@ This matrix inherits:
 | CONFIG-FILE-GENERATED-ACCESS-004 | integration | Generated access idempotency | Selected Resource already has the same generated access profile | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
 | CONFIG-FILE-GENERATED-ACCESS-005 | integration | Generated access disabled from config | Config declares `access.generated.enabled = false` | Config deploy handles Resource profile reconciliation | Resource access profile is configured with generated access disabled before deployment | None | `resources.show` -> `resources.configure-access(mode=disabled)` -> `deployments.create` |
 
+## Runtime Monitoring Threshold Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-MONITORING-THRESHOLDS-001 | parser/schema | Monitoring thresholds accepted | Config declares `monitoring.thresholds.enabled` and one or more signal/metric rules | Parser accepts the declaration, defaults `enabled` and comparator, validates signal/metric pairs, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-MONITORING-THRESHOLDS-002 | parser/schema | Unknown or unsafe monitoring threshold fields rejected | Config declares policy id, scope/resource/server/project/deployment id, provider account, container id, sample id, token, credential, raw metric payload, log text, host path, or mismatched signal/metric under `monitoring.thresholds` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-capability-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-MONITORING-THRESHOLDS-003 | integration | Config monitoring thresholds configure before deployment | Selected Resource has no exact matching Resource-scope threshold policy | Config deploy handles monitoring threshold reconciliation | Threshold readback is requested, an exact Resource-scope policy is configured, and deployment admission remains ids-only | None | `runtime-monitoring.thresholds.show(resource)` -> `runtime-monitoring.thresholds.configure(resource)` -> `deployments.create` |
+| CONFIG-FILE-MONITORING-THRESHOLDS-004 | integration | Monitoring threshold idempotency | Selected Resource already has an exact matching threshold policy | Config deploy runs again | No duplicate configure command is dispatched | None | `runtime-monitoring.thresholds.show(resource)` -> `deployments.create` |
+| CONFIG-FILE-MONITORING-THRESHOLDS-005 | integration | Inherited threshold policy not mutated | Threshold readback returns an inherited parent-scope policy | Config deploy handles Resource YAML | Config deploy creates an exact Resource-scope override and does not pass the inherited parent policy id | None | `runtime-monitoring.thresholds.show(resource)` -> `runtime-monitoring.thresholds.configure(resource without inherited policyId)` -> `deployments.create` |
+
 ## Resource Sizing And Runtime Target Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -341,8 +356,10 @@ Current implemented coverage:
   `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
   `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
-  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002`, and
-  `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002` are covered in
+  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002`,
+  `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002`, and
+  `CONFIG-FILE-MONITORING-THRESHOLDS-001` through
+  `CONFIG-FILE-MONITORING-THRESHOLDS-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
@@ -352,8 +369,10 @@ Current implemented coverage:
   `CONFIG-FILE-DEPENDENCY-BACKUP-003` through `CONFIG-FILE-DEPENDENCY-BACKUP-007`,
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
   `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and
-  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`, and
-  `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005` are covered in
+  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`,
+  `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005`, and
+  `CONFIG-FILE-MONITORING-THRESHOLDS-003` through
+  `CONFIG-FILE-MONITORING-THRESHOLDS-005` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
@@ -426,8 +445,9 @@ CLI/filesystem discovery use the same parser.
 Current config schema rejects `project`, `environment`, `resource`, `targets`, `servers`, raw
 secret material, secret-looking inline env values, unknown fields, unsafe domain/TLS-like fields,
 and unsupported sizing/rollout fields before mutation. It now accepts `access.domains[]` with
-provider-neutral `host`, `pathPrefix`, and `tlsMode` fields, and `access.generated` with generated
-access eligibility and path prefix fields. SSH CLI config deploy now persists
+provider-neutral `host`, `pathPrefix`, and `tlsMode` fields, `access.generated` with generated
+access eligibility and path prefix fields, and `monitoring.thresholds` with non-enforcing
+Resource-scope warning/critical rules. SSH CLI config deploy now persists
 server-applied route desired state under the selected SSH-server state backend before
 `deployments.create`; deployment planning consumes that desired state and records applied/failed
 status after deployment-finished route outcomes. Resource access, health, and diagnostic summaries
@@ -435,7 +455,10 @@ expose the latest server-applied route URL/status. Provider-local TLS diagnostic
 `tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
 managed-domain mapping remains follow-up work. Config generated access profile is reconciled
 through `resources.configure-access` before ids-only deployment admission and does not mutate
-domain bindings, certificates, default access policies, or proxy routes directly.
+domain bindings, certificates, default access policies, or proxy routes directly. Config runtime
+monitoring thresholds are reconciled through `runtime-monitoring.thresholds.configure` and
+`runtime-monitoring.thresholds.show` before ids-only deployment admission and do not enforce
+runtime sizing, cleanup, alert routing, autoscaling, or billing policy.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).

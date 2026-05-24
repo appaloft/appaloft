@@ -439,6 +439,69 @@
       "additionalProperties": false,
       "description": "Access intent resolved outside deployments.create."
     },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "rules": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "signal": {
+                    "type": "string",
+                    "enum": ["cpu", "memory", "disk", "inode", "docker", "network"]
+                  },
+                  "metric": {
+                    "type": "string",
+                    "enum": [
+                      "containerCpuPercent",
+                      "loadAverage1m",
+                      "containerUsedBytes",
+                      "usedBytes",
+                      "attributedBytes",
+                      "used",
+                      "imageBytes",
+                      "buildCacheBytes",
+                      "containerWritableBytes",
+                      "rxBytes",
+                      "txBytes"
+                    ]
+                  },
+                  "warning": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "critical": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "comparator": {
+                    "default": "greater-than-or-equal",
+                    "type": "string",
+                    "const": "greater-than-or-equal"
+                  }
+                },
+                "required": ["signal", "metric", "comparator"],
+                "additionalProperties": false,
+                "description": "Resource runtime monitoring threshold rule."
+              }
+            }
+          },
+          "required": ["enabled", "rules"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Resource runtime monitoring config declarations."
+    },
     "preview": {
       "type": "object",
       "properties": {

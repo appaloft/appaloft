@@ -214,6 +214,12 @@ Runtime monitoring operations:
 | Configure runtime monitoring thresholds | Command | `runtime-monitoring.thresholds.configure` | Application command/use case, PG/PGlite exact-scope policy persistence, CLI, HTTP/oRPC, server/resource Web Monitor exact-scope CPU/memory/disk threshold configuration, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Writes stay exact-scope; Web creates an exact-scope override when saving inherited readback. Thresholds are non-enforcing observation policy only. |
 | Show runtime monitoring thresholds | Query | `runtime-monitoring.thresholds.show` | Application query service, PG/PGlite policy readback/evaluation, sample-evidence-based parent policy inheritance, CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Readback only, no runtime enforcement. |
 
+- Repository config `monitoring.thresholds` is governed by
+  [ADR-072](./decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md) and
+  [spec 081](./specs/081-repository-config-runtime-monitoring-thresholds/spec.md). It is a
+  workflow/profile extension over `runtime-monitoring.thresholds.configure` and
+  `runtime-monitoring.thresholds.show`, not a new operation key; it must reconcile exact
+  Resource-scope non-enforcing threshold policy before ids-only deployment admission.
 - Runtime monitoring is governed by
   [ADR-063: Runtime Monitoring Observation Boundary](./decisions/ADR-063-runtime-monitoring-observation-boundary.md)
   [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md),
