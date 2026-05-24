@@ -12,6 +12,7 @@
     createBlueprintMarketplaceEndpoint,
     defaultBlueprintMarketplaceListEndpoint,
   } from "./url";
+  import { Skeleton } from "@appaloft/ui/skeleton";
 
   type Props = {
     readonly apiBaseUrl?: string;
@@ -279,33 +280,33 @@
     <section class="marketplace-loading" aria-label="正在加载 Blueprint 目录" data-blueprint-marketplace-skeleton>
       <div class="category-tabs is-loading-tabs" aria-hidden="true">
         {#each Array.from({ length: 12 }) as _, index (index)}
-          <span class="skeleton category-pill" class:wide={index === 1 || index === 8}></span>
+          <Skeleton class={index === 1 || index === 8 ? "h-9 w-40 rounded-lg" : "h-9 w-28 rounded-lg"} />
         {/each}
       </div>
       {#each Array.from({ length: 3 }) as _, groupIndex (groupIndex)}
         <section class="marketplace-skeleton-group" aria-hidden="true">
           <div class="group-heading">
             <div>
-              <div class="skeleton heading"></div>
-              <div class="skeleton line group-line"></div>
+              <Skeleton class="h-7 w-[190px]" />
+              <Skeleton class="mt-2.5 h-4 w-full max-w-[360px]" />
             </div>
-            <span class="skeleton count-pill"></span>
+            <Skeleton class="h-7 w-[34px]" />
           </div>
           <div class="marketplace-grid">
             {#each Array.from({ length: groupIndex === 2 ? 2 : 4 }) as _, cardIndex (cardIndex)}
               <article class="listing-card is-loading">
                 <div class="listing-card-main">
-                  <div class="skeleton icon"></div>
+                  <Skeleton class="size-14 rounded-lg" />
                   <div>
-                    <div class="skeleton title"></div>
-                    <div class="skeleton line"></div>
-                    <div class="skeleton line short"></div>
+                    <Skeleton class="h-[26px] w-2/3" />
+                    <Skeleton class="mt-2 h-4 w-full" />
+                    <Skeleton class="mt-2 h-4 w-[58%]" />
                   </div>
                 </div>
-                <div class="skeleton paragraph"></div>
-                <div class="skeleton fact"></div>
-                <div class="skeleton fact short"></div>
-                <div class="skeleton footer"></div>
+                <Skeleton class="h-12 w-[88%]" />
+                <Skeleton class="h-[42px] w-full" />
+                <Skeleton class="h-[42px] w-[58%]" />
+                <Skeleton class="mt-auto h-[38px] w-full" />
               </article>
             {/each}
           </div>
@@ -948,84 +949,12 @@
     pointer-events: none;
   }
 
-  .category-pill {
-    display: inline-flex;
-    width: 112px;
-    height: 36px;
-    border-radius: 8px;
-  }
-
-  .category-pill.wide {
-    width: 164px;
-  }
-
   .listing-card.is-loading {
     min-height: 300px;
   }
 
   .listing-card.is-loading .listing-card-main {
     grid-template-columns: 56px minmax(0, 1fr);
-  }
-
-  .skeleton {
-    display: block;
-    border: 0;
-    border-radius: 8px;
-    background: linear-gradient(90deg, #edf3f9 0%, #f8fbfe 48%, #edf3f9 100%);
-    background-size: 220% 100%;
-    animation: pulse 1200ms ease-in-out infinite;
-  }
-
-  .skeleton.icon {
-    width: 56px;
-    height: 56px;
-  }
-
-  .skeleton.title {
-    height: 26px;
-    width: 66%;
-  }
-
-  .skeleton.heading {
-    width: 190px;
-    height: 28px;
-  }
-
-  .skeleton.line {
-    height: 16px;
-    width: 100%;
-  }
-
-  .skeleton.short {
-    width: 58%;
-  }
-
-  .skeleton.group-line {
-    width: min(100%, 360px);
-    margin-top: 10px;
-  }
-
-  .skeleton.paragraph {
-    height: 48px;
-    width: 88%;
-  }
-
-  .skeleton.fact {
-    height: 42px;
-    width: 100%;
-  }
-
-  .skeleton.footer {
-    height: 38px;
-    width: 100%;
-    margin-top: auto;
-  }
-
-  .skeleton.count-pill {
-    width: 34px;
-    height: 28px;
-    border: 0;
-    padding: 0;
   }
 
   .sr-only {
