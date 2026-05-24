@@ -1,11 +1,12 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { ArrowRight, ExternalLink, Package, Search } from "@lucide/svelte";
+  import { ArrowRight, ExternalLink, Eye, Package, Search } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   import { request } from "$lib/api/client";
+  import BlueprintProductIcon from "$lib/components/console/BlueprintProductIcon.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import { Input } from "$lib/components/ui/input";
@@ -38,6 +39,8 @@
     icon?: {
       label?: string;
       tone?: string;
+      url?: string;
+      alt?: string;
     };
     publisher: {
       name: string;
@@ -48,6 +51,10 @@
       version: string;
       summary: string;
       tags: readonly string[];
+    };
+    overview?: {
+      highlights?: readonly string[];
+      useCases?: readonly string[];
     };
     requirementsSummary?: {
       components: number;
@@ -60,7 +67,19 @@
     items: readonly BlueprintCatalogListing[];
   };
 
-  let { surface = "page" }: { surface?: CatalogSurface } = $props();
+  let {
+    surface = "page",
+    selectedSlug = "",
+    actionLabel = surface === "dialog" ? "选择" : "部署",
+    onselect,
+    onview,
+  }: {
+    surface?: CatalogSurface;
+    selectedSlug?: string;
+    actionLabel?: string;
+    onselect?: (item: BlueprintCatalogListing) => void;
+    onview?: (item: BlueprintCatalogListing) => void;
+  } = $props();
 
   let searchTerm = $state("");
   let selectedCategoryKey = $state("all");
@@ -157,16 +176,27 @@
     return `/marketplace/${encodeURIComponent(item.slug)}${search ? `?${search}` : ""}`;
   }
 
-  function iconLabel(item: BlueprintCatalogListing): string {
-    return item.icon?.label ?? item.title.slice(0, 2);
-  }
-
   function dependencySummary(item: BlueprintCatalogListing): string {
     const dependencies = item.requirementsSummary?.dependencies ?? [];
     if (dependencies.length === 0) {
       return "无托管依赖";
     }
     return dependencies.join(" / ");
+  }
+
+  function portSummary(item: BlueprintCatalogListing): string {
+    const ports = item.requirementsSummary?.ports ?? [];
+    if (ports.length === 0) {
+      return "无公开端口";
+    }
+    return ports
+      .map((port) => port.split(":").at(-1) ?? port)
+      .slice(0, 2)
+      .join(" / ");
+  }
+
+  function handlePrimaryAction(item: BlueprintCatalogListing): void {
+    onselect?.(item);
   }
 </script>
 
@@ -237,7 +267,7 @@
       </div>
     </section>
   {:else}
-    <nav class="flex gap-2 overflow-x-auto pb-1" aria-label="Blueprint categories">
+    <nav class="flex flex-wrap gap-2" aria-label="Blueprint categories">
       <Button
         type="button"
         size="sm"
@@ -289,15 +319,12 @@
             </div>
             <div class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {#each group.items as item (item.slug)}
-                <article class="console-panel flex min-h-64 flex-col p-4">
+                <article
+                  class={`console-panel flex min-h-72 flex-col p-4 ${selectedSlug === item.slug ? "border-ring/45 ring-1 ring-ring/20" : ""}`}
+                >
                   <div class="flex min-w-0 items-start justify-between gap-3">
                     <div class="flex min-w-0 items-start gap-3">
-                      <div
-                        class="flex size-11 shrink-0 items-center justify-center rounded-md border bg-muted text-sm font-semibold uppercase"
-                        style={item.icon?.tone ? `background:${item.icon.tone};color:white;border-color:${item.icon.tone}` : undefined}
-                      >
-                        {iconLabel(item)}
-                      </div>
+                      <BlueprintProductIcon title={item.title} icon={item.icon} />
                       <div class="min-w-0">
                         <h3 class="truncate text-base font-semibold">{item.title}</h3>
                         <p class="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
@@ -305,8 +332,17 @@
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline">{item.featured ? "Featured" : "Official"}</Badge>
+                    <div class="flex shrink-0 flex-col items-end gap-1">
+                      <Badge variant="outline">{item.featured ? "Featured" : "Official"}</Badge>
+                      {#if selectedSlug === item.slug}
+                        <Badge variant="outline">已选择</Badge>
+                      {/if}
+                    </div>
                   </div>
+
+                  <p class="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    {item.blueprint.summary}
+                  </p>
 
                   <div class="mt-4 grid gap-2 text-xs sm:grid-cols-2">
                     <div class="console-subtle-panel min-w-0 px-3 py-2">
@@ -318,6 +354,10 @@
                       <p class="truncate font-medium">
                         {(item.requirementsSummary?.components ?? 1).toString()} component
                       </p>
+                    </div>
+                    <div class="console-subtle-panel min-w-0 px-3 py-2 sm:col-span-2">
+                      <p class="text-muted-foreground">公开入口</p>
+                      <p class="truncate font-medium">{portSummary(item)}</p>
                     </div>
                   </div>
 
@@ -347,10 +387,28 @@
                           <ExternalLink class="size-4" />
                         </Button>
                       {/if}
-                      <Button href={listingDetailHref(item)} size="sm">
-                        部署
-                        <ArrowRight class="size-4" />
-                      </Button>
+                      {#if onview}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onclick={() => onview?.(item)}
+                        >
+                          查看
+                          <Eye class="size-4" />
+                        </Button>
+                      {/if}
+                      {#if onselect}
+                        <Button type="button" size="sm" onclick={() => handlePrimaryAction(item)}>
+                          {actionLabel}
+                          <ArrowRight class="size-4" />
+                        </Button>
+                      {:else}
+                        <Button href={listingDetailHref(item)} size="sm">
+                          {actionLabel}
+                          <ArrowRight class="size-4" />
+                        </Button>
+                      {/if}
                     </div>
                   </div>
                 </article>
