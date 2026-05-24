@@ -35,6 +35,7 @@ describe("organization auth management console surface", () => {
     expect(shellSource).toContain("i18nKeys.console.nav.instance");
     expect(shellSource).toContain('"/api/auth/sign-out"');
     expect(shellSource).toContain("i18nKeys.common.actions.signOut");
+    expect(shellSource).toContain("data-console-sign-out-action");
     expect(clientContractSource).toContain("organizations: {");
     expect(clientContractSource).toContain("SwitchCurrentOrganizationCommandInput");
     expect(clientContractSource).toContain("InviteOrganizationMemberCommandInput");

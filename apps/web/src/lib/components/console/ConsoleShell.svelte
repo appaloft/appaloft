@@ -11,6 +11,7 @@
     GitBranch,
     Globe2,
     LogIn,
+    LogOut,
     Moon,
     Package,
     Play,
@@ -58,6 +59,7 @@
     SidebarRail,
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
+  import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import {
     initials,
@@ -65,6 +67,7 @@
     readSessionIdentity,
   } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
+  import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   type BreadcrumbItem = {
     label: string;
@@ -76,6 +79,10 @@
     description: string;
     breadcrumbs?: BreadcrumbItem[];
     children: Snippet;
+  };
+
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
   };
 
   const navigationItems = [
@@ -119,10 +126,23 @@
     certificates: false,
     providers: false,
   });
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
 
   const pathname = $derived(page.url.pathname);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
   const projects = $derived(projectsQuery.data?.items ?? []);
+  const navigationExtensions = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .filter((extension) => extension.placement === "navigation")
+      .toSorted((a, b) => a.title.localeCompare(b.title)),
+  );
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
     if (!query) {
@@ -233,6 +253,16 @@
     }
   }
 
+  async function signOut(): Promise<void> {
+    await request<{ success?: boolean }>("/api/auth/sign-out", {
+      method: "POST",
+    });
+
+    if (browser) {
+      window.location.href = "/login";
+    }
+  }
+
   function openHealthCheck(): void {
     if (browser) {
       window.open(`${API_BASE}/api/health`, "_blank");
@@ -311,6 +341,36 @@
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
+
+      {#if navigationExtensions.length > 0}
+        <SidebarGroup>
+          <SidebarGroupLabel>{$t(i18nKeys.console.nav.extensions)}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {#each navigationExtensions as extension (extension.key)}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={isNavigationActive(extension.path)}
+                    tooltipContent={extension.title}
+                  >
+                    {#snippet child({ props })}
+                      <a
+                        href={extension.path}
+                        target={extension.target === "external-page" ? "_blank" : undefined}
+                        rel={extension.target === "external-page" ? "noreferrer" : undefined}
+                        {...props}
+                      >
+                        <Package class="size-4" />
+                        <span>{extension.title}</span>
+                      </a>
+                    {/snippet}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              {/each}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      {/if}
 
       <SidebarGroup>
         <SidebarGroupLabel>{$t(i18nKeys.common.domain.projects)}</SidebarGroupLabel>
@@ -397,6 +457,12 @@
             <Rocket class="size-4" />
             {$t(i18nKeys.console.deployments.records)}
           </DropdownMenuItem>
+          {#if authSession.session}
+            <DropdownMenuItem data-console-sign-out-action onclick={signOut}>
+              <LogOut class="size-4" />
+              {$t(i18nKeys.common.actions.signOut)}
+            </DropdownMenuItem>
+          {/if}
           <DropdownMenuItem onclick={openDocumentation}>
             <BookOpen class="size-4" />
             {$t(i18nKeys.common.actions.openDocumentation)}
