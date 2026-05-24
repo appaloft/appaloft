@@ -32,7 +32,7 @@ export const systemPluginWebExtensionSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1).optional(),
   path: z.string().min(1),
-  placement: z.enum(["auth", "navigation", "settings"]),
+  placement: z.enum(["auth", "navigation", "settings", "quick-deploy-source"]),
   target: z.enum(["server-page", "external-page"]),
   requiresAuth: z.boolean(),
 });

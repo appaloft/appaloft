@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
+import { describe, expect, test } from "vitest";
 
 describe("self-hosted auth bootstrap Web surfaces", () => {
   test("[FIRST-ADMIN-BOOTSTRAP-007] login stays an ordinary account surface after setup", async () => {

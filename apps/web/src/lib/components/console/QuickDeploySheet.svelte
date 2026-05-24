@@ -43,6 +43,7 @@
     ResourceSummary,
     ServerSummary,
     SshCredentialSummary,
+    SystemPluginWebExtension,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
 
@@ -83,6 +84,7 @@
   type SourceKind =
     | "local-folder"
     | "github"
+    | "blueprint"
     | "remote-git"
     | "docker-image"
     | "compose"
@@ -102,6 +104,9 @@
   type QuickDeployWorkflowProgressItem = {
     kind: QuickDeployWorkflowStep["kind"];
     status: QuickDeployWorkflowStepStatus;
+  };
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
   };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
@@ -154,6 +159,12 @@
       labelKey: i18nKeys.console.quickDeploy.sourceGithub,
       hintKey: i18nKeys.console.quickDeploy.sourceGithubHint,
       icon: GitHubIcon,
+    },
+    {
+      key: "blueprint",
+      labelKey: i18nKeys.console.quickDeploy.sourceBlueprint,
+      hintKey: i18nKeys.console.quickDeploy.sourceBlueprintHint,
+      icon: Package,
     },
     {
       key: "remote-git",
@@ -253,6 +264,14 @@
       queryKey: ["providers"],
       queryFn: () => orpcClient.providers.list(),
       enabled: browser && enabled,
+    }),
+  );
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser && enabled,
+      staleTime: 30_000,
     }),
   );
 
@@ -384,6 +403,9 @@
   let dockerImageLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let composeLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let staticSiteLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? ".") : ".");
+  let selectedBlueprintSourceExtensionKey = $state(
+    browser ? (page.url.searchParams.get("sourceExtension") ?? "") : "",
+  );
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
   let deployFeedback = $state<{
@@ -485,6 +507,18 @@
   const environments = $derived((environmentsQuery.data?.items ?? []) as EnvironmentSummary[]);
   const resources = $derived((resourcesQuery.data?.items ?? []) as ResourceSummary[]);
   const providers = $derived((providersQuery.data?.items ?? []) as ProviderSummary[]);
+  const quickDeploySourceExtensions = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .filter((extension) => extension.placement === "quick-deploy-source")
+      .toSorted((a, b) => a.title.localeCompare(b.title)),
+  );
+  const selectedBlueprintSourceExtension = $derived(
+    quickDeploySourceExtensions.find(
+      (extension) => extension.key === selectedBlueprintSourceExtensionKey,
+    ) ??
+      quickDeploySourceExtensions[0] ??
+      null,
+  );
   const sshCredentials = $derived(
     (sshCredentialsQuery.data?.items ?? []) as SshCredentialSummary[],
   );
@@ -542,6 +576,8 @@
     switch (sourceKind) {
       case "github":
         return githubLocator.trim();
+      case "blueprint":
+        return selectedBlueprintSourceExtension?.key ?? "";
       case "remote-git":
         return remoteGitLocator.trim();
       case "docker-image":
@@ -558,6 +594,8 @@
     switch (sourceKind) {
       case "github":
         return "https://github.com/acme/project.git";
+      case "blueprint":
+        return selectedBlueprintSourceExtension?.path ?? "/marketplace";
       case "remote-git":
         return "https://git.example.com/team/project.git";
       case "docker-image":
@@ -673,6 +711,11 @@
       return selectedGitHubRepository.fullName;
     }
 
+    if (sourceKind === "blueprint") {
+      return selectedBlueprintSourceExtension?.title ??
+        $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector);
+    }
+
     return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
   });
   const sourceDetailRows = $derived.by((): SummaryRow[] => {
@@ -693,6 +736,25 @@
         {
           label: $t(i18nKeys.console.quickDeploy.cloneUrl),
           value: selectedGitHubRepository.cloneUrl,
+          mono: true,
+        },
+      ];
+    }
+
+    if (sourceKind === "blueprint") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessBlueprintCatalog),
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector),
+          value: selectedBlueprintSourceExtension?.title ??
+            $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable),
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAddress),
+          value: selectedBlueprintSourceExtension?.path ?? "/marketplace",
           mono: true,
         },
       ];
@@ -1235,6 +1297,29 @@
     params.delete(key);
   }
 
+  function sourceExtensionHref(extension: SystemPluginWebExtension | null): string {
+    if (!extension) {
+      return "#";
+    }
+
+    if (!browser) {
+      return extension.path;
+    }
+
+    try {
+      const url = new URL(extension.path, window.location.origin);
+      if (url.origin !== window.location.origin) {
+        return url.toString();
+      }
+
+      const returnTo = buildDeployStateUrl();
+      url.searchParams.set("returnTo", `${returnTo.pathname}${returnTo.search}`);
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return extension.path;
+    }
+  }
+
   function buildDeployStateUrl(): URL {
     const url = new URL(browser ? window.location.href : page.url.href);
     url.pathname = "/deploy";
@@ -1246,7 +1331,7 @@
     setSearchParam(
       params,
       "sourceLocator",
-      sourceLocator,
+      sourceKind === "blueprint" ? "" : sourceLocator,
       sourceKind === "local-folder"
         ? "."
         : "",
@@ -1258,6 +1343,14 @@
         setSearchParam(params, "repository", selectedGitHubRepository?.fullName ?? githubRepositorySearch);
         setSearchParam(params, "githubRepositoryId", selectedGitHubRepositoryId);
       }
+    }
+
+    if (sourceKind === "blueprint") {
+      setSearchParam(
+        params,
+        "sourceExtension",
+        selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey,
+      );
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
@@ -1399,6 +1492,7 @@
     githubRepositorySearch = params.get("repository") ?? "";
     selectedGitHubRepositoryId = params.get("githubRepositoryId") ?? "";
     selectedGitHubRepository = null;
+    selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
 
     localFolderLocator = nextSourceKind === "local-folder" ? nextSourceLocator || "." : localFolderLocator;
     githubLocator = nextSourceKind === "github" ? nextSourceLocator : githubLocator;
@@ -1445,6 +1539,9 @@
     if (kind === "github" && githubConnected && !githubLocator.trim()) {
       githubSourceMode = "browser";
       githubSourceModeTouched = false;
+    }
+    if (kind === "blueprint" && !selectedBlueprintSourceExtensionKey) {
+      selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension?.key ?? "";
     }
   }
 
@@ -1685,6 +1782,10 @@
   function stepIsComplete(stepKey: DeploymentStepKey): boolean {
     switch (stepKey) {
       case "source":
+        if (sourceKind === "blueprint") {
+          return false;
+        }
+
         if (!sourceLocator) {
           return false;
         }
@@ -2080,6 +2181,15 @@
     resetDiagnosticSummaryCopy();
 
     try {
+      if (sourceKind === "blueprint") {
+        const href = sourceExtensionHref(selectedBlueprintSourceExtension);
+        if (href !== "#") {
+          await goto(href);
+          return;
+        }
+        throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
+      }
+
       if (!sourceLocator) {
         throw new Error("请先填写来源地址。");
       }
@@ -2423,6 +2533,61 @@
                   </div>
                 {/if}
               </div>
+            {:else if sourceKind === "blueprint"}
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogs)}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogsHint)}
+                    </p>
+                  </div>
+                  {#if selectedBlueprintSourceExtension}
+                    <Badge variant="outline">{selectedBlueprintSourceExtension.pluginDisplayName}</Badge>
+                  {/if}
+                </div>
+                {#if webExtensionsQuery.isPending}
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <Skeleton class="h-20 w-full" />
+                    <Skeleton class="h-20 w-full" />
+                  </div>
+                {:else if quickDeploySourceExtensions.length > 0}
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    {#each quickDeploySourceExtensions as extension (extension.key)}
+                      <Button
+                        type="button"
+                        variant={selectedBlueprintSourceExtension?.key === extension.key ? "selected" : "outline"}
+                        class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                        onclick={() => {
+                          selectedBlueprintSourceExtensionKey = extension.key;
+                        }}
+                      >
+                        <Package class="size-4 shrink-0" />
+                        <span class="min-w-0">
+                          <span class="block truncate text-sm font-medium">{extension.title}</span>
+                          <span class="block text-xs font-normal text-muted-foreground">
+                            {extension.description ?? extension.pluginDisplayName}
+                          </span>
+                        </span>
+                      </Button>
+                    {/each}
+                  </div>
+                  <Button
+                    href={sourceExtensionHref(selectedBlueprintSourceExtension)}
+                    class="w-full"
+                    disabled={!selectedBlueprintSourceExtension}
+                  >
+                    <Package class="size-4" />
+                    {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
+                  </Button>
+                {:else}
+                  <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)}
+                  </div>
+                {/if}
+              </div>
             {:else}
               <div class="space-y-2">
                 <label class="text-xs font-medium text-muted-foreground" for="source-locator">
@@ -2465,7 +2630,7 @@
                 {/if}
               </div>
             {/if}
-            {#if sourceKind !== "docker-image"}
+            {#if sourceKind !== "docker-image" && sourceKind !== "blueprint"}
               <div class="space-y-2">
                 <label class="text-xs font-medium text-muted-foreground" for="source-base-directory">
                   {$t(i18nKeys.console.quickDeploy.sourceBaseDirectory)}
@@ -2517,7 +2682,7 @@
                   {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
                 </p>
               </div>
-            {:else if sourceKind !== "docker-image"}
+            {:else if sourceKind !== "docker-image" && sourceKind !== "blueprint"}
               <div class="grid gap-3 sm:grid-cols-3">
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="runtime-install-command">
@@ -3577,7 +3742,15 @@
             >
               {$t(i18nKeys.common.actions.previous)}
             </Button>
-            {#if activeStep !== "review"}
+            {#if activeStep === "source" && sourceKind === "blueprint"}
+              <Button
+                href={sourceExtensionHref(selectedBlueprintSourceExtension)}
+                class="flex-1 sm:flex-none"
+                disabled={!selectedBlueprintSourceExtension}
+              >
+                {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
+              </Button>
+            {:else if activeStep !== "review"}
               <Button class="flex-1 sm:flex-none" disabled={!canAdvance} onclick={goToNextStep}>
                 {$t(i18nKeys.common.actions.next)}
               </Button>
