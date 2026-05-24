@@ -3119,6 +3119,167 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-003] ordinary config deploy ignores PR preview profile overlay", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-overlay-ordinary-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  APP_ENV: production",
+        "preview:",
+        "  pullRequest:",
+        "    profile:",
+        "      runtime:",
+        "        startCommand: bun run preview",
+        "      network:",
+        "        internalPort: 3001",
+        "      env:",
+        "        APP_ENV: preview",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        startCommand: "bun run start",
+      },
+      networkProfile: {
+        internalPort: 3000,
+      },
+    });
+    const variable = harness.commands.find(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variable).toMatchObject({
+      key: "APP_ENV",
+      value: "production",
+      kind: "plain-config",
+    });
+  });
+
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-004] PR preview applies selected profile overlay before ids-only deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-overlay-selected-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  APP_ENV: production",
+        "preview:",
+        "  pullRequest:",
+        "    profile:",
+        "      runtime:",
+        "        name: preview-{pr_number}",
+        "        startCommand: bun run preview",
+        "      network:",
+        "        internalPort: 3001",
+        "      health:",
+        "        path: /preview-ready",
+        "      env:",
+        "        APP_ENV: preview-{pr_number}",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_HEAD_REF: "feature/preview-overlay",
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-44",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        runtimeName: "preview-44",
+        startCommand: "bun run preview",
+        healthCheckPath: "/preview-ready",
+      },
+      networkProfile: {
+        internalPort: 3001,
+      },
+    });
+    const variable = harness.commands.find(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variable).toMatchObject({
+      key: "APP_ENV",
+      value: "preview-44",
+      kind: "plain-config",
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect("runtimeProfile" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("networkProfile" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
   test("[CONFIG-FILE-ENTRY-001] config env variables dispatch before ids-only deployment input returns", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(

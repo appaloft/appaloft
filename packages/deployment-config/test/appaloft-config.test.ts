@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   appaloftDeploymentConfigFileNames,
   appaloftDeploymentDependencyKinds,
+  applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
@@ -123,6 +124,146 @@ describe("Appaloft deployment config schema", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-001] accepts and applies PR preview profile overlays", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "workspace-commands",
+        startCommand: "bun run start",
+      },
+      network: {
+        internalPort: 3000,
+      },
+      env: {
+        APP_ENV: "production",
+      },
+      preview: {
+        pullRequest: {
+          domainTemplate: "pr-{pr_number}.preview.example.com",
+          profile: {
+            runtime: {
+              name: "preview-{pr_number}",
+              start: {
+                command: "bun run preview",
+              },
+            },
+            network: {
+              internalPort: 3001,
+            },
+            health: {
+              path: "/preview-ready",
+            },
+            access: {
+              generated: {
+                enabled: true,
+                pathPrefix: "/",
+              },
+            },
+            env: {
+              APP_ENV: "preview",
+            },
+            secrets: {
+              APP_SECRET: {
+                from: "ci-env:APP_SECRET",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const effective = applyAppaloftDeploymentPreviewProfile(parsed.data);
+      expect(effective.runtime?.name).toBe("preview-{pr_number}");
+      expect(effective.runtime?.start?.command).toBe("bun run preview");
+      expect(effective.network?.internalPort).toBe(3001);
+      expect(effective.health?.path).toBe("/preview-ready");
+      expect(effective.access?.generated?.enabled).toBe(true);
+      expect(effective.env?.APP_ENV).toBe("preview");
+      expect(effective.secrets?.APP_SECRET?.from).toBe("ci-env:APP_SECRET");
+    }
+  });
+
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-002] rejects unsafe PR preview overlay fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            runtime: {
+              startCommand: "bun run start",
+            },
+            projectId: "proj_prod",
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+
+    const unsafeDomainOverlay = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            access: {
+              domains: [
+                {
+                  host: "preview.example.com",
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    expect(unsafeDomainOverlay.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            env: {
+              DATABASE_URL: "postgres://user:password@example/db",
+            },
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const providerHandle = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            runtime: {
+              startCommand: "bun run start",
+            },
+            providerAccount: "acct_prod",
+          },
+        },
+      },
+    });
+
+    expect(providerHandle.success).toBe(false);
+
+    const lifecycleGraphDelta = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            storage: {
+              data: {
+                kind: "volume",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(lifecycleGraphDelta.success).toBe(false);
   });
 
   test("[CONFIG-FILE-DEPENDENCY-001] accepts managed Postgres dependency declarations", () => {

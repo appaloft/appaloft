@@ -738,21 +738,6 @@ function isSafePreviewDomainTemplate(value: string): boolean {
   return isDomainName(rendered);
 }
 
-export const appaloftDeploymentPreviewConfigSchema = z
-  .object({
-    pullRequest: z
-      .object({
-        domainTemplate: nonEmptyStringSchema
-          .refine(isSafePreviewDomainTemplate, previewDomainTemplateError)
-          .optional(),
-        tlsMode: z.enum(["auto", "disabled"]).optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict()
-  .describe("Preview deployment policy read by trusted entrypoints such as GitHub Actions.");
-
 const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const appaloftDeploymentSecretReferenceSchema = z
@@ -944,6 +929,51 @@ export const appaloftDeploymentMonitoringConfigSchema = z
   })
   .describe("Resource runtime monitoring config declarations.");
 
+const appaloftDeploymentPreviewAccessProfileConfigSchema = z
+  .object({
+    generated: appaloftDeploymentGeneratedAccessConfigSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.generated) {
+      context.addIssue({
+        code: "custom",
+        path: ["generated"],
+        message: "preview_config: preview.pullRequest.profile.access requires generated",
+      });
+    }
+  })
+  .describe("Preview profile access overlay fields.");
+
+export const appaloftDeploymentPreviewProfileConfigSchema = z
+  .object({
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentPreviewAccessProfileConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+  })
+  .strict()
+  .describe("Selected PR preview profile overlay fields.");
+
+export const appaloftDeploymentPreviewConfigSchema = z
+  .object({
+    pullRequest: z
+      .object({
+        domainTemplate: nonEmptyStringSchema
+          .refine(isSafePreviewDomainTemplate, previewDomainTemplateError)
+          .optional(),
+        tlsMode: z.enum(["auto", "disabled"]).optional(),
+        profile: appaloftDeploymentPreviewProfileConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("Preview deployment policy read by trusted entrypoints such as GitHub Actions.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -1091,6 +1121,26 @@ export const appaloftDeploymentConfigSchema = z
 export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
 export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
 
+export function applyAppaloftDeploymentPreviewProfile(
+  config: AppaloftDeploymentConfig,
+): AppaloftDeploymentConfig {
+  const profile = config.preview?.pullRequest?.profile;
+  if (!profile) {
+    return config;
+  }
+
+  return normalizeDeploymentConfig({
+    ...config,
+    ...(profile.runtime ? { runtime: { ...config.runtime, ...profile.runtime } } : {}),
+    ...(profile.network ? { network: { ...config.network, ...profile.network } } : {}),
+    ...(profile.health ? { health: { ...config.health, ...profile.health } } : {}),
+    ...(profile.access ? { access: { ...config.access, ...profile.access } } : {}),
+    ...(profile.monitoring ? { monitoring: { ...config.monitoring, ...profile.monitoring } } : {}),
+    ...(profile.env ? { env: { ...config.env, ...profile.env } } : {}),
+    ...(profile.secrets ? { secrets: { ...config.secrets, ...profile.secrets } } : {}),
+  });
+}
+
 function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
   return {
     ...config,
@@ -1188,8 +1238,8 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
 
 function isAllowedSecretReference(path: (string | number)[], value: unknown): boolean {
   return (
-    path.length === 2 &&
-    path[0] === "secrets" &&
+    path.length >= 2 &&
+    path[path.length - 2] === "secrets" &&
     isRecord(value) &&
     typeof value.from === "string" &&
     value.from.trim().length > 0
@@ -1197,7 +1247,7 @@ function isAllowedSecretReference(path: (string | number)[], value: unknown): bo
 }
 
 function shouldTreatSecretField(path: (string | number)[], key: string, value: unknown): boolean {
-  if (path.length === 0 && key === "secrets" && isRecord(value)) {
+  if (key === "secrets" && isRecord(value)) {
     return false;
   }
 

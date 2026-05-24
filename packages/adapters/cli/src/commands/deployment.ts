@@ -35,6 +35,7 @@ import {
   type AppaloftDeploymentConfig,
   appaloftDeploymentAccessConfigSchema,
   appaloftDeploymentConfigFileNames,
+  applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
@@ -1411,8 +1412,12 @@ export const deployCommand = EffectCommand.make(
           ...(configFilePath ? { configFilePath } : {}),
         }),
       );
+      const effectiveConfig =
+        configResolution && previewContext
+          ? applyAppaloftDeploymentPreviewProfile(configResolution.config)
+          : configResolution?.config;
       const configSeed = applyPreviewRoutePrecedence({
-        configSeed: configResolution ? deploymentPromptSeedFromConfig(configResolution.config) : {},
+        configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
         ...(configResolution ? { configResolution } : {}),
         ...(previewContext ? { previewContext } : {}),
         ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
@@ -1426,7 +1431,7 @@ export const deployCommand = EffectCommand.make(
       );
       const configEnvironmentVariables = configResolution
         ? yield* resultToEffect(
-            deploymentEnvironmentVariablesFromConfig(configResolution.config, {
+            deploymentEnvironmentVariablesFromConfig(effectiveConfig ?? configResolution.config, {
               ...(previewContext
                 ? {
                     previewContext: {

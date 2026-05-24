@@ -55,8 +55,8 @@ installer; that would blur the boundary between installing an agent skill and ru
   provider SDKs, or proxy config directly when an Appaloft operation exists.
 - Do not add source, runtime, network, health, or access fields to `deployments.create`; configure
   Resource profile, health, and access operations first.
-- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, or
-  monitoring threshold fields to `deployments.create`; reconcile repository config declarations
-  through their existing operation families first.
+- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, preview
+  overlay, or monitoring threshold fields to `deployments.create`; reconcile repository config
+  declarations through their existing operation families first.
 - Do not create `quick-deploy.create`; Quick Deploy remains a workflow over explicit operations.
 - Do not expose unmasked secrets in prompts, logs, diagnostics, docs, PRs, or final responses.

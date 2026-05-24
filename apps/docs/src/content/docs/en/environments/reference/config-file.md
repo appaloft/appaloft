@@ -23,6 +23,36 @@ Configuration files are for reviewable project, resource, environment, and deplo
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
+<h2 id="environment-config-file-preview-profile">PR preview profile</h2>
+
+Use `preview.pullRequest.profile` for profile differences that should apply only to a PR preview
+deploy selected by trusted entrypoint context:
+
+```yaml
+runtime:
+  start:
+    command: bun run start
+
+env:
+  APP_ENV: production
+
+preview:
+  pullRequest:
+    domainTemplate: pr-{pr_number}.preview.example.com
+    profile:
+      runtime:
+        name: preview-{pr_number}
+        start:
+          command: bun run preview
+      env:
+        APP_ENV: preview
+```
+
+The overlay is ignored for ordinary deploys. In PR preview deploys, Appaloft merges it after root
+config validation and before applying profile/env commands. It cannot choose project,
+environment, resource, server, destination, provider account, or credentials, and it cannot add
+fields to the final deployment command.
+
 <h2 id="environment-config-file-health">Health policy</h2>
 
 Use `health` when the Resource should have a reusable HTTP health policy:

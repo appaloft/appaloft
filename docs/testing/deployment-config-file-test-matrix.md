@@ -334,10 +334,14 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-018 | contract | Deploy action PR preview fork safety | Default example workflow skips fork PR preview deployment before secrets or SSH credentials are exposed, and docs explain that fork previews require explicit reduced-credential policy. |
 | CONFIG-FILE-ENTRY-019 | integration | Deploy action PR preview cleanup | A user-authored `pull_request.closed` workflow invokes CLI/action preview cleanup with trusted PR context; Appaloft derives the preview-scoped source fingerprint, stops preview runtime when present, deletes preview server-applied route desired state, unlinks the preview source link, and returns success when cleanup is done or already clean. |
 | CONFIG-FILE-ENTRY-020 | integration | Deploy action PR preview explicit config path | With `preview=pull-request` and `config: appaloft.preview.yml`, the action/CLI uses the preview config origin, does not read production-only root config fields, creates/reuses preview environment/resource identity from trusted PR context, and dispatches ids-only `deployments.create`. |
-| CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
-| CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
+| CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or selected generated access profile overlay. |
+| CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
 | CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
 | CONFIG-FILE-ENTRY-023A | integration | Config PR preview env templates | Selected preview config declares non-secret env values with `{preview_id}` or `{pr_number}` placeholders, and trusted PR preview context is present | CLI renders placeholders from trusted preview context before applying `plain-config` variables; without preview context, admission fails in `config-template-resolution` before mutation | None | Preview context resolution -> config template resolution -> environment variable commands |
+| CONFIG-FILE-PREVIEW-OVERLAY-001 | parser/schema | Preview profile overlay accepted | Config declares `preview.pullRequest.profile.runtime`, `network`, `health`, `access.generated`, `monitoring`, `env`, or `secrets` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-PREVIEW-OVERLAY-002 | parser/schema | Preview profile overlay rejects unsafe fields | Config declares unknown fields, identity selectors, raw secret material, provider handles, `access.domains`, dependency/storage/scheduled-task deltas, or unsupported resource sizing under `preview.pullRequest.profile` | Parser fails before mutation and diagnostics are sanitized | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-PREVIEW-OVERLAY-003 | integration | Ordinary deploy ignores preview overlay | Root config declares production runtime/env values and `preview.pullRequest.profile` declares preview-only runtime/env values | Non-preview config deploy uses the root values and does not apply preview overlay | None | Root profile operations -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-OVERLAY-004 | integration | PR preview applies preview overlay | Trusted PR preview context is present and config declares `preview.pullRequest.profile` | The overlay is merged before prompt seed/env normalization, existing operations receive the merged profile, and deployment admission remains ids-only | None | Preview context resolution -> overlay merge -> profile/env operations -> `deployments.create` |
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 | CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
 | CONFIG-FILE-ENTRY-027 | contract | Deploy action optional PR comment | With `pr-comment=true`, trusted PR context, and an explicit GitHub token, the wrapper posts or updates one marker-based PR comment with available preview URL, console URL, deployment id, or cleanup status; without `pr-comment`, no GitHub comment permission is required. |
@@ -361,7 +365,8 @@ Current implemented coverage:
   `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002`,
   `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-001` through
-  `CONFIG-FILE-MONITORING-THRESHOLDS-002` are covered in
+  `CONFIG-FILE-MONITORING-THRESHOLDS-002`, and
+  `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
@@ -374,7 +379,8 @@ Current implemented coverage:
   `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`,
   `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-003` through
-  `CONFIG-FILE-MONITORING-THRESHOLDS-005` are covered in
+  `CONFIG-FILE-MONITORING-THRESHOLDS-005`, and `CONFIG-FILE-PREVIEW-OVERLAY-003` through
+  `CONFIG-FILE-PREVIEW-OVERLAY-004` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
@@ -452,17 +458,19 @@ access eligibility and path prefix fields, and `monitoring.thresholds` with non-
 Resource-scope warning/critical rules. SSH CLI config deploy now persists
 server-applied route desired state under the selected SSH-server state backend before
 `deployments.create`; deployment planning consumes that desired state and records applied/failed
-status after deployment-finished route outcomes. Resource access, health, and diagnostic summaries
-expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
-`tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
-managed-domain mapping remains follow-up work. Config generated access profile is reconciled
-through `resources.configure-access` before ids-only deployment admission and does not mutate
-domain bindings, certificates, default access policies, or proxy routes directly. Config runtime
-monitoring thresholds are reconciled through `runtime-monitoring.thresholds.configure` and
-`runtime-monitoring.thresholds.show` before ids-only deployment admission and do not enforce
-runtime sizing, cleanup, alert routing, autoscaling, or billing policy. Config health policy is
-reconciled through `resources.configure-health` during explicit existing-resource profile apply and
-remains fail-first drift guidance by default.
+status after deployment-finished route outcomes. Selected PR preview config deploy merges
+`preview.pullRequest.profile` for runtime/network/health/generated-access/monitoring/env/secret
+profile fields only after trusted preview context exists, and ordinary deploy ignores that overlay.
+Resource access, health, and diagnostic summaries expose the latest server-applied route
+URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are exposed through proxy
+configuration/resource diagnostics. Control-plane managed-domain mapping remains follow-up work.
+Config generated access profile is reconciled through `resources.configure-access` before ids-only
+deployment admission and does not mutate domain bindings, certificates, default access policies, or
+proxy routes directly. Config runtime monitoring thresholds are reconciled through
+`runtime-monitoring.thresholds.configure` and `runtime-monitoring.thresholds.show` before ids-only
+deployment admission and do not enforce runtime sizing, cleanup, alert routing, autoscaling, or
+billing policy. Config health policy is reconciled through `resources.configure-health` during
+explicit existing-resource profile apply and remains fail-first drift guidance by default.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).

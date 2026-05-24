@@ -385,6 +385,13 @@ normalize and configure Resource HTTP health policy before ids-only deployment a
 existing-resource profile apply is explicitly selected; default config deploy still fails first on
 unacknowledged health drift.
 
+Repository config `preview.pullRequest.profile` is a selected PR-preview overlay governed by
+[ADR-074](./decisions/ADR-074-repository-config-preview-profile-overlays.md) and
+[spec 083](./specs/083-repository-config-preview-profile-overlays/spec.md). It is a workflow
+extension over existing profile/env/access/monitoring/health operations, not a new operation key.
+The overlay is ignored for ordinary deploys, applies only after trusted preview context selects the
+preview scope, and never adds profile fields to `deployments.create`.
+
 Phase 7 storage operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

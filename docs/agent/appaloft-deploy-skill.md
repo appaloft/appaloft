@@ -51,15 +51,18 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, generated
   access, or monitoring threshold fields to `deployments.create`. `appaloft.yaml` declarations for
   dependencies, dependency backup policy, storage, scheduled tasks, auto-deploy policy, generated
-  access profile, runtime monitoring thresholds, or Resource health policy must reconcile through
-  existing dependency, backup-policy, storage, Resource binding, scheduled task, Resource
-  auto-deploy, Resource access, runtime monitoring threshold, and `resources.configure-health`
-  operations before deployment admission.
+  access profile, runtime monitoring thresholds, Resource health policy, or
+  `preview.pullRequest.profile` overlays must reconcile through existing dependency,
+  backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy, Resource access,
+  runtime monitoring threshold, environment variable, and `resources.configure-health` operations
+  before deployment admission.
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - Do not ask ordinary users for project/resource/server ids as the first step of a GitHub Action
   deploy. Prefer source-link state, repository binding, deploy-token scope, or one-time trusted
   bootstrap context.
+- Apply `preview.pullRequest.profile` only after trusted PR preview context selects preview scope.
+  It is a profile overlay, not a way for committed YAML to choose preview identity.
 - For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
   workflow. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
   workspace-command deployments still use the same resource and deployment operation boundary.

@@ -582,8 +582,9 @@ Access behavior:
   Action-only mode; it does not update DNS.
 - Production `access.domains[]` from a root config must not be reinterpreted as PR preview domain
   intent. Preview route intent should come from generated/default access, trusted
-  `preview-domain-template`, an explicitly selected preview config file, or a future selected
-  preview overlay.
+  `preview-domain-template`, or an explicitly selected preview config file. A selected
+  `preview.pullRequest.profile` overlay may adjust generated access profile and runtime/env
+  profile fields, but it must not carry preview domain hosts.
 - A public preview URL requires reverse-proxy exposure and edge proxy readiness. The workflow must
   not publish direct host ports as a fallback.
 - If no generated or custom route is available and `require-preview-url` is false, deployment may
@@ -677,14 +678,20 @@ Environment-specific config overlays are allowed only as overlays for an environ
 the entrypoint or trusted link state. A committed config file must not be the only reason a
 deployment moves from `staging` to `production`.
 
-The same rule applies to PR preview environments. A future preview overlay may adjust profile fields
-for the already selected `preview-pr-123` environment, but it must not create the preview identity,
-select a different durable environment, or retarget project/resource/server/destination state.
+The same rule applies to PR preview environments. `preview.pullRequest.profile` may adjust profile
+fields for the already selected `preview-pr-123` environment, but it must not create the preview
+identity, select a different durable environment, or retarget project/resource/server/destination
+state. The overlay is selected only after trusted PR preview context exists, and trusted CLI/Action
+flags still override the merged config profile.
 
 ## Profile Mapping
 
 Accepted config profile fields map to resource-owned or environment-owned contracts before
 deployment admission.
+
+`preview.pullRequest.profile` is a selected overlay over the same profile fields. It is ignored for
+ordinary deploys, merged for trusted PR preview deploys before prompt seed/env normalization, and
+never adds fields to `deployments.create`.
 
 | Config concern | Canonical owner | Rule |
 | --- | --- | --- |
@@ -1016,11 +1023,12 @@ e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
 `ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
-history, and managed domain control-plane mapping remain follow-up work.
+history, general environment overlays, and managed domain control-plane mapping remain follow-up
+work.
 
 ## Open Questions
 
-- Which environment and preview overlay syntax should be admitted without allowing a committed
-  config file to select identity?
+- Which general environment overlay syntax should be admitted without allowing a committed config
+  file to select identity?
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?

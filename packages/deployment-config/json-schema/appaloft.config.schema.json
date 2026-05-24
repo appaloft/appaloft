@@ -515,6 +515,316 @@
             "tlsMode": {
               "type": "string",
               "enum": ["auto", "disabled"]
+            },
+            "profile": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "description": "Application runtime type shorthand.",
+                      "type": "string",
+                      "const": "node"
+                    },
+                    "strategy": {
+                      "description": "Requested runtime plan strategy.",
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "dockerfile",
+                        "docker-compose",
+                        "prebuilt-image",
+                        "workspace-commands",
+                        "static"
+                      ]
+                    },
+                    "installCommand": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "buildCommand": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "startCommand": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "build": {
+                      "type": "object",
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["command"],
+                      "additionalProperties": false
+                    },
+                    "start": {
+                      "type": "object",
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["command"],
+                      "additionalProperties": false
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "publishDirectory": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+                    },
+                    "dockerfilePath": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+                    },
+                    "dockerComposeFilePath": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+                    },
+                    "buildTarget": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "healthCheckPath": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "healthCheck": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "path": {
+                          "description": "HTTP path used for readiness checks.",
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "intervalSeconds": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "timeoutSeconds": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "retries": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Health-check profile fields."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Runtime profile fields copied into resource creation for quick deploy."
+                },
+                "network": {
+                  "type": "object",
+                  "properties": {
+                    "internalPort": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "upstreamProtocol": {
+                      "type": "string",
+                      "enum": ["http", "tcp"]
+                    },
+                    "exposureMode": {
+                      "type": "string",
+                      "enum": ["none", "reverse-proxy", "direct-port"]
+                    },
+                    "targetServiceName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hostPort": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Network profile fields copied into resource creation for quick deploy."
+                },
+                "health": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "path": {
+                      "description": "HTTP path used for readiness checks.",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "intervalSeconds": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "timeoutSeconds": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "retries": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Health-check profile fields."
+                },
+                "access": {
+                  "type": "object",
+                  "properties": {
+                    "generated": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "pathPrefix": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["enabled", "pathPrefix"],
+                      "additionalProperties": false,
+                      "description": "Resource generated access profile intent."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Preview profile access overlay fields."
+                },
+                "monitoring": {
+                  "type": "object",
+                  "properties": {
+                    "thresholds": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "rules": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "signal": {
+                                "type": "string",
+                                "enum": ["cpu", "memory", "disk", "inode", "docker", "network"]
+                              },
+                              "metric": {
+                                "type": "string",
+                                "enum": [
+                                  "containerCpuPercent",
+                                  "loadAverage1m",
+                                  "containerUsedBytes",
+                                  "usedBytes",
+                                  "attributedBytes",
+                                  "used",
+                                  "imageBytes",
+                                  "buildCacheBytes",
+                                  "containerWritableBytes",
+                                  "rxBytes",
+                                  "txBytes"
+                                ]
+                              },
+                              "warning": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "critical": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "comparator": {
+                                "default": "greater-than-or-equal",
+                                "type": "string",
+                                "const": "greater-than-or-equal"
+                              }
+                            },
+                            "required": ["signal", "metric", "comparator"],
+                            "additionalProperties": false,
+                            "description": "Resource runtime monitoring threshold rule."
+                          }
+                        }
+                      },
+                      "required": ["enabled", "rules"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Resource runtime monitoring config declarations."
+                },
+                "env": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                },
+                "secrets": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod."
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["from"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false,
+              "description": "Selected PR preview profile overlay fields."
             }
           },
           "additionalProperties": false
