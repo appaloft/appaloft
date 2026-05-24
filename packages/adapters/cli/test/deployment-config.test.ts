@@ -150,6 +150,8 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "res_1" } as T);
         case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
+        case "ConfigureResourceAccessCommand":
+          return ok({ id: "res_1" } as T);
         case "ConfigureResourceAutoDeployCommand": {
           const autoDeployCommand = command as unknown as Record<string, unknown>;
           const policy = autoDeployCommand.policy as Record<string, unknown> | undefined;
@@ -5210,6 +5212,172 @@ describe("CLI deployment config entry workflow", () => {
       mode: "disable",
     });
     expect(autoDeploy?.policy).toBeUndefined();
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-003] config generated access profile configures before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-generated-access-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "access:",
+        "  generated:",
+        "    enabled: true",
+        "    pathPrefix: /app",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.94",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowResourceQuery");
+    expect(harness.operations.indexOf("ConfigureResourceAccessCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const access = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureResourceAccessCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(access).toMatchObject({
+      resourceId: "res_1",
+      accessProfile: {
+        generatedAccessMode: "inherit",
+        pathPrefix: "/app",
+      },
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("accessProfile");
+    expect(deployment).not.toHaveProperty("generatedAccessMode");
+    expect(deployment).not.toHaveProperty("pathPrefix");
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-004] config generated access profile is idempotent for matching profile", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            accessProfile: {
+              generatedAccessMode: "inherit",
+              pathPrefix: "/app",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          generatedAccessProfile: {
+            generatedAccessMode: "inherit",
+            pathPrefix: "/app",
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("ConfigureResourceAccessCommand");
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-005] config generated access profile disables generated access", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: "res_existing" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            accessProfile: {
+              generatedAccessMode: "inherit",
+              pathPrefix: "/",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          generatedAccessProfile: {
+            generatedAccessMode: "disabled",
+            pathPrefix: "/",
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    const access = commands.find(
+      (command) => command.constructor.name === "ConfigureResourceAccessCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(access).toMatchObject({
+      resourceId: "res_existing",
+      accessProfile: {
+        generatedAccessMode: "disabled",
+        pathPrefix: "/",
+      },
+    });
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {

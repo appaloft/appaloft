@@ -27,6 +27,7 @@ Canonical assertions:
 - `storage` declarations map to storage-volume list/create and Resource storage attachment
   operations before deployment;
 - `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
+- `access.generated` declarations map to Resource access profile configuration before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -52,6 +53,7 @@ This matrix inherits:
 - [ADR-068: Repository Config Scheduled Task Graph](../decisions/ADR-068-repository-config-scheduled-task-graph.md)
 - [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
 - [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
+- [ADR-071: Repository Config Generated Access Profile](../decisions/ADR-071-repository-config-generated-access-profile.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -60,6 +62,7 @@ This matrix inherits:
 - [Repository Config Scheduled Task Graph](../specs/077-repository-config-scheduled-task-graph/spec.md)
 - [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
 - [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
+- [Repository Config Generated Access Profile](../specs/080-repository-config-generated-access-profile/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -85,6 +88,7 @@ This matrix inherits:
 | Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
 | Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
+| Generated access profile | Resource generated access preference and generated route path prefix are configured before deployment admission and never become deployment fields. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -265,6 +269,16 @@ This matrix inherits:
 | CONFIG-FILE-DOMAIN-008 | integration | Canonical redirect graph rejected | Config redirects to itself, to a missing host, to another redirect entry, or forms a loop | Workflow stops before mutation | `validation_error`, phase `config-domain-resolution` | No write commands |
 | CONFIG-FILE-DOMAIN-009 | e2e-preferred, GitHub Actions secret-gated + local explicit SSH | Canonical redirect reaches canonical host | SSH deploy has reverse-proxy network profile, a served canonical host, and an alias host redirecting to it | Request to target edge with `Host: <alias>` returns the configured redirect status and `Location` for the canonical host while `Host: <canonical>` reaches the service; read/proxy diagnostics report applied redirect route state | None or structured proxy error | Remote state -> `deployments.create` -> provider redirect route apply/reload -> alias redirect verification -> canonical route verification/read model |
 
+## Generated Access Profile Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-GENERATED-ACCESS-001 | parser/schema | Generated access profile accepted | Config declares `access.generated.enabled` and optional `pathPrefix` | Parser accepts the declaration, defaults `pathPrefix` to `/`, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-GENERATED-ACCESS-002 | parser/schema | Unknown or unsafe generated access fields rejected | Config declares provider account, DNS/certificate provider identity, route id, certificate id, server id, destination id, token, credential, raw certificate material, or unsafe path under `access.generated` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-domain-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-GENERATED-ACCESS-003 | integration | Config generated access profile configures before deployment | Selected Resource has no matching generated access profile | Config deploy handles Resource profile reconciliation | Resource detail is read, access profile is configured through `resources.configure-access`, and deployment admission remains ids-only | None | `resources.show` -> `resources.configure-access` -> `deployments.create` |
+| CONFIG-FILE-GENERATED-ACCESS-004 | integration | Generated access idempotency | Selected Resource already has the same generated access profile | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-GENERATED-ACCESS-005 | integration | Generated access disabled from config | Config declares `access.generated.enabled = false` | Config deploy handles Resource profile reconciliation | Resource access profile is configured with generated access disabled before deployment | None | `resources.show` -> `resources.configure-access(mode=disabled)` -> `deployments.create` |
+
 ## Resource Sizing And Runtime Target Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -327,7 +341,8 @@ Current implemented coverage:
   `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
   `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
-  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002` are covered in
+  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002`, and
+  `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
@@ -337,7 +352,8 @@ Current implemented coverage:
   `CONFIG-FILE-DEPENDENCY-BACKUP-003` through `CONFIG-FILE-DEPENDENCY-BACKUP-007`,
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
   `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and
-  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006` are covered in
+  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`, and
+  `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
@@ -410,13 +426,16 @@ CLI/filesystem discovery use the same parser.
 Current config schema rejects `project`, `environment`, `resource`, `targets`, `servers`, raw
 secret material, secret-looking inline env values, unknown fields, unsafe domain/TLS-like fields,
 and unsupported sizing/rollout fields before mutation. It now accepts `access.domains[]` with
-provider-neutral `host`, `pathPrefix`, and `tlsMode` fields. SSH CLI config deploy now persists
+provider-neutral `host`, `pathPrefix`, and `tlsMode` fields, and `access.generated` with generated
+access eligibility and path prefix fields. SSH CLI config deploy now persists
 server-applied route desired state under the selected SSH-server state backend before
 `deployments.create`; deployment planning consumes that desired state and records applied/failed
 status after deployment-finished route outcomes. Resource access, health, and diagnostic summaries
 expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
 `tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
-managed-domain mapping remains follow-up work.
+managed-domain mapping remains follow-up work. Config generated access profile is reconciled
+through `resources.configure-access` before ids-only deployment admission and does not mutate
+domain bindings, certificates, default access policies, or proxy routes directly.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).

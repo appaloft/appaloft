@@ -419,9 +419,23 @@
             "additionalProperties": false,
             "description": "Provider-neutral server-applied domain intent."
           }
+        },
+        "generated": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "pathPrefix": {
+              "type": "string"
+            }
+          },
+          "required": ["enabled", "pathPrefix"],
+          "additionalProperties": false,
+          "description": "Resource generated access profile intent."
         }
       },
-      "required": ["domains"],
       "additionalProperties": false,
       "description": "Access intent resolved outside deployments.create."
     },

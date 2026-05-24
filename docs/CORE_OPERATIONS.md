@@ -574,6 +574,11 @@ Current boundary:
   route path prefix for future planned/deployment route resolution; it does not change system or
   server default access policy, bind custom domains, issue certificates, or apply proxy routes to
   existing runtime state
+- Repository config `access.generated` is governed by
+  [ADR-071](./decisions/ADR-071-repository-config-generated-access-profile.md) and
+  [spec 080](./specs/080-repository-config-generated-access-profile/spec.md). It is a
+  workflow/profile extension over `resources.configure-access`, not a new operation key; it must
+  reconcile generated access preference and path prefix before ids-only deployment admission.
 - project/resource console ownership is governed by
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived

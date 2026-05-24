@@ -710,7 +710,7 @@ function resolvePreviewDomainTemplateRoutes(
   }
 
   return ok(
-    parsed.data.domains.map((domain) => ({
+    (parsed.data.domains ?? []).map((domain) => ({
       host: domain.host,
       pathPrefix: domain.pathPrefix,
       tlsMode: domain.tlsMode,

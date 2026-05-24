@@ -286,6 +286,23 @@ not a host bind source path. Config may not include provider accounts, credentia
 organization ids, host source paths, provider-native storage handles, backup handles, raw secret
 values, or storage provider-specific settings.
 
+`access.generated` uses Resource access language:
+
+```yaml
+access:
+  generated:
+    enabled: true
+    pathPrefix: /
+```
+
+Generated access declarations configure the Resource access profile through
+`resources.configure-access`. `enabled: true` keeps the Resource eligible for generated default
+access when the selected default access policy, network profile, deployment target, and edge proxy
+allow it. `enabled: false` disables generated default access for that Resource only.
+`pathPrefix` applies only to generated default access routes. Config may not include provider
+accounts, DNS/certificate provider identity, route ids, certificate ids, server ids, destination
+ids, credentials, private keys, tokens, raw certificate material, or secret values.
+
 `scheduledTasks` uses application language, not Appaloft internal object language:
 
 ```yaml
@@ -727,6 +744,10 @@ requires an SSH-capable target, but it must not register a server with an inline
 
 The target repository config schema may accept provider-neutral domain intent under
 `access.domains[]`.
+
+It may also accept Resource generated access intent under `access.generated`. Generated access
+intent is reconciled through `resources.configure-access` and does not create managed
+`DomainBinding` records, issue certificates, or apply proxy routes directly.
 
 Each domain entry must stay within this shape:
 

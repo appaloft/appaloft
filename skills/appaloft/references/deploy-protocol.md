@@ -103,8 +103,8 @@ secret values, credentials, host bind source paths, provider-native storage hand
 provider-native scheduler handles, backup policy ids, backup artifact handles, restore point ids,
 source-event ids, webhook delivery ids, or webhook secret values into `appaloft.yml`. Repository
 config may declare high-level application `dependencies`, `dependencies.<key>.backup`, `storage`,
-`scheduledTasks`, and `autoDeploy`, but deploy must reconcile them through existing operations
-before ids-only deployment admission.
+`scheduledTasks`, `autoDeploy`, and `access.generated`, but deploy must reconcile them through
+existing operations before ids-only deployment admission.
 
 ## Entry Selection
 

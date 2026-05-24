@@ -711,6 +711,95 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-GENERATED-ACCESS-001] accepts generated access profile declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      ["access:", "  generated:", "    enabled: true", "    pathPrefix: /app"].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.access?.generated).toEqual({
+        enabled: true,
+        pathPrefix: "/app",
+      });
+    }
+
+    const defaults = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {},
+      },
+    });
+
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data.access?.generated).toEqual({
+        enabled: true,
+        pathPrefix: "/",
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-002] rejects unknown and unsafe generated access fields", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          providerMode: "sslip",
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["access", "generated"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          routeId: "route_123",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["access", "generated", "routeId"]);
+    }
+
+    const unsafePath = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          pathPrefix: "https://example.com/app",
+        },
+      },
+    });
+
+    expect(unsafePath.success).toBe(false);
+    if (!unsafePath.success) {
+      expect(unsafePath.error.issues[0]?.path).toEqual(["access", "generated", "pathPrefix"]);
+    }
+
+    const rawCertificate = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          certificate: "-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----",
+        },
+      },
+    });
+
+    expect(rawCertificate.success).toBe(false);
+    if (!rawCertificate.success) {
+      expect(rawCertificate.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawCertificate.error.issues[0]?.path).toEqual(["access", "generated", "certificate"]);
+    }
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

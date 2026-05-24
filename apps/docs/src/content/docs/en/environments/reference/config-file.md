@@ -88,6 +88,27 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 delete only the storage volume that Appaloft can prove was created and attached by this config for
 that preview. Manual or shared storage is preserved.
 
+<h2 id="environment-config-file-generated-access">Generated access</h2>
+
+Use `access.generated` when the Resource should opt in or out of generated default access, or when
+generated access should use a path prefix:
+
+```yaml
+access:
+  generated:
+    enabled: true
+    pathPrefix: /
+```
+
+`enabled: true` keeps the Resource eligible for generated default access when the selected server,
+network profile, proxy, and default access policy support it. `enabled: false` disables generated
+default access for this Resource only. `pathPrefix` applies only to generated default access routes.
+
+This does not create custom domains, issue certificates, change the default access provider policy,
+or add access fields to the final deployment command. Keep provider accounts, DNS/certificate
+provider credentials, route ids, certificate ids, private keys, tokens, and raw certificate material
+outside `appaloft.yaml`.
+
 <h2 id="environment-config-file-scheduled-tasks">Scheduled tasks</h2>
 
 Use `scheduledTasks` when the application needs recurring Resource-owned jobs:

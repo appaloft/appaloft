@@ -31,8 +31,8 @@ installer; that would blur the boundary between installing an agent skill and ru
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
    ordinary default mental model. High-level `dependencies`, `dependencies.<key>.backup`,
-   `storage`, `scheduledTasks`, and `autoDeploy` declarations must reconcile through existing
-   operations before ids-only deployment admission.
+   `storage`, `scheduledTasks`, `autoDeploy`, and `access.generated` declarations must reconcile
+   through existing operations before ids-only deployment admission.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
 

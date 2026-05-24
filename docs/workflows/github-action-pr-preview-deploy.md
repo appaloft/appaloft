@@ -185,6 +185,12 @@ Resource source-event auto-deploy policy may be declared in the selected config 
 events for the Resource; it must not add webhook payload, delivery id, provider account, or trigger
 fields to `deployments.create`.
 
+Resource generated access preference may be declared in the selected config with
+`access.generated`. The action/CLI reconciles it through `resources.configure-access` before
+deployment admission. This can disable generated/default preview access for a Resource or set a
+generated route path prefix, but it does not create custom domain bindings, issue certificates,
+change default access provider policy, or add access fields to `deployments.create`.
+
 Custom route intent for PR previews should come from one of these sources:
 
 - generated/default access;

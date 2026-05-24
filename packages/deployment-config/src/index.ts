@@ -62,6 +62,8 @@ const domainHostError =
   "config_domain_resolution: access.domains[].host must be a domain name without scheme, port, path, or wildcard";
 const domainPathPrefixError =
   "config_domain_resolution: access.domains[].pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
+const generatedAccessPathPrefixError =
+  "config_generated_access_resolution: access.generated.pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
 const domainRedirectToError =
   "config_domain_resolution: access.domains[].redirectTo must be a domain name without scheme, port, path, or wildcard";
 const controlPlaneUrlError =
@@ -121,6 +123,9 @@ const identityConfigFields = new Set([
   "webhookDelivery",
   "webhookDeliveryId",
   "deliveryId",
+  "routeId",
+  "domainBindingId",
+  "certificateId",
   "provider",
   "providerKey",
   "providerAccount",
@@ -559,14 +564,36 @@ const appaloftDeploymentAccessDomainConfigSchema = z
   .strict()
   .describe("Provider-neutral server-applied domain intent.");
 
+const appaloftDeploymentGeneratedAccessConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    pathPrefix: nonEmptyStringSchema
+      .optional()
+      .default("/")
+      .pipe(z.string().refine(isSafeDomainPathPrefix, generatedAccessPathPrefixError)),
+  })
+  .strict()
+  .describe("Resource generated access profile intent.");
+
 export const appaloftDeploymentAccessConfigSchema = z
   .object({
-    domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1),
+    domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1).optional(),
+    generated: appaloftDeploymentGeneratedAccessConfigSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
-    const byHost = new Map<string, (typeof value.domains)[number]>();
-    for (const domain of value.domains) {
+    const domains = value.domains ?? [];
+    if (domains.length === 0 && !value.generated) {
+      context.addIssue({
+        code: "custom",
+        path: ["domains"],
+        message: "config_domain_resolution: access requires domains or generated",
+      });
+      return;
+    }
+
+    const byHost = new Map<string, NonNullable<typeof value.domains>[number]>();
+    for (const domain of domains) {
       const existing = byHost.get(domain.host);
       if (existing) {
         context.addIssue({
@@ -579,7 +606,7 @@ export const appaloftDeploymentAccessConfigSchema = z
       byHost.set(domain.host, domain);
     }
 
-    for (const domain of value.domains) {
+    for (const domain of domains) {
       if (domain.redirectStatus && !domain.redirectTo) {
         context.addIssue({
           code: "custom",
@@ -965,20 +992,25 @@ function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDe
     ...(config.access
       ? {
           access: {
-            domains: config.access.domains.map((domain) => {
-              const normalizedDomain = {
-                ...domain,
-                host: domain.host.toLowerCase(),
-                ...(domain.redirectTo ? { redirectTo: domain.redirectTo.toLowerCase() } : {}),
-              };
+            ...(config.access.domains
+              ? {
+                  domains: config.access.domains.map((domain) => {
+                    const normalizedDomain = {
+                      ...domain,
+                      host: domain.host.toLowerCase(),
+                      ...(domain.redirectTo ? { redirectTo: domain.redirectTo.toLowerCase() } : {}),
+                    };
 
-              return normalizedDomain.redirectTo && !normalizedDomain.redirectStatus
-                ? {
-                    ...normalizedDomain,
-                    redirectStatus: 308,
-                  }
-                : normalizedDomain;
-            }),
+                    return normalizedDomain.redirectTo && !normalizedDomain.redirectStatus
+                      ? {
+                          ...normalizedDomain,
+                          redirectStatus: 308,
+                        }
+                      : normalizedDomain;
+                  }),
+                }
+              : {}),
+            ...(config.access.generated ? { generated: config.access.generated } : {}),
           },
         }
       : {}),

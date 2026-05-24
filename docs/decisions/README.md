@@ -95,6 +95,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-068: Repository Config Scheduled Task Graph](./ADR-068-repository-config-scheduled-task-graph.md) | Accepted | Defines repository config `scheduledTasks` as a user-facing Resource scheduled task graph that creates/configures existing scheduled tasks and uses source-link provenance for safe preview cleanup. |
 | [ADR-069: Repository Config Auto-Deploy Policy](./ADR-069-repository-config-auto-deploy-policy.md) | Accepted | Defines repository config `autoDeploy` as a user-facing Resource source-event policy that configures existing Resource auto-deploy operations before ids-only deployment admission. |
 | [ADR-070: Repository Config Dependency Backup Policy](./ADR-070-repository-config-dependency-backup-policy.md) | Accepted | Defines repository config `dependencies.<key>.backup` as a user-facing scheduled backup policy declaration reconciled through existing dependency resource backup policy operations. |
+| [ADR-071: Repository Config Generated Access Profile](./ADR-071-repository-config-generated-access-profile.md) | Accepted | Defines repository config `access.generated` as a user-facing Resource generated access profile declaration reconciled through existing Resource access operations. |
 
 ## Authoring Rules
 

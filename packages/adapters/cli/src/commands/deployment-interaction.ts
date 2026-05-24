@@ -3,6 +3,7 @@ import {
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
+  ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -142,6 +143,7 @@ export interface DeploymentPromptSeed {
   storageGraph?: DeploymentStorageSeed[];
   scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
   autoDeployPolicy?: DeploymentAutoDeploySeed;
+  generatedAccessProfile?: DeploymentGeneratedAccessProfileSeed;
   profileDriftPreflight?: boolean;
 }
 
@@ -195,6 +197,10 @@ export interface DeploymentAutoDeploySeed {
   refs?: string[];
   eventKinds: ("push" | "tag")[];
   dedupeWindowSeconds?: number;
+}
+export interface DeploymentGeneratedAccessProfileSeed {
+  generatedAccessMode: "inherit" | "disabled";
+  pathPrefix: string;
 }
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
@@ -475,7 +481,7 @@ export function deploymentPromptSeedFromConfig(
     ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
-  const serverAppliedRoutes = config.access?.domains.map((domain) => ({
+  const serverAppliedRoutes = config.access?.domains?.map((domain) => ({
     host: domain.host,
     pathPrefix: domain.pathPrefix,
     tlsMode: domain.tlsMode,
@@ -550,6 +556,12 @@ export function deploymentPromptSeedFromConfig(
           : {}),
       } satisfies DeploymentAutoDeploySeed)
     : undefined;
+  const generatedAccessProfile = config.access?.generated
+    ? ({
+        generatedAccessMode: config.access.generated.enabled ? "inherit" : "disabled",
+        pathPrefix: config.access.generated.pathPrefix,
+      } satisfies DeploymentGeneratedAccessProfileSeed)
+    : undefined;
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -589,6 +601,7 @@ export function deploymentPromptSeedFromConfig(
     ...(storageGraph.length > 0 ? { storageGraph } : {}),
     ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
     ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
+    ...(generatedAccessProfile ? { generatedAccessProfile } : {}),
   };
 }
 
@@ -1005,6 +1018,23 @@ function configureResourceNetwork(input: {
   });
 }
 
+function configureResourceAccess(input: {
+  resourceId: string;
+  accessProfile: DeploymentGeneratedAccessProfileSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceAccessCommand.create({
+        resourceId: input.resourceId,
+        accessProfile: input.accessProfile,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function showResource(resourceId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -1019,6 +1049,16 @@ function showResource(resourceId: string) {
     const result = yield* Effect.promise(() => cli.executeQuery(message));
     return yield* resultToEffect(result);
   });
+}
+
+function generatedAccessProfileMatchesConfig(input: {
+  current: ResourceDetail["accessProfile"] | undefined;
+  desired: DeploymentGeneratedAccessProfileSeed;
+}): boolean {
+  return (
+    input.current?.generatedAccessMode === input.desired.generatedAccessMode &&
+    input.current?.pathPrefix === input.desired.pathPrefix
+  );
 }
 
 function sourceProfilesMatch(input: {
@@ -2871,6 +2911,33 @@ function ensureRepositoryConfigAutoDeploy(input: {
   });
 }
 
+function ensureRepositoryConfigGeneratedAccessProfile(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const accessProfile = input.seed.generatedAccessProfile;
+    if (!accessProfile) {
+      return;
+    }
+
+    const detail = yield* showResource(input.resourceId);
+    if (
+      generatedAccessProfileMatchesConfig({
+        current: detail.accessProfile,
+        desired: accessProfile,
+      })
+    ) {
+      return;
+    }
+
+    yield* configureResourceAccess({
+      resourceId: input.resourceId,
+      accessProfile,
+    });
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -4003,6 +4070,10 @@ export function resolveInteractiveDeploymentInput(
             ? { destinationId: deploymentInput.destinationId }
             : {}),
           environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigGeneratedAccessProfile({
+          seed: resolvedSeed,
           resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigAutoDeploy({
