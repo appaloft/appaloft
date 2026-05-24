@@ -10,7 +10,7 @@ Repository config may declare an application dependency graph under `dependencie
 user-facing deployment workflow profile, not a new deployment command schema and not a serialization
 of `DependencyResource` or `ResourceBinding` internals.
 
-The accepted MVP shape is:
+The accepted shape is:
 
 ```yaml
 dependencies:
@@ -19,6 +19,11 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
     preview:
       lifecycle: ephemeral
 ```
@@ -56,7 +61,7 @@ type SourceLinkDependencyProvenance = {
   sourceFingerprint: string;
   entries: Array<{
     key: string;
-    kind: "postgres";
+    kind: "postgres" | "redis" | "mysql" | "clickhouse" | "object-storage" | "opensearch";
     source: "managed";
     lifecycle: "ephemeral";
     resourceId: string;
@@ -80,9 +85,9 @@ store-backed secret resolution, and preview cleanup. Users still need to perform
 manually before config-driven deploys, which breaks the repository config promise of reproducible
 headless setup for CLI and GitHub Action workflows.
 
-The product need is to express "this app needs Postgres and wants it bound as `DATABASE_URL`" in a
-reviewable file without exposing internal provider credentials or adding dependency fields to
-deployment admission.
+The product need is to express "this app needs a managed dependency and wants it bound as this
+runtime env var" in a reviewable file without exposing internal provider credentials or adding
+dependency fields to deployment admission.
 
 Preview cleanup requires a stronger rule than naming convention. A preview database may be created
 by config, manually bound by an operator, shared by another resource, or retained by policy. Only
@@ -90,9 +95,11 @@ explicit repository-config provenance can authorize cleanup of the config-owned 
 
 ## Consequences
 
-- Repository config accepts `dependencies.<key>` with strict MVP fields for managed Postgres.
-- The config parser remains strict; unsupported dependency kinds, external imports, provider
-  accounts, secret values, raw connection strings, and unknown fields fail before mutation.
+- Repository config accepts `dependencies.<key>` with strict fields for the Appaloft canonical
+  managed dependency kinds: `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, and
+  `opensearch`.
+- The config parser remains strict; external imports, provider accounts, secret values, raw
+  connection strings, and unknown fields fail before mutation.
 - CLI and Action config deploy run existing command/query buses only. Adapters must not access
   dependency repositories or application services directly.
 - Existing bindings are reused only when they match the declared env target and dependency identity.

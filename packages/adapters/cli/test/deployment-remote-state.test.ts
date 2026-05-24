@@ -1159,14 +1159,14 @@ describe("CLI source link state", () => {
           sourceFingerprint,
           entries: [
             {
-              key: "db",
-              kind: "postgres",
+              key: "cache",
+              kind: "redis",
               source: "managed",
               lifecycle: "ephemeral",
               resourceId: "res_1",
-              dependencyResourceId: "dep_res_db",
-              bindingId: "rbd_db",
-              targetName: "DATABASE_URL",
+              dependencyResourceId: "dep_res_cache",
+              bindingId: "rbd_cache",
+              targetName: "REDIS_URL",
               createdAt: "2026-05-24T00:00:00.000Z",
             },
           ],
@@ -1202,8 +1202,9 @@ describe("CLI source link state", () => {
         throw new Error(stored.error.message);
       }
       expect(stored.value.dependencyProvenance?.entries[0]?.dependencyResourceId).toBe(
-        "dep_res_db",
+        "dep_res_cache",
       );
+      expect(stored.value.dependencyProvenance?.entries[0]?.kind).toBe("redis");
       expect(stored.value.storageProvenance?.entries[0]?.storageVolumeId).toBe("stv_uploads");
     } finally {
       await rm(root, { recursive: true, force: true });

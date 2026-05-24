@@ -157,7 +157,7 @@ trusted action/CLI secret flag that resolves the same `ci-env:<NAME>` reference.
 only the runner environment after GitHub policy has selected the job environment.
 
 Application dependencies may be declared in the selected preview config with top-level
-`dependencies`. For MVP, a managed Postgres dependency bound as `DATABASE_URL` is reconciled before
+`dependencies`. Managed canonical dependency kinds such as Postgres and Redis are reconciled before
 deployment admission through existing dependency-resource and binding operations. If the dependency
 declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the preview source link
 contains explicit repository-config provenance for the same preview fingerprint, Resource, binding,

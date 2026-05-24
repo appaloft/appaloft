@@ -35,13 +35,20 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
     preview:
       lifecycle: ephemeral
 ```
 
-This declares an application Postgres dependency and asks Appaloft to inject it through the existing
-dependency binding runtime path as `DATABASE_URL`. The final deployment command still contains only
-Appaloft ids; connection strings and database passwords do not belong in `appaloft.yaml`.
+This declares managed application dependencies and asks Appaloft to inject them through the
+existing dependency binding runtime path as environment variables such as `DATABASE_URL` and
+`REDIS_URL`. Supported managed kinds are `postgres`, `redis`, `mysql`, `clickhouse`,
+`object-storage`, and `opensearch`. The final deployment command still contains only Appaloft ids;
+connection strings and database passwords do not belong in `appaloft.yaml`.
 
 For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup to remove only the
 dependency resource that Appaloft can prove was created and bound by this config for that preview.

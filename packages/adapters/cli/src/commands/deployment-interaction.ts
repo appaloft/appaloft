@@ -25,6 +25,7 @@ import {
   ListResourcesQuery,
   ListServersQuery,
   ListStorageVolumesQuery,
+  type ManagedDependencyResourceKind,
   type ProjectSummary,
   ProvisionDependencyResourceCommand,
   RegisterServerCommand,
@@ -144,7 +145,7 @@ export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableIn
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 export interface DeploymentDependencySeed {
   key: string;
-  kind: "postgres";
+  kind: ManagedDependencyResourceKind;
   source: "managed";
   bindEnv: string;
   previewLifecycle?: "ephemeral";

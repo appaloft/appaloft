@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { type ManagedDependencyResourceKind } from "@appaloft/application";
 import {
   type DomainError,
   domainError,
@@ -46,7 +47,7 @@ export interface SourceLinkTarget {
 
 export interface SourceLinkDependencyProvenanceEntry {
   key: string;
-  kind: "postgres";
+  kind: ManagedDependencyResourceKind;
   source: "managed";
   lifecycle: "ephemeral";
   resourceId: string;

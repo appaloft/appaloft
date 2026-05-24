@@ -457,7 +457,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "const": "postgres",
+            "enum": ["postgres", "redis", "mysql", "clickhouse", "object-storage", "opensearch"],
             "description": "Application dependency kind."
           },
           "source": {

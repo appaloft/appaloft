@@ -32,6 +32,14 @@ const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
 const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const storageKeyPattern = dependencyKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
+export const appaloftDeploymentDependencyKinds = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+] as const;
 export const appaloftDeploymentRuntimeNameTemplateVariables = ["preview_id", "pr_number"] as const;
 type AppaloftDeploymentRuntimeNameTemplateVariable =
   (typeof appaloftDeploymentRuntimeNameTemplateVariables)[number];
@@ -620,7 +628,7 @@ export const appaloftDeploymentSecretReferenceSchema = z
 
 export const appaloftDeploymentDependencyConfigSchema = z
   .object({
-    kind: z.literal("postgres").describe("Application dependency kind."),
+    kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
     source: z.literal("managed").describe("Managed dependencies are created by Appaloft."),
     bind: z
       .object({

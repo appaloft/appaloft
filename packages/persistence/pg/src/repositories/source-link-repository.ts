@@ -1,4 +1,5 @@
 import {
+  dependencyResourceKinds,
   type RepositoryContext,
   type SourceLinkBySourceFingerprintSpec,
   type SourceLinkDependencyProvenance,
@@ -113,7 +114,8 @@ function isDependencyProvenanceEntry(value: unknown): value is SourceLinkDepende
   const record = value as Record<string, unknown>;
   return (
     typeof record.key === "string" &&
-    record.kind === "postgres" &&
+    typeof record.kind === "string" &&
+    dependencyResourceKinds.includes(record.kind as (typeof dependencyResourceKinds)[number]) &&
     record.source === "managed" &&
     record.lifecycle === "ephemeral" &&
     typeof record.resourceId === "string" &&

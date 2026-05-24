@@ -465,8 +465,10 @@ Current boundary:
   [ADR-066](./decisions/ADR-066-repository-config-dependency-graph.md) and
   [Repository Config Dependency Graph](./specs/075-repository-config-dependency-graph/spec.md).
   It is a workflow/profile extension over the existing dependency operation catalog, not a new
-  operation key. Config deploy may list/provision managed dependency resources, list/bind Resource
-  dependency bindings, and persist preview source-link provenance before `deployments.create`.
+  operation key. Config supports the canonical managed dependency kinds `postgres`, `redis`,
+  `mysql`, `clickhouse`, `object-storage`, and `opensearch`. Config deploy may list/provision
+  managed dependency resources, list/bind Resource dependency bindings, and persist preview
+  source-link provenance before `deployments.create`.
   Preview cleanup may unbind/delete only provenance-marked ephemeral dependencies through
   `resources.unbind-dependency` and `dependency-resources.delete`; manual/shared dependencies and
   dependencies without matching provenance are preserved by design.

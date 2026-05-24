@@ -18,7 +18,8 @@
 
 ## Tests
 
-- [x] Parser accepts managed Postgres dependency and rejects unknown fields.
+- [x] Parser accepts canonical managed dependency kinds and rejects unknown fields.
+- [x] CLI config deploy dispatches kind-specific list/provision/bind for Redis as well as Postgres.
 - [x] CLI config deploy dispatches list/provision/bind before deployment create.
 - [x] CLI config deploy is idempotent with existing resource and binding.
 - [x] CLI config deploy reports stable conflict for mismatched env target binding.

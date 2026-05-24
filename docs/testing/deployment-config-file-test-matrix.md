@@ -139,15 +139,16 @@ This matrix inherits:
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
 | --- | --- | --- | --- | --- | --- | --- |
-| CONFIG-FILE-DEPENDENCY-001 | parser/schema | Managed Postgres dependency accepted | Config declares `dependencies.db.kind = postgres`, `source = managed`, `bind.env = DATABASE_URL`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-001 | parser/schema | Managed dependency accepted | Config declares `dependencies.db.kind = postgres`, `source = managed`, `bind.env = DATABASE_URL`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
 | CONFIG-FILE-DEPENDENCY-002 | parser/schema | Unknown dependency fields rejected | Config declares an unsupported field under `dependencies.db` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
 | CONFIG-FILE-DEPENDENCY-003 | parser/schema | Dependency identity and secret material rejected | Config declares provider account, tenant, credential, raw `databaseUrl`, `connectionString`, password, or provider-specific settings under `dependencies` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity` or `config-secret-validation` | No write commands |
-| CONFIG-FILE-DEPENDENCY-004 | integration | Config dependency provisions and binds before deployment | Selected Resource has no matching managed Postgres dependency resource or binding | Config deploy handles dependencies | Dependency resource is listed, provisioned, bindings are listed, binding is created, and deployment admission remains ids-only | None | `dependency-resources.list` -> `dependency-resources.provision` -> `resources.list-dependency-bindings` -> `resources.bind-dependency` -> `deployments.create` |
-| CONFIG-FILE-DEPENDENCY-005 | integration | Config dependency idempotency | Matching managed Postgres dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched | None | `dependency-resources.list` -> `resources.list-dependency-bindings` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-004 | integration | Config dependency provisions and binds before deployment | Selected Resource has no matching managed dependency resource or binding | Config deploy handles dependencies | Dependency resource is listed by declared kind, provisioned, bindings are listed, binding is created, and deployment admission remains ids-only | None | `dependency-resources.list` -> `dependency-resources.provision` -> `resources.list-dependency-bindings` -> `resources.bind-dependency` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-005 | integration | Config dependency idempotency | Matching managed dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched | None | `dependency-resources.list` -> `resources.list-dependency-bindings` -> `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-006 | integration | Env target conflict | Resource already has active binding for `DATABASE_URL` to a different dependency resource | Config deploy declares `dependencies.db.bind.env = DATABASE_URL` | Workflow fails before deployment with safe details | `repository_config_dependency_binding_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-007 | integration | Preview ephemeral provenance | PR preview config dependency declares `preview.lifecycle = ephemeral` | Config deploy provisions or reuses the preview dependency and binding | Source link records safe repository-config provenance for dependency key, target env, resource id, binding id, dependency resource id, and source fingerprint | None | Dependency operations -> source-link provenance write -> `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-010 | parser/integration | Canonical managed dependency kinds | Config declares managed `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` dependencies with env bindings | Parser accepts canonical kinds; config deploy filters/provisions using the declared kind and records provenance with that same kind | None | Parse or `dependency-resources.list(kind)` -> `dependency-resources.provision(kind)` -> bind |
 
 ## Storage Graph Matrix
 
@@ -273,14 +274,15 @@ Current implemented coverage:
 - `CONFIG-FILE-PARSE-001`, `CONFIG-FILE-DISC-001`, `CONFIG-FILE-ID-001`,
   `CONFIG-FILE-SEC-001`, and `CONFIG-FILE-UNSUPPORTED-001` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
-- `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003` and
+- `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
+  `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
-- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-009` and
+- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and

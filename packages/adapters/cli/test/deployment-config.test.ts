@@ -3126,6 +3126,93 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-DEPENDENCY-010] config dependencies support Redis managed kind", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-redis-dependency-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "dependencies:",
+        "  cache:",
+        "    kind: redis",
+        "    source: managed",
+        "    bind:",
+        "      env: REDIS_URL",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_redis_dependency_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/cache",
+          GITHUB_SHA: "def456",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-88",
+              "--server-host",
+              "203.0.113.88",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const listDependencyResources = harness.queries.find(
+      (query) => query.constructor.name === "ListDependencyResourcesQuery",
+    ) as Record<string, unknown> | undefined;
+    expect(listDependencyResources).toMatchObject({
+      kind: "redis",
+    });
+    const provisionDependency = harness.commands.find(
+      (command) => command.constructor.name === "ProvisionDependencyResourceCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(provisionDependency).toMatchObject({
+      kind: "redis",
+    });
+    const bindDependency = harness.commands.find(
+      (command) => command.constructor.name === "BindResourceDependencyCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(bindDependency).toMatchObject({
+      targetName: "REDIS_URL",
+    });
+    expect(harness.dependencyProvenanceWrites[0]).toMatchObject({
+      dependencyProvenance: {
+        entries: [
+          {
+            key: "cache",
+            kind: "redis",
+            targetName: "REDIS_URL",
+          },
+        ],
+      },
+    });
+  });
+
   test("[CONFIG-FILE-DEPENDENCY-005] config dependencies reuse existing managed resource and binding", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(

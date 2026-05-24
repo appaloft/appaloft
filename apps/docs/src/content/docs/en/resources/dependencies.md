@@ -73,14 +73,20 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
     preview:
       lifecycle: ephemeral
 ```
 
 During config deploy, Appaloft lists existing dependency resources and bindings, provisions a
-managed Postgres dependency when needed, binds the selected Resource to `DATABASE_URL`, and then
-creates the deployment with ids only. The runtime receives the value through the same safe
-dependency runtime injection path described below.
+managed dependency when needed, binds the selected Resource to the requested environment variable,
+and then creates the deployment with ids only. Repository config accepts `postgres`, `redis`,
+`mysql`, `clickhouse`, `object-storage`, and `opensearch` for managed dependency declarations. The
+runtime receives the value through the same safe dependency runtime injection path described below.
 
 Do not put provider accounts, tenants, credentials, database passwords, raw connection strings, or
 secret values in `appaloft.yaml`. `controlPlane.install.database` is only for the Appaloft

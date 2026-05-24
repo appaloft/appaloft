@@ -65,8 +65,8 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 - resource network profile such as `internalPort`, upstream protocol, exposure mode, and compose
   target service;
 - reusable health-check defaults;
-- user-facing application dependency graph declarations such as managed Postgres bound to
-  `DATABASE_URL`;
+- user-facing application dependency graph declarations such as managed Postgres or Redis bound to
+  runtime env targets;
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
 - non-secret environment variable declarations and required secret references;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
@@ -202,14 +202,20 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
     preview:
       lifecycle: ephemeral
 ```
 
-The MVP supports managed Postgres only. Config may not include provider accounts, credentials,
-tenants, organization ids, raw connection strings, database passwords, secret values, or
-provider-specific realization settings. Those values stay in Appaloft/provider state or trusted
-entrypoint secret stores.
+Managed dependency declarations support `postgres`, `redis`, `mysql`, `clickhouse`,
+`object-storage`, and `opensearch`. Config may not include provider accounts, credentials, tenants,
+organization ids, raw connection strings, database passwords, secret values, or provider-specific
+realization settings. Those values stay in Appaloft/provider state or trusted entrypoint secret
+stores.
 
 `storage` uses application language, not Appaloft internal object language:
 
@@ -565,7 +571,7 @@ deployment admission.
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. In PR preview context, `{preview_id}` and `{pr_number}` render from trusted entrypoint context before variables are applied. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
-| `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres bound to `DATABASE_URL`; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
+| `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |

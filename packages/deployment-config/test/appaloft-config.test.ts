@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   appaloftDeploymentConfigFileNames,
+  appaloftDeploymentDependencyKinds,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
@@ -164,6 +165,30 @@ describe("Appaloft deployment config schema", () => {
           lifecycle: "ephemeral",
         },
       });
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-010] accepts canonical managed dependency kinds", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: Object.fromEntries(
+        appaloftDeploymentDependencyKinds.map((kind) => [
+          kind.replaceAll("-", "_"),
+          {
+            kind,
+            source: "managed",
+            bind: {
+              env: `${kind.replaceAll("-", "_").toUpperCase()}_URL`,
+            },
+          },
+        ]),
+      ),
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.redis?.kind).toBe("redis");
+      expect(parsed.data.dependencies?.object_storage?.kind).toBe("object-storage");
+      expect(parsed.data.dependencies?.opensearch?.bind.env).toBe("OPENSEARCH_URL");
     }
   });
 

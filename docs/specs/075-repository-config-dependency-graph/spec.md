@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: MVP planned for managed Postgres declarations in repository config, CLI/Action
-  config deploy orchestration, and preview cleanup provenance
+- Artifact state: implemented for canonical managed dependency declarations in repository config,
+  CLI/Action config deploy orchestration, and preview cleanup provenance
 - Roadmap target: `0.12.x` repository config hardening
 - Compatibility impact: `pre-1.0-policy`, additive repository config fields
 - Decision state: governed by
@@ -12,10 +12,10 @@
 
 ## Business Outcome
 
-Users can commit an `appaloft.yaml` that says the application needs a managed Postgres database and
-that the app should receive it as `DATABASE_URL`. CLI and GitHub Action config deploy create or
-reuse the dependency resource, bind it to the Resource, and let existing runtime injection deliver
-the variable during deployment.
+Users can commit an `appaloft.yaml` that says the application needs managed dependencies such as
+Postgres, Redis, object storage, or OpenSearch and that the app should receive them as runtime
+environment variables. CLI and GitHub Action config deploy create or reuse the dependency resource,
+bind it to the Resource, and let existing runtime injection deliver the variable during deployment.
 
 For PR previews, users can mark the declared dependency ephemeral so preview cleanup removes only
 the Appaloft-managed dependency resource that the config workflow created for that preview scope.
@@ -33,18 +33,19 @@ the Appaloft-managed dependency resource that the config workflow created for th
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| CONFIG-DEPENDENCY-001 | Parse managed Postgres dependency | `appaloft.yaml` declares `dependencies.db.kind = postgres`, `source = managed`, and `bind.env = DATABASE_URL` | The config parser runs | The config is accepted, normalized, represented in the JSON schema, and does not accept unknown dependency fields. |
+| CONFIG-DEPENDENCY-001 | Parse managed dependency declaration | `appaloft.yaml` declares `dependencies.db.kind = postgres`, `source = managed`, and `bind.env = DATABASE_URL` | The config parser runs | The config is accepted, normalized, represented in the JSON schema, and does not accept unknown dependency fields. |
 | CONFIG-DEPENDENCY-002 | Reject secrets and identity in dependency declarations | Config includes provider account, tenant, credential, password, database URL, raw connection string, or provider-specific settings under `dependencies` | The config parser runs | Parsing fails before mutation with strict schema, identity, unsupported, or raw-secret validation. |
 | CONFIG-DEPENDENCY-003 | Provision and bind from config deploy | No matching dependency resource or binding exists for the selected Resource | CLI/Action config deploy resolves identity | The workflow dispatches `dependency-resources.list`, `dependency-resources.provision`, `resources.list-dependency-bindings`, `resources.bind-dependency`, then `deployments.create` with ids only. |
-| CONFIG-DEPENDENCY-004 | Reuse existing resource and binding idempotently | A matching managed Postgres dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched, and deployment admission still uses ids-only input. |
+| CONFIG-DEPENDENCY-004 | Reuse existing resource and binding idempotently | A matching managed dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched, and deployment admission still uses ids-only input. |
 | CONFIG-DEPENDENCY-005 | Stable conflict on env target | The Resource already has an active binding for `DATABASE_URL` to a different dependency resource | Config deploy handles `dependencies.db.bind.env = DATABASE_URL` | The workflow fails before deployment with a stable conflict code and safe details. |
 | CONFIG-DEPENDENCY-006 | Preview provenance is durable | A PR preview dependency has `preview.lifecycle = ephemeral` | Config deploy provisions/binds it for a preview source fingerprint | The source link records safe repository-config provenance with dependency key, target env, resource id, binding id, dependency resource id, and lifecycle. |
 | CONFIG-DEPENDENCY-007 | Cleanup removes only provenance-owned ephemeral dependencies | Preview cleanup runs for a source fingerprint with matching provenance | Runtime cleanup has succeeded | Cleanup unbinds the recorded binding, deletes the recorded dependency resource through existing delete safety, removes route/source-link state, and returns safe cleanup counts. |
 | CONFIG-DEPENDENCY-008 | Cleanup preserves manual/shared dependencies | Preview cleanup runs when no matching dependency provenance exists or delete safety reports another active/shared blocker | Cleanup reaches dependency stage | No unproven dependency is deleted; delete blockers are surfaced without guessing by resource name. |
+| CONFIG-DEPENDENCY-010 | Support canonical dependency kinds | `appaloft.yaml` declares `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` with `source = managed` and an env binding | Parser and config deploy run | The parser accepts the canonical kind, config deploy filters/provisions that kind, records provenance with the same kind, and deployment admission remains ids-only. |
 
 ## Config Contract
 
-MVP repository config fields:
+Repository config fields:
 
 ```yaml
 dependencies:
@@ -53,6 +54,11 @@ dependencies:
     source: managed
     bind:
       env: DATABASE_URL
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
     preview:
       lifecycle: ephemeral
 ```
@@ -60,8 +66,9 @@ dependencies:
 Rules:
 
 - dependency keys must be stable repository-local names, not Appaloft ids;
-- `kind` supports `postgres` for the MVP;
-- `source` supports `managed` for the MVP;
+- `kind` supports the Appaloft canonical managed dependency kinds: `postgres`, `redis`, `mysql`,
+  `clickhouse`, `object-storage`, and `opensearch`;
+- `source` supports `managed`;
 - `bind.env` must be a safe environment variable name;
 - `preview.lifecycle` supports `ephemeral`;
 - omission of `preview.lifecycle` means normal dependency lifecycle; cleanup must not delete it;
@@ -115,8 +122,7 @@ command fails before source-link deletion so a retry can resume with provenance 
 - No dependency fields on `deployments.create`.
 - No raw connection string, database password, provider credential, tenant, organization, or
   provider account in repository config.
-- No external/imported dependency config declaration in this MVP.
-- No managed Redis/MySQL/ClickHouse/object-storage/OpenSearch config declaration in this MVP.
+- No external/imported dependency config declaration.
 - No build-time dependency injection.
 - No provider-specific database sizing or backup policy fields in `dependencies`.
 - No deletion of manual, shared, imported, or unproven dependency resources during preview cleanup.

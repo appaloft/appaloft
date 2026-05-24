@@ -387,7 +387,7 @@ export interface SourceLinkTarget {
 
 export interface SourceLinkDependencyProvenanceEntry {
   key: string;
-  kind: "postgres";
+  kind: ManagedDependencyResourceKind;
   source: "managed";
   lifecycle: "ephemeral";
   resourceId: string;
