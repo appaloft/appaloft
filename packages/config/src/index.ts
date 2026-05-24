@@ -114,6 +114,8 @@ export interface AppConfig {
   bootstrapFirstAdminOutputFile?: string;
   firstAdminDisplayName?: string;
   firstAdminEmail?: string;
+  firstAdminOrganizationName?: string;
+  firstAdminOrganizationSlug?: string;
   firstAdminPassword?: string;
   githubClientId?: string;
   githubClientSecret?: string;
@@ -731,6 +733,26 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             source.flags?.firstAdminPassword ??
             env.APPALOFT_FIRST_ADMIN_PASSWORD ??
             fileConfig.firstAdminPassword,
+        }
+      : {}),
+    ...(source.flags?.firstAdminOrganizationName ||
+    env.APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME ||
+    fileConfig.firstAdminOrganizationName
+      ? {
+          firstAdminOrganizationName:
+            source.flags?.firstAdminOrganizationName ??
+            env.APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME ??
+            fileConfig.firstAdminOrganizationName,
+        }
+      : {}),
+    ...(source.flags?.firstAdminOrganizationSlug ||
+    env.APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG ||
+    fileConfig.firstAdminOrganizationSlug
+      ? {
+          firstAdminOrganizationSlug:
+            source.flags?.firstAdminOrganizationSlug ??
+            env.APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG ??
+            fileConfig.firstAdminOrganizationSlug,
         }
       : {}),
     ...(source.flags?.githubClientId || env.APPALOFT_GITHUB_CLIENT_ID || fileConfig.githubClientId

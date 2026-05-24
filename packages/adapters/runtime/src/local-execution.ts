@@ -162,6 +162,11 @@ function supersededDeploymentIdsForCleanup(input: {
   return input.supersedesDeploymentId ? [input.supersedesDeploymentId.value] : [];
 }
 
+function parseOptionalPort(value: string | undefined): number | undefined {
+  const port = Number(value);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+}
+
 async function reservePort(preferred?: number): Promise<number> {
   if (preferred) {
     await new Promise<void>((resolvePort, reject) => {
@@ -1410,8 +1415,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const containerPort = state.runtimePlan.execution.port ?? 3000;
     const usesDirectHostPort =
       state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+    const directHostPort = parseOptionalPort(
+      state.runtimePlan.execution.metadata?.["resource.hostPort"],
+    );
     if (usesDirectHostPort) {
-      await reservePort(containerPort);
+      await reservePort(directHostPort ?? containerPort);
     }
     const packageEnv = await resolveDependencyRuntimeEnvironment({
       context,
@@ -2044,6 +2052,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         dockerCommandBuilder.publishPort({
           containerPort,
           mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
+          ...(usesDirectHostPort && directHostPort ? { hostPort: directHostPort } : {}),
         }),
       ],
     });

@@ -1,0 +1,51 @@
+schemaVersion: appaloft.blueprint/v1
+id: pocketbase
+name: PocketBase
+version: 1.0.0
+summary: Single-service PocketBase application with persistent data.
+description: Deploys PocketBase from a container image and attaches a durable data volume.
+tags:
+  - database
+  - internal-tool
+parameters:
+  - key: APP_NAME
+    label: App name
+    type: string
+    required: true
+    default: pocketbase
+secrets:
+  - key: POCKETBASE_ADMIN_PASSWORD
+    label: Admin password
+    required: true
+resources:
+  - id: data
+    kind: volume
+    label: PocketBase data
+components:
+  - id: pocketbase
+    name: PocketBase
+    kind: service
+    runtime:
+      strategy: container-image
+      image: ghcr.io/muchobien/pocketbase:latest
+    ports:
+      - name: http
+        containerPort: 8090
+        protocol: http
+    routes:
+      - port: http
+        pathPrefix: /
+    usesSecrets:
+      - POCKETBASE_ADMIN_PASSWORD
+    usesResources:
+      - data
+profiles:
+  preview:
+    label: Preview
+    replicas: 1
+  production:
+    label: Production
+    replicas: 1
+    variables:
+      - key: APPALOFT_BLUEPRINT_PROFILE
+        value: production

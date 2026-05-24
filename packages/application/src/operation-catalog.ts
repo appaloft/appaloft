@@ -300,6 +300,9 @@ export const operationCatalog = [
     serviceName: "GetAuthBootstrapStatusQueryService",
     inputSchema: getAuthBootstrapStatusQueryInputSchema,
     serviceToken: tokens.getAuthBootstrapStatusQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
     transports: {
       cli: "appaloft auth bootstrap-status",
       orpc: { method: "GET", path: "/api/bootstrap/auth/status" },
@@ -502,6 +505,11 @@ export const operationCatalog = [
     serviceName: "ListDeployTokensQueryService",
     inputSchema: listDeployTokensQueryInputSchema,
     serviceToken: tokens.listDeployTokensQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft deploy-token list",
       orpc: { method: "GET", path: "/api/deploy-tokens" },
@@ -516,6 +524,11 @@ export const operationCatalog = [
     serviceName: "ShowDeployTokenQueryService",
     inputSchema: showDeployTokenQueryInputSchema,
     serviceToken: tokens.showDeployTokenQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
     transports: {
       cli: "appaloft deploy-token show <tokenId>",
       orpc: { method: "GET", path: "/api/deploy-tokens/{tokenId}" },

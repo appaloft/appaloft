@@ -59,6 +59,10 @@
         return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentsCreate);
       case "resources.create":
         return $t(i18nKeys.console.quickDeploy.workflowStepResourcesCreate);
+      case "resources.configureSource":
+        return $t(i18nKeys.console.resources.sourceProfileTitle);
+      case "resources.configureNetwork":
+        return $t(i18nKeys.console.resources.networkProfileTitle);
       case "resources.configureRuntime":
         return $t(i18nKeys.console.resources.runtimeProfileTitle);
       case "environments.setVariable":

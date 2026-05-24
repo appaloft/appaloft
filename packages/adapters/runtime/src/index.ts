@@ -434,7 +434,7 @@ function createAccessRoutes(input: {
       return ok([]);
     }
 
-    const targetPort = input.fallbackPort;
+    const targetPort = input.requestedDeployment.hostPort ?? input.fallbackPort;
 
     return safeTry(function* () {
       const route = yield* AccessRoute.create({
@@ -477,6 +477,9 @@ function executionMetadataFor(
   return {
     ...(requestedDeployment.exposureMode
       ? { "resource.exposureMode": requestedDeployment.exposureMode }
+      : {}),
+    ...(requestedDeployment.hostPort
+      ? { "resource.hostPort": String(requestedDeployment.hostPort) }
       : {}),
     ...(requestedDeployment.upstreamProtocol
       ? { "resource.upstreamProtocol": requestedDeployment.upstreamProtocol }

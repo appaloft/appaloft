@@ -1,7 +1,10 @@
 import { customAlphabet } from "nanoid";
 
 import {
+  type ConfigureResourceNetworkInput,
   type ConfigureResourceRuntimeInput,
+  type ConfigureResourceSourceInput,
+  type ConfigureResourceSourceResponse,
   type ConfigureServerCredentialInput,
   type CreateDeploymentInput,
   type CreateDeploymentResponse,
@@ -81,6 +84,8 @@ export type QuickDeployResourceReference =
   | {
       mode: "existing";
       id: string;
+      configureSource?: Omit<ConfigureResourceSourceInput, "resourceId">;
+      configureNetwork?: Omit<ConfigureResourceNetworkInput, "resourceId">;
       configureRuntime?: Omit<ConfigureResourceRuntimeInput, "resourceId">;
     }
   | {
@@ -175,6 +180,14 @@ export type QuickDeployWorkflowStep =
       input: CreateResourceInput;
     }
   | {
+      kind: "resources.configureSource";
+      input: ConfigureResourceSourceInput;
+    }
+  | {
+      kind: "resources.configureNetwork";
+      input: ConfigureResourceNetworkInput;
+    }
+  | {
       kind: "resources.configureRuntime";
       input: ConfigureResourceRuntimeInput;
     }
@@ -193,6 +206,7 @@ export type QuickDeployWorkflowStepOutput =
   | CreateSshCredentialResponse
   | CreateEnvironmentResponse
   | CreateResourceResponse
+  | ConfigureResourceSourceResponse
   | CreateDeploymentResponse
   | void;
 
@@ -308,12 +322,32 @@ export function* quickDeployWorkflow(
           "resources.create",
         );
 
+  if (input.resource.mode === "existing" && input.resource.configureSource) {
+    yield {
+      kind: "resources.configureSource",
+      input: {
+        resourceId,
+        ...input.resource.configureSource,
+      },
+    };
+  }
+
   if (input.resource.mode === "existing" && input.resource.configureRuntime) {
     yield {
       kind: "resources.configureRuntime",
       input: {
         resourceId,
         ...input.resource.configureRuntime,
+      },
+    };
+  }
+
+  if (input.resource.mode === "existing" && input.resource.configureNetwork) {
+    yield {
+      kind: "resources.configureNetwork",
+      input: {
+        resourceId,
+        ...input.resource.configureNetwork,
       },
     };
   }

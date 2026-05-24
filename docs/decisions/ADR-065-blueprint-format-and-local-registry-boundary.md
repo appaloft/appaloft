@@ -26,7 +26,9 @@ Community Appaloft must keep this capability open, neutral, and local-first. Use
 - Existing documents that talk about Resource Templates or Template Catalogs should be migrated to Blueprint language unless they are describing command skeleton files, config string interpolation, or unrelated template mechanics.
 - Community can ship neutral built-in Blueprint files and local registry/import/export behavior without requiring any hosted catalog.
 - Blueprint installation must compile into existing Appaloft application operations and deployment planning. It must not become a second deployment engine.
-- Future parser, schema, import/export, registry, instantiation, and MCP integration work needs its own Spec Round and test matrix before Code Round.
+- The v1 neutral implementation may start as a package-level capability: schema, JSON/YAML loader, validator, local/file registry port, install-plan compiler, sample manifests, and tests. CLI/API/import execution can follow in a later operation spec.
+- The neutral resource requirement vocabulary can include mainstream dependency kinds such as `mysql`, `clickhouse`, and `opensearch` when they are expressed only as portable Blueprint dependencies, not as Cloud marketplace, provider, billing, or managed-service promises.
+- Future import/export commands, persisted registry indexes, real install execution, and MCP integration work need their own Spec Round and test matrix before Code Round.
 
 ## Alternatives Considered
 

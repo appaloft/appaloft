@@ -221,6 +221,8 @@ describe("resolveConfig", () => {
         APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE: "/tmp/appaloft-bootstrap/first-admin.json",
         APPALOFT_FIRST_ADMIN_DISPLAY_NAME: "Admin User",
         APPALOFT_FIRST_ADMIN_EMAIL: "admin@example.com",
+        APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME: "Admin Organization",
+        APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG: "admin-organization",
         APPALOFT_FIRST_ADMIN_PASSWORD: "local-admin-password",
       },
     });
@@ -228,6 +230,8 @@ describe("resolveConfig", () => {
     expect(config.bootstrapFirstAdminOutputFile).toBe("/tmp/appaloft-bootstrap/first-admin.json");
     expect(config.firstAdminDisplayName).toBe("Admin User");
     expect(config.firstAdminEmail).toBe("admin@example.com");
+    expect(config.firstAdminOrganizationName).toBe("Admin Organization");
+    expect(config.firstAdminOrganizationSlug).toBe("admin-organization");
     expect(config.firstAdminPassword).toBe("local-admin-password");
   });
 

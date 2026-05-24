@@ -7,7 +7,7 @@ inputs:
     required: false
     default: deploy
   version:
-    description: Appaloft release tag, for example v0.9.0. Use latest for the latest stable release.
+    description: Appaloft release tag, for example v0.9.0. Use latest for the latest stable release, or source to build the deploy CLI from the checked-out Appaloft source tree.
     required: false
     default: latest
   config:

@@ -323,7 +323,9 @@ Required verification:
   secrets.
 
 The main release workflow already generates `checksums.txt`, `release-manifest.json`, release notes,
-and platform CLI archives. The wrapper must consume those artifacts instead of rebuilding the CLI.
+and platform CLI archives. Published production workflows should consume those artifacts by default
+instead of rebuilding the CLI. Trusted in-repository workflows may opt into `version: source` to
+build the CLI from the checked-out Appaloft source tree for same-commit validation or deployment.
 
 ## Version Propagation
 
@@ -334,6 +336,9 @@ Expected propagation model:
 - `appaloft/deploy-action@v1` stays stable across many Appaloft CLI releases.
 - `with.version: vX.Y.Z` downloads exactly that CLI release.
 - `with.version: latest` resolves the newest stable Appaloft CLI release at runtime.
+- `with.version: source` requires the action to run from a checked-out Appaloft source tree with
+  Bun available, installs workspace dependencies, builds the binary bundle from that checkout, and
+  runs the deployment with that same source revision.
 - The deploy-action repository releases only when wrapper inputs, install logic, Marketplace docs,
   or security behavior changes.
 - A future docs automation may update example snippets to a newer pinned CLI version, but runtime
@@ -450,7 +455,8 @@ The main repository now also contains a reference composite action under
   handling, output, and reserved control-plane examples;
 - `scripts/install-appaloft.sh`, which resolves `latest` or exact release tags, selects the runner
   target, downloads the CLI archive plus `checksums.txt`, verifies SHA-256, extracts the binary, and
-  adds it to the job path;
+  adds it to the job path; it also supports trusted `version: source` workflows by building the CLI
+  binary bundle from the checked-out source tree instead of using a published release;
 - `scripts/run-deploy.sh`, which maps trusted wrapper inputs to the existing CLI flags, writes
   `ssh-private-key` to a temp file, rejects future control-plane inputs before mutation, and maps PR
   preview inputs to `--preview`, `--preview-id`, `--preview-domain-template`, and
@@ -483,4 +489,17 @@ Remaining public wrapper release follow-ups:
   should be smoke-tested from CI;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
-- add structured CLI deploy output if action outputs need deployment/resource ids.
+- add structured CLI deploy output if action outputs need deployment/resource ids;
+- add a neutral workflow scaffolding capability for repositories that want Appaloft-managed GitHub
+  Actions YAML. The generated workflow should select Pure SSH Action by default when only an SSH
+  target is configured, support exact release and trusted `version: source` installs, reference
+  secrets by name instead of materializing values, and leave paid/external resource creation outside
+  generated YAML;
+- improve Action progress output for Dockerfile deploys by relaying the CLI/runtime milestones
+  defined by the runtime substrate plan: source/context size, upload, Docker build/cache status,
+  image id/size, runtime replace, health verification, route realization, deployment id/resource id
+  when structured output exists, and sanitized rollback target;
+- keep Action failure semantics strict: broken pipes, failed SSH commands, failed Docker builds,
+  missing health readiness, route failures, and cleanup failures must fail the Action step unless the
+  user explicitly selected a documented asynchronous/control-plane mode that accepts work before
+  terminal verification.

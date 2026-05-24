@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { CheckCircle2, KeyRound, ShieldCheck } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
@@ -71,6 +72,12 @@
       !bootstrapMutation.isPending &&
       status?.bootstrapRequired === true,
   );
+
+  $effect(() => {
+    if (browser && !createdResult && status?.bootstrapRequired === false) {
+      void goto(loginUrl);
+    }
+  });
 
   function submitFirstAdmin(event: SubmitEvent): void {
     event.preventDefault();

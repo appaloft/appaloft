@@ -152,23 +152,35 @@ fi
 preview_id="${INPUT_PREVIEW_ID:-}"
 domain_template="${INPUT_PREVIEW_DOMAIN_TEMPLATE:-}"
 tls_mode="${INPUT_PREVIEW_TLS_MODE:-}"
+has_preview_route_input=false
+
+if [ -n "$domain_template" ] || [ -n "$tls_mode" ]; then
+  has_preview_route_input=true
+fi
 
 if [ -n "$config_path" ] && [ -f "$config_path" ]; then
   config_domain_template="$(read_config_path_value "$config_path" "preview.pullRequest.domainTemplate")"
   config_tls_mode="$(read_config_path_value "$config_path" "preview.pullRequest.tlsMode")"
+  if [ -n "$config_domain_template" ] || [ -n "$config_tls_mode" ]; then
+    has_preview_route_input=true
+  fi
   domain_template="${domain_template:-$config_domain_template}"
   tls_mode="${tls_mode:-$config_tls_mode}"
 fi
 
-tls_mode="${tls_mode:-auto}"
-case "$tls_mode" in
-  auto|disabled)
-    ;;
-  *)
-    echo "::error::preview.pullRequest.tlsMode must be 'auto' or 'disabled'." >&2
-    exit 1
-    ;;
-esac
+if $has_preview_route_input; then
+  tls_mode="${tls_mode:-auto}"
+  case "$tls_mode" in
+    auto|disabled)
+      ;;
+    *)
+      echo "::error::preview.pullRequest.tlsMode must be 'auto' or 'disabled'." >&2
+      exit 1
+      ;;
+  esac
+else
+  tls_mode=""
+fi
 
 if [ -n "$domain_template" ]; then
   if [ -z "$preview_id" ]; then

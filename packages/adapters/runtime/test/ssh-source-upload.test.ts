@@ -35,7 +35,10 @@ describe("SSH source upload", () => {
 
     expect(command).toContain("git -C '/tmp/appaloft source' rev-parse --is-inside-work-tree");
     expect(command).toContain(
-      "git -C '/tmp/appaloft source' ls-files -z --cached --others --exclude-standard",
+      "git -C '/tmp/appaloft source' ls-files -z --cached --recurse-submodules",
+    );
+    expect(command).toContain(
+      "git -C '/tmp/appaloft source' ls-files -z --others --exclude-standard",
     );
     expect(command).toContain("tar --null -czf - -C '/tmp/appaloft source' --files-from -");
     expect(command).toContain("else tar -czf -");

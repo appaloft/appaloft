@@ -4760,7 +4760,7 @@
               disabled={isResourceArchived || isPreviewEnvironmentResource}
             >
               <Plus class="size-4" />
-              {$t(i18nKeys.common.actions.newDeployment)}
+              {$t(i18nKeys.common.actions.quickDeploy)}
             </Button>
           </div>
         </div>
@@ -4808,7 +4808,7 @@
                 {/if}
                 <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
                   <Plus class="size-4" />
-                  {$t(i18nKeys.common.actions.newDeployment)}
+                  {$t(i18nKeys.common.actions.quickDeploy)}
                 </Button>
               </div>
             </div>
@@ -4991,7 +4991,7 @@
                       title={$t(i18nKeys.console.resources.overviewNoDeploymentTitle)}
                       description={$t(i18nKeys.console.resources.overviewNoDeploymentDescription)}
                       actionHref={resourceDeploymentHref()}
-                      actionLabel={$t(i18nKeys.common.actions.newDeployment)}
+                      actionLabel={$t(i18nKeys.common.actions.quickDeploy)}
                       actionDisabled={isResourceArchived}
                     />
                   {/if}
@@ -5049,7 +5049,7 @@
               </div>
               <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
                 <Plus class="size-4" />
-                {$t(i18nKeys.common.actions.newDeployment)}
+                {$t(i18nKeys.common.actions.quickDeploy)}
               </Button>
             </div>
 

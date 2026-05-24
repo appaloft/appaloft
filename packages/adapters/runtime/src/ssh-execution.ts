@@ -58,6 +58,7 @@ import {
 } from "./git-source-submodules";
 import {
   dockerPublishedPortCommand,
+  dockerRemoveConflictingRouteContainersCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
@@ -239,14 +240,24 @@ export function buildLocalWorkspaceUploadCommand(input: {
     ">/dev/null",
     "2>&1;",
     "then",
+    "{",
     "git",
     "-C",
     shellQuote(input.localWorkdir),
     "ls-files",
     "-z",
     "--cached",
+    "--recurse-submodules",
+    ";",
+    "git",
+    "-C",
+    shellQuote(input.localWorkdir),
+    "ls-files",
+    "-z",
     "--others",
     "--exclude-standard",
+    ";",
+    "}",
     "|",
     "tar",
     "--null",
@@ -603,6 +614,11 @@ function supersededDeploymentIdsForCleanup(input: {
   supersedesDeploymentId?: { value: string };
 }): string[] {
   return input.supersedesDeploymentId ? [input.supersedesDeploymentId.value] : [];
+}
+
+function parseOptionalPort(value: string | undefined): number | undefined {
+  const port = Number(value);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
 }
 
 interface SshTarget {
@@ -992,6 +1008,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       "BatchMode=yes",
       "-o",
       "StrictHostKeyChecking=accept-new",
+      "-o",
+      "ServerAliveInterval=30",
+      "-o",
+      "ServerAliveCountMax=20",
       target.host,
     ];
   }
@@ -2188,6 +2208,9 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       const usesDirectHostPort =
         state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+      const directHostPort = parseOptionalPort(
+        state.runtimePlan.execution.metadata?.["resource.hostPort"],
+      );
       const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
       const removeSupersededResourceContainersSpec =
         dockerCommandBuilder.removeResourceContainers({
@@ -2215,6 +2238,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             dockerCommandBuilder.publishPort({
               containerPort: port,
               mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
+              ...(usesDirectHostPort && directHostPort ? { hostPort: directHostPort } : {}),
             }),
           ],
         }),
@@ -2423,6 +2447,19 @@ export class SshExecutionBackend implements ExecutionBackend {
         route,
         url: publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
       }));
+      const routeConflictCleanupCommand = !usesDirectHostPort
+        ? dockerRemoveConflictingRouteContainersCommand({
+            deploymentId: state.id.value,
+            accessRoutes: accessRoutes.flatMap((route) =>
+              route.domains.map((host) => ({
+                host,
+                pathPrefix: route.pathPrefix,
+              })),
+            ),
+            quote: shellQuote,
+          })
+        : "";
+      let routeConflictCleanupAttempted = false;
       const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
       if (!healthOptions) {
         this.report(context, {
@@ -2528,6 +2565,25 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         if (step === "public-http") {
+          if (routeConflictCleanupCommand.length > 0 && !routeConflictCleanupAttempted) {
+            routeConflictCleanupAttempted = true;
+            const cleanup = await this.runRemoteCommand({
+              target,
+              command: routeConflictCleanupCommand,
+              cwd: runtimeDir,
+              env,
+            });
+            logs.push(
+              phaseLog(
+                "deploy",
+                cleanup.failed
+                  ? "Failed to release SSH containers with conflicting access routes"
+                  : "Released SSH containers with conflicting access routes",
+                cleanup.failed ? "warn" : "info",
+              ),
+            );
+          }
+
           if (publicRouteHealthChecks.length === 0) {
             const message = "SSH public route health check requested without access routes";
             logs.push(phaseLog("verify", message, "error"));
