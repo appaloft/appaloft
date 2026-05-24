@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export const blueprintSchemaVersion = "appaloft.blueprint/v1" as const;
 export const blueprintInstallPlanSchemaVersion = "appaloft.blueprint.install-plan/v1" as const;
+export const blueprintUpgradePlanSchemaVersion = "appaloft.blueprint.upgrade-plan/v1" as const;
 
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
 const envKeyPattern = /^[A-Z][A-Z0-9_]{0,127}$/;
@@ -139,6 +140,44 @@ const blueprintEnvironmentProfileSchema = z
   })
   .strict();
 
+const blueprintUpgradeStepSchema = z
+  .object({
+    from: nonEmptyString.optional(),
+    to: nonEmptyString.optional(),
+    classification: z.enum(["non-breaking", "potentially-breaking", "breaking"]),
+    requiresManualReview: z.boolean().default(false),
+    notes: nonEmptyString.optional(),
+    changes: z.array(nonEmptyString).default([]),
+  })
+  .strict();
+
+const blueprintUpgradePolicySchema = z
+  .object({
+    strategy: z
+      .enum(["image-tag", "blueprint-plan", "application-managed", "manual"])
+      .default("blueprint-plan"),
+    destructive: z.boolean().default(false),
+    instructions: nonEmptyString.optional(),
+    steps: z.array(blueprintUpgradeStepSchema).default([]),
+  })
+  .strict();
+
+const blueprintVariantSchema = z
+  .object({
+    label: nonEmptyString.optional(),
+    summary: nonEmptyString.optional(),
+    description: nonEmptyString.optional(),
+    tags: z.array(slugSchema).default([]),
+    defaultProfile: slugSchema.optional(),
+    parameters: z.array(blueprintParameterSchema).optional(),
+    secrets: z.array(blueprintSecretSchema).optional(),
+    resources: z.array(blueprintResourceRequirementSchema).optional(),
+    components: z.array(blueprintComponentSchema).min(1).optional(),
+    profiles: z.record(slugSchema, blueprintEnvironmentProfileSchema).optional(),
+    upgrade: blueprintUpgradePolicySchema.optional(),
+  })
+  .strict();
+
 export const blueprintManifestSchema = z
   .object({
     schemaVersion: z.literal(blueprintSchemaVersion),
@@ -153,52 +192,127 @@ export const blueprintManifestSchema = z
     resources: z.array(blueprintResourceRequirementSchema).default([]),
     components: z.array(blueprintComponentSchema).min(1),
     profiles: z.record(slugSchema, blueprintEnvironmentProfileSchema).default({}),
+    defaultVariant: slugSchema.optional(),
+    variants: z.record(slugSchema, blueprintVariantSchema).default({}),
+    upgrade: blueprintUpgradePolicySchema.optional(),
   })
   .strict()
   .superRefine((manifest, context) => {
-    const componentIds = new Set(manifest.components.map((component) => component.id));
-    const secretKeys = new Set(manifest.secrets.map((secret) => secret.key));
-    const resourceIds = new Set(manifest.resources.map((resource) => resource.id));
+    validateTopologyReferences({
+      context,
+      path: [],
+      components: manifest.components,
+      secrets: manifest.secrets,
+      resources: manifest.resources,
+      parameters: manifest.parameters,
+    });
 
-    for (const component of manifest.components) {
-      const portNames = new Set(component.ports.map((port) => port.name));
-      for (const route of component.routes) {
-        if (!portNames.has(route.port)) {
-          context.addIssue({
-            code: "custom",
-            message: `route references unknown component port ${route.port}`,
-            path: ["components", manifest.components.indexOf(component), "routes"],
-          });
-        }
-      }
-      for (const secretKey of component.usesSecrets) {
-        if (!secretKeys.has(secretKey)) {
-          context.addIssue({
-            code: "custom",
-            message: `component references unknown secret ${secretKey}`,
-            path: ["components", manifest.components.indexOf(component), "usesSecrets"],
-          });
-        }
-      }
-      for (const resourceId of component.usesResources) {
-        if (!resourceIds.has(resourceId)) {
-          context.addIssue({
-            code: "custom",
-            message: `component references unknown resource ${resourceId}`,
-            path: ["components", manifest.components.indexOf(component), "usesResources"],
-          });
-        }
-      }
-    }
-
-    if (componentIds.size !== manifest.components.length) {
+    if (manifest.defaultVariant && !manifest.variants[manifest.defaultVariant]) {
       context.addIssue({
         code: "custom",
-        message: "component ids must be unique",
-        path: ["components"],
+        message: `defaultVariant references unknown variant ${manifest.defaultVariant}`,
+        path: ["defaultVariant"],
       });
     }
+
+    for (const [variantId, variant] of Object.entries(manifest.variants)) {
+      validateTopologyReferences({
+        context,
+        path: ["variants", variantId],
+        components: variant.components ?? manifest.components,
+        secrets: variant.secrets ?? manifest.secrets,
+        resources: variant.resources ?? manifest.resources,
+        parameters: variant.parameters ?? manifest.parameters,
+      });
+
+      const profiles = variant.profiles ?? manifest.profiles;
+      if (variant.defaultProfile && !profiles[variant.defaultProfile]) {
+        context.addIssue({
+          code: "custom",
+          message: `variant defaultProfile references unknown profile ${variant.defaultProfile}`,
+          path: ["variants", variantId, "defaultProfile"],
+        });
+      }
+    }
   });
+
+export const blueprintManifestJsonSchema = z.toJSONSchema(blueprintManifestSchema, {
+  io: "input",
+});
+
+function validateTopologyReferences(input: {
+  readonly context: z.RefinementCtx;
+  readonly path: readonly (number | string)[];
+  readonly components: readonly z.infer<typeof blueprintComponentSchema>[];
+  readonly secrets: readonly z.infer<typeof blueprintSecretSchema>[];
+  readonly resources: readonly z.infer<typeof blueprintResourceRequirementSchema>[];
+  readonly parameters: readonly z.infer<typeof blueprintParameterSchema>[];
+}): void {
+  const componentIds = new Set(input.components.map((component) => component.id));
+  const secretKeys = new Set(input.secrets.map((secret) => secret.key));
+  const resourceIds = new Set(input.resources.map((resource) => resource.id));
+  const parameterKeys = new Set(input.parameters.map((parameter) => parameter.key));
+
+  if (componentIds.size !== input.components.length) {
+    input.context.addIssue({
+      code: "custom",
+      message: "component ids must be unique",
+      path: [...input.path, "components"],
+    });
+  }
+  if (secretKeys.size !== input.secrets.length) {
+    input.context.addIssue({
+      code: "custom",
+      message: "secret keys must be unique",
+      path: [...input.path, "secrets"],
+    });
+  }
+  if (resourceIds.size !== input.resources.length) {
+    input.context.addIssue({
+      code: "custom",
+      message: "resource ids must be unique",
+      path: [...input.path, "resources"],
+    });
+  }
+  if (parameterKeys.size !== input.parameters.length) {
+    input.context.addIssue({
+      code: "custom",
+      message: "parameter keys must be unique",
+      path: [...input.path, "parameters"],
+    });
+  }
+
+  for (const component of input.components) {
+    const portNames = new Set(component.ports.map((port) => port.name));
+    for (const route of component.routes) {
+      if (!portNames.has(route.port)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `route references unknown component port ${route.port}`,
+          path: [...input.path, "components", input.components.indexOf(component), "routes"],
+        });
+      }
+    }
+    for (const secretKey of component.usesSecrets) {
+      if (!secretKeys.has(secretKey)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `component references unknown secret ${secretKey}`,
+          path: [...input.path, "components", input.components.indexOf(component), "usesSecrets"],
+        });
+      }
+    }
+    for (const resourceId of component.usesResources) {
+      if (!resourceIds.has(resourceId)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `component references unknown resource ${resourceId}`,
+          path: [...input.path, "components", input.components.indexOf(component), "usesResources"],
+        });
+      }
+    }
+  }
+}
 
 export type BlueprintManifest = z.infer<typeof blueprintManifestSchema>;
 export type BlueprintComponent = BlueprintManifest["components"][number];
@@ -206,6 +320,8 @@ export type BlueprintEnvironmentProfile = NonNullable<BlueprintManifest["profile
 export type BlueprintParameter = BlueprintManifest["parameters"][number];
 export type BlueprintSecretPlaceholder = BlueprintManifest["secrets"][number];
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
+export type BlueprintVariant = NonNullable<BlueprintManifest["variants"]>[string];
+export type BlueprintUpgradePolicy = NonNullable<BlueprintManifest["upgrade"]>;
 
 export interface BlueprintIssue {
   readonly path: readonly (number | string)[];
@@ -237,6 +353,12 @@ export interface BlueprintRegistryEntry {
   readonly summary: string;
   readonly sourcePath: string;
   readonly tags: readonly string[];
+  readonly defaultVariant?: string;
+  readonly variants: readonly {
+    readonly id: string;
+    readonly label?: string;
+    readonly summary?: string;
+  }[];
 }
 
 export interface BlueprintRegistry {
@@ -257,6 +379,7 @@ export interface BlueprintInstallTarget {
 
 export interface CreateBlueprintInstallPlanInput {
   readonly manifest: BlueprintManifest;
+  readonly variant?: string;
   readonly profile?: string;
   readonly parameters?: Readonly<Record<string, string | number | boolean>>;
   readonly target: BlueprintInstallTarget;
@@ -331,10 +454,108 @@ export interface BlueprintInstallPlan {
     readonly id: string;
     readonly name: string;
     readonly version: string;
+    readonly variant?: string;
   };
   readonly profile: string;
   readonly target: BlueprintInstallTarget;
   readonly operations: readonly BlueprintInstallOperation[];
+  readonly warnings: readonly string[];
+}
+
+export type BlueprintUpgradeClassification = "non-breaking" | "potentially-breaking" | "breaking";
+
+export interface CreateBlueprintUpgradePlanInput {
+  readonly currentManifest: BlueprintManifest;
+  readonly targetManifest: BlueprintManifest;
+  readonly currentVariant?: string;
+  readonly targetVariant?: string;
+  readonly currentProfile?: string;
+  readonly targetProfile?: string;
+  readonly preserveUserConfiguration?: boolean;
+}
+
+export type BlueprintUpgradeOperation =
+  | {
+      readonly kind: "review-upgrade-policy";
+      readonly strategy: BlueprintUpgradePolicy["strategy"];
+      readonly classification: BlueprintUpgradeClassification;
+      readonly requiresManualReview: boolean;
+      readonly changes: readonly string[];
+    }
+  | {
+      readonly kind: "change-blueprint-version";
+      readonly fromVersion: string;
+      readonly toVersion: string;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "change-variant";
+      readonly fromVariant?: string;
+      readonly toVariant?: string;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "change-profile";
+      readonly fromProfile?: string;
+      readonly toProfile?: string;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "change-runtime";
+      readonly componentId: string;
+      readonly fromRuntime?: BlueprintComponent["runtime"];
+      readonly toRuntime?: BlueprintComponent["runtime"];
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "change-network";
+      readonly componentId: string;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "add-component" | "remove-component";
+      readonly componentId: string;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "add-dependency" | "remove-dependency" | "change-dependency-kind";
+      readonly requirementId: string;
+      readonly fromKind?: BlueprintResourceRequirement["kind"];
+      readonly toKind?: BlueprintResourceRequirement["kind"];
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "add-secret" | "remove-secret";
+      readonly key: string;
+      readonly required: boolean;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "add-parameter" | "remove-parameter";
+      readonly key: string;
+      readonly required: boolean;
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind: "review-user-configuration";
+      readonly classification: BlueprintUpgradeClassification;
+      readonly changes: readonly string[];
+    };
+
+export interface BlueprintUpgradePlan {
+  readonly schemaVersion: typeof blueprintUpgradePlanSchemaVersion;
+  readonly createsExternalResources: false;
+  readonly blueprint: {
+    readonly id: string;
+    readonly fromVersion: string;
+    readonly toVersion: string;
+    readonly fromVariant?: string;
+    readonly toVariant?: string;
+  };
+  readonly classification: BlueprintUpgradeClassification;
+  readonly destructive: boolean;
+  readonly requiresManualReview: boolean;
+  readonly operations: readonly BlueprintUpgradeOperation[];
   readonly warnings: readonly string[];
 }
 
@@ -373,6 +594,46 @@ export function loadBlueprintManifest(
   }
 
   return validateBlueprintManifest(parsed);
+}
+
+export function resolveBlueprintVariantManifest(input: {
+  readonly manifest: BlueprintManifest;
+  readonly variant?: string;
+}): BlueprintResult<BlueprintManifest> {
+  const variantId = input.variant ?? input.manifest.defaultVariant;
+  if (!variantId) {
+    return { ok: true, value: input.manifest };
+  }
+
+  const variant = input.manifest.variants[variantId];
+  if (!variant) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: ["variant"],
+          message: `Unknown Blueprint variant: ${variantId}`,
+        },
+      ],
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      ...input.manifest,
+      summary: variant.summary ?? input.manifest.summary,
+      description: variant.description ?? input.manifest.description,
+      tags: [...new Set([...input.manifest.tags, ...variant.tags])],
+      parameters: variant.parameters ?? input.manifest.parameters,
+      secrets: variant.secrets ?? input.manifest.secrets,
+      resources: variant.resources ?? input.manifest.resources,
+      components: variant.components ?? input.manifest.components,
+      profiles: variant.profiles ?? input.manifest.profiles,
+      defaultVariant: variantId,
+      upgrade: variant.upgrade ?? input.manifest.upgrade,
+    },
+  };
 }
 
 export class LocalFileBlueprintRegistry implements BlueprintRegistry {
@@ -435,8 +696,21 @@ export class LocalFileBlueprintRegistry implements BlueprintRegistry {
 export function createBlueprintInstallPlan(
   input: CreateBlueprintInstallPlanInput,
 ): BlueprintResult<BlueprintInstallPlan> {
-  const profileName = input.profile ?? firstProfileName(input.manifest);
-  const profile = input.manifest.profiles[profileName];
+  const variantId = input.variant ?? input.manifest.defaultVariant;
+  const resolvedManifest = resolveBlueprintVariantManifest({
+    manifest: input.manifest,
+    ...(input.variant ? { variant: input.variant } : {}),
+  });
+  if (!resolvedManifest.ok) {
+    return resolvedManifest;
+  }
+
+  const manifest = resolvedManifest.value;
+  const variantDefaultProfile = variantId
+    ? input.manifest.variants[variantId]?.defaultProfile
+    : undefined;
+  const profileName = input.profile ?? variantDefaultProfile ?? firstProfileName(manifest);
+  const profile = manifest.profiles[profileName];
   if (!profile) {
     return {
       ok: false,
@@ -449,7 +723,7 @@ export function createBlueprintInstallPlan(
     };
   }
 
-  const parameterIssues = validateParameterValues(input.manifest, input.parameters ?? {});
+  const parameterIssues = validateParameterValues(manifest, input.parameters ?? {});
   if (parameterIssues.length > 0) {
     return { ok: false, issues: parameterIssues };
   }
@@ -466,7 +740,7 @@ export function createBlueprintInstallPlan(
     },
   ];
 
-  for (const component of input.manifest.components) {
+  for (const component of manifest.components) {
     const slug = [input.target.resourceSlugPrefix, component.id].filter(Boolean).join("-");
     operations.push({
       kind: "create-resource",
@@ -504,7 +778,7 @@ export function createBlueprintInstallPlan(
         value: variable.value,
       });
     }
-    for (const parameter of input.manifest.parameters) {
+    for (const parameter of manifest.parameters) {
       const value = parameterValue(parameter, input.parameters ?? {});
       operations.push({
         kind: "set-variable",
@@ -515,7 +789,7 @@ export function createBlueprintInstallPlan(
       });
     }
     for (const secretKey of component.usesSecrets) {
-      const secret = input.manifest.secrets.find((candidate) => candidate.key === secretKey);
+      const secret = manifest.secrets.find((candidate) => candidate.key === secretKey);
       if (secret) {
         operations.push({
           kind: "create-secret-reference",
@@ -526,9 +800,7 @@ export function createBlueprintInstallPlan(
       }
     }
     for (const requirementId of component.usesResources) {
-      const requirement = input.manifest.resources.find(
-        (candidate) => candidate.id === requirementId,
-      );
+      const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
       if (requirement) {
         operations.push({
           kind: "bind-dependency",
@@ -551,9 +823,10 @@ export function createBlueprintInstallPlan(
       schemaVersion: blueprintInstallPlanSchemaVersion,
       createsExternalResources: false,
       blueprint: {
-        id: input.manifest.id,
-        name: input.manifest.name,
-        version: input.manifest.version,
+        id: manifest.id,
+        name: manifest.name,
+        version: manifest.version,
+        ...(manifest.defaultVariant ? { variant: manifest.defaultVariant } : {}),
       },
       profile: profileName,
       target: input.target,
@@ -561,6 +834,326 @@ export function createBlueprintInstallPlan(
       warnings: profile.replicas === 0 ? ["Selected profile has zero replicas."] : [],
     },
   };
+}
+
+export function createBlueprintUpgradePlan(
+  input: CreateBlueprintUpgradePlanInput,
+): BlueprintResult<BlueprintUpgradePlan> {
+  if (input.currentManifest.id !== input.targetManifest.id) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: ["targetManifest", "id"],
+          message: `Blueprint id mismatch: ${input.currentManifest.id} cannot upgrade to ${input.targetManifest.id}`,
+        },
+      ],
+    };
+  }
+
+  const currentResolved = resolveBlueprintVariantManifest({
+    manifest: input.currentManifest,
+    ...(input.currentVariant ? { variant: input.currentVariant } : {}),
+  });
+  if (!currentResolved.ok) {
+    return currentResolved;
+  }
+
+  const targetResolved = resolveBlueprintVariantManifest({
+    manifest: input.targetManifest,
+    ...(input.targetVariant ? { variant: input.targetVariant } : {}),
+  });
+  if (!targetResolved.ok) {
+    return targetResolved;
+  }
+
+  const currentManifest = currentResolved.value;
+  const targetManifest = targetResolved.value;
+  const currentVariant = input.currentVariant ?? input.currentManifest.defaultVariant;
+  const targetVariant = input.targetVariant ?? input.targetManifest.defaultVariant;
+  const operations: BlueprintUpgradeOperation[] = [];
+
+  const policy = targetManifest.upgrade;
+  if (policy) {
+    const classification = classifyUpgradePolicy(policy);
+    operations.push({
+      kind: "review-upgrade-policy",
+      strategy: policy.strategy,
+      classification,
+      requiresManualReview:
+        policy.destructive || policy.steps.some((step) => step.requiresManualReview),
+      changes: policy.steps.flatMap((step) => step.changes),
+    });
+  }
+
+  if (input.currentManifest.version !== input.targetManifest.version) {
+    operations.push({
+      kind: "change-blueprint-version",
+      fromVersion: input.currentManifest.version,
+      toVersion: input.targetManifest.version,
+      classification: "non-breaking",
+    });
+  }
+
+  if (currentVariant !== targetVariant) {
+    operations.push({
+      kind: "change-variant",
+      ...(currentVariant ? { fromVariant: currentVariant } : {}),
+      ...(targetVariant ? { toVariant: targetVariant } : {}),
+      classification: "potentially-breaking",
+    });
+  }
+
+  if (input.currentProfile !== input.targetProfile) {
+    operations.push({
+      kind: "change-profile",
+      ...(input.currentProfile ? { fromProfile: input.currentProfile } : {}),
+      ...(input.targetProfile ? { toProfile: input.targetProfile } : {}),
+      classification: "potentially-breaking",
+    });
+  }
+
+  operations.push(...diffComponents(currentManifest, targetManifest));
+  operations.push(...diffResources(currentManifest, targetManifest));
+  operations.push(...diffSecrets(currentManifest, targetManifest));
+  operations.push(...diffParameters(currentManifest, targetManifest));
+
+  if (input.preserveUserConfiguration !== false) {
+    operations.push({
+      kind: "review-user-configuration",
+      classification: "potentially-breaking",
+      changes: [
+        "Dry-run upgrade planning does not overwrite user-owned environment variables.",
+        "Dry-run upgrade planning does not replace dependency bindings without an explicit update command.",
+      ],
+    });
+  }
+
+  const classification = maxClassification(operations.map((operation) => operation.classification));
+  const destructive = Boolean(policy?.destructive) || classification === "breaking";
+
+  return {
+    ok: true,
+    value: {
+      schemaVersion: blueprintUpgradePlanSchemaVersion,
+      createsExternalResources: false,
+      blueprint: {
+        id: input.targetManifest.id,
+        fromVersion: input.currentManifest.version,
+        toVersion: input.targetManifest.version,
+        ...(currentVariant ? { fromVariant: currentVariant } : {}),
+        ...(targetVariant ? { toVariant: targetVariant } : {}),
+      },
+      classification,
+      destructive,
+      requiresManualReview:
+        destructive ||
+        classification !== "non-breaking" ||
+        Boolean(policy?.steps.some((step) => step.requiresManualReview)),
+      operations,
+      warnings:
+        input.preserveUserConfiguration === false
+          ? []
+          : [
+              "User-owned env vars, secrets, and dependency bindings require explicit review before execution.",
+            ],
+    },
+  };
+}
+
+function classifyUpgradePolicy(policy: BlueprintUpgradePolicy): BlueprintUpgradeClassification {
+  if (policy.destructive) {
+    return "breaking";
+  }
+  return maxClassification(policy.steps.map((step) => step.classification));
+}
+
+function maxClassification(
+  classifications: readonly BlueprintUpgradeClassification[],
+): BlueprintUpgradeClassification {
+  const ranks: Record<BlueprintUpgradeClassification, number> = {
+    "non-breaking": 0,
+    "potentially-breaking": 1,
+    breaking: 2,
+  };
+  return classifications.reduce<BlueprintUpgradeClassification>(
+    (current, candidate) => (ranks[candidate] > ranks[current] ? candidate : current),
+    "non-breaking",
+  );
+}
+
+function diffComponents(
+  currentManifest: BlueprintManifest,
+  targetManifest: BlueprintManifest,
+): readonly BlueprintUpgradeOperation[] {
+  const operations: BlueprintUpgradeOperation[] = [];
+  const currentById = byId(currentManifest.components);
+  const targetById = byId(targetManifest.components);
+
+  for (const component of targetManifest.components) {
+    const current = currentById.get(component.id);
+    if (!current) {
+      operations.push({
+        kind: "add-component",
+        componentId: component.id,
+        classification: "potentially-breaking",
+      });
+      continue;
+    }
+    if (fingerprint(current.runtime) !== fingerprint(component.runtime)) {
+      operations.push({
+        kind: "change-runtime",
+        componentId: component.id,
+        fromRuntime: current.runtime,
+        toRuntime: component.runtime,
+        classification: "potentially-breaking",
+      });
+    }
+    if (
+      fingerprint(current.ports) !== fingerprint(component.ports) ||
+      fingerprint(current.routes) !== fingerprint(component.routes)
+    ) {
+      operations.push({
+        kind: "change-network",
+        componentId: component.id,
+        classification: "potentially-breaking",
+      });
+    }
+  }
+
+  for (const component of currentManifest.components) {
+    if (!targetById.has(component.id)) {
+      operations.push({
+        kind: "remove-component",
+        componentId: component.id,
+        classification: "breaking",
+      });
+    }
+  }
+
+  return operations;
+}
+
+function diffResources(
+  currentManifest: BlueprintManifest,
+  targetManifest: BlueprintManifest,
+): readonly BlueprintUpgradeOperation[] {
+  const operations: BlueprintUpgradeOperation[] = [];
+  const currentById = byId(currentManifest.resources);
+  const targetById = byId(targetManifest.resources);
+
+  for (const resource of targetManifest.resources) {
+    const current = currentById.get(resource.id);
+    if (!current) {
+      operations.push({
+        kind: "add-dependency",
+        requirementId: resource.id,
+        toKind: resource.kind,
+        classification: "potentially-breaking",
+      });
+      continue;
+    }
+    if (current.kind !== resource.kind) {
+      operations.push({
+        kind: "change-dependency-kind",
+        requirementId: resource.id,
+        fromKind: current.kind,
+        toKind: resource.kind,
+        classification: "breaking",
+      });
+    }
+  }
+
+  for (const resource of currentManifest.resources) {
+    if (!targetById.has(resource.id)) {
+      operations.push({
+        kind: "remove-dependency",
+        requirementId: resource.id,
+        fromKind: resource.kind,
+        classification: "breaking",
+      });
+    }
+  }
+
+  return operations;
+}
+
+function diffSecrets(
+  currentManifest: BlueprintManifest,
+  targetManifest: BlueprintManifest,
+): readonly BlueprintUpgradeOperation[] {
+  const operations: BlueprintUpgradeOperation[] = [];
+  const currentByKey = byKey(currentManifest.secrets);
+  const targetByKey = byKey(targetManifest.secrets);
+
+  for (const secret of targetManifest.secrets) {
+    if (!currentByKey.has(secret.key)) {
+      operations.push({
+        kind: "add-secret",
+        key: secret.key,
+        required: secret.required,
+        classification: secret.required ? "potentially-breaking" : "non-breaking",
+      });
+    }
+  }
+
+  for (const secret of currentManifest.secrets) {
+    if (!targetByKey.has(secret.key)) {
+      operations.push({
+        kind: "remove-secret",
+        key: secret.key,
+        required: secret.required,
+        classification: "breaking",
+      });
+    }
+  }
+
+  return operations;
+}
+
+function diffParameters(
+  currentManifest: BlueprintManifest,
+  targetManifest: BlueprintManifest,
+): readonly BlueprintUpgradeOperation[] {
+  const operations: BlueprintUpgradeOperation[] = [];
+  const currentByKey = byKey(currentManifest.parameters);
+  const targetByKey = byKey(targetManifest.parameters);
+
+  for (const parameter of targetManifest.parameters) {
+    if (!currentByKey.has(parameter.key)) {
+      operations.push({
+        kind: "add-parameter",
+        key: parameter.key,
+        required: parameter.required,
+        classification: parameter.required ? "potentially-breaking" : "non-breaking",
+      });
+    }
+  }
+
+  for (const parameter of currentManifest.parameters) {
+    if (!targetByKey.has(parameter.key)) {
+      operations.push({
+        kind: "remove-parameter",
+        key: parameter.key,
+        required: parameter.required,
+        classification: "breaking",
+      });
+    }
+  }
+
+  return operations;
+}
+
+function byId<T extends { readonly id: string }>(items: readonly T[]): Map<string, T> {
+  return new Map(items.map((item) => [item.id, item]));
+}
+
+function byKey<T extends { readonly key: string }>(items: readonly T[]): Map<string, T> {
+  return new Map(items.map((item) => [item.key, item]));
+}
+
+function fingerprint(value: unknown): string {
+  return JSON.stringify(value);
 }
 
 function toRegistryEntry(manifest: BlueprintManifest, sourcePath: string): BlueprintRegistryEntry {
@@ -571,6 +1164,12 @@ function toRegistryEntry(manifest: BlueprintManifest, sourcePath: string): Bluep
     summary: manifest.summary,
     sourcePath,
     tags: manifest.tags,
+    ...(manifest.defaultVariant ? { defaultVariant: manifest.defaultVariant } : {}),
+    variants: Object.entries(manifest.variants).map(([id, variant]) => ({
+      id,
+      ...(variant.label ? { label: variant.label } : {}),
+      ...(variant.summary ? { summary: variant.summary } : {}),
+    })),
   };
 }
 
