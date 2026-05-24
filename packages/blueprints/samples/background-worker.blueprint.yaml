@@ -1,0 +1,45 @@
+schemaVersion: appaloft.blueprint/v1
+id: background-worker
+name: Background Worker
+version: 1.0.0
+summary: Queue-backed background worker with Redis dependency.
+description: Deploys a worker container and binds it to a Redis-compatible dependency resource.
+tags:
+  - worker
+  - redis
+parameters:
+  - key: WORKER_CONCURRENCY
+    label: Worker concurrency
+    type: number
+    required: true
+    default: 2
+secrets:
+  - key: QUEUE_AUTH_TOKEN
+    label: Queue auth token
+    required: true
+resources:
+  - id: queue
+    kind: redis
+    label: Queue Redis
+components:
+  - id: worker
+    name: Worker
+    kind: worker
+    runtime:
+      strategy: container-image
+      image: ghcr.io/appaloft/examples-worker:latest
+      command:
+        - bun
+        - run
+        - worker
+    usesSecrets:
+      - QUEUE_AUTH_TOKEN
+    usesResources:
+      - queue
+profiles:
+  preview:
+    label: Preview
+    replicas: 1
+  production:
+    label: Production
+    replicas: 2

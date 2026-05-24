@@ -91,6 +91,10 @@ export interface SystemPluginDefinition {
 }
 
 export function isPluginCompatible(manifest: PluginManifest, appVersion: string): boolean {
+  if (manifest.compatibilityRange.trim() === "*") {
+    return true;
+  }
+
   return semverSatisfies(appVersion, manifest.compatibilityRange, {
     includePrerelease: true,
   });

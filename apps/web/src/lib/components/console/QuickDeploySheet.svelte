@@ -29,6 +29,9 @@
   import { onDestroy, type Component } from "svelte";
   import type {
     AuthSessionResponse,
+    ConfigureResourceNetworkInput,
+    ConfigureResourceRuntimeInput,
+    ConfigureResourceSourceInput,
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     DeploymentProgressEvent,
@@ -428,6 +431,18 @@
   const createResourceMutation = createMutation(() => ({
     mutationFn: (input: CreateResourceInput) => orpcClient.resources.create(input),
   }));
+  const configureResourceSourceMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceSourceInput) =>
+      orpcClient.resources.configureSource(input),
+  }));
+  const configureResourceRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceRuntimeInput) =>
+      orpcClient.resources.configureRuntime(input),
+  }));
+  const configureResourceNetworkMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceNetworkInput) =>
+      orpcClient.resources.configureNetwork(input),
+  }));
   const setEnvironmentVariableMutation = createMutation(() => ({
     mutationFn: (input: {
       environmentId: string;
@@ -517,6 +532,9 @@
       serverConnectivityTestPending ||
       createEnvironmentMutation.isPending ||
       createResourceMutation.isPending ||
+      configureResourceSourceMutation.isPending ||
+      configureResourceRuntimeMutation.isPending ||
+      configureResourceNetworkMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
       deploymentCreateInFlight,
   );
@@ -1997,6 +2015,21 @@
         selectedResourceId = createdResource.id;
         await resourcesQuery.refetch();
         return createdResource;
+      }
+      case "resources.configureSource": {
+        const configuredResource = await configureResourceSourceMutation.mutateAsync(step.input);
+        await resourcesQuery.refetch();
+        return configuredResource;
+      }
+      case "resources.configureRuntime": {
+        const configuredResource = await configureResourceRuntimeMutation.mutateAsync(step.input);
+        await resourcesQuery.refetch();
+        return configuredResource;
+      }
+      case "resources.configureNetwork": {
+        const configuredResource = await configureResourceNetworkMutation.mutateAsync(step.input);
+        await resourcesQuery.refetch();
+        return configuredResource;
       }
       case "environments.setVariable": {
         await setEnvironmentVariableMutation.mutateAsync(step.input);

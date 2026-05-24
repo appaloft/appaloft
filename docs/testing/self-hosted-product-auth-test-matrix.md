@@ -24,11 +24,15 @@ by session and organization-role authorization.
 | FIRST-ADMIN-BOOTSTRAP-003 | application/integration | Bootstrap idempotency | A first admin or organization owner already exists | No new user, organization, member, or password output is created | `first_admin_bootstrap_disabled` or safe complete status | Status check -> no-op |
 | FIRST-ADMIN-BOOTSTRAP-004 | auth-adapter | Better Auth implementation boundary | `@appaloft/auth-better` implements the Appaloft bootstrap port | Better Auth creates email/password user plus organization owner without Better Auth types leaking into application | None | Appaloft port -> Better Auth API |
 | FIRST-ADMIN-BOOTSTRAP-005 | config/auth-adapter | Optional OAuth provider configuration | GitHub, Google, or OIDC config is incomplete, then complete | Provider login remains disabled until client id, client secret, callback URL, and trusted origin are all configured; first-admin local login remains available | None or `oauth_provider_unavailable` | Config read -> Appaloft auth status -> safe login method summary |
+| FIRST-ADMIN-BOOTSTRAP-006 | shell/server startup | Startup config bootstrap | Trusted runtime config supplies `APPALOFT_FIRST_ADMIN_EMAIL` and `APPALOFT_FIRST_ADMIN_PASSWORD` without a handoff file | Startup checks status, creates the first admin and initial organization when required, returns safe status, and never echoes or writes the supplied password | None or `first_admin_bootstrap_failed` | Status check -> bootstrap command -> safe result |
+| FIRST-ADMIN-BOOTSTRAP-007 | HTTP/Web contract | Completed bootstrap hides setup surfaces | A first admin or organization owner already exists | The first-admin setup endpoint returns `404` before input validation or command dispatch, the login page has no create-admin action, setup-page visitors are sent to login, and login copy uses ordinary account language | `first_admin_bootstrap_disabled`, `404` | Status check -> setup endpoint rejected or Web login rendered |
 | FIRST-ADMIN-NAV-001 | HTTP/adapter contract | First-admin navigation gate before SPA boot | No first admin exists and a browser requests a console document route | The HTTP adapter redirects to `/bootstrap/auth/first-admin` before serving Web static fallback; API, docs, static assets, ACME, and the first-admin setup route are not redirected | None or bootstrap-status lookup failure falls back to ordinary static routing | Document request -> bootstrap status query -> redirect or static routing |
 | SELF-HOSTED-AUTH-ARCH-001 | architecture/unit | Auth provider dependency boundary | Core and application source code are scanned | `packages/core/src` and `packages/application/src` contain only Appaloft-owned auth abstractions and no Better Auth package/type markers | None | Source scan -> boundary assertion |
 | PRODUCT-AUTH-GATE-001 | HTTP/oRPC contract | Missing product session | Protected mutation endpoint receives no session | Request rejects before command dispatch | `product_auth_missing`, `401` | Parse request -> auth reject -> no command dispatch |
 | PRODUCT-AUTH-GATE-002 | HTTP/oRPC contract | Insufficient role | Authenticated user lacks target organization role | Request rejects before mutation | `product_auth_forbidden`, `403` | Session verify -> role reject -> no command dispatch |
 | PRODUCT-AUTH-GATE-003 | HTTP/oRPC contract | Explicit public endpoints | Health/version/readiness/bootstrap status are requested | Requests remain public and do not require product session | None | Route -> public response |
+| PRODUCT-AUTH-NAV-001 | HTTP/adapter contract | Product session navigation gate before SPA boot | Bootstrap is complete and a browser without product session requests a console document route | The HTTP adapter redirects to `/login?next=...` before serving Web static fallback; login, API endpoints, docs routes, static assets, ACME, and first-admin setup routes are not redirected | None or auth-session lookup failure falls back to the login redirect | Document request -> auth session status -> redirect or static routing |
+| PRODUCT-AUTH-SIGNUP-001 | HTTP/Web contract | Product signup remains public | Bootstrap is complete and a browser has no product session | `/sign-up` is served as an ordinary account surface, `/api/auth/sign-up/email` is handled by the auth runtime without product-session auth, and the signup UI starts organization setup without first-admin bootstrap controls | None or auth runtime validation errors | Signup document request -> static route; signup API request -> auth runtime; organization setup request -> auth runtime |
 | PRODUCT-AUTH-SESSION-001 | installer contract | Stable product auth session secret | `install.sh` writes or repairs a self-hosted stack | A strong product auth session secret is generated on first install, reused from `.env` on rerun, passed to the app container, and never printed to installer stdout | None | Read existing `.env` -> generate or reuse auth secret -> write `.env` -> compose env injection |
 | PRODUCT-AUTH-READ-001 | HTTP/oRPC contract | Role-aware product read authorization | Project, environment, resource, deployment target, deployment, or deploy-token read models are requested over HTTP/oRPC | Missing product sessions reject before query dispatch; authenticated members can read safe project/environment/resource/deployment-target/deployment metadata with a user actor; deploy-token read models remain admin-only | `product_auth_missing`, `401`, or `product_auth_forbidden`, `403` | Parse request -> session/role verify -> query dispatch |
 | PRODUCT-AUTH-DOCS-001 | docs/help | First install login docs | First-admin bootstrap is user-visible | Docs/help explain local admin bootstrap, generated password, OAuth optionality, login URL, and recovery | None | Docs registry/help lookup |
@@ -70,11 +74,14 @@ by session and organization-role authorization.
 - `PgAuthBootstrapStatusReader` now reads Better Auth-compatible `user`, `organization`, and
   `member` tables through `packages/persistence/pg` and reports safe bootstrap-required/complete
   status for `FIRST-ADMIN-STATUS-001`.
-- Shell composition now supports `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`,
-  `APPALOFT_FIRST_ADMIN_EMAIL`, `APPALOFT_FIRST_ADMIN_DISPLAY_NAME`, and
-  `APPALOFT_FIRST_ADMIN_PASSWORD` as trusted runtime config for first-admin handoff output. It
-  writes a one-time generated password only when the application command generated one, does not
-  echo supplied passwords, and no-ops when the first admin already exists.
+- Shell/server composition now supports `APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`,
+  `APPALOFT_FIRST_ADMIN_EMAIL`, `APPALOFT_FIRST_ADMIN_DISPLAY_NAME`,
+  `APPALOFT_FIRST_ADMIN_PASSWORD`, `APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME`, and
+  `APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG` as trusted runtime config for first-admin bootstrap. It
+  writes a one-time generated password only when a trusted output file is configured and the
+  application command generated one, can bootstrap directly from supplied startup email/password
+  without a handoff file, does not echo supplied passwords, and no-ops when the first admin already
+  exists.
 - `install.sh` now passes first-admin bootstrap settings into Compose/Swarm app containers, reads
   the first-admin handoff output after health readiness, prints generated passwords only from that
   trusted output, suppresses supplied-password echo, and keeps deploy-token output as the separate
@@ -92,20 +99,31 @@ by session and organization-role authorization.
   environment, resource, deployment-target, and deployment read models before `QueryBus` dispatch,
   while deploy-token and organization/team read models remain admin-only. This is covered by
   `packages/orpc/test/product-auth-gate.http.test.ts` for `PRODUCT-AUTH-READ-001`.
-- `auth.bootstrap-status` is exposed as the public `GET /api/bootstrap/auth/status` endpoint and
-  `auth.bootstrap-first-admin` as the public `POST /api/bootstrap/auth/first-admin` setup endpoint.
-  Both bypass the product session gate intentionally; the setup command remains one-time/idempotent
-  through application bootstrap status checks.
+- After bootstrap is complete, the HTTP adapter now checks product session status before serving
+  console document navigation and redirects missing sessions to `/login?next=...` before the SPA
+  shell is returned. This keeps API 401/403 semantics on API routes while preventing anonymous
+  browser navigations from briefly rendering the console shell, covering `PRODUCT-AUTH-NAV-001`.
+- Product signup stays an ordinary account surface after bootstrap. `/sign-up` and
+  `/api/auth/sign-up/email` are not product-session protected by the console document navigation
+  gate; the Web signup page creates the account and starts organization setup through auth-runtime
+  endpoints without linking to first-admin bootstrap, covering `PRODUCT-AUTH-SIGNUP-001`.
+- `auth.bootstrap-status` is exposed as the public `GET /api/bootstrap/auth/status` endpoint.
+  `auth.bootstrap-first-admin` is exposed as the public `POST /api/bootstrap/auth/first-admin`
+  setup endpoint only while bootstrap is required. It bypasses the product session gate
+  intentionally before setup, but after bootstrap completion the transport checks status and returns
+  `404 first_admin_bootstrap_disabled` before command dispatch. The application command remains
+  one-time/idempotent as a race-condition backstop.
 - Public docs now cover first install login, local first-admin bootstrap, generated password
   handling, OAuth optionality, public bootstrap endpoints, product auth 401/403 recovery, and
   recovery cautions under `self-hosting.first-admin-bootstrap`, covering `PRODUCT-AUTH-DOCS-001`.
 - Web onboarding now exposes `/bootstrap/auth/first-admin` for local first-admin setup and `/login`
   for local email/password sign-in using `packages/i18n` keys. Production static-console routing
   and local Vite dev/preview gate console document navigation through bootstrap status before
-  serving the SPA shell, covering `FIRST-ADMIN-NAV-001`. Web `/organization` covers current
-  organization switching, member invitation, and token management. The console shell exposes
-  localized sign-out affordances, calls `/api/auth/sign-out`, clears cached session state, and returns to
-  `/login`, covering `SELF-HOSTED-AUTH-WEB-001`.
+  serving the SPA shell, covering `FIRST-ADMIN-NAV-001`. After setup, `/login` uses ordinary account
+  language and has no create-admin action, while direct setup-page visitors are sent to `/login`.
+  Web `/organization` covers current organization switching, member invitation, and token
+  management. The console shell exposes localized sign-out affordances, calls `/api/auth/sign-out`,
+  clears cached session state, and returns to `/login`, covering `SELF-HOSTED-AUTH-WEB-001`.
 - ADR-045 and `docs/specs/054-self-hosted-organization-team-operations` now govern
   organization/team current context, member list, invitation, role update, member removal, and the
   Better Auth adapter boundary.

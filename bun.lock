@@ -205,6 +205,13 @@
         "reflect-metadata": "^0.2.2",
       },
     },
+    "packages/blueprints": {
+      "name": "@appaloft/blueprints",
+      "dependencies": {
+        "yaml": "^2.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "packages/cli-logging": {
       "name": "@appaloft/cli-logging",
       "dependencies": {
@@ -570,6 +577,8 @@
     "@appaloft/application": ["@appaloft/application@workspace:packages/application"],
 
     "@appaloft/auth-better": ["@appaloft/auth-better@workspace:packages/auth/better"],
+
+    "@appaloft/blueprints": ["@appaloft/blueprints@workspace:packages/blueprints"],
 
     "@appaloft/cli": ["@appaloft/cli@workspace:packages/npm/cli"],
 

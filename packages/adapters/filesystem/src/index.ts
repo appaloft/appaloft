@@ -1163,6 +1163,7 @@ function toDeploymentConfigSnapshot(
       ? { upstreamProtocol: config.network.upstreamProtocol }
       : {}),
     ...(config.network?.exposureMode ? { exposureMode: config.network.exposureMode } : {}),
+    ...(config.network?.hostPort ? { hostPort: config.network.hostPort } : {}),
     ...(healthCheckPath ? { healthCheckPath } : {}),
   };
 

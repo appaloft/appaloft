@@ -878,6 +878,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(queries.map((query) => query.constructor.name)).toEqual([
       "ListProjectsQuery",
       "ListServersQuery",
+      "ListDeploymentsQuery",
     ]);
     expect(operations).toEqual([
       "PrepareState:ssh-pglite",
@@ -889,6 +890,7 @@ describe("CLI deployment config entry workflow", () => {
       "CreateResourceCommand",
       "UpsertServerAppliedRoutes",
       "CreateDeploymentCommand",
+      "ListDeploymentsQuery",
       "ReleaseState:ssh-pglite",
     ]);
     expect(desiredRoutes).toHaveLength(1);
@@ -1601,6 +1603,273 @@ describe("CLI deployment config entry workflow", () => {
     expect(
       harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
     ).toBeUndefined();
+  });
+
+  test("[RES-PROFILE-DRIFT-004] deploy action can explicitly acknowledge resource profile drift", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-config-profile-ack-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  buildCommand: bun run build",
+        "  startCommand: bun run start",
+        "network:",
+        "  internalPort: 4310",
+        "env:",
+        "  API_URL: https://entry.example.test",
+        "secrets:",
+        "  DATABASE_URL:",
+        "    from: ci-env:DATABASE_URL",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          buildCommand: "bun run build",
+          startCommand: "bun run start",
+        },
+        networkProfile: {
+          internalPort: 4310,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+      },
+      resourceEffectiveConfig: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_existing",
+        environmentId: "env_existing",
+        ownedEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        effectiveEntries: [
+          {
+            key: "API_URL",
+            value: "https://resource.example.test",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+        ],
+        overrides: [],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-05-16T00:00:00.000Z",
+      },
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_existing",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          DATABASE_URL: "postgres://entry-user:entry-pass@example.test/app",
+          GITHUB_HEAD_REF: undefined,
+          GITHUB_REF: undefined,
+          GITHUB_REPOSITORY: undefined,
+          GITHUB_REPOSITORY_ID: undefined,
+          GITHUB_SHA: undefined,
+          GITHUB_WORKSPACE: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--method",
+              "workspace-commands",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+              "--acknowledge-resource-profile-drift",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.queries.map((query) => query.constructor.name)).toContain("ShowResourceQuery");
+    expect(harness.queries.map((query) => query.constructor.name)).not.toContain(
+      "ResourceEffectiveConfigQuery",
+    );
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+      ),
+    ).toBeDefined();
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+      serverId: "srv_existing",
+    });
+  });
+
+  test("[CONFIG-FILE-IMAGE-001] acknowledged existing resource deploy updates source before prebuilt image deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-image-profile-"));
+    const configPath = join(workspace, "appaloft.image.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: prebuilt-image",
+        "network:",
+        "  internalPort: 3001",
+        "  upstreamProtocol: http",
+        "  exposureMode: direct-port",
+        "  hostPort: 80",
+        "",
+      ].join("\n"),
+    );
+    const imageLocator = "docker://ghcr.io/acme/api@sha256:abc";
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        source: {
+          kind: "local-folder",
+          locator: workspace,
+          displayName: workspace.split("/").at(-1) ?? "workspace",
+        },
+        runtimeProfile: {
+          strategy: "dockerfile",
+          dockerfilePath: "Dockerfile",
+        },
+        networkProfile: {
+          internalPort: 3001,
+          upstreamProtocol: "http",
+          exposureMode: "direct-port",
+          hostPort: 80,
+        },
+      },
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_existing",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+      ],
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          imageLocator,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.10",
+          "--server-provider",
+          "generic-ssh",
+          "--acknowledge-resource-profile-drift",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceSourceCommand",
+      ),
+    ).toMatchObject({
+      resourceId: "res_existing",
+      source: {
+        kind: "docker-image",
+        locator: imageLocator,
+      },
+    });
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toMatchObject({
+      resourceId: "res_existing",
+      runtimeProfile: {
+        strategy: "prebuilt-image",
+      },
+    });
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+      serverId: "srv_existing",
+    });
   });
 
   test("[CONFIG-FILE-ENTRY-015D] deploy action resolves explicit config and source from nested shell cwd", async () => {
@@ -2336,6 +2605,79 @@ describe("CLI deployment config entry workflow", () => {
       expect(errorText).toContain('"reason":"deployment_failed"');
       expect(errorText).toContain("failureLogCount");
       expect(errorText).toContain("docker build failed: process killed");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-024C] synchronous deploy fails when runtime execution records terminal failure", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-sync-deploy-failed-"));
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "failed",
+          logs: [
+            {
+              timestamp: "2026-05-22T10:12:00.000Z",
+              source: "runtime",
+              phase: "package",
+              level: "error",
+              message: "client_loop: send disconnect: Broken pipe",
+            },
+            {
+              timestamp: "2026-05-22T10:12:01.000Z",
+              source: "runtime",
+              phase: "package",
+              level: "error",
+              message: "SSH Docker image build failed",
+            },
+          ],
+          runtimePlan: {
+            execution: {
+              accessRoutes: [],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      const result = await withMutedProcessOutput(async () =>
+        harness.program
+          .parseAsync([
+            "node",
+            "appaloft",
+            "deploy",
+            workspace,
+            "--method",
+            "workspace-commands",
+            "--start",
+            "bun run start",
+            "--port",
+            "4321",
+            "--server-host",
+            "203.0.113.10",
+            "--server-provider",
+            "generic-ssh",
+          ])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected synchronous failed deployment to fail");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"phase":"runtime-execution"');
+      expect(errorText).toContain('"reason":"deployment_failed"');
+      expect(errorText).toContain("client_loop: send disconnect: Broken pipe");
+      expect(errorText).toContain("SSH Docker image build failed");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

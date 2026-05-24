@@ -16,6 +16,7 @@ const actionRoot = resolve(import.meta.dir, "../../.github/actions/deploy-action
 const actionYaml = readFileSync(join(actionRoot, "action.yml"), "utf8");
 const readme = readFileSync(join(actionRoot, "README.md"), "utf8");
 const publicCiWorkflow = readFileSync(join(actionRoot, ".github/workflows/ci.yml"), "utf8");
+const installScript = join(actionRoot, "scripts/install-appaloft.sh");
 const runDeployScript = join(actionRoot, "scripts/run-deploy.sh");
 const resolvePreviewScript = join(actionRoot, "scripts/resolve-preview.sh");
 const exportScript = resolve(import.meta.dir, "../export-deploy-action-wrapper.ts");
@@ -69,6 +70,9 @@ describe("deploy-action wrapper reference", () => {
     expect(actionYaml).toContain("scripts/install-appaloft.sh");
     expect(actionYaml).toContain("scripts/run-deploy.sh");
     expect(actionYaml).toContain("scripts/resolve-preview.sh");
+    expect(actionYaml).toContain(
+      "source to build the deploy CLI from the checked-out Appaloft source tree",
+    );
     expect(actionYaml).toContain("command:");
     expect(actionYaml).toContain("install-console");
     expect(actionYaml).toContain("console-domain");
@@ -179,6 +183,95 @@ describe("deploy-action wrapper reference", () => {
       expect(output).toContain("preview-domain-template=cloud-pr-42.preview.example.com");
       expect(output).toContain("preview-tls-mode=disabled");
       expect(output).toContain("preview-url=http://cloud-pr-42.preview.example.com");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-027] leaves preview TLS mode empty when no preview route is selected", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-no-route-"));
+    const outputPath = join(workspace, "github-output.txt");
+
+    const result = Bun.spawnSync(["bash", resolvePreviewScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        GITHUB_OUTPUT: outputPath,
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("preview-domain-template=\n");
+      expect(output).toContain("preview-tls-mode=\n");
+      expect(output).toContain("preview-url=\n");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-ENTRY-009] version=source builds the deploy CLI from the checked-out source tree", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-deploy-action-source-install-"));
+    const sourceRoot = join(workspace, "appaloft-source");
+    const binDir = join(workspace, "bin");
+    const fakeBun = join(binDir, "bun");
+    const outputPath = join(workspace, "github-output.txt");
+    const bunLogPath = join(workspace, "bun.log");
+    mkdirSync(join(sourceRoot, "scripts/release"), { recursive: true });
+    mkdirSync(binDir);
+    writeFileSync(join(sourceRoot, "package.json"), '{"name":"appaloft"}\n');
+    writeFileSync(join(sourceRoot, "scripts/release/build-deploy-cli-bundle.ts"), "");
+    writeFileSync(
+      fakeBun,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'printf "%s\\n" "$*" >> "$APPALOFT_TEST_BUN_LOG"',
+        'if [ "$1" = "run" ] && [ "$2" = "package:deploy-cli-bundle" ]; then',
+        '  out_dir=""',
+        '  while [ "$#" -gt 0 ]; do',
+        '    if [ "$1" = "--out-dir" ]; then',
+        "      shift",
+        '      out_dir="$1"',
+        "    fi",
+        "    shift || true",
+        "  done",
+        '  mkdir -p "$out_dir"',
+        '  printf "#!/usr/bin/env sh\\n" > "$out_dir/appaloft"',
+        "fi",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fakeBun, 0o755);
+
+    const result = Bun.spawnSync(["bash", installScript], {
+      cwd: workspace,
+      env: {
+        ...Bun.env,
+        APPALOFT_DEPLOY_ACTION_SOURCE_ROOT: sourceRoot,
+        APPALOFT_TEST_BUN_LOG: bunLogPath,
+        GITHUB_OUTPUT: outputPath,
+        PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+        RUNNER_TEMP: workspace,
+        INPUT_VERSION: "source",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    try {
+      expect(result.exitCode).toBe(0);
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).toContain("appaloft-version=source");
+      expect(output).toContain("appaloft-bin=");
+      expect(output).toContain("source-binary-bundle/appaloft");
+      const bunLog = readFileSync(bunLogPath, "utf8");
+      expect(bunLog).toContain("install --frozen-lockfile");
+      expect(bunLog).toContain("run package:deploy-cli-bundle");
+      expect(bunLog).toContain("--out-dir");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

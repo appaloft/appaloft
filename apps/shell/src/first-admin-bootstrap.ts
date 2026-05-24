@@ -79,13 +79,26 @@ export async function writeBootstrapFirstAdminOutput(
   input: BootstrapFirstAdminOutputInput,
 ): Promise<Result<FirstAdminBootstrapOutput | null>> {
   const outputFile = input.config.bootstrapFirstAdminOutputFile?.trim();
-  if (!outputFile) {
+  const outputFileAlreadyExists = outputFile ? existsSync(outputFile) : false;
+  const firstAdminEmail = input.config.firstAdminEmail?.trim();
+  const firstAdminPassword = input.config.firstAdminPassword?.trim();
+  const startupBootstrapConfigured = Boolean(firstAdminEmail && firstAdminPassword);
+
+  if (!startupBootstrapConfigured && !outputFile) {
     return ok(null);
   }
 
-  if (existsSync(outputFile)) {
+  if (!startupBootstrapConfigured && outputFileAlreadyExists) {
     return ok(null);
   }
+
+  const writeOutputIfNeeded = (output: FirstAdminBootstrapOutput) => {
+    if (!outputFile || outputFileAlreadyExists) {
+      return ok(output);
+    }
+
+    return writeOutputFile(outputFile, output);
+  };
 
   const context = input.executionContextFactory.create({
     entrypoint: "system",
@@ -106,7 +119,7 @@ export async function writeBootstrapFirstAdminOutput(
   }
 
   if (!status.value.bootstrapRequired) {
-    return writeOutputFile(outputFile, {
+    return writeOutputIfNeeded({
       schemaVersion: "first-admin.bootstrap/v1",
       bootstrapRequired: false,
       created: false,
@@ -118,9 +131,8 @@ export async function writeBootstrapFirstAdminOutput(
     });
   }
 
-  const firstAdminEmail = input.config.firstAdminEmail?.trim();
   if (!firstAdminEmail) {
-    return writeOutputFile(outputFile, {
+    return writeOutputIfNeeded({
       schemaVersion: "first-admin.bootstrap/v1",
       bootstrapRequired: true,
       created: false,
@@ -132,11 +144,9 @@ export async function writeBootstrapFirstAdminOutput(
   const command = BootstrapFirstAdminCommand.create({
     email: firstAdminEmail,
     displayName: input.config.firstAdminDisplayName?.trim() || "Appaloft Admin",
-    ...(input.config.firstAdminPassword?.trim()
-      ? { password: input.config.firstAdminPassword.trim() }
-      : {}),
-    organizationName: "Self-hosted Appaloft",
-    organizationSlug: "self-hosted-appaloft",
+    ...(firstAdminPassword ? { password: firstAdminPassword } : {}),
+    organizationName: input.config.firstAdminOrganizationName?.trim() || "Self-hosted Appaloft",
+    organizationSlug: input.config.firstAdminOrganizationSlug?.trim() || "self-hosted-appaloft",
     idempotencyKey: "installer-bootstrap-first-admin",
   });
   if (command.isErr()) {
@@ -148,7 +158,7 @@ export async function writeBootstrapFirstAdminOutput(
     return err(created.error);
   }
 
-  return writeOutputFile(outputFile, {
+  return writeOutputIfNeeded({
     schemaVersion: "first-admin.bootstrap/v1",
     bootstrapRequired: false,
     created: true,

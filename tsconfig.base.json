@@ -23,6 +23,7 @@
       "@appaloft/application/operation-catalog": [
         "./packages/application/src/operation-catalog.ts"
       ],
+      "@appaloft/blueprints": ["./packages/blueprints/src/index.ts"],
       "@appaloft/cli-logging": ["./packages/cli-logging/src/index.ts"],
       "@appaloft/contracts": ["./packages/contracts/src/index.ts"],
       "@appaloft/design": ["./packages/design/src/index.ts"],

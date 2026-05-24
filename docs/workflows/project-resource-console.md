@@ -62,9 +62,9 @@ Project identity and lifecycle must come from `projects.show` where a detail rea
 Project name changes and project archive actions must dispatch `projects.rename` and
 `projects.archive`; no generic `projects.update` form is allowed.
 
-Project detail pages must not make "new deployment" look like a project-owned command.
+Project detail pages must not make Quick Deploy look like a project-owned deployment command.
 
-If a project detail page offers a "new deployment" affordance, it must be one of:
+If a project detail page offers a Quick Deploy affordance, it must be one of:
 
 - a Quick Deploy entry workflow that selects or creates a resource before `deployments.create`; or
 - a secondary shortcut that asks the user to choose an existing resource before deployment admission.
@@ -83,7 +83,7 @@ Each resource item should expose:
 - current resource health when available;
 - latest deployment status as contextual history only;
 - primary navigation to the resource detail page;
-- resource-scoped create deployment shortcut only when the selected resource can accept it.
+- resource-scoped Quick Deploy shortcut only when the selected resource can accept it.
 
 Current resource health and latest deployment status are read-model/projection fields. They must not
 become Resource aggregate invariants unless a future ADR promotes them.
@@ -92,7 +92,7 @@ become Resource aggregate invariants unless a future ADR promotes them.
 
 Resource detail pages must be the primary owner-scoped surface for:
 
-- new deployment;
+- Quick Deploy;
 - future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - deployment progress/status;
@@ -113,7 +113,7 @@ Resource detail pages must be the primary owner-scoped surface for:
 
 Deployment history shown on the resource page must be filtered by `resourceId`.
 
-New deployment from a resource detail page must dispatch `deployments.create` with the resource id and use resource-profile-derived defaults during deployment admission.
+Quick Deploy from a resource detail page must dispatch `deployments.create` with the resource id and use resource-profile-derived defaults during deployment admission.
 
 ## Resource Detail Information Architecture Contract
 
@@ -125,7 +125,7 @@ The persistent resource header must be compact and must not become a summary das
 - resource name;
 - resource kind;
 - compact current health indicator and refresh affordance;
-- one primary resource-scoped lifecycle action such as new deployment when supported.
+- one primary resource-scoped lifecycle action such as Quick Deploy when supported.
 
 The persistent resource header must not show these as primary actions:
 
@@ -227,8 +227,8 @@ Allowed entry differences:
 | Entry | Contract |
 | --- | --- |
 | Project page create resource | Navigates to a dedicated project-scoped first-deploy flow with project context prefilled. |
-| Project page new deployment | Must not be a direct project-owned write action. If reintroduced, it opens Quick Deploy or requires resource selection before deployment admission. |
-| Resource page new deployment | Dispatches `deployments.create` with the selected `resourceId` after collecting allowed attempt inputs. |
+| Project page Quick Deploy | Must not be a direct project-owned write action. It opens Quick Deploy or requires resource selection before deployment admission. |
+| Resource page Quick Deploy | Dispatches `deployments.create` with the selected `resourceId` after collecting allowed attempt inputs. |
 | Resource page deployment history | Queries deployments filtered by resource. |
 | Resource page health | Queries `resources.health` or reads a compact health projection when available; latest deployment status remains context. |
 | Resource page show profile | Queries `resources.show` for the durable detail/profile surface. |

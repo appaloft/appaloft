@@ -976,10 +976,11 @@ Current boundary:
   project/resource/domain/deployment mutation. Until that handshake exists, mode selection may be
   documented as roadmap and must fail before mutation when selected.
 - The public GitHub Actions install UX is a thin `appaloft/deploy-action` wrapper around the
-  released Appaloft CLI binary. It downloads and verifies release assets, maps trusted action inputs
-  to CLI flags, writes SSH private key input to a temporary key file, and invokes the same
-  repository config deploy workflow. It is not a new operation, not a hidden Quick Deploy API, and
-  not a hosted control plane.
+  selected Appaloft CLI binary. By default it downloads and verifies release assets; trusted
+  in-repository workflows may opt into a source-built CLI from the checked-out Appaloft source tree.
+  The wrapper maps trusted action inputs to CLI flags, writes SSH private key input to a temporary
+  key file, and invokes the same repository config deploy workflow. It is not a new operation, not
+  a hidden Quick Deploy API, and not a hosted control plane.
 - The deploy action also exposes `command: install-console` for the operator-owned self-hosted
   console bootstrap path. That command uses trusted SSH inputs to download the selected release
   `install.sh` on the target host, runs the self-hosted Docker installer with a configured public

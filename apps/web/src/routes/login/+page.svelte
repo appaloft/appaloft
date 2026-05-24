@@ -127,16 +127,19 @@
           <Input bind:value={password} type="password" autocomplete="current-password" required />
         </label>
 
-        <div class="appaloft-action-row justify-start pt-1">
+        <div class="flex flex-wrap items-center gap-3 pt-1">
           <Button type="submit" disabled={!canSubmit}>
             <LogIn class="size-4" />
             {submitting
               ? $t(i18nKeys.console.authBootstrap.signingIn)
               : $t(i18nKeys.console.authBootstrap.signIn)}
           </Button>
-          <Button href="/bootstrap/auth/first-admin" variant="outline">
-            {$t(i18nKeys.console.authBootstrap.createAdmin)}
-          </Button>
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.authSignup.signUpPrompt)}
+            <a class="font-medium text-primary hover:underline" href={`/sign-up?next=${encodeURIComponent(returnTo)}`}>
+              {$t(i18nKeys.console.authSignup.signUpLink)}
+            </a>
+          </p>
         </div>
       </form>
     </section>

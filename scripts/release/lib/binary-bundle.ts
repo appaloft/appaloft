@@ -296,3 +296,133 @@ export async function createBinaryBundle(input: {
 
   await removePath(tempBuildRoot);
 }
+
+async function createDeployCliEntryModule(input: {
+  entryPath: string;
+  root: string;
+  version: string;
+  pgliteFsBundlePath: string;
+  pgliteWasmPath: string;
+  initdbWasmPath: string;
+  reflectMetadataPath?: string;
+}): Promise<void> {
+  const runModulePath = join(input.root, "apps", "shell", "src", "run.ts");
+  const runModuleSpecifier = toImportSpecifier(input.entryPath, runModulePath);
+  const reflectMetadataPath =
+    input.reflectMetadataPath ??
+    Bun.resolveSync("reflect-metadata", join(input.root, "apps", "shell", "src", "index.ts"));
+  const reflectMetadataSpecifier = toImportSpecifier(input.entryPath, reflectMetadataPath);
+  const pgliteFsBundleSpecifier = toImportSpecifier(input.entryPath, input.pgliteFsBundlePath);
+  const pgliteWasmSpecifier = toImportSpecifier(input.entryPath, input.pgliteWasmPath);
+  const initdbWasmSpecifier = toImportSpecifier(input.entryPath, input.initdbWasmPath);
+
+  await Bun.write(
+    input.entryPath,
+    `import "${reflectMetadataSpecifier}";
+
+import pgliteFsBundlePath from "${pgliteFsBundleSpecifier}" with { type: "file" };
+import pgliteWasmPath from "${pgliteWasmSpecifier}" with { type: "file" };
+import initdbWasmPath from "${initdbWasmSpecifier}" with { type: "file" };
+
+if (!process.env.APPALOFT_APP_VERSION) {
+\tprocess.env.APPALOFT_APP_VERSION = ${JSON.stringify(input.version)};
+}
+if (!process.env.APPALOFT_DATABASE_DRIVER) {
+\tprocess.env.APPALOFT_DATABASE_DRIVER = "pglite";
+}
+if (!process.env.APPALOFT_DATA_DIR) {
+\tconst dataHome = process.env.XDG_DATA_HOME || (process.env.HOME ? \`\${process.env.HOME}/.local/share\` : "");
+\tprocess.env.APPALOFT_DATA_DIR = dataHome
+\t\t? \`\${dataHome}/appaloft/data\`
+\t\t: \`\${process.cwd()}/.appaloft/data\`;
+}
+if (!process.env.APPALOFT_PGLITE_DATA_DIR) {
+\tprocess.env.APPALOFT_PGLITE_DATA_DIR = \`\${process.env.APPALOFT_DATA_DIR}/pglite\`;
+}
+
+async function loadEmbeddedPgliteRuntimeAssets() {
+\tconst [pgliteWasmModule, initdbWasmModule] = await Promise.all([
+\t\tBun.file(pgliteWasmPath)
+\t\t\t.arrayBuffer()
+\t\t\t.then((buffer) => WebAssembly.compile(buffer)),
+\t\tBun.file(initdbWasmPath)
+\t\t\t.arrayBuffer()
+\t\t\t.then((buffer) => WebAssembly.compile(buffer)),
+\t]);
+
+\treturn {
+\t\tfsBundle: Bun.file(pgliteFsBundlePath),
+\t\tpgliteWasmModule,
+\t\tinitdbWasmModule,
+\t};
+}
+
+function shouldUseEmbeddedPglite(): boolean {
+\tconst driver = process.env.APPALOFT_DATABASE_DRIVER?.toLowerCase();
+\treturn !driver || driver === "pglite";
+}
+
+const { runShellCli } = await import("${runModuleSpecifier}");
+
+await runShellCli({
+\t...(shouldUseEmbeddedPglite()
+\t\t? {
+\t\t\t\tpgliteRuntimeAssets: await loadEmbeddedPgliteRuntimeAssets(),
+\t\t\t}
+\t\t: {}),
+});
+`,
+  );
+}
+
+export async function createDeployCliBinaryBundle(input: {
+  root: string;
+  outDir: string;
+  target?: ReleaseBinaryTarget;
+  version?: string;
+}): Promise<void> {
+  const target = input.target ?? detectHostReleaseBinaryTarget();
+  const version = input.version ?? process.env.APPALOFT_APP_VERSION ?? "0.1.0";
+  const binaryPath = join(input.outDir, target.executableName);
+  const tempBuildRoot = join(input.root, "dist", ".tmp-deploy-cli-bundle");
+  const binaryEntryPath = join(tempBuildRoot, "deploy-cli-entry.ts");
+  const pglitePackageEntry = Bun.resolveSync(
+    "@electric-sql/pglite",
+    join(input.root, "packages", "persistence", "pg", "src", "index.ts"),
+  );
+  const pgliteDistDir = dirname(pglitePackageEntry);
+  const pgliteFsBundlePath = join(pgliteDistDir, "pglite.data");
+  const pgliteWasmPath = join(pgliteDistDir, "pglite.wasm");
+  const initdbWasmPath = join(pgliteDistDir, "initdb.wasm");
+
+  await resetDir(input.outDir);
+  await resetDir(tempBuildRoot);
+  process.env.APPALOFT_APP_VERSION = version;
+
+  await createDeployCliEntryModule({
+    entryPath: binaryEntryPath,
+    root: input.root,
+    version,
+    pgliteFsBundlePath,
+    pgliteWasmPath,
+    initdbWasmPath,
+  });
+
+  await run(
+    [
+      "bun",
+      "build",
+      binaryEntryPath,
+      "--compile",
+      `--target=${target.bunTarget}`,
+      "--outfile",
+      binaryPath,
+    ],
+    input.root,
+  );
+  if (target.os === "darwin") {
+    await adHocSignDarwinExecutable(binaryPath);
+  }
+
+  await removePath(tempBuildRoot);
+}

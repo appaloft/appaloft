@@ -57,6 +57,7 @@ export type DockerPortPublishMode = "loopback-ephemeral" | "host-same-port";
 export interface DockerPublishedPortSpec {
   containerPort: PortNumber;
   mode: DockerPortPublishMode;
+  hostPort?: PortNumber;
 }
 
 export type DockerRunMountType = "volume" | "bind";

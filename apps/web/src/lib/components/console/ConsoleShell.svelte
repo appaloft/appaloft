@@ -12,7 +12,6 @@
     Globe2,
     LogIn,
     Moon,
-    LogOut,
     Package,
     Play,
     Rocket,
@@ -32,7 +31,6 @@
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { queryClient } from "$lib/query-client";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -104,16 +102,14 @@
   let colorModeReady = $state(false);
   let sidebarOpen = $state(false);
   let sidebarReady = $state(false);
-  let signOutError = $state("");
-  let signingOut = $state(false);
 
   const {
     healthQuery,
-    versionQuery,
     authSessionQuery,
     projectsQuery,
   } = createConsoleQueries(browser, {
     readiness: false,
+    version: false,
     servers: false,
     environments: false,
     resources: false,
@@ -125,7 +121,6 @@
   });
 
   const pathname = $derived(page.url.pathname);
-  const version = $derived(versionQuery.data ?? null);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
   const projects = $derived(projectsQuery.data?.items ?? []);
   const filteredProjects = $derived.by(() => {
@@ -150,12 +145,6 @@
   const loginRequired = $derived(authSession.loginRequired && !authSession.session);
   const loginHref = $derived(`/login?next=${encodeURIComponent(pathname)}`);
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
-  const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
-  const appVersion = $derived(version?.version ?? healthQuery.data?.version ?? "");
-  const appVersionLabel = $derived(appVersion ? `v${appVersion}` : "");
-  const appVersionTitle = $derived(
-    appVersion ? `${$t(i18nKeys.common.domain.version)} ${appVersion}` : "",
-  );
   const colorModeLabel = $derived(
     colorMode === "dark"
       ? $t(i18nKeys.common.actions.switchToLightMode)
@@ -244,27 +233,6 @@
     }
   }
 
-  async function signOut(): Promise<void> {
-    if (!browser || signingOut) {
-      return;
-    }
-
-    signingOut = true;
-    signOutError = "";
-
-    try {
-      await request<{ success: boolean }>("/api/auth/sign-out", {
-        method: "POST",
-      });
-      queryClient.clear();
-      await goto("/login");
-    } catch (error) {
-      signOutError = readErrorMessage(error);
-    } finally {
-      signingOut = false;
-    }
-  }
-
   function openHealthCheck(): void {
     if (browser) {
       window.open(`${API_BASE}/api/health`, "_blank");
@@ -309,7 +277,7 @@
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
           <span class="block truncate text-xs text-muted-foreground">
-            {$t(i18nKeys.common.app.consoleSubtitle)}{appVersionLabel ? ` · ${appVersionLabel}` : ""}
+            {$t(i18nKeys.common.app.consoleSubtitle)}
           </span>
         </span>
       </a>
@@ -391,6 +359,7 @@
     <SidebarFooter>
       <DropdownMenu>
         <DropdownMenuTrigger
+          data-console-user-menu-trigger
           class="flex w-full items-center gap-2 px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
         >
           <Avatar size="sm">
@@ -432,18 +401,6 @@
             <BookOpen class="size-4" />
             {$t(i18nKeys.common.actions.openDocumentation)}
           </DropdownMenuItem>
-          {#if authSession.session}
-            <DropdownMenuSeparator />
-            {#if signOutError}
-              <DropdownMenuLabel>
-                <span class="block text-xs font-normal text-destructive">{signOutError}</span>
-              </DropdownMenuLabel>
-            {/if}
-            <DropdownMenuItem disabled={signingOut} onclick={signOut}>
-              <LogOut class="size-4" />
-              {signingOut ? $t(i18nKeys.common.actions.signingOut) : $t(i18nKeys.common.actions.signOut)}
-            </DropdownMenuItem>
-          {/if}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={$locale}>
@@ -494,12 +451,6 @@
         </div>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        {#if appVersionLabel}
-          <Badge variant="outline" class="hidden sm:inline-flex" title={appVersionTitle}>
-            {appVersionLabel}
-          </Badge>
-        {/if}
-        <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
         <Button
           aria-label={colorModeLabel}
           title={colorModeLabel}
@@ -513,25 +464,13 @@
             <Moon class="size-4" />
           {/if}
         </Button>
-        {#if authSession.session}
-          <Button
-            aria-label={$t(i18nKeys.common.actions.signOut)}
-            title={$t(i18nKeys.common.actions.signOut)}
-            size="icon-sm"
-            variant="outline"
-            disabled={signingOut}
-            onclick={signOut}
-          >
-            <LogOut class="size-4" />
-          </Button>
-        {/if}
         <Button
           href="/deploy"
           size="sm"
           variant="outline"
         >
           <Play class="size-4" />
-          {$t(i18nKeys.common.actions.newDeployment)}
+          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
       </div>
     </header>

@@ -325,7 +325,7 @@ API and automation clients must call `resources.create` explicitly when they nee
 `deployments.create.resource` remains a compatibility bootstrap path only until callers are migrated.
 
 Project pages and project sidebar groups may expose `resources.create` as the primary project-scoped
-write affordance because the project is a resource collection boundary. New deployment and
+write affordance because the project is a resource collection boundary. Quick Deploy and
 deployment history actions must be resource-scoped or explicitly modeled as Quick Deploy entry
 workflows that select or create a resource before dispatching deployment admission.
 

@@ -660,7 +660,7 @@ models, such as config path and JSON/YAML pointer. Origin metadata must not incl
 ## Entry Workflow Sequence
 
 ```text
-When invoked from deploy-action, install and verify the released Appaloft binary
+When invoked from deploy-action, install and verify the selected Appaloft CLI release or trusted source-built CLI
   -> user selects source or passes source path
   -> entrypoint resolves config file path
   -> parse and validate strict config schema

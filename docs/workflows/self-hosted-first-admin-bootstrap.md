@@ -24,15 +24,29 @@ installer/runtime config
 - Bootstrap status is safe to expose publicly; it must not expose passwords, session tokens, account
   ids beyond safe user/organization metadata, or provider secrets.
 - First-admin bootstrap itself is only valid while no product admin/organization owner exists.
+- After a product admin or organization owner exists, Web must not show create-admin affordances on
+  the login page, the setup page should send ordinary visitors to `/login`, and the setup endpoint
+  must return `404` before dispatching the create command.
 - User/session/provider implementation details stay behind application-owned ports.
 - OAuth configuration is additive and optional. Missing OAuth never blocks local first-admin login.
 - Existing first-admin state makes bootstrap idempotent and suppresses raw password output.
+- Runtime startup may bootstrap directly from `APPALOFT_FIRST_ADMIN_EMAIL` and
+  `APPALOFT_FIRST_ADMIN_PASSWORD` without a handoff file. This path must not echo or persist the raw
+  supplied password in output. If no supplied password exists, startup must not generate an
+  inaccessible password unless a trusted first-admin output file is configured.
 - Public product health/version/readiness endpoints remain public; ordinary product mutations become
   protected by product-session and organization-role policy after this gate is implemented.
 - When bootstrap is required, the HTTP adapter gates console document navigation before serving the
   SPA shell. The gate redirects browser document requests for console routes to
   `/bootstrap/auth/first-admin` and must not redirect API endpoints, docs routes, static assets,
   ACME challenges, or the first-admin route itself.
+- After bootstrap is complete, the HTTP adapter gates console document navigation by product
+  session before serving the SPA shell. Missing sessions redirect to `/login?next=...`; API
+  endpoints continue to return product-auth `401`/`403` rather than HTML redirects.
+- Ordinary account signup is separate from first-admin bootstrap. `/sign-up` and
+  `/api/auth/sign-up/email` remain public account surfaces after bootstrap, and signup-created users
+  start organization setup through ordinary auth-runtime organization creation rather than the
+  first-admin bootstrap command.
 
 ## Error Phases
 

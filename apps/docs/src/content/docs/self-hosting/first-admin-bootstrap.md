@@ -51,6 +51,19 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- \
 安装器不会把你提供的密码回显到输出里。不要把密码写进仓库配置、shell history、CI 日志、issue、
 PR 评论或部署输出。
 
+容器或自托管运行时也可以通过受信任的环境变量在启动时自动创建首次管理员，而不写 handoff 文件：
+
+```sh
+APPALOFT_FIRST_ADMIN_EMAIL=admin@example.com
+APPALOFT_FIRST_ADMIN_DISPLAY_NAME=Admin
+APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME="Self-hosted Appaloft"
+APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG=self-hosted-appaloft
+APPALOFT_FIRST_ADMIN_PASSWORD="$APPALOFT_INITIAL_ADMIN_PASSWORD"
+```
+
+启动时 bootstrap 只会在同时配置 email 和 password 时自动执行；如果没有提供 password，必须配置
+`APPALOFT_BOOTSTRAP_FIRST_ADMIN_OUTPUT_FILE`，这样生成的一次性密码才有受信任的 handoff 输出。
+
 如果安装器没有收到 first-admin email，安装后打开打印出来的 console URL 即可。console 会检查
 bootstrap status，并把首次访问者引导到 `/bootstrap/auth/first-admin`。你也可以直接打开这个设置路径。
 该页面会先读取 bootstrap status；如果实例已经有管理员，会引导你去 `/login` 登录，而不会再次创建账号。
@@ -69,7 +82,7 @@ appaloft auth bootstrap-first-admin \
 安装器会打印 console URL。没有配置域名时，通常是服务器的 `3721` 端口；配置了 `--domain` 时，
 使用对应的 HTTPS 域名。
 
-用 first-admin email 和密码登录。登录后，Appaloft 会把你识别为用户会话，并按 organization role
+用已配置账号的 email 和密码登录。登录后，Appaloft 会把你识别为用户会话，并按 organization role
 保护产品 mutation。没有 session 的 mutation 会返回 `401 product_auth_missing`；已登录但不属于目标
 organization 或 role 不足时，会返回 `403 product_auth_forbidden`。
 
@@ -90,9 +103,9 @@ GET /api/bootstrap/auth/status
 POST /api/bootstrap/auth/first-admin
 ```
 
-这些 bootstrap endpoints 是刻意公开的；它们不要求已有产品 session。安全性来自一次性/idempotent
-setup 规则：一旦已经存在管理员或 organization owner，后续 setup 不会再创建新管理员，也不会返回
-密码。
+bootstrap status 是刻意公开的；setup endpoint 只在首次配置未完成时可用。一旦已经存在管理员或
+organization owner，Web 不再显示创建管理员入口，直接访问 setup page 会回到登录页，setup endpoint
+会返回 `404 first_admin_bootstrap_disabled`，不会 dispatch 创建命令、创建新管理员或返回密码。
 
 <h2 id="self-hosting-first-admin-oauth">OAuth 是可选项</h2>
 

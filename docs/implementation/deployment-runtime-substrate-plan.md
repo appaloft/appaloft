@@ -395,6 +395,26 @@ capability checks, and adapter-owned render/apply/observe contracts without addi
 fields to `deployments.create`. Kubernetes remains a future runtime target and must use the same
 descriptor/capability boundary rather than extending deployment admission input.
 
+Dockerfile deploy build experience remains a governed follow-up for public deploy workflows:
+
+- Dockerfile and generated-Dockerfile builds should expose cache policy as adapter/runtime behavior,
+  not as entrypoint-only shell snippets. The target shape should support BuildKit cache mounts,
+  registry or target-local cache refs, cache invalidation keyed by source/runtime profile changes,
+  and explicit cache-disable behavior for trusted reproducibility checks.
+- Generic SSH and local Docker execution should publish sanitized build progress milestones:
+  source/context preparation, upload size, Dockerfile path, build start, build stage summaries when
+  available, image id or digest, final image size, container/service replace, health verification,
+  and rollback candidate capture.
+- Progress, diagnostics, and logs must never include secret values, raw secret environment entries,
+  SSH private keys, registry credentials, or request bodies. Build args and runtime environment
+  values must be masked according to the environment/secret boundary.
+- Runtime command specs should keep Docker build flags provider-neutral where possible, while
+  provider/runtime adapters own concrete `docker buildx`, BuildKit, or future OCI builder command
+  rendering.
+- Failure diagnostics should distinguish build cache misses from build failures, upload/SSH
+  transport failures, registry pull/push failures, health verification failures, and rollback
+  preparation failures so Action and CLI users can recover without inspecting raw shell output first.
+
 ## Open Questions
 
 - Which old image/container retention policy should v1 use before public rollback exists?

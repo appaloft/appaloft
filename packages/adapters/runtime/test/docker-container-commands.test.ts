@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   dockerContainerLabelFlags,
   dockerPublishedPortFlag,
+  dockerRemoveConflictingRouteContainersCommand,
   dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabels,
@@ -16,6 +17,13 @@ describe("docker container command helpers", () => {
     expect(dockerPublishedPortFlag({ containerPort: 3000, exposureMode: "direct-port" })).toBe(
       "-p 3000:3000",
     );
+    expect(
+      dockerPublishedPortFlag({
+        containerPort: 3001,
+        exposureMode: "direct-port",
+        hostPort: 80,
+      }),
+    ).toBe("-p 80:3001");
   });
 
   test("publishes reverse-proxy resources on a loopback ephemeral host port", () => {
@@ -35,6 +43,36 @@ describe("docker container command helpers", () => {
     expect(command).toContain("--filter 'label=appaloft.resource-id=res_first'");
     expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_previous'");
     expect(command).not.toContain("publish=3000");
+  });
+
+  test("cleans conflicting access route containers without removing the active deployment", () => {
+    const command = dockerRemoveConflictingRouteContainersCommand({
+      deploymentId: "dep_current",
+      accessRoutes: [
+        { host: "app.example.com", pathPrefix: "/" },
+        { host: "app.example.com", pathPrefix: "/" },
+      ],
+      quote,
+    });
+
+    expect(command).toContain("--filter 'label=appaloft.managed=true'");
+    expect(command).toContain(
+      "docker inspect -f '{{ index .Config.Labels \"appaloft.deployment-id\" }}'",
+    );
+    expect(command).toContain(
+      "docker inspect -f '{{ index .Config.Labels \"appaloft.access-host\" }}'",
+    );
+    expect(command).toContain(
+      "docker inspect -f '{{ index .Config.Labels \"appaloft.access-hosts\" }}'",
+    );
+    expect(command).toContain(
+      "docker inspect -f '{{ index .Config.Labels \"appaloft.access-path-prefix\" }}'",
+    );
+    expect(command).toContain("grep -F ',app.example.com,'");
+    expect(command).toContain("if [ \"$deployment_id\" != 'dep_current' ]");
+    expect(command).toContain('[ \'/\' = "/" ] && [ -z "$access_path_prefix" ]');
+    expect(command).toContain('docker rm -f "$container_id"');
+    expect(command.match(/app.example.com/g)).toHaveLength(2);
   });
 
   test("renders stable Appaloft identity labels", () => {
@@ -73,6 +111,7 @@ describe("docker container command helpers", () => {
       runtimeArtifactIntent: "build-image",
       routeSource: "server-applied-config-domain",
       accessHostname: "14.preview.appaloft.com",
+      accessPathPrefix: "/",
       accessScheme: "http",
       accessHosts: ["14.preview.appaloft.com", "14.preview.appaloft.com"],
       sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A14",
@@ -118,6 +157,7 @@ describe("docker container command helpers", () => {
       "appaloft.artifact-intent=build-image",
       "appaloft.route-source=server-applied-config-domain",
       "appaloft.access-host=14.preview.appaloft.com",
+      "appaloft.access-path-prefix=/",
       "appaloft.access-scheme=http",
       "appaloft.access-hosts=14.preview.appaloft.com",
     ]);

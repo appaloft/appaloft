@@ -1,0 +1,17 @@
+{
+  "name": "@appaloft/blueprints",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4",
+    "test": "bun test"
+  }
+}

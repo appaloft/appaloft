@@ -18,7 +18,7 @@
   import { request } from "$lib/api/client";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
-  import type { ReadinessResponse, VersionResponse } from "@appaloft/contracts";
+  import type { ReadinessResponse } from "@appaloft/contracts";
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     certificates: false,
@@ -92,15 +92,6 @@
       staleTime: 5_000,
     }),
   );
-  const versionQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["system", "version", "home"],
-      queryFn: () => request<VersionResponse>("/api/version"),
-      enabled: browser,
-      staleTime: 30_000,
-    }),
-  );
-
   const dependencyResourceCount = $derived(dependencyResourcesQuery.data?.items.length ?? 0);
   const projects = $derived(projectsQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
@@ -108,7 +99,6 @@
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items.slice(0, 5) ?? []);
   const readiness = $derived(readinessQuery.data ?? null);
-  const version = $derived(versionQuery.data ?? null);
   const deploymentBaseLoaded = $derived(
     Boolean(projectsQuery.data) && Boolean(deploymentsQuery.data),
   );
@@ -162,7 +152,7 @@
             <p class="nothing-copy">{$t(i18nKeys.console.home.deploymentBaseBody)}</p>
             <Button href="/deploy" class="nothing-button w-fit">
               <Rocket class="size-4" />
-              {$t(i18nKeys.common.actions.newDeployment)}
+              {$t(i18nKeys.common.actions.quickDeploy)}
             </Button>
           </div>
           <div class="nothing-flow-panel">
@@ -203,7 +193,7 @@
           <div class="mt-6 flex flex-wrap gap-2">
             <Button href="/deploy" class="nothing-button">
               <Rocket class="size-4" />
-              {$t(i18nKeys.common.actions.newDeployment)}
+              {$t(i18nKeys.common.actions.quickDeploy)}
             </Button>
             <Button href="/deployments" variant="outline" class="nothing-button-secondary">
               {$t(i18nKeys.common.actions.openDeployments)}
@@ -347,11 +337,6 @@
           <Database class="size-4" />
           <span>{$t(i18nKeys.console.home.databaseCard)}</span>
           <strong>{readiness?.details?.databaseDriver ?? $t(i18nKeys.common.status.unknown)}</strong>
-        </div>
-        <div>
-          <ArrowRight class="size-4" />
-          <span>{$t(i18nKeys.console.home.modeCard)}</span>
-          <strong>{version?.mode ?? "self-hosted"}</strong>
         </div>
       </section>
     </div>

@@ -58,4 +58,44 @@ describe("createAppaloftServer", () => {
       await server.shutdown();
     }
   });
+
+  test("keeps configured HTTP routes active when app version is a deployment SHA", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0313c2dd90333931d3b6d767668f6f36774735fa",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpPort: 0,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+      extensions: [
+        {
+          name: "deployment-sha-extension-route",
+          http: {
+            routes: [
+              {
+                method: "GET",
+                path: "/extension/deployment-sha-health",
+                handle: () => new Response("ok", { status: 200 }),
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    try {
+      const response = await server.httpApp.handle(
+        new Request("http://localhost/extension/deployment-sha-health"),
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("ok");
+    } finally {
+      await server.shutdown();
+    }
+  });
 });
