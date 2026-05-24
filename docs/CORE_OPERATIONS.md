@@ -1153,6 +1153,11 @@ Current boundary:
   Compatibility preview Resources that live in preview-kind Environments are omitted from default
   `resources.list` results and may be deleted through explicit operator confirmation without
   treating retained preview deployment/audit rows as product Resource blockers.
+- Repository config `preview.pullRequest.policy` is governed by ADR-077/spec 086 as a
+  workflow/profile extension over existing `preview-policies.configure` and
+  `preview-policies.show`. Ordinary trusted config deploy reconciles a Resource-scoped preview
+  policy before ids-only deployment admission; PR preview deploys skip policy mutation so a PR
+  branch cannot change the policy that admits previews. No new operation-catalog key is introduced.
 
 Product-grade preview policy operations:
 

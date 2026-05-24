@@ -71,6 +71,7 @@ This command inherits:
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [GitHub Action PR Preview Deploy Workflow](../workflows/github-action-pr-preview-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md)
@@ -210,6 +211,9 @@ The command must not:
   source fingerprint, matching resource id, and `ephemeral` lifecycle. It must not delete scheduled
   tasks based on names, commands, schedules, project/environment alone, disabled state, or the
   absence of current runtime state.
+- Repository config preview policy is not cleanup provenance. `preview.pullRequest.policy`
+  controls product-grade preview admission through preview policy operations, while cleanup remains
+  scoped to source-link and repository-config ephemeral resource provenance.
 - Inability to prove or complete inert artifact cleanup must be surfaced as
   `cleanedArtifacts = false` or a future diagnostic warning, but must not keep preview routes or
   source links live after runtime cleanup succeeded.

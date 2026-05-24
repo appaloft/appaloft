@@ -3,6 +3,7 @@ import {
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
+  ConfigurePreviewPolicyCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
   ConfigureResourceHealthCommand,
@@ -39,6 +40,8 @@ import {
   ListServersQuery,
   ListStorageVolumesQuery,
   type ManagedDependencyResourceKind,
+  type PreviewPolicySettings,
+  type PreviewPolicySummary,
   type ProjectSummary,
   ProvisionDependencyResourceCommand,
   RegisterServerCommand,
@@ -60,6 +63,7 @@ import {
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
+  ShowPreviewPolicyQuery,
   ShowResourceQuery,
   ShowResourceSecretReferenceQuery,
   ShowRuntimeMonitoringThresholdsQuery,
@@ -158,6 +162,8 @@ export interface DeploymentPromptSeed {
   monitoringThresholds?: DeploymentMonitoringThresholdsSeed;
   runtimePrunePolicy?: DeploymentRuntimePrunePolicySeed;
   resourceSecretRequirements?: DeploymentResourceSecretRequirementSeed[];
+  previewPolicy?: DeploymentPreviewPolicySeed;
+  isPullRequestPreview?: boolean;
   profileDriftPreflight?: boolean;
 }
 
@@ -233,6 +239,7 @@ export interface DeploymentResourceSecretRequirementSeed {
   refKey: string;
   required: boolean;
 }
+export type DeploymentPreviewPolicySeed = PreviewPolicySettings;
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
@@ -642,6 +649,19 @@ export function deploymentPromptSeedFromConfig(
         enabled: config.retention.runtimePrune.enabled,
       } satisfies DeploymentRuntimePrunePolicySeed)
     : undefined;
+  const previewPolicy = config.preview?.pullRequest?.policy
+    ? ({
+        sameRepositoryPreviews: config.preview.pullRequest.policy.sameRepositoryPreviews,
+        forkPreviews: config.preview.pullRequest.policy.forkPreviews,
+        secretBackedPreviews: config.preview.pullRequest.policy.secretBackedPreviews,
+        ...(config.preview.pullRequest.policy.maxActivePreviews !== undefined
+          ? { maxActivePreviews: config.preview.pullRequest.policy.maxActivePreviews }
+          : {}),
+        ...(config.preview.pullRequest.policy.previewTtlHours !== undefined
+          ? { previewTtlHours: config.preview.pullRequest.policy.previewTtlHours }
+          : {}),
+      } satisfies DeploymentPreviewPolicySeed)
+    : undefined;
   const resourceSecretRequirements = Object.entries(config.secrets ?? {})
     .sort(compareConfigKeys)
     .flatMap(([key, reference]) => {
@@ -707,6 +727,7 @@ export function deploymentPromptSeedFromConfig(
     ...(monitoringThresholds ? { monitoringThresholds } : {}),
     ...(runtimePrunePolicy ? { runtimePrunePolicy } : {}),
     ...(resourceSecretRequirements.length > 0 ? { resourceSecretRequirements } : {}),
+    ...(previewPolicy ? { previewPolicy } : {}),
   };
 }
 
@@ -1299,6 +1320,32 @@ function runtimeMonitoringThresholdsMatchConfig(input: {
       current: rule,
       desired: input.desired.rules[index],
     }),
+  );
+}
+
+function previewPolicyMatchesConfig(input: {
+  current: PreviewPolicySummary | undefined | null;
+  desired: DeploymentPreviewPolicySeed;
+  projectId: string;
+  resourceId: string;
+}): boolean {
+  const current = input.current;
+  if (
+    !current ||
+    current.source !== "configured" ||
+    current.scope.kind !== "resource" ||
+    current.scope.projectId !== input.projectId ||
+    current.scope.resourceId !== input.resourceId
+  ) {
+    return false;
+  }
+
+  return (
+    current.settings.sameRepositoryPreviews === input.desired.sameRepositoryPreviews &&
+    current.settings.forkPreviews === input.desired.forkPreviews &&
+    current.settings.secretBackedPreviews === input.desired.secretBackedPreviews &&
+    current.settings.maxActivePreviews === input.desired.maxActivePreviews &&
+    current.settings.previewTtlHours === input.desired.previewTtlHours
   );
 }
 
@@ -3254,6 +3301,80 @@ function ensureRepositoryConfigMonitoringThresholds(input: {
   });
 }
 
+function showPreviewPolicy(input: { projectId: string; resourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowPreviewPolicyQuery.create({
+        scope: {
+          kind: "resource",
+          projectId: input.projectId,
+          resourceId: input.resourceId,
+        },
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigPreviewPolicy(input: {
+  projectId: string;
+  resourceId: string;
+  policy: DeploymentPreviewPolicySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigurePreviewPolicyCommand.create({
+        scope: {
+          kind: "resource",
+          projectId: input.projectId,
+          resourceId: input.resourceId,
+        },
+        policy: input.policy,
+        idempotencyKey: "repository-config:preview-policy",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigPreviewPolicy(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.previewPolicy;
+    if (!policy || input.seed.isPullRequestPreview) {
+      return;
+    }
+
+    const readback = yield* showPreviewPolicy({
+      projectId: input.projectId,
+      resourceId: input.resourceId,
+    });
+    if (
+      previewPolicyMatchesConfig({
+        current: readback.policy,
+        desired: policy,
+        projectId: input.projectId,
+        resourceId: input.resourceId,
+      })
+    ) {
+      return;
+    }
+
+    yield* configureRepositoryConfigPreviewPolicy({
+      projectId: input.projectId,
+      resourceId: input.resourceId,
+      policy,
+    });
+  });
+}
+
 function ensureRepositoryConfigRuntimePrunePolicy(input: {
   seed: DeploymentPromptSeed;
   serverId: string;
@@ -4489,6 +4610,11 @@ export function resolveInteractiveDeploymentInput(
         });
         yield* ensureRepositoryConfigMonitoringThresholds({
           seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigPreviewPolicy({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
           resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigAutoDeploy({

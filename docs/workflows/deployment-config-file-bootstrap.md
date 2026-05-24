@@ -21,6 +21,7 @@ source selection
   -> create/reuse and attach declared managed storage through storage/resource commands
   -> create/reuse or configure declared scheduled tasks through scheduled-task commands
   -> configure or disable declared Resource auto-deploy policy through resource commands
+  -> configure declared Resource preview policy through preview policy commands when not running a PR preview
   -> configure declared deployment-snapshot runtime prune policy through server capacity policy commands
   -> configure declared Resource health policy through resource commands when profile apply is explicit
   -> apply non-secret env values and resolved secret references through environment commands
@@ -45,6 +46,7 @@ This workflow inherits:
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
@@ -53,6 +55,7 @@ This workflow inherits:
 - [GitHub Action PR Preview Deploy](./github-action-pr-preview-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
+- [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
@@ -75,6 +78,7 @@ The file exists to make source-adjacent deployment profile choices reproducible:
   runtime env targets;
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
 - user-facing scheduled task graph declarations such as a nightly sync command;
+- product-grade pull request preview policy declarations for the selected Resource;
 - target-scoped runtime prune policy declarations for selected deployment-snapshot cleanup;
 - non-secret environment variable declarations and required secret references;
 - trusted-entrypoint-selected named config profile overlays for staging/production/smoke variants;
@@ -406,6 +410,28 @@ Auto-deploy declarations configure Resource-owned source-event policy through
 provider accounts, credentials, tenants, organization ids, raw webhook secrets, raw tokens, or
 target/server identity. Generic signed webhook policy remains an explicit operation outside this
 MVP because it needs secret-reference custody and endpoint setup.
+
+`preview.pullRequest.policy` uses product-grade preview policy language:
+
+```yaml
+preview:
+  pullRequest:
+    policy:
+      sameRepositoryPreviews: true
+      forkPreviews: disabled
+      secretBackedPreviews: true
+      maxActivePreviews: 5
+      previewTtlHours: 72
+```
+
+Preview policy declarations configure a Resource-scoped policy through
+`preview-policies.configure` during ordinary trusted config deploys. `preview-policies.show` is
+used first so an already matching configured Resource policy can be reused. Pull request preview
+deploys must not mutate preview policy from the PR branch; they ignore this declaration for policy
+mutation and continue applying preview profile/env/dependency/storage workflow steps. Config may
+not include GitHub App installation ids, webhook secrets, feedback tokens, provider accounts,
+credentials, tenants, organization ids, project/global scope selectors, raw secret values, or
+cleanup credentials.
 
 The HTTP adapter may serve the config schema for tooling, but strict `POST /api/deployments` remains
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP

@@ -478,6 +478,8 @@ The active product-grade preview baseline supports:
 - no workflow file required when GitHub App execution is selected;
 - PR comments and check runs from the Appaloft GitHub App;
 - preview policy list/show/update;
+- repository config `preview.pullRequest.policy` applied only from trusted non-PR-preview config
+  deploys;
 - preview environment list/show/delete;
 - scoped preview environment variables and secrets;
 - durable audit and operator-work visibility;
@@ -491,7 +493,11 @@ Future public enablement work adds:
   those integrations.
 
 The same repository config and operation contracts still apply. Product-grade preview orchestration
-must not add source/runtime/domain fields to `deployments.create`.
+must not add source/runtime/domain fields to `deployments.create`. When `appaloft.yaml` declares
+`preview.pullRequest.policy`, ordinary trusted config deploy may reconcile the selected Resource
+policy before deployment. A PR preview deploy itself must not apply policy changes from the PR
+branch; the policy that admits previews must come from trusted default-branch, Web, CLI,
+HTTP/oRPC, or control-plane configuration.
 
 The governing product-grade preview artifact is
 [Product-Grade Preview Deployments](../specs/046-product-grade-preview-deployments/spec.md), with
@@ -566,4 +572,6 @@ surfaces, close/expiry/delete cleanup retry state, scheduler-runner wiring, and 
 recording for comments/checks. Remaining product-grade preview work is public enablement and
 hardening: GitHub App installation-token onboarding, broader provider smoke coverage beyond the
 secret-gated PR-comment feedback smoke, managed-domain mapping, DNS observation, and certificate
-lifecycle when the control plane owns those integrations.
+lifecycle when the control plane owns those integrations. Repository config
+`preview.pullRequest.policy` is now a trusted-deploy policy declaration over those existing
+preview policy operations, not a PR-branch mutation path.

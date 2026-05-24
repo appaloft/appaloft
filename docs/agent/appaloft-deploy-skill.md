@@ -48,15 +48,18 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   resource configuration, and `deployments.create`.
 - Do not add source, runtime, network, or health fields to `deployments.create`. Those belong to
   the Resource profile and deployment snapshot.
-- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, generated
-  access, monitoring threshold, or runtime prune policy fields to `deployments.create`.
+- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, preview
+  policy, generated access, monitoring threshold, or runtime prune policy fields to
+  `deployments.create`.
   `appaloft.yaml` declarations for prebuilt image source, dependencies, dependency backup policy,
-  storage, scheduled tasks, auto-deploy policy, generated access profile, runtime monitoring
-  thresholds, runtime prune policy, Resource health policy, named `profiles.<key>` overlays, or
-  `preview.pullRequest.profile` overlays must reconcile through existing Resource source/runtime,
-  dependency, backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy,
-  Resource access, runtime monitoring threshold, scheduled runtime prune policy, environment
-  variable, and `resources.configure-health` operations before deployment admission.
+  storage, scheduled tasks, auto-deploy policy, product-grade preview policy, generated access
+  profile, runtime monitoring thresholds, runtime prune policy, Resource health policy, named
+  `profiles.<key>` overlays, or `preview.pullRequest.profile` overlays must reconcile through
+  existing Resource source/runtime, dependency, backup-policy, storage, Resource binding, scheduled
+  task, Resource auto-deploy, preview policy, Resource access, runtime monitoring threshold,
+  scheduled runtime prune policy, environment variable, and `resources.configure-health`
+  operations before deployment admission. PR preview deploys must not mutate preview policy from
+  the PR branch.
 - Treat `secrets.from` as a reference only. `ci-env:<NAME>` resolves from the trusted runner
   environment; `resource-secret:<KEY>` only checks an existing same-key Resource runtime secret
   reference. Do not invent external secret resolvers or put raw secret values in `appaloft.yaml`.

@@ -30,6 +30,8 @@ Canonical assertions:
 - `storage` declarations map to storage-volume list/create and Resource storage attachment
   operations before deployment;
 - `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
+- `preview.pullRequest.policy` declarations map to Resource preview policy show/configure before
+  ordinary trusted deployments and are skipped during PR preview mutation;
 - `access.generated` declarations map to Resource access profile configuration before deployment;
 - `monitoring.thresholds` declarations map to exact Resource-scope runtime monitoring threshold
   policy configuration before deployment;
@@ -64,6 +66,7 @@ This matrix inherits:
 - [ADR-071: Repository Config Generated Access Profile](../decisions/ADR-071-repository-config-generated-access-profile.md)
 - [ADR-072: Repository Config Runtime Monitoring Thresholds](../decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md)
 - [ADR-076: Repository Config Prebuilt Image Source](../decisions/ADR-076-repository-config-prebuilt-image-source.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -76,6 +79,7 @@ This matrix inherits:
 - [Repository Config Generated Access Profile](../specs/080-repository-config-generated-access-profile/spec.md)
 - [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
 - [Repository Config Prebuilt Image Source](../specs/085-repository-config-prebuilt-image-source/spec.md)
+- [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -101,6 +105,7 @@ This matrix inherits:
 | Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
 | Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
+| Preview policy | Resource product-grade preview policy is configured before ordinary trusted deployment admission, skipped during PR preview deploy mutation, and never becomes a deployment field. |
 | Generated access profile | Resource generated access preference and generated route path prefix are configured before deployment admission and never become deployment fields. |
 | Monitoring thresholds | Resource-scope runtime monitoring warning/critical policy is configured before deployment admission, never becomes a deployment field, and never enforces sizing or cleanup. |
 | Runtime prune policy | Deployment-snapshot scheduled runtime prune policy is configured for the trusted selected server before deployment admission and never becomes a deployment field or broad target selector. |
@@ -239,6 +244,16 @@ This matrix inherits:
 | CONFIG-FILE-AUTO-DEPLOY-004 | integration | Auto-deploy idempotency | Selected Resource already has the same enabled git-push policy | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
 | CONFIG-FILE-AUTO-DEPLOY-005 | integration | Auto-deploy drift or blocked policy replaced | Selected Resource policy differs or is blocked by source-binding change | Config deploy handles auto-deploy | Policy is reconfigured from YAML before deployment | None | `resources.show` -> `resources.configure-auto-deploy` -> `deployments.create` |
 | CONFIG-FILE-AUTO-DEPLOY-006 | integration | Auto-deploy disabled from config | Config declares `autoDeploy.enabled = false` and the Resource currently has a policy | Config deploy handles auto-deploy | Policy is disabled before deployment | None | `resources.show` -> `resources.configure-auto-deploy(mode=disable)` -> `deployments.create` |
+
+## Preview Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-PREVIEW-POLICY-001 | parser/schema | Product-grade preview policy accepted | Config declares `preview.pullRequest.policy` with same-repository, fork, secret-backed, quota, and TTL settings | Parser accepts the declaration, defaults omitted safe fields, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-PREVIEW-POLICY-002 | parser/schema | Unknown or unsafe preview policy fields rejected | Config declares provider account, tenant/org identity, GitHub installation id, webhook secret, token, raw credential, cleanup credential, project/global scope selector, or unknown field under `preview.pullRequest.policy` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-PREVIEW-POLICY-003 | integration | Config preview policy configures before deployment | Selected Resource has no matching configured preview policy | Ordinary trusted config deploy handles preview policy | Effective preview policy is read, a Resource-scoped policy is configured through `preview-policies.configure`, and deployment admission remains ids-only | None | `preview-policies.show(resource)` -> `preview-policies.configure(resource)` -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-POLICY-004 | integration | Preview policy idempotency | Selected Resource already has an exact configured preview policy matching YAML | Config deploy runs again | No duplicate configure command is dispatched | None | `preview-policies.show(resource)` -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-POLICY-005 | integration | PR preview deploy skips policy mutation | PR preview deploy reads config that declares `preview.pullRequest.policy` | The deploy runs with trusted PR preview context | No preview policy show/configure command is dispatched from the PR branch and deployment admission remains ids-only | None | trusted PR context -> profile/env/resource reconciliation -> `deployments.create` |
 
 ## Control-Plane Policy Matrix
 
@@ -397,6 +412,7 @@ Current implemented coverage:
   `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-001` through
   `CONFIG-FILE-MONITORING-THRESHOLDS-002`, and
+  `CONFIG-FILE-PREVIEW-POLICY-001` through `CONFIG-FILE-PREVIEW-POLICY-002`, and
   `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002`, and
   `CONFIG-FILE-NAMED-PROFILE-001` through `CONFIG-FILE-NAMED-PROFILE-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
@@ -411,7 +427,9 @@ Current implemented coverage:
   `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`,
   `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005`, and
   `CONFIG-FILE-MONITORING-THRESHOLDS-003` through
-  `CONFIG-FILE-MONITORING-THRESHOLDS-005`, and `CONFIG-FILE-PREVIEW-OVERLAY-003` through
+  `CONFIG-FILE-MONITORING-THRESHOLDS-005`,
+  `CONFIG-FILE-PREVIEW-POLICY-003` through `CONFIG-FILE-PREVIEW-POLICY-005`, and
+  `CONFIG-FILE-PREVIEW-OVERLAY-003` through
   `CONFIG-FILE-PREVIEW-OVERLAY-004`, and `CONFIG-FILE-NAMED-PROFILE-003` through
   `CONFIG-FILE-NAMED-PROFILE-006` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
@@ -507,7 +525,10 @@ deployment admission and does not mutate domain bindings, certificates, default 
 proxy routes directly. Config runtime monitoring thresholds are reconciled through
 `runtime-monitoring.thresholds.configure` and `runtime-monitoring.thresholds.show` before ids-only
 deployment admission and do not enforce runtime sizing, cleanup, alert routing, autoscaling, or
-billing policy. Config `retention.runtimePrune` is reconciled through
+billing policy. Config preview policy is reconciled through `preview-policies.show` and
+`preview-policies.configure` before ordinary trusted ids-only deployment admission; PR preview
+deploys skip preview policy mutation so a PR branch cannot change the policy that admits previews.
+Config `retention.runtimePrune` is reconciled through
 `scheduled-runtime-prune-policies.configure` as a deterministic `deployment-snapshot` policy for
 the trusted selected server before ids-only deployment admission; it does not select broad server
 identity or become a deployment field. Config health policy is reconciled through

@@ -521,6 +521,37 @@
               "type": "string",
               "enum": ["auto", "disabled"]
             },
+            "policy": {
+              "type": "object",
+              "properties": {
+                "sameRepositoryPreviews": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "forkPreviews": {
+                  "default": "disabled",
+                  "type": "string",
+                  "enum": ["disabled", "without-secrets", "with-secrets"]
+                },
+                "secretBackedPreviews": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "maxActivePreviews": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "previewTtlHours": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["sameRepositoryPreviews", "forkPreviews", "secretBackedPreviews"],
+              "additionalProperties": false,
+              "description": "Product-grade pull request preview policy declaration."
+            },
             "profile": {
               "type": "object",
               "properties": {

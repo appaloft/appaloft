@@ -185,6 +185,10 @@ Product-grade previews are an Appaloft Cloud or self-hosted control-plane workfl
 
 That product line uses signed GitHub webhooks, preview policy, fork and secret policy, preview environment list/show/delete, comments/checks/status feedback, cleanup retries, quotas, audit, and managed domain follow-up. It still must deploy through ids-only `deployments.create` after the control plane selects or creates the preview context.
 
+You can declare the Resource preview policy in `appaloft.yaml` with `preview.pullRequest.policy`.
+Apply that config from trusted default-branch, Web, CLI, API, or control-plane context. PR preview
+deploys do not let the PR branch mutate the policy that decides whether previews are admitted.
+
 A preview environment is a temporary derived runtime environment under the selected Resource, not a long-lived Resource peer. The Resource detail preview area shows that Resource's pull request previews, expiry, source fingerprint, and cleanup state. The global preview environment page is only a cross-project troubleshooting rollup; normal inspection and cleanup should start from the Resource.
 
 If a GitHub close event, provider callback, or workflow cleanup does not fire reliably, the control plane still keeps compensation paths: closed pull request webhooks trigger cleanup by preview source scope; the Resource preview area and preview detail can manually request `preview-environments.delete`; cleanup is idempotent; and retryable runtime, route, source-link, provider metadata, or feedback failures leave safe retry/manual-review state.

@@ -31,10 +31,12 @@ installer; that would blur the boundary between installing an agent skill and ru
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
    ordinary default mental model. High-level prebuilt image source, `dependencies`,
-   `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`,
-   `monitoring.thresholds`, and `retention.runtimePrune` declarations plus supported
-   `env`/`secrets` references must reconcile through existing operations before ids-only deployment
-   admission. Supported secret resolvers are `ci-env:<NAME>` and same-key
+   `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`,
+   `preview.pullRequest.policy`, `access.generated`, `monitoring.thresholds`, and
+   `retention.runtimePrune` declarations plus supported `env`/`secrets` references must reconcile
+   through existing operations before ids-only deployment admission. Preview policy declarations
+   apply only during ordinary trusted deploys and are skipped during PR preview deploy mutation.
+   Supported secret resolvers are `ci-env:<NAME>` and same-key
    `resource-secret:<KEY>`.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
@@ -58,8 +60,8 @@ installer; that would blur the boundary between installing an agent skill and ru
   provider SDKs, or proxy config directly when an Appaloft operation exists.
 - Do not add source, runtime, network, health, or access fields to `deployments.create`; configure
   Resource profile, health, and access operations first.
-- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, named
-  profile overlay, preview overlay, monitoring threshold, or runtime prune policy fields to
+- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, preview
+  policy, named profile overlay, preview overlay, monitoring threshold, or runtime prune policy fields to
   `deployments.create`; reconcile repository config declarations through their existing operation
   families first.
 - Do not create `quick-deploy.create`; Quick Deploy remains a workflow over explicit operations.

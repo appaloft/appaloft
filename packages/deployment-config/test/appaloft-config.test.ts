@@ -374,6 +374,101 @@ describe("Appaloft deployment config schema", () => {
     expect(lifecycleGraphDelta.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-PREVIEW-POLICY-001] accepts product-grade PR preview policy", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            sameRepositoryPreviews: true,
+            forkPreviews: "without-secrets",
+            secretBackedPreviews: false,
+            maxActivePreviews: 5,
+            previewTtlHours: 72,
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.preview?.pullRequest?.policy).toEqual({
+        sameRepositoryPreviews: true,
+        forkPreviews: "without-secrets",
+        secretBackedPreviews: false,
+        maxActivePreviews: 5,
+        previewTtlHours: 72,
+      });
+    }
+
+    const defaults = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {},
+        },
+      },
+    });
+
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data.preview?.pullRequest?.policy).toEqual({
+        sameRepositoryPreviews: true,
+        forkPreviews: "disabled",
+        secretBackedPreviews: true,
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-002] rejects unsafe PR preview policy fields", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            sameRepositoryPreviews: true,
+            providerInstallationId: "inst_123",
+          },
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["preview", "pullRequest", "policy"]);
+    }
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            webhookSecret: "plain-secret-value",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+    if (!rawSecret.success) {
+      expect(rawSecret.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawSecret.error.issues[0]?.path).toEqual([
+        "preview",
+        "pullRequest",
+        "policy",
+        "webhookSecret",
+      ]);
+    }
+
+    const invalidTtl = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            previewTtlHours: 0,
+          },
+        },
+      },
+    });
+
+    expect(invalidTtl.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-NAMED-PROFILE-001] accepts and applies named config profile overlays", () => {
     const parsed = parseAppaloftDeploymentConfig({
       runtime: {

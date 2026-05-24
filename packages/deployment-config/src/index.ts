@@ -117,6 +117,10 @@ const sourceImageRuntimeTypeError =
   "config_source_resolution: source.type image must not combine with runtime.type";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
+const previewPolicyMaxActivePreviewsError =
+  "preview_config: preview.pullRequest.policy.maxActivePreviews must be a non-negative integer";
+const previewPolicyTtlHoursError =
+  "preview_config: preview.pullRequest.policy.previewTtlHours must be a positive integer";
 const storageMountPathError =
   "config_storage_resolution: storage.<key>.mount.path must be an absolute normalized workload path";
 const scheduledTaskScheduleError =
@@ -248,6 +252,7 @@ const secretLikeKeyPattern =
   /(?:secret|password|passwd|token|api[_-]?key|database[_-]?url|connection[_-]?string|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
 const rawSecretValuePattern =
   /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----|(?:ssh-rsa|ssh-ed25519) [A-Za-z0-9+/=]+/;
+const allowedSecretLikeConfigFields = new Set(["secretBackedPreviews"]);
 
 export type AppaloftDeploymentConfigViolationCode =
   | "config_identity_field"
@@ -1031,6 +1036,28 @@ const appaloftDeploymentPreviewAccessProfileConfigSchema = z
   })
   .describe("Preview profile access overlay fields.");
 
+export const appaloftDeploymentPreviewPolicyConfigSchema = z
+  .object({
+    sameRepositoryPreviews: z.boolean().optional().default(true),
+    forkPreviews: z
+      .enum(["disabled", "without-secrets", "with-secrets"])
+      .optional()
+      .default("disabled"),
+    secretBackedPreviews: z.boolean().optional().default(true),
+    maxActivePreviews: z
+      .number()
+      .int(previewPolicyMaxActivePreviewsError)
+      .nonnegative(previewPolicyMaxActivePreviewsError)
+      .optional(),
+    previewTtlHours: z
+      .number()
+      .int(previewPolicyTtlHoursError)
+      .positive(previewPolicyTtlHoursError)
+      .optional(),
+  })
+  .strict()
+  .describe("Product-grade pull request preview policy declaration.");
+
 export const appaloftDeploymentPreviewProfileConfigSchema = z
   .object({
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
@@ -1065,6 +1092,7 @@ export const appaloftDeploymentPreviewConfigSchema = z
           .refine(isSafePreviewDomainTemplate, previewDomainTemplateError)
           .optional(),
         tlsMode: z.enum(["auto", "disabled"]).optional(),
+        policy: appaloftDeploymentPreviewPolicyConfigSchema.optional(),
         profile: appaloftDeploymentPreviewProfileConfigSchema.optional(),
       })
       .strict()
@@ -1419,6 +1447,10 @@ function isAllowedSecretReference(path: (string | number)[], value: unknown): bo
 
 function shouldTreatSecretField(path: (string | number)[], key: string, value: unknown): boolean {
   if (key === "secrets" && isRecord(value)) {
+    return false;
+  }
+
+  if (allowedSecretLikeConfigFields.has(key)) {
     return false;
   }
 

@@ -101,6 +101,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-074: Repository Config Preview Profile Overlays](./ADR-074-repository-config-preview-profile-overlays.md) | Accepted | Defines repository config `preview.pullRequest.profile` as a selected PR-preview overlay over existing repository config workflow operations. |
 | [ADR-075: Repository Config Named Profile Overlays](./ADR-075-repository-config-named-profile-overlays.md) | Accepted | Defines repository config `profiles.<key>` as a trusted-entrypoint-selected overlay over existing repository config workflow operations. |
 | [ADR-076: Repository Config Prebuilt Image Source](./ADR-076-repository-config-prebuilt-image-source.md) | Accepted | Defines repository config `source.type = image` as a user-facing prebuilt Docker/OCI image source profile over existing Resource source/runtime operations. |
+| [ADR-077: Repository Config Preview Policy](./ADR-077-repository-config-preview-policy.md) | Accepted | Defines repository config `preview.pullRequest.policy` as a trusted-deploy Resource preview policy declaration reconciled through existing preview policy operations while PR preview deploys skip policy mutation. |
 
 ## Authoring Rules
 

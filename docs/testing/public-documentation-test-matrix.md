@@ -118,18 +118,21 @@ Current status:
   `/organization` member/deploy-token management.
   Repository config docs now cover user-facing application graphs for `dependencies`,
   `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`,
-  `monitoring.thresholds`, `profiles.<key>`, `preview.pullRequest.profile`, plus Resource health policy through
+  `monitoring.thresholds`, `preview.pullRequest.policy`, `profiles.<key>`,
+  `preview.pullRequest.profile`, plus Resource health policy through
   `health`, including ids-only deployment admission, preview provenance cleanup
   where applicable, dependency backup policy reconciliation, Resource auto-deploy policy
   reconciliation, Resource generated access profile reconciliation, exact Resource-scope
-  non-enforcing monitoring threshold reconciliation, selected named profile overlay application,
+  non-enforcing monitoring threshold reconciliation, Resource preview policy reconciliation,
+  selected named profile overlay application,
   selected PR preview overlay application, Resource health policy reconciliation, and the
   no-secret/no-provider-handle boundary
   under
   `environments/reference/config-file#environment-config-file-dependencies`,
   `#environment-config-file-storage`, `#environment-config-file-generated-access`,
   `#environment-config-file-monitoring-thresholds`, `#environment-config-file-named-profiles`,
-  `#environment-config-file-preview-profile`, `#environment-config-file-health`,
+  `#environment-config-file-preview-profile`, `#environment-config-file-preview-policy`,
+  `#environment-config-file-health`,
   `#environment-config-file-scheduled-tasks`, and `#environment-config-file-auto-deploy`.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,

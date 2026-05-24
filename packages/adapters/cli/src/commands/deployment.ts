@@ -1609,6 +1609,7 @@ export const deployCommand = EffectCommand.make(
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
+        ...(previewContext ? { isPullRequestPreview: true } : {}),
         ...(configResolution && !acknowledgeResourceProfileDrift
           ? { profileDriftPreflight: true }
           : {}),

@@ -107,6 +107,7 @@ async function createPreviewDeployCliHarness(
     storageVolumes?: unknown[];
     scheduledTasks?: unknown[];
     monitoringThresholdsReadback?: Record<string, unknown> | null;
+    previewPolicy?: Record<string, unknown> | null;
     resourceSecretReferences?: unknown[];
   } = {},
 ) {
@@ -167,6 +168,8 @@ async function createPreviewDeployCliHarness(
             },
           } as T);
         }
+        case "ConfigurePreviewPolicyCommand":
+          return ok({ id: "pvp_resource" } as T);
         case "ConfigureResourceAutoDeployCommand": {
           const autoDeployCommand = command as unknown as Record<string, unknown>;
           const policy = autoDeployCommand.policy as Record<string, unknown> | undefined;
@@ -305,6 +308,21 @@ async function createPreviewDeployCliHarness(
             },
           }) as Record<string, unknown> as T,
         );
+      }
+      if (query.constructor.name === "ShowPreviewPolicyQuery") {
+        return ok({
+          schemaVersion: "preview-policies.show/v1",
+          policy: input.previewPolicy ?? {
+            scope: { kind: "resource", projectId: "proj_1", resourceId: "res_1" },
+            settings: {
+              sameRepositoryPreviews: true,
+              forkPreviews: "disabled",
+              secretBackedPreviews: true,
+            },
+            source: "default",
+          },
+          generatedAt: "2026-05-24T00:00:00.000Z",
+        } as T);
       }
       if (query.constructor.name === "ShowResourceSecretReferenceQuery") {
         const secretQuery = query as unknown as {
@@ -552,6 +570,17 @@ describe("CLI deployment config entry workflow", () => {
         events: ["push"],
         dedupeWindowSeconds: 300,
       },
+      preview: {
+        pullRequest: {
+          policy: {
+            sameRepositoryPreviews: true,
+            forkPreviews: "without-secrets",
+            secretBackedPreviews: false,
+            maxActivePreviews: 5,
+            previewTtlHours: 72,
+          },
+        },
+      },
       secrets: {
         APP_SECRET: {
           from: "resource-secret:APP_SECRET",
@@ -609,6 +638,13 @@ describe("CLI deployment config entry workflow", () => {
         refs: ["main"],
         eventKinds: ["push"],
         dedupeWindowSeconds: 300,
+      },
+      previewPolicy: {
+        sameRepositoryPreviews: true,
+        forkPreviews: "without-secrets",
+        secretBackedPreviews: false,
+        maxActivePreviews: 5,
+        previewTtlHours: 72,
       },
       runtimePrunePolicy: {
         retentionDays: 14,
@@ -6660,6 +6696,192 @@ describe("CLI deployment config entry workflow", () => {
       enabled: true,
     });
     expect(thresholds?.input).not.toHaveProperty("policyId");
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-003] config preview policy configures before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-policy-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "preview:",
+        "  pullRequest:",
+        "    policy:",
+        "      sameRepositoryPreviews: true",
+        "      forkPreviews: without-secrets",
+        "      secretBackedPreviews: false",
+        "      maxActivePreviews: 5",
+        "      previewTtlHours: 72",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.96",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowPreviewPolicyQuery");
+    expect(harness.operations.indexOf("ConfigurePreviewPolicyCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const previewPolicy = harness.commands.find(
+      (command) => command.constructor.name === "ConfigurePreviewPolicyCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(previewPolicy).toMatchObject({
+      scope: { kind: "resource", projectId: "proj_1", resourceId: "res_1" },
+      policy: {
+        sameRepositoryPreviews: true,
+        forkPreviews: "without-secrets",
+        secretBackedPreviews: false,
+        maxActivePreviews: 5,
+        previewTtlHours: 72,
+      },
+      idempotencyKey: "repository-config:preview-policy",
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("previewPolicy");
+    expect(deployment).not.toHaveProperty("forkPreviews");
+    expect(deployment).not.toHaveProperty("previewTtlHours");
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-004] matching config preview policy is idempotent", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-policy-idempotent-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "preview:",
+        "  pullRequest:",
+        "    policy:",
+        "      sameRepositoryPreviews: true",
+        "      forkPreviews: without-secrets",
+        "      secretBackedPreviews: false",
+        "      maxActivePreviews: 5",
+        "      previewTtlHours: 72",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      previewPolicy: {
+        id: "pvp_resource",
+        scope: { kind: "resource", projectId: "proj_1", resourceId: "res_1" },
+        settings: {
+          sameRepositoryPreviews: true,
+          forkPreviews: "without-secrets",
+          secretBackedPreviews: false,
+          maxActivePreviews: 5,
+          previewTtlHours: 72,
+        },
+        source: "configured",
+        updatedAt: "2026-05-24T00:00:00.000Z",
+      },
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.97",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowPreviewPolicyQuery");
+    expect(harness.operations).not.toContain("ConfigurePreviewPolicyCommand");
+    expect(harness.operations).toContain("CreateDeploymentCommand");
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-005] PR preview config deploy does not mutate preview policy", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-policy-pr-skip-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "preview:",
+        "  pullRequest:",
+        "    policy:",
+        "      sameRepositoryPreviews: true",
+        "      forkPreviews: with-secrets",
+        "      secretBackedPreviews: true",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_preview_policy_repo",
+          GITHUB_REF: "refs/pull/97/merge",
+          GITHUB_HEAD_REF: "feature/preview-policy",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-97",
+              "--server-host",
+              "203.0.113.98",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).not.toContain("ShowPreviewPolicyQuery");
+    expect(harness.operations).not.toContain("ConfigurePreviewPolicyCommand");
+    expect(harness.operations).toContain("CreateDeploymentCommand");
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {

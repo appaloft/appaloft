@@ -118,6 +118,30 @@ config validation and before applying profile/env commands. It cannot choose pro
 environment, resource, server, destination, provider account, or credentials, and it cannot add
 fields to the final deployment command.
 
+<h2 id="environment-config-file-preview-policy">PR preview policy</h2>
+
+Use `preview.pullRequest.policy` when the selected Resource should have reviewable product-grade
+preview rules:
+
+```yaml
+preview:
+  pullRequest:
+    policy:
+      sameRepositoryPreviews: true
+      forkPreviews: disabled
+      secretBackedPreviews: true
+      maxActivePreviews: 5
+      previewTtlHours: 72
+```
+
+Ordinary trusted config deploys apply this as Resource preview policy before deployment. A PR
+preview deploy does not apply policy changes from the PR branch; update the policy from a trusted
+default-branch deploy, Web, CLI, API, or control-plane workflow.
+
+Keep GitHub App installation ids, webhook secrets, feedback tokens, provider accounts,
+organization or tenant identity, project/global scope selectors, cleanup credentials, raw secret
+values, and Appaloft ids outside `appaloft.yaml`.
+
 <h2 id="environment-config-file-health">Health policy</h2>
 
 Use `health` when the Resource should have a reusable HTTP health policy:

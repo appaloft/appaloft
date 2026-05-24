@@ -105,16 +105,18 @@ source-event ids, webhook delivery ids, monitoring policy ids, runtime prune pol
 sample ids, log payloads, raw Docker/SSH cleanup commands, or webhook secret values into
 `appaloft.yml`. Repository config may declare high-level application
 `dependencies`, `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`,
-`access.generated`, `monitoring.thresholds`, `retention.runtimePrune`, `health`, `env`, supported
-`secrets` references, selected `profiles.<key>` overlays, and selected
-`preview.pullRequest.profile` overlays, but deploy must reconcile them through existing operations
-before ids-only deployment admission. Supported `secrets` references are trusted runner
-`ci-env:<NAME>` values and same-key existing Resource secret checks via `resource-secret:<KEY>`;
-external secret adapters are not repository config resolvers yet. Resource health policy
-declarations use `resources.configure-health`; runtime prune declarations configure only the
-trusted selected server's `deployment-snapshot` scheduled runtime prune policy; named config
-profiles apply only after trusted CLI/Action `config-profile` selection, preview profile overlays
-apply only after trusted PR preview context selects preview scope, and none may be added to
+`preview.pullRequest.policy`, `access.generated`, `monitoring.thresholds`,
+`retention.runtimePrune`, `health`, `env`, supported `secrets` references, selected
+`profiles.<key>` overlays, and selected `preview.pullRequest.profile` overlays, but deploy must
+reconcile them through existing operations before ids-only deployment admission. Supported
+`secrets` references are trusted runner `ci-env:<NAME>` values and same-key existing Resource
+secret checks via `resource-secret:<KEY>`; external secret adapters are not repository config
+resolvers yet. Resource health policy declarations use `resources.configure-health`; runtime prune
+declarations configure only the trusted selected server's `deployment-snapshot` scheduled runtime
+prune policy; preview policy declarations configure only the selected Resource policy during
+ordinary trusted deploys and are skipped during PR preview deploy mutation; named config profiles
+apply only after trusted CLI/Action `config-profile` selection, preview profile overlays apply only
+after trusted PR preview context selects preview scope, and none may be added to
 `deployments.create`.
 
 ## Entry Selection
