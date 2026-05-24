@@ -63,12 +63,32 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain(
       "i18nKeys.console.dependencyResources.kindOpenSearch",
     );
-    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.provision");
+    expect(dependencyResourcePageSource).toContain("siPostgresql");
+    expect(dependencyResourcePageSource).toContain("siRedis");
+    expect(dependencyResourcePageSource).toContain("siMysql");
+    expect(dependencyResourcePageSource).toContain("siClickhouse");
+    expect(dependencyResourcePageSource).toContain("siMinio");
+    expect(dependencyResourcePageSource).toContain("siOpensearch");
+    expect(dependencyResourcePageSource).toContain("aria-pressed={createKind === dependencyKind}");
+    expect(dependencyResourcePageSource).toContain("aria-pressed={provisioningMode === mode}");
+    expect(dependencyResourcePageSource).not.toContain("<Select.Item value={dependencyKind}");
+    expect(dependencyResourcePageSource).toContain(
+      "orpcClient.dependencyResources.provisioning.plan",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "orpcClient.dependencyResources.provisioning.accept",
+    );
+    expect(dependencyResourcePageSource).toContain('mode: "reuse"');
+    expect(dependencyResourcePageSource).toContain("reuseConnectionUrl");
     expect(dependencyResourcePageSource).not.toContain(
       "i18nKeys.console.dependencyResources.createUnavailable",
     );
     expect(dependencyResourcePageSource).not.toContain("selectedDependencyKindOption.provision");
     expect(clientContractSource).toContain("dependencyResources: {");
+    expect(clientContractSource).toContain("provisioning: {");
+    expect(clientContractSource).toContain("plan: Client");
+    expect(clientContractSource).toContain("accept: Client");
+    expect(clientContractSource).toContain("status: Client");
     expect(clientContractSource).toContain("dependencyBindings: {");
     expect(clientContractSource).toContain("provision: Client");
     expect(clientContractSource).toContain("import: Client");

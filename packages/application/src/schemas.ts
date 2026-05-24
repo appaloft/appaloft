@@ -28,6 +28,7 @@ export * from "./operations/default-access-domain-policies/show-default-access-d
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.schema";
 export * from "./operations/dependency-resources/delete-dependency-resource.schema";
+export * from "./operations/dependency-resources/dependency-resource-provisioning.schema";
 export * from "./operations/dependency-resources/import-dependency-resource.schema";
 export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.schema";

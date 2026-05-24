@@ -54,6 +54,28 @@ class RecordingNativeCommandRunner implements ShellDependencyResourceNativeComma
 }
 
 describe("Shell managed dependency resource providers", () => {
+  test("[DEP-RES-GENERIC-001] Docker-backed dependency provider uses one generic realization path", async () => {
+    const [genericProviderSource, dockerEntrySource] = await Promise.all([
+      readFile(new URL("../src/managed-dependency-providers/generic.ts", import.meta.url), "utf8"),
+      readFile(new URL("../src/docker-managed-dependency-provider.ts", import.meta.url), "utf8"),
+    ]);
+
+    expect(genericProviderSource).not.toContain("DockerBackedManagedPostgresProvider");
+    expect(genericProviderSource).not.toContain("DockerBackedManagedRedisProvider");
+    expect(dockerEntrySource).not.toContain("DockerBackedManagedPostgresProvider");
+    expect(dockerEntrySource).not.toContain("DockerBackedManagedRedisProvider");
+    for (const dependencyKind of [
+      "postgres",
+      "redis",
+      "mysql",
+      "clickhouse",
+      "object-storage",
+      "opensearch",
+    ]) {
+      expect(genericProviderSource).toContain(`case "${dependencyKind}"`);
+    }
+  });
+
   test("[DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-005] writes and marks managed Postgres realization artifacts", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-managed-postgres-"));
     const provider = new ShellManagedPostgresProvider(dataDir);

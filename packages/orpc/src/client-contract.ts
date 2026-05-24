@@ -1,4 +1,5 @@
 import {
+  type AcceptDependencyResourceProvisioningPlanInput,
   type ArchiveDeploymentCommandInput,
   type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
@@ -31,6 +32,7 @@ import {
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDependencyResourceBackupCommandInput,
+  type CreateDependencyResourceProvisioningPlanInput,
   type CreateDeploymentCommandInput,
   type CreateDeployTokenCommandInput,
   type CreateDomainBindingCommandInput,
@@ -145,6 +147,7 @@ import {
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDependencyResourceBackupPolicyQueryInput,
   type ShowDependencyResourceBackupQueryInput,
+  type ShowDependencyResourceProvisioningPlanInput,
   type ShowDependencyResourceQueryInput,
   type ShowDeploymentQueryInput,
   type ShowDeployTokenQueryInput,
@@ -232,6 +235,7 @@ import {
   type DeleteSshCredentialResponse,
   type DeleteStorageVolumeInput,
   type DeleteStorageVolumeResponse,
+  type DependencyResourceProvisioningPlanResponse,
   type DependencyResourceResponse,
   type DeploymentEventStreamEnvelope,
   type DeploymentEventStreamResponse,
@@ -1126,6 +1130,26 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   dependencyResources: {
+    provisioning: {
+      plan: Client<
+        AppaloftClientContext,
+        CreateDependencyResourceProvisioningPlanInput,
+        DependencyResourceProvisioningPlanResponse,
+        AppaloftClientError
+      >;
+      accept: Client<
+        AppaloftClientContext,
+        AcceptDependencyResourceProvisioningPlanInput,
+        DependencyResourceProvisioningPlanResponse,
+        AppaloftClientError
+      >;
+      status: Client<
+        AppaloftClientContext,
+        ShowDependencyResourceProvisioningPlanInput,
+        DependencyResourceProvisioningPlanResponse,
+        AppaloftClientError
+      >;
+    };
     provision: Client<
       AppaloftClientContext,
       ProvisionDependencyResourceCommandInput,

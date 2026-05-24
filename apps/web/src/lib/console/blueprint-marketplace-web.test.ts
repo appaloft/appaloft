@@ -112,5 +112,16 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("onselect={applyBlueprintListing}");
     expect(quickDeploySource).toContain("openSelectedBlueprintDetailDialog");
     expect(quickDeploySource).toContain("selectedBlueprintDetailHref");
+    expect(quickDeploySource).toContain("data-blueprint-dependency-provisioning");
+    expect(quickDeploySource).toContain("blueprintDependencyProvisioningPayload");
+    expect(quickDeploySource).toContain("blueprintQuickDeployDependencyProvisioningInput");
+    expect(quickDeploySource).toContain('case "dependencyResources.provision"');
+    expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.plan");
+    expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.accept");
+    expect(quickDeploySource).toContain("orpcClient.resources.dependencyBindings.bind");
+    expect(quickDeploySource).toContain("siMysql");
+    expect(quickDeploySource).toContain("siClickhouse");
+    expect(quickDeploySource).toContain("siMinio");
+    expect(quickDeploySource).toContain("siOpensearch");
   });
 });

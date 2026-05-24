@@ -10,9 +10,18 @@
     Server,
     Trash2,
   } from "@lucide/svelte";
+  import {
+    siClickhouse,
+    siMinio,
+    siMysql,
+    siOpensearch,
+    siPostgresql,
+    siRedis,
+  } from "simple-icons";
   import type {
     DependencyResourceBackupPolicyRead,
     DependencyResourceBackupSummary,
+    DependencyResourceProvisioningPlan,
     DependencyResourceSummary,
     EnvironmentSummary,
     ProjectSummary,
@@ -36,19 +45,16 @@
   import { queryClient } from "$lib/query-client";
 
   type DependencyKind = DependencyResourceSummary["kind"];
-  type CreateDependencyResourceInput = {
-    kind: DependencyKind;
-    projectId: string;
-    environmentId: string;
-    serverId: string;
-    name: string;
-    backupRelationship?: {
-      retentionRequired: boolean;
-      reason?: string;
-    };
+  type DependencyKindIcon = {
+    title: string;
+    path: string;
+    hex: string;
   };
+  type ProvisioningMode = "create" | "reuse";
+  type ProvisioningPlanInput = Parameters<typeof orpcClient.dependencyResources.provisioning.plan>[0];
   type DependencyKindOption = {
     labelKey: TranslationKey;
+    icon: DependencyKindIcon;
   };
   type Feedback = {
     kind: "success" | "error";
@@ -59,21 +65,27 @@
   const dependencyKindOptions: Record<DependencyKind, DependencyKindOption> = {
     postgres: {
       labelKey: i18nKeys.console.dependencyResources.kindPostgres,
+      icon: siPostgresql,
     },
     redis: {
       labelKey: i18nKeys.console.dependencyResources.kindRedis,
+      icon: siRedis,
     },
     mysql: {
       labelKey: i18nKeys.console.dependencyResources.kindMysql,
+      icon: siMysql,
     },
     clickhouse: {
       labelKey: i18nKeys.console.dependencyResources.kindClickHouse,
+      icon: siClickhouse,
     },
     "object-storage": {
       labelKey: i18nKeys.console.dependencyResources.kindObjectStorage,
+      icon: siMinio,
     },
     opensearch: {
       labelKey: i18nKeys.console.dependencyResources.kindOpenSearch,
+      icon: siOpensearch,
     },
   };
   const dependencyKindOrder = [
@@ -84,6 +96,7 @@
     "object-storage",
     "opensearch",
   ] as const satisfies readonly DependencyKind[];
+  const provisioningModes = ["create", "reuse"] as const satisfies readonly ProvisioningMode[];
 
   const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
     resources: false,
@@ -105,10 +118,15 @@
   let selectedProjectId = $state("");
   let selectedEnvironmentId = $state("");
   let selectedServerId = $state("");
+  let provisioningMode = $state<ProvisioningMode>("create");
   let createKind = $state<DependencyKind>("postgres");
   let createName = $state("");
+  let reuseConnectionUrl = $state("");
+  let reuseSecretRef = $state("");
   let backupRetentionRequired = $state(false);
   let backupRetentionReason = $state("");
+  let provisioningPlan = $state<DependencyResourceProvisioningPlan | null>(null);
+  let acceptProvisioningPlanAcknowledged = $state(false);
   let selectedDependencyResourceId = $state("");
   let selectedBackupId = $state("");
   let restoreAcknowledgeData = $state(false);
@@ -183,8 +201,15 @@
   const canCreate = $derived(
     selectedProjectId.length > 0 &&
       selectedEnvironmentId.length > 0 &&
-      selectedServerId.length > 0 &&
-      createName.trim().length > 0,
+      createName.trim().length > 0 &&
+      (provisioningMode === "create"
+        ? selectedServerId.length > 0
+        : reuseConnectionUrl.trim().length > 0),
+  );
+  const canAcceptProvisioningPlan = $derived(
+    Boolean(provisioningPlan?.id) &&
+      provisioningPlan?.status === "planned" &&
+      acceptProvisioningPlanAcknowledged,
   );
   const canRestore = $derived(
     selectedBackupId.length > 0 && restoreAcknowledgeData && restoreAcknowledgeRuntime,
@@ -196,18 +221,45 @@
   );
 
   const createDependencyResourceMutation = createMutation(() => ({
-    mutationFn: (input: CreateDependencyResourceInput) =>
-      orpcClient.dependencyResources.provision(input),
+    mutationFn: (input: ProvisioningPlanInput) =>
+      orpcClient.dependencyResources.provisioning.plan(input),
     onSuccess: (result) => {
+      provisioningPlan = result.plan;
+      acceptProvisioningPlanAcknowledged = false;
+      feedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.dependencyResources.planCreated),
+        detail: result.plan.id,
+      };
+    },
+    onError: (error) => {
+      feedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.dependencyResources.planFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const acceptProvisioningPlanMutation = createMutation(() => ({
+    mutationFn: (planId: string) =>
+      orpcClient.dependencyResources.provisioning.accept({
+        planId,
+        acknowledgeMutation: true,
+      }),
+    onSuccess: (result) => {
+      provisioningPlan = result.plan;
       feedback = {
         kind: "success",
         title: $t(i18nKeys.console.dependencyResources.createSucceeded),
-        detail: result.id,
+        detail: result.plan.dependencyResourceId ?? result.plan.id,
       };
       createName = "";
+      reuseConnectionUrl = "";
+      reuseSecretRef = "";
       backupRetentionRequired = false;
       backupRetentionReason = "";
-      selectedDependencyResourceId = result.id;
+      acceptProvisioningPlanAcknowledged = false;
+      selectedDependencyResourceId = result.plan.dependencyResourceId ?? "";
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -385,6 +437,14 @@
     return $t(dependencyKindOptions[kind].labelKey);
   }
 
+  function kindIcon(kind: DependencyKind): DependencyKindIcon {
+    return dependencyKindOptions[kind].icon;
+  }
+
+  function iconColor(kind: DependencyKind): string {
+    return `#${kindIcon(kind).hex}`;
+  }
+
   function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
     if (status === "ready" || status === "active") {
       return "default";
@@ -404,21 +464,82 @@
       return;
     }
     const reason = backupRetentionReason.trim();
-    createDependencyResourceMutation.mutate({
-      kind: createKind,
-      projectId: selectedProjectId,
-      environmentId: selectedEnvironmentId,
-      serverId: selectedServerId,
-      name: createName.trim(),
-      ...(backupRetentionRequired || reason
+    const backupRelationship =
+      backupRetentionRequired || reason
         ? {
-            backupRelationship: {
-              retentionRequired: backupRetentionRequired,
-              ...(reason ? { reason } : {}),
+            retentionRequired: backupRetentionRequired,
+            ...(reason ? { reason } : {}),
+          }
+        : undefined;
+    provisioningPlan = null;
+    acceptProvisioningPlanAcknowledged = false;
+
+    createDependencyResourceMutation.mutate(
+      provisioningMode === "create"
+        ? {
+            mode: "create",
+            create: {
+              kind: createKind,
+              projectId: selectedProjectId,
+              environmentId: selectedEnvironmentId,
+              serverId: selectedServerId,
+              name: createName.trim(),
+              ...(backupRelationship ? { backupRelationship } : {}),
             },
           }
-        : {}),
-    });
+        : {
+            mode: "reuse",
+            reuse: {
+              kind: createKind,
+              projectId: selectedProjectId,
+              environmentId: selectedEnvironmentId,
+              name: createName.trim(),
+              connectionUrl: reuseConnectionUrl.trim(),
+              ...(reuseSecretRef.trim() ? { secretRef: reuseSecretRef.trim() } : {}),
+              ...(backupRelationship ? { backupRelationship } : {}),
+            },
+          },
+    );
+  }
+
+  function acceptProvisioningPlan(): void {
+    if (
+      !provisioningPlan ||
+      !canAcceptProvisioningPlan ||
+      acceptProvisioningPlanMutation.isPending
+    ) {
+      return;
+    }
+    acceptProvisioningPlanMutation.mutate(provisioningPlan.id);
+  }
+
+  function resetProvisioningPlan(): void {
+    provisioningPlan = null;
+    acceptProvisioningPlanAcknowledged = false;
+  }
+
+  function selectProvisioningMode(mode: ProvisioningMode): void {
+    provisioningMode = mode;
+    resetProvisioningPlan();
+  }
+
+  function selectDependencyKind(kind: DependencyKind): void {
+    createKind = kind;
+    resetProvisioningPlan();
+  }
+
+  function provisioningActionLabel(): string {
+    return provisioningMode === "create"
+      ? $t(i18nKeys.console.dependencyResources.createAction)
+      : $t(i18nKeys.console.dependencyResources.reuseAction);
+  }
+
+  function planSummary(plan: DependencyResourceProvisioningPlan): string {
+    return `${kindLabel(plan.kind)} · ${plan.name} · ${plan.status}`;
+  }
+
+  function plannedEndpoint(plan: DependencyResourceProvisioningPlan): string {
+    return plan.endpoint ?? plan.providerKey ?? "-";
   }
 
   function selectResource(resource: DependencyResourceSummary): void {
@@ -552,7 +673,7 @@
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div class="space-y-1">
             <div class="flex items-center gap-2">
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.dependencyResources.createAction)}</h2>
+              <h2 class="text-lg font-semibold">{provisioningActionLabel()}</h2>
               <DocsHelpLink
                 href={webDocsHrefs.dependencyResourceLifecycle}
                 ariaLabel={$t(i18nKeys.common.actions.openDocs)}
@@ -562,85 +683,171 @@
               {$t(i18nKeys.console.dependencyResources.createDescription)}
             </p>
           </div>
-          <Badge variant="outline">{$t(i18nKeys.console.dependencyResources.managedOnlyNotice)}</Badge>
+          <Badge variant="outline">
+            {provisioningMode === "create"
+              ? $t(i18nKeys.console.dependencyResources.managedOnlyNotice)
+              : $t(i18nKeys.console.dependencyResources.reuseNotice)}
+          </Badge>
         </div>
 
         <form
           id="dependency-resource-create-form"
-          class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)_auto]"
+          class="space-y-4"
           onsubmit={submitCreate}
         >
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="console-field-label">{$t(i18nKeys.common.domain.project)}</span>
-            <Select.Root bind:value={selectedProjectId} type="single">
-              <Select.Trigger class="w-full">{projectName(selectedProjectId)}</Select.Trigger>
-              <Select.Content>
-                {#each projects as project (project.id)}
-                  <Select.Item value={project.id}>{project.name}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </label>
+          <fieldset class="space-y-2">
+            <legend class="console-field-label">{$t(i18nKeys.console.dependencyResources.provisioningMode)}</legend>
+            <div class="grid gap-3 sm:grid-cols-2">
+              {#each provisioningModes as mode (mode)}
+                <button
+                  type="button"
+                  class={[
+                    "rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    provisioningMode === mode
+                      ? "border-primary bg-primary/5 text-foreground shadow-sm"
+                      : "border-border bg-background text-foreground hover:bg-muted/50",
+                  ]}
+                  aria-pressed={provisioningMode === mode}
+                  onclick={() => selectProvisioningMode(mode)}
+                >
+                  <span class="block text-sm font-semibold">
+                    {mode === "create"
+                      ? $t(i18nKeys.console.dependencyResources.modeCreate)
+                      : $t(i18nKeys.console.dependencyResources.modeReuse)}
+                  </span>
+                  <span class="mt-1 block text-xs text-muted-foreground">
+                    {mode === "create"
+                      ? $t(i18nKeys.console.dependencyResources.modeCreateDescription)
+                      : $t(i18nKeys.console.dependencyResources.modeReuseDescription)}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          </fieldset>
 
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="console-field-label">{$t(i18nKeys.common.domain.environment)}</span>
-            <Select.Root bind:value={selectedEnvironmentId} type="single">
-              <Select.Trigger class="w-full">{environmentName(selectedEnvironmentId)}</Select.Trigger>
-              <Select.Content>
-                {#each projectEnvironments as environment (environment.id)}
-                  <Select.Item value={environment.id}>{environment.name}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </label>
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label class="space-y-1.5 text-sm font-medium">
+              <span class="console-field-label">{$t(i18nKeys.common.domain.project)}</span>
+              <Select.Root bind:value={selectedProjectId} type="single">
+                <Select.Trigger class="w-full">{projectName(selectedProjectId)}</Select.Trigger>
+                <Select.Content>
+                  {#each projects as project (project.id)}
+                    <Select.Item value={project.id}>{project.name}</Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </label>
 
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="console-field-label">{$t(i18nKeys.common.domain.server)}</span>
-            <Select.Root bind:value={selectedServerId} type="single">
-              <Select.Trigger class="w-full">
-                {selectedServerId ? serverName(selectedServerId) : $t(i18nKeys.console.dependencyResources.selectServer)}
-              </Select.Trigger>
-              <Select.Content>
-                {#each activeSingleServerTargets as server (server.id)}
-                  <Select.Item value={server.id}>{server.name}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </label>
+            <label class="space-y-1.5 text-sm font-medium">
+              <span class="console-field-label">{$t(i18nKeys.common.domain.environment)}</span>
+              <Select.Root bind:value={selectedEnvironmentId} type="single">
+                <Select.Trigger class="w-full">{environmentName(selectedEnvironmentId)}</Select.Trigger>
+                <Select.Content>
+                  {#each projectEnvironments as environment (environment.id)}
+                    <Select.Item value={environment.id}>{environment.name}</Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </label>
 
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="console-field-label">{$t(i18nKeys.common.domain.kind)}</span>
-            <Select.Root bind:value={createKind} type="single">
-              <Select.Trigger class="w-full">{kindLabel(createKind)}</Select.Trigger>
-              <Select.Content>
-                {#each dependencyKindOrder as dependencyKind (dependencyKind)}
-                  <Select.Item value={dependencyKind}>{kindLabel(dependencyKind)}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </label>
-
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="console-field-label">{$t(i18nKeys.common.domain.name)}</span>
-            <Input
-              id="dependency-resource-name-input"
-              bind:value={createName}
-              placeholder={$t(i18nKeys.console.dependencyResources.namePlaceholder)}
-            />
-          </label>
-
-          <Button
-            class="self-end"
-            type="submit"
-            disabled={!canCreate || createDependencyResourceMutation.isPending}
-          >
-            {#if createDependencyResourceMutation.isPending}
-              {$t(i18nKeys.common.actions.creating)}
-            {:else}
-              <Plus class="size-4" />
-              {$t(i18nKeys.console.dependencyResources.createAction)}
+            {#if provisioningMode === "create"}
+              <label class="space-y-1.5 text-sm font-medium">
+                <span class="console-field-label">{$t(i18nKeys.common.domain.server)}</span>
+                <Select.Root bind:value={selectedServerId} type="single">
+                  <Select.Trigger class="w-full">
+                    {selectedServerId ? serverName(selectedServerId) : $t(i18nKeys.console.dependencyResources.selectServer)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each activeSingleServerTargets as server (server.id)}
+                      <Select.Item value={server.id}>{server.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </label>
             {/if}
-          </Button>
+
+            <label class="space-y-1.5 text-sm font-medium">
+              <span class="console-field-label">{$t(i18nKeys.common.domain.name)}</span>
+              <Input
+                id="dependency-resource-name-input"
+                bind:value={createName}
+                placeholder={$t(i18nKeys.console.dependencyResources.namePlaceholder)}
+              />
+            </label>
+          </div>
+
+          {#if provisioningMode === "reuse"}
+            <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
+              <label class="space-y-1.5 text-sm font-medium">
+                <span class="console-field-label">{$t(i18nKeys.console.dependencyResources.connectionUrl)}</span>
+                <Input
+                  id="dependency-resource-reuse-connection-url-input"
+                  bind:value={reuseConnectionUrl}
+                  placeholder="https://search.example.com:9200"
+                />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span class="console-field-label">{$t(i18nKeys.console.dependencyResources.secretRef)}</span>
+                <Input
+                  id="dependency-resource-reuse-secret-ref-input"
+                  bind:value={reuseSecretRef}
+                  placeholder="secret://dependency/external"
+                />
+              </label>
+            </div>
+          {/if}
+
+          <fieldset class="space-y-2">
+            <legend class="console-field-label">{$t(i18nKeys.common.domain.kind)}</legend>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+              {#each dependencyKindOrder as dependencyKind (dependencyKind)}
+                {@const icon = kindIcon(dependencyKind)}
+                <button
+                  type="button"
+                  class={[
+                    "flex min-h-24 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    createKind === dependencyKind
+                      ? "border-primary bg-primary/5 text-foreground shadow-sm"
+                      : "border-border bg-background text-foreground hover:bg-muted/50",
+                  ]}
+                  aria-pressed={createKind === dependencyKind}
+                  onclick={() => selectDependencyKind(dependencyKind)}
+                >
+                  <span
+                    class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
+                    style={`border-color: ${iconColor(dependencyKind)}33; background-color: ${iconColor(dependencyKind)}12;`}
+                  >
+                    <svg
+                      class="size-5"
+                      role="img"
+                      aria-label={icon.title}
+                      viewBox="0 0 24 24"
+                      fill={iconColor(dependencyKind)}
+                    >
+                      <path d={icon.path} />
+                    </svg>
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold">{kindLabel(dependencyKind)}</span>
+                    <span class="mt-1 block truncate text-xs text-muted-foreground">
+                      {icon.title}
+                    </span>
+                  </span>
+                </button>
+              {/each}
+            </div>
+          </fieldset>
+
+          <div class="flex justify-end">
+            <Button type="submit" disabled={!canCreate || createDependencyResourceMutation.isPending}>
+              {#if createDependencyResourceMutation.isPending}
+                {$t(i18nKeys.console.dependencyResources.creatingPlan)}
+              {:else}
+                <Plus class="size-4" />
+                {$t(i18nKeys.console.dependencyResources.createPlanAction)}
+              {/if}
+            </Button>
+          </div>
         </form>
 
         <div class="grid gap-4 md:grid-cols-[auto_minmax(0,1fr)]">
@@ -659,6 +866,48 @@
             placeholder={$t(i18nKeys.console.dependencyResources.backupRetentionReasonPlaceholder)}
           />
         </div>
+
+        {#if provisioningPlan}
+          <section class="console-section space-y-3">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div class="space-y-1">
+                <h3 class="font-semibold">{$t(i18nKeys.console.dependencyResources.planReady)}</h3>
+                <p class="text-sm text-muted-foreground">{planSummary(provisioningPlan)}</p>
+              </div>
+              <Badge variant={statusVariant(provisioningPlan.status)}>{provisioningPlan.status}</Badge>
+            </div>
+            <div class="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+              <p class="break-all">ID: {provisioningPlan.id}</p>
+              <p class="break-all">
+                {$t(i18nKeys.console.dependencyResources.endpoint)}: {plannedEndpoint(provisioningPlan)}
+              </p>
+            </div>
+            <ul class="grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
+              {#each provisioningPlan.summary as item}
+                <li class="rounded-md border bg-background p-3">{item}</li>
+              {/each}
+            </ul>
+            <label class="flex gap-2 text-sm text-muted-foreground">
+              <input
+                id="dependency-resource-provisioning-accept-input"
+                class="mt-0.5 size-4 accent-primary"
+                type="checkbox"
+                bind:checked={acceptProvisioningPlanAcknowledged}
+              />
+              <span>{$t(i18nKeys.console.dependencyResources.acceptPlanAcknowledge)}</span>
+            </label>
+            <div class="flex justify-end">
+              <Button
+                type="button"
+                disabled={!canAcceptProvisioningPlan || acceptProvisioningPlanMutation.isPending}
+                onclick={acceptProvisioningPlan}
+              >
+                <BadgeCheck class="size-4" />
+                {$t(i18nKeys.console.dependencyResources.acceptPlanAction)}
+              </Button>
+            </div>
+          </section>
+        {/if}
       </section>
 
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">

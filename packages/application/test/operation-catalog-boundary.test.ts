@@ -220,6 +220,40 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[DEP-RES-PROV-ENTRY-001] Dependency provisioning acceptance workflow is cataloged", () => {
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      operationCatalog.map((entry) => [entry.key, entry]),
+    );
+
+    expect(entriesByKey.get("dependency-resources.provisioning.plan")).toMatchObject({
+      kind: "command",
+      messageName: "CreateDependencyResourceProvisioningPlanCommand",
+      serviceName: "CreateDependencyResourceProvisioningPlanUseCase",
+      transports: {
+        cli: "appaloft dependency plan --mode <create|reuse>",
+        orpc: { method: "POST", path: "/api/dependency-resources/provisioning/plan" },
+      },
+    });
+    expect(entriesByKey.get("dependency-resources.provisioning.accept")).toMatchObject({
+      kind: "command",
+      messageName: "AcceptDependencyResourceProvisioningPlanCommand",
+      serviceName: "AcceptDependencyResourceProvisioningPlanUseCase",
+      transports: {
+        cli: "appaloft dependency accept <planId> --acknowledge-mutation",
+        orpc: { method: "POST", path: "/api/dependency-resources/provisioning/{planId}/accept" },
+      },
+    });
+    expect(entriesByKey.get("dependency-resources.provisioning.status")).toMatchObject({
+      kind: "query",
+      messageName: "ShowDependencyResourceProvisioningPlanQuery",
+      serviceName: "ShowDependencyResourceProvisioningPlanQueryService",
+      transports: {
+        cli: "appaloft dependency status <planId>",
+        orpc: { method: "GET", path: "/api/dependency-resources/provisioning/{planId}" },
+      },
+    });
+  });
+
   test("[DEP-RES-NATIVE-009] Dependency provider-native realization reuses stable catalog operations and schemas", () => {
     const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
     const entriesByKey = new Map<string, OperationCatalogEntry>(

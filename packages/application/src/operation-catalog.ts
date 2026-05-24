@@ -25,8 +25,10 @@ import { showCertificateQueryInputSchema } from "./operations/certificates/show-
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
+import { acceptDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/accept-dependency-resource-provisioning-plan.command";
 import { configureDependencyResourceBackupPolicyCommandInputSchema } from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 import { createDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/create-dependency-resource-backup.command";
+import { createDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
 import { importDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-dependency-resource.command";
 import { listDependencyResourceBackupPoliciesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
@@ -38,6 +40,7 @@ import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { showDependencyResourceBackupQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup.query";
 import { showDependencyResourceBackupPolicyQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";
+import { showDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/show-dependency-resource-provisioning-plan.query";
 import { createDeployTokenCommandInputSchema } from "./operations/deploy-tokens/create-deploy-token.schema";
 import { listDeployTokensQueryInputSchema } from "./operations/deploy-tokens/list-deploy-tokens.schema";
 import { revokeDeployTokenCommandInputSchema } from "./operations/deploy-tokens/revoke-deploy-token.schema";
@@ -1695,6 +1698,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource proxy-config <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/proxy-configuration" },
+    },
+  },
+  {
+    key: "dependency-resources.provisioning.plan",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "CreateDependencyResourceProvisioningPlanCommand",
+    handlerName: "CreateDependencyResourceProvisioningPlanCommandHandler",
+    serviceName: "CreateDependencyResourceProvisioningPlanUseCase",
+    inputSchema: createDependencyResourceProvisioningPlanInputSchema,
+    serviceToken: tokens.createDependencyResourceProvisioningPlanUseCase,
+    transports: {
+      cli: "appaloft dependency plan --mode <create|reuse>",
+      orpc: { method: "POST", path: "/api/dependency-resources/provisioning/plan" },
+    },
+  },
+  {
+    key: "dependency-resources.provisioning.accept",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "AcceptDependencyResourceProvisioningPlanCommand",
+    handlerName: "AcceptDependencyResourceProvisioningPlanCommandHandler",
+    serviceName: "AcceptDependencyResourceProvisioningPlanUseCase",
+    inputSchema: acceptDependencyResourceProvisioningPlanInputSchema,
+    serviceToken: tokens.acceptDependencyResourceProvisioningPlanUseCase,
+    transports: {
+      cli: "appaloft dependency accept <planId> --acknowledge-mutation",
+      orpc: { method: "POST", path: "/api/dependency-resources/provisioning/{planId}/accept" },
+    },
+  },
+  {
+    key: "dependency-resources.provisioning.status",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "ShowDependencyResourceProvisioningPlanQuery",
+    handlerName: "ShowDependencyResourceProvisioningPlanQueryHandler",
+    serviceName: "ShowDependencyResourceProvisioningPlanQueryService",
+    inputSchema: showDependencyResourceProvisioningPlanInputSchema,
+    serviceToken: tokens.showDependencyResourceProvisioningPlanQueryService,
+    transports: {
+      cli: "appaloft dependency status <planId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/provisioning/{planId}" },
     },
   },
   {
