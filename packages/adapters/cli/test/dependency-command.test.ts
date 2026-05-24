@@ -2,11 +2,13 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcceptDependencyResourceProvisioningPlanCommand,
   type Command as AppCommand,
   type Query as AppQuery,
   BindResourceDependencyCommand,
   type CommandBus,
   CreateDependencyResourceBackupCommand,
+  CreateDependencyResourceProvisioningPlanCommand,
   type ExecutionContextFactory,
   ImportDependencyResourceCommand,
   ListDependencyResourceBackupsQuery,
@@ -17,6 +19,7 @@ import {
   RestoreDependencyResourceBackupCommand,
   RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceBackupQuery,
+  ShowDependencyResourceProvisioningPlanQuery,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -180,6 +183,55 @@ describe("CLI dependency commands", () => {
     expect(commands[0]).toMatchObject({ kind: "opensearch" });
     expect(commands[1]).toBeInstanceOf(ImportDependencyResourceCommand);
     expect(commands[1]).toMatchObject({ kind: "object-storage" });
+  });
+
+  test("[DEP-RES-PROV-ENTRY-001] dependency plan acceptance workflow dispatches unified commands", async () => {
+    const { commands, program, queries } = await createCommandCaptureHarness(
+      "req_cli_dep_provisioning",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "plan",
+      "--mode",
+      "reuse",
+      "--kind",
+      "opensearch",
+      "--project",
+      "prj_demo",
+      "--environment",
+      "env_demo",
+      "--name",
+      "External Search",
+      "--connection-url",
+      "https://admin:secret@search.example.com:9200",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "accept",
+      "drp_1",
+      "--acknowledge-mutation",
+    ]);
+    await parseCli(program, ["node", "appaloft", "dependency", "status", "drp_1"]);
+
+    expect(commands[0]).toBeInstanceOf(CreateDependencyResourceProvisioningPlanCommand);
+    expect(commands[0]).toMatchObject({
+      input: {
+        mode: "reuse",
+        reuse: {
+          kind: "opensearch",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "External Search",
+        },
+      },
+    });
+    expect(commands[1]).toBeInstanceOf(AcceptDependencyResourceProvisioningPlanCommand);
+    expect(queries[0]).toBeInstanceOf(ShowDependencyResourceProvisioningPlanQuery);
   });
 
   test("[DEP-RES-PG-ENTRY-001] dependency list/show dispatch query bus", async () => {

@@ -56,6 +56,7 @@ import {
   RotateResourceDependencyBindingSecretCommand,
   ShowResourceDependencyBindingQuery,
 } from "../src/messages";
+import { createDependencyBindingSnapshotReferences } from "../src/operations/deployments/dependency-binding-snapshot-references";
 import {
   BindResourceDependencyUseCase,
   DeleteDependencyResourceUseCase,
@@ -265,6 +266,133 @@ describe("Dependency resource binding use cases", () => {
         },
       }),
     );
+  });
+
+  test("[CLOUD-DEP-PROV-PUBLIC-KINDS-041] binds mainstream dependency kinds into deployment snapshot references", async () => {
+    const { bindDependency, context, dependencyResources, listBindings, repositoryContext } =
+      await createHarness();
+    const mainstreamDependencies = [
+      {
+        kind: "mysql",
+        id: "rsi_mysql",
+        name: "Application MySQL",
+        providerKey: "external-mysql",
+        host: "mysql.example.com",
+        port: 3306,
+        databaseName: "app",
+        targetName: "MYSQL_URL",
+        maskedConnection: "mysql://app:********@mysql.example.com:3306/app",
+      },
+      {
+        kind: "clickhouse",
+        id: "rsi_clickhouse",
+        name: "Analytics ClickHouse",
+        providerKey: "external-clickhouse",
+        host: "clickhouse.example.com",
+        port: 8123,
+        databaseName: "analytics",
+        targetName: "CLICKHOUSE_URL",
+        maskedConnection: "clickhouse://app:********@clickhouse.example.com:8123/analytics",
+      },
+      {
+        kind: "object-storage",
+        id: "rsi_object_storage",
+        name: "Object Storage",
+        providerKey: "external-object-storage",
+        host: "objects.example.com",
+        port: 9000,
+        databaseName: "app-bucket",
+        targetName: "S3_ENDPOINT",
+        maskedConnection: "s3://access:********@objects.example.com:9000/app-bucket",
+      },
+      {
+        kind: "opensearch",
+        id: "rsi_opensearch",
+        name: "Search OpenSearch",
+        providerKey: "external-opensearch",
+        host: "search.example.com",
+        port: 9200,
+        databaseName: "app-index",
+        targetName: "OPENSEARCH_URL",
+        maskedConnection: "https://app:********@search.example.com:9200/app-index",
+      },
+    ] as const;
+
+    for (const dependency of mainstreamDependencies) {
+      const dependencyResource = ResourceInstance.createDependencyResource({
+        id: ResourceInstanceId.rehydrate(dependency.id),
+        projectId: ProjectId.rehydrate("prj_demo"),
+        environmentId: EnvironmentId.rehydrate("env_demo"),
+        name: ResourceInstanceName.rehydrate(dependency.name),
+        kind: ResourceInstanceKindValue.rehydrate(dependency.kind),
+        sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+        providerKey: ProviderKey.rehydrate(dependency.providerKey),
+        providerManaged: false,
+        endpoint: {
+          host: dependency.host,
+          port: dependency.port,
+          databaseName: dependency.databaseName,
+          maskedConnection: dependency.maskedConnection,
+        },
+        connectionSecretRef: DependencyResourceSecretRef.rehydrate(
+          `appaloft://dependency-resources/${dependency.id}/connection`,
+        ),
+        createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      })._unsafeUnwrap();
+      await dependencyResources.upsert(
+        repositoryContext,
+        dependencyResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+      );
+
+      const result = await bindDependency.execute(context, {
+        resourceId: "res_web",
+        dependencyResourceId: dependency.id,
+        targetName: dependency.targetName,
+      });
+
+      expect(result.isOk()).toBe(true);
+    }
+
+    const list = await listBindings.execute(
+      context,
+      ListResourceDependencyBindingsQuery.create({ resourceId: "res_web" })._unsafeUnwrap(),
+    );
+    const items = list
+      ._unsafeUnwrap()
+      .items.filter((binding) =>
+        mainstreamDependencies.some((dependency) => dependency.id === binding.dependencyResourceId),
+      );
+    const snapshotReferences = createDependencyBindingSnapshotReferences(items)._unsafeUnwrap();
+
+    expect(items).toHaveLength(mainstreamDependencies.length);
+    expect(items.map((binding) => binding.kind).toSorted()).toEqual([
+      "clickhouse",
+      "mysql",
+      "object-storage",
+      "opensearch",
+    ]);
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: "rsi_object_storage",
+        kind: "object-storage",
+        target: expect.objectContaining({
+          targetName: "S3_ENDPOINT",
+          secretRef: "appaloft://dependency-resources/rsi_object_storage/connection",
+        }),
+        snapshotReadiness: {
+          status: "ready",
+        },
+      }),
+    );
+    expect(snapshotReferences.map((reference) => reference.kind.value).toSorted()).toEqual([
+      "clickhouse",
+      "mysql",
+      "object-storage",
+      "opensearch",
+    ]);
+    expect(JSON.stringify(items)).not.toContain("super-secret");
+    expect(JSON.stringify(snapshotReferences)).not.toContain("********");
   });
 
   test("[DEP-BIND-PG-BIND-004] rejects duplicate active binding target", async () => {

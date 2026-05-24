@@ -78,6 +78,7 @@ const forbiddenDeploymentInputKeys = [
   "ingressClass",
   "replicas",
   "pullSecret",
+  "dependencyProvisioning",
 ];
 
 describe("quick deploy workflow", () => {
@@ -1033,6 +1034,61 @@ describe("quick deploy workflow", () => {
       expectedKinds: ["deployments.create"],
     },
     {
+      id: "[QUICK-DEPLOY-WF-063]",
+      name: "dependency provisioning is accepted and bound before deployment",
+      input: workflowInput({
+        dependencyProvisioning: [
+          {
+            mode: "create",
+            requirementId: "postgres",
+            kind: "postgres",
+            name: "app-postgres",
+            binding: {
+              targetName: "postgres",
+              scope: "runtime-only",
+              injectionMode: "env",
+            },
+          },
+          {
+            mode: "reuse",
+            requirementId: "search",
+            kind: "opensearch",
+            name: "shared-search",
+            connectionUrl: "https://search.example.com",
+            secretRef: "secret://dependency/search",
+          },
+        ],
+      }),
+      expectedKinds: ["dependencyResources.provision", "deployments.create"],
+      assert: ({ steps }) => {
+        const provisionStep = findStep(steps, "dependencyResources.provision");
+        expect(provisionStep.input).toMatchObject({
+          projectId: "proj_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          items: [
+            {
+              mode: "create",
+              requirementId: "postgres",
+              kind: "postgres",
+              name: "app-postgres",
+              serverId: "srv_existing",
+            },
+            {
+              mode: "reuse",
+              requirementId: "search",
+              kind: "opensearch",
+              name: "shared-search",
+              connectionUrl: "https://search.example.com",
+              secretRef: "secret://dependency/search",
+            },
+          ],
+        });
+        expectStepOrder(steps, "dependencyResources.provision", "deployments.create");
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-ENTRY-007]",
       name: "domain TLS entry remains a separate follow-up surface",
       input: workflowInput(),
@@ -1486,6 +1542,11 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
       return { id: "res_1" };
     case "environments.setVariable":
       return;
+    case "dependencyResources.provision":
+      return {
+        dependencyResourceIds: ["rsi_postgres", "rsi_search"],
+        bindingIds: ["rdb_postgres", "rdb_search"],
+      };
     case "deployments.create":
       return { id: "dep_1" };
   }

@@ -1,9 +1,12 @@
 import {
+  AcceptDependencyResourceProvisioningPlanCommand,
+  BindResourceDependencyCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
+  CreateDependencyResourceProvisioningPlanCommand,
   type CreateDeploymentCommandInput,
   CreateEnvironmentCommand,
   CreateProjectCommand,
@@ -40,6 +43,7 @@ import {
   normalizeQuickDeployGeneratedNameBase,
   type QuickDeployCreateEnvironmentInput,
   type QuickDeployEnvironmentVariableInput,
+  type QuickDeployProvisionDependencyResourcesInput,
   type QuickDeployReference,
   type QuickDeployResourceReference,
   type QuickDeployServerCredential,
@@ -1101,6 +1105,88 @@ function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
   });
 }
 
+function provisionDependencyResources(input: QuickDeployProvisionDependencyResourcesInput) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const dependencyResourceIds: string[] = [];
+    const bindingIds: string[] = [];
+
+    for (const item of input.items) {
+      const planMessage = yield* resultToEffect(
+        CreateDependencyResourceProvisioningPlanCommand.create(
+          item.mode === "create"
+            ? {
+                mode: "create",
+                create: {
+                  kind: item.kind,
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                  name: item.name,
+                  ...(item.serverId ? { serverId: item.serverId } : {}),
+                  ...(item.providerKey ? { providerKey: item.providerKey } : {}),
+                  ...(item.description ? { description: item.description } : {}),
+                },
+              }
+            : {
+                mode: "reuse",
+                reuse: {
+                  kind: item.kind,
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                  name: item.name,
+                  connectionUrl: item.connectionUrl,
+                  ...(item.secretRef ? { secretRef: item.secretRef } : {}),
+                  ...(item.connectionSecret ? { connectionSecret: item.connectionSecret } : {}),
+                  ...(item.description ? { description: item.description } : {}),
+                },
+              },
+        ),
+      );
+      const planResult = yield* Effect.promise(() => cli.executeCommand(planMessage));
+      const plan = yield* resultToEffect(planResult);
+      const acceptMessage = yield* resultToEffect(
+        AcceptDependencyResourceProvisioningPlanCommand.create({
+          planId: plan.plan.id,
+          acknowledgeMutation: true,
+        }),
+      );
+      const acceptedResult = yield* Effect.promise(() => cli.executeCommand(acceptMessage));
+      const accepted = yield* resultToEffect(acceptedResult);
+      const dependencyResourceId = accepted.plan.dependencyResourceId;
+      if (!dependencyResourceId) {
+        return yield* Effect.fail(
+          domainError.validation(
+            `Dependency provisioning plan ${accepted.plan.id} did not realize a resource`,
+            {
+              phase: "quick-deploy-dependency-provisioning",
+              planId: accepted.plan.id,
+            },
+          ),
+        );
+      }
+
+      dependencyResourceIds.push(dependencyResourceId);
+      const bindingMessage = yield* resultToEffect(
+        BindResourceDependencyCommand.create({
+          resourceId: input.resourceId,
+          dependencyResourceId,
+          targetName: item.binding?.targetName ?? item.requirementId,
+          ...(item.binding?.scope ? { scope: item.binding.scope } : {}),
+          ...(item.binding?.injectionMode ? { injectionMode: item.binding.injectionMode } : {}),
+        }),
+      );
+      const bindingResult = yield* Effect.promise(() => cli.executeCommand(bindingMessage));
+      const binding = yield* resultToEffect(bindingResult);
+      bindingIds.push(binding.id);
+    }
+
+    return {
+      dependencyResourceIds,
+      bindingIds,
+    };
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -2060,6 +2146,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return configureResourceNetwork(step.input);
     case "environments.setVariable":
       return setEnvironmentVariable(step.input);
+    case "dependencyResources.provision":
+      return provisionDependencyResources(step.input);
     case "deployments.create":
       return Effect.succeed({ id: "__cli_deployment_pending__" });
   }

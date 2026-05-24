@@ -111,6 +111,9 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
 - `appaloft dependency provision --kind <kind>` - `dependency-resources.provision`
 - `appaloft dependency import --kind <kind>` - `dependency-resources.import`
+- `appaloft dependency plan --mode <create|reuse>` - `dependency-resources.provisioning.plan`
+- `appaloft dependency accept <planId> --acknowledge-mutation` - `dependency-resources.provisioning.accept`
+- `appaloft dependency status <planId>` - `dependency-resources.provisioning.status`
 - `appaloft dependency list` - `dependency-resources.list`
 - `appaloft dependency show <dependencyResourceId>` - `dependency-resources.show`
 - `appaloft dependency rename <dependencyResourceId>` - `dependency-resources.rename`

@@ -627,6 +627,18 @@ export const cliCommandDescriptions = {
     "self-hosting.organization-team-management",
   ),
   dependency: withDocs("Dependency resource operations", "dependency.resource-lifecycle"),
+  dependencyPlan: withDocs(
+    "Prepare a dependency resource create or reuse plan without mutating providers",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyAccept: withDocs(
+    "Accept a dependency resource provisioning plan and execute the planned mutation",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyStatus: withDocs(
+    "Show dependency resource provisioning plan status",
+    "dependency.resource-lifecycle",
+  ),
   dependencyProvision: withDocs(
     "Create an Appaloft-managed dependency resource by kind; pass --server for Docker-backed single-server realization",
     "dependency.resource-lifecycle",

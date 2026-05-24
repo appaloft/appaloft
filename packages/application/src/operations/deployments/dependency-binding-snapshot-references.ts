@@ -21,6 +21,7 @@ import {
   type DependencyResourceSecretStore,
   type DeploymentDependencyBindingSnapshotReferenceSummary,
   type DeploymentDependencyBindingSnapshotSummary,
+  dependencyResourceKinds,
   type ResourceDependencyBindingSummary,
   type RuntimeTargetBackend,
 } from "../../ports";
@@ -34,8 +35,9 @@ const appaloftOwnedDependencySecretRefPrefixes = [
 function toDependencyBindingReferenceKind(
   kind: ResourceInstanceKindValue,
 ): DeploymentDependencyBindingSnapshotReferenceSummary["kind"] {
-  if (kind.value === "postgres" || kind.value === "redis") {
-    return kind.value;
+  const dependencyKind = dependencyResourceKinds.find((candidate) => candidate === kind.value);
+  if (dependencyKind) {
+    return dependencyKind;
   }
 
   throw new Error(`Deployment dependency binding reference kind ${kind.value} is not supported`);
@@ -44,7 +46,7 @@ function toDependencyBindingReferenceKind(
 function runtimeInjectionBlockReason(
   binding: ResourceDependencyBindingSummary,
 ): string | undefined {
-  if (binding.kind !== "postgres" && binding.kind !== "redis") {
+  if (!dependencyResourceKinds.includes(binding.kind)) {
     return "dependency_runtime_injection_kind_unsupported";
   }
 
