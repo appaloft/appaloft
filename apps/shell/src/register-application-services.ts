@@ -3,6 +3,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
+  AcceptDependencyResourceProvisioningPlanCommandHandler,
+  AcceptDependencyResourceProvisioningPlanUseCase,
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
   ApplyInstanceUpgradeCommandHandler,
@@ -94,6 +96,8 @@ import {
   CreateAuditEventArchiveUseCase,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
+  CreateDependencyResourceProvisioningPlanCommandHandler,
+  CreateDependencyResourceProvisioningPlanUseCase,
   CreateDeploymentSourceEventDispatcher,
   CreateDeploymentUseCase,
   CreateDeployTokenCommandHandler,
@@ -181,6 +185,7 @@ import {
   ImportResourceVariablesUseCase,
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
+  InMemoryDependencyResourceProvisioningPlanStore,
   InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
@@ -400,6 +405,8 @@ import {
   ShowDependencyResourceBackupPolicyQueryService,
   ShowDependencyResourceBackupQueryHandler,
   ShowDependencyResourceBackupQueryService,
+  ShowDependencyResourceProvisioningPlanQueryHandler,
+  ShowDependencyResourceProvisioningPlanQueryService,
   ShowDependencyResourceQueryHandler,
   ShowDependencyResourceQueryService,
   ShowDeploymentQueryHandler,
@@ -1677,6 +1684,9 @@ export function registerApplicationServices(
   container.registerSingleton(ShowSourceEventQueryHandler);
   container.registerSingleton(ResolveGenericSignedSourceEventSecretQueryHandler);
   container.registerSingleton(ResolvePreviewPullRequestContextQueryHandler);
+  container.registerSingleton(CreateDependencyResourceProvisioningPlanCommandHandler);
+  container.registerSingleton(AcceptDependencyResourceProvisioningPlanCommandHandler);
+  container.registerSingleton(ShowDependencyResourceProvisioningPlanQueryHandler);
   container.registerSingleton(ProvisionDependencyResourceCommandHandler);
   container.registerSingleton(ImportDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
@@ -1921,6 +1931,22 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.scheduledTaskRunLogsQueryService,
     ScheduledTaskRunLogsQueryService,
+  );
+  container.registerSingleton(
+    tokens.dependencyResourceProvisioningPlanStore,
+    InMemoryDependencyResourceProvisioningPlanStore,
+  );
+  container.registerSingleton(
+    tokens.createDependencyResourceProvisioningPlanUseCase,
+    CreateDependencyResourceProvisioningPlanUseCase,
+  );
+  container.registerSingleton(
+    tokens.acceptDependencyResourceProvisioningPlanUseCase,
+    AcceptDependencyResourceProvisioningPlanUseCase,
+  );
+  container.registerSingleton(
+    tokens.showDependencyResourceProvisioningPlanQueryService,
+    ShowDependencyResourceProvisioningPlanQueryService,
   );
   container.registerSingleton(
     tokens.provisionDependencyResourceUseCase,

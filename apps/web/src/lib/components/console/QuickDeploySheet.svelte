@@ -8,6 +8,7 @@
     Eye,
     FolderOpen,
     GitFork,
+    HardDriveDownload,
     LoaderCircle,
     Package,
     Play,
@@ -17,12 +18,22 @@
     TerminalSquare,
     Waypoints,
   } from "@lucide/svelte";
+  import {
+    siClickhouse,
+    siMinio,
+    siMysql,
+    siOpensearch,
+    siPostgresql,
+    siRedis,
+  } from "simple-icons";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     createQuickDeployOutcomePacket,
     createQuickDeployGeneratedResourceName,
     normalizeQuickDeployGeneratedNameBase,
     runQuickDeployWorkflow,
+    type QuickDeployDependencyProvisioningInput,
+    type QuickDeployProvisionDependencyResourcesInput,
     type QuickDeployWorkflowInput,
     type QuickDeployWorkflowStep,
     type QuickDeployWorkflowStepOutput,
@@ -37,6 +48,7 @@
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     DeploymentProgressEvent,
+    DependencyResourceSummary,
     CreateResourceInput,
     EnvironmentSummary,
     GitHubRepositorySummary,
@@ -103,6 +115,26 @@
   type DraftMode = "existing" | "new";
   type EnvironmentKind = EnvironmentSummary["kind"];
   type ResourceKind = ResourceSummary["kind"];
+  type DependencyKind = DependencyResourceSummary["kind"];
+  type DependencyKindIcon = {
+    title: string;
+    path: string;
+    hex: string;
+  };
+  type BlueprintDependencyProvisioningMode = "create" | "reuse";
+  type BlueprintDependencyProvisioningDraft = {
+    requirementId: string;
+    kind: DependencyKind;
+    mode: BlueprintDependencyProvisioningMode;
+    reuseConnectionUrl: string;
+    reuseSecretRef: string;
+  };
+  type BlueprintDependencyRequirement = {
+    id: string;
+    kind: DependencyKind;
+    label: string;
+    optional?: boolean;
+  };
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
   type SummaryRow = {
     label: string;
@@ -184,6 +216,7 @@
       secrets: readonly { key: string; label: string; required?: boolean }[];
     };
   };
+  type BlueprintComponent = BlueprintDetailResponse["manifest"]["components"][number];
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
@@ -218,6 +251,47 @@
     "static-site",
     "external",
   ] as const satisfies readonly ResourceKind[];
+  const dependencyKindOptions: Record<
+    DependencyKind,
+    { label: string; icon: DependencyKindIcon }
+  > = {
+    postgres: {
+      label: "Postgres",
+      icon: siPostgresql,
+    },
+    redis: {
+      label: "Redis",
+      icon: siRedis,
+    },
+    mysql: {
+      label: "MySQL",
+      icon: siMysql,
+    },
+    clickhouse: {
+      label: "ClickHouse",
+      icon: siClickhouse,
+    },
+    "object-storage": {
+      label: "Object Storage",
+      icon: siMinio,
+    },
+    opensearch: {
+      label: "OpenSearch",
+      icon: siOpensearch,
+    },
+  };
+  const dependencyKindOrder = [
+    "postgres",
+    "redis",
+    "mysql",
+    "clickhouse",
+    "object-storage",
+    "opensearch",
+  ] as const satisfies readonly DependencyKind[];
+  const blueprintDependencyProvisioningModes = [
+    "create",
+    "reuse",
+  ] as const satisfies readonly BlueprintDependencyProvisioningMode[];
   const sourceOptions: Array<{
     key: SourceKind;
     labelKey: TranslationKey;
@@ -402,6 +476,7 @@
   let serverConnectivityTestPending = $state(false);
   let workflowProgressItems = $state<QuickDeployWorkflowProgressItem[]>([]);
   let workflowProgressError = $state("");
+  let dependencyProvisioningInFlight = $state(false);
   let deploymentCreateInFlight = $state(false);
   let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
   let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
@@ -484,6 +559,9 @@
   );
   let selectedBlueprintSlug = $state(browser ? (page.url.searchParams.get("blueprintSlug") ?? "") : "");
   let selectedBlueprintTitle = $state(browser ? (page.url.searchParams.get("blueprintTitle") ?? "") : "");
+  let blueprintDependencyProvisioningDrafts = $state<
+    Record<string, BlueprintDependencyProvisioningDraft>
+  >({});
   let blueprintSelectorDialogOpen = $state(false);
   let blueprintDetailDialogOpen = $state(false);
   let blueprintDetailSlug = $state("");
@@ -621,7 +699,8 @@
       enabled:
         browser &&
         enabled &&
-        blueprintDetailDialogOpen &&
+        (blueprintDetailDialogOpen ||
+          (sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()))) &&
         Boolean(selectedBlueprintDetailEndpointValue),
       staleTime: 30_000,
     }),
@@ -632,6 +711,54 @@
   const selectedBlueprintVariables = $derived(
     selectedBlueprintManifest?.components.flatMap((component) => component.variables) ?? [],
   );
+  const selectedBlueprintPrimaryComponent = $derived(
+    selectedBlueprintManifest?.components[0] ?? null,
+  );
+  const selectedBlueprintDefaultPort = $derived.by(() => {
+    const component = selectedBlueprintPrimaryComponent;
+    const port =
+      component?.ports.find((candidate) => candidate.public && candidate.protocol === "http") ??
+      component?.ports.find((candidate) => candidate.protocol === "http") ??
+      component?.ports[0];
+
+    return port ? String(port.containerPort) : "3000";
+  });
+  const selectedBlueprintProvisionableDependencies = $derived(
+    selectedBlueprintManifest?.resources.flatMap((resource): BlueprintDependencyRequirement[] =>
+      isProvisionableDependencyKind(resource.kind)
+        ? [
+            {
+              id: resource.id,
+              kind: resource.kind,
+              label: resource.label,
+              ...(resource.optional ? { optional: resource.optional } : {}),
+            },
+          ]
+        : [],
+    ) ?? [],
+  );
+  const selectedBlueprintUnsupportedDependencies = $derived(
+    selectedBlueprintManifest?.resources.filter(
+      (resource) => !isProvisionableDependencyKind(resource.kind),
+    ) ?? [],
+  );
+  const blueprintDependencyProvisioningSummary = $derived.by(() => {
+    if (selectedBlueprintProvisionableDependencies.length === 0) {
+      return "无";
+    }
+
+    const createCount = selectedBlueprintProvisionableDependencies.filter(
+      (requirement) => blueprintDependencyDraft(requirement).mode === "create",
+    ).length;
+    const reuseCount = selectedBlueprintProvisionableDependencies.length - createCount;
+
+    return [
+      createCount > 0 ? `${createCount} create` : "",
+      reuseCount > 0 ? `${reuseCount} reuse` : "",
+    ]
+      .filter(Boolean)
+      .join(" / ");
+  });
   const sshCredentials = $derived(
     (sshCredentialsQuery.data?.items ?? []) as SshCredentialSummary[],
   );
@@ -683,6 +810,7 @@
       configureResourceRuntimeMutation.isPending ||
       configureResourceNetworkMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
+      dependencyProvisioningInFlight ||
       deploymentCreateInFlight,
   );
   const sourceLocator = $derived.by(() => {
@@ -786,13 +914,13 @@
 
     if (!resourceContextEnabled) {
       segments.push(`--resource-name ${inferredResourceInput.name}`);
-      segments.push(`--port ${resourceInternalPort.trim() || resourceInternalPortDefault}`);
+      segments.push(`--port ${effectiveResourceInternalPortText()}`);
     } else if (resourceMode === "new") {
       segments.push(`--resource-name ${editedResourceInput.name}`);
       if (editedResourceInput.kind) {
         segments.push(`--resource-kind ${editedResourceInput.kind}`);
       }
-      segments.push(`--port ${resourceInternalPort.trim() || resourceInternalPortDefault}`);
+      segments.push(`--port ${effectiveResourceInternalPortText()}`);
     }
 
     if (createsResource && resourceRuntimeName.trim()) {
@@ -1034,7 +1162,13 @@
 
     return sourceKind === "static-site" || draftKind === "static-site";
   });
-  const resourceInternalPortDefault = $derived(createsStaticSiteResource ? "80" : "3000");
+  const resourceInternalPortDefault = $derived(
+    createsStaticSiteResource
+      ? "80"
+      : sourceKind === "blueprint"
+        ? selectedBlueprintDefaultPort
+        : "3000",
+  );
   const defaultProjectSummary = $derived.by(() => {
     if (selectedProject) {
       return selectedProject.name;
@@ -1058,7 +1192,7 @@
       }`;
     }
 
-    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || resourceInternalPortDefault}`;
+    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"} · :${effectiveResourceInternalPortText()}`;
   });
   const projectSummary = $derived.by(() => {
     if (projectMode === "existing") {
@@ -1127,7 +1261,7 @@
         : "未选择资源";
     }
 
-    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || resourceInternalPortDefault}`;
+    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${effectiveResourceInternalPortText()}`;
   });
   const resourceHealthCheckSummary = $derived.by(() => {
     if (resourceContextEnabled && resourceMode === "existing") {
@@ -1321,6 +1455,37 @@
   });
 
   $effect(() => {
+    const nextDrafts: Record<string, BlueprintDependencyProvisioningDraft> = {};
+    let changed = false;
+
+    for (const requirement of selectedBlueprintProvisionableDependencies) {
+      const existing = blueprintDependencyProvisioningDrafts[requirement.id];
+      if (existing?.kind === requirement.kind) {
+        nextDrafts[requirement.id] = existing;
+        continue;
+      }
+
+      nextDrafts[requirement.id] = createDefaultBlueprintDependencyDraft(
+        requirement.id,
+        requirement.kind,
+      );
+      changed = true;
+    }
+
+    if (
+      Object.keys(blueprintDependencyProvisioningDrafts).some(
+        (requirementId) => !nextDrafts[requirementId],
+      )
+    ) {
+      changed = true;
+    }
+
+    if (changed) {
+      blueprintDependencyProvisioningDrafts = nextDrafts;
+    }
+  });
+
+  $effect(() => {
     const baseName = normalizeQuickDeployGeneratedNameBase(inferredSourceName);
     if (
       generatedResourceNameBase !== baseName ||
@@ -1399,6 +1564,197 @@
 
   function parseResourceKind(value: string | null): ResourceKind {
     return resourceKinds.includes(value as ResourceKind) ? (value as ResourceKind) : "application";
+  }
+
+  function isProvisionableDependencyKind(value: string): value is DependencyKind {
+    return dependencyKindOrder.includes(value as DependencyKind);
+  }
+
+  function dependencyKindLabel(kind: DependencyKind): string {
+    return dependencyKindOptions[kind].label;
+  }
+
+  function dependencyKindIcon(kind: DependencyKind): DependencyKindIcon {
+    return dependencyKindOptions[kind].icon;
+  }
+
+  function dependencyKindIconColor(kind: DependencyKind): string {
+    return `#${dependencyKindIcon(kind).hex}`;
+  }
+
+  function effectiveResourceInternalPortText(): string {
+    const requestedPort = resourceInternalPort.trim();
+    if (sourceKind === "blueprint" && (!requestedPort || requestedPort === "3000")) {
+      return selectedBlueprintDefaultPort;
+    }
+
+    return requestedPort || resourceInternalPortDefault;
+  }
+
+  function createDefaultBlueprintDependencyDraft(
+    requirementId: string,
+    kind: DependencyKind,
+  ): BlueprintDependencyProvisioningDraft {
+    return {
+      requirementId,
+      kind,
+      mode: "create",
+      reuseConnectionUrl: "",
+      reuseSecretRef: "",
+    };
+  }
+
+  function blueprintDependencyDraft(input: {
+    id: string;
+    kind: string;
+  }): BlueprintDependencyProvisioningDraft {
+    if (!isProvisionableDependencyKind(input.kind)) {
+      throw new Error(`Blueprint dependency kind ${input.kind} is not provisionable`);
+    }
+
+    return (
+      blueprintDependencyProvisioningDrafts[input.id] ??
+      createDefaultBlueprintDependencyDraft(input.id, input.kind)
+    );
+  }
+
+  function updateBlueprintDependencyDraft(
+    requirementId: string,
+    update: Partial<BlueprintDependencyProvisioningDraft>,
+  ): void {
+    const existing = blueprintDependencyProvisioningDrafts[requirementId];
+    if (!existing) {
+      return;
+    }
+
+    blueprintDependencyProvisioningDrafts = {
+      ...blueprintDependencyProvisioningDrafts,
+      [requirementId]: {
+        ...existing,
+        ...update,
+      },
+    };
+  }
+
+  function blueprintDependencySelectionsComplete(): boolean {
+    return selectedBlueprintProvisionableDependencies.every((requirement) => {
+      const draft = blueprintDependencyDraft(requirement);
+      return draft.mode === "create"
+        ? true
+        : Boolean(draft.reuseConnectionUrl.trim() && draft.reuseSecretRef.trim());
+    });
+  }
+
+  function blueprintDependencyProvisioningPayload() {
+    return selectedBlueprintProvisionableDependencies.map((requirement) => {
+      const draft = blueprintDependencyDraft(requirement);
+      const providerKey = draft.mode === "create" ? "cloud-local-docker" : "external";
+
+      return {
+        requirementId: requirement.id,
+        kind: requirement.kind,
+        label: requirement.label,
+        mode: draft.mode,
+        providerKey,
+        ...(draft.mode === "create"
+          ? {
+              target: {
+                ...(selectedServerId ? { serverId: selectedServerId } : {}),
+              },
+            }
+          : {
+              reuse: {
+                maskedConnection: draft.reuseConnectionUrl.trim(),
+                secretRef: draft.reuseSecretRef.trim(),
+              },
+          }),
+      };
+    });
+  }
+
+  function blueprintDependencyResourceName(requirement: BlueprintDependencyRequirement): string {
+    const blueprintName =
+      selectedBlueprintSlug.trim() ||
+      selectedBlueprintTitle.trim() ||
+      inferredResourceInput.name ||
+      "blueprint";
+
+    return normalizeQuickDeployGeneratedNameBase(
+      `${blueprintName}-${requirement.id}`,
+      requirement.kind,
+    );
+  }
+
+  function blueprintQuickDeployDependencyProvisioningInput(): QuickDeployDependencyProvisioningInput[] {
+    return selectedBlueprintProvisionableDependencies.map((requirement) => {
+      const draft = blueprintDependencyDraft(requirement);
+      const binding = {
+        targetName: requirement.id,
+        scope: "runtime-only",
+        injectionMode: "env",
+      } as const;
+
+      if (draft.mode === "create") {
+        return {
+          mode: "create",
+          requirementId: requirement.id,
+          kind: requirement.kind,
+          name: blueprintDependencyResourceName(requirement),
+          binding,
+        };
+      }
+
+      return {
+        mode: "reuse",
+        requirementId: requirement.id,
+        kind: requirement.kind,
+        name: blueprintDependencyResourceName(requirement),
+        connectionUrl: draft.reuseConnectionUrl.trim(),
+        secretRef: draft.reuseSecretRef.trim(),
+        binding,
+      };
+    });
+  }
+
+  function blueprintWorkflowEnvironmentVariables(): NonNullable<
+    QuickDeployWorkflowInput["environmentVariables"]
+  > {
+    if (sourceKind !== "blueprint") {
+      return [];
+    }
+
+    return selectedBlueprintVariables.map((variable) => ({
+      key: variable.key,
+      value: variable.value,
+      exposure: "runtime" as const,
+      kind: "plain-config" as const,
+      scope: "environment" as const,
+    }));
+  }
+
+  function blueprintComponentForQuickDeploy(): BlueprintComponent {
+    const component = selectedBlueprintPrimaryComponent;
+    if (!component) {
+      throw new Error("请先选择一个可部署的 Blueprint。");
+    }
+
+    return component;
+  }
+
+  function resourceSourceForBlueprintComponent(component: BlueprintComponent): ResourceSourceInput {
+    if (component.runtime.strategy !== "container-image" || !component.runtime.image) {
+      throw new Error("当前快速部署只支持 container image Blueprint。");
+    }
+
+    return {
+      kind: "docker-image",
+      locator: component.runtime.image,
+      displayName: component.name,
+      metadata: {
+        blueprintSlug: selectedBlueprintSlug.trim(),
+        blueprintComponentId: component.id,
+      },
+    };
   }
 
   function parseHealthCheckMethod(value: string | null): "GET" | "HEAD" | "POST" | "OPTIONS" {
@@ -1508,10 +1864,14 @@
     if (selectedBlueprintSlug.trim() && previousKey && previousKey !== extension.key) {
       selectedBlueprintSlug = "";
       selectedBlueprintTitle = "";
+      blueprintDependencyProvisioningDrafts = {};
     }
   }
 
   function applyBlueprintListing(item: BlueprintCatalogListing): void {
+    if (selectedBlueprintSlug !== item.slug) {
+      blueprintDependencyProvisioningDrafts = {};
+    }
     selectedBlueprintSlug = item.slug;
     selectedBlueprintTitle = item.title;
     if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
@@ -1705,6 +2065,9 @@
     githubRepositorySearch = params.get("repository") ?? "";
     selectedGitHubRepositoryId = params.get("githubRepositoryId") ?? "";
     selectedGitHubRepository = null;
+    if (selectedBlueprintSlug !== (params.get("blueprintSlug") ?? "")) {
+      blueprintDependencyProvisioningDrafts = {};
+    }
     selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
     selectedBlueprintSlug = params.get("blueprintSlug") ?? "";
     selectedBlueprintTitle = params.get("blueprintTitle") ?? "";
@@ -1829,6 +2192,8 @@
           kind: gitSourceKindForLocator(locator),
           locator,
         });
+      case "blueprint":
+        return resourceSourceForBlueprintComponent(blueprintComponentForQuickDeploy());
       case "docker-image":
         return {
           kind: "docker-image",
@@ -1936,6 +2301,11 @@
         : input;
 
     switch (sourceKind) {
+      case "blueprint":
+        if (blueprintComponentForQuickDeploy().runtime.strategy !== "container-image") {
+          throw new Error("当前快速部署只支持 container image Blueprint。");
+        }
+        return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "docker-image":
         return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "compose":
@@ -1982,7 +2352,7 @@
   }
 
   function networkProfileForSource(): ResourceNetworkProfileInput {
-    const internalPort = Number(resourceInternalPort.trim() || resourceInternalPortDefault);
+    const internalPort = Number(effectiveResourceInternalPortText());
     if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) {
       throw new Error($t(i18nKeys.console.quickDeploy.applicationPortInvalid));
     }
@@ -1998,7 +2368,11 @@
     switch (stepKey) {
       case "source":
         if (sourceKind === "blueprint") {
-          return Boolean(selectedBlueprintSlug.trim());
+          return (
+            Boolean(selectedBlueprintSlug.trim()) &&
+            Boolean(selectedBlueprintManifest) &&
+            blueprintDependencySelectionsComplete()
+          );
         }
 
         if (!sourceLocator) {
@@ -2289,8 +2663,79 @@
       queryClient.invalidateQueries({ queryKey: ["servers"] }),
       queryClient.invalidateQueries({ queryKey: ["environments"] }),
       queryClient.invalidateQueries({ queryKey: ["resources"] }),
+      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
       queryClient.invalidateQueries({ queryKey: ["deployments"] }),
     ]);
+  }
+
+  async function executeQuickDeployDependencyProvisioning(
+    input: QuickDeployProvisionDependencyResourcesInput,
+  ): Promise<QuickDeployWorkflowStepOutput> {
+    dependencyProvisioningInFlight = true;
+    try {
+      const dependencyResourceIds: string[] = [];
+      const bindingIds: string[] = [];
+
+      for (const item of input.items) {
+        const planResponse =
+          item.mode === "create"
+            ? await orpcClient.dependencyResources.provisioning.plan({
+                mode: "create",
+                create: {
+                  kind: item.kind,
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                  name: item.name,
+                  ...(item.serverId ? { serverId: item.serverId } : {}),
+                  ...(item.providerKey ? { providerKey: item.providerKey } : {}),
+                  ...(item.description ? { description: item.description } : {}),
+                },
+              })
+            : await orpcClient.dependencyResources.provisioning.plan({
+                mode: "reuse",
+                reuse: {
+                  kind: item.kind,
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                  name: item.name,
+                  connectionUrl: item.connectionUrl,
+                  ...(item.secretRef ? { secretRef: item.secretRef } : {}),
+                  ...(item.connectionSecret ? { connectionSecret: item.connectionSecret } : {}),
+                  ...(item.description ? { description: item.description } : {}),
+                },
+              });
+        const acceptedResponse = await orpcClient.dependencyResources.provisioning.accept({
+          planId: planResponse.plan.id,
+          acknowledgeMutation: true,
+        });
+        const dependencyResourceId = acceptedResponse.plan.dependencyResourceId;
+        if (!dependencyResourceId) {
+          throw new Error(`Dependency provisioning plan ${acceptedResponse.plan.id} did not realize a resource.`);
+        }
+
+        dependencyResourceIds.push(dependencyResourceId);
+        const binding = await orpcClient.resources.dependencyBindings.bind({
+          resourceId: input.resourceId,
+          dependencyResourceId,
+          targetName: item.binding?.targetName ?? item.requirementId,
+          ...(item.binding?.scope ? { scope: item.binding.scope } : {}),
+          ...(item.binding?.injectionMode ? { injectionMode: item.binding.injectionMode } : {}),
+        });
+        bindingIds.push(binding.id);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
+        queryClient.invalidateQueries({ queryKey: ["resources"] }),
+      ]);
+
+      return {
+        dependencyResourceIds,
+        bindingIds,
+      };
+    } finally {
+      dependencyProvisioningInFlight = false;
+    }
   }
 
   async function executeQuickDeployWorkflowStepOperation(
@@ -2352,6 +2797,8 @@
         await environmentsQuery.refetch();
         return;
       }
+      case "dependencyResources.provision":
+        return executeQuickDeployDependencyProvisioning(step.input);
       case "deployments.create": {
         deploymentCreateInFlight = true;
         try {
@@ -2398,6 +2845,14 @@
     try {
       if (sourceKind === "blueprint") {
         if (selectedBlueprintSlug.trim()) {
+          if (!selectedBlueprintManifest) {
+            throw new Error("请等待 Blueprint 详情加载完成。");
+          }
+
+          if (!blueprintDependencySelectionsComplete()) {
+            throw new Error("请完成 Blueprint 依赖资源的 create/reuse 选择。");
+          }
+
           const endpoint = selectedBlueprintInstallPlanEndpoint();
           if (endpoint) {
             await request<unknown>(endpoint, {
@@ -2410,6 +2865,7 @@
                 parameters: {
                   APP_NAME: selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
                 },
+                dependencyProvisioning: blueprintDependencyProvisioningPayload(),
                 target: {
                   projectName:
                     projectName.trim() || selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
@@ -2419,20 +2875,17 @@
               }),
             });
           }
-
-          await goto(selectedBlueprintDetailHref());
-          return;
+        } else {
+          const href = sourceExtensionHref(selectedBlueprintSourceExtension);
+          if (href !== "#") {
+            await goto(href);
+            return;
+          }
+          throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
         }
-
-        const href = sourceExtensionHref(selectedBlueprintSourceExtension);
-        if (href !== "#") {
-          await goto(href);
-          return;
-        }
-        throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
       }
 
-      if (!sourceLocator) {
+      if (sourceKind !== "blueprint" && !sourceLocator) {
         throw new Error("请先填写来源地址。");
       }
 
@@ -2443,7 +2896,13 @@
       let workflowProject: QuickDeployWorkflowInput["project"];
 
       if (projectMode === "new") {
-        const nextProjectName = projectName.trim() || (projects.length === 0 ? "Local Workspace" : "");
+        const nextProjectName =
+          projectName.trim() ||
+          (sourceKind === "blueprint"
+            ? selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()
+            : projects.length === 0
+              ? "Local Workspace"
+              : "");
 
         if (!nextProjectName) {
           throw new Error("请填写项目名。");
@@ -2599,22 +3058,33 @@
         };
       }
 
+      const workflowEnvironmentVariables = [
+        ...blueprintWorkflowEnvironmentVariables(),
+        ...(variableContextEnabled && variableKey.trim()
+          ? [
+              {
+                key: variableKey.trim(),
+                value: variableValue,
+                exposure: "runtime" as const,
+                kind: variableIsSecret ? ("secret" as const) : ("plain-config" as const),
+                isSecret: variableIsSecret,
+                scope: "environment" as const,
+              },
+            ]
+          : []),
+      ];
+      const workflowDependencyProvisioning =
+        sourceKind === "blueprint" ? blueprintQuickDeployDependencyProvisioningInput() : [];
       const workflowInput: QuickDeployWorkflowInput = {
         project: workflowProject,
         server: workflowServer,
         environment: workflowEnvironment,
         resource: workflowResource,
-        ...(variableContextEnabled && variableKey.trim()
-          ? {
-              environmentVariable: {
-                key: variableKey.trim(),
-                value: variableValue,
-                exposure: "runtime",
-                kind: variableIsSecret ? "secret" : "plain-config",
-                isSecret: variableIsSecret,
-                scope: "environment",
-              },
-            }
+        ...(workflowEnvironmentVariables.length > 0
+          ? { environmentVariables: workflowEnvironmentVariables }
+          : {}),
+        ...(workflowDependencyProvisioning.length > 0
+          ? { dependencyProvisioning: workflowDependencyProvisioning }
           : {}),
       };
       workflowProgressDialogOpen = true;
@@ -2841,6 +3311,138 @@
                         <Package class="size-4" />
                         {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
                       </Button>
+                    </div>
+                  {/if}
+                  {#if selectedBlueprintSlug.trim()}
+                    <div class="space-y-3" data-blueprint-dependency-provisioning>
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="text-sm font-medium">依赖资源</p>
+                          <p class="text-xs text-muted-foreground">
+                            {blueprintDependencyProvisioningSummary}
+                          </p>
+                        </div>
+                        {#if selectedBlueprintDetailQuery.isPending}
+                          <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
+                        {/if}
+                      </div>
+                      {#if selectedBlueprintDetailQuery.isError}
+                        <div class="console-subtle-panel px-3 py-3 text-sm text-destructive">
+                          依赖资源读取失败
+                        </div>
+                      {:else if selectedBlueprintDetailQuery.isPending && !selectedBlueprintManifest}
+                        <div class="grid gap-2 sm:grid-cols-2">
+                          <Skeleton class="h-24 w-full" />
+                          <Skeleton class="h-24 w-full" />
+                        </div>
+                      {:else if selectedBlueprintProvisionableDependencies.length > 0}
+                        <div class="grid gap-3">
+                          {#each selectedBlueprintProvisionableDependencies as requirement (requirement.id)}
+                            {@const draft = blueprintDependencyDraft(requirement)}
+                            {@const icon = dependencyKindIcon(requirement.kind)}
+                            <div class="rounded-md border bg-background p-3">
+                              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div class="flex min-w-0 items-start gap-3">
+                                  <span
+                                    class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
+                                    style={`border-color: ${dependencyKindIconColor(requirement.kind)}33; background-color: ${dependencyKindIconColor(requirement.kind)}12;`}
+                                  >
+                                    <svg
+                                      class="size-5"
+                                      role="img"
+                                      aria-label={icon.title}
+                                      viewBox="0 0 24 24"
+                                      fill={dependencyKindIconColor(requirement.kind)}
+                                    >
+                                      <path d={icon.path} />
+                                    </svg>
+                                  </span>
+                                  <span class="min-w-0">
+                                    <span class="block truncate text-sm font-semibold">
+                                      {requirement.label || dependencyKindLabel(requirement.kind)}
+                                    </span>
+                                    <span class="mt-1 block text-xs text-muted-foreground">
+                                      {dependencyKindLabel(requirement.kind)} · {requirement.id}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div class="grid shrink-0 grid-cols-2 gap-2 md:w-64">
+                                  {#each blueprintDependencyProvisioningModes as mode (mode)}
+                                    <button
+                                      type="button"
+                                      class={[
+                                        "min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        draft.mode === mode
+                                          ? "border-primary bg-primary/5 text-foreground"
+                                          : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                                      ]}
+                                      aria-pressed={draft.mode === mode}
+                                      onclick={() =>
+                                        updateBlueprintDependencyDraft(requirement.id, { mode })}
+                                    >
+                                      {mode === "create"
+                                        ? $t(i18nKeys.console.dependencyResources.modeCreate)
+                                        : $t(i18nKeys.console.dependencyResources.modeReuse)}
+                                    </button>
+                                  {/each}
+                                </div>
+                              </div>
+                              {#if draft.mode === "reuse"}
+                                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                                  <div class="space-y-2">
+                                    <label
+                                      class="text-xs font-medium text-muted-foreground"
+                                      for={`blueprint-dependency-${requirement.id}-connection`}
+                                    >
+                                      {$t(i18nKeys.console.dependencyResources.connectionUrl)}
+                                    </label>
+                                    <Input
+                                      id={`blueprint-dependency-${requirement.id}-connection`}
+                                      class="font-mono text-xs"
+                                      value={draft.reuseConnectionUrl}
+                                      oninput={(event) =>
+                                        updateBlueprintDependencyDraft(requirement.id, {
+                                          reuseConnectionUrl: event.currentTarget.value,
+                                        })}
+                                      placeholder="postgres://********@db.example.com/app"
+                                    />
+                                  </div>
+                                  <div class="space-y-2">
+                                    <label
+                                      class="text-xs font-medium text-muted-foreground"
+                                      for={`blueprint-dependency-${requirement.id}-secret`}
+                                    >
+                                      {$t(i18nKeys.console.dependencyResources.secretRef)}
+                                    </label>
+                                    <Input
+                                      id={`blueprint-dependency-${requirement.id}-secret`}
+                                      class="font-mono text-xs"
+                                      value={draft.reuseSecretRef}
+                                      oninput={(event) =>
+                                        updateBlueprintDependencyDraft(requirement.id, {
+                                          reuseSecretRef: event.currentTarget.value,
+                                        })}
+                                      placeholder={`secret://dependency/${requirement.kind}/${requirement.id}`}
+                                    />
+                                  </div>
+                                </div>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {:else}
+                        <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
+                          无需依赖资源
+                        </div>
+                      {/if}
+                      {#if selectedBlueprintUnsupportedDependencies.length > 0}
+                        <div class="console-subtle-panel flex items-start gap-2 px-3 py-3 text-xs text-muted-foreground">
+                          <HardDriveDownload class="mt-0.5 size-4 shrink-0" />
+                          <span>
+                            {selectedBlueprintUnsupportedDependencies.map((resource) => `${resource.label} · ${resource.kind}`).join(" / ")}
+                          </span>
+                        </div>
+                      {/if}
                     </div>
                   {/if}
                   {#if quickDeploySourceExtensions.length > 1}
@@ -4098,6 +4700,14 @@
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
             <span class="min-w-0 break-words text-right font-medium">{projectSummary}</span>
           </div>
+          {#if sourceKind === "blueprint" && selectedBlueprintSlug.trim()}
+            <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
+              <span class="shrink-0 text-muted-foreground">依赖资源</span>
+              <span class="min-w-0 break-words text-right font-medium">
+                {blueprintDependencyProvisioningSummary}
+              </span>
+            </div>
+          {/if}
           <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
             <span class="min-w-0 break-words text-right font-medium">{serverSummary}</span>

@@ -1,5 +1,7 @@
+export * from "./operations/dependency-resources/accept-dependency-resource-provisioning-plan.command";
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.command";
+export * from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.command";
 export * from "./operations/dependency-resources/delete-dependency-resource.command";
 export * from "./operations/dependency-resources/import-dependency-resource.command";
 export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
@@ -11,3 +13,4 @@ export * from "./operations/dependency-resources/restore-dependency-resource-bac
 export * from "./operations/dependency-resources/show-dependency-resource.query";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query";
 export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";
+export * from "./operations/dependency-resources/show-dependency-resource-provisioning-plan.query";

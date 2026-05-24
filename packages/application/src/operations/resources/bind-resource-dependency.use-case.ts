@@ -24,6 +24,7 @@ import {
   type AppLogger,
   type Clock,
   type DependencyResourceRepository,
+  dependencyResourceKinds,
   type EventBus,
   type IdGenerator,
   type ResourceDependencyBindingRepository,
@@ -32,6 +33,8 @@ import {
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type BindResourceDependencyCommandInput } from "./bind-resource-dependency.command";
+
+const bindableDependencyKinds = new Set<string>(dependencyResourceKinds);
 
 @injectable()
 export class BindResourceDependencyUseCase {
@@ -107,7 +110,7 @@ export class BindResourceDependencyUseCase {
       }
       if (
         dependencyState.status.value !== "ready" ||
-        (dependencyState.kind.value !== "postgres" && dependencyState.kind.value !== "redis")
+        !bindableDependencyKinds.has(dependencyState.kind.value)
       ) {
         return err(
           domainError.validation("Dependency resource is not bindable", {

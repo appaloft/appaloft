@@ -9,6 +9,7 @@ import {
   type ServerRepository,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import { dockerBackupCapabilities } from "./backup-capabilities";
 import {
   backupHandle,
   commandFailure,
@@ -18,8 +19,6 @@ import {
   runTargetCommand,
   serviceForProvider,
 } from "./docker-shared";
-import { postgresDockerBackupCapability } from "./postgres";
-import { redisDockerBackupCapability } from "./redis";
 
 interface DockerDependencyBackupCapability {
   definition: DockerManagedDependencyServiceDefinition;
@@ -31,11 +30,6 @@ interface DockerDependencyBackupCapability {
   ): Result<string, DomainError>;
   pathForBackup(input: Parameters<typeof backupHandle>[0]): string;
 }
-
-const dockerBackupCapabilities: DockerDependencyBackupCapability[] = [
-  postgresDockerBackupCapability,
-  redisDockerBackupCapability,
-];
 
 export class DockerBackedDependencyResourceBackupProvider
   implements DependencyResourceBackupProviderPort

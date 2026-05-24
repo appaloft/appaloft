@@ -67,6 +67,8 @@
         return $t(i18nKeys.console.resources.runtimeProfileTitle);
       case "environments.setVariable":
         return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentVariableSet);
+      case "dependencyResources.provision":
+        return $t(i18nKeys.console.quickDeploy.workflowStepDependencyResourcesProvision);
       case "deployments.create":
         return $t(i18nKeys.console.quickDeploy.workflowStepDeploymentsCreate);
     }

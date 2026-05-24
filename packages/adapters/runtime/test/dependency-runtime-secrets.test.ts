@@ -101,7 +101,7 @@ function createDeploymentWithDependencyRef(
   input: {
     bindingId?: string;
     dependencyResourceId?: string;
-    kind?: "postgres" | "redis";
+    kind?: "postgres" | "redis" | "mysql" | "clickhouse" | "object-storage" | "opensearch";
     targetName?: string;
   } = {},
 ): Deployment {
@@ -272,6 +272,38 @@ describe("dependency runtime secret resolution", () => {
     const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
     expect(display).toContain("REDIS_URL=[redacted]");
     expect(display).not.toContain(secretValue);
+  });
+
+  test("[CLOUD-DEP-PROV-PUBLIC-KINDS-041] resolves mainstream dependency kind refs into runtime env", async () => {
+    const context = testContext("req_mainstream_dependency_runtime_secret_test");
+    const store = new MemoryDependencyResourceSecretStore();
+    const secretValue = "s3://access:super-secret@objects.example.com:9000/app-bucket";
+    store.store({
+      dependencyResourceId: "rsi_object_storage",
+      purpose: "connection",
+      secretValue,
+    });
+
+    const resolved = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment: createDeploymentWithDependencyRef(
+        "appaloft://dependency-resources/rsi_object_storage/connection",
+        {
+          bindingId: "rbd_object_storage",
+          dependencyResourceId: "rsi_object_storage",
+          kind: "object-storage",
+          targetName: "S3_ENDPOINT",
+        },
+      ),
+      dependencyResourceSecretStore: store,
+      baseEnv: {},
+    });
+
+    expect(resolved.isOk()).toBe(true);
+    const runtime = resolved._unsafeUnwrap();
+    expect(runtime.env.S3_ENDPOINT).toBe(secretValue);
+    expect(runtime.redactions).toContain(secretValue);
+    expect(runtime.dependencyTargetNames.has("S3_ENDPOINT")).toBe(true);
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-005] rejects unresolved Appaloft-owned refs before runtime env materialization", async () => {

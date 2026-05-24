@@ -14,7 +14,6 @@ import {
   containerName,
   type DockerManagedDependencyServiceDefinition,
   dockerHandle,
-  dockerManagedDependencyServices,
   dockerNetworkName,
   ensureNetworkCommand,
   managedLabel,
@@ -25,8 +24,6 @@ import {
   shellQuote,
   volumeName,
 } from "./docker-shared";
-import { DockerBackedManagedPostgresProvider } from "./postgres";
-import { DockerBackedManagedRedisProvider } from "./redis";
 
 interface DockerRealizationSpec {
   command: string;
@@ -35,29 +32,16 @@ interface DockerRealizationSpec {
 }
 
 export class DockerBackedManagedDependencyProvider implements ManagedDependencyProviderPort {
-  private readonly postgresProvider: DockerBackedManagedPostgresProvider;
-  private readonly redisProvider: DockerBackedManagedRedisProvider;
-
-  constructor(private readonly serverRepository: ServerRepository) {
-    this.postgresProvider = new DockerBackedManagedPostgresProvider(serverRepository);
-    this.redisProvider = new DockerBackedManagedRedisProvider(serverRepository);
-  }
+  constructor(private readonly serverRepository: ServerRepository) {}
 
   supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
     return serviceForKind(kind)?.managedProviderKey === providerKey;
   }
 
   async realize(
-    context: ExecutionContext,
+    _context: ExecutionContext,
     input: ManagedDependencyRealizationInput,
   ): Promise<Result<ManagedDependencyRealizationResult, DomainError>> {
-    if (input.kind === "postgres") {
-      return this.postgresProvider.realize(context, input);
-    }
-    if (input.kind === "redis") {
-      return this.redisProvider.realize(context, input);
-    }
-
     const definition = serviceForKind(input.kind);
     if (!definition || definition.managedProviderKey !== input.providerKey) {
       return err(unsupported(input.providerKey, input.kind, "dependency-resources.provision"));
@@ -95,13 +79,6 @@ export class DockerBackedManagedDependencyProvider implements ManagedDependencyP
     context: ExecutionContext,
     input: ManagedDependencyDeleteInput,
   ): Promise<Result<ManagedDependencyDeleteResult, DomainError>> {
-    if (input.kind === "postgres") {
-      return this.postgresProvider.delete(context, input);
-    }
-    if (input.kind === "redis") {
-      return this.redisProvider.delete(context, input);
-    }
-
     const definition = serviceForKind(input.kind);
     if (!definition || definition.managedProviderKey !== input.providerKey) {
       return err(unsupported(input.providerKey, input.kind, "dependency-resources.delete"));
@@ -162,6 +139,10 @@ function dockerRealizationSpec(
   volume: string,
 ): DockerRealizationSpec {
   switch (input.kind) {
+    case "postgres":
+      return postgresSpec(input, definition, container, volume);
+    case "redis":
+      return redisSpec(input, definition, container, volume);
     case "mysql":
       return mysqlSpec(input, definition, container, volume);
     case "clickhouse":
@@ -175,9 +156,106 @@ function dockerRealizationSpec(
   }
 }
 
+function postgresSpec(
+  input: ManagedDependencyRealizationInput,
+  _definition: DockerManagedDependencyServiceDefinition,
+  container: string,
+  volume: string,
+): DockerRealizationSpec {
+  const databaseName = databaseNameFor(input.slug);
+  const user = "app";
+  const password = randomPassword();
+  const connection = `postgres://${user}:${password}@${container}:5432/${databaseName}`;
+  return {
+    endpoint: {
+      host: container,
+      port: 5432,
+      databaseName,
+      maskedConnection: `postgres://${user}:********@${container}:5432/${databaseName}`,
+    },
+    connectionSecretValue: connection,
+    command: [
+      "set -eu",
+      ensureNetworkCommand(),
+      volumeCreateCommand(volume, input.dependencyResourceId),
+      removeContainerCommand(container),
+      [
+        "docker run -d",
+        `--name ${shellQuote(container)}`,
+        `--network ${shellQuote(dockerNetworkName)}`,
+        "--restart unless-stopped",
+        labels(input.dependencyResourceId),
+        `-e ${shellQuote(`POSTGRES_DB=${databaseName}`)}`,
+        `-e ${shellQuote(`POSTGRES_USER=${user}`)}`,
+        `-e ${shellQuote(`POSTGRES_PASSWORD=${password}`)}`,
+        `-v ${shellQuote(`${volume}:/var/lib/postgresql/data`)}`,
+        "postgres:16-alpine",
+      ].join(" "),
+      [
+        "for attempt in $(seq 1 60); do",
+        `  if PGPASSWORD=${shellQuote(password)} docker exec -e PGPASSWORD ${shellQuote(
+          container,
+        )} pg_isready -U ${shellQuote(user)} -d ${shellQuote(databaseName)} >/dev/null 2>&1; then`,
+        "    exit 0",
+        "  fi",
+        "  sleep 1",
+        "done",
+        "exit 1",
+      ].join("\n"),
+    ].join("\n"),
+  };
+}
+
+function redisSpec(
+  input: ManagedDependencyRealizationInput,
+  _definition: DockerManagedDependencyServiceDefinition,
+  container: string,
+  volume: string,
+): DockerRealizationSpec {
+  const password = randomPassword();
+  const connection = `redis://:${password}@${container}:6379/0`;
+  return {
+    endpoint: {
+      host: container,
+      port: 6379,
+      maskedConnection: `redis://:********@${container}:6379/0`,
+    },
+    connectionSecretValue: connection,
+    command: [
+      "set -eu",
+      ensureNetworkCommand(),
+      volumeCreateCommand(volume, input.dependencyResourceId),
+      removeContainerCommand(container),
+      [
+        "docker run -d",
+        `--name ${shellQuote(container)}`,
+        `--network ${shellQuote(dockerNetworkName)}`,
+        "--restart unless-stopped",
+        labels(input.dependencyResourceId),
+        `-v ${shellQuote(`${volume}:/data`)}`,
+        "redis:7-alpine",
+        "redis-server",
+        "--appendonly yes",
+        `--requirepass ${shellQuote(password)}`,
+      ].join(" "),
+      [
+        "for attempt in $(seq 1 60); do",
+        `  if docker exec ${shellQuote(container)} redis-cli -a ${shellQuote(
+          password,
+        )} --no-auth-warning PING >/dev/null 2>&1; then`,
+        "    exit 0",
+        "  fi",
+        "  sleep 1",
+        "done",
+        "exit 1",
+      ].join("\n"),
+    ].join("\n"),
+  };
+}
+
 function mysqlSpec(
   input: ManagedDependencyRealizationInput,
-  definition: DockerManagedDependencyServiceDefinition,
+  _definition: DockerManagedDependencyServiceDefinition,
   container: string,
   volume: string,
 ): DockerRealizationSpec {

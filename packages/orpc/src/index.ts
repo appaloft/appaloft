@@ -1,4 +1,5 @@
 import {
+  AcceptDependencyResourceProvisioningPlanCommand,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
   type ActionDeployTokenResolvedScope,
@@ -12,6 +13,7 @@ import {
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
   type AuthBootstrapStatus,
+  acceptDependencyResourceProvisioningPlanInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
@@ -58,6 +60,7 @@ import {
   CreateActionSourceLinkDeploymentCommand,
   CreateAuditEventArchiveCommand,
   CreateDependencyResourceBackupCommand,
+  CreateDependencyResourceProvisioningPlanCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   CreateDeployTokenCommand,
@@ -99,6 +102,7 @@ import {
   confirmDomainBindingOwnershipCommandInputSchema,
   createAuditEventArchiveCommandInputSchema,
   createDependencyResourceBackupCommandInputSchema,
+  createDependencyResourceProvisioningPlanInputSchema,
   createDeploymentCommandInputSchema,
   createDeployTokenCommandInputSchema,
   createDomainBindingCommandInputSchema,
@@ -401,6 +405,7 @@ import {
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
+  ShowDependencyResourceProvisioningPlanQuery,
   ShowDependencyResourceQuery,
   ShowDeploymentQuery,
   ShowDeployTokenQuery,
@@ -443,6 +448,7 @@ import {
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
+  showDependencyResourceProvisioningPlanInputSchema,
   showDependencyResourceQueryInputSchema,
   showDeploymentQueryInputSchema,
   showDeployTokenQueryInputSchema,
@@ -543,6 +549,7 @@ import {
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
   deleteStorageVolumeResponseSchema,
+  dependencyResourceProvisioningPlanResponseSchema,
   dependencyResourceResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
@@ -1201,6 +1208,18 @@ export const apiRouteDescriptions = {
   cleanupStorageVolumeRuntime: routeDescription(
     "Dry-runs or explicitly removes safe Appaloft-owned runtime volume realizations for one storage volume on one server.",
     "storage.volume-lifecycle",
+  ),
+  createDependencyResourceProvisioningPlan: routeDescription(
+    "Creates a safe dependency resource provisioning plan for create or reuse mode without mutating provider resources.",
+    "dependency.resource-lifecycle",
+  ),
+  acceptDependencyResourceProvisioningPlan: routeDescription(
+    "Accepts a dependency resource provisioning plan and then performs the planned create or reuse mutation.",
+    "dependency.resource-lifecycle",
+  ),
+  showDependencyResourceProvisioningPlan: routeDescription(
+    "Reads dependency resource provisioning plan status and safe realization readback.",
+    "dependency.resource-lifecycle",
   ),
   provisionDependencyResource: routeDescription(
     "Provisions an Appaloft-managed dependency resource of the requested kind through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed infrastructure on that single-server target.",
@@ -4895,6 +4914,45 @@ export const cleanupStorageVolumeRuntimeProcedure = base
     executeCommand(context, CleanupStorageVolumeRuntimeCommand.create(input)),
   );
 
+export const createDependencyResourceProvisioningPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/provisioning/plan",
+    description: apiRouteDescriptions.createDependencyResourceProvisioningPlan,
+    successStatus: 201,
+  })
+  .input(createDependencyResourceProvisioningPlanInputSchema)
+  .output(dependencyResourceProvisioningPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateDependencyResourceProvisioningPlanCommand.create(input)),
+  );
+
+export const acceptDependencyResourceProvisioningPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/provisioning/{planId}/accept",
+    description: apiRouteDescriptions.acceptDependencyResourceProvisioningPlan,
+    successStatus: 202,
+  })
+  .input(acceptDependencyResourceProvisioningPlanInputSchema)
+  .output(dependencyResourceProvisioningPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AcceptDependencyResourceProvisioningPlanCommand.create(input)),
+  );
+
+export const showDependencyResourceProvisioningPlanProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/provisioning/{planId}",
+    description: apiRouteDescriptions.showDependencyResourceProvisioningPlan,
+    successStatus: 200,
+  })
+  .input(showDependencyResourceProvisioningPlanInputSchema)
+  .output(dependencyResourceProvisioningPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDependencyResourceProvisioningPlanQuery.create(input)),
+  );
+
 export const provisionDependencyResourceProcedure = base
   .route({
     method: "POST",
@@ -5425,6 +5483,11 @@ export const appaloftOrpcRouter = {
     },
   },
   dependencyResources: {
+    provisioning: {
+      plan: createDependencyResourceProvisioningPlanProcedure,
+      accept: acceptDependencyResourceProvisioningPlanProcedure,
+      status: showDependencyResourceProvisioningPlanProcedure,
+    },
     provision: provisionDependencyResourceProcedure,
     import: importDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
@@ -7818,6 +7881,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/source-links/relink",
     "/api/source-links/:sourceFingerprint",
     "/api/dependency-resources",
+    "/api/dependency-resources/provisioning/plan",
+    "/api/dependency-resources/provisioning/:planId",
+    "/api/dependency-resources/provisioning/:planId/accept",
     "/api/dependency-resources/provision",
     "/api/dependency-resources/import",
     "/api/dependency-resources/backups/:backupId",

@@ -344,6 +344,18 @@ export const tokens = {
     "appaloft.show_dependency_resource_backup_policy_query_service",
   ),
   scheduledDependencyBackupService: Symbol.for("appaloft.scheduled_dependency_backup_service"),
+  dependencyResourceProvisioningPlanStore: Symbol.for(
+    "appaloft.dependency_resource_provisioning_plan_store",
+  ),
+  createDependencyResourceProvisioningPlanUseCase: Symbol.for(
+    "appaloft.create_dependency_resource_provisioning_plan_use_case",
+  ),
+  acceptDependencyResourceProvisioningPlanUseCase: Symbol.for(
+    "appaloft.accept_dependency_resource_provisioning_plan_use_case",
+  ),
+  showDependencyResourceProvisioningPlanQueryService: Symbol.for(
+    "appaloft.show_dependency_resource_provisioning_plan_query_service",
+  ),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
   listResourceDependencyBindingsQueryService: Symbol.for(
