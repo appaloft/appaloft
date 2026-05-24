@@ -11,6 +11,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
+    findBlueprintCatalogExtensionByKey,
     findBlueprintCatalogExtension,
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
@@ -73,12 +74,33 @@
     }),
   );
 
+  const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
+  const returnToSourceExtensionKey = $derived.by(() => {
+    if (!returnTo) {
+      return "";
+    }
+    try {
+      const url = new URL(returnTo, "https://appaloft.local");
+      return url.searchParams.get("sourceExtension") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const catalogExtension = $derived(
-    findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
+    findBlueprintCatalogExtensionByKey(
+      webExtensionsQuery.data?.items ?? [],
+      returnToSourceExtensionKey,
+    ) ??
+      findBlueprintCatalogExtension(
+        webExtensionsQuery.data?.items ?? [],
+        surface === "dialog" || page.url.searchParams.get("surface") === "quick-deploy"
+          ? "quick-deploy-source"
+          : "navigation",
+      ) ??
+      findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
   );
   const catalogMetadata = $derived(readBlueprintCatalogExtensionMetadata(catalogExtension));
   const listEndpoint = $derived(catalogMetadata?.listEndpoint ?? "");
-  const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
 
   const catalogQuery = createQuery(() =>
     queryOptions({

@@ -22,6 +22,22 @@ export function findBlueprintCatalogExtension(
   );
 }
 
+export function findBlueprintCatalogExtensionByKey(
+  extensions: readonly SystemPluginWebExtension[],
+  key: string | null | undefined,
+): SystemPluginWebExtension | null {
+  if (!key) {
+    return null;
+  }
+
+  return (
+    extensions.find(
+      (extension) =>
+        extension.key === key && readBlueprintCatalogExtensionMetadata(extension) !== null,
+    ) ?? null
+  );
+}
+
 export function readBlueprintCatalogExtensionMetadata(
   extension: SystemPluginWebExtension | null | undefined,
 ): BlueprintCatalogExtensionMetadata | null {
