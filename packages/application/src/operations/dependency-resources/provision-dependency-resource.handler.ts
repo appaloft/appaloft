@@ -4,24 +4,25 @@ import { inject, injectable } from "tsyringe";
 import { CommandHandler, type CommandHandlerContract } from "../../cqrs";
 import { type ExecutionContext } from "../../execution-context";
 import { tokens } from "../../tokens";
-import { ProvisionRedisDependencyResourceCommand } from "./provision-redis-dependency-resource.command";
-import { type ProvisionRedisDependencyResourceUseCase } from "./provision-redis-dependency-resource.use-case";
+import { ProvisionDependencyResourceCommand } from "./provision-dependency-resource.command";
+import { type ProvisionDependencyResourceUseCase } from "./provision-dependency-resource.use-case";
 
-@CommandHandler(ProvisionRedisDependencyResourceCommand)
+@CommandHandler(ProvisionDependencyResourceCommand)
 @injectable()
-export class ProvisionRedisDependencyResourceCommandHandler
-  implements CommandHandlerContract<ProvisionRedisDependencyResourceCommand, { id: string }>
+export class ProvisionDependencyResourceCommandHandler
+  implements CommandHandlerContract<ProvisionDependencyResourceCommand, { id: string }>
 {
   constructor(
-    @inject(tokens.provisionRedisDependencyResourceUseCase)
-    private readonly useCase: ProvisionRedisDependencyResourceUseCase,
+    @inject(tokens.provisionDependencyResourceUseCase)
+    private readonly useCase: ProvisionDependencyResourceUseCase,
   ) {}
 
   async handle(
     context: ExecutionContext,
-    command: ProvisionRedisDependencyResourceCommand,
+    command: ProvisionDependencyResourceCommand,
   ): Promise<Result<{ id: string }>> {
     return this.useCase.execute(context, {
+      kind: command.kind,
       projectId: command.projectId,
       environmentId: command.environmentId,
       ...(command.serverId ? { serverId: command.serverId } : {}),

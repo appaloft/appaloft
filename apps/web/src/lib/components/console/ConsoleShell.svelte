@@ -338,39 +338,29 @@
                 </SidebarMenuButton>
               </SidebarMenuItem>
             {/each}
+            {#each navigationExtensions as extension (extension.key)}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isNavigationActive(extension.path)}
+                  tooltipContent={extension.title}
+                >
+                  {#snippet child({ props })}
+                    <a
+                      href={extension.path}
+                      target={extension.target === "external-page" ? "_blank" : undefined}
+                      rel={extension.target === "external-page" ? "noreferrer" : undefined}
+                      {...props}
+                    >
+                      <Package class="size-4" />
+                      <span>{extension.title}</span>
+                    </a>
+                  {/snippet}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            {/each}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
-
-      {#if navigationExtensions.length > 0}
-        <SidebarGroup>
-          <SidebarGroupLabel>{$t(i18nKeys.console.nav.extensions)}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {#each navigationExtensions as extension (extension.key)}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={isNavigationActive(extension.path)}
-                    tooltipContent={extension.title}
-                  >
-                    {#snippet child({ props })}
-                      <a
-                        href={extension.path}
-                        target={extension.target === "external-page" ? "_blank" : undefined}
-                        rel={extension.target === "external-page" ? "noreferrer" : undefined}
-                        {...props}
-                      >
-                        <Package class="size-4" />
-                        <span>{extension.title}</span>
-                      </a>
-                    {/snippet}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              {/each}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      {/if}
 
       <SidebarGroup>
         <SidebarGroupLabel>{$t(i18nKeys.common.domain.projects)}</SidebarGroupLabel>

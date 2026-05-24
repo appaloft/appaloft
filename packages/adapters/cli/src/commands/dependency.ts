@@ -2,13 +2,12 @@ import {
   ConfigureDependencyResourceBackupPolicyCommand,
   CreateDependencyResourceBackupCommand,
   DeleteDependencyResourceCommand,
-  ImportPostgresDependencyResourceCommand,
-  ImportRedisDependencyResourceCommand,
+  ImportDependencyResourceCommand,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
-  ProvisionPostgresDependencyResourceCommand,
-  ProvisionRedisDependencyResourceCommand,
+  type ManagedDependencyResourceKind,
+  ProvisionDependencyResourceCommand,
   RenameDependencyResourceCommand,
   RestoreDependencyResourceBackupCommand,
   ShowDependencyResourceBackupPolicyQuery,
@@ -27,6 +26,7 @@ const projectOption = Options.text("project");
 const environmentOption = Options.text("environment");
 const optionalProjectOption = Options.text("project").pipe(Options.optional);
 const optionalEnvironmentOption = Options.text("environment").pipe(Options.optional);
+const kindOption = Options.text("kind");
 const nameOption = Options.text("name");
 const serverOption = Options.text("server").pipe(Options.optional);
 const providerKeyOption = Options.text("provider-key").pipe(Options.optional);
@@ -51,9 +51,14 @@ const nextRunAtOption = Options.text("next-run-at").pipe(Options.optional);
 const enabledOnlyOption = Options.boolean("enabled-only").pipe(Options.withDefault(false));
 const dueAtOption = Options.text("due-at").pipe(Options.optional);
 
-const provisionPostgresCommand = EffectCommand.make(
+function dependencyKindValue(kind: string): ManagedDependencyResourceKind {
+  return kind as ManagedDependencyResourceKind;
+}
+
+const provisionCommand = EffectCommand.make(
   "provision",
   {
+    kind: kindOption,
     project: projectOption,
     environment: environmentOption,
     name: nameOption,
@@ -68,6 +73,7 @@ const provisionPostgresCommand = EffectCommand.make(
     backupRetentionRequired,
     description,
     environment,
+    kind,
     name,
     project,
     providerKey,
@@ -75,7 +81,8 @@ const provisionPostgresCommand = EffectCommand.make(
   }) => {
     const backupReasonValue = optionalValue(backupReason);
     return runCommand(
-      ProvisionPostgresDependencyResourceCommand.create({
+      ProvisionDependencyResourceCommand.create({
+        kind: dependencyKindValue(kind),
         projectId: project,
         environmentId: environment,
         name,
@@ -93,11 +100,12 @@ const provisionPostgresCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyPostgresProvision));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyProvision));
 
-const importPostgresCommand = EffectCommand.make(
+const importCommand = EffectCommand.make(
   "import",
   {
+    kind: kindOption,
     project: projectOption,
     environment: environmentOption,
     name: nameOption,
@@ -113,13 +121,15 @@ const importPostgresCommand = EffectCommand.make(
     connectionUrl,
     description,
     environment,
+    kind,
     name,
     project,
     secretRef,
   }) => {
     const backupReasonValue = optionalValue(backupReason);
     return runCommand(
-      ImportPostgresDependencyResourceCommand.create({
+      ImportDependencyResourceCommand.create({
+        kind: dependencyKindValue(kind),
         projectId: project,
         environmentId: environment,
         name,
@@ -137,95 +147,7 @@ const importPostgresCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyPostgresImport));
-
-const provisionRedisCommand = EffectCommand.make(
-  "provision",
-  {
-    project: projectOption,
-    environment: environmentOption,
-    name: nameOption,
-    server: serverOption,
-    providerKey: providerKeyOption,
-    description: descriptionOption,
-    backupRetentionRequired: backupRetentionOption,
-    backupReason: backupReasonOption,
-  },
-  ({
-    backupReason,
-    backupRetentionRequired,
-    description,
-    environment,
-    name,
-    project,
-    providerKey,
-    server,
-  }) => {
-    const backupReasonValue = optionalValue(backupReason);
-    return runCommand(
-      ProvisionRedisDependencyResourceCommand.create({
-        projectId: project,
-        environmentId: environment,
-        name,
-        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
-        ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
-        ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
-        ...(backupRetentionRequired || backupReasonValue
-          ? {
-              backupRelationship: {
-                retentionRequired: backupRetentionRequired,
-                ...(backupReasonValue ? { reason: backupReasonValue } : {}),
-              },
-            }
-          : {}),
-      }),
-    );
-  },
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyRedisProvision));
-
-const importRedisCommand = EffectCommand.make(
-  "import",
-  {
-    project: projectOption,
-    environment: environmentOption,
-    name: nameOption,
-    connectionUrl: connectionUrlOption,
-    secretRef: secretRefOption,
-    description: descriptionOption,
-    backupRetentionRequired: backupRetentionOption,
-    backupReason: backupReasonOption,
-  },
-  ({
-    backupReason,
-    backupRetentionRequired,
-    connectionUrl,
-    description,
-    environment,
-    name,
-    project,
-    secretRef,
-  }) => {
-    const backupReasonValue = optionalValue(backupReason);
-    return runCommand(
-      ImportRedisDependencyResourceCommand.create({
-        projectId: project,
-        environmentId: environment,
-        name,
-        connectionUrl,
-        ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
-        ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
-        ...(backupRetentionRequired || backupReasonValue
-          ? {
-              backupRelationship: {
-                retentionRequired: backupRetentionRequired,
-                ...(backupReasonValue ? { reason: backupReasonValue } : {}),
-              },
-            }
-          : {}),
-      }),
-    );
-  },
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyRedisImport));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyImport));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -393,16 +315,6 @@ const backupPolicyCommand = EffectCommand.make("policy").pipe(
   ]),
 );
 
-const postgresCommand = EffectCommand.make("postgres").pipe(
-  EffectCommand.withDescription(cliCommandDescriptions.dependencyPostgres),
-  EffectCommand.withSubcommands([provisionPostgresCommand, importPostgresCommand]),
-);
-
-const redisCommand = EffectCommand.make("redis").pipe(
-  EffectCommand.withDescription(cliCommandDescriptions.dependencyRedis),
-  EffectCommand.withSubcommands([provisionRedisCommand, importRedisCommand]),
-);
-
 const backupCommand = EffectCommand.make("backup").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.dependencyBackup),
   EffectCommand.withSubcommands([
@@ -417,8 +329,8 @@ const backupCommand = EffectCommand.make("backup").pipe(
 export const dependencyCommand = EffectCommand.make("dependency").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.dependency),
   EffectCommand.withSubcommands([
-    postgresCommand,
-    redisCommand,
+    provisionCommand,
+    importCommand,
     backupCommand,
     listCommand,
     showCommand,

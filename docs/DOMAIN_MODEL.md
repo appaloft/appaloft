@@ -487,6 +487,11 @@ Rules:
 - source mode is either `appaloft-managed` or `imported-external`
 - Appaloft-managed Postgres and Redis include durable provider-native realization state and safe
   provider handles without moving provider SDK concerns into core
+- the neutral dependency kind vocabulary recognizes `postgres`, `redis`, `mysql`, `clickhouse`,
+  `object-storage`, and `opensearch` in core/read/contract surfaces. `object-storage` is the
+  canonical control-plane kind; S3-compatible providers such as S3 and MinIO are provider aliases,
+  not core kind names. Provider-native create/import operations remain explicitly scoped to
+  Postgres and Redis until governed operations and adapters are introduced for the other kinds.
 - provider-native realization and managed provider cleanup attempts are mirrored into
   operator-visible process-attempt state with safe dependency/provider metadata
 - imported external Postgres delete removes only the Appaloft control-plane record and must not

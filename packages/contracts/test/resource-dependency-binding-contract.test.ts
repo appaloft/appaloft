@@ -6,6 +6,38 @@ import {
 } from "../src/index";
 
 describe("resource dependency binding contract", () => {
+  test("[DEP-RES-KIND-COVERAGE-001] accepts safe mainstream dependency binding summaries", () => {
+    for (const kind of ["mysql", "clickhouse", "object-storage", "opensearch"] as const) {
+      const binding = resourceDependencyBindingSummarySchema.parse({
+        id: `rbd_${kind.replace("-", "_")}`,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_web",
+        dependencyResourceId: `rsi_${kind.replace("-", "_")}`,
+        dependencyResourceName: `${kind} dependency`,
+        dependencyResourceSlug: `${kind}-dependency`,
+        kind,
+        sourceMode: "imported-external",
+        providerKey: `external-${kind}`,
+        providerManaged: false,
+        lifecycleStatus: "ready",
+        target: {
+          targetName: `${kind.toUpperCase().replace("-", "_")}_URL`,
+          scope: "runtime-only",
+          injectionMode: "env",
+          secretRef: `appaloft://dependency-resources/${kind}/connection`,
+        },
+        bindingReadiness: { status: "not-implemented" },
+        snapshotReadiness: { status: "deferred" },
+        status: "active",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      expect(binding.kind).toBe(kind);
+      expect(JSON.stringify(binding)).not.toContain("super-secret");
+    }
+  });
+
   test("[DEP-BIND-REDIS-BIND-001] accepts safe Redis binding summaries", () => {
     const binding = resourceDependencyBindingSummarySchema.parse({
       id: "rbd_redis",

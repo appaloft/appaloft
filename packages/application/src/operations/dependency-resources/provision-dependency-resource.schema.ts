@@ -1,19 +1,20 @@
 import { z } from "zod";
 
+import { managedDependencyResourceKinds } from "../../ports";
 import { nonEmptyTrimmedString } from "../shared-schema";
 import { dependencyResourceBackupRelationshipInputSchema } from "./dependency-resource.schema";
 
-export const importPostgresDependencyResourceCommandInputSchema = z.object({
+export const provisionDependencyResourceCommandInputSchema = z.object({
+  kind: z.enum(managedDependencyResourceKinds),
   projectId: nonEmptyTrimmedString("Project id"),
   environmentId: nonEmptyTrimmedString("Environment id"),
+  serverId: nonEmptyTrimmedString("Server id").optional(),
   name: nonEmptyTrimmedString("Dependency resource name"),
-  connectionUrl: nonEmptyTrimmedString("Connection URL"),
-  secretRef: nonEmptyTrimmedString("Secret reference").optional(),
-  connectionSecret: nonEmptyTrimmedString("Connection secret").optional(),
+  providerKey: nonEmptyTrimmedString("Provider key").optional(),
   description: nonEmptyTrimmedString("Description").optional(),
   backupRelationship: dependencyResourceBackupRelationshipInputSchema,
 });
 
-export type ImportPostgresDependencyResourceCommandInput = z.output<
-  typeof importPostgresDependencyResourceCommandInputSchema
+export type ProvisionDependencyResourceCommandInput = z.output<
+  typeof provisionDependencyResourceCommandInputSchema
 >;

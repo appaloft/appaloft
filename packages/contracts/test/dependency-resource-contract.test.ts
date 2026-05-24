@@ -6,6 +6,49 @@ import {
 } from "../src/index";
 
 describe("dependency resource contract", () => {
+  test("[DEP-RES-KIND-COVERAGE-001] accepts safe mainstream dependency summaries", () => {
+    const summaries = ["mysql", "clickhouse", "object-storage", "opensearch"].map((kind) =>
+      dependencyResourceSummarySchema.parse({
+        id: `rsi_${kind.replace("-", "_")}`,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: `${kind} dependency`,
+        slug: `${kind}-dependency`,
+        kind,
+        sourceMode: "imported-external",
+        providerKey: `external-${kind}`,
+        providerManaged: false,
+        lifecycleStatus: "ready",
+        connection: {
+          host: `${kind}.example.com`,
+          maskedConnection: `${kind}://********@${kind}.example.com`,
+          secretRef: `secret://dependency/${kind}/external`,
+        },
+        bindingReadiness: { status: "not-implemented" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+    const list = listDependencyResourcesResponseSchema.parse({
+      schemaVersion: "dependency-resources.list/v1",
+      items: summaries,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(list.items.map((item) => item.kind)).toEqual([
+      "mysql",
+      "clickhouse",
+      "object-storage",
+      "opensearch",
+    ]);
+    expect(JSON.stringify(list)).not.toContain("super-secret");
+    expect(() =>
+      dependencyResourceSummarySchema.parse({
+        ...summaries[0]!,
+        kind: "s3",
+      }),
+    ).toThrow();
+  });
+
   test("[DEP-RES-REDIS-READ-001] [DEP-RES-REDIS-READ-002] accepts safe Redis dependency summaries", () => {
     const redis = dependencyResourceSummarySchema.parse({
       id: "rsi_redis",

@@ -173,10 +173,8 @@ import {
   GetCurrentOrganizationContextQueryService,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
-  ImportPostgresDependencyResourceCommandHandler,
-  ImportPostgresDependencyResourceUseCase,
-  ImportRedisDependencyResourceCommandHandler,
-  ImportRedisDependencyResourceUseCase,
+  ImportDependencyResourceCommandHandler,
+  ImportDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
   IngestSourceEventCommandHandler,
@@ -250,6 +248,12 @@ import {
   ListUsageIntentRecordsQueryService,
   LockEnvironmentCommandHandler,
   LockEnvironmentUseCase,
+  type ManagedDependencyDeleteInput,
+  type ManagedDependencyDeleteResult,
+  type ManagedDependencyProviderPort,
+  type ManagedDependencyRealizationInput,
+  type ManagedDependencyRealizationResult,
+  type ManagedDependencyResourceKind,
   type ManagedPostgresDeleteInput,
   type ManagedPostgresDeleteResult,
   type ManagedPostgresProviderPort,
@@ -278,10 +282,8 @@ import {
   PreviewLifecycleService,
   PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
-  ProvisionPostgresDependencyResourceCommandHandler,
-  ProvisionPostgresDependencyResourceUseCase,
-  ProvisionRedisDependencyResourceCommandHandler,
-  ProvisionRedisDependencyResourceUseCase,
+  ProvisionDependencyResourceCommandHandler,
+  ProvisionDependencyResourceUseCase,
   PruneAuditEventArchivesCommandHandler,
   PruneAuditEventArchivesUseCase,
   PruneAuditEventsCommandHandler,
@@ -811,6 +813,234 @@ export class ShellManagedRedisProvider implements ManagedRedisProviderPort {
       );
     }
   }
+}
+
+const shellManagedDependencyKinds: readonly ManagedDependencyResourceKind[] = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+];
+
+export class ShellManagedDependencyProvider implements ManagedDependencyProviderPort {
+  constructor(private readonly dataDir = ".appaloft/data") {}
+
+  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
+    return (
+      shellManagedDependencyKinds.includes(kind) && providerKey === shellManagedProviderKey(kind)
+    );
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedDependencyRealizationInput,
+  ): Promise<Result<ManagedDependencyRealizationResult, DomainError>> {
+    void context;
+    const endpoint = shellManagedEndpoint(input);
+    const result: ManagedDependencyRealizationResult = {
+      providerResourceHandle: `${input.kind}/${input.dependencyResourceId}`,
+      endpoint,
+      secretRef: `secret://dependency/${input.kind}/${input.dependencyResourceId}`,
+      realizedAt: input.requestedAt,
+    };
+    const artifact: ShellManagedDependencyResourceArtifact = {
+      schemaVersion: "appaloft.dependency-resource-realization/v1",
+      dependencyResourceId: input.dependencyResourceId,
+      dependencyKind: input.kind,
+      providerKey: input.providerKey,
+      ...result,
+    };
+
+    try {
+      await mkdir(shellManagedResourceArtifactDir(this.dataDir, input.kind), { recursive: true });
+      await Bun.write(
+        shellManagedResourceArtifactPath(this.dataDir, input.kind, input.dependencyResourceId),
+        `${JSON.stringify(artifact, null, 2)}\n`,
+      );
+    } catch (cause) {
+      return err(
+        shellManagedProviderError(
+          "Managed dependency artifact could not be written",
+          {
+            dependencyResourceId: input.dependencyResourceId,
+            dependencyKind: input.kind,
+            providerKey: input.providerKey,
+          },
+          cause,
+        ),
+      );
+    }
+
+    return ok(result);
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedDependencyDeleteInput,
+  ): Promise<Result<ManagedDependencyDeleteResult, DomainError>> {
+    void context;
+    const artifact = await this.readArtifact(
+      input.kind,
+      input.dependencyResourceId,
+      input.providerKey,
+    );
+    if (artifact.isErr()) {
+      return err(artifact.error);
+    }
+    if (
+      artifact.value.providerKey !== input.providerKey ||
+      artifact.value.providerResourceHandle !== input.providerResourceHandle ||
+      artifact.value.dependencyKind !== input.kind
+    ) {
+      return err(
+        shellManagedProviderError(
+          "Managed dependency artifact does not match delete request",
+          {
+            dependencyResourceId: input.dependencyResourceId,
+            dependencyKind: input.kind,
+            providerKey: input.providerKey,
+          },
+          new Error("artifact_mismatch"),
+        ),
+      );
+    }
+
+    try {
+      await Bun.write(
+        shellManagedResourceArtifactPath(this.dataDir, input.kind, input.dependencyResourceId),
+        `${JSON.stringify({ ...artifact.value, deletedAt: input.requestedAt }, null, 2)}\n`,
+      );
+    } catch (cause) {
+      return err(
+        shellManagedProviderError(
+          "Managed dependency delete artifact could not be written",
+          {
+            dependencyResourceId: input.dependencyResourceId,
+            dependencyKind: input.kind,
+            providerKey: input.providerKey,
+          },
+          cause,
+        ),
+      );
+    }
+
+    return ok({ deletedAt: input.requestedAt });
+  }
+
+  private async readArtifact(
+    dependencyKind: ManagedDependencyResourceKind,
+    dependencyResourceId: string,
+    providerKey: string,
+  ): Promise<Result<ShellManagedDependencyResourceArtifact, DomainError>> {
+    try {
+      const raw = await readFile(
+        shellManagedResourceArtifactPath(this.dataDir, dependencyKind, dependencyResourceId),
+        "utf8",
+      );
+      const parsed = JSON.parse(raw) as ShellManagedDependencyResourceArtifact;
+      if (parsed.schemaVersion !== "appaloft.dependency-resource-realization/v1") {
+        return err(
+          shellManagedProviderError(
+            "Managed dependency artifact has an unsupported schema",
+            {
+              dependencyResourceId,
+              dependencyKind,
+              providerKey,
+            },
+            new Error("unsupported_schema"),
+          ),
+        );
+      }
+      return ok(parsed);
+    } catch (cause) {
+      return err(
+        shellManagedProviderError(
+          "Managed dependency artifact could not be read",
+          {
+            dependencyResourceId,
+            dependencyKind,
+            providerKey,
+          },
+          cause,
+        ),
+      );
+    }
+  }
+}
+
+function shellManagedProviderKey(kind: ManagedDependencyResourceKind): string {
+  return `appaloft-managed-${kind}`;
+}
+
+function shellManagedEndpoint(
+  input: ManagedDependencyRealizationInput,
+): ManagedDependencyRealizationResult["endpoint"] {
+  const host = `${input.slug}.${shellManagedHostSegment(input.kind)}.internal`;
+  const port = shellManagedPort(input.kind);
+  const databaseName = shellManagedDatabaseName(input.kind, input.slug);
+  const scheme = shellManagedScheme(input.kind);
+  const maskedConnection =
+    input.kind === "redis"
+      ? `redis://:********@${host}:${port}/0`
+      : `${scheme}://app:********@${host}:${port}${databaseName ? `/${databaseName}` : ""}`;
+  return {
+    host,
+    port,
+    ...(databaseName ? { databaseName } : {}),
+    maskedConnection,
+  };
+}
+
+function shellManagedHostSegment(kind: ManagedDependencyResourceKind): string {
+  return kind === "object-storage" ? "minio" : kind;
+}
+
+function shellManagedPort(kind: ManagedDependencyResourceKind): number {
+  switch (kind) {
+    case "postgres":
+      return 5432;
+    case "redis":
+      return 6379;
+    case "mysql":
+      return 3306;
+    case "clickhouse":
+      return 9000;
+    case "object-storage":
+      return 9000;
+    case "opensearch":
+      return 9200;
+  }
+}
+
+function shellManagedScheme(kind: ManagedDependencyResourceKind): string {
+  switch (kind) {
+    case "object-storage":
+      return "s3";
+    case "opensearch":
+      return "http";
+    default:
+      return kind;
+  }
+}
+
+function shellManagedDatabaseName(
+  kind: ManagedDependencyResourceKind,
+  slug: string,
+): string | undefined {
+  if (kind === "redis" || kind === "opensearch") {
+    return undefined;
+  }
+  const replacement = kind === "object-storage" ? "-" : "_";
+  const normalized = slug
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, replacement)
+    .replaceAll(new RegExp(`^\\${replacement}+|\\${replacement}+$`, "g"), "");
+  if (kind === "object-storage") {
+    return (normalized.length >= 3 ? normalized : `${normalized || "app"}-bucket`).slice(0, 63);
+  }
+  return normalized || "app";
 }
 
 interface ShellDependencyResourceBackupArtifact {
@@ -1639,10 +1869,8 @@ export function registerApplicationServices(
   container.registerSingleton(ShowSourceEventQueryHandler);
   container.registerSingleton(ResolveGenericSignedSourceEventSecretQueryHandler);
   container.registerSingleton(ResolvePreviewPullRequestContextQueryHandler);
-  container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
-  container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
-  container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
-  container.registerSingleton(ImportRedisDependencyResourceCommandHandler);
+  container.registerSingleton(ProvisionDependencyResourceCommandHandler);
+  container.registerSingleton(ImportDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(ConfigureDependencyResourceBackupPolicyCommandHandler);
@@ -1675,11 +1903,8 @@ export function registerApplicationServices(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
   );
-  container.register(tokens.managedPostgresProvider, {
-    useValue: new ShellManagedPostgresProvider(input.dataDir),
-  });
-  container.register(tokens.managedRedisProvider, {
-    useValue: new ShellManagedRedisProvider(input.dataDir),
+  container.register(tokens.managedDependencyProvider, {
+    useValue: new ShellManagedDependencyProvider(input.dataDir),
   });
   container.register(tokens.dependencyResourceBackupProvider, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
@@ -1936,20 +2161,12 @@ export function registerApplicationServices(
     ScheduledTaskRunLogsQueryService,
   );
   container.registerSingleton(
-    tokens.provisionPostgresDependencyResourceUseCase,
-    ProvisionPostgresDependencyResourceUseCase,
+    tokens.provisionDependencyResourceUseCase,
+    ProvisionDependencyResourceUseCase,
   );
   container.registerSingleton(
-    tokens.importPostgresDependencyResourceUseCase,
-    ImportPostgresDependencyResourceUseCase,
-  );
-  container.registerSingleton(
-    tokens.provisionRedisDependencyResourceUseCase,
-    ProvisionRedisDependencyResourceUseCase,
-  );
-  container.registerSingleton(
-    tokens.importRedisDependencyResourceUseCase,
-    ImportRedisDependencyResourceUseCase,
+    tokens.importDependencyResourceUseCase,
+    ImportDependencyResourceUseCase,
   );
   container.registerSingleton(
     tokens.renameDependencyResourceUseCase,

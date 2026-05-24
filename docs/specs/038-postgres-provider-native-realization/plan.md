@@ -21,7 +21,7 @@
     Appaloft-managed provider cleanup.
 - Application:
   - Add provider capability ports for managed Postgres create/delete/observe with safe DTOs.
-  - Upgrade `ProvisionPostgresDependencyResourceUseCase` to persist realization state and call or
+  - Upgrade `ProvisionDependencyResourceUseCase` to persist realization state and call or
     schedule the provider capability.
   - Upgrade bind admission to require ready realized state for Appaloft-managed Postgres.
   - Upgrade delete to request provider cleanup only after safety readers report no blockers.

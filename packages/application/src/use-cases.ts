@@ -28,13 +28,11 @@ export * from "./operations/dependency-resources/create-dependency-resource-back
 export * from "./operations/dependency-resources/delete-dependency-resource.use-case";
 export * from "./operations/dependency-resources/dependency-resource-backup-policy.types";
 export * from "./operations/dependency-resources/dependency-resource-scheduled-backup.service";
-export * from "./operations/dependency-resources/import-postgres-dependency-resource.use-case";
-export * from "./operations/dependency-resources/import-redis-dependency-resource.use-case";
+export * from "./operations/dependency-resources/import-dependency-resource.use-case";
 export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query-service";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.query-service";
 export * from "./operations/dependency-resources/list-dependency-resources.query-service";
-export * from "./operations/dependency-resources/provision-postgres-dependency-resource.use-case";
-export * from "./operations/dependency-resources/provision-redis-dependency-resource.use-case";
+export * from "./operations/dependency-resources/provision-dependency-resource.use-case";
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";

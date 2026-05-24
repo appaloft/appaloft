@@ -74,6 +74,21 @@ export const targetKinds = ["single-server", "orchestrator-cluster"] as const;
 
 export type TargetKind = (typeof targetKinds)[number];
 
+export const resourceInstanceKinds = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+  "dns",
+  "secret-manager",
+  "registry",
+  "generic-service",
+] as const;
+
+export type ResourceInstanceKind = (typeof resourceInstanceKinds)[number];
+
 export const edgeProxyKinds = ["none", "traefik", "caddy"] as const;
 
 export type EdgeProxyKind = (typeof edgeProxyKinds)[number];

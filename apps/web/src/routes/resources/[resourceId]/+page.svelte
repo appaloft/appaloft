@@ -26,6 +26,7 @@
     Terminal,
     Trash2,
   } from "@lucide/svelte";
+  import type { TranslationKey } from "@appaloft/i18n";
   import type {
     ArchiveResourceInput,
     AttachResourceStorageInput,
@@ -188,18 +189,10 @@
     typeof orpcClient.storageVolumes.cleanupRuntime
   >[0];
   type StorageRuntimeCleanupCandidate = CleanupStorageVolumeRuntimeResponse["candidates"][number];
-  type ProvisionPostgresDependencyResourceInput = Parameters<
-    typeof orpcClient.dependencyResources.provisionPostgres
+  type ProvisionDependencyResourceInput = Parameters<
+    typeof orpcClient.dependencyResources.provision
   >[0];
-  type ProvisionRedisDependencyResourceInput = Parameters<
-    typeof orpcClient.dependencyResources.provisionRedis
-  >[0];
-  type ImportPostgresDependencyResourceInput = Parameters<
-    typeof orpcClient.dependencyResources.importPostgres
-  >[0];
-  type ImportRedisDependencyResourceInput = Parameters<
-    typeof orpcClient.dependencyResources.importRedis
-  >[0];
+  type ImportDependencyResourceInput = Parameters<typeof orpcClient.dependencyResources.import>[0];
   type RenameDependencyResourceInput = Parameters<typeof orpcClient.dependencyResources.rename>[0];
   type DeleteDependencyResourceInput = Parameters<typeof orpcClient.dependencyResources.delete>[0];
   type CreateDependencyResourceBackupInput = Parameters<
@@ -914,6 +907,14 @@
     title: string;
     detail: string;
   } | null>(null);
+  const dependencyResourceKindOrder = [
+    "postgres",
+    "redis",
+    "mysql",
+    "clickhouse",
+    "object-storage",
+    "opensearch",
+  ] as const satisfies readonly DependencyResourceSummary["kind"][];
   let proxyConfigurationResourceId = $state("");
   let proxyConfiguration = $state<ProxyConfigurationView | null>(null);
   let proxyConfigurationLoading = $state(false);
@@ -1825,20 +1826,8 @@
     },
   }));
   const provisionDependencyResourceMutation = createMutation(() => ({
-    mutationFn: (
-      input: {
-        kind: DependencyResourceSummary["kind"];
-      } & (ProvisionPostgresDependencyResourceInput | ProvisionRedisDependencyResourceInput),
-    ) => {
-      const { kind, ...payload } = input;
-      return kind === "postgres"
-        ? orpcClient.dependencyResources.provisionPostgres(
-            payload as ProvisionPostgresDependencyResourceInput,
-          )
-        : orpcClient.dependencyResources.provisionRedis(
-            payload as ProvisionRedisDependencyResourceInput,
-          );
-    },
+    mutationFn: (input: ProvisionDependencyResourceInput) =>
+      orpcClient.dependencyResources.provision(input),
     onSuccess: (result) => {
       dependencyFeedback = {
         kind: "success",
@@ -1858,18 +1847,8 @@
     },
   }));
   const importDependencyResourceMutation = createMutation(() => ({
-    mutationFn: (
-      input: {
-        kind: DependencyResourceSummary["kind"];
-      } & (ImportPostgresDependencyResourceInput | ImportRedisDependencyResourceInput),
-    ) => {
-      const { kind, ...payload } = input;
-      return kind === "postgres"
-        ? orpcClient.dependencyResources.importPostgres(
-            payload as ImportPostgresDependencyResourceInput,
-          )
-        : orpcClient.dependencyResources.importRedis(payload as ImportRedisDependencyResourceInput);
-    },
+    mutationFn: (input: ImportDependencyResourceInput) =>
+      orpcClient.dependencyResources.import(input),
     onSuccess: (result) => {
       dependencyFeedback = {
         kind: "success",
@@ -4226,9 +4205,27 @@
   }
 
   function dependencyResourceKindLabel(kind: DependencyResourceSummary["kind"]): string {
-    return kind === "postgres"
-      ? $t(i18nKeys.console.resources.dependencyKindPostgres)
-      : $t(i18nKeys.console.resources.dependencyKindRedis);
+    const labels = {
+      postgres: i18nKeys.console.dependencyResources.kindPostgres,
+      redis: i18nKeys.console.dependencyResources.kindRedis,
+      mysql: i18nKeys.console.dependencyResources.kindMysql,
+      clickhouse: i18nKeys.console.dependencyResources.kindClickHouse,
+      "object-storage": i18nKeys.console.dependencyResources.kindObjectStorage,
+      opensearch: i18nKeys.console.dependencyResources.kindOpenSearch,
+    } satisfies Record<DependencyResourceSummary["kind"], TranslationKey>;
+    return $t(labels[kind]);
+  }
+
+  function dependencyConnectionPlaceholder(kind: DependencyResourceSummary["kind"]): string {
+    const placeholders = {
+      postgres: "postgres://...",
+      redis: "redis://...",
+      mysql: "mysql://...",
+      clickhouse: "clickhouse://...",
+      "object-storage": "s3://...",
+      opensearch: "https://...",
+    } satisfies Record<DependencyResourceSummary["kind"], string>;
+    return placeholders[kind];
   }
 
   function dependencyResourceOptionLabel(dependency: DependencyResourceSummary): string {
@@ -7837,12 +7834,11 @@
                           {dependencyResourceKindLabel(dependencyProvisionKind)}
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="postgres">
-                            {$t(i18nKeys.console.resources.dependencyKindPostgres)}
-                          </Select.Item>
-                          <Select.Item value="redis">
-                            {$t(i18nKeys.console.resources.dependencyKindRedis)}
-                          </Select.Item>
+                          {#each dependencyResourceKindOrder as dependencyKind (dependencyKind)}
+                            <Select.Item value={dependencyKind}>
+                              {dependencyResourceKindLabel(dependencyKind)}
+                            </Select.Item>
+                          {/each}
                         </Select.Content>
                       </Select.Root>
                     </label>
@@ -7888,12 +7884,11 @@
                           {dependencyResourceKindLabel(dependencyImportKind)}
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="postgres">
-                            {$t(i18nKeys.console.resources.dependencyKindPostgres)}
-                          </Select.Item>
-                          <Select.Item value="redis">
-                            {$t(i18nKeys.console.resources.dependencyKindRedis)}
-                          </Select.Item>
+                          {#each dependencyResourceKindOrder as dependencyKind (dependencyKind)}
+                            <Select.Item value={dependencyKind}>
+                              {dependencyResourceKindLabel(dependencyKind)}
+                            </Select.Item>
+                          {/each}
                         </Select.Content>
                       </Select.Root>
                     </label>
@@ -7904,9 +7899,7 @@
                         id="resource-dependency-import-url"
                         bind:value={dependencyImportConnectionUrl}
                         autocomplete="off"
-                        placeholder={dependencyImportKind === "postgres"
-                          ? "postgres://..."
-                          : "redis://..."}
+                        placeholder={dependencyConnectionPlaceholder(dependencyImportKind)}
                       />
                     </label>
 

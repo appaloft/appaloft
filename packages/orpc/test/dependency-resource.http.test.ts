@@ -11,13 +11,11 @@ import {
   DeleteDependencyResourceCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
-  ImportPostgresDependencyResourceCommand,
-  ImportRedisDependencyResourceCommand,
+  ImportDependencyResourceCommand,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
-  ProvisionPostgresDependencyResourceCommand,
-  ProvisionRedisDependencyResourceCommand,
+  ProvisionDependencyResourceCommand,
   type Query,
   type QueryBus,
   RestoreDependencyResourceBackupCommand,
@@ -180,14 +178,15 @@ function createHarness() {
 }
 
 describe("dependency resource HTTP routes", () => {
-  test("[DEP-RES-PG-ENTRY-002] dispatches provision and import through HTTP", async () => {
+  test("[DEP-RES-ENTRY-002] dispatches dependency provision and import through HTTP", async () => {
     const { app, commands } = createHarness();
 
     const provisionResponse = await app.handle(
-      new Request("http://localhost/api/dependency-resources/postgres/provision", {
+      new Request("http://localhost/api/dependency-resources/provision", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          kind: "postgres",
           projectId: "prj_demo",
           environmentId: "env_demo",
           name: "Main DB",
@@ -195,55 +194,62 @@ describe("dependency resource HTTP routes", () => {
       }),
     );
     const importResponse = await app.handle(
-      new Request("http://localhost/api/dependency-resources/postgres/import", {
+      new Request("http://localhost/api/dependency-resources/import", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          kind: "mysql",
           projectId: "prj_demo",
           environmentId: "env_demo",
-          name: "External DB",
-          connectionUrl: "postgres://user:secret@db.example.com:5432/app?sslmode=require",
+          name: "External MySQL",
+          connectionUrl: "mysql://user:secret@db.example.com:3306/app",
         }),
       }),
     );
 
     expect(provisionResponse.status).toBe(201);
     expect(importResponse.status).toBe(201);
-    expect(commands[0]).toBeInstanceOf(ProvisionPostgresDependencyResourceCommand);
-    expect(commands[1]).toBeInstanceOf(ImportPostgresDependencyResourceCommand);
+    expect(commands[0]).toBeInstanceOf(ProvisionDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({ kind: "postgres" });
+    expect(commands[1]).toBeInstanceOf(ImportDependencyResourceCommand);
+    expect(commands[1]).toMatchObject({ kind: "mysql" });
   });
 
-  test("[DEP-RES-REDIS-ENTRY-001] dispatches Redis provision and import through HTTP", async () => {
+  test("[DEP-RES-ENTRY-003] dispatches additional dependency kinds through one HTTP route", async () => {
     const { app, commands } = createHarness();
 
     const provisionResponse = await app.handle(
-      new Request("http://localhost/api/dependency-resources/redis/provision", {
+      new Request("http://localhost/api/dependency-resources/provision", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          kind: "opensearch",
           projectId: "prj_demo",
           environmentId: "env_demo",
-          name: "Main Cache",
+          name: "Search",
         }),
       }),
     );
     const importResponse = await app.handle(
-      new Request("http://localhost/api/dependency-resources/redis/import", {
+      new Request("http://localhost/api/dependency-resources/import", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          kind: "object-storage",
           projectId: "prj_demo",
           environmentId: "env_demo",
-          name: "External Cache",
-          connectionUrl: "redis://default:secret@cache.example.com:6379/0",
+          name: "Artifacts",
+          connectionUrl: "s3://key:secret@minio.example.com:9000/artifacts",
         }),
       }),
     );
 
     expect(provisionResponse.status).toBe(201);
     expect(importResponse.status).toBe(201);
-    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
-    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
+    expect(commands[0]).toBeInstanceOf(ProvisionDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({ kind: "opensearch" });
+    expect(commands[1]).toBeInstanceOf(ImportDependencyResourceCommand);
+    expect(commands[1]).toMatchObject({ kind: "object-storage" });
   });
 
   test("[DEP-RES-PG-ENTRY-002] dispatches list/show/delete through HTTP", async () => {

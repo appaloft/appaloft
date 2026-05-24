@@ -9,9 +9,10 @@ Appaloft now uses two related but different resource concepts:
   bindings, such as a managed Postgres instance or object storage bucket.
 
 `ResourceInstance` and `ResourceBinding` are first-class Appaloft concepts. Appaloft-managed
-Postgres and Redis provisioning, imported Postgres/Redis metadata, binding, store-backed runtime
-secret resolution, provider-backed delete, and backup/restore are active through the dependency
-resource operation surface.
+Dependency resource provisioning/import for `postgres`, `redis`, `mysql`, `clickhouse`,
+`object-storage`, and `opensearch`, binding, store-backed runtime secret resolution,
+provider-backed delete, and backup/restore are active through the dependency resource operation
+surface.
 
 ## Why This Exists
 
@@ -46,8 +47,8 @@ Implemented in `core`:
 - `ResourceBinding`
 
 Implemented through application, CLI, HTTP/oRPC, Web, and provider capability boundaries:
-- Appaloft-managed Postgres and Redis provisioning
-- external Postgres and Redis import
+- Appaloft-managed dependency provisioning through `dependency-resources.provision`
+- external dependency import through `dependency-resources.import`
 - dependency binding, unbinding, binding-secret rotation, and safe runtime injection
 - dependency resource list/show/rename/delete with binding, backup, snapshot, and provider blockers
 - dependency backup create/list/show and acknowledged in-place restore for Postgres and Redis

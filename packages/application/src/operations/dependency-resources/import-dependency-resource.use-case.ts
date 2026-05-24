@@ -36,11 +36,13 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
-import { type ImportPostgresDependencyResourceCommandInput } from "./import-postgres-dependency-resource.command";
-import { maskPostgresConnectionUrl } from "./postgres-connection-masking";
+import { maskDependencyConnectionUrl } from "./dependency-connection-masking";
+import { type ImportDependencyResourceCommandInput } from "./import-dependency-resource.command";
+
+const importDependencyResourceOperation = "dependency-resources.import";
 
 @injectable()
-export class ImportPostgresDependencyResourceUseCase {
+export class ImportDependencyResourceUseCase {
   constructor(
     @inject(tokens.projectRepository)
     private readonly projectRepository: ProjectRepository,
@@ -62,7 +64,7 @@ export class ImportPostgresDependencyResourceUseCase {
 
   async execute(
     context: ExecutionContext,
-    input: ImportPostgresDependencyResourceCommandInput,
+    input: ImportDependencyResourceCommandInput,
   ): Promise<Result<{ id: string }>> {
     const repositoryContext = toRepositoryContext(context);
     const {
@@ -81,8 +83,11 @@ export class ImportPostgresDependencyResourceUseCase {
       const environmentId = yield* EnvironmentId.create(input.environmentId);
       const name = yield* ResourceInstanceName.create(input.name);
       const slug = yield* ResourceInstanceSlug.fromName(name);
-      const kind = ResourceInstanceKindValue.rehydrate("postgres");
-      const endpoint = yield* maskPostgresConnectionUrl(input.connectionUrl);
+      const kind = ResourceInstanceKindValue.rehydrate(input.kind);
+      const endpoint = yield* maskDependencyConnectionUrl({
+        kind: input.kind,
+        connectionUrl: input.connectionUrl,
+      });
       const createdAt = yield* CreatedAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
       const dependencyResourceId = ResourceInstanceId.rehydrate(idGenerator.next("rsi"));
@@ -93,7 +98,7 @@ export class ImportPostgresDependencyResourceUseCase {
       if (!project) {
         return err(domainError.notFound("project", projectId.value));
       }
-      yield* project.ensureCanAcceptMutation("dependency-resources.import-postgres");
+      yield* project.ensureCanAcceptMutation(importDependencyResourceOperation);
 
       const environment = await environmentRepository.findOne(
         repositoryContext,
@@ -127,6 +132,7 @@ export class ImportPostgresDependencyResourceUseCase {
         );
       }
 
+      const secretValue = input.connectionSecret ?? input.connectionUrl;
       const secretRefValue =
         input.secretRef ??
         (yield* await dependencyResourceSecretStore
@@ -134,22 +140,22 @@ export class ImportPostgresDependencyResourceUseCase {
             dependencyResourceId: dependencyResourceId.value,
             projectId: projectId.value,
             environmentId: environmentId.value,
-            kind: "postgres",
+            kind: input.kind,
             purpose: "connection",
-            secretValue: input.connectionUrl,
+            secretValue,
             storedAt: createdAt.value,
           })
           .then((result) => result.map((stored) => stored.secretRef)));
       const secretRef = yield* DependencyResourceSecretRef.create(secretRefValue);
 
-      const dependencyResource = yield* ResourceInstance.createPostgresDependencyResource({
+      const dependencyResource = yield* ResourceInstance.createDependencyResource({
         id: dependencyResourceId,
         projectId,
         environmentId,
         name,
         kind,
         sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
-        providerKey: ProviderKey.rehydrate("external-postgres"),
+        providerKey: ProviderKey.rehydrate(`external-${input.kind}`),
         providerManaged: false,
         endpoint,
         connectionSecretRef: secretRef,

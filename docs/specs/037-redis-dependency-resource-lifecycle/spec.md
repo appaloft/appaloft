@@ -48,8 +48,8 @@ of this provider-neutral baseline.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| DEP-RES-REDIS-PROVISION-001 | Provision managed Redis record | Active project/environment context | `dependency-resources.provision-redis` with valid name | A Redis `ResourceInstance` is persisted, marked Appaloft-managed, emits `dependency-resource-created`, and, when provider-native realization is available, records safe provider realization attempt state through the later provider-native realization slice. |
-| DEP-RES-REDIS-IMPORT-001 | Import external Redis | Active project/environment context | `dependency-resources.import-redis` supplies endpoint metadata and a secret reference or secret-bearing input | A Redis `ResourceInstance` is persisted as imported-external; read models mask all secret-bearing connection data. |
+| DEP-RES-REDIS-PROVISION-001 | Provision managed Redis record | Active project/environment context | `dependency-resources.provision` with valid name | A Redis `ResourceInstance` is persisted, marked Appaloft-managed, emits `dependency-resource-created`, and, when provider-native realization is available, records safe provider realization attempt state through the later provider-native realization slice. |
+| DEP-RES-REDIS-IMPORT-001 | Import external Redis | Active project/environment context | `dependency-resources.import` supplies endpoint metadata and a secret reference or secret-bearing input | A Redis `ResourceInstance` is persisted as imported-external; read models mask all secret-bearing connection data. |
 | DEP-RES-REDIS-VALIDATION-001 | Reject invalid Redis input | Name, host, port, database index, TLS mode, URI, or secret reference is invalid | Redis provision/import runs | Command returns `validation_error`, `phase = dependency-resource-validation`, no mutation. |
 | DEP-RES-REDIS-READ-001 | List/show safe Redis summaries | Managed and imported Redis resources exist | `dependency-resources.list` or `dependency-resources.show` runs | Output includes ownership, status, kind `redis`, provider key, binding readiness, backup relationship metadata, and masked Redis connection summary only. |
 | DEP-RES-REDIS-READ-002 | Mask Redis secret material | Redis import receives a raw password, ACL credential, token, TLS key/cert, or secret-bearing URI | Any output, event, error, log, or snapshot surface is inspected | Raw secret material is absent and password-like parts are replaced by a stable mask. |
@@ -79,11 +79,11 @@ of this provider-neutral baseline.
 
 ## Public Surfaces
 
-- API/oRPC: add `POST /api/dependency-resources/redis/provision` and
-  `POST /api/dependency-resources/redis/import`; extend existing list/show/rename/delete routes to
+- API/oRPC: use `POST /api/dependency-resources/provision` and
+  `POST /api/dependency-resources/import` with `kind = redis`; extend existing list/show/rename/delete routes to
   accept and return `redis`; existing dependency binding and deployment plan/show contracts accept
   Redis safe binding references.
-- CLI: add `appaloft dependency redis provision/import`; reuse
+- CLI: use `appaloft dependency provision --kind redis` and `appaloft dependency import --kind redis`; reuse
   `appaloft dependency list/show/rename/delete`; existing dependency binding commands can bind
   ready imported Redis.
 - Web/UI: Resource detail exposes dependency resource provision/import/list, rename/delete, backup

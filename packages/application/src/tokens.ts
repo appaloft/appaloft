@@ -352,22 +352,11 @@ export const tokens = {
   showResourceDependencyBindingQueryService: Symbol.for(
     "appaloft.show_resource_dependency_binding_query_service",
   ),
-  provisionPostgresDependencyResourceUseCase: Symbol.for(
-    "appaloft.provision_postgres_dependency_resource_use_case",
-  ),
-  importPostgresDependencyResourceUseCase: Symbol.for(
-    "appaloft.import_postgres_dependency_resource_use_case",
-  ),
-  provisionRedisDependencyResourceUseCase: Symbol.for(
-    "appaloft.provision_redis_dependency_resource_use_case",
-  ),
-  importRedisDependencyResourceUseCase: Symbol.for(
-    "appaloft.import_redis_dependency_resource_use_case",
-  ),
+  provisionDependencyResourceUseCase: Symbol.for("appaloft.provision_dependency_resource_use_case"),
+  importDependencyResourceUseCase: Symbol.for("appaloft.import_dependency_resource_use_case"),
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
-  managedPostgresProvider: Symbol.for("appaloft.managed_postgres_provider"),
-  managedRedisProvider: Symbol.for("appaloft.managed_redis_provider"),
+  managedDependencyProvider: Symbol.for("appaloft.managed_dependency_provider"),
   dependencyResourceBackupProvider: Symbol.for("appaloft.dependency_resource_backup_provider"),
   createDependencyResourceBackupUseCase: Symbol.for(
     "appaloft.create_dependency_resource_backup_use_case",
