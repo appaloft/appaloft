@@ -208,6 +208,9 @@
     "packages/blueprint-marketplace-web": {
       "name": "@appaloft/blueprint-marketplace-web",
       "version": "0.0.0",
+      "dependencies": {
+        "@appaloft/ui": "workspace:*",
+      },
       "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^7.1.2",
         "svelte": "^5.55.5",
