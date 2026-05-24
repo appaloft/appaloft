@@ -1436,11 +1436,16 @@ export const deployCommand = EffectCommand.make(
         : [];
       const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
-      const configAnchoredSourceLocator =
-        resolveConfigAnchoredSourceLocator({
-          ...(sourceLocator ? { sourceLocator } : {}),
-          ...(configResolution ? { configResolution } : {}),
-        }) ?? (configResolution ? "." : undefined);
+      const configAnchoredSourceLocator = sourceLocator
+        ? resolveConfigAnchoredSourceLocator({
+            sourceLocator,
+            ...(configResolution ? { configResolution } : {}),
+          })
+        : (configSeed.sourceLocator ??
+          resolveConfigAnchoredSourceLocator({
+            ...(configResolution ? { configResolution } : {}),
+          }) ??
+          (configResolution ? "." : undefined));
       const normalizedSourceLocator = configAnchoredSourceLocator
         ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
         : undefined;

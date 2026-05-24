@@ -29,9 +29,13 @@ import {
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
   SourceLinkBySourceFingerprintSpec,
+  type SourceLinkDependencyProvenanceEntry,
+  type SourceLinkRecord,
   type SourceLinkRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { type DeleteDependencyResourceUseCase } from "../dependency-resources/delete-dependency-resource.use-case";
+import { type UnbindResourceDependencyUseCase } from "../resources/unbind-resource-dependency.use-case";
 import { type CleanupPreviewCommandInput } from "./cleanup-preview.command";
 import { previewLifecycleScope } from "./deployment-mutation-scopes";
 
@@ -41,6 +45,8 @@ export interface CleanupPreviewResult {
   cleanedRuntime: boolean;
   removedServerAppliedRoute: boolean;
   removedSourceLink: boolean;
+  removedDependencyBindings?: number;
+  deletedDependencyResources?: number;
   projectId?: string;
   environmentId?: string;
   resourceId?: string;
@@ -96,6 +102,55 @@ function cleanupStageFromError(error: DomainError, fallback: string): string {
   return typeof cleanupStage === "string" ? cleanupStage : fallback;
 }
 
+function isNotFoundError(error: DomainError): boolean {
+  return error.code === "not_found";
+}
+
+function previewDependencyProvenanceEntries(input: {
+  sourceLink: SourceLinkRecord;
+  sourceFingerprint: string;
+}): SourceLinkDependencyProvenanceEntry[] {
+  const provenance = input.sourceLink.dependencyProvenance;
+  if (
+    provenance?.schemaVersion !== "source-link.dependency-provenance/v1" ||
+    provenance.source !== "repository-config" ||
+    provenance.sourceFingerprint !== input.sourceFingerprint
+  ) {
+    return [];
+  }
+
+  return provenance.entries.filter(
+    (entry) =>
+      entry.source === "managed" &&
+      entry.lifecycle === "ephemeral" &&
+      entry.resourceId === input.sourceLink.resourceId &&
+      entry.dependencyResourceId.trim().length > 0 &&
+      entry.bindingId.trim().length > 0,
+  );
+}
+
+const missingUnbindResourceDependencyUseCase: Pick<UnbindResourceDependencyUseCase, "execute"> = {
+  async execute() {
+    return err(
+      domainError.infra("Resource dependency unbind use case is not registered", {
+        phase: "preview-cleanup",
+        cleanupStage: "dependency-unbind",
+      }),
+    );
+  },
+};
+
+const missingDeleteDependencyResourceUseCase: Pick<DeleteDependencyResourceUseCase, "execute"> = {
+  async execute() {
+    return err(
+      domainError.infra("Dependency resource delete use case is not registered", {
+        phase: "preview-cleanup",
+        cleanupStage: "dependency-delete",
+      }),
+    );
+  },
+};
+
 @injectable()
 export class CleanupPreviewUseCase {
   constructor(
@@ -111,6 +166,16 @@ export class CleanupPreviewUseCase {
     private readonly executionBackend: ExecutionBackend,
     @inject(tokens.mutationCoordinator)
     private readonly mutationCoordinator: MutationCoordinator,
+    @inject(tokens.unbindResourceDependencyUseCase)
+    private readonly unbindResourceDependencyUseCase: Pick<
+      UnbindResourceDependencyUseCase,
+      "execute"
+    > = missingUnbindResourceDependencyUseCase,
+    @inject(tokens.deleteDependencyResourceUseCase)
+    private readonly deleteDependencyResourceUseCase: Pick<
+      DeleteDependencyResourceUseCase,
+      "execute"
+    > = missingDeleteDependencyResourceUseCase,
   ) {}
 
   private async findLatestDeploymentForResource(
@@ -194,6 +259,8 @@ export class CleanupPreviewUseCase {
       mutationCoordinator,
       serverAppliedRouteStateRepository,
       sourceLinkRepository,
+      unbindResourceDependencyUseCase,
+      deleteDependencyResourceUseCase,
     } = this;
     const findDeploymentById = this.findDeploymentById.bind(this);
     const findLatestDeploymentForResource = this.findLatestDeploymentForResource.bind(this);
@@ -225,6 +292,8 @@ export class CleanupPreviewUseCase {
               cleanedRuntime: false,
               removedServerAppliedRoute: false,
               removedSourceLink: false,
+              removedDependencyBindings: 0,
+              deletedDependencyResources: 0,
             });
           }
 
@@ -288,6 +357,52 @@ export class CleanupPreviewUseCase {
             cleanedRuntime = true;
           }
 
+          let removedDependencyBindings = 0;
+          let deletedDependencyResources = 0;
+          for (const dependency of previewDependencyProvenanceEntries({
+            sourceLink,
+            sourceFingerprint: input.sourceFingerprint,
+          })) {
+            const unbindResult = await unbindResourceDependencyUseCase.execute(context, {
+              resourceId: dependency.resourceId,
+              bindingId: dependency.bindingId,
+            });
+            if (unbindResult.isErr() && !isNotFoundError(unbindResult.error)) {
+              return err(
+                withPreviewCleanupDetails(unbindResult.error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: cleanupStageFromError(unbindResult.error, "dependency-unbind"),
+                  resourceId: dependency.resourceId,
+                  bindingId: dependency.bindingId,
+                  dependencyResourceId: dependency.dependencyResourceId,
+                  dependencyKey: dependency.key,
+                }),
+              );
+            }
+            if (unbindResult.isOk()) {
+              removedDependencyBindings += 1;
+            }
+
+            const deleteResult = await deleteDependencyResourceUseCase.execute(context, {
+              dependencyResourceId: dependency.dependencyResourceId,
+            });
+            if (deleteResult.isErr() && !isNotFoundError(deleteResult.error)) {
+              return err(
+                withPreviewCleanupDetails(deleteResult.error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: cleanupStageFromError(deleteResult.error, "dependency-delete"),
+                  resourceId: dependency.resourceId,
+                  bindingId: dependency.bindingId,
+                  dependencyResourceId: dependency.dependencyResourceId,
+                  dependencyKey: dependency.key,
+                }),
+              );
+            }
+            if (deleteResult.isOk()) {
+              deletedDependencyResources += 1;
+            }
+          }
+
           const removedLinkedServerAppliedRoute = sourceLink.serverId
             ? yield* await serverAppliedRouteStateRepository
                 .deleteOne(
@@ -347,12 +462,18 @@ export class CleanupPreviewUseCase {
           return ok({
             sourceFingerprint: input.sourceFingerprint,
             status:
-              cleanedRuntime || removedServerAppliedRoute || removedSourceLink
+              cleanedRuntime ||
+              removedDependencyBindings > 0 ||
+              deletedDependencyResources > 0 ||
+              removedServerAppliedRoute ||
+              removedSourceLink
                 ? ("cleaned" as const)
                 : ("already-clean" as const),
             cleanedRuntime,
             removedServerAppliedRoute,
             removedSourceLink,
+            removedDependencyBindings,
+            deletedDependencyResources,
             projectId: sourceLink.projectId,
             environmentId: sourceLink.environmentId,
             resourceId: sourceLink.resourceId,

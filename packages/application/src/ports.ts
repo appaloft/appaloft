@@ -385,10 +385,30 @@ export interface SourceLinkTarget {
   destinationId?: string;
 }
 
+export interface SourceLinkDependencyProvenanceEntry {
+  key: string;
+  kind: "postgres";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  dependencyResourceId: string;
+  bindingId: string;
+  targetName: string;
+  createdAt: string;
+}
+
+export interface SourceLinkDependencyProvenance {
+  schemaVersion: "source-link.dependency-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
+  dependencyProvenance?: SourceLinkDependencyProvenance;
 }
 
 export interface SourceLinkSelectionSpecVisitor<TResult> {

@@ -4476,6 +4476,8 @@ export const cleanupPreviewResponseSchema = z.object({
   cleanedArtifacts: z.boolean().optional(),
   removedServerAppliedRoute: z.boolean(),
   removedSourceLink: z.boolean(),
+  removedDependencyBindings: z.number().int().nonnegative().optional(),
+  deletedDependencyResources: z.number().int().nonnegative().optional(),
   projectId: z.string().optional(),
   environmentId: z.string().optional(),
   resourceId: z.string().optional(),

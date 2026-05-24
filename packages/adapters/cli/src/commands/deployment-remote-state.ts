@@ -44,10 +44,30 @@ export interface SourceLinkTarget {
   destinationId?: string;
 }
 
+export interface SourceLinkDependencyProvenanceEntry {
+  key: string;
+  kind: "postgres";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  dependencyResourceId: string;
+  bindingId: string;
+  targetName: string;
+  createdAt: string;
+}
+
+export interface SourceLinkDependencyProvenance {
+  schemaVersion: "source-link.dependency-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
+  dependencyProvenance?: SourceLinkDependencyProvenance;
 }
 
 export interface SourceLinkDiagnostics {
@@ -1035,6 +1055,43 @@ export class FileSystemSourceLinkStore {
       sourceFingerprint: input.sourceFingerprint,
       updatedAt: input.updatedAt,
       ...input.target,
+    });
+  }
+
+  async recordDependencyProvenance(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    dependencyProvenance: SourceLinkDependencyProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>> {
+    const targetResult = validateTargetContext(input.target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const existing = await this.read(input.sourceFingerprint);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    if (existing.value && !sameTarget(existing.value, input.target)) {
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint: input.sourceFingerprint,
+          projectId: existing.value.projectId,
+          environmentId: existing.value.environmentId,
+          resourceId: existing.value.resourceId,
+        }),
+      );
+    }
+
+    return await this.write({
+      ...(existing.value ?? {}),
+      sourceFingerprint: input.sourceFingerprint,
+      updatedAt: input.updatedAt,
+      ...input.target,
+      dependencyProvenance: input.dependencyProvenance,
+      ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
     });
   }
 

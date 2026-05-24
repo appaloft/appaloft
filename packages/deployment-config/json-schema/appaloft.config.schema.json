@@ -118,6 +118,16 @@
     "source": {
       "type": "object",
       "properties": {
+        "type": {
+          "description": "Repository source kind.",
+          "type": "string",
+          "const": "git"
+        },
+        "repository": {
+          "description": "Git repository URL to deploy from.",
+          "type": "string",
+          "minLength": 1
+        },
         "baseDirectory": {
           "description": "Relative workspace directory to use as the deployable source root.",
           "type": "string",
@@ -141,6 +151,11 @@
     "runtime": {
       "type": "object",
       "properties": {
+        "type": {
+          "description": "Application runtime type shorthand.",
+          "type": "string",
+          "const": "node"
+        },
         "strategy": {
           "description": "Requested runtime plan strategy.",
           "type": "string",
@@ -164,6 +179,28 @@
         "startCommand": {
           "type": "string",
           "minLength": 1
+        },
+        "build": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["command"],
+          "additionalProperties": false
+        },
+        "start": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["command"],
+          "additionalProperties": false
         },
         "name": {
           "type": "string",
@@ -387,6 +424,75 @@
       "required": ["domains"],
       "additionalProperties": false,
       "description": "Access intent resolved outside deployments.create."
+    },
+    "preview": {
+      "type": "object",
+      "properties": {
+        "pullRequest": {
+          "type": "object",
+          "properties": {
+            "domainTemplate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tlsMode": {
+              "type": "string",
+              "enum": ["auto", "disabled"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Preview deployment policy read by trusted entrypoints such as GitHub Actions."
+    },
+    "dependencies": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "postgres",
+            "description": "Application dependency kind."
+          },
+          "source": {
+            "type": "string",
+            "const": "managed",
+            "description": "Managed dependencies are created by Appaloft."
+          },
+          "bind": {
+            "type": "object",
+            "properties": {
+              "env": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                "description": "Runtime environment variable target for this dependency."
+              }
+            },
+            "required": ["env"],
+            "additionalProperties": false
+          },
+          "preview": {
+            "type": "object",
+            "properties": {
+              "lifecycle": {
+                "type": "string",
+                "const": "ephemeral"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["kind", "source", "bind"],
+        "additionalProperties": false,
+        "description": "User-facing application dependency declaration."
+      }
     },
     "env": {
       "type": "object",

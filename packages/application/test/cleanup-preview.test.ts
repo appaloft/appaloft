@@ -342,6 +342,34 @@ class CapturingExecutionBackend implements ExecutionBackend {
   }
 }
 
+class CapturingUnbindDependencyUseCase {
+  readonly calls: Array<{ resourceId: string; bindingId: string }> = [];
+
+  constructor(private readonly result: Result<{ id: string }> = ok({ id: "rbd_preview_db" })) {}
+
+  async execute(
+    _context: unknown,
+    input: { resourceId: string; bindingId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDeleteDependencyResourceUseCase {
+  readonly calls: Array<{ dependencyResourceId: string }> = [];
+
+  constructor(private readonly result: Result<{ id: string }> = ok({ id: "dep_res_preview_db" })) {}
+
+  async execute(
+    _context: unknown,
+    input: { dependencyResourceId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
 class MemoryDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly items: Awaited<ReturnType<DeploymentReadModel["list"]>> = []) {}
 
@@ -389,11 +417,131 @@ describe("CleanupPreviewUseCase", () => {
       cleanedRuntime: false,
       removedServerAppliedRoute: false,
       removedSourceLink: false,
+      removedDependencyBindings: 0,
+      deletedDependencyResources: 0,
     });
     expect(executionBackend.canceledDeploymentIds).toEqual([]);
     expect(routeRepository.deletedTargets).toEqual([]);
     expect(routeRepository.deletedSourceFingerprints).toEqual([]);
     expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-011] cleans only provenance-owned ephemeral dependencies", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      destinationId: "dst_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      dependencyProvenance: {
+        schemaVersion: "source-link.dependency-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "db",
+            kind: "postgres",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_preview_1",
+            dependencyResourceId: "dep_res_preview_db",
+            bindingId: "rbd_preview_db",
+            targetName: "DATABASE_URL",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const unbindDependency = new CapturingUnbindDependencyUseCase();
+    const deleteDependency = new CapturingDeleteDependencyResourceUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_dependency",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      unbindDependency,
+      deleteDependency,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "cleaned",
+      removedDependencyBindings: 1,
+      deletedDependencyResources: 1,
+      removedSourceLink: true,
+    });
+    expect(unbindDependency.calls).toEqual([
+      {
+        resourceId: "res_preview_1",
+        bindingId: "rbd_preview_db",
+      },
+    ]);
+    expect(deleteDependency.calls).toEqual([
+      {
+        dependencyResourceId: "dep_res_preview_db",
+      },
+    ]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-012] preserves dependencies without matching provenance", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const unbindDependency = new CapturingUnbindDependencyUseCase();
+    const deleteDependency = new CapturingDeleteDependencyResourceUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_no_dependency_provenance",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      unbindDependency,
+      deleteDependency,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      removedDependencyBindings: 0,
+      deletedDependencyResources: 0,
+      removedSourceLink: true,
+    });
+    expect(unbindDependency.calls).toEqual([]);
+    expect(deleteDependency.calls).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-002][CONFIG-FILE-ENTRY-019] cleans runtime, route state, and source link for a preview", async () => {

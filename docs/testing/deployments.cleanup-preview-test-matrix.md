@@ -16,6 +16,8 @@ Tests must prove:
   preview retargets;
 - cleanup removes preview-owned inert runtime artifacts and materialized workspaces when ownership
   can be proven without touching active runtime, rollback candidates, volumes, or remote state;
+- cleanup removes only repository-config provenance-marked ephemeral dependency resources and
+  preserves manual/shared dependencies;
 - cleanup does not treat standalone `ssh-pglite` as obsolete state and must preserve live PGlite,
   source-link, server-applied-route, lock, revision, and backend marker files;
 - runtime cleanup failure stops later cleanup stages;
@@ -34,6 +36,7 @@ This matrix inherits:
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -61,6 +64,8 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-008 | integration | Cleaned preview route is not current access | Preview resource remains as history/audit, but the preview source link has been removed by cleanup | Resource access summary does not project that historical preview route as current/ready; deployment history remains visible | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-009 | integration | Closed preview cleanup does not stop a newer live deployment | A preview source link still points at a resource whose latest deployment no longer carries the preview fingerprint, while older preview deployments still carry the closed preview fingerprint | Cleanup skips the newer live deployment, cleans only deployments carrying the preview fingerprint, then removes preview route/source-link state idempotently | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-010 | integration | Preview cleanup preserves standalone SSH live state | Cleanup runs for a closed preview on a server whose selected backend is `ssh-pglite` | Cleanup may remove preview-owned runtime, route, and selected source-link state, but it does not delete live `pglite`, locks, unrelated source links/routes, `sync-revision.txt`, or backend marker files | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-011 | integration | Preview cleanup removes provenance-owned ephemeral dependencies | Preview source link includes repository-config provenance for an ephemeral managed dependency binding/resource | Cleanup unbinds the recorded binding, deletes the recorded dependency resource through existing delete safety, reports safe counts, then removes route/source-link state | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-012 | integration | Preview cleanup preserves manual or shared dependencies | Preview resource has a dependency binding/resource but the source link lacks matching repository-config ephemeral provenance, or delete safety finds another blocker | Cleanup does not delete unproven dependencies; delete blockers stop before source-link deletion when provenance exists but safety blocks delete | None or `dependency_resource_delete_blocked`, phase `preview-cleanup` |
 | DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-001 | HTTP/oRPC | HTTP preview cleanup dispatches command | `POST /api/deployments/cleanup-preview` receives a preview-scoped source fingerprint | HTTP returns `202` with cleanup result and dispatches `CleanupPreviewCommand` with the same source fingerprint | Domain error mapped through standard HTTP/oRPC error contract |
 | DEPLOYMENTS-CLEANUP-PREVIEW-HTTP-002 | HTTP/oRPC | Action preview cleanup carries trusted repository scope | `POST /api/deployments/cleanup-preview` is marked with `x-appaloft-action-command: preview-cleanup` and the deploy token is repository-scoped | HTTP passes `trustedContext.repositoryFullName` to deploy-token authorization before dispatch; missing or mismatched repository context is rejected before command dispatch | `action_auth_forbidden`, phase `action-authorization`, reason `scope_value_missing` or `scope_value_not_allowed` |
 

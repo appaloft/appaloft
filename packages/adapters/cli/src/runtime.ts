@@ -20,6 +20,7 @@ import { Context, Effect, Layer, Option } from "effect";
 import {
   type RemoteStateSession,
   type ServerAppliedRouteDesiredStateStore,
+  type SourceLinkDependencyProvenance,
   type SourceLinkRecord,
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
@@ -34,6 +35,12 @@ export interface CliSourceLinkStore {
   createIfMissing(input: {
     sourceFingerprint: string;
     target: SourceLinkTarget;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordDependencyProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    dependencyProvenance: SourceLinkDependencyProvenance;
     updatedAt: string;
   }): Promise<Result<SourceLinkRecord>>;
 }

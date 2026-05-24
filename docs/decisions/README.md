@@ -90,6 +90,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-063: Runtime Monitoring Observation Boundary](./ADR-063-runtime-monitoring-observation-boundary.md) | Accepted | Defines bounded runtime monitoring observation with retained samples, rollups, chart/log/event correlation, and non-enforcing thresholds without becoming a Prometheus-class observability platform. |
 | [ADR-064: Storage Volume Runtime Realization And Cleanup](./ADR-064-storage-volume-runtime-realization-and-cleanup.md) | Accepted | Defines deployment-driven storage runtime realization and keeps destructive runtime volume cleanup behind an explicit dry-run-first storage operation instead of generic prune or delete. |
 | [ADR-065: Blueprint Format And Local Registry Boundary](./ADR-065-blueprint-format-and-local-registry-boundary.md) | Proposed | Defines Blueprint as the canonical portable topology definition, with open file-first format, local registry, desired-state instantiation, and MCP/tool separation. |
+| [ADR-066: Repository Config Dependency Graph](./ADR-066-repository-config-dependency-graph.md) | Accepted | Defines repository config `dependencies` as a user-facing application dependency graph that provisions/binds existing dependency resources and uses source-link provenance for safe preview cleanup. |
 
 ## Authoring Rules
 

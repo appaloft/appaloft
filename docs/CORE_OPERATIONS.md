@@ -461,6 +461,15 @@ Current boundary:
   Appaloft-owned refs, managed Redis refs, single-server runtimes, Docker Swarm, and retained
   rotated binding refs. Managed Postgres and Redis closed loops have end-to-end
   application/read-model verification.
+- Repository config `dependencies` is governed by
+  [ADR-066](./decisions/ADR-066-repository-config-dependency-graph.md) and
+  [Repository Config Dependency Graph](./specs/075-repository-config-dependency-graph/spec.md).
+  It is a workflow/profile extension over the existing dependency operation catalog, not a new
+  operation key. Config deploy may list/provision managed dependency resources, list/bind Resource
+  dependency bindings, and persist preview source-link provenance before `deployments.create`.
+  Preview cleanup may unbind/delete only provenance-marked ephemeral dependencies through
+  `resources.unbind-dependency` and `dependency-resources.delete`; manual/shared dependencies and
+  dependencies without matching provenance are preserved by design.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database

@@ -14,6 +14,7 @@ GitHub pull_request event
   -> appaloft/deploy-action installs and verifies the Appaloft CLI
   -> action resolves trusted PR preview context from GitHub event metadata
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
+  -> repository config dependency graph provisions/reuses and binds application dependencies
   -> existing environment/resource/deployment commands create or update the preview target
   -> deployments.create accepts the deployment attempt with ids-only input
   -> default or custom preview access route is realized through the edge proxy when available
@@ -154,6 +155,13 @@ environment variables or secrets and referenced either from config with `ci-env:
 trusted action/CLI secret flag that resolves the same `ci-env:<NAME>` reference. The action sees
 only the runner environment after GitHub policy has selected the job environment.
 
+Application dependencies may be declared in the selected preview config with top-level
+`dependencies`. For MVP, a managed Postgres dependency bound as `DATABASE_URL` is reconciled before
+deployment admission through existing dependency-resource and binding operations. If the dependency
+declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the preview source link
+contains explicit repository-config provenance for the same preview fingerprint, Resource, binding,
+and dependency resource.
+
 Custom route intent for PR previews should come from one of these sources:
 
 - generated/default access;
@@ -216,6 +224,9 @@ resolve preview context
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
   -> derive preview runtime name seed `preview-{pr_number}` when profile input does not override it
+  -> list/provision/reuse declared managed dependency resources
+  -> list/bind Resource dependency bindings for declared env targets
+  -> persist preview dependency provenance for config-owned ephemeral dependencies
   -> apply config env and secret references through environment operations
   -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
@@ -223,7 +234,8 @@ resolve preview context
 ```
 
 `deployments.create` remains ids-only. PR number, branch name, GitHub repository, preview domain
-template, route host, proxy kind, and TLS mode must not become deployment command fields.
+template, route host, proxy kind, TLS mode, dependency kind, dependency resource id, binding target,
+and connection material must not become deployment command fields.
 
 Preview deploy and preview cleanup must use logical mutation coordination, not only whole-server
 serialization. The workflow may still encounter brief backend state-root coordination during

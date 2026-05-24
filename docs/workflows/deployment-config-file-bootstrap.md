@@ -16,6 +16,7 @@ source selection
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
   -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
      or stop with structured profile drift guidance before deployment admission
+  -> provision/reuse and bind declared application dependencies through dependency-resource commands
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -63,6 +64,8 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 - resource network profile such as `internalPort`, upstream protocol, exposure mode, and compose
   target service;
 - reusable health-check defaults;
+- user-facing application dependency graph declarations such as managed Postgres bound to
+  `DATABASE_URL`;
 - non-secret environment variable declarations and required secret references;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
   file for identity and credentials;
@@ -70,7 +73,8 @@ The file exists to make source-adjacent deployment profile choices reproducible:
   detection, Appaloft Cloud, or a self-hosted Appaloft control plane;
 - future provider-neutral resource sizing and rollout policy after their own ADR/spec coverage.
 
-The file does not exist to choose durable Appaloft control-plane identity.
+The file does not exist to choose durable Appaloft control-plane identity, provider accounts, raw
+connection strings, database passwords, or tenant/organization scope.
 
 ## Control-Plane Mode Policy
 
@@ -114,6 +118,9 @@ Rules:
   origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and
   Swarm/Compose names. SSH host/key, tokens, raw database credentials, and resource identity remain
   trusted entrypoint inputs or server-owned state.
+- `controlPlane.install.database` selects the database backend for installing the Appaloft
+  control plane itself. It is not an application dependency database. Application dependencies must
+  be declared under top-level `dependencies`.
 - Config `controlPlane` cannot retarget source link identity. Identity comes from trusted
   entrypoint input, authenticated control-plane scope, GitHub repository identity, source link
   state, adoption markers, or explicit relink/adoption operations.
@@ -137,6 +144,13 @@ The config file is not a separate deploy API and does not introduce a hidden wor
 headless executor may skip prompts by using trusted action inputs, CLI flags, link state, or
 source-derived defaults, but it must still dispatch explicit operations and keep the final
 deployment admission ids-only.
+
+Declared dependencies are reconciled as part of the same Quick Deploy entry workflow after the
+target Resource is known and before deployment admission. The workflow lists current dependency
+resources and Resource bindings, provisions a missing managed dependency resource when needed, binds
+the Resource to the requested env target, and then lets existing dependency runtime injection
+materialize the deployment snapshot. The config workflow must not add dependency-specific fields to
+`deployments.create`.
 
 When the entrypoint targets an SSH server without a selected control plane, the config workflow must
 resolve the SSH-server `ssh-pglite` state backend before identity resolution. Repository config
@@ -169,6 +183,24 @@ instead of choosing by accident.
 Schema validation is strict. Unknown fields, deprecated identity fields, unsupported future fields,
 and malformed profile fields must fail before any write command is dispatched unless the entrypoint
 is running an explicit migration command.
+
+`dependencies` uses application language, not Appaloft internal object language:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    preview:
+      lifecycle: ephemeral
+```
+
+The MVP supports managed Postgres only. Config may not include provider accounts, credentials,
+tenants, organization ids, raw connection strings, database passwords, secret values, or
+provider-specific realization settings. Those values stay in Appaloft/provider state or trusted
+entrypoint secret stores.
 
 The HTTP adapter may serve the config schema for tooling, but strict `POST /api/deployments` remains
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP

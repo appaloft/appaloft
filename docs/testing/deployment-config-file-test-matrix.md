@@ -20,6 +20,8 @@ Canonical assertions:
   temporary config files;
 - non-secret env values and resolved secret references map to environment commands before
   deployment;
+- `dependencies` declarations map to dependency-resource list/provision and Resource binding
+  operations before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -40,9 +42,11 @@ This matrix inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
+- [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -64,6 +68,7 @@ This matrix inherits:
 | Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
 | Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
+| Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -124,6 +129,20 @@ This matrix inherits:
 | CONFIG-FILE-SEC-008 | integration | Required CI secret reference missing | Config declares required `ci-env:API_TOKEN` but the entrypoint environment does not contain `API_TOKEN` | Workflow stops before mutation and does not include the secret key value in details | `validation_error`, phase `config-secret-resolution` | No write commands |
 | CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
 | CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
+
+## Dependency Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-DEPENDENCY-001 | parser/schema | Managed Postgres dependency accepted | Config declares `dependencies.db.kind = postgres`, `source = managed`, `bind.env = DATABASE_URL`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-002 | parser/schema | Unknown dependency fields rejected | Config declares an unsupported field under `dependencies.db` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-DEPENDENCY-003 | parser/schema | Dependency identity and secret material rejected | Config declares provider account, tenant, credential, raw `databaseUrl`, `connectionString`, password, or provider-specific settings under `dependencies` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity` or `config-secret-validation` | No write commands |
+| CONFIG-FILE-DEPENDENCY-004 | integration | Config dependency provisions and binds before deployment | Selected Resource has no matching managed Postgres dependency resource or binding | Config deploy handles dependencies | Dependency resource is listed, provisioned, bindings are listed, binding is created, and deployment admission remains ids-only | None | `dependency-resources.list` -> `dependency-resources.provision` -> `resources.list-dependency-bindings` -> `resources.bind-dependency` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-005 | integration | Config dependency idempotency | Matching managed Postgres dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched | None | `dependency-resources.list` -> `resources.list-dependency-bindings` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-006 | integration | Env target conflict | Resource already has active binding for `DATABASE_URL` to a different dependency resource | Config deploy declares `dependencies.db.bind.env = DATABASE_URL` | Workflow fails before deployment with safe details | `repository_config_dependency_binding_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-007 | integration | Preview ephemeral provenance | PR preview config dependency declares `preview.lifecycle = ephemeral` | Config deploy provisions or reuses the preview dependency and binding | Source link records safe repository-config provenance for dependency key, target env, resource id, binding id, dependency resource id, and source fingerprint | None | Dependency operations -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
 
 ## Control-Plane Policy Matrix
 

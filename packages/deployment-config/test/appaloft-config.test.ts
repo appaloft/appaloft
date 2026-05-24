@@ -124,6 +124,113 @@ describe("Appaloft deployment config schema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-DEPENDENCY-001] accepts managed Postgres dependency declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "source:",
+        "  type: git",
+        "  repository: https://github.com/acme/api",
+        "runtime:",
+        "  type: node",
+        "  build:",
+        "    command: bun install && bun run build",
+        "  start:",
+        "    command: bun run start",
+        "dependencies:",
+        "  db:",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "    preview:",
+        "      lifecycle: ephemeral",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.source?.repository).toBe("https://github.com/acme/api");
+      expect(parsed.data.runtime?.type).toBe("node");
+      expect(parsed.data.runtime?.build?.command).toBe("bun install && bun run build");
+      expect(parsed.data.runtime?.start?.command).toBe("bun run start");
+      expect(parsed.data.dependencies?.db).toEqual({
+        kind: "postgres",
+        source: "managed",
+        bind: {
+          env: "DATABASE_URL",
+        },
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-002] rejects unknown dependency fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          plan: "starter",
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.path).toEqual(["dependencies", "db"]);
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-003] rejects dependency identity and secret material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["dependencies", "db", "providerAccount"]);
+    }
+
+    const rawConnection = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          connectionString: "postgres://user:password@example.test/app",
+        },
+      },
+    });
+
+    expect(rawConnection.success).toBe(false);
+    if (!rawConnection.success) {
+      expect(rawConnection.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawConnection.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "db",
+        "connectionString",
+      ]);
+    }
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

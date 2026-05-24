@@ -29,6 +29,8 @@ const safeRelativePathPattern =
   /^(?!\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*[;&|`$<>]).+$/;
 const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
 const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
+const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
+const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 export const appaloftDeploymentRuntimeNameTemplateVariables = ["preview_id", "pr_number"] as const;
 type AppaloftDeploymentRuntimeNameTemplateVariable =
   (typeof appaloftDeploymentRuntimeNameTemplateVariables)[number];
@@ -50,6 +52,8 @@ const controlPlaneUrlError =
   "control_plane_config: controlPlane.url must be an http(s) URL without credentials, query, or fragment";
 const controlPlaneInstallerUrlError =
   "control_plane_config: controlPlane.install.installerUrl must be an http(s) URL without credentials, query, or fragment";
+const sourceRepositoryUrlError =
+  "config_source_resolution: source.repository must be a git URL without credentials, query, or fragment";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const positiveIntegerSchema = z.number().int().positive();
@@ -241,8 +245,35 @@ export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
   return ok(rendered);
 }
 
+function isSafeGitRepositoryUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (/^git@[^:\s]+:[^\s]+$/.test(trimmed)) {
+    return !/[?#]/.test(trimmed);
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!["http:", "https:", "ssh:"].includes(parsed.protocol)) {
+      return false;
+    }
+
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      return false;
+    }
+
+    return Boolean(parsed.hostname && parsed.pathname && parsed.pathname !== "/");
+  } catch {
+    return false;
+  }
+}
+
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
+    type: z.literal("git").optional().describe("Repository source kind."),
+    repository: nonEmptyStringSchema
+      .refine(isSafeGitRepositoryUrl, sourceRepositoryUrlError)
+      .optional()
+      .describe("Git repository URL to deploy from."),
     baseDirectory: safeRelativePathSchema
       .optional()
       .describe("Relative workspace directory to use as the deployable source root."),
@@ -252,6 +283,15 @@ export const appaloftDeploymentSourceConfigSchema = z
       .describe("Immutable git commit SHA to record with the source profile."),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.type === "git" && !value.repository) {
+      context.addIssue({
+        code: "custom",
+        path: ["repository"],
+        message: "config_source_resolution: source.repository is required when source.type is git",
+      });
+    }
+  })
   .describe("Source profile fields. This object must not choose projects or resources.");
 
 export const appaloftDeploymentHealthCheckConfigSchema = z
@@ -265,12 +305,21 @@ export const appaloftDeploymentHealthCheckConfigSchema = z
   .strict()
   .describe("Health-check profile fields.");
 
+const appaloftDeploymentRuntimeCommandConfigSchema = z
+  .object({
+    command: nonEmptyStringSchema,
+  })
+  .strict();
+
 export const appaloftDeploymentRuntimeConfigSchema = z
   .object({
+    type: z.literal("node").optional().describe("Application runtime type shorthand."),
     strategy: z.enum(deploymentMethods).optional().describe("Requested runtime plan strategy."),
     installCommand: nonEmptyStringSchema.optional(),
     buildCommand: nonEmptyStringSchema.optional(),
     startCommand: nonEmptyStringSchema.optional(),
+    build: appaloftDeploymentRuntimeCommandConfigSchema.optional(),
+    start: appaloftDeploymentRuntimeCommandConfigSchema.optional(),
     name: runtimeNameConfigSchema.optional(),
     publishDirectory: safeRelativePathSchema.optional(),
     dockerfilePath: safeRelativePathSchema.optional(),
@@ -280,6 +329,39 @@ export const appaloftDeploymentRuntimeConfigSchema = z
     healthCheck: appaloftDeploymentHealthCheckConfigSchema.optional(),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.type === "node" && value.strategy && value.strategy !== "workspace-commands") {
+      context.addIssue({
+        code: "custom",
+        path: ["strategy"],
+        message: "runtime.type node requires runtime.strategy workspace-commands when both are set",
+      });
+    }
+
+    if (
+      value.buildCommand &&
+      value.build?.command &&
+      value.buildCommand.trim() !== value.build.command.trim()
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["build", "command"],
+        message: "runtime.build.command must match runtime.buildCommand when both are set",
+      });
+    }
+
+    if (
+      value.startCommand &&
+      value.start?.command &&
+      value.startCommand.trim() !== value.start.command.trim()
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["start", "command"],
+        message: "runtime.start.command must match runtime.startCommand when both are set",
+      });
+    }
+  })
   .describe("Runtime profile fields copied into resource creation for quick deploy.");
 
 export const appaloftDeploymentNetworkConfigSchema = z
@@ -511,6 +593,30 @@ export const appaloftDeploymentSecretReferenceSchema = z
   })
   .strict();
 
+export const appaloftDeploymentDependencyConfigSchema = z
+  .object({
+    kind: z.literal("postgres").describe("Application dependency kind."),
+    source: z.literal("managed").describe("Managed dependencies are created by Appaloft."),
+    bind: z
+      .object({
+        env: nonEmptyStringSchema
+          .regex(
+            environmentVariableNamePattern,
+            "config_dependency_resolution: dependencies.<key>.bind.env must be an environment variable name",
+          )
+          .describe("Runtime environment variable target for this dependency."),
+      })
+      .strict(),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing application dependency declaration.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -614,6 +720,17 @@ export const appaloftDeploymentConfigSchema = z
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),
+    dependencies: z
+      .record(
+        z
+          .string()
+          .regex(
+            dependencyKeyPattern,
+            "config_dependency_resolution: dependency keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentDependencyConfigSchema,
+      )
+      .optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
@@ -688,6 +805,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "network" ||
     root === "source" ||
     root === "access" ||
+    root === "dependencies" ||
     root === "controlPlane"
   );
 }

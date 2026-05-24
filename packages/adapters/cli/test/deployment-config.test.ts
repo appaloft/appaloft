@@ -94,6 +94,8 @@ async function createPreviewDeployCliHarness(
     resourceSummaries?: unknown[];
     resourceDetail?: Record<string, unknown> | null;
     resourceEffectiveConfig?: Record<string, unknown> | null;
+    dependencyResources?: unknown[];
+    dependencyBindings?: unknown[];
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -104,6 +106,7 @@ async function createPreviewDeployCliHarness(
   const desiredRoutes: unknown[] = [];
   const sourceLinkCalls: string[] = [];
   const createdLinks: unknown[] = [];
+  const dependencyProvenanceWrites: unknown[] = [];
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       operations.push(command.constructor.name);
@@ -135,6 +138,10 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "res_1" } as T);
         case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
+        case "ProvisionDependencyResourceCommand":
+          return ok({ id: "dep_res_db" } as T);
+        case "BindResourceDependencyCommand":
+          return ok({ id: "rbd_db" } as T);
         case "CreateDeploymentCommand":
           return ok({ id: "dep_1" } as T);
         default:
@@ -181,6 +188,12 @@ async function createPreviewDeployCliHarness(
           }) as Record<string, unknown> as T,
         );
       }
+      if (query.constructor.name === "ListDependencyResourcesQuery") {
+        return ok({ items: input.dependencyResources ?? [] } as T);
+      }
+      if (query.constructor.name === "ListResourceDependencyBindingsQuery") {
+        return ok({ items: input.dependencyBindings ?? [] } as T);
+      }
       return ok({ items: [] } as T);
     },
   } as unknown as QueryBus;
@@ -226,6 +239,16 @@ async function createPreviewDeployCliHarness(
           ...sourceLinkInput.target,
         });
       },
+      recordDependencyProvenance: async (sourceLinkInput) => {
+        sourceLinkCalls.push(`recordDependencyProvenance:${sourceLinkInput.sourceFingerprint}`);
+        dependencyProvenanceWrites.push(sourceLinkInput);
+        return ok({
+          sourceFingerprint: sourceLinkInput.sourceFingerprint,
+          updatedAt: sourceLinkInput.updatedAt,
+          ...sourceLinkInput.target,
+          dependencyProvenance: sourceLinkInput.dependencyProvenance,
+        });
+      },
     },
     ...(input.withRouteStore
       ? {
@@ -263,6 +286,7 @@ async function createPreviewDeployCliHarness(
   return {
     commands,
     createdLinks,
+    dependencyProvenanceWrites,
     desiredRoutes,
     operations,
     program,
@@ -313,15 +337,24 @@ describe("CLI deployment config entry workflow", () => {
 
     const seed = deploymentPromptSeedFromConfig({
       source: {
+        type: "git",
+        repository: "https://github.com/acme/app",
         gitRef: "main",
         commitSha: "abc123",
         baseDirectory: "apps/api",
       },
       runtime: {
+        type: "node",
         strategy: "workspace-commands",
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        build: {
+          command: "bun run build",
+        },
+        start: {
+          command: "bun run start",
+        },
         dockerfilePath: "deploy/Dockerfile",
         dockerComposeFilePath: "deploy/compose.yaml",
         buildTarget: "runner",
@@ -348,6 +381,7 @@ describe("CLI deployment config entry workflow", () => {
     });
 
     expect(seed).toMatchObject({
+      sourceLocator: "https://github.com/acme/app",
       sourceProfile: {
         gitRef: "main",
         commitSha: "abc123",
@@ -2951,6 +2985,475 @@ describe("CLI deployment config entry workflow", () => {
       environmentId: "env_existing",
       resourceId: "res_existing",
     });
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-004][CONFIG-FILE-DEPENDENCY-007] config dependencies provision, bind, and record preview provenance before deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-dependency-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "dependencies:",
+        "  db:",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_dependency_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/db",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-77",
+              "--server-host",
+              "203.0.113.77",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ListDependencyResourcesQuery");
+    expect(harness.operations).toContain("ListResourceDependencyBindingsQuery");
+    expect(harness.operations.indexOf("ProvisionDependencyResourceCommand")).toBeLessThan(
+      harness.operations.indexOf("BindResourceDependencyCommand"),
+    );
+    expect(harness.operations.indexOf("BindResourceDependencyCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect(deployment).not.toHaveProperty("dependencyResourceId");
+    expect(deployment).not.toHaveProperty("targetName");
+    expect(harness.dependencyProvenanceWrites).toHaveLength(1);
+    expect(harness.dependencyProvenanceWrites[0]).toMatchObject({
+      target: {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      },
+      dependencyProvenance: {
+        source: "repository-config",
+        entries: [
+          {
+            key: "db",
+            kind: "postgres",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_1",
+            dependencyResourceId: "dep_res_db",
+            bindingId: "rbd_db",
+            targetName: "DATABASE_URL",
+          },
+        ],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-005] config dependencies reuse existing managed resource and binding", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_res_existing_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
+          return ok({
+            items: [
+              {
+                id: "rbd_existing_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                resourceId: "res_existing",
+                dependencyResourceId: "dep_res_existing_db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                target: {
+                  targetName: "DATABASE_URL",
+                  scope: "runtime-only",
+                  injectionMode: "env",
+                },
+                bindingReadiness: { status: "ready" },
+                snapshotReadiness: { status: "deferred" },
+                status: "active",
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          dependencyGraph: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              bindEnv: "DATABASE_URL",
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+    expect(commands).not.toContain("ProvisionDependencyResourceCommand");
+    expect(commands).not.toContain("BindResourceDependencyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-006] config dependencies fail on env target conflicts", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>() => ok(null as T),
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_res_expected_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-db",
+                slug: "res-existing-db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
+          return ok({
+            items: [
+              {
+                id: "rbd_other_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                resourceId: "res_existing",
+                dependencyResourceId: "dep_res_other_db",
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                target: {
+                  targetName: "DATABASE_URL",
+                  scope: "runtime-only",
+                  injectionMode: "env",
+                },
+                bindingReadiness: { status: "ready" },
+                snapshotReadiness: { status: "deferred" },
+                status: "active",
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            dependencyGraph: [
+              {
+                key: "db",
+                kind: "postgres",
+                source: "managed",
+                bindEnv: "DATABASE_URL",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected dependency target conflict");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_dependency_binding_conflict",
+      details: {
+        phase: "config-dependency-resolution",
+        resourceId: "res_existing",
+        dependencyKey: "db",
+        targetName: "DATABASE_URL",
+        existingBindingId: "rbd_other_db",
+        existingDependencyResourceId: "dep_res_other_db",
+        expectedDependencyResourceId: "dep_res_expected_db",
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-008] preview ephemeral dependencies require matching provenance before reuse", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A909";
+    const dependencyName = `preview-${new Bun.CryptoHasher("sha256").update(sourceFingerprint).digest("hex").slice(0, 10)}-db`;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      sourceLinkStore: {
+        read: async () => ok(null),
+        requireSameTargetOrMissing: async () => ok(null),
+        createIfMissing: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+          }),
+        recordDependencyProvenance: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+            dependencyProvenance: input.dependencyProvenance,
+          }),
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_res_manual_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: dependencyName,
+                slug: dependencyName,
+                kind: "postgres",
+                sourceMode: "appaloft-managed",
+                providerKey: "generic-ssh",
+                providerManaged: true,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            sourceFingerprint,
+            dependencyGraph: [
+              {
+                key: "db",
+                kind: "postgres",
+                source: "managed",
+                bindEnv: "DATABASE_URL",
+                previewLifecycle: "ephemeral",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected unprovenanced preview dependency resource conflict");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_dependency_resource_conflict",
+      details: {
+        phase: "config-dependency-resolution",
+        resourceId: "res_existing",
+        dependencyKey: "db",
+        targetName: "DATABASE_URL",
+        dependencyResourceId: "dep_res_manual_db",
+        sourceFingerprint,
+      },
+    });
+    expect(commands).not.toContain("ProvisionDependencyResourceCommand");
+    expect(commands).not.toContain("BindResourceDependencyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-009] preview ephemeral dependencies fail before mutation when provenance storage is unavailable", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>() => ok({ items: [] } as T),
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A910",
+            dependencyGraph: [
+              {
+                key: "db",
+                kind: "postgres",
+                source: "managed",
+                bindEnv: "DATABASE_URL",
+                previewLifecycle: "ephemeral",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected missing provenance storage to fail");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_dependency_provenance_unavailable",
+      details: {
+        phase: "config-dependency-resolution",
+        resourceId: "res_existing",
+        dependencyKey: "db",
+        targetName: "DATABASE_URL",
+      },
+    });
+    expect(commands).toEqual([]);
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {

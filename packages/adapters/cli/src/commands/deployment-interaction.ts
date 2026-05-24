@@ -14,14 +14,19 @@ import {
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   compareResourceProfileDrift,
+  type DependencyResourceSummary,
   type EnvironmentSummary,
+  ListDependencyResourcesQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
+  ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
   ListServersQuery,
   type ProjectSummary,
+  ProvisionDependencyResourceCommand,
   RegisterServerCommand,
   type RegisterServerCommandInput,
+  type ResourceDependencyBindingSummary,
   type ResourceDetail,
   type ResourceDetailProfileDiagnostic,
   ResourceEffectiveConfigQuery,
@@ -70,6 +75,9 @@ import { CliRuntime, resultToEffect } from "../runtime.js";
 import {
   type RemoteStateSession,
   type ServerAppliedRouteDomainIntent,
+  type SourceLinkDependencyProvenance,
+  type SourceLinkDependencyProvenanceEntry,
+  type SourceLinkRecord,
 } from "./deployment-remote-state.js";
 import {
   type DeploymentMethod,
@@ -112,6 +120,7 @@ export interface DeploymentPromptSeed {
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
+  dependencyGraph?: DeploymentDependencySeed[];
   profileDriftPreflight?: boolean;
 }
 
@@ -126,6 +135,13 @@ type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["ne
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
+export interface DeploymentDependencySeed {
+  key: string;
+  kind: "postgres";
+  source: "managed";
+  bindEnv: string;
+  previewLifecycle?: "ephemeral";
+}
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
@@ -412,13 +428,34 @@ export function deploymentPromptSeedFromConfig(
     ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
     ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
   }));
+  const dependencyGraph = Object.entries(config.dependencies ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, dependency]) =>
+        ({
+          key,
+          kind: dependency.kind,
+          source: dependency.source,
+          bindEnv: dependency.bind.env,
+          ...(dependency.preview?.lifecycle
+            ? { previewLifecycle: dependency.preview.lifecycle }
+            : {}),
+        }) satisfies DeploymentDependencySeed,
+    );
+  const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
+  const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
   return {
+    ...(config.source?.repository ? { sourceLocator: config.source.repository } : {}),
     ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
-    ...(config.runtime?.strategy ? { deploymentMethod: config.runtime.strategy } : {}),
+    ...(config.runtime?.strategy
+      ? { deploymentMethod: config.runtime.strategy }
+      : config.runtime?.type === "node"
+        ? { deploymentMethod: "workspace-commands" as const }
+        : {}),
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
-    ...(config.runtime?.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
-    ...(config.runtime?.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(buildCommand ? { buildCommand } : {}),
+    ...(startCommand ? { startCommand } : {}),
     ...(config.runtime?.name ? { runtimeNameTemplate: config.runtime.name } : {}),
     ...(config.runtime?.publishDirectory
       ? { publishDirectory: config.runtime.publishDirectory }
@@ -440,6 +477,7 @@ export function deploymentPromptSeedFromConfig(
     ...(healthCheckPath ? { healthCheckPath } : {}),
     ...(healthCheck ? { healthCheck } : {}),
     ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
+    ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
   };
 }
 
@@ -1184,6 +1222,500 @@ function provisionDependencyResources(input: QuickDeployProvisionDependencyResou
       dependencyResourceIds,
       bindingIds,
     };
+  });
+}
+
+function shortSourceFingerprintHash(sourceFingerprint: string): string {
+  return new Bun.CryptoHasher("sha256").update(sourceFingerprint).digest("hex").slice(0, 10);
+}
+
+function repositoryConfigDependencyName(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  sourceFingerprint?: string;
+}): string {
+  const base =
+    input.dependency.previewLifecycle === "ephemeral" && input.sourceFingerprint
+      ? `preview-${shortSourceFingerprintHash(input.sourceFingerprint)}-${input.dependency.key}`
+      : `${input.resourceId}-${input.dependency.key}`;
+
+  return normalizeQuickDeployGeneratedNameBase(base);
+}
+
+function isManagedDependencyResource(
+  resource: DependencyResourceSummary | undefined,
+  dependency: DeploymentDependencySeed,
+): resource is DependencyResourceSummary {
+  return Boolean(
+    resource &&
+      resource.kind === dependency.kind &&
+      !resource.deletedAt &&
+      (resource.providerManaged || resource.sourceMode === "appaloft-managed"),
+  );
+}
+
+function findDependencyResourceById(
+  resources: readonly DependencyResourceSummary[],
+  dependencyResourceId: string,
+): DependencyResourceSummary | undefined {
+  return resources.find((resource) => resource.id === dependencyResourceId);
+}
+
+function findManagedDependencyResourceByName(input: {
+  resources: readonly DependencyResourceSummary[];
+  dependency: DeploymentDependencySeed;
+  name: string;
+}): DependencyResourceSummary | undefined {
+  const slug = slugify(input.name);
+  return input.resources.find(
+    (resource) =>
+      isManagedDependencyResource(resource, input.dependency) &&
+      (resource.slug === slug || slugify(resource.name) === slug),
+  );
+}
+
+function repositoryConfigDependencyConflict(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  targetName: string;
+  existingBinding: ResourceDependencyBindingSummary;
+  expectedDependencyResourceId?: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_binding_conflict",
+    category: "user",
+    message: "Repository config dependency target is already bound to another dependency",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+      existingBindingId: input.existingBinding.id,
+      existingDependencyResourceId: input.existingBinding.dependencyResourceId,
+      ...(input.expectedDependencyResourceId
+        ? { expectedDependencyResourceId: input.expectedDependencyResourceId }
+        : {}),
+    },
+  };
+}
+
+function repositoryConfigDependencyResourceConflict(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  targetName: string;
+  dependencyResource: DependencyResourceSummary;
+  sourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_resource_conflict",
+    category: "user",
+    message: "Repository config dependency resource exists without matching provenance",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+      dependencyResourceId: input.dependencyResource.id,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigDependencyProvenanceError(input: {
+  dependency: DeploymentDependencySeed;
+  sourceFingerprint: string;
+  resourceId: string;
+  targetName: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_provenance_unavailable",
+    category: "user",
+    message: "Preview dependency cleanup provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      sourceFingerprint: input.sourceFingerprint,
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+    },
+  };
+}
+
+function listDependencyResourcesForConfig(input: {
+  projectId: string;
+  environmentId: string;
+  kind: DeploymentDependencySeed["kind"];
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListDependencyResourcesQuery.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        kind: input.kind,
+        limit: 100,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function listResourceDependencyBindingsForConfig(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListResourceDependencyBindingsQuery.create({
+        resourceId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function provisionRepositoryConfigDependency(input: {
+  dependency: DeploymentDependencySeed;
+  projectId: string;
+  environmentId: string;
+  serverId: string;
+  name: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ProvisionDependencyResourceCommand.create({
+        kind: input.dependency.kind,
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        serverId: input.serverId,
+        name: input.name,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function bindRepositoryConfigDependency(input: {
+  resourceId: string;
+  dependencyResourceId: string;
+  targetName: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      BindResourceDependencyCommand.create({
+        resourceId: input.resourceId,
+        dependencyResourceId: input.dependencyResourceId,
+        targetName: input.targetName,
+        scope: "runtime-only",
+        injectionMode: "env",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function buildDependencyProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkDependencyProvenance;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}): SourceLinkDependencyProvenance {
+  const byKey = new Map<string, SourceLinkDependencyProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(`${entry.key}:${entry.targetName}`, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(`${entry.key}:${entry.targetName}`, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.dependency-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigDependencies(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const dependencyGraph = input.seed.dependencyGraph ?? [];
+    if (dependencyGraph.length === 0) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const provenanceRequiredDependency = dependencyGraph.find(
+      (dependency) => dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+    );
+    if (provenanceRequiredDependency && !cli.sourceLinkStore?.recordDependencyProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyProvenanceError({
+          dependency: provenanceRequiredDependency,
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          resourceId: input.resourceId,
+          targetName: provenanceRequiredDependency.bindEnv,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    let existingSourceLink: SourceLinkRecord | null = null;
+    if (input.seed.sourceFingerprint) {
+      const existingSourceLinkResult = yield* Effect.promise(
+        () =>
+          cli.sourceLinkStore?.read(input.seed.sourceFingerprint ?? "") ??
+          Promise.resolve(ok(null)),
+      );
+      existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    }
+    const bindingsResult = yield* listResourceDependencyBindingsForConfig(input.resourceId);
+    const bindings = [...bindingsResult.items];
+    const provenanceEntries: SourceLinkDependencyProvenanceEntry[] = [];
+
+    for (const dependency of dependencyGraph) {
+      const targetName = dependency.bindEnv;
+      const resourceName = repositoryConfigDependencyName({
+        dependency,
+        resourceId: input.resourceId,
+        ...(input.seed.sourceFingerprint
+          ? { sourceFingerprint: input.seed.sourceFingerprint }
+          : {}),
+      });
+      const dependencyResourcesResult = yield* listDependencyResourcesForConfig({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        kind: dependency.kind,
+      });
+      const dependencyResources = [...dependencyResourcesResult.items];
+      const existingProvenanceEntry =
+        existingSourceLink &&
+        input.seed.sourceFingerprint &&
+        existingSourceLink.dependencyProvenance?.sourceFingerprint === input.seed.sourceFingerprint
+          ? existingSourceLink.dependencyProvenance.entries.find(
+              (entry) =>
+                entry.key === dependency.key &&
+                entry.targetName === targetName &&
+                entry.resourceId === input.resourceId,
+            )
+          : undefined;
+      const activeTargetBinding = bindings.find(
+        (binding) => binding.status === "active" && binding.target.targetName === targetName,
+      );
+      const isEphemeralPreviewDependency = Boolean(
+        dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+      );
+      const provenanceResource = existingProvenanceEntry
+        ? findDependencyResourceById(
+            dependencyResources,
+            existingProvenanceEntry.dependencyResourceId,
+          )
+        : undefined;
+      const namedResource = findManagedDependencyResourceByName({
+        resources: dependencyResources,
+        dependency,
+        name: resourceName,
+      });
+      let dependencyResource = isManagedDependencyResource(provenanceResource, dependency)
+        ? provenanceResource
+        : isEphemeralPreviewDependency
+          ? undefined
+          : namedResource;
+
+      if (isEphemeralPreviewDependency && !existingProvenanceEntry && namedResource) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyResourceConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            dependencyResource: namedResource,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (isEphemeralPreviewDependency && !existingProvenanceEntry && activeTargetBinding) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            existingBinding: activeTargetBinding,
+          }),
+        );
+      }
+
+      if (
+        isEphemeralPreviewDependency &&
+        existingProvenanceEntry &&
+        namedResource &&
+        namedResource.id !== existingProvenanceEntry.dependencyResourceId &&
+        !provenanceResource
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyResourceConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            dependencyResource: namedResource,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (!dependencyResource && activeTargetBinding) {
+        const activeBindingResource = findDependencyResourceById(
+          dependencyResources,
+          activeTargetBinding.dependencyResourceId,
+        );
+        if (
+          dependency.previewLifecycle !== "ephemeral" &&
+          isManagedDependencyResource(activeBindingResource, dependency)
+        ) {
+          dependencyResource = activeBindingResource;
+        }
+      }
+
+      if (!dependencyResource) {
+        const provisioned = yield* provisionRepositoryConfigDependency({
+          dependency,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          serverId: input.serverId,
+          name: resourceName,
+        });
+        dependencyResource = {
+          id: provisioned.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: resourceName,
+          slug: slugify(resourceName),
+          kind: dependency.kind,
+          sourceMode: "appaloft-managed",
+          providerKey: "",
+          providerManaged: true,
+          lifecycleStatus: "provisioning",
+          bindingReadiness: { status: "blocked", reason: "provisioning" },
+          createdAt: new Date().toISOString(),
+        } satisfies DependencyResourceSummary;
+        dependencyResources.push(dependencyResource);
+      }
+
+      if (
+        activeTargetBinding &&
+        activeTargetBinding.dependencyResourceId !== dependencyResource.id
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            existingBinding: activeTargetBinding,
+            expectedDependencyResourceId: dependencyResource.id,
+          }),
+        );
+      }
+
+      const binding = activeTargetBinding
+        ? { id: activeTargetBinding.id }
+        : yield* bindRepositoryConfigDependency({
+            resourceId: input.resourceId,
+            dependencyResourceId: dependencyResource.id,
+            targetName,
+          });
+      if (!activeTargetBinding) {
+        bindings.push({
+          id: binding.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          resourceId: input.resourceId,
+          dependencyResourceId: dependencyResource.id,
+          kind: dependency.kind,
+          sourceMode: "appaloft-managed",
+          providerKey: dependencyResource.providerKey,
+          providerManaged: true,
+          lifecycleStatus: dependencyResource.lifecycleStatus,
+          target: {
+            targetName,
+            scope: "runtime-only",
+            injectionMode: "env",
+          },
+          bindingReadiness: { status: "ready" },
+          snapshotReadiness: { status: "deferred" },
+          status: "active",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      if (dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint) {
+        provenanceEntries.push({
+          key: dependency.key,
+          kind: dependency.kind,
+          source: dependency.source,
+          lifecycle: dependency.previewLifecycle,
+          resourceId: input.resourceId,
+          dependencyResourceId: dependencyResource.id,
+          bindingId: binding.id,
+          targetName,
+          createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+        });
+      }
+    }
+
+    if (provenanceEntries.length === 0 || !input.seed.sourceFingerprint) {
+      return;
+    }
+
+    if (!cli.sourceLinkStore?.recordDependencyProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyProvenanceError({
+          dependency: dependencyGraph[0] as DeploymentDependencySeed,
+          sourceFingerprint: input.seed.sourceFingerprint,
+          resourceId: input.resourceId,
+          targetName: provenanceEntries[0]?.targetName ?? "",
+        }),
+      );
+    }
+
+    const provenance = buildDependencyProvenance({
+      sourceFingerprint: input.seed.sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingSourceLink?.dependencyProvenance
+        ? { existing: existingSourceLink.dependencyProvenance }
+        : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordDependencyProvenance?.({
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          target,
+          dependencyProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
   });
 }
 
@@ -2282,6 +2814,16 @@ export function resolveInteractiveDeploymentInput(
         const deploymentInput = yield* resolveDeploymentInputFromQuickDeployWorkflow(workflowInput);
 
         yield* persistSourceLinkIfNeeded({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigDependencies({
           seed: resolvedSeed,
           projectId: deploymentInput.projectId,
           serverId: deploymentInput.serverId,

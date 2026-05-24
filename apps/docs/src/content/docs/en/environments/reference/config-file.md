@@ -23,6 +23,30 @@ Configuration files are for reviewable project, resource, environment, and deplo
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
+<h2 id="environment-config-file-dependencies">Application dependencies</h2>
+
+Use `dependencies` when the application needs Appaloft to manage and bind an application dependency
+before deployment:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    preview:
+      lifecycle: ephemeral
+```
+
+This declares an application Postgres dependency and asks Appaloft to inject it through the existing
+dependency binding runtime path as `DATABASE_URL`. The final deployment command still contains only
+Appaloft ids; connection strings and database passwords do not belong in `appaloft.yaml`.
+
+For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup to remove only the
+dependency resource that Appaloft can prove was created and bound by this config for that preview.
+Manual or shared dependency resources are preserved.
+
 <h2 id="environment-config-file-env">Environment values</h2>
 
 Use `env` for non-secret values and `secrets` for references to values supplied outside the
@@ -57,6 +81,9 @@ server API instead of mutating SSH PGlite directly.
 `controlPlane.url` is not a secret, but it must be an `http` or `https` origin without credentials,
 path, query, or fragment. Keep tokens, SSH keys, repository identity, organization/tenant/provider
 account identity, database URLs, secret values, and broad target identity outside repository config.
+
+`controlPlane.install.database` configures the database backend for installing Appaloft itself. It
+does not create an application database. Use top-level `dependencies` for application dependencies.
 
 For self-hosted Action deploys, project/environment/resource/server ids are not required in the
 common path. The server should resolve the target from source-link state, deploy-token scope, source

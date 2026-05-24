@@ -255,6 +255,9 @@ Transport compatibility note:
   deployment context should still come from trusted entrypoint inputs, authenticated control-plane
   state, source fingerprint links, repository binding, deploy-token scope, adoption markers, or
   explicit relink/adoption operations.
+- `controlPlane.install.database` is the database backend for installing Appaloft's own control
+  plane. It is not an application dependency resource and must not be interpreted as a workload
+  database declaration.
 - `access.domains[]` from repository config expresses provider-neutral custom domain route intent.
   In pure CLI/SSH mode it becomes target-local server-applied route state owned by the selected
   deployment target and edge proxy provider; in control-plane mode it may be mapped to managed
@@ -503,6 +506,14 @@ Rules:
   provider-managed unsafe state, and future deployment snapshot/reference blockers
 - binding readiness is a read-model summary; `resources.bind-dependency` must revalidate
   write-side Resource and Dependency Resource state
+- repository config `dependencies` is an application dependency graph projection over existing
+  dependency resource and binding operations. It may request managed Postgres and a runtime env
+  binding such as `DATABASE_URL`, but it must not expose provider accounts, tenant identity,
+  credentials, raw connection strings, database passwords, or internal ResourceInstance/
+  ResourceBinding payloads.
+- preview ephemeral dependency cleanup is authorized only by safe source-link provenance that names
+  the repository-config dependency key, source fingerprint, Resource, binding, and dependency
+  resource. Resource names or env target names alone are not ownership proof.
 
 Current scope:
 - Phase 7 baseline under
@@ -525,6 +536,8 @@ Current scope:
   [Dependency Runtime Secret Value Resolution](./specs/048-dependency-runtime-secret-value-resolution/spec.md)
 - Phase 7 provider-native Redis realization under
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md)
+- Repository config dependency graph under
+  [Repository Config Dependency Graph](./specs/075-repository-config-dependency-graph/spec.md)
 - provider-native Postgres and Redis realization/delete, backup/restore, runtime secret injection,
   Web management, and Postgres/Redis closed-loop verification are implemented through the Phase 7
   specs and dependency resource test matrix
