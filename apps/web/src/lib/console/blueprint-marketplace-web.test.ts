@@ -23,6 +23,7 @@ const marketplaceExtension: SystemPluginWebExtension = {
     listEndpoint: "/example/blueprints",
     detailEndpointTemplate: "/example/blueprints/{slug}",
     installPlanEndpointTemplate: "/example/blueprints/{slug}/install-plan",
+    upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
   },
 };
 const quickDeployExtension: SystemPluginWebExtension = {
@@ -55,6 +56,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(readBlueprintCatalogExtensionMetadata(marketplaceExtension)).toMatchObject({
       renderer: "blueprint-catalog",
       listEndpoint: "/example/blueprints",
+      upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
     });
     expect(endpointFromTemplate("/example/blueprints/{slug}/install-plan", "n8n")).toBe(
       "/example/blueprints/n8n/install-plan",
@@ -106,8 +108,16 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
     expect(detailPageSource).toContain("官方网站");
+    expect(detailPageSource).toContain("部署方案");
+    expect(detailPageSource).toContain("升级策略");
+    expect(detailPageSource).toContain("upgradePlanEndpoint");
+    expect(detailPageSource).toContain("generateUpgradePlan");
+    expect(detailPageSource).toContain("生成升级 dry-run");
+    expect(detailPageSource).toContain("variant: selectedVariant");
     expect(detailPageSource).toContain("<details");
     expect(quickDeploySource).toContain("blueprintSlug");
+    expect(quickDeploySource).toContain("blueprintVariant");
+    expect(quickDeploySource).toContain("selectedBlueprintVariantLabel");
     expect(quickDeploySource).toContain("Dialog.Root bind:open={blueprintSelectorDialogOpen}");
     expect(quickDeploySource).toContain("onselect={applyBlueprintListing}");
     expect(quickDeploySource).toContain("openSelectedBlueprintDetailDialog");
