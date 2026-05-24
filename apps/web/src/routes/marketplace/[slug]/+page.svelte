@@ -18,6 +18,7 @@
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   import { request, readErrorMessage } from "$lib/api/client";
+  import BlueprintProductIcon from "$lib/components/console/BlueprintProductIcon.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -72,6 +73,8 @@
       icon?: {
         label?: string;
         tone?: string;
+        url?: string;
+        alt?: string;
       };
       publisher: {
         name: string;
@@ -217,13 +220,6 @@
     }
   });
 
-  function iconLabel(): string {
-    if (!listing) {
-      return "BP";
-    }
-    return listing.icon?.label ?? listing.title.slice(0, 2);
-  }
-
   function deployHref(): string {
     const url = new URL(returnTo || "/deploy", "https://appaloft.local");
     url.pathname = "/deploy";
@@ -328,12 +324,12 @@
         <section class="console-panel p-5">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div class="flex min-w-0 items-start gap-4">
-              <div
-                class="flex size-14 shrink-0 items-center justify-center rounded-md border bg-muted text-base font-semibold uppercase"
-                style={listing.icon?.tone ? `background:${listing.icon.tone};color:white;border-color:${listing.icon.tone}` : undefined}
-              >
-                {iconLabel()}
-              </div>
+              <BlueprintProductIcon
+                title={listing.title}
+                icon={listing.icon}
+                class="size-14"
+                imageClass="size-8"
+              />
               <div class="min-w-0 space-y-3">
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
@@ -396,6 +392,62 @@
             </p>
             <p class="mt-1 text-xs text-muted-foreground">route intent from Blueprint</p>
           </article>
+        </section>
+
+        <section class="console-panel p-5">
+          <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div class="space-y-1">
+              <h2 class="text-lg font-semibold">介绍</h2>
+              <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
+                {manifest.description ?? listing.blueprint.summary ?? listing.subtitle}
+              </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              {#if listing.websiteUrl}
+                <Button href={listing.websiteUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
+                  官方网站
+                  <ExternalLink class="size-4" />
+                </Button>
+              {/if}
+              {#if listing.documentationUrl}
+                <Button href={listing.documentationUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
+                  部署文档
+                  <ExternalLink class="size-4" />
+                </Button>
+              {/if}
+            </div>
+          </div>
+
+          <div class="grid gap-5 md:grid-cols-2">
+            <div class="space-y-2">
+              <h3 class="text-sm font-semibold">适合场景</h3>
+              <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                {#each listing.overview?.useCases ?? [`部署 ${listing.title} 应用`, "先查看拓扑和依赖，再进入部署流程"] as useCase (useCase)}
+                  <li class="flex gap-2">
+                    <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                    <span>{useCase}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+            <div class="space-y-2">
+              <h3 class="text-sm font-semibold">Appaloft 会创建</h3>
+              <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                {#each listing.overview?.highlights ?? [
+                  `${manifest.components.length} 个应用运行单元`,
+                  manifest.resources.length > 0
+                    ? `${manifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
+                    : "无托管依赖资源",
+                  "项目、环境、资源、网络和部署 dry-run 计划",
+                ] as highlight (highlight)}
+                  <li class="flex gap-2">
+                    <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                    <span>{highlight}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </div>
         </section>
 
         <section class="console-panel p-5">

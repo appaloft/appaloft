@@ -283,7 +283,7 @@ export const enUS = {
       bindingReadiness: "Binding readiness",
       createAction: "Create managed service",
       createDescription:
-        "Create an Appaloft-managed Postgres or Redis service on a single-server Docker target.",
+        "Create an Appaloft-managed Postgres, Redis, MySQL, ClickHouse, object storage, or OpenSearch service on a single-server Docker target.",
       createFailed: "Create failed",
       createSucceeded: "Managed service created",
       deleteAction: "Delete resource",
@@ -291,12 +291,12 @@ export const enUS = {
       deleteSucceeded: "Dependency resource deleted",
       dockerBacked: "Docker-backed",
       emptyBody:
-        "No dependency resources yet. Choose a project, environment, and server to create managed Postgres or Redis.",
+        "No dependency resources yet. Choose a project, environment, server, and resource kind to create a managed service.",
       emptyTitle: "Create the first dependency resource",
       endpoint: "Endpoint",
       filterAll: "All",
       focusDescription:
-        "Manage Postgres/Redis dependency resources, including Docker-backed creation, backup, restore, and safe deletion.",
+        "Manage database, cache, object storage, and search dependency resources, including Docker-backed creation, backup, restore, and safe deletion.",
       focusTitle: "Dependency resources",
       kindPostgres: "Postgres",
       kindRedis: "Redis",
@@ -306,10 +306,11 @@ export const enUS = {
       kindOpenSearch: "OpenSearch",
       latestBackup: "Latest backup",
       managedOnlyNotice:
-        "The Web create flow currently creates Appaloft-managed Docker-backed services; external imports remain available through CLI/API.",
+        "The Web create flow creates Appaloft-managed Docker-backed services; external imports remain available through CLI/API.",
       createUnavailable: "Provider adapter pending for this dependency kind.",
       namePlaceholder: "Main database",
-      pageDescription: "Provision, backup, restore, and delete managed Postgres/Redis services.",
+      pageDescription:
+        "Provision, backup, restore, and delete managed database, cache, object storage, and search services.",
       pageTitle: "Dependency resources",
       providerHandle: "Provider handle",
       realizationStatus: "Realization status",
@@ -460,8 +461,8 @@ export const enUS = {
       dependencyResourcesCount: "Managed services",
       dependencyResourcesCta: "Open dependency resources",
       dependencyResourcesDescription:
-        "Provision Docker-backed Postgres and Redis on active single-server targets, then manage masked endpoints, backups, restores, and safe deletion from one place.",
-      dependencyResourcesTitle: "Managed Postgres and Redis",
+        "Provision Docker-backed databases, caches, object storage, and search services on active single-server targets, then manage masked endpoints, backups, restores, and safe deletion from one place.",
+      dependencyResourcesTitle: "Managed dependency resources",
       deploymentBaseBody:
         "Choose a local folder, GitHub repository, remote Git URL, or image. Appaloft connects the project link, target server, environment snapshot, and deployment record in one deployment flow.",
       deploymentBaseTitle: "Start with one deployment; project links are created from there.",
@@ -1743,17 +1744,17 @@ export const enUS = {
       sourceAccessGithubApp: "GitHub authorization",
       sourceAccessLocalFolder: "Local workspace",
       sourceAccessPublicGit: "Public Git clone",
-      sourceAccessBlueprintCatalog: "Blueprint catalog",
+      sourceAccessBlueprintCatalog: "Blueprint marketplace",
       sourceBlueprint: "Blueprint",
-      sourceBlueprintCatalogs: "Registered Blueprint catalogs",
+      sourceBlueprintCatalogs: "Blueprint marketplace",
       sourceBlueprintCatalogsHint:
-        "Choose a registered catalog selector to inspect Blueprints and generate a dry-run install plan.",
+        "Choose an application from the Blueprint marketplace, then inspect dependencies, entrypoints, and dry-run plans.",
       sourceBlueprintCatalogUnavailable:
         "No Blueprint catalog source is registered for Quick Deploy.",
       sourceBlueprintHint:
-        "Choose from a registered Blueprint catalog instead of entering source code.",
-      sourceBlueprintOpenSelector: "Open selector",
-      sourceBlueprintSelector: "Blueprint selector",
+        "Choose an application from the Blueprint marketplace instead of entering source code.",
+      sourceBlueprintOpenSelector: "Choose Blueprint",
+      sourceBlueprintSelector: "Selected Blueprint",
       sourceCompose: "Compose",
       sourceComposeHint: "Import a compose manifest or a compose path from a repository.",
       sourceDetails: "Source details",
