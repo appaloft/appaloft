@@ -109,10 +109,6 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
   release. It provisions a Redis service in GitHub Actions, installs `redis-cli`, and runs
   `bun run smoke:dependency-redis-backup` with `APPALOFT_E2E_REDIS_BACKUP_RESTORE=true` to prove the
   shell native Redis logical backup/restore path against a real Redis server.
-- `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
-  with Appaloft from the checked-out source and `appaloft.docs.yml`. Pushes to `main` auto-deploy
-  when docs content, docs config, or the source-side deployment stack used by docs changes. Manual
-  runs can redeploy docs from `main` or another ref without waiting for a release.
 - `release-retry.yml`: rebuilds and reuploads assets for an existing tag without changing the version.
 - `release-build.yml`: reusable release build for source archives, CLI binaries, desktop bundles, GHCR, npm, GitHub Release assets, checksums, attestations, and Homebrew tap updates.
 
@@ -176,27 +172,19 @@ The CLI binary bundle embeds:
   preview provider feedback smoke.
 - `APPALOFT_GITHUB_PREVIEW_SMOKE_PR`: optional pull request number used by the product-grade preview
   provider feedback smoke.
-- `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by `deploy-docs.yml` to deploy to the same
-  server as `appaloft/www` when the docs workflow uses the pure SSH CLI fallback.
-- `APPALOFT_TOKEN`: bearer token used by `deploy-docs.yml` when
-  `APPALOFT_CONTROL_PLANE_MODE=self-hosted`.
+- `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by preview workflows and remote-state
+  maintenance when they target the shared preview server.
 
 ## Required Variables
 
-- `APPALOFT_SSH_HOST`: SSH host used by `deploy-docs.yml`; keep it aligned with `appaloft/www`.
-- `APPALOFT_SSH_USER`: optional SSH username used by `deploy-docs.yml`; defaults to `root`.
-- `APPALOFT_CONTROL_PLANE_MODE`: set to `self-hosted` to route docs deployment through the
-  Appaloft server config deploy API.
-- `APPALOFT_CONTROL_PLANE_URL`: Appaloft server URL used when
-  `APPALOFT_CONTROL_PLANE_MODE=self-hosted`.
-- `APPALOFT_PROJECT_ID`, `APPALOFT_ENVIRONMENT_ID`, `APPALOFT_DOCS_RESOURCE_ID`,
-  `APPALOFT_SERVER_ID`: trusted Appaloft context used by the docs server config deploy workflow.
+- `APPALOFT_SSH_HOST`: SSH host used by preview workflows and remote-state maintenance.
+- `APPALOFT_SSH_USER`: optional SSH username used by preview workflows and remote-state
+  maintenance; defaults to `root`.
 
 ## Required DNS
 
-- `docs.appaloft.com` must resolve through Cloudflare to the same public origin path used by
-  `www.appaloft.com`. The docs deployment creates the Appaloft static-site resource and server-side
-  reverse-proxy route, but DNS still has to send traffic to that server.
+- `docs.appaloft.com` production hosting and DNS are managed outside this repository's GitHub
+  Actions.
 
 For npm trusted publishing, configure each npm package to trust GitHub Actions from
 `appaloft/appaloft` with workflow filename `release.yml`. The publish command lives in the reusable
@@ -248,18 +236,11 @@ flows.
 
 If you do not want to publish yet, do not run `Release`, or leave the Release Please PR unmerged.
 
-## Docs-Only Redeploys
+## Docs-Only Publishing
 
-`Deploy Docs` runs automatically on `main` when docs content, docs config, or the docs deploy
-dependency chain changes. Use it manually only when the docs source needs to be rebuilt from a
-specific ref.
-
-1. Open GitHub Actions and run `Deploy Docs`.
-2. Leave `source_ref=main` to redeploy the latest merged docs source, or choose another branch,
-   tag, or SHA for a targeted redeploy.
-
-Docs deploys always run Appaloft from the checked-out source ref, so docs-recovery fixes in
-unreleased CLI code can be used immediately without publishing a new product release first.
+The repository no longer includes production or pull request docs deployment workflows. Production
+docs publishing for `docs.appaloft.com` and docs previews are handled outside this repository's
+GitHub Actions.
 
 ## Checksums And Provenance
 

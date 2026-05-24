@@ -55,8 +55,7 @@ jobs:
     if: ${{ needs.changes.outputs.console_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.event.pull_request.head.ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Use one shared preview group for remote deploys so console and docs previews do not compete
-    # for Docker build capacity on the same SSH host.
+    # Serialize preview remote deploys so Docker work does not compete for capacity on the same SSH host.
     concurrency:
       group: appaloft-preview-remote-state
       cancel-in-progress: false
@@ -85,11 +84,11 @@ jobs:
 
           missing=0
           if [ -z "$APPALOFT_SSH_HOST" ]; then
-            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Console preview uses the same SSH target as docs preview."
+            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Console preview needs an SSH target."
             missing=1
           fi
           if [ -z "$APPALOFT_SSH_PRIVATE_KEY" ]; then
-            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Console preview uses the same deployment key as docs preview."
+            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Console preview needs an SSH private key."
             missing=1
           fi
 

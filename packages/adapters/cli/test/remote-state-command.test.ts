@@ -44,17 +44,13 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
   });
 
-  test("[CONFIG-FILE-STATE-020] docs maintenance workflow uses shared stale-only lock maintenance", () => {
+  test("[CONFIG-FILE-STATE-020] remote-state maintenance and preview workflows use stale-only lock maintenance", () => {
     const maintenanceWorkflow = readFileSync(
       resolve(import.meta.dir, "../../../../.github/workflows/remote-state-maintenance.yml"),
       "utf8",
     );
-    const deployDocsWorkflow = readFileSync(
-      resolve(import.meta.dir, "../../../../.github/workflows/deploy-docs.yml"),
-      "utf8",
-    );
-    const deployDocsPreviewWorkflow = readFileSync(
-      resolve(import.meta.dir, "../../../../.github/workflows/deploy-docs-preview.yml"),
+    const deployConsolePreviewWorkflow = readFileSync(
+      resolve(import.meta.dir, "../../../../.github/workflows/deploy-console-preview.yml"),
       "utf8",
     );
     const preflightAction = readFileSync(
@@ -76,8 +72,8 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(maintenanceWorkflow).toContain("workflow_dispatch:");
     expect(maintenanceWorkflow).toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("ref: main");
-    expect(deployDocsPreviewWorkflow).toContain("group: appaloft-docs-preview-remote-state");
-    expect(deployDocsPreviewWorkflow).not.toContain("group: appaloft-www-remote-state");
+    expect(deployConsolePreviewWorkflow).toContain("group: appaloft-preview-remote-state");
+    expect(deployConsolePreviewWorkflow).not.toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("default: /var/lib/appaloft/runtime");
     expect(maintenanceWorkflow).toContain(
       `APPALOFT_SSH_HOST: ${githubExpressionOpen} vars.APPALOFT_SSH_HOST }}`,
@@ -86,12 +82,10 @@ describe("CLI SSH remote-state lock commands", () => {
       `APPALOFT_SSH_PRIVATE_KEY: ${githubExpressionOpen} secrets.APPALOFT_SSH_PRIVATE_KEY }}`,
     );
     expect(maintenanceWorkflow).toContain('remote-state lock "$MAINTENANCE_ACTION"');
-    expect(deployDocsWorkflow).toContain("uses: ./.github/actions/remote-state-lock-preflight");
-    expect(deployDocsWorkflow).toContain(
-      "uses: ./.github/actions/remote-runtime-capacity-preflight",
+    expect(deployConsolePreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
+    expect(deployConsolePreviewWorkflow.match(/Remote Runtime Capacity Preflight/g)?.length).toBe(
+      2,
     );
-    expect(deployDocsPreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
-    expect(deployDocsPreviewWorkflow.match(/Remote Runtime Capacity Preflight/g)?.length).toBe(2);
     expect(preflightAction).toContain("remote-state lock recover-stale");
     expect(preflightAction).toContain("stale-after-seconds");
     expect(preflightAction).toContain('--stale-after-seconds "$STALE_AFTER_SECONDS"');

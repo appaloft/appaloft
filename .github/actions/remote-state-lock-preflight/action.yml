@@ -1,5 +1,5 @@
 name: Remote State Lock Preflight
-description: Inspect and recover only stale SSH remote-state locks before docs deploy work.
+description: Inspect and recover only stale SSH remote-state locks before preview deploy work.
 
 inputs:
   ssh-host:
