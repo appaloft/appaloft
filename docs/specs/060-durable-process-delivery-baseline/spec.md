@@ -157,8 +157,8 @@ baseline before retry execution and production automation can depend on backgrou
   state is persisted, but consume process-attempt atomic claim/completion when a process journal is
   available. Background retry execution remains a governed worker slice.
 - Provider-native dependency resource realization/delete is the twelfth operator-visible
-  process-attempt binding. `dependency-resources.provision-postgres`,
-  `dependency-resources.provision-redis`, and provider-managed
+  process-attempt binding. `dependency-resources.provision`,
+  `dependency-resources.provision`, and provider-managed
   `dependency-resources.delete` record running, succeeded, and failed provider realization/delete
   attempts into the process attempt journal with ResourceInstance realization/delete attempt ids,
   stable dependency-resource realization/delete dedupe authority, safe dependency kind/provider

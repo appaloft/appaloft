@@ -29,8 +29,7 @@ import {
 import {
   CapturedEventBus,
   FakeDependencyResourceSecretStore,
-  FakeManagedPostgresProvider,
-  FakeManagedRedisProvider,
+  FakeManagedDependencyProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -53,11 +52,9 @@ import {
 import { ListDependencyResourcesQuery, ShowDependencyResourceQuery } from "../src/messages";
 import {
   DeleteDependencyResourceUseCase,
-  ImportPostgresDependencyResourceUseCase,
-  ImportRedisDependencyResourceUseCase,
+  ImportDependencyResourceUseCase,
   ListDependencyResourcesQueryService,
-  ProvisionPostgresDependencyResourceUseCase,
-  ProvisionRedisDependencyResourceUseCase,
+  ProvisionDependencyResourceUseCase,
   RenameDependencyResourceUseCase,
   ShowDependencyResourceQueryService,
 } from "../src/use-cases";
@@ -106,8 +103,7 @@ async function createHarness() {
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader();
   const readModel = new MemoryDependencyResourceReadModel(dependencyResources, deleteSafetyReader);
   const eventBus = new CapturedEventBus();
-  const managedPostgresProvider = new FakeManagedPostgresProvider();
-  const managedRedisProvider = new FakeManagedRedisProvider();
+  const managedDependencyProvider = new FakeManagedDependencyProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
   const processAttemptRecorder = new RecordingProcessAttemptRecorder();
@@ -138,6 +134,30 @@ async function createHarness() {
     UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
   );
 
+  const importDependency = new ImportDependencyResourceUseCase(
+    projects,
+    environments,
+    dependencyResources,
+    dependencyResourceSecretStore,
+    clock,
+    idGenerator,
+    eventBus,
+    logger,
+  );
+  const provisionDependency = new ProvisionDependencyResourceUseCase(
+    projects,
+    environments,
+    servers,
+    dependencyResources,
+    dependencyResourceSecretStore,
+    clock,
+    idGenerator,
+    eventBus,
+    logger,
+    managedDependencyProvider,
+    processAttemptRecorder,
+  );
+
   return {
     context,
     deleteDependencyResource: new DeleteDependencyResourceUseCase(
@@ -147,64 +167,18 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
-      managedPostgresProvider,
-      managedRedisProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
     ),
     deleteSafetyReader,
     dependencyResources,
     dependencyResourceSecretStore,
     eventBus,
-    managedPostgresProvider,
-    managedRedisProvider,
+    managedDependencyProvider,
     servers,
-    importPostgres: new ImportPostgresDependencyResourceUseCase(
-      projects,
-      environments,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-    ),
-    importRedis: new ImportRedisDependencyResourceUseCase(
-      projects,
-      environments,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-    ),
+    importDependencyResource: importDependency,
     listDependencyResources: new ListDependencyResourcesQueryService(readModel, clock),
-    provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedPostgresProvider,
-      processAttemptRecorder,
-    ),
-    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedRedisProvider,
-      processAttemptRecorder,
-    ),
+    provisionDependencyResource: provisionDependency,
     processAttemptRecorder,
     readModel,
     renameDependencyResource: new RenameDependencyResourceUseCase(
@@ -223,20 +197,21 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       eventBus,
-      managedPostgresProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
     });
 
     expect(result.isOk()).toBe(true);
-    expect(managedPostgresProvider.realized).toContainEqual(
+    expect(managedDependencyProvider.realized).toContainEqual(
       expect.objectContaining({
         dependencyResourceId: result._unsafeUnwrap().id,
         providerKey: "appaloft-managed-postgres",
@@ -276,7 +251,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         id: "dpr_0002",
         kind: "system",
         status: "running",
-        operationKey: "dependency-resources.provision-postgres",
+        operationKey: "dependency-resources.provision",
         dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
         correlationId: "req_dependency_resource_lifecycle_test",
         requestId: "req_dependency_resource_lifecycle_test",
@@ -298,7 +273,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         id: "dpr_0002",
         kind: "system",
         status: "succeeded",
-        operationKey: "dependency-resources.provision-postgres",
+        operationKey: "dependency-resources.provision",
         dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
         correlationId: "req_dependency_resource_lifecycle_test",
         requestId: "req_dependency_resource_lifecycle_test",
@@ -324,8 +299,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       dependencyResourceSecretStore,
-      managedPostgresProvider,
-      provisionPostgres,
+      managedDependencyProvider,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
     const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
@@ -338,7 +313,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       secretValue: "postgres://app:super-secret@main-db.postgres.internal:5432/main_db",
       storedAt: "2026-01-01T00:00:00.000Z",
     });
-    managedPostgresProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       ok({
         providerResourceHandle: "pg/rsi_0001",
         endpoint: {
@@ -352,7 +327,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       }),
     );
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -377,10 +353,14 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-003] blocks managed Postgres binding readiness for unresolved Appaloft-owned refs", async () => {
-    const { context, managedPostgresProvider, provisionPostgres, showDependencyResource } =
-      await createHarness();
+    const {
+      context,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
     const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
-    managedPostgresProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       ok({
         providerResourceHandle: "pg/rsi_0001",
         endpoint: {
@@ -394,7 +374,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       }),
     );
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -424,12 +405,12 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   test("[DEP-RES-PG-NATIVE-003] [PROC-DELIVERY-004] provider realization failure keeps provision accepted and blocks binding readiness", async () => {
     const {
       context,
-      managedPostgresProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
-    managedPostgresProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       err(
         domainError.provider("Managed Postgres unavailable with secret token output", {
           phase: "dependency-resource-realization",
@@ -438,7 +419,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       ),
     );
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -463,7 +445,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       id: "dpr_0002",
       kind: "system",
       status: "failed",
-      operationKey: "dependency-resources.provision-postgres",
+      operationKey: "dependency-resources.provision",
       phase: "dependency-resource-realization",
       step: "failed",
       projectId: "prj_demo",
@@ -483,9 +465,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-NATIVE-008] passes single-server target to managed Postgres provider", async () => {
-    const { context, managedPostgresProvider, provisionPostgres } = await createHarness();
+    const { context, managedDependencyProvider, provisionDependencyResource } =
+      await createHarness();
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -493,7 +477,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(result.isOk()).toBe(true);
-    expect(managedPostgresProvider.realized[0]?.target).toMatchObject({
+    expect(managedDependencyProvider.realized[0]?.target).toMatchObject({
       serverId: "srv_demo",
       providerKey: "local-shell",
       targetKind: "single-server",
@@ -503,11 +487,16 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-NATIVE-007] rejects unsupported managed Postgres provider before persistence", async () => {
-    const { context, managedPostgresProvider, provisionPostgres, listDependencyResources } =
-      await createHarness();
-    managedPostgresProvider.setSupportedProviderKeys([]);
+    const {
+      context,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      listDependencyResources,
+    } = await createHarness();
+    managedDependencyProvider.setSupportedProviderKeys([]);
 
-    const result = await provisionPostgres.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -528,9 +517,10 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-IMPORT-001] [DEP-RES-PG-READ-002] imports external Postgres with masked read model", async () => {
-    const { context, importPostgres, showDependencyResource } = await createHarness();
+    const { context, importDependencyResource, showDependencyResource } = await createHarness();
 
-    const created = await importPostgres.execute(context, {
+    const created = await importDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "External DB",
@@ -555,12 +545,17 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-001] stores imported Postgres connection value behind safe ref", async () => {
-    const { context, dependencyResourceSecretStore, importPostgres, showDependencyResource } =
-      await createHarness();
+    const {
+      context,
+      dependencyResourceSecretStore,
+      importDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
 
     const connectionUrl =
       "postgres://app:super-secret@db.example.com:5432/app?sslmode=require&token=hidden";
-    const created = await importPostgres.execute(context, {
+    const created = await importDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "External DB",
@@ -598,9 +593,10 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-VALIDATION-001] rejects invalid Postgres endpoint input", async () => {
-    const { context, importPostgres } = await createHarness();
+    const { context, importDependencyResource } = await createHarness();
 
-    const result = await importPostgres.execute(context, {
+    const result = await importDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Broken",
@@ -617,10 +613,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-READ-001] list/show include readiness and backup metadata", async () => {
-    const { context, importPostgres, listDependencyResources, showDependencyResource } =
+    const { context, importDependencyResource, listDependencyResources, showDependencyResource } =
       await createHarness();
     const created = (
-      await importPostgres.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External DB",
@@ -655,10 +652,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-RENAME-001] renames dependency resource without changing connection metadata", async () => {
-    const { context, importPostgres, renameDependencyResource, showDependencyResource } =
+    const { context, importDependencyResource, renameDependencyResource, showDependencyResource } =
       await createHarness();
     const created = (
-      await importPostgres.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External DB",
@@ -686,10 +684,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-DELETE-001] imported external delete tombstones Appaloft record only", async () => {
-    const { context, deleteDependencyResource, importPostgres, showDependencyResource } =
+    const { context, deleteDependencyResource, importDependencyResource, showDependencyResource } =
       await createHarness();
     const created = (
-      await importPostgres.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External DB",
@@ -714,13 +713,14 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       deleteDependencyResource,
-      managedPostgresProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
     const created = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -732,9 +732,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(deleted.isOk()).toBe(true);
-    expect(managedPostgresProvider.deleted).toContainEqual(
+    void managedDependencyProvider;
+    expect(managedDependencyProvider.deleted).toContainEqual(
       expect.objectContaining({
         dependencyResourceId: created.id,
+        kind: "postgres",
         providerResourceHandle: `pg/${created.id}`,
       }),
     );
@@ -794,10 +796,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-PG-DELETE-002] blocks bound dependency delete", async () => {
-    const { context, deleteDependencyResource, deleteSafetyReader, importPostgres } =
+    const { context, deleteDependencyResource, deleteSafetyReader, importDependencyResource } =
       await createHarness();
     const created = (
-      await importPostgres.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External DB",
@@ -823,18 +826,19 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       deleteDependencyResource,
-      managedPostgresProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
     } = await createHarness();
     const created = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Failing Delete DB",
       })
     )._unsafeUnwrap();
-    managedPostgresProvider.setDeleteResult(
+    managedDependencyProvider.setDeleteResult(
       err(
         domainError.provider("Delete failed with secret token output", {
           phase: "dependency-resource-provider-delete",
@@ -881,20 +885,21 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       eventBus,
-      managedRedisProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionRedis,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
     });
 
     expect(result.isOk()).toBe(true);
-    expect(managedRedisProvider.realized).toContainEqual(
+    expect(managedDependencyProvider.realized).toContainEqual(
       expect.objectContaining({
         dependencyResourceId: result._unsafeUnwrap().id,
         providerKey: "appaloft-managed-redis",
@@ -934,7 +939,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         id: "dpr_0002",
         kind: "system",
         status: "running",
-        operationKey: "dependency-resources.provision-redis",
+        operationKey: "dependency-resources.provision",
         dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
         correlationId: "req_dependency_resource_lifecycle_test",
         requestId: "req_dependency_resource_lifecycle_test",
@@ -956,7 +961,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         id: "dpr_0002",
         kind: "system",
         status: "succeeded",
-        operationKey: "dependency-resources.provision-redis",
+        operationKey: "dependency-resources.provision",
         dedupeKey: `dependency-resource-realization:${result._unsafeUnwrap().id}:dpr_0002`,
         correlationId: "req_dependency_resource_lifecycle_test",
         requestId: "req_dependency_resource_lifecycle_test",
@@ -982,8 +987,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       dependencyResourceSecretStore,
-      managedRedisProvider,
-      provisionRedis,
+      managedDependencyProvider,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
     const secretRef = "appaloft://dependency-resources/rsi_0001/connection";
@@ -996,7 +1001,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       secretValue: "redis://:super-secret@main-cache.redis.internal:6379/0",
       storedAt: "2026-01-01T00:00:00.000Z",
     });
-    managedRedisProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       ok({
         providerResourceHandle: "redis/rsi_0001",
         endpoint: {
@@ -1009,7 +1014,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       }),
     );
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
@@ -1037,11 +1043,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       dependencyResourceSecretStore,
-      managedRedisProvider,
-      provisionRedis,
+      managedDependencyProvider,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
-    managedRedisProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       ok({
         providerResourceHandle: "redis/rsi_0001",
         endpoint: {
@@ -1054,7 +1060,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       }),
     );
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
@@ -1095,12 +1102,12 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   test("[DEP-RES-REDIS-NATIVE-003] [PROC-DELIVERY-004] provider realization failure keeps Redis provision accepted and blocks binding readiness", async () => {
     const {
       context,
-      managedRedisProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionRedis,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
-    managedRedisProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       err(
         domainError.provider("Managed Redis unavailable with secret token output", {
           phase: "dependency-resource-realization",
@@ -1109,7 +1116,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       ),
     );
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
@@ -1134,7 +1142,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       id: "dpr_0002",
       kind: "system",
       status: "failed",
-      operationKey: "dependency-resources.provision-redis",
+      operationKey: "dependency-resources.provision",
       phase: "dependency-resource-realization",
       step: "failed",
       projectId: "prj_demo",
@@ -1154,9 +1162,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-REDIS-NATIVE-009] passes single-server target to managed Redis provider", async () => {
-    const { context, managedRedisProvider, provisionRedis } = await createHarness();
+    const { context, managedDependencyProvider, provisionDependencyResource } =
+      await createHarness();
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
@@ -1164,7 +1174,7 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(result.isOk()).toBe(true);
-    expect(managedRedisProvider.realized[0]?.target).toMatchObject({
+    expect(managedDependencyProvider.realized[0]?.target).toMatchObject({
       serverId: "srv_demo",
       providerKey: "local-shell",
       targetKind: "single-server",
@@ -1174,11 +1184,16 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-REDIS-NATIVE-008] rejects unsupported managed Redis provider before persistence", async () => {
-    const { context, listDependencyResources, managedRedisProvider, provisionRedis } =
-      await createHarness();
-    managedRedisProvider.setSupportedProviderKeys([]);
+    const {
+      context,
+      listDependencyResources,
+      managedDependencyProvider,
+      provisionDependencyResource,
+    } = await createHarness();
+    managedDependencyProvider.setSupportedProviderKeys([]);
 
-    const result = await provisionRedis.execute(context, {
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",
@@ -1202,13 +1217,14 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     const {
       context,
       deleteDependencyResource,
-      managedRedisProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
-      provisionRedis,
+      provisionDependencyResource,
       showDependencyResource,
     } = await createHarness();
     const created = (
-      await provisionRedis.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main Cache",
@@ -1220,9 +1236,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     });
 
     expect(deleted.isOk()).toBe(true);
-    expect(managedRedisProvider.deleted).toContainEqual(
+    void managedDependencyProvider;
+    expect(managedDependencyProvider.deleted).toContainEqual(
       expect.objectContaining({
         dependencyResourceId: created.id,
+        kind: "redis",
         providerResourceHandle: `redis/${created.id}`,
       }),
     );
@@ -1286,18 +1304,20 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       context,
       deleteDependencyResource,
       deleteSafetyReader,
-      managedRedisProvider,
-      provisionRedis,
+      managedDependencyProvider,
+      provisionDependencyResource,
     } = await createHarness();
     const bound = (
-      await provisionRedis.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Bound Cache",
       })
     )._unsafeUnwrap();
     const retained = (
-      await provisionRedis.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Retained Cache",
@@ -1308,7 +1328,8 @@ describe("Postgres dependency resource lifecycle use cases", () => {
       })
     )._unsafeUnwrap();
     const referenced = (
-      await provisionRedis.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Referenced Cache",
@@ -1353,13 +1374,15 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         deletionBlockers: expect.stringContaining("deployment-snapshot-reference"),
       },
     });
-    expect(managedRedisProvider.deleted).toEqual([]);
+    void managedDependencyProvider;
+    expect(managedDependencyProvider.deleted).toEqual([]);
   });
 
   test("[DEP-RES-REDIS-IMPORT-001] [DEP-RES-REDIS-READ-002] imports external Redis with masked read model", async () => {
-    const { context, importRedis, showDependencyResource } = await createHarness();
+    const { context, importDependencyResource, showDependencyResource } = await createHarness();
 
-    const created = await importRedis.execute(context, {
+    const created = await importDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "External Cache",
@@ -1384,11 +1407,16 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-002] stores imported Redis connection value behind safe ref", async () => {
-    const { context, dependencyResourceSecretStore, importRedis, showDependencyResource } =
-      await createHarness();
+    const {
+      context,
+      dependencyResourceSecretStore,
+      importDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
 
     const connectionUrl = "rediss://default:super-secret@cache.example.com:6380/0?token=hidden";
-    const created = await importRedis.execute(context, {
+    const created = await importDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "External Cache",
@@ -1426,9 +1454,10 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-REDIS-VALIDATION-001] rejects invalid Redis endpoint input", async () => {
-    const { context, importRedis } = await createHarness();
+    const { context, importDependencyResource } = await createHarness();
 
-    const result = await importRedis.execute(context, {
+    const result = await importDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Broken Cache",
@@ -1445,10 +1474,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-REDIS-READ-001] [DEP-RES-REDIS-RENAME-001] lists and renames Redis resources", async () => {
-    const { context, importRedis, listDependencyResources, renameDependencyResource } =
+    const { context, importDependencyResource, listDependencyResources, renameDependencyResource } =
       await createHarness();
     const created = (
-      await importRedis.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External Cache",
@@ -1477,10 +1507,11 @@ describe("Postgres dependency resource lifecycle use cases", () => {
   });
 
   test("[DEP-RES-REDIS-DELETE-001] [DEP-RES-REDIS-DELETE-002] deletes only unblocked Redis records", async () => {
-    const { context, deleteDependencyResource, deleteSafetyReader, importRedis } =
+    const { context, deleteDependencyResource, deleteSafetyReader, importDependencyResource } =
       await createHarness();
     const created = (
-      await importRedis.execute(context, {
+      await importDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "External Cache",

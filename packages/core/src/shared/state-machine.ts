@@ -20,6 +20,7 @@ import {
   projectLifecycleStatuses,
   resourceExposureModes,
   resourceGeneratedAccessModes,
+  resourceInstanceKinds,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -55,6 +56,7 @@ export {
   projectLifecycleStatuses,
   resourceExposureModes,
   resourceGeneratedAccessModes,
+  resourceInstanceKinds,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -926,28 +928,24 @@ export class PluginInstallationStatusValue extends StateMachineValueObject<
 
 const resourceInstanceKindBrand: unique symbol = Symbol("ResourceInstanceKindValue");
 export class ResourceInstanceKindValue extends EnumValueObject<
-  "postgres" | "redis" | "s3" | "dns" | "secret-manager" | "registry" | "generic-service"
+  (typeof resourceInstanceKinds)[number]
 > {
   private [resourceInstanceKindBrand]!: void;
 
-  private constructor(
-    value: "postgres" | "redis" | "s3" | "dns" | "secret-manager" | "registry" | "generic-service",
-  ) {
+  private constructor(value: (typeof resourceInstanceKinds)[number]) {
     super(value);
   }
 
   static create(value: string): Result<ResourceInstanceKindValue> {
     return createEnumValue(
       value,
-      ["postgres", "redis", "s3", "dns", "secret-manager", "registry", "generic-service"] as const,
+      resourceInstanceKinds,
       "Resource instance kind",
       (validated) => new ResourceInstanceKindValue(validated),
     );
   }
 
-  static rehydrate(
-    value: "postgres" | "redis" | "s3" | "dns" | "secret-manager" | "registry" | "generic-service",
-  ): ResourceInstanceKindValue {
+  static rehydrate(value: (typeof resourceInstanceKinds)[number]): ResourceInstanceKindValue {
     return new ResourceInstanceKindValue(value);
   }
 }

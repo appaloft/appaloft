@@ -955,7 +955,7 @@ Current verification notes:
   runtime injection, provider-native database realization, Redis, backup/restore, recovery,
   auto-deploy, preview, and cluster runtime items remain open for the full `0.9.0` release rule.
 - 2026-05-05 Phase 7 Redis dependency resource lifecycle Spec Round positioned
-  `dependency-resources.provision-redis` and `dependency-resources.import-redis` as accepted
+  `dependency-resources.provision` and `dependency-resources.import` as accepted
   candidates, with matrix rows for safe Redis metadata, secret masking, list/show/rename/delete
   inclusion, and CLI/oRPC/HTTP dispatch. It does not implement the Redis Code Round yet, so the
   full `0.9.0` release rule remains blocked by Redis, provider-native database realization,
@@ -1026,7 +1026,7 @@ Current verification notes:
   completed by later managed Redis and managed Postgres closed-loop verification slices.
 - 2026-05-06 Phase 7 Redis provider-native realization Spec Round added
   [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) to
-  position `dependency-resources.provision-redis`, `resources.bind-dependency`, and
+  position `dependency-resources.provision`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Redis realization, binding readiness, runtime secret
   resolvability, and provider cleanup. It does not implement the Code Round yet, so the Redis
   closed-loop exit criterion remains open.
@@ -1068,7 +1068,7 @@ Current verification notes:
   deploy -> observe logs/status -> backup/restore for managed Postgres without exposing raw
   Postgres material. The Postgres closed-loop exit criterion is now closed.
 - 2026-05-05 Phase 7 Postgres provider-native realization Spec Round positioned
-  `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
+  `dependency-resources.provision`, `resources.bind-dependency`, and
   `dependency-resources.delete` for managed Postgres realization, bind readiness, and provider
   cleanup semantics. It does not implement the Code Round yet, so the full `0.9.0` release rule
   remains blocked by provider-native database realization, backup/restore, recovery, auto-deploy,
@@ -2158,7 +2158,7 @@ Required:
   cases rather than process-attempt atomic claim/completion. Provider-native dependency resource
   realization/delete is the twelfth operator-visible binding with running, success, and failure
   outcomes mirrored into the process attempt journal for
-  `dependency-resources.provision-postgres`, `dependency-resources.provision-redis`, and
+  `dependency-resources.provision`, `dependency-resources.provision`, and
   provider-managed `dependency-resources.delete`; provider execution still runs inline through
   command use cases rather than process-attempt atomic claim/completion. Deployment create
   execution is the thirteenth operator-visible binding with running, success, and failure outcomes

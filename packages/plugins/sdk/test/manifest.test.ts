@@ -54,4 +54,27 @@ describe("plugin manifest contract", () => {
       placement: "quick-deploy-source",
     });
   });
+
+  test("accepts console route web extension metadata", () => {
+    expect(
+      systemPluginWebExtensionSchema.parse({
+        key: "example-marketplace",
+        title: "Marketplace",
+        path: "/marketplace",
+        placement: "navigation",
+        target: "console-route",
+        requiresAuth: false,
+        metadata: {
+          renderer: "blueprint-catalog",
+          listEndpoint: "/example/blueprints",
+        },
+      }),
+    ).toMatchObject({
+      key: "example-marketplace",
+      target: "console-route",
+      metadata: {
+        renderer: "blueprint-catalog",
+      },
+    });
+  });
 });

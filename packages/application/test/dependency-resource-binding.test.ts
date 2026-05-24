@@ -36,8 +36,7 @@ import {
 import {
   CapturedEventBus,
   FakeDependencyBindingSecretStore,
-  FakeManagedPostgresProvider,
-  FakeManagedRedisProvider,
+  FakeManagedDependencyProvider,
   FixedClock,
   MemoryDependencyResourceDeleteSafetyReader,
   MemoryDependencyResourceReadModel,
@@ -95,8 +94,7 @@ async function createHarness() {
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
   const bindingSecretStore = new FakeDependencyBindingSecretStore("secret");
-  const managedPostgresProvider = new FakeManagedPostgresProvider();
-  const managedRedisProvider = new FakeManagedRedisProvider();
+  const managedDependencyProvider = new FakeManagedDependencyProvider();
   const createdAt = CreatedAt.rehydrate(clock.now());
 
   const project = Project.create({
@@ -170,8 +168,7 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
-      managedPostgresProvider,
-      managedRedisProvider,
+      managedDependencyProvider,
     ),
     dependencyReadModel,
     dependencyResources,

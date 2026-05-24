@@ -61,8 +61,7 @@ import {
   type GetAuthBootstrapStatusQueryInput,
   type GetCurrentOrganizationContextQueryInput,
   type ImportCertificateCommandInput,
-  type ImportPostgresDependencyResourceCommandInput,
-  type ImportRedisDependencyResourceCommandInput,
+  type ImportDependencyResourceCommandInput,
   type ImportResourceVariablesCommandInput,
   type InspectRuntimeUsageQueryInput,
   type InspectServerCapacityQueryInput,
@@ -97,8 +96,7 @@ import {
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
-  type ProvisionPostgresDependencyResourceCommandInput,
-  type ProvisionRedisDependencyResourceCommandInput,
+  type ProvisionDependencyResourceCommandInput,
   type PruneDeploymentLogsCommandInput,
   type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
@@ -1128,27 +1126,15 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   dependencyResources: {
-    provisionPostgres: Client<
+    provision: Client<
       AppaloftClientContext,
-      ProvisionPostgresDependencyResourceCommandInput,
+      ProvisionDependencyResourceCommandInput,
       DependencyResourceResponse,
       AppaloftClientError
     >;
-    importPostgres: Client<
+    import: Client<
       AppaloftClientContext,
-      ImportPostgresDependencyResourceCommandInput,
-      DependencyResourceResponse,
-      AppaloftClientError
-    >;
-    provisionRedis: Client<
-      AppaloftClientContext,
-      ProvisionRedisDependencyResourceCommandInput,
-      DependencyResourceResponse,
-      AppaloftClientError
-    >;
-    importRedis: Client<
-      AppaloftClientContext,
-      ImportRedisDependencyResourceCommandInput,
+      ImportDependencyResourceCommandInput,
       DependencyResourceResponse,
       AppaloftClientError
     >;

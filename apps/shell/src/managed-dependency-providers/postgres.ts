@@ -91,7 +91,7 @@ export class DockerBackedManagedPostgresProvider implements ManagedPostgresProvi
       return commandFailure({
         message: "Docker-backed managed Postgres realization failed",
         providerKey: input.providerKey,
-        operation: "dependency-resources.provision-postgres",
+        operation: "dependency-resources.provision",
         exitCode: result.exitCode,
       });
     }

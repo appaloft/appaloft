@@ -627,28 +627,12 @@ export const cliCommandDescriptions = {
     "self-hosting.organization-team-management",
   ),
   dependency: withDocs("Dependency resource operations", "dependency.resource-lifecycle"),
-  dependencyPostgres: withDocs(
-    "Postgres dependency resource operations",
+  dependencyProvision: withDocs(
+    "Create an Appaloft-managed dependency resource by kind; pass --server for Docker-backed single-server realization",
     "dependency.resource-lifecycle",
   ),
-  dependencyPostgresProvision: withDocs(
-    "Create an Appaloft-managed Postgres dependency resource; pass --server for Docker-backed single-server realization",
-    "dependency.resource-lifecycle",
-  ),
-  dependencyPostgresImport: withDocs(
-    "Import an external Postgres dependency resource",
-    "dependency.resource-lifecycle",
-  ),
-  dependencyRedis: withDocs(
-    "Redis dependency resource operations",
-    "dependency.resource-lifecycle",
-  ),
-  dependencyRedisProvision: withDocs(
-    "Create an Appaloft-managed Redis dependency resource; pass --server for Docker-backed single-server realization",
-    "dependency.resource-lifecycle",
-  ),
-  dependencyRedisImport: withDocs(
-    "Import an external Redis dependency resource",
+  dependencyImport: withDocs(
+    "Import an external dependency resource by kind",
     "dependency.resource-lifecycle",
   ),
   dependencyList: withDocs("List dependency resources", "dependency.resource-lifecycle"),

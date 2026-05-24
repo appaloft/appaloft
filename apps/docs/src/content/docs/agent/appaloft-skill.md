@@ -15,7 +15,7 @@ relatedOperations:
   - resources.create
   - servers.register
   - domain-bindings.create
-  - dependency-resources.provision-postgres
+  - dependency-resources.provision
 sidebar:
   label: "Appaloft skill"
   order: 0
