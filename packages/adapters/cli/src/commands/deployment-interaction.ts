@@ -10,6 +10,7 @@ import {
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   ConfigureRuntimeMonitoringThresholdsCommand,
+  ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
@@ -25,6 +26,8 @@ import {
   compareResourceProfileDrift,
   type DependencyResourceBackupPolicyRead,
   type DependencyResourceSummary,
+  type DeploymentConfiguredRuntimePrunePolicy,
+  deploymentSnapshotRuntimePrunePolicyId,
   type EnvironmentSummary,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourcesQuery,
@@ -152,6 +155,7 @@ export interface DeploymentPromptSeed {
   autoDeployPolicy?: DeploymentAutoDeploySeed;
   generatedAccessProfile?: DeploymentGeneratedAccessProfileSeed;
   monitoringThresholds?: DeploymentMonitoringThresholdsSeed;
+  runtimePrunePolicy?: DeploymentRuntimePrunePolicySeed;
   profileDriftPreflight?: boolean;
 }
 
@@ -221,6 +225,7 @@ export interface DeploymentMonitoringThresholdsSeed {
   enabled: boolean;
   rules: DeploymentMonitoringThresholdRuleSeed[];
 }
+export type DeploymentRuntimePrunePolicySeed = DeploymentConfiguredRuntimePrunePolicy;
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
@@ -617,6 +622,15 @@ export function deploymentPromptSeedFromConfig(
         ),
       } satisfies DeploymentMonitoringThresholdsSeed)
     : undefined;
+  const runtimePrunePolicy = config.retention?.runtimePrune
+    ? ({
+        retentionDays: config.retention.runtimePrune.retentionDays,
+        destructive: config.retention.runtimePrune.destructive,
+        categories: [...config.retention.runtimePrune.categories],
+        retryOnFailure: config.retention.runtimePrune.retryOnFailure,
+        enabled: config.retention.runtimePrune.enabled,
+      } satisfies DeploymentRuntimePrunePolicySeed)
+    : undefined;
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -658,6 +672,7 @@ export function deploymentPromptSeedFromConfig(
     ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
     ...(generatedAccessProfile ? { generatedAccessProfile } : {}),
     ...(monitoringThresholds ? { monitoringThresholds } : {}),
+    ...(runtimePrunePolicy ? { runtimePrunePolicy } : {}),
   };
 }
 
@@ -1136,6 +1151,30 @@ function configureRuntimeMonitoringThresholds(input: {
         scope: { kind: "resource", resourceId: input.resourceId },
         enabled: input.thresholds.enabled,
         rules: input.thresholds.rules,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRuntimePrunePolicy(input: {
+  serverId: string;
+  policy: DeploymentRuntimePrunePolicySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureScheduledRuntimePrunePolicyCommand.create({
+        policyId: deploymentSnapshotRuntimePrunePolicyId(input.serverId),
+        version: "repository-config",
+        scope: "deployment-snapshot",
+        serverId: input.serverId,
+        retentionDays: input.policy.retentionDays,
+        destructive: input.policy.destructive,
+        categories: input.policy.categories,
+        retryOnFailure: input.policy.retryOnFailure,
+        enabled: input.policy.enabled,
       }),
     );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
@@ -3158,6 +3197,23 @@ function ensureRepositoryConfigMonitoringThresholds(input: {
   });
 }
 
+function ensureRepositoryConfigRuntimePrunePolicy(input: {
+  seed: DeploymentPromptSeed;
+  serverId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.runtimePrunePolicy;
+    if (!policy) {
+      return;
+    }
+
+    yield* configureRuntimePrunePolicy({
+      serverId: input.serverId,
+      policy,
+    });
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -4298,6 +4354,10 @@ export function resolveInteractiveDeploymentInput(
             : {}),
           environmentId: deploymentInput.environmentId,
           resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigRuntimePrunePolicy({
+          seed: resolvedSeed,
+          serverId: deploymentInput.serverId,
         });
         yield* ensureRepositoryConfigGeneratedAccessProfile({
           seed: resolvedSeed,

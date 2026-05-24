@@ -21,6 +21,7 @@ source selection
   -> create/reuse and attach declared managed storage through storage/resource commands
   -> create/reuse or configure declared scheduled tasks through scheduled-task commands
   -> configure or disable declared Resource auto-deploy policy through resource commands
+  -> configure declared deployment-snapshot runtime prune policy through server capacity policy commands
   -> configure declared Resource health policy through resource commands when profile apply is explicit
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
@@ -73,6 +74,7 @@ The file exists to make source-adjacent deployment profile choices reproducible:
   runtime env targets;
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
 - user-facing scheduled task graph declarations such as a nightly sync command;
+- target-scoped runtime prune policy declarations for selected deployment-snapshot cleanup;
 - non-secret environment variable declarations and required secret references;
 - trusted-entrypoint-selected named config profile overlays for staging/production/smoke variants;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
@@ -325,6 +327,29 @@ be reused and inherited parent-scope policies are not mutated. Config may not in
 scope ids, provider accounts, provider-native monitoring ids, container ids, sample ids, host
 paths, raw metric payloads, log lines, credentials, private keys, tokens, raw secret values, quota,
 autoscaling, alert routing, cleanup, billing, or runtime sizing fields.
+
+`retention.runtimePrune` uses runtime target maintenance language:
+
+```yaml
+retention:
+  runtimePrune:
+    retentionDays: 14
+    destructive: false
+    categories:
+      - stopped-containers
+      - preview-workspaces
+    retryOnFailure: true
+    enabled: true
+```
+
+Runtime prune declarations configure a deterministic `deployment-snapshot` scoped scheduled
+runtime prune policy for the trusted selected server after target resolution and before deployment
+admission. They reuse `scheduled-runtime-prune-policies.configure` and never become fields on
+`deployments.create`. `destructive` defaults to `false`; destructive scheduled cleanup is still
+policy-gated and routed through the existing `servers.capacity.prune` safety boundary. Config may
+not include policy ids, server ids, organization/project/environment ids, provider accounts,
+credentials, host paths, raw Docker or SSH commands, broad `docker system prune` settings, volume
+prune, audit/event/log retention policy, legal hold, or secret values.
 
 `scheduledTasks` uses application language, not Appaloft internal object language:
 
@@ -721,6 +746,7 @@ and never adds fields to `deployments.create`.
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
 | `scheduledTasks.*` | Scheduled task operations | Describes Resource-owned recurring application jobs; reconciled through scheduled-task list/create/configure commands before deployment, never as deployment command fields. |
 | `autoDeploy` | Resource auto-deploy policy operation | Describes git-push source-event policy for the Resource; reconciled through `resources.configure-auto-deploy`, never as deployment command fields. |
+| `retention.runtimePrune` | Scheduled runtime prune policy operation | Describes selected-target deployment-snapshot runtime cleanup policy; reconciled through `scheduled-runtime-prune-policies.configure` after trusted server resolution, never as deployment command fields or broad server identity selection. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
 | `controlPlane.install.*` | Console install entry workflow | Provides non-secret defaults for `command=install-console`, including public origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and Swarm/Compose names. It never enters `deployments.create`, never selects durable deployment identity, and never carries SSH keys, tokens, raw database URLs, or raw secret values. |

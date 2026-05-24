@@ -30,6 +30,8 @@ Canonical assertions:
 - `access.generated` declarations map to Resource access profile configuration before deployment;
 - `monitoring.thresholds` declarations map to exact Resource-scope runtime monitoring threshold
   policy configuration before deployment;
+- `retention.runtimePrune` declarations map to deployment-snapshot scheduled runtime prune policy
+  configuration for the trusted selected server before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -50,6 +52,7 @@ This matrix inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-055: Scheduled Runtime Prune Automation](../decisions/ADR-055-scheduled-runtime-prune-automation.md)
 - [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
 - [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
 - [ADR-068: Repository Config Scheduled Task Graph](../decisions/ADR-068-repository-config-scheduled-task-graph.md)
@@ -60,6 +63,7 @@ This matrix inherits:
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
+- [Scheduled Runtime Prune Automation](../specs/061-scheduled-runtime-prune-automation/spec.md)
 - [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
 - [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
 - [Repository Config Scheduled Task Graph](../specs/077-repository-config-scheduled-task-graph/spec.md)
@@ -94,6 +98,7 @@ This matrix inherits:
 | Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
 | Generated access profile | Resource generated access preference and generated route path prefix are configured before deployment admission and never become deployment fields. |
 | Monitoring thresholds | Resource-scope runtime monitoring warning/critical policy is configured before deployment admission, never becomes a deployment field, and never enforces sizing or cleanup. |
+| Runtime prune policy | Deployment-snapshot scheduled runtime prune policy is configured for the trusted selected server before deployment admission and never becomes a deployment field or broad target selector. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -296,6 +301,14 @@ This matrix inherits:
 | CONFIG-FILE-MONITORING-THRESHOLDS-004 | integration | Monitoring threshold idempotency | Selected Resource already has an exact matching threshold policy | Config deploy runs again | No duplicate configure command is dispatched | None | `runtime-monitoring.thresholds.show(resource)` -> `deployments.create` |
 | CONFIG-FILE-MONITORING-THRESHOLDS-005 | integration | Inherited threshold policy not mutated | Threshold readback returns an inherited parent-scope policy | Config deploy handles Resource YAML | Config deploy creates an exact Resource-scope override and does not pass the inherited parent policy id | None | `runtime-monitoring.thresholds.show(resource)` -> `runtime-monitoring.thresholds.configure(resource without inherited policyId)` -> `deployments.create` |
 
+## Runtime Prune Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-RUNTIME-PRUNE-001 | parser/schema | Runtime prune policy accepted | Config declares `retention.runtimePrune.retentionDays`, category list, destructive flag, retry policy, and enabled flag | Parser accepts the declaration, defaults safe fields, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-RUNTIME-PRUNE-002 | parser/schema | Unknown or unsafe runtime prune fields rejected | Config declares policy id, server id, organization/project/environment/deployment id, provider account, credential, host path, raw Docker/SSH command, volume prune, audit/event/log retention, legal hold, or secret value under `retention.runtimePrune` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-capability-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-RUNTIME-PRUNE-003 | integration | Config runtime prune policy configures before deployment | Config deploy resolves a trusted selected server and declares `retention.runtimePrune` | Workflow configures a deterministic `deployment-snapshot` scheduled runtime prune policy for that server before ids-only deployment admission | None | trusted target resolution -> `scheduled-runtime-prune-policies.configure(scope=deployment-snapshot)` -> `deployments.create` |
+
 ## Resource Sizing And Runtime Target Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -480,8 +493,12 @@ deployment admission and does not mutate domain bindings, certificates, default 
 proxy routes directly. Config runtime monitoring thresholds are reconciled through
 `runtime-monitoring.thresholds.configure` and `runtime-monitoring.thresholds.show` before ids-only
 deployment admission and do not enforce runtime sizing, cleanup, alert routing, autoscaling, or
-billing policy. Config health policy is reconciled through `resources.configure-health` during
-explicit existing-resource profile apply and remains fail-first drift guidance by default.
+billing policy. Config `retention.runtimePrune` is reconciled through
+`scheduled-runtime-prune-policies.configure` as a deterministic `deployment-snapshot` policy for
+the trusted selected server before ids-only deployment admission; it does not select broad server
+identity or become a deployment field. Config health policy is reconciled through
+`resources.configure-health` during explicit existing-resource profile apply and remains fail-first
+drift guidance by default.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).

@@ -527,6 +527,15 @@ describe("CLI deployment config entry workflow", () => {
         events: ["push"],
         dedupeWindowSeconds: 300,
       },
+      retention: {
+        runtimePrune: {
+          retentionDays: 14,
+          destructive: false,
+          categories: ["stopped-containers", "preview-workspaces"],
+          retryOnFailure: true,
+          enabled: true,
+        },
+      },
     });
 
     expect(seed).toMatchObject({
@@ -570,6 +579,13 @@ describe("CLI deployment config entry workflow", () => {
         refs: ["main"],
         eventKinds: ["push"],
         dedupeWindowSeconds: 300,
+      },
+      runtimePrunePolicy: {
+        retentionDays: 14,
+        destructive: false,
+        categories: ["stopped-containers", "preview-workspaces"],
+        retryOnFailure: true,
+        enabled: true,
       },
     });
     expect(seed.healthCheck).toMatchObject({
@@ -3986,6 +4002,75 @@ describe("CLI deployment config entry workflow", () => {
     expect(deployment).not.toHaveProperty("backup");
     expect(deployment).not.toHaveProperty("backupPolicy");
     expect(deployment).not.toHaveProperty("backupPolicyId");
+  });
+
+  test("[CONFIG-FILE-RUNTIME-PRUNE-003] config runtime prune policy configures before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-runtime-prune-config-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "retention:",
+        "  runtimePrune:",
+        "    retentionDays: 14",
+        "    destructive: false",
+        "    categories:",
+        "      - stopped-containers",
+        "      - preview-workspaces",
+        "    retryOnFailure: false",
+        "    enabled: true",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.79",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ConfigureScheduledRuntimePrunePolicyCommand");
+    expect(harness.operations).toContain("CreateDeploymentCommand");
+    expect(harness.operations.indexOf("ConfigureScheduledRuntimePrunePolicyCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const runtimePrunePolicy = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureScheduledRuntimePrunePolicyCommand",
+    ) as { input?: Record<string, unknown> } | undefined;
+    expect(runtimePrunePolicy?.input).toMatchObject({
+      policyId: "rpp_deployment_snapshot_srv_1",
+      version: "repository-config",
+      scope: "deployment-snapshot",
+      serverId: "srv_1",
+      retentionDays: 14,
+      destructive: false,
+      categories: ["stopped-containers", "preview-workspaces"],
+      retryOnFailure: false,
+      enabled: true,
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("retention");
+    expect(deployment).not.toHaveProperty("runtimePrune");
+    expect(deployment).not.toHaveProperty("runtimePrunePolicy");
   });
 
   test("[CONFIG-FILE-DEPENDENCY-005] config dependencies reuse existing managed resource and binding", async () => {

@@ -16,6 +16,10 @@ export const scheduledRuntimePrunePolicyScopeSchema = z.enum([
   "deployment-snapshot",
 ]);
 
+export function deploymentSnapshotRuntimePrunePolicyId(serverId: string): string {
+  return `rpp_deployment_snapshot_${serverId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
 export const configureScheduledRuntimePrunePolicyCommandInputSchema = z.object({
   policyId: optionalNonEmptyString,
   version: optionalNonEmptyString.default("v1"),

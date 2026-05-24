@@ -114,7 +114,28 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
-  test("[RT-CAP-SCHED-001] rejects unsafe scheduled runtime prune retention config", () => {
+  test("[CONFIG-FILE-RUNTIME-PRUNE-001][RT-CAP-SCHED-001] accepts runtime prune retention config defaults", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      retention: {
+        runtimePrune: {
+          retentionDays: 14,
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.retention?.runtimePrune).toEqual({
+        retentionDays: 14,
+        destructive: false,
+        categories: ["stopped-containers"],
+        retryOnFailure: true,
+        enabled: true,
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-RUNTIME-PRUNE-002][RT-CAP-SCHED-001] rejects unsafe scheduled runtime prune retention config", () => {
     const parsed = parseAppaloftDeploymentConfig({
       retention: {
         runtimePrune: {

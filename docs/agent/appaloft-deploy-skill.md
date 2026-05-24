@@ -49,13 +49,15 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
 - Do not add source, runtime, network, or health fields to `deployments.create`. Those belong to
   the Resource profile and deployment snapshot.
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, generated
-  access, or monitoring threshold fields to `deployments.create`. `appaloft.yaml` declarations for
+  access, monitoring threshold, or runtime prune policy fields to `deployments.create`.
+  `appaloft.yaml` declarations for
   dependencies, dependency backup policy, storage, scheduled tasks, auto-deploy policy, generated
-  access profile, runtime monitoring thresholds, Resource health policy, named `profiles.<key>`
-  overlays, or `preview.pullRequest.profile` overlays must reconcile through existing dependency,
+  access profile, runtime monitoring thresholds, runtime prune policy, Resource health policy,
+  named `profiles.<key>` overlays, or `preview.pullRequest.profile` overlays must reconcile through
+  existing dependency,
   backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy, Resource access,
-  runtime monitoring threshold, environment variable, and `resources.configure-health` operations
-  before deployment admission.
+  runtime monitoring threshold, scheduled runtime prune policy, environment variable, and
+  `resources.configure-health` operations before deployment admission.
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - Do not ask ordinary users for project/resource/server ids as the first step of a GitHub Action

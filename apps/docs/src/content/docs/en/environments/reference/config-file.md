@@ -240,6 +240,32 @@ Keep policy ids, scope ids, provider accounts, container ids, sample ids, host p
 payloads, log lines, credentials, private keys, tokens, and raw secret values outside
 `appaloft.yaml`.
 
+<h2 id="environment-config-file-runtime-prune">Runtime prune policy</h2>
+
+Use `retention.runtimePrune` when a selected deployment target should have a scheduled runtime
+cleanup policy for deployment-snapshot cleanup:
+
+```yaml
+retention:
+  runtimePrune:
+    retentionDays: 14
+    destructive: false
+    categories:
+      - stopped-containers
+      - preview-workspaces
+    retryOnFailure: true
+    enabled: true
+```
+
+Config deploy applies this after trusted server resolution and before deployment admission by
+configuring a deterministic `deployment-snapshot` scheduled runtime prune policy. It does not put
+retention fields on the final deployment command, and it does not let the committed file select a
+server, organization, project, environment, policy id, provider account, credential, host path, raw
+Docker/SSH command, volume prune, audit/event/log retention policy, or secret value.
+
+`destructive` defaults to `false`. Destructive scheduled cleanup is still gated by the policy and
+runs through the existing server capacity prune safety checks.
+
 <h2 id="environment-config-file-scheduled-tasks">Scheduled tasks</h2>
 
 Use `scheduledTasks` when the application needs recurring Resource-owned jobs:

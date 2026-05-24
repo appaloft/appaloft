@@ -31,8 +31,9 @@ installer; that would blur the boundary between installing an agent skill and ru
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
    ordinary default mental model. High-level `dependencies`, `dependencies.<key>.backup`,
-   `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`, and `monitoring.thresholds`
-   declarations must reconcile through existing operations before ids-only deployment admission.
+   `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`, `monitoring.thresholds`, and
+   `retention.runtimePrune` declarations must reconcile through existing operations before
+   ids-only deployment admission.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
 
@@ -56,7 +57,8 @@ installer; that would blur the boundary between installing an agent skill and ru
 - Do not add source, runtime, network, health, or access fields to `deployments.create`; configure
   Resource profile, health, and access operations first.
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, named
-  profile overlay, preview overlay, or monitoring threshold fields to `deployments.create`;
-  reconcile repository config declarations through their existing operation families first.
+  profile overlay, preview overlay, monitoring threshold, or runtime prune policy fields to
+  `deployments.create`; reconcile repository config declarations through their existing operation
+  families first.
 - Do not create `quick-deploy.create`; Quick Deploy remains a workflow over explicit operations.
 - Do not expose unmasked secrets in prompts, logs, diagnostics, docs, PRs, or final responses.
