@@ -26,7 +26,7 @@ jobs:
     name: Remote State Lock
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Docs production deploys and this maintenance action share this GitHub group. PR preview
+    # Keep manual remote-state maintenance runs serialized with one another. PR preview
     # workflows use their own shared preview group so remote Docker builds stay serialized.
     concurrency:
       group: appaloft-www-remote-state
@@ -53,11 +53,11 @@ jobs:
 
           missing=0
           if [ -z "$APPALOFT_SSH_HOST" ]; then
-            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Use the same SSH target as docs deploy and preview."
+            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Use the same SSH target as preview workflows."
             missing=1
           fi
           if [ -z "$APPALOFT_SSH_PRIVATE_KEY" ]; then
-            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Use the same deployment key as docs deploy and preview."
+            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Use the same deployment key as preview workflows."
             missing=1
           fi
           if [ -z "$REMOTE_RUNTIME_ROOT" ]; then

@@ -68,45 +68,9 @@ The binary bundle is self-contained:
 
 ## Docs Deployment
 
-Production docs deploys run from `.github/workflows/deploy-docs.yml` on `main` and use
-`appaloft.docs.yml` to deploy `docs.appaloft.com`. When `APPALOFT_CONTROL_PLANE_MODE` resolves to
-`self-hosted`, the workflow calls the Appaloft server config deploy API so the server owns config
-bootstrap and state. Otherwise it keeps the pure SSH CLI fallback path.
-
-PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The workflow classifies
-changed files first. For same-repository pull requests that do not affect docs content, the docs
-app, or docs build inputs, the `Preview` job records a no-op skip summary and succeeds so unrelated
-PRs do not carry a cancelled docs-preview check. Docs and console preview jobs use separate GitHub
-concurrency groups so a PR that requires both previews does not cancel one pending job; SSH
-remote-state locks still coordinate the shared remote state root. When docs preview is required, it
-invokes:
-
-```bash
-appaloft deploy . \
-  --method static \
-  --publish-dir apps/docs/dist \
-  --port 80 \
-  --preview pull-request \
-  --preview-id pr-<number> \
-  --preview-domain-template docs-pr-<number>.preview.appaloft.com \
-  --preview-tls-mode disabled \
-  --require-preview-url
-```
-
-The close job runs `appaloft preview cleanup` on `pull_request.closed`, then deletes the matching
-GitHub deployments and `docs-preview-pr-<number>` GitHub environment. Appaloft cleanup is
-idempotent, so the close job is allowed to run for same-repository PRs even if the final file list
-no longer contains docs changes.
-
-Required GitHub repository settings:
-
-- variable `APPALOFT_SSH_HOST`
-- optional variable `APPALOFT_SSH_USER` (defaults to `root`)
-- secret `APPALOFT_SSH_PRIVATE_KEY`
-
-Docs previews use hosts shaped as `docs-pr-<number>.preview.appaloft.com`, matching the existing
-`*.preview.appaloft.com` wildcard preview domain used by `appaloft/www`. Preview docs use HTTP with
-TLS disabled at the Appaloft route layer.
+The repository no longer runs production or pull request docs deployment workflows. Production
+publishing for `docs.appaloft.com` and any docs preview workflow are managed outside this
+repository's GitHub Actions.
 
 Run the Tauri desktop shell:
 

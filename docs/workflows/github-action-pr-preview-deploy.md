@@ -469,16 +469,10 @@ the public `appaloft/deploy-action` repository layout; that public repository is
 same reference export and validates wrapper layout, dry-run preview mapping, and an explicitly
 requested exact-version install smoke in its public CI.
 
-The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
-repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
-files affect docs content or docs build inputs, skips fork PR preview deploys, checks out the PR
-head for same-repository preview deploy, passes trusted PR context through `--preview pull-request`
-and `--preview-id pr-<number>`, passes static build/publish/network profile flags instead of the
-production docs config file, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
-preview host with TLS disabled, requires the preview URL to be observable, and runs `appaloft
-preview cleanup` on `pull_request.closed` before deleting the matching GitHub preview deployments
-and `docs-preview-pr-<number>` environment metadata. This workflow is an internal use of the CLI
-preview feature; it does not replace the public `appaloft/deploy-action` wrapper gap below.
+The main Appaloft repository no longer carries a repository-authored docs preview workflow. The
+remaining repository-authored preview workflow is the console backend preview; it is an internal use
+of the CLI preview feature and does not replace the public `appaloft/deploy-action` wrapper gap
+below.
 
 The reference `appaloft/deploy-action` wrapper supports a first self-hosted server-mode preview
 deploy trigger. With `control-plane-mode: self-hosted`, `preview: pull-request`, and `preview-id`,

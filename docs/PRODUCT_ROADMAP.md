@@ -60,9 +60,9 @@ Current release alignment:
 <!-- release-alignment:end -->
 
 Historical alignment notes:
-- [x] On 2026-04-23, the public docs app and standalone docs deployment workflow are merged on
-  `origin/main`; `docs.appaloft.com` DNS and release deployment secrets/variables are configured,
-  so the docs site should deploy after the next release publish run creates a GitHub Release.
+- [x] On 2026-04-23, the public docs app and standalone docs deployment workflow were merged on
+  `origin/main`; on 2026-05-24, repository-owned production docs deployment was removed, so
+  `docs.appaloft.com` production publishing is managed outside this repository's GitHub Actions.
 - [x] On 2026-04-22, custom resource runtime/container naming for Quick Deploy, CLI config-driven
   deploys, and Web runtime profile editing is merged on `origin/main`, and the current preview
   runtime-name template variables on `main` are `{preview_id}` and `{pr_number}`.

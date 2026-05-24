@@ -233,12 +233,12 @@ Recovery requirements:
   active leases and may use a shorter incomplete-lock stale window before stale-only recovery;
 - out-of-band remote-state diagnostics and stale recovery must run without acquiring the same
   state-root mutation lock they are diagnosing;
-- repository-owned docs production maintenance uses the `Remote State Maintenance` workflow, which
-  shares the docs production remote-state concurrency group, runs `inspect` or stale-only
-  `recover-stale`, and reports safe lock metadata in the GitHub step summary. Preview workflows use
-  surface-specific GitHub concurrency groups so docs and console previews required by the same PR do
-  not cancel each other, while SSH remote-state locks still coordinate shared state mutation;
-- repository-owned docs production/preview deploys may run a narrow SSH runtime-capacity preflight
+- repository-owned preview maintenance uses the `Remote State Maintenance` workflow, which
+  serializes manual maintenance runs, runs `inspect` or stale-only `recover-stale`, and reports safe
+  lock metadata in the GitHub step summary. Preview workflows use one shared GitHub concurrency
+  group so remote Docker work stays serialized, while SSH remote-state locks still coordinate
+  shared state mutation;
+- repository-owned console preview deploys may run a narrow SSH runtime-capacity preflight
   before state-root locking to remove stale attempt-scoped `ssh-deployments/dep_*` staging
   directories when previous failed uploads exhausted the remote runtime filesystem;
 - releasing a lock must be owner-aware so an older workflow cannot delete a newer lock after
