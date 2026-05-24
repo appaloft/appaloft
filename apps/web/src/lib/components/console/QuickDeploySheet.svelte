@@ -4,6 +4,8 @@
   import { page } from "$app/state";
   import {
     CheckCircle2,
+    ExternalLink,
+    Eye,
     FolderOpen,
     GitFork,
     LoaderCircle,
@@ -48,6 +50,8 @@
   } from "@appaloft/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+  import BlueprintCatalogSelector from "$lib/components/console/BlueprintCatalogSelector.svelte";
+  import BlueprintProductIcon from "$lib/components/console/BlueprintProductIcon.svelte";
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
@@ -60,6 +64,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
+  import * as Dialog from "$lib/components/ui/dialog";
   import {
     endpointFromTemplate,
     readBlueprintCatalogExtensionMetadata,
@@ -111,6 +116,73 @@
   };
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
+  };
+  type BlueprintCatalogListing = {
+    slug: string;
+    title: string;
+    subtitle: string;
+    category: string;
+    featured: boolean;
+    websiteUrl?: string;
+    documentationUrl?: string;
+    icon?: {
+      label?: string;
+      tone?: string;
+      url?: string;
+      alt?: string;
+    };
+    publisher: {
+      name: string;
+      verified: boolean;
+    };
+    blueprint: {
+      id: string;
+      version: string;
+      summary: string;
+      tags: readonly string[];
+    };
+    overview?: {
+      highlights?: readonly string[];
+      useCases?: readonly string[];
+    };
+    requirementsSummary?: {
+      components: number;
+      dependencies: readonly string[];
+      ports: readonly string[];
+    };
+  };
+  type BlueprintDetailResponse = {
+    listing: BlueprintCatalogListing;
+    manifest: {
+      summary: string;
+      description?: string;
+      parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
+      secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
+      resources: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+      components: readonly {
+        id: string;
+        name: string;
+        kind: string;
+        runtime: {
+          strategy: string;
+          image?: string;
+          buildCommand?: string;
+          startCommand?: string;
+          outputDirectory?: string;
+        };
+        ports: readonly { name: string; containerPort: number; protocol: string; public?: boolean }[];
+        routes: readonly { port: string; pathPrefix: string }[];
+        variables: readonly { key: string; value: string; description?: string }[];
+        usesSecrets: readonly string[];
+        usesResources: readonly string[];
+      }[];
+    };
+    install: {
+      profiles: readonly string[];
+      defaultProfile: string;
+      parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
+      secrets: readonly { key: string; label: string; required?: boolean }[];
+    };
   };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
@@ -412,6 +484,10 @@
   );
   let selectedBlueprintSlug = $state(browser ? (page.url.searchParams.get("blueprintSlug") ?? "") : "");
   let selectedBlueprintTitle = $state(browser ? (page.url.searchParams.get("blueprintTitle") ?? "") : "");
+  let blueprintSelectorDialogOpen = $state(false);
+  let blueprintDetailDialogOpen = $state(false);
+  let blueprintDetailSlug = $state("");
+  let blueprintDetailTitle = $state("");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
   let deployFeedback = $state<{
@@ -524,6 +600,37 @@
     ) ??
       quickDeploySourceExtensions[0] ??
       null,
+  );
+  const selectedBlueprintDetailEndpointValue = $derived.by(() => {
+    const slug = blueprintDetailSlug.trim() || selectedBlueprintSlug.trim();
+    const metadata = readBlueprintCatalogExtensionMetadata(selectedBlueprintSourceExtension);
+    if (!slug || !metadata) {
+      return "";
+    }
+
+    if (metadata.detailEndpointTemplate) {
+      return endpointFromTemplate(metadata.detailEndpointTemplate, slug);
+    }
+
+    return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
+  });
+  const selectedBlueprintDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["blueprint-catalog-detail", selectedBlueprintDetailEndpointValue],
+      queryFn: () => request<BlueprintDetailResponse>(selectedBlueprintDetailEndpointValue),
+      enabled:
+        browser &&
+        enabled &&
+        blueprintDetailDialogOpen &&
+        Boolean(selectedBlueprintDetailEndpointValue),
+      staleTime: 30_000,
+    }),
+  );
+  const selectedBlueprintDetail = $derived(selectedBlueprintDetailQuery.data ?? null);
+  const selectedBlueprintListing = $derived(selectedBlueprintDetail?.listing ?? null);
+  const selectedBlueprintManifest = $derived(selectedBlueprintDetail?.manifest ?? null);
+  const selectedBlueprintVariables = $derived(
+    selectedBlueprintManifest?.components.flatMap((component) => component.variables) ?? [],
   );
   const sshCredentials = $derived(
     (sshCredentialsQuery.data?.items ?? []) as SshCredentialSummary[],
@@ -765,7 +872,7 @@
         ...(selectedBlueprintSlug.trim()
           ? [
               {
-                label: "Blueprint",
+                label: $t(i18nKeys.console.quickDeploy.sourceBlueprint),
                 value: selectedBlueprintSlug.trim(),
                 mono: true,
               },
@@ -1370,6 +1477,58 @@
     }
 
     return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}/install-plan`;
+  }
+
+  function openBlueprintSelectorDialog(): void {
+    if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
+      selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension.key;
+    }
+    blueprintSelectorDialogOpen = true;
+  }
+
+  function openSelectedBlueprintDetailDialog(): void {
+    if (!selectedBlueprintSlug.trim()) {
+      openBlueprintSelectorDialog();
+      return;
+    }
+    blueprintDetailSlug = selectedBlueprintSlug.trim();
+    blueprintDetailTitle = selectedBlueprintTitle.trim();
+    blueprintDetailDialogOpen = true;
+  }
+
+  function openBlueprintListingDetail(item: BlueprintCatalogListing): void {
+    blueprintDetailSlug = item.slug;
+    blueprintDetailTitle = item.title;
+    blueprintDetailDialogOpen = true;
+  }
+
+  function selectBlueprintSourceExtension(extension: SystemPluginWebExtension): void {
+    const previousKey = selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey;
+    selectedBlueprintSourceExtensionKey = extension.key;
+    if (selectedBlueprintSlug.trim() && previousKey && previousKey !== extension.key) {
+      selectedBlueprintSlug = "";
+      selectedBlueprintTitle = "";
+    }
+  }
+
+  function applyBlueprintListing(item: BlueprintCatalogListing): void {
+    selectedBlueprintSlug = item.slug;
+    selectedBlueprintTitle = item.title;
+    if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
+      selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension.key;
+    }
+    if (projectMode === "new" && !projectName.trim()) {
+      projectName = item.title;
+    }
+    blueprintSelectorDialogOpen = false;
+  }
+
+  function applyVisibleBlueprintDetail(): void {
+    if (!selectedBlueprintListing) {
+      return;
+    }
+    applyBlueprintListing(selectedBlueprintListing);
+    blueprintDetailDialogOpen = false;
   }
 
   function buildDeployStateUrl(): URL {
@@ -2638,50 +2797,84 @@
                   </div>
                 {:else if quickDeploySourceExtensions.length > 0}
                   {#if selectedBlueprintSlug.trim()}
-                    <div class="console-subtle-panel flex items-center justify-between gap-3 px-3 py-3">
+                    <div class="console-subtle-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div class="flex min-w-0 items-center gap-3">
+                        <Package class="size-4 shrink-0 text-muted-foreground" />
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-medium">
+                            {selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()}
+                          </p>
+                          <p class="truncate font-mono text-xs text-muted-foreground">
+                            {selectedBlueprintSlug.trim()}
+                          </p>
+                        </div>
+                      </div>
+                      <div class="flex shrink-0 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onclick={openSelectedBlueprintDetailDialog}
+                        >
+                          <Eye class="size-4" />
+                          查看详情
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onclick={openBlueprintSelectorDialog}
+                        >
+                          更换
+                        </Button>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="console-subtle-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div class="min-w-0">
-                        <p class="truncate text-sm font-medium">
-                          {selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()}
-                        </p>
-                        <p class="truncate font-mono text-xs text-muted-foreground">
-                          {selectedBlueprintSlug.trim()}
+                        <p class="text-sm font-medium">尚未选择蓝图</p>
+                        <p class="text-xs leading-5 text-muted-foreground">
+                          打开蓝图市场，在弹窗里查看应用、依赖资源和入口后再选择。
                         </p>
                       </div>
-                      <Button href={selectedBlueprintDetailHref()} size="sm" variant="outline">
-                        查看
+                      <Button type="button" size="sm" onclick={openBlueprintSelectorDialog}>
+                        <Package class="size-4" />
+                        {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
                       </Button>
                     </div>
                   {/if}
-                  <div class="grid gap-2 sm:grid-cols-2">
-                    {#each quickDeploySourceExtensions as extension (extension.key)}
-                      <Button
-                        type="button"
-                        variant={selectedBlueprintSourceExtension?.key === extension.key ? "selected" : "outline"}
-                        class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
-                        onclick={() => {
-                          selectedBlueprintSourceExtensionKey = extension.key;
-                          selectedBlueprintSlug = "";
-                          selectedBlueprintTitle = "";
-                        }}
-                      >
-                        <Package class="size-4 shrink-0" />
-                        <span class="min-w-0">
-                          <span class="block truncate text-sm font-medium">{extension.title}</span>
-                          <span class="block text-xs font-normal text-muted-foreground">
-                            {extension.description ?? extension.pluginDisplayName}
-                          </span>
-                        </span>
-                      </Button>
-                    {/each}
-                  </div>
-                  <Button
-                    href={sourceExtensionHref(selectedBlueprintSourceExtension)}
-                    class="w-full"
-                    disabled={!selectedBlueprintSourceExtension}
-                  >
-                    <Package class="size-4" />
-                    {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
-                  </Button>
+                  {#if quickDeploySourceExtensions.length > 1}
+                    <div class="space-y-2">
+                      <p class="text-xs font-medium text-muted-foreground">蓝图目录来源</p>
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        {#each quickDeploySourceExtensions as extension (extension.key)}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                            onclick={() => selectBlueprintSourceExtension(extension)}
+                          >
+                            <Package class="size-4 shrink-0" />
+                            <span class="min-w-0">
+                              <span class="flex items-center gap-2 text-sm font-medium">
+                                <span class="truncate">{extension.title}</span>
+                                {#if selectedBlueprintSourceExtension?.key === extension.key}
+                                  <Badge variant="outline">当前</Badge>
+                                {/if}
+                              </span>
+                              <span class="block text-xs font-normal text-muted-foreground">
+                                {extension.description ?? extension.pluginDisplayName}
+                              </span>
+                            </span>
+                          </Button>
+                        {/each}
+                      </div>
+                    </div>
+                  {:else if selectedBlueprintSourceExtension}
+                    <p class="text-xs text-muted-foreground">
+                      蓝图目录来源：{selectedBlueprintSourceExtension.title}
+                    </p>
+                  {/if}
                 {:else}
                   <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
                     {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)}
@@ -3844,9 +4037,10 @@
             </Button>
             {#if activeStep === "source" && sourceKind === "blueprint" && !selectedBlueprintSlug.trim()}
               <Button
-                href={sourceExtensionHref(selectedBlueprintSourceExtension)}
+                type="button"
                 class="flex-1 sm:flex-none"
                 disabled={!selectedBlueprintSourceExtension}
+                onclick={openBlueprintSelectorDialog}
               >
                 {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
               </Button>
@@ -3877,6 +4071,17 @@
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
               </span>
+              {#if sourceKind === "blueprint" && selectedBlueprintSlug.trim()}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onclick={openSelectedBlueprintDetailDialog}
+                >
+                  <Eye class="size-4" />
+                  详情
+                </Button>
+              {/if}
             </div>
             <div class="space-y-2">
               {#each sourceDetailRows as row, index (`${row.label}-${index}`)}
@@ -4046,3 +4251,223 @@
     void goto(lastCreatedDeploymentHref());
   }}
 />
+
+<Dialog.Root bind:open={blueprintSelectorDialogOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
+    <Dialog.Header>
+      <Dialog.Title>选择蓝图</Dialog.Title>
+      <Dialog.Description>
+        从蓝图市场选择应用，选择后会回到当前快速部署流程。
+      </Dialog.Description>
+    </Dialog.Header>
+
+    <div class="px-5 pb-5">
+      <BlueprintCatalogSelector
+        surface="dialog"
+        selectedSlug={selectedBlueprintSlug}
+        actionLabel="选择蓝图"
+        onselect={applyBlueprintListing}
+        onview={openBlueprintListingDetail}
+      />
+    </div>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={blueprintDetailDialogOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
+    <Dialog.Header>
+      <Dialog.Title>{(selectedBlueprintListing?.title ?? blueprintDetailTitle) || "蓝图详情"}</Dialog.Title>
+      <Dialog.Description>
+        查看应用介绍、官网、依赖资源、入口和配置项。
+      </Dialog.Description>
+    </Dialog.Header>
+
+    <div class="px-5 pb-5">
+      {#if selectedBlueprintDetailQuery.isPending}
+        <div class="grid gap-3 md:grid-cols-2">
+          <Skeleton class="h-40 w-full" />
+          <Skeleton class="h-40 w-full" />
+        </div>
+      {:else if selectedBlueprintDetailQuery.isError || !selectedBlueprintDetail || !selectedBlueprintListing || !selectedBlueprintManifest}
+        <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
+          无法加载这个蓝图详情。
+        </div>
+      {:else}
+        <div class="space-y-5">
+          <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex min-w-0 items-start gap-4">
+              <BlueprintProductIcon
+                title={selectedBlueprintListing.title}
+                icon={selectedBlueprintListing.icon}
+                class="size-14"
+                imageClass="size-8"
+              />
+              <div class="min-w-0 space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <Badge variant="outline">{selectedBlueprintListing.category}</Badge>
+                  <Badge variant="outline">
+                    {selectedBlueprintListing.featured ? "Featured" : "Official"}
+                  </Badge>
+                  <Badge variant="outline">{selectedBlueprintListing.publisher.name}</Badge>
+                </div>
+                <div>
+                  <h3 class="text-xl font-semibold">{selectedBlueprintListing.title}</h3>
+                  <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                    {selectedBlueprintListing.subtitle}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              {#if selectedBlueprintListing.websiteUrl}
+                <Button
+                  href={selectedBlueprintListing.websiteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  size="sm"
+                  variant="outline"
+                >
+                  官网
+                  <ExternalLink class="size-4" />
+                </Button>
+              {/if}
+              {#if selectedBlueprintListing.documentationUrl}
+                <Button
+                  href={selectedBlueprintListing.documentationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  size="sm"
+                  variant="outline"
+                >
+                  文档
+                  <ExternalLink class="size-4" />
+                </Button>
+              {/if}
+            </div>
+          </section>
+
+          <section class="grid gap-3 text-sm md:grid-cols-3">
+            <div class="console-subtle-panel px-3 py-2">
+              <p class="text-xs text-muted-foreground">运行单元</p>
+              <p class="mt-1 font-medium">{selectedBlueprintManifest.components.length} component</p>
+            </div>
+            <div class="console-subtle-panel px-3 py-2">
+              <p class="text-xs text-muted-foreground">依赖资源</p>
+              <p class="mt-1 truncate font-medium">
+                {selectedBlueprintManifest.resources.map((resource) => resource.kind).join(" / ") || "无"}
+              </p>
+            </div>
+            <div class="console-subtle-panel px-3 py-2">
+              <p class="text-xs text-muted-foreground">公开入口</p>
+              <p class="mt-1 truncate font-medium">
+                {selectedBlueprintManifest.components
+                  .flatMap((component) =>
+                    component.ports.map((port) => `${port.containerPort}/${port.protocol}`),
+                  )
+                  .join(" / ") || "无"}
+              </p>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <div>
+              <h3 class="text-base font-semibold">介绍</h3>
+              <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                {selectedBlueprintManifest.description ??
+                  selectedBlueprintListing.blueprint.summary ??
+                  selectedBlueprintListing.subtitle}
+              </p>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="space-y-2">
+                <p class="text-xs font-medium uppercase text-muted-foreground">适合场景</p>
+                <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                  {#each selectedBlueprintListing.overview?.useCases ?? ["快速部署官方应用", "先审阅拓扑和依赖资源"] as useCase (useCase)}
+                    <li class="flex gap-2">
+                      <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                      <span>{useCase}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+              <div class="space-y-2">
+                <p class="text-xs font-medium uppercase text-muted-foreground">Appaloft 概念</p>
+                <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                  {#each selectedBlueprintListing.overview?.highlights ?? [
+                    `${selectedBlueprintManifest.components.length} 个应用运行单元`,
+                    selectedBlueprintManifest.resources.length > 0
+                      ? `${selectedBlueprintManifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
+                      : "无托管依赖资源",
+                    "生成项目、环境、资源、网络和部署 dry-run 计划",
+                  ] as highlight (highlight)}
+                    <li class="flex gap-2">
+                      <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                      <span>{highlight}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid gap-3 md:grid-cols-2">
+            <div class="space-y-2">
+              <p class="text-xs font-medium uppercase text-muted-foreground">组件</p>
+              {#each selectedBlueprintManifest.components as component (component.id)}
+                <div class="console-subtle-panel px-3 py-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium">{component.name}</span>
+                    <Badge variant="outline">{component.runtime.strategy}</Badge>
+                  </div>
+                  <p class="mt-1 truncate text-xs text-muted-foreground">
+                    {component.runtime.image ??
+                      component.runtime.startCommand ??
+                      component.runtime.outputDirectory ??
+                      component.kind}
+                  </p>
+                </div>
+              {/each}
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs font-medium uppercase text-muted-foreground">配置</p>
+              <div class="console-subtle-panel px-3 py-2 text-sm">
+                <p class="text-muted-foreground">参数</p>
+                <p class="mt-1 font-medium">
+                  {selectedBlueprintDetail.install.parameters.map((parameter) => parameter.key).join(", ") || "无"}
+                </p>
+              </div>
+              <div class="console-subtle-panel px-3 py-2 text-sm">
+                <p class="text-muted-foreground">密钥占位</p>
+                <p class="mt-1 font-medium">
+                  {selectedBlueprintDetail.install.secrets.map((secret) => secret.key).join(", ") || "无"}
+                </p>
+              </div>
+              <div class="console-subtle-panel px-3 py-2 text-sm">
+                <p class="text-muted-foreground">环境变量</p>
+                <p class="mt-1 font-medium">
+                  {selectedBlueprintVariables.map((variable) => variable.key).join(", ") || "无默认环境变量"}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <Dialog.Footer>
+            <Button
+              type="button"
+              variant="outline"
+              onclick={() => {
+                blueprintDetailDialogOpen = false;
+                blueprintSelectorDialogOpen = true;
+              }}
+            >
+              更换蓝图
+            </Button>
+            <Button type="button" onclick={applyVisibleBlueprintDetail}>
+              {selectedBlueprintSlug === selectedBlueprintListing.slug ? "继续使用" : "选择这个蓝图"}
+            </Button>
+          </Dialog.Footer>
+        </div>
+      {/if}
+    </div>
+  </Dialog.Content>
+</Dialog.Root>
