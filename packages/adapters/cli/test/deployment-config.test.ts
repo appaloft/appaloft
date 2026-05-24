@@ -97,6 +97,7 @@ async function createPreviewDeployCliHarness(
     dependencyResources?: unknown[];
     dependencyBindings?: unknown[];
     storageVolumes?: unknown[];
+    scheduledTasks?: unknown[];
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -109,6 +110,7 @@ async function createPreviewDeployCliHarness(
   const createdLinks: unknown[] = [];
   const dependencyProvenanceWrites: unknown[] = [];
   const storageProvenanceWrites: unknown[] = [];
+  const scheduledTaskProvenanceWrites: unknown[] = [];
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       operations.push(command.constructor.name);
@@ -148,6 +150,42 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "stv_uploads" } as T);
         case "AttachResourceStorageCommand":
           return ok({ id: "rsa_uploads" } as T);
+        case "CreateScheduledTaskCommand": {
+          const taskCommand = command as unknown as Record<string, unknown>;
+          return ok({
+            schemaVersion: "scheduled-tasks.command/v1",
+            task: {
+              taskId: "tsk_nightly_sync",
+              resourceId: taskCommand.resourceId,
+              schedule: taskCommand.schedule,
+              timezone: taskCommand.timezone,
+              commandIntent: taskCommand.commandIntent,
+              timeoutSeconds: taskCommand.timeoutSeconds,
+              retryLimit: taskCommand.retryLimit,
+              concurrencyPolicy: taskCommand.concurrencyPolicy,
+              status: taskCommand.status,
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
+        case "ConfigureScheduledTaskCommand": {
+          const taskCommand = command as unknown as Record<string, unknown>;
+          return ok({
+            schemaVersion: "scheduled-tasks.command/v1",
+            task: {
+              taskId: taskCommand.taskId,
+              resourceId: taskCommand.resourceId,
+              schedule: taskCommand.schedule,
+              timezone: taskCommand.timezone,
+              commandIntent: taskCommand.commandIntent,
+              timeoutSeconds: taskCommand.timeoutSeconds,
+              retryLimit: taskCommand.retryLimit,
+              concurrencyPolicy: taskCommand.concurrencyPolicy,
+              status: taskCommand.status,
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
         case "CreateDeploymentCommand":
           return ok({ id: "dep_1" } as T);
         default:
@@ -202,6 +240,9 @@ async function createPreviewDeployCliHarness(
       }
       if (query.constructor.name === "ListStorageVolumesQuery") {
         return ok({ items: input.storageVolumes ?? [] } as T);
+      }
+      if (query.constructor.name === "ListScheduledTasksQuery") {
+        return ok({ items: input.scheduledTasks ?? [] } as T);
       }
       return ok({ items: [] } as T);
     },
@@ -268,6 +309,16 @@ async function createPreviewDeployCliHarness(
           storageProvenance: sourceLinkInput.storageProvenance,
         });
       },
+      recordScheduledTaskProvenance: async (sourceLinkInput) => {
+        sourceLinkCalls.push(`recordScheduledTaskProvenance:${sourceLinkInput.sourceFingerprint}`);
+        scheduledTaskProvenanceWrites.push(sourceLinkInput);
+        return ok({
+          sourceFingerprint: sourceLinkInput.sourceFingerprint,
+          updatedAt: sourceLinkInput.updatedAt,
+          ...sourceLinkInput.target,
+          scheduledTaskProvenance: sourceLinkInput.scheduledTaskProvenance,
+        });
+      },
     },
     ...(input.withRouteStore
       ? {
@@ -310,6 +361,7 @@ async function createPreviewDeployCliHarness(
     operations,
     program,
     queries,
+    scheduledTaskProvenanceWrites,
     sourceLinkCalls,
     storageProvenanceWrites,
   };
@@ -3858,6 +3910,498 @@ describe("CLI deployment config entry workflow", () => {
         expectedStorageVolumeId: "stv_expected_uploads",
       },
     });
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-004][CONFIG-FILE-SCHED-TASK-009] config scheduled tasks create and record provenance before deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "scheduledTasks:",
+        "  nightly_sync:",
+        '    schedule: "0 3 * * *"',
+        "    command: bun run sync",
+        "    timeoutSeconds: 600",
+        "    retryLimit: 2",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_scheduled_task_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/scheduled-task",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-91",
+              "--server-host",
+              "203.0.113.91",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ListScheduledTasksQuery");
+    expect(harness.operations.indexOf("CreateScheduledTaskCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect(deployment).not.toHaveProperty("taskId");
+    expect(deployment).not.toHaveProperty("schedule");
+    expect(harness.scheduledTaskProvenanceWrites).toHaveLength(1);
+    expect(harness.scheduledTaskProvenanceWrites[0]).toMatchObject({
+      target: {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      },
+      scheduledTaskProvenance: {
+        source: "repository-config",
+        entries: [
+          {
+            key: "nightly_sync",
+            source: "repository-config",
+            lifecycle: "ephemeral",
+            resourceId: "res_1",
+            taskId: "tsk_nightly_sync",
+          },
+        ],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-005] config scheduled tasks configure provenance-owned drift", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A912";
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      sourceLinkStore: {
+        read: async () =>
+          ok({
+            sourceFingerprint,
+            projectId: "proj_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            serverId: "srv_existing",
+            updatedAt: "2026-05-24T00:00:00.000Z",
+            scheduledTaskProvenance: {
+              schemaVersion: "source-link.scheduled-task-provenance/v1" as const,
+              source: "repository-config" as const,
+              sourceFingerprint,
+              entries: [
+                {
+                  key: "nightly_sync",
+                  source: "repository-config" as const,
+                  lifecycle: "persistent" as const,
+                  resourceId: "res_existing",
+                  taskId: "tsk_nightly_sync",
+                  commandFingerprint: "old",
+                  createdAt: "2026-05-24T00:00:00.000Z",
+                },
+              ],
+            },
+          }),
+        requireSameTargetOrMissing: async () => ok(null),
+        createIfMissing: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+          }),
+        recordScheduledTaskProvenance: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+            scheduledTaskProvenance: input.scheduledTaskProvenance,
+          }),
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        if (message.constructor.name === "ConfigureScheduledTaskCommand") {
+          return ok({
+            schemaVersion: "scheduled-tasks.command/v1",
+            task: {
+              taskId: "tsk_nightly_sync",
+              resourceId: "res_existing",
+              schedule: "0 3 * * *",
+              timezone: "UTC",
+              commandIntent: "bun run sync",
+              timeoutSeconds: 600,
+              retryLimit: 2,
+              concurrencyPolicy: "forbid",
+              status: "enabled",
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListScheduledTasksQuery") {
+          return ok({
+            items: [
+              {
+                taskId: "tsk_nightly_sync",
+                resourceId: "res_existing",
+                schedule: "0 2 * * *",
+                timezone: "UTC",
+                commandIntent: "bun run old-sync",
+                timeoutSeconds: 300,
+                retryLimit: 0,
+                concurrencyPolicy: "forbid",
+                status: "enabled",
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          sourceFingerprint,
+          scheduledTaskGraph: [
+            {
+              key: "nightly_sync",
+              schedule: "0 3 * * *",
+              timezone: "UTC",
+              command: "bun run sync",
+              timeoutSeconds: 600,
+              retryLimit: 2,
+              concurrencyPolicy: "forbid",
+              status: "enabled",
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).toContain("ConfigureScheduledTaskCommand");
+    expect(commands).not.toContain("CreateScheduledTaskCommand");
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-006] config scheduled tasks adopt exact existing tasks", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const provenanceWrites: unknown[] = [];
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A913";
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      sourceLinkStore: {
+        read: async () => ok(null),
+        requireSameTargetOrMissing: async () => ok(null),
+        createIfMissing: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+          }),
+        recordScheduledTaskProvenance: async (input) => {
+          provenanceWrites.push(input);
+          return ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+            scheduledTaskProvenance: input.scheduledTaskProvenance,
+          });
+        },
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListScheduledTasksQuery") {
+          return ok({
+            items: [
+              {
+                taskId: "tsk_exact",
+                resourceId: "res_existing",
+                schedule: "@hourly",
+                timezone: "UTC",
+                commandIntent: "bun run sync",
+                timeoutSeconds: 3600,
+                retryLimit: 0,
+                concurrencyPolicy: "forbid",
+                status: "enabled",
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          sourceFingerprint,
+          scheduledTaskGraph: [
+            {
+              key: "hourly_sync",
+              schedule: "@hourly",
+              timezone: "UTC",
+              command: "bun run sync",
+              timeoutSeconds: 3600,
+              retryLimit: 0,
+              concurrencyPolicy: "forbid",
+              status: "enabled",
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("CreateScheduledTaskCommand");
+    expect(commands).not.toContain("ConfigureScheduledTaskCommand");
+    expect(provenanceWrites[0]).toMatchObject({
+      scheduledTaskProvenance: {
+        entries: [
+          {
+            key: "hourly_sync",
+            taskId: "tsk_exact",
+            lifecycle: "persistent",
+          },
+        ],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-007] config scheduled tasks fail on provenance conflicts", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A914";
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      sourceLinkStore: {
+        read: async () =>
+          ok({
+            sourceFingerprint,
+            projectId: "proj_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            serverId: "srv_existing",
+            updatedAt: "2026-05-24T00:00:00.000Z",
+            scheduledTaskProvenance: {
+              schemaVersion: "source-link.scheduled-task-provenance/v1" as const,
+              source: "repository-config" as const,
+              sourceFingerprint,
+              entries: [
+                {
+                  key: "nightly_sync",
+                  source: "repository-config" as const,
+                  lifecycle: "ephemeral" as const,
+                  resourceId: "res_other",
+                  taskId: "tsk_other",
+                  commandFingerprint: "old",
+                  createdAt: "2026-05-24T00:00:00.000Z",
+                },
+              ],
+            },
+          }),
+        requireSameTargetOrMissing: async () => ok(null),
+        createIfMissing: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+          }),
+        recordScheduledTaskProvenance: async (input) =>
+          ok({
+            sourceFingerprint: input.sourceFingerprint,
+            updatedAt: input.updatedAt,
+            ...input.target,
+            scheduledTaskProvenance: input.scheduledTaskProvenance,
+          }),
+      },
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>() => ok({ items: [] } as T),
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            sourceFingerprint,
+            scheduledTaskGraph: [
+              {
+                key: "nightly_sync",
+                schedule: "0 3 * * *",
+                timezone: "UTC",
+                command: "bun run sync",
+                timeoutSeconds: 600,
+                retryLimit: 2,
+                concurrencyPolicy: "forbid",
+                status: "enabled",
+                previewLifecycle: "ephemeral",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected scheduled task provenance conflict");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_scheduled_task_conflict",
+      details: {
+        phase: "config-scheduled-task-resolution",
+        resourceId: "res_existing",
+        taskKey: "nightly_sync",
+        existingTaskId: "tsk_other",
+        existingResourceId: "res_other",
+      },
+    });
+    expect(commands).toEqual([]);
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-008] config scheduled tasks fail before mutation when provenance storage is unavailable", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>() => ok({ items: [] } as T),
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A915",
+            scheduledTaskGraph: [
+              {
+                key: "nightly_sync",
+                schedule: "0 3 * * *",
+                timezone: "UTC",
+                command: "bun run sync",
+                timeoutSeconds: 600,
+                retryLimit: 2,
+                concurrencyPolicy: "forbid",
+                status: "enabled",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected missing scheduled task provenance storage to fail");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_scheduled_task_provenance_unavailable",
+      details: {
+        phase: "config-scheduled-task-resolution",
+        resourceId: "res_existing",
+        taskKey: "nightly_sync",
+      },
+    });
+    expect(commands).toEqual([]);
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {

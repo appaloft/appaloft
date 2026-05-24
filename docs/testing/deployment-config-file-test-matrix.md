@@ -164,6 +164,20 @@ This matrix inherits:
 | CONFIG-FILE-STORAGE-008 | integration | Preview ephemeral unprovenanced storage conflict | PR preview config storage declares `preview.lifecycle = ephemeral` and a matching managed storage volume or mount path exists without matching source-link provenance | Workflow refuses to adopt the storage for cleanup ownership | `repository_config_storage_volume_conflict` or `repository_config_storage_attachment_conflict`, phase `config-storage-resolution` | `resources.show` -> `storage-volumes.list`; no create, attach, or `deployments.create` |
 | CONFIG-FILE-STORAGE-009 | integration | Preview ephemeral storage provenance unavailable | PR preview config storage declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link storage provenance | Workflow fails before storage mutation | `repository_config_storage_provenance_unavailable`, phase `config-storage-resolution` | No create, attach, or `deployments.create` |
 
+## Scheduled Task Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-SCHED-TASK-001 | parser/schema | Managed scheduled task accepted | Config declares `scheduledTasks.nightly_sync.schedule`, `command`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration, defaults timezone, timeout, retry, concurrency, and status, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-SCHED-TASK-002 | parser/schema | Unknown scheduled task fields rejected | Config declares an unsupported field under `scheduledTasks.nightly_sync` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-SCHED-TASK-003 | parser/schema | Scheduled task identity and secret material rejected | Config declares provider account, tenant, credential, task id, raw token, private key, or credential-bearing connection string under `scheduledTasks` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity`, `config-secret-validation`, or `config-schema` | No write commands |
+| CONFIG-FILE-SCHED-TASK-004 | integration | Config scheduled task creates before deployment | Selected Resource has no matching provenance-owned scheduled task | Config deploy handles scheduled tasks | Scheduled tasks are listed, a task is created, provenance is recorded, and deployment admission remains ids-only | None | `scheduled-tasks.list` -> `scheduled-tasks.create` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-005 | integration | Config scheduled task configure idempotency | Source-link provenance maps the YAML key to an existing task whose schedule or command differs | Config deploy runs again | Existing task is configured and no duplicate create command is dispatched | None | `scheduled-tasks.list` -> `scheduled-tasks.configure` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-006 | integration | Exact task adoption | A same-Resource task exactly matches the YAML declaration but no provenance entry exists yet | Config deploy handles scheduled tasks | The workflow records provenance for the exact match and does not create a duplicate | None | `scheduled-tasks.list` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-007 | integration | Provenance conflict | Source-link scheduled task provenance points at a task for another Resource or a conflicting source fingerprint | Config deploy handles scheduled tasks | Workflow fails before deployment with safe details | `repository_config_scheduled_task_conflict`, phase `config-scheduled-task-resolution` | `scheduled-tasks.list`; no create, configure, or `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-008 | integration | Scheduled task provenance unavailable | Config declares scheduled tasks but the selected entry workflow cannot persist source-link scheduled task provenance | Workflow fails before scheduled task mutation | `repository_config_scheduled_task_provenance_unavailable`, phase `config-scheduled-task-resolution` | No create, configure, or `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-009 | integration | Preview ephemeral scheduled task cleanup provenance | PR preview config scheduled task declares `preview.lifecycle = ephemeral` | Config deploy creates or reuses the preview task | Source link records safe repository-config provenance for task key, resource id, task id, lifecycle, and source fingerprint | None | Scheduled task operations -> source-link provenance write -> `deployments.create` |
+
 ## Control-Plane Policy Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -276,14 +290,16 @@ Current implemented coverage:
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
   `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
-  `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003` are covered in
+  `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
+  `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
-  `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007` are covered in
+  `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
+  `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,

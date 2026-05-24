@@ -22,6 +22,7 @@ import {
   type ServerAppliedRouteDesiredStateStore,
   type SourceLinkDependencyProvenance,
   type SourceLinkRecord,
+  type SourceLinkScheduledTaskProvenance,
   type SourceLinkStorageProvenance,
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
@@ -48,6 +49,12 @@ export interface CliSourceLinkStore {
     sourceFingerprint: string;
     target: SourceLinkTarget;
     storageProvenance: SourceLinkStorageProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordScheduledTaskProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    scheduledTaskProvenance: SourceLinkScheduledTaskProvenance;
     updatedAt: string;
   }): Promise<Result<SourceLinkRecord>>;
 }

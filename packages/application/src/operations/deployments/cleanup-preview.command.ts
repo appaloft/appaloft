@@ -20,6 +20,9 @@ export class CleanupPreviewCommand extends Command<{
   removedSourceLink: boolean;
   removedDependencyBindings?: number;
   deletedDependencyResources?: number;
+  removedStorageAttachments?: number;
+  deletedStorageVolumes?: number;
+  deletedScheduledTasks?: number;
   projectId?: string;
   environmentId?: string;
   resourceId?: string;

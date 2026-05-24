@@ -113,6 +113,11 @@ Current status:
   `self-hosting.organization-team-management` help topic for HTTP/API routes, CLI commands, session
   input, safe outputs, owner-retention recovery, current organization switching, and apps/web
   `/organization` member/deploy-token management.
+  Repository config docs now cover user-facing application graphs for `dependencies`, `storage`,
+  and `scheduledTasks`, including ids-only deployment admission, preview provenance cleanup, and
+  the no-secret/no-provider-handle boundary under
+  `environments/reference/config-file#environment-config-file-dependencies`,
+  `#environment-config-file-storage`, and `#environment-config-file-scheduled-tasks`.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,

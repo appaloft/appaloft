@@ -423,12 +423,30 @@ export interface SourceLinkStorageProvenance {
   entries: SourceLinkStorageProvenanceEntry[];
 }
 
+export interface SourceLinkScheduledTaskProvenanceEntry {
+  key: string;
+  source: "repository-config";
+  lifecycle: "persistent" | "ephemeral";
+  resourceId: string;
+  taskId: string;
+  commandFingerprint: string;
+  createdAt: string;
+}
+
+export interface SourceLinkScheduledTaskProvenance {
+  schemaVersion: "source-link.scheduled-task-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkScheduledTaskProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
   dependencyProvenance?: SourceLinkDependencyProvenance;
   storageProvenance?: SourceLinkStorageProvenance;
+  scheduledTaskProvenance?: SourceLinkScheduledTaskProvenance;
 }
 
 export interface SourceLinkSelectionSpecVisitor<TResult> {

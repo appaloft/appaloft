@@ -16,6 +16,7 @@ GitHub pull_request event
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
   -> repository config dependency graph provisions/reuses and binds application dependencies
   -> repository config storage graph creates/reuses and attaches managed storage
+  -> repository config scheduled task graph creates/reuses or configures Resource scheduled tasks
   -> existing environment/resource/deployment commands create or update the preview target
   -> deployments.create accepts the deployment attempt with ids-only input
   -> default or custom preview access route is realized through the edge proxy when available

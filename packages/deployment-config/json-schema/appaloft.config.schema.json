@@ -546,6 +546,76 @@
         "description": "User-facing application storage declaration."
       }
     },
+    "scheduledTasks": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "schedule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Safe scheduled task schedule expression."
+          },
+          "timezone": {
+            "default": "UTC",
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Single-line scheduled task command intent."
+          },
+          "timeoutSeconds": {
+            "default": 3600,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          },
+          "retryLimit": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "concurrencyPolicy": {
+            "default": "forbid",
+            "type": "string",
+            "enum": ["forbid"]
+          },
+          "status": {
+            "default": "enabled",
+            "type": "string",
+            "enum": ["enabled", "disabled"]
+          },
+          "preview": {
+            "type": "object",
+            "properties": {
+              "lifecycle": {
+                "type": "string",
+                "const": "ephemeral"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schedule",
+          "timezone",
+          "command",
+          "timeoutSeconds",
+          "retryLimit",
+          "concurrencyPolicy",
+          "status"
+        ],
+        "additionalProperties": false,
+        "description": "User-facing Resource scheduled task declaration."
+      }
+    },
     "env": {
       "type": "object",
       "propertyNames": {

@@ -6,8 +6,8 @@ For deployment work, use this Appaloft deploy protocol:
 2. Select the deployment mode before asking for Appaloft ids.
 3. Select or create project, server, environment, and resource context only through Appaloft
    operations or trusted bootstrap context.
-4. Configure source, runtime, network, health, access, variables, dependencies, and storage on the
-   Resource profile.
+4. Configure source, runtime, network, health, access, variables, dependencies, storage, and
+   scheduled tasks on the Resource profile.
 5. Run plan/preview when useful.
 6. Create or clean up deployment through Appaloft.
 7. Observe deployment detail, logs, resource health, diagnostics, and recovery readiness.
@@ -99,9 +99,10 @@ If binding is missing, prompt for one safe action:
 - run one trusted bootstrap deploy with complete project/environment/resource/server context.
 
 Never put tokens, SSH keys, database URLs, provider account ids, organization ids, tenant ids, raw
-secret values, credentials, host bind source paths, or provider-native storage handles into
-`appaloft.yml`. Repository config may declare high-level application `dependencies` and `storage`,
-but deploy must reconcile them through existing operations before ids-only deployment admission.
+secret values, credentials, host bind source paths, provider-native storage handles, task ids, or
+provider-native scheduler handles into `appaloft.yml`. Repository config may declare high-level
+application `dependencies`, `storage`, and `scheduledTasks`, but deploy must reconcile them through
+existing operations before ids-only deployment admission.
 
 ## Entry Selection
 

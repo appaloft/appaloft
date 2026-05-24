@@ -5,6 +5,7 @@ import {
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
   CreateDependencyResourceProvisioningPlanCommand,
@@ -12,6 +13,7 @@ import {
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
+  CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
@@ -23,6 +25,7 @@ import {
   ListProjectsQuery,
   ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
+  ListScheduledTasksQuery,
   ListServersQuery,
   ListStorageVolumesQuery,
   type ManagedDependencyResourceKind,
@@ -38,6 +41,7 @@ import {
   type ResourceProfileConfigurationEntry,
   type ResourceSummary,
   resourceProfileFromResourceDetail,
+  type ScheduledTaskDefinitionSummary,
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
@@ -83,6 +87,8 @@ import {
   type SourceLinkDependencyProvenance,
   type SourceLinkDependencyProvenanceEntry,
   type SourceLinkRecord,
+  type SourceLinkScheduledTaskProvenance,
+  type SourceLinkScheduledTaskProvenanceEntry,
   type SourceLinkStorageProvenance,
   type SourceLinkStorageProvenanceEntry,
 } from "./deployment-remote-state.js";
@@ -129,6 +135,7 @@ export interface DeploymentPromptSeed {
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
   dependencyGraph?: DeploymentDependencySeed[];
   storageGraph?: DeploymentStorageSeed[];
+  scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
   profileDriftPreflight?: boolean;
 }
 
@@ -156,6 +163,17 @@ export interface DeploymentStorageSeed {
   source: "managed";
   mountPath: string;
   mountMode: "read-write" | "read-only";
+  previewLifecycle?: "ephemeral";
+}
+export interface DeploymentScheduledTaskSeed {
+  key: string;
+  schedule: string;
+  timezone: string;
+  command: string;
+  timeoutSeconds: number;
+  retryLimit: number;
+  concurrencyPolicy: "forbid";
+  status: "enabled" | "disabled";
   previewLifecycle?: "ephemeral";
 }
 export const deploymentEntryModes = ["static-site"] as const;
@@ -471,6 +489,22 @@ export function deploymentPromptSeedFromConfig(
           ...(storage.preview?.lifecycle ? { previewLifecycle: storage.preview.lifecycle } : {}),
         }) satisfies DeploymentStorageSeed,
     );
+  const scheduledTaskGraph = Object.entries(config.scheduledTasks ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, task]) =>
+        ({
+          key,
+          schedule: task.schedule,
+          timezone: task.timezone,
+          command: task.command,
+          timeoutSeconds: task.timeoutSeconds,
+          retryLimit: task.retryLimit,
+          concurrencyPolicy: task.concurrencyPolicy,
+          status: task.status,
+          ...(task.preview?.lifecycle ? { previewLifecycle: task.preview.lifecycle } : {}),
+        }) satisfies DeploymentScheduledTaskSeed,
+    );
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -508,6 +542,7 @@ export function deploymentPromptSeedFromConfig(
     ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
     ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
     ...(storageGraph.length > 0 ? { storageGraph } : {}),
+    ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
   };
 }
 
@@ -2206,6 +2241,309 @@ function ensureRepositoryConfigStorage(input: {
   });
 }
 
+function scheduledTaskCommandFingerprint(task: DeploymentScheduledTaskSeed): string {
+  return new Bun.CryptoHasher("sha256")
+    .update(
+      [
+        task.schedule,
+        task.timezone,
+        task.command,
+        String(task.timeoutSeconds),
+        String(task.retryLimit),
+        task.concurrencyPolicy,
+        task.status,
+      ].join("\0"),
+    )
+    .digest("hex");
+}
+
+function repositoryConfigScheduledTaskProvenanceError(input: {
+  task: DeploymentScheduledTaskSeed;
+  sourceFingerprint?: string;
+  resourceId: string;
+}): DomainError {
+  return {
+    code: "repository_config_scheduled_task_provenance_unavailable",
+    category: "user",
+    message: "Repository config scheduled task provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-scheduled-task-resolution",
+      resourceId: input.resourceId,
+      taskKey: input.task.key,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigScheduledTaskConflict(input: {
+  task: DeploymentScheduledTaskSeed;
+  resourceId: string;
+  sourceFingerprint: string;
+  existingTaskId?: string;
+  existingResourceId?: string;
+  provenanceSourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_scheduled_task_conflict",
+    category: "user",
+    message: "Repository config scheduled task provenance points at another context",
+    retryable: false,
+    details: {
+      phase: "config-scheduled-task-resolution",
+      resourceId: input.resourceId,
+      taskKey: input.task.key,
+      sourceFingerprint: input.sourceFingerprint,
+      ...(input.existingTaskId ? { existingTaskId: input.existingTaskId } : {}),
+      ...(input.existingResourceId ? { existingResourceId: input.existingResourceId } : {}),
+      ...(input.provenanceSourceFingerprint
+        ? { provenanceSourceFingerprint: input.provenanceSourceFingerprint }
+        : {}),
+    },
+  };
+}
+
+function scheduledTaskMatchesConfig(
+  task: ScheduledTaskDefinitionSummary,
+  seed: DeploymentScheduledTaskSeed,
+): boolean {
+  return (
+    task.schedule === seed.schedule &&
+    task.timezone === seed.timezone &&
+    task.commandIntent === seed.command &&
+    task.timeoutSeconds === seed.timeoutSeconds &&
+    task.retryLimit === seed.retryLimit &&
+    task.concurrencyPolicy === seed.concurrencyPolicy &&
+    task.status === seed.status
+  );
+}
+
+function findScheduledTaskById(
+  tasks: readonly ScheduledTaskDefinitionSummary[],
+  taskId: string,
+): ScheduledTaskDefinitionSummary | undefined {
+  return tasks.find((task) => task.taskId === taskId);
+}
+
+function findExactScheduledTask(
+  tasks: readonly ScheduledTaskDefinitionSummary[],
+  seed: DeploymentScheduledTaskSeed,
+): ScheduledTaskDefinitionSummary | undefined {
+  return tasks.find((task) => scheduledTaskMatchesConfig(task, seed));
+}
+
+function listScheduledTasksForConfig(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListScheduledTasksQuery.create({
+        resourceId,
+        limit: 100,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createRepositoryConfigScheduledTask(input: {
+  resourceId: string;
+  task: DeploymentScheduledTaskSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      CreateScheduledTaskCommand.create({
+        resourceId: input.resourceId,
+        schedule: input.task.schedule,
+        timezone: input.task.timezone,
+        commandIntent: input.task.command,
+        timeoutSeconds: input.task.timeoutSeconds,
+        retryLimit: input.task.retryLimit,
+        concurrencyPolicy: input.task.concurrencyPolicy,
+        status: input.task.status,
+        idempotencyKey: `repository-config:${input.task.key}`,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigScheduledTask(input: {
+  taskId: string;
+  resourceId: string;
+  task: DeploymentScheduledTaskSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureScheduledTaskCommand.create({
+        taskId: input.taskId,
+        resourceId: input.resourceId,
+        schedule: input.task.schedule,
+        timezone: input.task.timezone,
+        commandIntent: input.task.command,
+        timeoutSeconds: input.task.timeoutSeconds,
+        retryLimit: input.task.retryLimit,
+        concurrencyPolicy: input.task.concurrencyPolicy,
+        status: input.task.status,
+        idempotencyKey: `repository-config:${input.task.key}`,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function buildScheduledTaskProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkScheduledTaskProvenance;
+  entries: SourceLinkScheduledTaskProvenanceEntry[];
+}): SourceLinkScheduledTaskProvenance {
+  const byKey = new Map<string, SourceLinkScheduledTaskProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(entry.key, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(entry.key, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.scheduled-task-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigScheduledTasks(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const scheduledTaskGraph = input.seed.scheduledTaskGraph ?? [];
+    if (scheduledTaskGraph.length === 0) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const firstTask = scheduledTaskGraph[0] as DeploymentScheduledTaskSeed;
+    const sourceFingerprint = input.seed.sourceFingerprint;
+    if (!sourceFingerprint || !cli.sourceLinkStore?.recordScheduledTaskProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigScheduledTaskProvenanceError({
+          task: firstTask,
+          ...(sourceFingerprint ? { sourceFingerprint } : {}),
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    const existingSourceLinkResult = yield* Effect.promise(
+      () => cli.sourceLinkStore?.read(sourceFingerprint) ?? Promise.resolve(ok(null)),
+    );
+    const existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    const existingProvenance = existingSourceLink?.scheduledTaskProvenance;
+    if (existingProvenance && existingProvenance.sourceFingerprint !== sourceFingerprint) {
+      return yield* Effect.fail(
+        repositoryConfigScheduledTaskConflict({
+          task: firstTask,
+          resourceId: input.resourceId,
+          sourceFingerprint,
+          provenanceSourceFingerprint: existingProvenance.sourceFingerprint,
+        }),
+      );
+    }
+
+    const tasksResult = yield* listScheduledTasksForConfig(input.resourceId);
+    const tasks = [...tasksResult.items];
+    const provenanceEntries: SourceLinkScheduledTaskProvenanceEntry[] = [];
+
+    for (const task of scheduledTaskGraph) {
+      const existingProvenanceEntry = existingProvenance?.entries.find(
+        (entry) => entry.key === task.key,
+      );
+      if (existingProvenanceEntry && existingProvenanceEntry.resourceId !== input.resourceId) {
+        return yield* Effect.fail(
+          repositoryConfigScheduledTaskConflict({
+            task,
+            resourceId: input.resourceId,
+            sourceFingerprint,
+            existingTaskId: existingProvenanceEntry.taskId,
+            existingResourceId: existingProvenanceEntry.resourceId,
+          }),
+        );
+      }
+
+      const provenanceTask = existingProvenanceEntry
+        ? findScheduledTaskById(tasks, existingProvenanceEntry.taskId)
+        : undefined;
+      const exactTask = provenanceTask ? undefined : findExactScheduledTask(tasks, task);
+      let resolvedTask = provenanceTask ?? exactTask;
+
+      if (resolvedTask && !scheduledTaskMatchesConfig(resolvedTask, task)) {
+        const configured = yield* configureRepositoryConfigScheduledTask({
+          taskId: resolvedTask.taskId,
+          resourceId: input.resourceId,
+          task,
+        });
+        resolvedTask = configured.task;
+        const taskIndex = tasks.findIndex((item) => item.taskId === resolvedTask?.taskId);
+        if (taskIndex >= 0) {
+          tasks[taskIndex] = configured.task;
+        }
+      }
+
+      if (!resolvedTask) {
+        const created = yield* createRepositoryConfigScheduledTask({
+          resourceId: input.resourceId,
+          task,
+        });
+        resolvedTask = created.task;
+        tasks.push(created.task);
+      }
+
+      provenanceEntries.push({
+        key: task.key,
+        source: "repository-config",
+        lifecycle: task.previewLifecycle === "ephemeral" ? "ephemeral" : "persistent",
+        resourceId: input.resourceId,
+        taskId: resolvedTask.taskId,
+        commandFingerprint: scheduledTaskCommandFingerprint(task),
+        createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+      });
+    }
+
+    const provenance = buildScheduledTaskProvenance({
+      sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingProvenance ? { existing: existingProvenance } : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordScheduledTaskProvenance?.({
+          sourceFingerprint,
+          target,
+          scheduledTaskProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -3321,6 +3659,16 @@ export function resolveInteractiveDeploymentInput(
           resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigStorage({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigScheduledTasks({
           seed: resolvedSeed,
           projectId: deploymentInput.projectId,
           serverId: deploymentInput.serverId,

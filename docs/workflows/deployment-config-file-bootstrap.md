@@ -18,6 +18,7 @@ source selection
      or stop with structured profile drift guidance before deployment admission
   -> provision/reuse and bind declared application dependencies through dependency-resource commands
   -> create/reuse and attach declared managed storage through storage/resource commands
+  -> create/reuse or configure declared scheduled tasks through scheduled-task commands
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -68,6 +69,7 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 - user-facing application dependency graph declarations such as managed Postgres or Redis bound to
   runtime env targets;
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
+- user-facing scheduled task graph declarations such as a nightly sync command;
 - non-secret environment variable declarations and required secret references;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
   file for identity and credentials;
@@ -161,6 +163,13 @@ when needed, attaches the Resource at the requested workload path, and then lets
 profile snapshot materialization carry mount metadata. The config workflow must not add storage
 volume, attachment, or destination path fields to `deployments.create`.
 
+Declared scheduled tasks are reconciled in the same entry workflow after the target Resource is
+known and before deployment admission. The workflow lists Resource scheduled tasks, uses source-link
+scheduled-task provenance to locate the task owned by each repository config key, creates missing
+tasks, configures drifted provenance-owned tasks, and records safe provenance for future idempotency
+or preview cleanup. The config workflow must not add schedule, command, timeout, retry, or task id
+fields to `deployments.create`.
+
 When the entrypoint targets an SSH server without a selected control plane, the config workflow must
 resolve the SSH-server `ssh-pglite` state backend before identity resolution. Repository config
 does not become the state store; it is a versioned desired profile that is reconciled into
@@ -235,6 +244,25 @@ The MVP supports managed named volumes only. `mount.path` is an absolute workloa
 not a host bind source path. Config may not include provider accounts, credentials, tenants,
 organization ids, host source paths, provider-native storage handles, backup handles, raw secret
 values, or storage provider-specific settings.
+
+`scheduledTasks` uses application language, not Appaloft internal object language:
+
+```yaml
+scheduledTasks:
+  nightly_sync:
+    schedule: "0 3 * * *"
+    timezone: UTC
+    command: bun run sync
+    timeoutSeconds: 600
+    retryLimit: 2
+    preview:
+      lifecycle: ephemeral
+```
+
+Scheduled task declarations create or configure Resource-owned scheduled task definitions through
+existing scheduled-task commands. Config may not include task ids, provider-native scheduler
+handles, provider accounts, credentials, tenants, organization ids, raw secret values, raw
+connection strings with embedded credentials, or target/server identity.
 
 The HTTP adapter may serve the config schema for tooling, but strict `POST /api/deployments` remains
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP
@@ -573,6 +601,7 @@ deployment admission.
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
+| `scheduledTasks.*` | Scheduled task operations | Describes Resource-owned recurring application jobs; reconciled through scheduled-task list/create/configure commands before deployment, never as deployment command fields. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
 | `controlPlane.install.*` | Console install entry workflow | Provides non-secret defaults for `command=install-console`, including public origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and Swarm/Compose names. It never enters `deployments.create`, never selects durable deployment identity, and never carries SSH keys, tokens, raw database URLs, or raw secret values. |

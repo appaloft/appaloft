@@ -52,6 +52,30 @@ task container, Compose run, or Swarm replicated-job in the retained runtime con
 can reach the same internal runtime network without replacing the serving process. The long-running
 scheduled task runner is still disabled by default and must be enabled in configuration.
 
+<h2 id="scheduled-task-config-file">Declare scheduled tasks in appaloft.yaml</h2>
+
+For repository-driven deploys, you can ask Appaloft to create or configure Resource-owned scheduled
+tasks before deployment:
+
+```yaml
+scheduledTasks:
+  nightly_sync:
+    schedule: "0 3 * * *"
+    timezone: UTC
+    command: bun run sync
+    timeoutSeconds: 600
+    retryLimit: 2
+```
+
+The config workflow keeps deployment admission ids-only: it reconciles scheduled tasks through
+`scheduled-tasks.list`, `scheduled-tasks.create`, and `scheduled-tasks.configure`, then creates the
+deployment from the selected ids. Do not put task ids, provider-native scheduler handles, tokens,
+passwords, or credential-bearing connection strings in `appaloft.yaml`.
+
+For pull request previews, add `preview.lifecycle: ephemeral` only when the preview task should be
+deleted on PR close. Preview cleanup removes a task only when source-link provenance proves that
+repository config created or adopted that exact preview task.
+
 <h2 id="scheduled-task-run-now">Run now</h2>
 
 `scheduled-tasks.run-now` accepts one manual run attempt. After the command returns a run id,

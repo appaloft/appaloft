@@ -80,6 +80,30 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 delete only the storage volume that Appaloft can prove was created and attached by this config for
 that preview. Manual or shared storage is preserved.
 
+<h2 id="environment-config-file-scheduled-tasks">Scheduled tasks</h2>
+
+Use `scheduledTasks` when the application needs recurring Resource-owned jobs:
+
+```yaml
+scheduledTasks:
+  nightly_sync:
+    schedule: "0 3 * * *"
+    timezone: UTC
+    command: bun run sync
+    timeoutSeconds: 600
+    retryLimit: 2
+    preview:
+      lifecycle: ephemeral
+```
+
+This creates or configures a scheduled task before deployment. The final deployment command still
+contains only Appaloft ids; task ids, provider-native scheduler handles, target identity, raw
+connection strings, tokens, and passwords do not belong in `appaloft.yaml`.
+
+For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup to delete only the
+scheduled task that Appaloft can prove was created or adopted by this config for that preview.
+Manual or shared scheduled tasks are preserved.
+
 <h2 id="environment-config-file-env">Environment values</h2>
 
 Use `env` for non-secret values and `secrets` for references to values supplied outside the

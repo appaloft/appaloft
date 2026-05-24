@@ -1138,7 +1138,7 @@ describe("CLI source link state", () => {
     }
   });
 
-  test("[SOURCE-LINK-STATE-024] source link stores repository config dependency and storage provenance", async () => {
+  test("[SOURCE-LINK-STATE-024] source link stores repository config provenance groups", async () => {
     const root = await tempStateRoot();
     try {
       const store = new FileSystemSourceLinkStore(root);
@@ -1173,7 +1173,7 @@ describe("CLI source link state", () => {
         },
       });
 
-      const stored = await store.recordStorageProvenance({
+      const storageStored = await store.recordStorageProvenance({
         sourceFingerprint,
         target,
         updatedAt: "2026-05-24T00:01:00.000Z",
@@ -1197,6 +1197,33 @@ describe("CLI source link state", () => {
         },
       });
 
+      expect(storageStored.isOk()).toBe(true);
+      if (storageStored.isErr()) {
+        throw new Error(storageStored.error.message);
+      }
+
+      const stored = await store.recordScheduledTaskProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:02:00.000Z",
+        scheduledTaskProvenance: {
+          schemaVersion: "source-link.scheduled-task-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "nightly_sync",
+              source: "repository-config",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              taskId: "tsk_nightly",
+              commandFingerprint: "sha256:nightly",
+              createdAt: "2026-05-24T00:02:00.000Z",
+            },
+          ],
+        },
+      });
+
       expect(stored.isOk()).toBe(true);
       if (stored.isErr()) {
         throw new Error(stored.error.message);
@@ -1206,6 +1233,7 @@ describe("CLI source link state", () => {
       );
       expect(stored.value.dependencyProvenance?.entries[0]?.kind).toBe("redis");
       expect(stored.value.storageProvenance?.entries[0]?.storageVolumeId).toBe("stv_uploads");
+      expect(stored.value.scheduledTaskProvenance?.entries[0]?.taskId).toBe("tsk_nightly");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

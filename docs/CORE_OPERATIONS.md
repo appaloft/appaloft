@@ -393,6 +393,11 @@ Phase 7 scheduled task operations:
 | Show scheduled task run | Query | `scheduled-task-runs.show` | `ShowScheduledTaskRunQuery` | `ShowScheduledTaskRunQueryInput` | `appaloft scheduled-task runs show <runId>` | `GET /api/scheduled-task-runs/{runId}` |
 | Read scheduled task run logs | Query | `scheduled-task-runs.logs` | `ScheduledTaskRunLogsQuery` | `ScheduledTaskRunLogsQueryInput` | `appaloft scheduled-task runs logs <runId>` | `GET /api/scheduled-task-runs/{runId}/logs` |
 
+Repository config `scheduledTasks.*` is a workflow/profile extension over the existing scheduled
+task operations. Config deploy may list, create, or configure Resource-owned scheduled tasks before
+ids-only deployment admission, and preview cleanup may delete only source-link provenance-owned
+ephemeral tasks. No new operation-catalog key is introduced.
+
 Phase 7 dependency resource operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

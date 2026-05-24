@@ -32,12 +32,14 @@ import {
   type SourceLinkDependencyProvenanceEntry,
   type SourceLinkRecord,
   type SourceLinkRepository,
+  type SourceLinkScheduledTaskProvenanceEntry,
   type SourceLinkStorageProvenanceEntry,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type DeleteDependencyResourceUseCase } from "../dependency-resources/delete-dependency-resource.use-case";
 import { type DetachResourceStorageUseCase } from "../resources/detach-resource-storage.use-case";
 import { type UnbindResourceDependencyUseCase } from "../resources/unbind-resource-dependency.use-case";
+import { type DeleteScheduledTaskUseCase } from "../scheduled-tasks/delete-scheduled-task.use-case";
 import { type DeleteStorageVolumeUseCase } from "../storage-volumes/delete-storage-volume.use-case";
 import { type CleanupPreviewCommandInput } from "./cleanup-preview.command";
 import { previewLifecycleScope } from "./deployment-mutation-scopes";
@@ -52,6 +54,7 @@ export interface CleanupPreviewResult {
   deletedDependencyResources?: number;
   removedStorageAttachments?: number;
   deletedStorageVolumes?: number;
+  deletedScheduledTasks?: number;
   projectId?: string;
   environmentId?: string;
   resourceId?: string;
@@ -157,6 +160,28 @@ function previewStorageProvenanceEntries(input: {
   );
 }
 
+function previewScheduledTaskProvenanceEntries(input: {
+  sourceLink: SourceLinkRecord;
+  sourceFingerprint: string;
+}): SourceLinkScheduledTaskProvenanceEntry[] {
+  const provenance = input.sourceLink.scheduledTaskProvenance;
+  if (
+    provenance?.schemaVersion !== "source-link.scheduled-task-provenance/v1" ||
+    provenance.source !== "repository-config" ||
+    provenance.sourceFingerprint !== input.sourceFingerprint
+  ) {
+    return [];
+  }
+
+  return provenance.entries.filter(
+    (entry) =>
+      entry.source === "repository-config" &&
+      entry.lifecycle === "ephemeral" &&
+      entry.resourceId === input.sourceLink.resourceId &&
+      entry.taskId.trim().length > 0,
+  );
+}
+
 const missingUnbindResourceDependencyUseCase: Pick<UnbindResourceDependencyUseCase, "execute"> = {
   async execute() {
     return err(
@@ -201,6 +226,17 @@ const missingDeleteStorageVolumeUseCase: Pick<DeleteStorageVolumeUseCase, "execu
   },
 };
 
+const missingDeleteScheduledTaskUseCase: Pick<DeleteScheduledTaskUseCase, "execute"> = {
+  async execute() {
+    return err(
+      domainError.infra("Scheduled task delete use case is not registered", {
+        phase: "preview-cleanup",
+        cleanupStage: "scheduled-task-delete",
+      }),
+    );
+  },
+};
+
 @injectable()
 export class CleanupPreviewUseCase {
   constructor(
@@ -236,6 +272,11 @@ export class CleanupPreviewUseCase {
       DeleteStorageVolumeUseCase,
       "execute"
     > = missingDeleteStorageVolumeUseCase,
+    @inject(tokens.deleteScheduledTaskUseCase)
+    private readonly deleteScheduledTaskUseCase: Pick<
+      DeleteScheduledTaskUseCase,
+      "execute"
+    > = missingDeleteScheduledTaskUseCase,
   ) {}
 
   private async findLatestDeploymentForResource(
@@ -323,6 +364,7 @@ export class CleanupPreviewUseCase {
       deleteDependencyResourceUseCase,
       detachResourceStorageUseCase,
       deleteStorageVolumeUseCase,
+      deleteScheduledTaskUseCase,
     } = this;
     const findDeploymentById = this.findDeploymentById.bind(this);
     const findLatestDeploymentForResource = this.findLatestDeploymentForResource.bind(this);
@@ -358,6 +400,7 @@ export class CleanupPreviewUseCase {
               deletedDependencyResources: 0,
               removedStorageAttachments: 0,
               deletedStorageVolumes: 0,
+              deletedScheduledTasks: 0,
             });
           }
 
@@ -513,6 +556,31 @@ export class CleanupPreviewUseCase {
             }
           }
 
+          let deletedScheduledTasks = 0;
+          for (const task of previewScheduledTaskProvenanceEntries({
+            sourceLink,
+            sourceFingerprint: input.sourceFingerprint,
+          })) {
+            const deleteResult = await deleteScheduledTaskUseCase.execute(context, {
+              resourceId: task.resourceId,
+              taskId: task.taskId,
+            });
+            if (deleteResult.isErr() && !isNotFoundError(deleteResult.error)) {
+              return err(
+                withPreviewCleanupDetails(deleteResult.error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: cleanupStageFromError(deleteResult.error, "scheduled-task-delete"),
+                  resourceId: task.resourceId,
+                  taskId: task.taskId,
+                  taskKey: task.key,
+                }),
+              );
+            }
+            if (deleteResult.isOk()) {
+              deletedScheduledTasks += 1;
+            }
+          }
+
           const removedLinkedServerAppliedRoute = sourceLink.serverId
             ? yield* await serverAppliedRouteStateRepository
                 .deleteOne(
@@ -577,6 +645,7 @@ export class CleanupPreviewUseCase {
               deletedDependencyResources > 0 ||
               removedStorageAttachments > 0 ||
               deletedStorageVolumes > 0 ||
+              deletedScheduledTasks > 0 ||
               removedServerAppliedRoute ||
               removedSourceLink
                 ? ("cleaned" as const)
@@ -588,6 +657,7 @@ export class CleanupPreviewUseCase {
             deletedDependencyResources,
             removedStorageAttachments,
             deletedStorageVolumes,
+            deletedScheduledTasks,
             projectId: sourceLink.projectId,
             environmentId: sourceLink.environmentId,
             resourceId: sourceLink.resourceId,

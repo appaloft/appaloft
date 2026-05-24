@@ -7,6 +7,8 @@ import {
   type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
+  type SourceLinkScheduledTaskProvenance,
+  type SourceLinkScheduledTaskProvenanceEntry,
   type SourceLinkSelectionSpec,
   type SourceLinkSelectionSpecVisitor,
   type SourceLinkStorageProvenance,
@@ -200,16 +202,67 @@ function storageProvenanceFromMetadata(metadata: unknown): SourceLinkStorageProv
   };
 }
 
+function isScheduledTaskProvenanceEntry(
+  value: unknown,
+): value is SourceLinkScheduledTaskProvenanceEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.key === "string" &&
+    record.source === "repository-config" &&
+    (record.lifecycle === "persistent" || record.lifecycle === "ephemeral") &&
+    typeof record.resourceId === "string" &&
+    typeof record.taskId === "string" &&
+    typeof record.commandFingerprint === "string" &&
+    typeof record.createdAt === "string"
+  );
+}
+
+function scheduledTaskProvenanceFromMetadata(
+  metadata: unknown,
+): SourceLinkScheduledTaskProvenance | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+  const provenance = (metadata as Record<string, unknown>).scheduledTaskProvenance;
+  if (!provenance || typeof provenance !== "object") {
+    return undefined;
+  }
+  const record = provenance as Record<string, unknown>;
+  if (
+    record.schemaVersion !== "source-link.scheduled-task-provenance/v1" ||
+    record.source !== "repository-config" ||
+    typeof record.sourceFingerprint !== "string" ||
+    !Array.isArray(record.entries) ||
+    !record.entries.every(isScheduledTaskProvenanceEntry)
+  ) {
+    return undefined;
+  }
+
+  return {
+    schemaVersion: "source-link.scheduled-task-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: record.sourceFingerprint,
+    entries: record.entries,
+  };
+}
+
 function sourceLinkMetadataFromRecord(record: SourceLinkRecord): Record<string, unknown> {
   return {
     ...(record.dependencyProvenance ? { dependencyProvenance: record.dependencyProvenance } : {}),
     ...(record.storageProvenance ? { storageProvenance: record.storageProvenance } : {}),
+    ...(record.scheduledTaskProvenance
+      ? { scheduledTaskProvenance: record.scheduledTaskProvenance }
+      : {}),
   };
 }
 
 function mapRow(row: SourceLinkRow): SourceLinkRecord {
   const dependencyProvenance = dependencyProvenanceFromMetadata(row.metadata);
   const storageProvenance = storageProvenanceFromMetadata(row.metadata);
+  const scheduledTaskProvenance = scheduledTaskProvenanceFromMetadata(row.metadata);
   return {
     sourceFingerprint: row.source_fingerprint,
     projectId: row.project_id,
@@ -221,6 +274,7 @@ function mapRow(row: SourceLinkRow): SourceLinkRecord {
     ...(row.reason ? { reason: row.reason } : {}),
     ...(dependencyProvenance ? { dependencyProvenance } : {}),
     ...(storageProvenance ? { storageProvenance } : {}),
+    ...(scheduledTaskProvenance ? { scheduledTaskProvenance } : {}),
   };
 }
 

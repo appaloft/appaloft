@@ -362,6 +362,108 @@ describe("Appaloft deployment config schema", () => {
     expect(hostPath.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-SCHED-TASK-001] accepts scheduled task declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "scheduledTasks:",
+        "  nightly_sync:",
+        '    schedule: "0 3 * * *"',
+        "    timezone: UTC",
+        "    command: bun run sync",
+        "    timeoutSeconds: 600",
+        "    retryLimit: 2",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "  cache_warm:",
+        '    schedule: "@hourly"',
+        "    command: bun run cache:warm",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.scheduledTasks?.nightly_sync).toEqual({
+        schedule: "0 3 * * *",
+        timezone: "UTC",
+        command: "bun run sync",
+        timeoutSeconds: 600,
+        retryLimit: 2,
+        concurrencyPolicy: "forbid",
+        status: "enabled",
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+      expect(parsed.data.scheduledTasks?.cache_warm).toEqual({
+        schedule: "@hourly",
+        timezone: "UTC",
+        command: "bun run cache:warm",
+        timeoutSeconds: 3600,
+        retryLimit: 0,
+        concurrencyPolicy: "forbid",
+        status: "enabled",
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-002] rejects unknown scheduled task fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "bun run sync",
+          providerScheduleHandle: "cron-123",
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.path).toEqual(["scheduledTasks", "nightly_sync"]);
+    }
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-003] rejects scheduled task identity and secret material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "bun run sync",
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual([
+        "scheduledTasks",
+        "nightly_sync",
+        "providerAccount",
+      ]);
+    }
+
+    const credentialUrl = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "psql postgres://app:secret@example.test/app -c 'select 1'",
+        },
+      },
+    });
+
+    expect(credentialUrl.success).toBe(false);
+    if (!credentialUrl.success) {
+      expect(credentialUrl.error.issues[0]?.path).toEqual([
+        "scheduledTasks",
+        "nightly_sync",
+        "command",
+      ]);
+    }
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

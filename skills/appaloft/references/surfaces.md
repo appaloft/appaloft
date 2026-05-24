@@ -30,7 +30,8 @@ installer; that would blur the boundary between installing an agent skill and ru
 4. Repository config: use Appaloft config files as deployment intent, not as a replacement for
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
-   ordinary default mental model.
+   ordinary default mental model. High-level `dependencies`, `storage`, and `scheduledTasks`
+   declarations must reconcile through existing operations before ids-only deployment admission.
 5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
    introduce MCP-only mutations.
 
@@ -53,5 +54,7 @@ installer; that would blur the boundary between installing an agent skill and ru
   provider SDKs, or proxy config directly when an Appaloft operation exists.
 - Do not add source, runtime, network, or access fields to `deployments.create`; configure Resource
   profile and access operations first.
+- Do not add dependency, storage, or scheduled task fields to `deployments.create`; reconcile
+  repository config declarations through their existing operation families first.
 - Do not create `quick-deploy.create`; Quick Deploy remains a workflow over explicit operations.
 - Do not expose unmasked secrets in prompts, logs, diagnostics, docs, PRs, or final responses.

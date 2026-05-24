@@ -1,4 +1,5 @@
 import {
+  containsScheduledTaskSecretText,
   domainError,
   err,
   ok,
@@ -6,6 +7,9 @@ import {
   resourceExposureModes,
   resourceNetworkProtocols,
   runtimePlanStrategies,
+  ScheduledTaskCommandIntent,
+  ScheduledTaskScheduleExpression,
+  ScheduledTaskTimezone,
 } from "@appaloft/core";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -31,6 +35,7 @@ const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
 const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
 const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const storageKeyPattern = dependencyKeyPattern;
+const scheduledTaskKeyPattern = dependencyKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 export const appaloftDeploymentDependencyKinds = [
   "postgres",
@@ -67,6 +72,12 @@ const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const storageMountPathError =
   "config_storage_resolution: storage.<key>.mount.path must be an absolute normalized workload path";
+const scheduledTaskScheduleError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.schedule must be a safe scheduled task schedule expression";
+const scheduledTaskTimezoneError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.timezone must be an IANA timezone";
+const scheduledTaskCommandError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.command must be a single-line command intent without secrets";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -89,6 +100,8 @@ const identityConfigFields = new Set([
   "targets",
   "destination",
   "destinationId",
+  "taskId",
+  "scheduledTaskId",
   "provider",
   "providerKey",
   "providerAccount",
@@ -486,6 +499,18 @@ function isSafeStorageMountPath(value: string): boolean {
   return segments.length > 0 && !segments.some((segment) => segment === "." || segment === "..");
 }
 
+function isSafeScheduledTaskSchedule(value: string): boolean {
+  return ScheduledTaskScheduleExpression.create(value).isOk();
+}
+
+function isSafeScheduledTaskTimezone(value: string): boolean {
+  return ScheduledTaskTimezone.create(value).isOk();
+}
+
+function isSafeScheduledTaskCommand(value: string): boolean {
+  return ScheduledTaskCommandIntent.create(value).isOk() && !containsScheduledTaskSecretText(value);
+}
+
 const appaloftDeploymentAccessDomainConfigSchema = z
   .object({
     host: nonEmptyStringSchema.refine(
@@ -672,6 +697,32 @@ export const appaloftDeploymentStorageConfigSchema = z
   .strict()
   .describe("User-facing application storage declaration.");
 
+export const appaloftDeploymentScheduledTaskConfigSchema = z
+  .object({
+    schedule: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskSchedule, scheduledTaskScheduleError)
+      .describe("Safe scheduled task schedule expression."),
+    timezone: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskTimezone, scheduledTaskTimezoneError)
+      .optional()
+      .default("UTC"),
+    command: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskCommand, scheduledTaskCommandError)
+      .describe("Single-line scheduled task command intent."),
+    timeoutSeconds: z.number().int().min(1).max(86_400).optional().default(3_600),
+    retryLimit: z.number().int().min(0).max(10).optional().default(0),
+    concurrencyPolicy: z.enum(["forbid"]).optional().default("forbid"),
+    status: z.enum(["enabled", "disabled"]).optional().default("enabled"),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing Resource scheduled task declaration.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -797,6 +848,17 @@ export const appaloftDeploymentConfigSchema = z
         appaloftDeploymentStorageConfigSchema,
       )
       .optional(),
+    scheduledTasks: z
+      .record(
+        z
+          .string()
+          .regex(
+            scheduledTaskKeyPattern,
+            "config_scheduled_task_resolution: scheduled task keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentScheduledTaskConfigSchema,
+      )
+      .optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
@@ -889,6 +951,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "access" ||
     root === "dependencies" ||
     root === "storage" ||
+    root === "scheduledTasks" ||
     root === "controlPlane"
   );
 }
