@@ -1307,7 +1307,7 @@ export interface DependencyResourceSecretStoreInput {
   dependencyResourceId: string;
   projectId: string;
   environmentId: string;
-  kind: "postgres" | "redis";
+  kind: DependencyResourceKind;
   purpose: "connection";
   secretValue: string;
   storedAt: string;
@@ -3188,7 +3188,19 @@ export interface ShowStorageVolumeResult {
   generatedAt: string;
 }
 
-export type DependencyResourceKind = "postgres" | "redis";
+export const dependencyResourceKinds = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+] as const;
+export type DependencyResourceKind = (typeof dependencyResourceKinds)[number];
+
+export const managedDependencyResourceKinds = dependencyResourceKinds;
+export type ManagedDependencyResourceKind = (typeof managedDependencyResourceKinds)[number];
+
 export type DependencyResourceSourceMode = "appaloft-managed" | "imported-external";
 export type DependencyResourceLifecycleStatus = "provisioning" | "ready" | "degraded" | "deleted";
 
@@ -7914,6 +7926,58 @@ export interface ManagedRedisProviderPort {
     context: ExecutionContext,
     input: ManagedRedisDeleteInput,
   ): Promise<Result<ManagedRedisDeleteResult, DomainError>>;
+}
+
+export interface ManagedDependencyRealizationInput {
+  dependencyResourceId: string;
+  projectId: string;
+  environmentId: string;
+  kind: ManagedDependencyResourceKind;
+  providerKey: string;
+  name: string;
+  slug: string;
+  attemptId: string;
+  requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
+}
+
+export interface ManagedDependencyRealizationResult {
+  providerResourceHandle: string;
+  endpoint: {
+    host: string;
+    port?: number;
+    databaseName?: string;
+    maskedConnection: string;
+  };
+  secretRef?: string;
+  connectionSecretValue?: string;
+  realizedAt: string;
+}
+
+export interface ManagedDependencyDeleteInput {
+  dependencyResourceId: string;
+  kind: ManagedDependencyResourceKind;
+  providerKey: string;
+  providerResourceHandle: string;
+  attemptId: string;
+  requestedAt: string;
+  target?: ManagedDependencySingleServerTarget;
+}
+
+export interface ManagedDependencyDeleteResult {
+  deletedAt: string;
+}
+
+export interface ManagedDependencyProviderPort {
+  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean;
+  realize(
+    context: ExecutionContext,
+    input: ManagedDependencyRealizationInput,
+  ): Promise<Result<ManagedDependencyRealizationResult, DomainError>>;
+  delete(
+    context: ExecutionContext,
+    input: ManagedDependencyDeleteInput,
+  ): Promise<Result<ManagedDependencyDeleteResult, DomainError>>;
 }
 
 export interface DependencyResourceBackupProviderInput {

@@ -484,6 +484,103 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     return new ResourceInstance(state);
   }
 
+  static createDependencyResource(input: {
+    id: ResourceInstanceId;
+    projectId: ProjectId;
+    environmentId: EnvironmentId;
+    name: ResourceInstanceName;
+    kind: ResourceInstanceKindValue;
+    sourceMode: DependencyResourceSourceModeValue;
+    providerKey: ProviderKey;
+    providerManaged: boolean;
+    endpoint?: DependencyResourceEndpointInput;
+    connectionSecretRef?: DependencyResourceSecretRef;
+    providerRealization?: DependencyResourceProviderRealizationState;
+    description?: DescriptionText;
+    backupRelationship?: DependencyResourceBackupRelationshipState;
+    createdAt: CreatedAt;
+  }): Result<ResourceInstance> {
+    const dependencyKind = input.kind.value;
+    if (!isSupportedDependencyResourceKind(dependencyKind)) {
+      return err(
+        dependencyResourceValidationError("Dependency resource kind is unsupported", {
+          field: "kind",
+          kind: dependencyKind,
+        }),
+      );
+    }
+
+    const slug = ResourceInstanceSlug.fromName(input.name);
+    if (slug.isErr()) {
+      return err(slug.error);
+    }
+
+    const endpoint = input.endpoint
+      ? createEndpointState(input.endpoint)
+      : ok<DependencyResourceEndpointState | undefined>(undefined);
+    if (endpoint.isErr()) {
+      return err(endpoint.error);
+    }
+
+    const instance = new ResourceInstance({
+      id: input.id,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      kind: input.kind,
+      ownerScope: OwnerScopeValue.rehydrate("project"),
+      ownerId: OwnerId.rehydrate(input.projectId.value),
+      name: input.name,
+      slug: slug.value,
+      ...(input.description ? { description: input.description } : {}),
+      sourceMode: input.sourceMode,
+      providerKey: input.providerKey,
+      providerManaged: input.providerManaged,
+      ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
+      ...(input.providerRealization
+        ? { providerRealization: cloneProviderRealization(input.providerRealization) }
+        : {}),
+      ...(endpoint.value
+        ? dependencyKind === "redis"
+          ? { redisEndpoint: endpoint.value }
+          : { postgresEndpoint: endpoint.value }
+        : {}),
+      ...(input.backupRelationship
+        ? { backupRelationship: cloneBackupRelationship(input.backupRelationship) }
+        : { backupRelationship: { retentionRequired: false } }),
+      bindingReadiness: input.providerRealization
+        ? {
+            status: "blocked",
+            reason: DescriptionText.rehydrate("Provider realization is pending"),
+          }
+        : {
+            status: "not-implemented",
+          },
+      status: input.providerRealization
+        ? ResourceInstanceStatusValue.provisioning()
+        : ResourceInstanceStatusValue.rehydrate("ready"),
+      createdAt: input.createdAt,
+    });
+
+    instance.recordDomainEvent("dependency-resource-created", input.createdAt, {
+      dependencyResourceId: input.id.value,
+      projectId: input.projectId.value,
+      environmentId: input.environmentId.value,
+      kind: input.kind.value,
+      sourceMode: input.sourceMode.value,
+      providerKey: input.providerKey.value,
+      slug: slug.value.value,
+      providerManaged: input.providerManaged,
+    });
+    if (input.providerRealization) {
+      instance.recordDomainEvent("dependency-resource-realization-requested", input.createdAt, {
+        dependencyResourceId: input.id.value,
+        providerKey: input.providerKey.value,
+        attemptId: input.providerRealization.attemptId.value,
+      });
+    }
+    return ok(instance);
+  }
+
   static createPostgresDependencyResource(input: {
     id: ResourceInstanceId;
     projectId: ProjectId;
@@ -990,6 +1087,17 @@ function createEndpointState(
     ...(databaseName ? { databaseName } : {}),
     maskedConnection: maskedConnection.value,
   });
+}
+
+function isSupportedDependencyResourceKind(input: string): boolean {
+  return (
+    input === "postgres" ||
+    input === "redis" ||
+    input === "mysql" ||
+    input === "clickhouse" ||
+    input === "object-storage" ||
+    input === "opensearch"
+  );
 }
 
 function cloneEndpoint(endpoint: DependencyResourceEndpointState): DependencyResourceEndpointState {

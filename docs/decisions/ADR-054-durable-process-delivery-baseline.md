@@ -118,7 +118,7 @@ historical and operator-visible until retention prunes them.
   still runs inline through the command use cases rather than process-attempt atomic
   claim/completion.
 - Provider-native dependency resource realization/delete records running, success, and failure
-  outcomes from `dependency-resources.provision-postgres`, `dependency-resources.provision-redis`,
+  outcomes from `dependency-resources.provision`, `dependency-resources.provision`,
   and provider-managed `dependency-resources.delete` into the process attempt journal for
   operator-work visibility and repair, but provider realization/delete execution still runs inline
   through the command use cases rather than process-attempt atomic claim/completion.

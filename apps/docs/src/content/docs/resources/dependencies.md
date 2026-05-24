@@ -1,6 +1,6 @@
 ---
 title: "Dependency resources"
-description: "管理 Postgres、Redis、绑定、secret 轮换和备份恢复。"
+description: "管理依赖资源、绑定、secret 轮换和备份恢复。"
 docType: task
 localeState:
   zh-CN: complete
@@ -15,10 +15,8 @@ searchAliases:
   - "DATABASE_URL"
   - "依赖资源"
 relatedOperations:
-  - dependency-resources.provision-postgres
-  - dependency-resources.import-postgres
-  - dependency-resources.provision-redis
-  - dependency-resources.import-redis
+  - dependency-resources.provision
+  - dependency-resources.import
   - dependency-resources.list
   - dependency-resources.show
   - dependency-resources.rename
@@ -40,12 +38,12 @@ sidebar:
 <h2 id="dependency-resource-lifecycle">依赖资源生命周期</h2>
 
 Dependency resource 是 Appaloft 管理的数据库或服务依赖记录。Phase 7 支持 provider-neutral
-Postgres 和 Redis 记录、Appaloft-managed Postgres/Redis realization、外部依赖导入、安全 read
-model、删除安全检查，以及备份恢复。
+Postgres、Redis、MySQL、ClickHouse、S3/MinIO object storage 和 OpenSearch 记录、
+Appaloft-managed realization、外部依赖导入、安全 read model、删除安全检查，以及备份恢复。
 
 ```bash title="创建或导入依赖资源"
-appaloft dependency postgres provision --project prj_prod --environment env_prod --name app-db
-appaloft dependency redis import --project prj_prod --environment env_prod --name cache
+appaloft dependency provision --kind postgres --project prj_prod --environment env_prod --name app-db
+appaloft dependency import --kind redis --project prj_prod --environment env_prod --name cache --connection-url redis://cache.internal:6379/0
 ```
 
 List/show 输出必须屏蔽连接 secret、provider token、密码和原始连接字符串。

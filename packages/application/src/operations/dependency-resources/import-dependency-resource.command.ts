@@ -1,19 +1,18 @@
 import { type Result } from "@appaloft/core";
 
 import { Command } from "../../cqrs";
+import { type DependencyResourceKind } from "../../ports";
 import { parseOperationInput } from "../shared-schema";
 import {
-  type ImportRedisDependencyResourceCommandInput,
-  importRedisDependencyResourceCommandInputSchema,
-} from "./import-redis-dependency-resource.schema";
+  type ImportDependencyResourceCommandInput,
+  importDependencyResourceCommandInputSchema,
+} from "./import-dependency-resource.schema";
 
-export {
-  type ImportRedisDependencyResourceCommandInput,
-  importRedisDependencyResourceCommandInputSchema,
-};
+export { type ImportDependencyResourceCommandInput, importDependencyResourceCommandInputSchema };
 
-export class ImportRedisDependencyResourceCommand extends Command<{ id: string }> {
+export class ImportDependencyResourceCommand extends Command<{ id: string }> {
   constructor(
+    public readonly kind: DependencyResourceKind,
     public readonly projectId: string,
     public readonly environmentId: string,
     public readonly name: string,
@@ -21,17 +20,18 @@ export class ImportRedisDependencyResourceCommand extends Command<{ id: string }
     public readonly secretRef?: string,
     public readonly connectionSecret?: string,
     public readonly description?: string,
-    public readonly backupRelationship?: ImportRedisDependencyResourceCommandInput["backupRelationship"],
+    public readonly backupRelationship?: ImportDependencyResourceCommandInput["backupRelationship"],
   ) {
     super();
   }
 
   static create(
-    input: ImportRedisDependencyResourceCommandInput,
-  ): Result<ImportRedisDependencyResourceCommand> {
-    return parseOperationInput(importRedisDependencyResourceCommandInputSchema, input).map(
+    input: ImportDependencyResourceCommandInput,
+  ): Result<ImportDependencyResourceCommand> {
+    return parseOperationInput(importDependencyResourceCommandInputSchema, input).map(
       (parsed) =>
-        new ImportRedisDependencyResourceCommand(
+        new ImportDependencyResourceCommand(
+          parsed.kind,
           parsed.projectId,
           parsed.environmentId,
           parsed.name,

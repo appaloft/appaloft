@@ -175,10 +175,8 @@ import {
   GetCurrentOrganizationContextQueryService,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
-  ImportPostgresDependencyResourceCommandHandler,
-  ImportPostgresDependencyResourceUseCase,
-  ImportRedisDependencyResourceCommandHandler,
-  ImportRedisDependencyResourceUseCase,
+  ImportDependencyResourceCommandHandler,
+  ImportDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
   ImportResourceVariablesUseCase,
   IngestSourceEventCommandHandler,
@@ -276,10 +274,8 @@ import {
   PreviewLifecycleService,
   PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
-  ProvisionPostgresDependencyResourceCommandHandler,
-  ProvisionPostgresDependencyResourceUseCase,
-  ProvisionRedisDependencyResourceCommandHandler,
-  ProvisionRedisDependencyResourceUseCase,
+  ProvisionDependencyResourceCommandHandler,
+  ProvisionDependencyResourceUseCase,
   PruneAuditEventArchivesCommandHandler,
   PruneAuditEventArchivesUseCase,
   PruneAuditEventsCommandHandler,
@@ -468,6 +464,7 @@ import { type DomainError, domainError, err, ok, type Result } from "@appaloft/c
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
 import { ShellDeploymentEventObserver } from "./deployment-event-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
+import { DockerBackedManagedDependencyProvider } from "./managed-dependency-providers";
 import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
@@ -1680,10 +1677,8 @@ export function registerApplicationServices(
   container.registerSingleton(ShowSourceEventQueryHandler);
   container.registerSingleton(ResolveGenericSignedSourceEventSecretQueryHandler);
   container.registerSingleton(ResolvePreviewPullRequestContextQueryHandler);
-  container.registerSingleton(ProvisionPostgresDependencyResourceCommandHandler);
-  container.registerSingleton(ImportPostgresDependencyResourceCommandHandler);
-  container.registerSingleton(ProvisionRedisDependencyResourceCommandHandler);
-  container.registerSingleton(ImportRedisDependencyResourceCommandHandler);
+  container.registerSingleton(ProvisionDependencyResourceCommandHandler);
+  container.registerSingleton(ImportDependencyResourceCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(ConfigureDependencyResourceBackupPolicyCommandHandler);
@@ -1716,11 +1711,13 @@ export function registerApplicationServices(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
   );
-  container.register(tokens.managedPostgresProvider, {
-    useValue: new ShellManagedPostgresProvider(input.dataDir),
-  });
-  container.register(tokens.managedRedisProvider, {
-    useValue: new ShellManagedRedisProvider(input.dataDir),
+  container.register(tokens.managedDependencyProvider, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new DockerBackedManagedDependencyProvider(
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+    ),
   });
   container.register(tokens.dependencyResourceBackupProvider, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
@@ -1926,20 +1923,12 @@ export function registerApplicationServices(
     ScheduledTaskRunLogsQueryService,
   );
   container.registerSingleton(
-    tokens.provisionPostgresDependencyResourceUseCase,
-    ProvisionPostgresDependencyResourceUseCase,
+    tokens.provisionDependencyResourceUseCase,
+    ProvisionDependencyResourceUseCase,
   );
   container.registerSingleton(
-    tokens.importPostgresDependencyResourceUseCase,
-    ImportPostgresDependencyResourceUseCase,
-  );
-  container.registerSingleton(
-    tokens.provisionRedisDependencyResourceUseCase,
-    ProvisionRedisDependencyResourceUseCase,
-  );
-  container.registerSingleton(
-    tokens.importRedisDependencyResourceUseCase,
-    ImportRedisDependencyResourceUseCase,
+    tokens.importDependencyResourceUseCase,
+    ImportDependencyResourceUseCase,
   );
   container.registerSingleton(
     tokens.renameDependencyResourceUseCase,

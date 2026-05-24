@@ -89,7 +89,7 @@ export class DockerBackedManagedRedisProvider implements ManagedRedisProviderPor
       return commandFailure({
         message: "Docker-backed managed Redis realization failed",
         providerKey: input.providerKey,
-        operation: "dependency-resources.provision-redis",
+        operation: "dependency-resources.provision",
         exitCode: result.exitCode,
       });
     }

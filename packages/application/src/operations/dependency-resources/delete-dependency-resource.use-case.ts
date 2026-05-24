@@ -23,8 +23,8 @@ import {
   type DependencyResourceRepository,
   type EventBus,
   type IdGenerator,
-  type ManagedPostgresProviderPort,
-  type ManagedRedisProviderPort,
+  type ManagedDependencyProviderPort,
+  type ManagedDependencyResourceKind,
   type ProcessAttemptRecorder,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
@@ -47,10 +47,8 @@ export class DeleteDependencyResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
-    @inject(tokens.managedPostgresProvider)
-    private readonly managedPostgresProvider: ManagedPostgresProviderPort,
-    @inject(tokens.managedRedisProvider)
-    private readonly managedRedisProvider: ManagedRedisProviderPort,
+    @inject(tokens.managedDependencyProvider)
+    private readonly managedDependencyProvider: ManagedDependencyProviderPort,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
@@ -67,8 +65,7 @@ export class DeleteDependencyResourceUseCase {
       eventBus,
       idGenerator,
       logger,
-      managedPostgresProvider,
-      managedRedisProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
     } = this;
 
@@ -98,15 +95,17 @@ export class DeleteDependencyResourceUseCase {
         }),
       );
       const dependencyState = dependencyResource.toState();
+      const dependencyKind = isManagedDependencyResourceKind(dependencyState.kind.value)
+        ? dependencyState.kind.value
+        : undefined;
       const shouldDeleteProviderManagedDependency =
         dependencyState.providerManaged === true &&
-        (dependencyState.kind.value === "postgres" || dependencyState.kind.value === "redis") &&
         dependencyState.sourceMode?.value === "appaloft-managed" &&
         blockers.length === 0 &&
         !dependencyState.backupRelationship?.retentionRequired;
 
       let allowProviderManaged = false;
-      if (shouldDeleteProviderManagedDependency) {
+      if (shouldDeleteProviderManagedDependency && dependencyKind) {
         const providerRealization = dependencyState.providerRealization;
         if (
           providerRealization?.status.value === "ready" &&
@@ -135,22 +134,14 @@ export class DeleteDependencyResourceUseCase {
             dependencyResource,
             undefined,
           );
-          const providerDelete =
-            dependencyState.kind.value === "postgres"
-              ? await managedPostgresProvider.delete(context, {
-                  dependencyResourceId: dependencyResourceId.value,
-                  providerKey: dependencyState.providerKey.value,
-                  providerResourceHandle: providerRealization.providerResourceHandle.value,
-                  attemptId: attemptId.value,
-                  requestedAt: requestedAt.value,
-                })
-              : await managedRedisProvider.delete(context, {
-                  dependencyResourceId: dependencyResourceId.value,
-                  providerKey: dependencyState.providerKey.value,
-                  providerResourceHandle: providerRealization.providerResourceHandle.value,
-                  attemptId: attemptId.value,
-                  requestedAt: requestedAt.value,
-                });
+          const providerDelete = await managedDependencyProvider.delete(context, {
+            dependencyResourceId: dependencyResourceId.value,
+            kind: dependencyKind,
+            providerKey: dependencyState.providerKey.value,
+            providerResourceHandle: providerRealization.providerResourceHandle.value,
+            attemptId: attemptId.value,
+            requestedAt: requestedAt.value,
+          });
           if (providerDelete.isErr()) {
             await recordProviderDeleteProcessAttempt({
               recorder: processAttemptRecorder,
@@ -181,6 +172,17 @@ export class DeleteDependencyResourceUseCase {
       return ok({ id: dependencyResourceId.value });
     });
   }
+}
+
+function isManagedDependencyResourceKind(input: string): input is ManagedDependencyResourceKind {
+  return (
+    input === "postgres" ||
+    input === "redis" ||
+    input === "mysql" ||
+    input === "clickhouse" ||
+    input === "object-storage" ||
+    input === "opensearch"
+  );
 }
 
 async function recordProviderDeleteProcessAttempt(input: {

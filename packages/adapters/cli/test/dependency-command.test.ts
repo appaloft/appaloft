@@ -8,13 +8,11 @@ import {
   type CommandBus,
   CreateDependencyResourceBackupCommand,
   type ExecutionContextFactory,
-  ImportPostgresDependencyResourceCommand,
-  ImportRedisDependencyResourceCommand,
+  ImportDependencyResourceCommand,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
-  ProvisionPostgresDependencyResourceCommand,
-  ProvisionRedisDependencyResourceCommand,
+  ProvisionDependencyResourceCommand,
   type QueryBus,
   RestoreDependencyResourceBackupCommand,
   RotateResourceDependencyBindingSecretCommand,
@@ -88,15 +86,16 @@ async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> 
 }
 
 describe("CLI dependency commands", () => {
-  test("[DEP-RES-PG-ENTRY-001] dependency postgres provision dispatches command", async () => {
+  test("[DEP-RES-ENTRY-001] dependency provision dispatches command by kind", async () => {
     const { commands, program } = await createCommandCaptureHarness("req_cli_dep_provision");
 
     await parseCli(program, [
       "node",
       "appaloft",
       "dependency",
-      "postgres",
       "provision",
+      "--kind",
+      "postgres",
       "--project",
       "prj_demo",
       "--environment",
@@ -105,75 +104,82 @@ describe("CLI dependency commands", () => {
       "Main DB",
     ]);
 
-    expect(commands[0]).toBeInstanceOf(ProvisionPostgresDependencyResourceCommand);
+    expect(commands[0]).toBeInstanceOf(ProvisionDependencyResourceCommand);
     expect(commands[0]).toMatchObject({
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
     });
   });
 
-  test("[DEP-RES-PG-ENTRY-001] dependency postgres import dispatches command", async () => {
+  test("[DEP-RES-ENTRY-001] dependency import dispatches command by kind", async () => {
     const { commands, program } = await createCommandCaptureHarness("req_cli_dep_import");
 
     await parseCli(program, [
       "node",
       "appaloft",
       "dependency",
-      "postgres",
       "import",
+      "--kind",
+      "mysql",
       "--project",
       "prj_demo",
       "--environment",
       "env_demo",
       "--name",
-      "External DB",
+      "External MySQL",
       "--connection-url",
-      "postgres://app:secret@db.example.com/app",
+      "mysql://app:secret@db.example.com/app",
     ]);
 
-    expect(commands[0]).toBeInstanceOf(ImportPostgresDependencyResourceCommand);
+    expect(commands[0]).toBeInstanceOf(ImportDependencyResourceCommand);
     expect(commands[0]).toMatchObject({
+      kind: "mysql",
       projectId: "prj_demo",
       environmentId: "env_demo",
-      name: "External DB",
+      name: "External MySQL",
     });
   });
 
-  test("[DEP-RES-REDIS-ENTRY-001] dependency redis provision/import dispatch commands", async () => {
+  test("[DEP-RES-ENTRY-001] dependency provision/import support additional kinds", async () => {
     const { commands, program } = await createCommandCaptureHarness("req_cli_dep_redis");
 
     await parseCli(program, [
       "node",
       "appaloft",
       "dependency",
-      "redis",
       "provision",
+      "--kind",
+      "opensearch",
       "--project",
       "prj_demo",
       "--environment",
       "env_demo",
       "--name",
-      "Main Cache",
+      "Search",
     ]);
     await parseCli(program, [
       "node",
       "appaloft",
       "dependency",
-      "redis",
       "import",
+      "--kind",
+      "object-storage",
       "--project",
       "prj_demo",
       "--environment",
       "env_demo",
       "--name",
-      "External Cache",
+      "Artifacts",
       "--connection-url",
-      "redis://default:secret@cache.example.com:6379/0",
+      "s3://default:secret@minio.example.com:9000/artifacts",
     ]);
 
-    expect(commands[0]).toBeInstanceOf(ProvisionRedisDependencyResourceCommand);
-    expect(commands[1]).toBeInstanceOf(ImportRedisDependencyResourceCommand);
+    expect(commands[0]).toBeInstanceOf(ProvisionDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({ kind: "opensearch" });
+    expect(commands[1]).toBeInstanceOf(ImportDependencyResourceCommand);
+    expect(commands[1]).toMatchObject({ kind: "object-storage" });
   });
 
   test("[DEP-RES-PG-ENTRY-001] dependency list/show dispatch query bus", async () => {

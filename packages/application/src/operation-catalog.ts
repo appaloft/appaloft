@@ -28,13 +28,11 @@ import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/defa
 import { configureDependencyResourceBackupPolicyCommandInputSchema } from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
 import { createDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/create-dependency-resource-backup.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
-import { importPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-postgres-dependency-resource.command";
-import { importRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-redis-dependency-resource.command";
+import { importDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-dependency-resource.command";
 import { listDependencyResourceBackupPoliciesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 import { listDependencyResourceBackupsQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backups.query";
 import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
-import { provisionPostgresDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-postgres-dependency-resource.command";
-import { provisionRedisDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-redis-dependency-resource.command";
+import { provisionDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-dependency-resource.command";
 import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
 import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
@@ -1700,59 +1698,31 @@ export const operationCatalog = [
     },
   },
   {
-    key: "dependency-resources.provision-postgres",
+    key: "dependency-resources.provision",
     kind: "command",
     domain: "dependency-resources",
-    messageName: "ProvisionPostgresDependencyResourceCommand",
-    handlerName: "ProvisionPostgresDependencyResourceCommandHandler",
-    serviceName: "ProvisionPostgresDependencyResourceUseCase",
-    inputSchema: provisionPostgresDependencyResourceCommandInputSchema,
-    serviceToken: tokens.provisionPostgresDependencyResourceUseCase,
+    messageName: "ProvisionDependencyResourceCommand",
+    handlerName: "ProvisionDependencyResourceCommandHandler",
+    serviceName: "ProvisionDependencyResourceUseCase",
+    inputSchema: provisionDependencyResourceCommandInputSchema,
+    serviceToken: tokens.provisionDependencyResourceUseCase,
     transports: {
-      cli: "appaloft dependency postgres provision",
-      orpc: { method: "POST", path: "/api/dependency-resources/postgres/provision" },
+      cli: "appaloft dependency provision --kind <kind>",
+      orpc: { method: "POST", path: "/api/dependency-resources/provision" },
     },
   },
   {
-    key: "dependency-resources.import-postgres",
+    key: "dependency-resources.import",
     kind: "command",
     domain: "dependency-resources",
-    messageName: "ImportPostgresDependencyResourceCommand",
-    handlerName: "ImportPostgresDependencyResourceCommandHandler",
-    serviceName: "ImportPostgresDependencyResourceUseCase",
-    inputSchema: importPostgresDependencyResourceCommandInputSchema,
-    serviceToken: tokens.importPostgresDependencyResourceUseCase,
+    messageName: "ImportDependencyResourceCommand",
+    handlerName: "ImportDependencyResourceCommandHandler",
+    serviceName: "ImportDependencyResourceUseCase",
+    inputSchema: importDependencyResourceCommandInputSchema,
+    serviceToken: tokens.importDependencyResourceUseCase,
     transports: {
-      cli: "appaloft dependency postgres import",
-      orpc: { method: "POST", path: "/api/dependency-resources/postgres/import" },
-    },
-  },
-  {
-    key: "dependency-resources.provision-redis",
-    kind: "command",
-    domain: "dependency-resources",
-    messageName: "ProvisionRedisDependencyResourceCommand",
-    handlerName: "ProvisionRedisDependencyResourceCommandHandler",
-    serviceName: "ProvisionRedisDependencyResourceUseCase",
-    inputSchema: provisionRedisDependencyResourceCommandInputSchema,
-    serviceToken: tokens.provisionRedisDependencyResourceUseCase,
-    transports: {
-      cli: "appaloft dependency redis provision",
-      orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
-    },
-  },
-  {
-    key: "dependency-resources.import-redis",
-    kind: "command",
-    domain: "dependency-resources",
-    messageName: "ImportRedisDependencyResourceCommand",
-    handlerName: "ImportRedisDependencyResourceCommandHandler",
-    serviceName: "ImportRedisDependencyResourceUseCase",
-    inputSchema: importRedisDependencyResourceCommandInputSchema,
-    serviceToken: tokens.importRedisDependencyResourceUseCase,
-    transports: {
-      cli: "appaloft dependency redis import",
-      orpc: { method: "POST", path: "/api/dependency-resources/redis/import" },
+      cli: "appaloft dependency import --kind <kind>",
+      orpc: { method: "POST", path: "/api/dependency-resources/import" },
     },
   },
   {

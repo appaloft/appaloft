@@ -51,6 +51,11 @@ import {
   type ImportedCertificateMaterialValidationResult,
   type ImportedCertificateSecretStoreInput,
   type ImportedCertificateSecretStoreResult,
+  type ManagedDependencyDeleteInput,
+  type ManagedDependencyDeleteResult,
+  type ManagedDependencyProviderPort,
+  type ManagedDependencyRealizationInput,
+  type ManagedDependencyRealizationResult,
   type ManagedPostgresDeleteInput,
   type ManagedPostgresDeleteResult,
   type ManagedPostgresProviderPort,
@@ -328,6 +333,96 @@ export class FakeDependencyResourceSecretStore implements DependencyResourceSecr
     }
     return ok({ secretRef: input.secretRef, secretValue });
   }
+}
+
+export class FakeManagedDependencyProvider implements ManagedDependencyProviderPort {
+  readonly realized: ManagedDependencyRealizationInput[] = [];
+  readonly deleted: ManagedDependencyDeleteInput[] = [];
+  private supportedProviderKeys = new Set([
+    "appaloft-managed-postgres:postgres",
+    "appaloft-managed-redis:redis",
+    "appaloft-managed-mysql:mysql",
+    "appaloft-managed-clickhouse:clickhouse",
+    "appaloft-managed-object-storage:object-storage",
+    "appaloft-managed-opensearch:opensearch",
+  ]);
+
+  constructor(
+    private realizationResult?: Result<ManagedDependencyRealizationResult, DomainError>,
+    private deleteResult?: Result<ManagedDependencyDeleteResult, DomainError>,
+  ) {}
+
+  setSupportedProviderKeys(providerKeys: string[]): void {
+    this.supportedProviderKeys = new Set(providerKeys);
+  }
+
+  setRealizationResult(result: Result<ManagedDependencyRealizationResult, DomainError>): void {
+    this.realizationResult = result;
+  }
+
+  setDeleteResult(result: Result<ManagedDependencyDeleteResult, DomainError>): void {
+    this.deleteResult = result;
+  }
+
+  supports(providerKey: string, kind: ManagedDependencyRealizationInput["kind"]): boolean {
+    return this.supportedProviderKeys.has(`${providerKey}:${kind}`);
+  }
+
+  async realize(
+    context: ExecutionContext,
+    input: ManagedDependencyRealizationInput,
+  ): Promise<Result<ManagedDependencyRealizationResult, DomainError>> {
+    void context;
+    this.realized.push(input);
+    return this.realizationResult ?? ok(defaultManagedDependencyRealization(input));
+  }
+
+  async delete(
+    context: ExecutionContext,
+    input: ManagedDependencyDeleteInput,
+  ): Promise<Result<ManagedDependencyDeleteResult, DomainError>> {
+    void context;
+    this.deleted.push(input);
+    return this.deleteResult ?? ok({ deletedAt: input.requestedAt });
+  }
+}
+
+function defaultManagedDependencyRealization(
+  input: ManagedDependencyRealizationInput,
+): ManagedDependencyRealizationResult {
+  const port =
+    input.kind === "postgres"
+      ? 5432
+      : input.kind === "redis"
+        ? 6379
+        : input.kind === "mysql"
+          ? 3306
+          : input.kind === "opensearch"
+            ? 9200
+            : 9000;
+  const databaseName =
+    input.kind === "redis" || input.kind === "opensearch"
+      ? undefined
+      : input.slug.replaceAll("-", "_");
+  const scheme =
+    input.kind === "object-storage" ? "s3" : input.kind === "opensearch" ? "http" : input.kind;
+  const host = `${input.slug}.${input.kind}.internal`;
+  const providerHandlePrefix = input.kind === "postgres" ? "pg" : input.kind;
+  const maskedConnection =
+    input.kind === "redis"
+      ? `redis://:********@${host}:6379/0`
+      : `${scheme}://app:********@${host}:${port}/${databaseName ?? ""}`;
+  return {
+    providerResourceHandle: `${providerHandlePrefix}/${input.dependencyResourceId}`,
+    endpoint: {
+      host,
+      port,
+      ...(databaseName ? { databaseName } : {}),
+      maskedConnection,
+    },
+    secretRef: `secret://dependency/${input.kind}/${input.dependencyResourceId}`,
+    realizedAt: input.requestedAt,
+  };
 }
 
 export class FakeManagedPostgresProvider implements ManagedPostgresProviderPort {

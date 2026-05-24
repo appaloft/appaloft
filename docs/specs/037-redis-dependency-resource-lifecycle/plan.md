@@ -5,8 +5,8 @@
 - Domain model: `docs/DOMAIN_MODEL.md`
 - Operation map: `docs/BUSINESS_OPERATION_MAP.md`
 - Local specs:
-  - `docs/commands/dependency-resources.provision-redis.md`
-  - `docs/commands/dependency-resources.import-redis.md`
+  - `docs/commands/dependency-resources.provision.md`
+  - `docs/commands/dependency-resources.import.md`
   - `docs/workflows/dependency-resource-lifecycle.md`
   - `docs/specs/033-postgres-dependency-resource-lifecycle/spec.md`
 - Test matrix: `docs/testing/dependency-resource-test-matrix.md`
@@ -22,7 +22,7 @@
 - Domain/application placement:
   - Extend the dependency resource model with Redis endpoint value objects and a
     `ResourceInstance.createRedisDependencyResource(...)` factory.
-  - Add `ProvisionRedisDependencyResourceCommand` and `ImportRedisDependencyResourceCommand`.
+  - Add `ProvisionDependencyResourceCommand` and `ImportDependencyResourceCommand`.
   - Keep `dependency-resources.list/show/rename/delete` generic and extend their input/output
     schemas from `postgres` to `postgres | redis`.
 - Repository/read-model impact:

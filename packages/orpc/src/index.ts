@@ -178,8 +178,7 @@ import {
   getAuthBootstrapStatusQueryInputSchema,
   getCurrentOrganizationContextQueryInputSchema,
   ImportCertificateCommand,
-  ImportPostgresDependencyResourceCommand,
-  ImportRedisDependencyResourceCommand,
+  ImportDependencyResourceCommand,
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
@@ -188,8 +187,7 @@ import {
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
-  importPostgresDependencyResourceCommandInputSchema,
-  importRedisDependencyResourceCommandInputSchema,
+  importDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
   inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
@@ -281,8 +279,7 @@ import {
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
   PromoteEnvironmentCommand,
-  ProvisionPostgresDependencyResourceCommand,
-  ProvisionRedisDependencyResourceCommand,
+  ProvisionDependencyResourceCommand,
   PruneAuditEventArchivesCommand,
   PruneAuditEventsCommand,
   PruneDeploymentLogsCommand,
@@ -294,8 +291,7 @@ import {
   PruneServerCapacityCommand,
   PruneSourceEventsCommand,
   promoteEnvironmentCommandInputSchema,
-  provisionPostgresDependencyResourceCommandInputSchema,
-  provisionRedisDependencyResourceCommandInputSchema,
+  provisionDependencyResourceCommandInputSchema,
   pruneAuditEventArchivesCommandInputSchema,
   pruneAuditEventsCommandInputSchema,
   pruneDeploymentLogsCommandInputSchema,
@@ -1206,20 +1202,12 @@ export const apiRouteDescriptions = {
     "Dry-runs or explicitly removes safe Appaloft-owned runtime volume realizations for one storage volume on one server.",
     "storage.volume-lifecycle",
   ),
-  provisionPostgresDependencyResource: routeDescription(
-    "Provisions an Appaloft-managed Postgres dependency resource through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed database infrastructure on that single-server target.",
+  provisionDependencyResource: routeDescription(
+    "Provisions an Appaloft-managed dependency resource of the requested kind through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed infrastructure on that single-server target.",
     "dependency.resource-lifecycle",
   ),
-  importPostgresDependencyResource: routeDescription(
-    "Imports external Postgres dependency metadata while keeping raw connection secrets outside list and show responses.",
-    "dependency.resource-lifecycle",
-  ),
-  provisionRedisDependencyResource: routeDescription(
-    "Provisions an Appaloft-managed Redis dependency resource through the configured provider capability. When serverId is supplied, the default shell provider realizes Docker-backed Redis infrastructure on that single-server target.",
-    "dependency.resource-lifecycle",
-  ),
-  importRedisDependencyResource: routeDescription(
-    "Imports external Redis dependency metadata while keeping raw connection secrets outside list and show responses.",
+  importDependencyResource: routeDescription(
+    "Imports external dependency resource metadata while keeping raw connection secrets outside list and show responses.",
     "dependency.resource-lifecycle",
   ),
   listDependencyResources: routeDescription(
@@ -4907,56 +4895,30 @@ export const cleanupStorageVolumeRuntimeProcedure = base
     executeCommand(context, CleanupStorageVolumeRuntimeCommand.create(input)),
   );
 
-export const provisionPostgresDependencyResourceProcedure = base
+export const provisionDependencyResourceProcedure = base
   .route({
     method: "POST",
-    path: "/dependency-resources/postgres/provision",
-    description: apiRouteDescriptions.provisionPostgresDependencyResource,
+    path: "/dependency-resources/provision",
+    description: apiRouteDescriptions.provisionDependencyResource,
     successStatus: 201,
   })
-  .input(provisionPostgresDependencyResourceCommandInputSchema)
+  .input(provisionDependencyResourceCommandInputSchema)
   .output(dependencyResourceResponseSchema)
   .handler(async ({ input, context }) =>
-    executeCommand(context, ProvisionPostgresDependencyResourceCommand.create(input)),
+    executeCommand(context, ProvisionDependencyResourceCommand.create(input)),
   );
 
-export const importPostgresDependencyResourceProcedure = base
+export const importDependencyResourceProcedure = base
   .route({
     method: "POST",
-    path: "/dependency-resources/postgres/import",
-    description: apiRouteDescriptions.importPostgresDependencyResource,
+    path: "/dependency-resources/import",
+    description: apiRouteDescriptions.importDependencyResource,
     successStatus: 201,
   })
-  .input(importPostgresDependencyResourceCommandInputSchema)
+  .input(importDependencyResourceCommandInputSchema)
   .output(dependencyResourceResponseSchema)
   .handler(async ({ input, context }) =>
-    executeCommand(context, ImportPostgresDependencyResourceCommand.create(input)),
-  );
-
-export const provisionRedisDependencyResourceProcedure = base
-  .route({
-    method: "POST",
-    path: "/dependency-resources/redis/provision",
-    description: apiRouteDescriptions.provisionRedisDependencyResource,
-    successStatus: 201,
-  })
-  .input(provisionRedisDependencyResourceCommandInputSchema)
-  .output(dependencyResourceResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, ProvisionRedisDependencyResourceCommand.create(input)),
-  );
-
-export const importRedisDependencyResourceProcedure = base
-  .route({
-    method: "POST",
-    path: "/dependency-resources/redis/import",
-    description: apiRouteDescriptions.importRedisDependencyResource,
-    successStatus: 201,
-  })
-  .input(importRedisDependencyResourceCommandInputSchema)
-  .output(dependencyResourceResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, ImportRedisDependencyResourceCommand.create(input)),
+    executeCommand(context, ImportDependencyResourceCommand.create(input)),
   );
 
 export const listDependencyResourcesProcedure = base
@@ -5463,10 +5425,8 @@ export const appaloftOrpcRouter = {
     },
   },
   dependencyResources: {
-    provisionPostgres: provisionPostgresDependencyResourceProcedure,
-    importPostgres: importPostgresDependencyResourceProcedure,
-    provisionRedis: provisionRedisDependencyResourceProcedure,
-    importRedis: importRedisDependencyResourceProcedure,
+    provision: provisionDependencyResourceProcedure,
+    import: importDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
     show: showDependencyResourceProcedure,
     rename: renameDependencyResourceProcedure,
@@ -7858,10 +7818,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/source-links/relink",
     "/api/source-links/:sourceFingerprint",
     "/api/dependency-resources",
-    "/api/dependency-resources/postgres/provision",
-    "/api/dependency-resources/postgres/import",
-    "/api/dependency-resources/redis/provision",
-    "/api/dependency-resources/redis/import",
+    "/api/dependency-resources/provision",
+    "/api/dependency-resources/import",
     "/api/dependency-resources/backups/:backupId",
     "/api/dependency-resources/backups/:backupId/restore",
     "/api/dependency-resources/backup-policies",

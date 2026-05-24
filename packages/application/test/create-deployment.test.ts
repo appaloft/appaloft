@@ -119,8 +119,7 @@ import {
   CapturedEventBus,
   FakeDependencyResourceBackupProvider,
   FakeDependencyResourceSecretStore,
-  FakeManagedPostgresProvider,
-  FakeManagedRedisProvider,
+  FakeManagedDependencyProvider,
   FixedClock,
   MemoryDependencyResourceBackupRepository,
   MemoryDependencyResourceRepository,
@@ -186,8 +185,7 @@ import {
   DeploymentLifecycleService,
   DeploymentLogsQueryService,
   DeploymentSnapshotFactory,
-  ProvisionPostgresDependencyResourceUseCase,
-  ProvisionRedisDependencyResourceUseCase,
+  ProvisionDependencyResourceUseCase,
   RestoreDependencyResourceBackupUseCase,
   RuntimePlanResolutionInputBuilder,
 } from "../src/use-cases";
@@ -747,8 +745,7 @@ async function createDeploymentFixture(
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
   const dependencyResourceBackups = new MemoryDependencyResourceBackupRepository();
   const dependencyResourceBackupProvider = new FakeDependencyResourceBackupProvider();
-  const managedPostgresProvider = new FakeManagedPostgresProvider();
-  const managedRedisProvider = new FakeManagedRedisProvider();
+  const managedDependencyProvider = new FakeManagedDependencyProvider();
   const dependencyBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
     dependencyResources,
@@ -874,6 +871,19 @@ async function createDeploymentFixture(
     dependencyResourceSecretStore,
     options.processAttemptRecorder,
   );
+  const provisionDependency = new ProvisionDependencyResourceUseCase(
+    projects,
+    environments,
+    servers,
+    dependencyResources,
+    dependencyResourceSecretStore,
+    clock,
+    idGenerator,
+    eventBus,
+    logger,
+    managedDependencyProvider,
+  );
+
   return {
     bindDependency: new BindResourceDependencyUseCase(
       resources,
@@ -909,32 +919,8 @@ async function createDeploymentFixture(
     environment,
     environments,
     eventBus,
-    managedPostgresProvider,
-    managedRedisProvider,
-    provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedPostgresProvider,
-    ),
-    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedRedisProvider,
-    ),
+    managedDependencyProvider,
+    provisionDependencyResource: provisionDependency,
     logger,
     projects,
     repositoryContext,
@@ -1870,12 +1856,13 @@ describe("CreateDeploymentUseCase", () => {
       deploymentLogs,
       deploymentReadModel,
       dependencyResourceBackupProvider,
-      provisionPostgres,
+      provisionDependencyResource,
       repositoryContext,
       restoreBackup,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
 
-    const provisioned = await provisionPostgres.execute(context, {
+    const provisioned = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main DB",
@@ -1953,13 +1940,13 @@ describe("CreateDeploymentUseCase", () => {
       deploymentReadModel,
       dependencyResourceBackupProvider,
       dependencyResourceSecretStore,
-      managedRedisProvider,
-      provisionRedis,
+      managedDependencyProvider,
+      provisionDependencyResource,
       repositoryContext,
       restoreBackup,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
     dependencyResourceBackupProvider.setSupported(["appaloft-managed-redis:redis"]);
-    managedRedisProvider.setRealizationResult(
+    managedDependencyProvider.setRealizationResult(
       ok({
         providerResourceHandle: "redis/rsi_0001",
         endpoint: {
@@ -1973,7 +1960,8 @@ describe("CreateDeploymentUseCase", () => {
       }),
     );
 
-    const provisioned = await provisionRedis.execute(context, {
+    const provisioned = await provisionDependencyResource.execute(context, {
+      kind: "redis",
       projectId: "prj_demo",
       environmentId: "env_demo",
       name: "Main Cache",

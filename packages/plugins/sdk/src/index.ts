@@ -33,8 +33,9 @@ export const systemPluginWebExtensionSchema = z.object({
   description: z.string().min(1).optional(),
   path: z.string().min(1),
   placement: z.enum(["auth", "navigation", "settings", "quick-deploy-source"]),
-  target: z.enum(["server-page", "external-page"]),
+  target: z.enum(["server-page", "external-page", "console-route"]),
   requiresAuth: z.boolean(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;

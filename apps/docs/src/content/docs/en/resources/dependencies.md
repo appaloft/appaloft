@@ -1,6 +1,6 @@
 ---
 title: "Dependency resources"
-description: "Manage Postgres, Redis, bindings, secret rotation, backup, and restore."
+description: "Manage dependency resources, bindings, secret rotation, backup, and restore."
 docType: task
 localeState:
   zh-CN: complete
@@ -14,10 +14,8 @@ searchAliases:
   - "runtime injection"
   - "DATABASE_URL"
 relatedOperations:
-  - dependency-resources.provision-postgres
-  - dependency-resources.import-postgres
-  - dependency-resources.provision-redis
-  - dependency-resources.import-redis
+  - dependency-resources.provision
+  - dependency-resources.import
   - dependency-resources.list
   - dependency-resources.show
   - dependency-resources.rename
@@ -39,12 +37,13 @@ sidebar:
 <h2 id="dependency-resource-lifecycle">Dependency resource lifecycle</h2>
 
 A dependency resource is Appaloft's record for a database or service dependency. Phase 7 supports
-provider-neutral Postgres and Redis records, Appaloft-managed Postgres/Redis realization, imported
-external dependencies, safe read models, delete safety checks, and backup/restore.
+provider-neutral Postgres, Redis, MySQL, ClickHouse, S3/MinIO object storage, and OpenSearch
+records, Appaloft-managed realization, imported external dependencies, safe read models, delete
+safety checks, and backup/restore.
 
 ```bash title="Create or import dependency resources"
-appaloft dependency postgres provision --project prj_prod --environment env_prod --name app-db
-appaloft dependency redis import --project prj_prod --environment env_prod --name cache
+appaloft dependency provision --kind postgres --project prj_prod --environment env_prod --name app-db
+appaloft dependency import --kind redis --project prj_prod --environment env_prod --name cache --connection-url redis://cache.internal:6379/0
 ```
 
 List/show output must mask connection secrets, provider tokens, passwords, and raw connection URLs.

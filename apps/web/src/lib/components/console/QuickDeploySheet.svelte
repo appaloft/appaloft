@@ -60,6 +60,10 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
+  import {
+    endpointFromTemplate,
+    readBlueprintCatalogExtensionMetadata,
+  } from "$lib/console/blueprint-marketplace-extension";
   import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
   import {
@@ -406,6 +410,8 @@
   let selectedBlueprintSourceExtensionKey = $state(
     browser ? (page.url.searchParams.get("sourceExtension") ?? "") : "",
   );
+  let selectedBlueprintSlug = $state(browser ? (page.url.searchParams.get("blueprintSlug") ?? "") : "");
+  let selectedBlueprintTitle = $state(browser ? (page.url.searchParams.get("blueprintTitle") ?? "") : "");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
   let deployFeedback = $state<{
@@ -712,8 +718,10 @@
     }
 
     if (sourceKind === "blueprint") {
-      return selectedBlueprintSourceExtension?.title ??
-        $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector);
+      return selectedBlueprintTitle.trim() ||
+        selectedBlueprintSlug.trim() ||
+        (selectedBlueprintSourceExtension?.title ??
+          $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector));
     }
 
     return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
@@ -742,6 +750,7 @@
     }
 
     if (sourceKind === "blueprint") {
+      const selectedBlueprintValue = selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
       return [
         {
           label: $t(i18nKeys.console.quickDeploy.sourceAccess),
@@ -749,9 +758,19 @@
         },
         {
           label: $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector),
-          value: selectedBlueprintSourceExtension?.title ??
-            $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable),
+          value: selectedBlueprintValue ||
+            (selectedBlueprintSourceExtension?.title ??
+              $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)),
         },
+        ...(selectedBlueprintSlug.trim()
+          ? [
+              {
+                label: "Blueprint",
+                value: selectedBlueprintSlug.trim(),
+                mono: true,
+              },
+            ]
+          : []),
         {
           label: $t(i18nKeys.console.quickDeploy.sourceAddress),
           value: selectedBlueprintSourceExtension?.path ?? "/marketplace",
@@ -858,6 +877,10 @@
   const inferredSourceName = $derived.by(() => {
     if (sourceKind === "github" && selectedGitHubRepository) {
       return selectedGitHubRepository.name;
+    }
+
+    if (sourceKind === "blueprint" && selectedBlueprintSlug.trim()) {
+      return selectedBlueprintSlug.trim();
     }
 
     const locator = sourceLocator.trim();
@@ -1320,6 +1343,35 @@
     }
   }
 
+  function selectedBlueprintDetailHref(): string {
+    const slug = selectedBlueprintSlug.trim();
+    if (!slug) {
+      return sourceExtensionHref(selectedBlueprintSourceExtension);
+    }
+
+    const params = new URLSearchParams();
+    if (browser) {
+      const returnTo = buildDeployStateUrl();
+      params.set("returnTo", `${returnTo.pathname}${returnTo.search}`);
+    }
+    const search = params.toString();
+    return `/marketplace/${encodeURIComponent(slug)}${search ? `?${search}` : ""}`;
+  }
+
+  function selectedBlueprintInstallPlanEndpoint(): string {
+    const slug = selectedBlueprintSlug.trim();
+    const metadata = readBlueprintCatalogExtensionMetadata(selectedBlueprintSourceExtension);
+    if (!slug || !metadata) {
+      return "";
+    }
+
+    if (metadata.installPlanEndpointTemplate) {
+      return endpointFromTemplate(metadata.installPlanEndpointTemplate, slug);
+    }
+
+    return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}/install-plan`;
+  }
+
   function buildDeployStateUrl(): URL {
     const url = new URL(browser ? window.location.href : page.url.href);
     url.pathname = "/deploy";
@@ -1351,6 +1403,8 @@
         "sourceExtension",
         selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey,
       );
+      setSearchParam(params, "blueprintSlug", selectedBlueprintSlug);
+      setSearchParam(params, "blueprintTitle", selectedBlueprintTitle);
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
@@ -1493,6 +1547,8 @@
     selectedGitHubRepositoryId = params.get("githubRepositoryId") ?? "";
     selectedGitHubRepository = null;
     selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
+    selectedBlueprintSlug = params.get("blueprintSlug") ?? "";
+    selectedBlueprintTitle = params.get("blueprintTitle") ?? "";
 
     localFolderLocator = nextSourceKind === "local-folder" ? nextSourceLocator || "." : localFolderLocator;
     githubLocator = nextSourceKind === "github" ? nextSourceLocator : githubLocator;
@@ -1783,7 +1839,7 @@
     switch (stepKey) {
       case "source":
         if (sourceKind === "blueprint") {
-          return false;
+          return Boolean(selectedBlueprintSlug.trim());
         }
 
         if (!sourceLocator) {
@@ -2182,6 +2238,33 @@
 
     try {
       if (sourceKind === "blueprint") {
+        if (selectedBlueprintSlug.trim()) {
+          const endpoint = selectedBlueprintInstallPlanEndpoint();
+          if (endpoint) {
+            await request<unknown>(endpoint, {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                profile: "production",
+                parameters: {
+                  APP_NAME: selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
+                },
+                target: {
+                  projectName:
+                    projectName.trim() || selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
+                  environmentName: environmentName.trim() || "production",
+                  resourceSlugPrefix: selectedBlueprintSlug.trim(),
+                },
+              }),
+            });
+          }
+
+          await goto(selectedBlueprintDetailHref());
+          return;
+        }
+
         const href = sourceExtensionHref(selectedBlueprintSourceExtension);
         if (href !== "#") {
           await goto(href);
@@ -2554,6 +2637,21 @@
                     <Skeleton class="h-20 w-full" />
                   </div>
                 {:else if quickDeploySourceExtensions.length > 0}
+                  {#if selectedBlueprintSlug.trim()}
+                    <div class="console-subtle-panel flex items-center justify-between gap-3 px-3 py-3">
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium">
+                          {selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()}
+                        </p>
+                        <p class="truncate font-mono text-xs text-muted-foreground">
+                          {selectedBlueprintSlug.trim()}
+                        </p>
+                      </div>
+                      <Button href={selectedBlueprintDetailHref()} size="sm" variant="outline">
+                        查看
+                      </Button>
+                    </div>
+                  {/if}
                   <div class="grid gap-2 sm:grid-cols-2">
                     {#each quickDeploySourceExtensions as extension (extension.key)}
                       <Button
@@ -2562,6 +2660,8 @@
                         class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
                         onclick={() => {
                           selectedBlueprintSourceExtensionKey = extension.key;
+                          selectedBlueprintSlug = "";
+                          selectedBlueprintTitle = "";
                         }}
                       >
                         <Package class="size-4 shrink-0" />
@@ -3742,7 +3842,7 @@
             >
               {$t(i18nKeys.common.actions.previous)}
             </Button>
-            {#if activeStep === "source" && sourceKind === "blueprint"}
+            {#if activeStep === "source" && sourceKind === "blueprint" && !selectedBlueprintSlug.trim()}
               <Button
                 href={sourceExtensionHref(selectedBlueprintSourceExtension)}
                 class="flex-1 sm:flex-none"
@@ -3826,6 +3926,9 @@
               {#if deployPending}
                 <LoaderCircle class="size-4 animate-spin" />
                 {$t(i18nKeys.console.quickDeploy.submitPending)}
+              {:else if sourceKind === "blueprint"}
+                <Play class="size-4" />
+                查看 Blueprint 安装计划
               {:else}
                 <Play class="size-4" />
                 {$t(i18nKeys.common.actions.createAndDeploy)}

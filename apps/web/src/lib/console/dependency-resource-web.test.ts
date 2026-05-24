@@ -5,22 +5,25 @@ import { webDocsHrefs } from "./docs-help";
 
 describe("dependency resource Web console surface", () => {
   test("[DEP-RES-WEB-001] exposes dependency resources and bindings through shared oRPC contracts", async () => {
-    const [resourcePageSource, clientContractSource] = await Promise.all([
-      readFile(
-        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
-        "utf8",
-      ),
-    ]);
+    const [resourcePageSource, dependencyResourcePageSource, clientContractSource] =
+      await Promise.all([
+        readFile(
+          new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL("../../routes/dependency-resources/+page.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
+          "utf8",
+        ),
+      ]);
 
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.list");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.provisionPostgres");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.provisionRedis");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.importPostgres");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.importRedis");
+    expect(resourcePageSource).toContain("orpcClient.dependencyResources.provision");
+    expect(resourcePageSource).toContain("orpcClient.dependencyResources.import");
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.rename");
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.delete");
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.createBackup");
@@ -48,12 +51,29 @@ describe("dependency resource Web console surface", () => {
     expect(resourcePageSource).toContain("i18nKeys.console.resources.dependenciesTitle");
     expect(resourcePageSource).toContain("webDocsHrefs.dependencyResourceLifecycle");
     expect(resourcePageSource).toContain("webDocsHrefs.dependencyRuntimeInjection");
+    expect(dependencyResourcePageSource).toContain(
+      "i18nKeys.console.dependencyResources.kindMysql",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "i18nKeys.console.dependencyResources.kindClickHouse",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "i18nKeys.console.dependencyResources.kindObjectStorage",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "i18nKeys.console.dependencyResources.kindOpenSearch",
+    );
+    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.provision");
+    expect(dependencyResourcePageSource).not.toContain(
+      "i18nKeys.console.dependencyResources.createUnavailable",
+    );
+    expect(dependencyResourcePageSource).not.toContain("selectedDependencyKindOption.provision");
     expect(clientContractSource).toContain("dependencyResources: {");
     expect(clientContractSource).toContain("dependencyBindings: {");
-    expect(clientContractSource).toContain("provisionPostgres: Client");
-    expect(clientContractSource).toContain("provisionRedis: Client");
-    expect(clientContractSource).toContain("importPostgres: Client");
-    expect(clientContractSource).toContain("importRedis: Client");
+    expect(clientContractSource).toContain("provision: Client");
+    expect(clientContractSource).toContain("import: Client");
+    expect(clientContractSource).not.toMatch(/provision(Postgres|Redis): Client/);
+    expect(clientContractSource).not.toMatch(/import(Postgres|Redis): Client/);
     expect(clientContractSource).toContain("rename: Client");
     expect(clientContractSource).toContain("delete: Client");
     expect(clientContractSource).toContain("createBackup: Client");

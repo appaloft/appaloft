@@ -1613,19 +1613,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         generatedAt: "2026-01-01T00:00:05.000Z",
       },
     },
-    "/api/rpc/dependencyResources/provisionPostgres": (_request: Request, body: unknown) => {
-      const input = readOrpcJsonPayload(body) as { name?: string } | null;
+    "/api/rpc/dependencyResources/provision": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { kind?: string; name?: string } | null;
       return {
         json: {
-          id: `dres_${input?.name ?? "postgres"}`,
-        },
-      };
-    },
-    "/api/rpc/dependencyResources/provisionRedis": (_request: Request, body: unknown) => {
-      const input = readOrpcJsonPayload(body) as { name?: string } | null;
-      return {
-        json: {
-          id: `dres_${input?.name ?? "redis"}`,
+          id: `dres_${input?.name ?? input?.kind ?? "dependency"}`,
         },
       };
     },
@@ -3264,9 +3256,7 @@ describe("console e2e with Bun.WebView", () => {
     );
     await clickFormSubmit(view, "#dependency-resource-create-form");
 
-    const provisionRequest = await waitForRecordedRequest(
-      "/api/rpc/dependencyResources/provisionPostgres",
-    );
+    const provisionRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/provision");
     expect(readOrpcJsonPayload(provisionRequest.body)).toEqual(
       expect.objectContaining({
         backupRelationship: {
@@ -3274,6 +3264,7 @@ describe("console e2e with Bun.WebView", () => {
           retentionRequired: true,
         },
         environmentId: "env_demo",
+        kind: "postgres",
         name: "reporting-db",
         projectId: "prj_demo",
         serverId: "srv_demo",

@@ -28,7 +28,7 @@ injection, backup/restore, and closed-loop verification on top of this baseline.
    core concepts with public operations, persistence, read models, and runtime snapshot coverage in
    later Phase 7 slices.
 2. This slice treats Postgres dependency resources as a write-side `ResourceInstance` aggregate plus
-   safe read models, not as provider action orchestration. `dependency-resources.provision-postgres`
+   safe read models, not as provider action orchestration. `dependency-resources.provision`
    records Appaloft-managed intent and provider-neutral metadata only; it does not create a
    provider-native database.
 3. Imported external Postgres and Appaloft-managed Postgres share project/environment ownership,
@@ -63,8 +63,8 @@ injection, backup/restore, and closed-loop verification on top of this baseline.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| DEP-RES-PG-PROVISION-001 | Provision managed Postgres record | Active project/environment context | `dependency-resources.provision-postgres` with valid name | A Postgres `ResourceInstance` is persisted, marked Appaloft-managed, emits creation event, and, when provider-native realization is available, records safe provider realization attempt state through the later provider-native realization slice. |
-| DEP-RES-PG-IMPORT-001 | Import external Postgres | Active project/environment context | `dependency-resources.import-postgres` with endpoint and secret reference or connection secret input | A Postgres `ResourceInstance` is persisted as imported-external; read models mask all secret-bearing connection data. |
+| DEP-RES-PG-PROVISION-001 | Provision managed Postgres record | Active project/environment context | `dependency-resources.provision` with valid name | A Postgres `ResourceInstance` is persisted, marked Appaloft-managed, emits creation event, and, when provider-native realization is available, records safe provider realization attempt state through the later provider-native realization slice. |
+| DEP-RES-PG-IMPORT-001 | Import external Postgres | Active project/environment context | `dependency-resources.import` with endpoint and secret reference or connection secret input | A Postgres `ResourceInstance` is persisted as imported-external; read models mask all secret-bearing connection data. |
 | DEP-RES-PG-VALIDATION-001 | Reject invalid input | Active context | Name/slug/endpoint/connection metadata is invalid or includes unsafe secret-bearing output fields | Command returns `validation_error`, `phase = dependency-resource-validation`, no mutation. |
 | DEP-RES-PG-READ-001 | List/show safe summaries | Existing managed and imported Postgres resources | `dependency-resources.list` or `dependency-resources.show` | Output includes ownership, status, exposure policy, binding readiness, backup relationship metadata, and masked connection summary only. |
 | DEP-RES-PG-READ-002 | Secret masking | Imported Postgres has raw password, token, auth header, cookie, SSH credential, provider token, or sensitive query in input | list/show/error/event/log surfaces are read | Raw secret material is absent; password-like parts are replaced by a stable mask. |
@@ -95,7 +95,7 @@ injection, backup/restore, and closed-loop verification on top of this baseline.
 
 - API/oRPC: add provision/import/list/show/rename/delete routes using application command/query
   schemas.
-- CLI: add `appaloft dependency postgres provision/import` plus
+- CLI: add `appaloft dependency provision --kind postgres and appaloft dependency import --kind postgres` plus
   `appaloft dependency list/show/rename/delete`.
 - Web/UI: Resource detail exposes dependency resource provision/import/list, rename/delete, backup
   create/list/acknowledged restore, and binding controls through shared commands/read models with

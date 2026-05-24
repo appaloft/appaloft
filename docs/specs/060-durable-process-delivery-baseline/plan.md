@@ -119,8 +119,8 @@
   after `DependencyResourceBackup` state is persisted, but uses process-attempt atomic
   claim/completion when a process journal is available.
 - Provider-native dependency resource realization/delete is the twelfth selected operator-visible
-  process-attempt binding. It mirrors `dependency-resources.provision-postgres`,
-  `dependency-resources.provision-redis`, and provider-managed `dependency-resources.delete`
+  process-attempt binding. It mirrors `dependency-resources.provision`,
+  `dependency-resources.provision`, and provider-managed `dependency-resources.delete`
   running, succeeded, and failed provider attempts into the process attempt journal with
   ResourceInstance realization/delete attempt ids, stable dependency-resource realization/delete
   dedupe keys, safe dependency kind/provider metadata, async-processing failure category,

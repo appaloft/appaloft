@@ -1,14 +1,16 @@
-# dependency-resources.provision-postgres Command Spec
+# dependency-resources.provision Command Spec
 
 ## Intent
 
-Create an Appaloft-managed Postgres dependency resource for one project/environment and admit a
-durable provider-native realization attempt when the selected provider supports managed Postgres.
-When `serverId` is supplied, the default shell provider realizes the database as a Docker-backed
-container and volume on that single-server target.
+Create an Appaloft-managed dependency resource for one project/environment and admit a durable
+provider-native realization attempt when the selected provider supports the requested kind. The
+same command handles `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, and
+`opensearch`. When `serverId` is supplied, the default shell provider realizes Docker-backed
+infrastructure on that single-server target.
 
 ## Input
 
+- `kind`
 - `projectId`
 - `environmentId`
 - `name`
@@ -19,14 +21,14 @@ container and volume on that single-server target.
 
 ## Success
 
-Returns `ok({ id })`, persists a `postgres` `ResourceInstance`, and records a
+Returns `ok({ id })`, persists a dependency `ResourceInstance`, and records a
 `dependency-resource-created` domain event.
 
 Success means realization request accepted. Provider success or failure is reflected through
 dependency resource state, safe read models, lifecycle events, and safe operator-visible
-process-attempt projection. For Docker-backed single-server realization, success stores an
-Appaloft-owned connection secret ref, safe Docker provider handle, masked endpoint metadata, and a
-binding-ready state when the secret can be resolved.
+process-attempt projection. Provider-returned raw connection values are stored through
+`DependencyResourceSecretStore`; public state stores only safe provider handle, masked endpoint, and
+secret-reference metadata.
 
 ## Failure
 
