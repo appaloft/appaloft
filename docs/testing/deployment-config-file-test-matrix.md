@@ -133,6 +133,8 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-001A | e2e-preferred | Runtime name from config | Config declares `runtime.name` | Value maps to `ResourceRuntimeProfile.runtimeName`; deployment remains ids-only and runtime adapters derive the effective runtime/container/project name later | None | `resources.create` or resource profile update -> `deployments.create` |
 | CONFIG-FILE-PROFILE-002 | e2e-preferred | Network profile from config | Config declares `network.internalPort`, upstream protocol, exposure mode, and target service when needed | Values map to `ResourceNetworkProfile` | None | `resources.create` or network profile update -> `deployments.create` |
 | CONFIG-FILE-PROFILE-003 | e2e-preferred | Health policy from config | Config declares HTTP health policy | Values map to resource runtime/health policy | None | Resource profile/health operation -> `deployments.create` |
+| CONFIG-FILE-PROFILE-003A | integration | Existing resource health policy configuration | Config declares HTTP health policy, selected Resource has no matching policy, and explicit profile apply is acknowledged | Workflow dispatches `resources.configure-health` before ids-only deployment admission | None | `resources.show` -> `resources.configure-health` -> `deployments.create` |
+| CONFIG-FILE-PROFILE-003B | integration | Existing resource health policy idempotency | Config declares HTTP health policy and selected Resource already has the same policy | Workflow skips `resources.configure-health` and keeps deployment admission ids-only | None | `resources.show` -> `deployments.create` |
 | CONFIG-FILE-PROFILE-004 | integration | Unsafe source base directory | Config base directory contains `..`, URL, shell metacharacter, or host absolute path | Workflow stops before mutation | `validation_error`, phase `config-profile-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
 | CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift blocks default config deploy | Existing resource profile differs from normalized config or trusted entry profile, or a resource-scoped effective config override would shadow an entry config key, and the workflow is not explicitly applying profile commands | Workflow stops before deployment with section, field path, config pointer when known, suggested command details, and no raw config or secret values | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show` and, when entry config exists, `resources.effective-config` -> no `deployments.create` |
@@ -458,7 +460,9 @@ through `resources.configure-access` before ids-only deployment admission and do
 domain bindings, certificates, default access policies, or proxy routes directly. Config runtime
 monitoring thresholds are reconciled through `runtime-monitoring.thresholds.configure` and
 `runtime-monitoring.thresholds.show` before ids-only deployment admission and do not enforce
-runtime sizing, cleanup, alert routing, autoscaling, or billing policy.
+runtime sizing, cleanup, alert routing, autoscaling, or billing policy. Config health policy is
+reconciled through `resources.configure-health` during explicit existing-resource profile apply and
+remains fail-first drift guidance by default.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).

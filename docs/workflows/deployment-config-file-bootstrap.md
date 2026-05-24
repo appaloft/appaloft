@@ -21,6 +21,7 @@ source selection
   -> create/reuse and attach declared managed storage through storage/resource commands
   -> create/reuse or configure declared scheduled tasks through scheduled-task commands
   -> configure or disable declared Resource auto-deploy policy through resource commands
+  -> configure declared Resource health policy through resource commands when profile apply is explicit
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -734,6 +735,12 @@ override would shadow an entry config key; raw config and secret values must not
 error. Current Resource profile versus latest deployment snapshot drift is informational and must
 not block a config deploy when the normalized profile already matches the current Resource profile.
 
+When the entrypoint explicitly applies Resource profile changes, declared health policy is
+reconciled through `resources.configure-health` after Resource identity is known and before
+ids-only deployment admission. `runtime.healthCheckPath` is only a shorthand for the same Resource
+HTTP health policy. The workflow must not smuggle health fields through `resources.configure-runtime`
+or `deployments.create`.
+
 ## Secret And Credential Rules
 
 Committed config files must not store raw secret material. This includes SSH private keys, deploy
@@ -936,7 +943,9 @@ config source/runtime/network/health profile fields into quick-deploy resource c
 supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
 plain `env` declarations and `ci-env:` secret references into environment variable commands,
 bootstraps project/server/environment/resource records in explicit local PGlite mode when ids are
-not provided, then dispatches ids-only `deployments.create`. For config-driven SSH targets, the CLI
+not provided, and reconciles declared health policy through `resources.configure-health` when
+existing-resource profile apply is explicitly acknowledged, then dispatches ids-only
+`deployments.create`. For config-driven SSH targets, the CLI
 now resolves `ssh-pglite` as the default state backend, carries a trusted SSH target into the state
 decision, and shell-built CLI programs run an SSH transport-backed remote-state lifecycle adapter
 before identity queries or mutations. The shell CLI also mirrors the selected SSH server's PGlite
@@ -1011,8 +1020,7 @@ history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 
-- Config-file changes to an existing resource must sequence the accepted candidate commands
-  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
-  when those profile fields drift after first deploy.
+- Which environment and preview overlay syntax should be admitted without allowing a committed
+  config file to select identity?
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?

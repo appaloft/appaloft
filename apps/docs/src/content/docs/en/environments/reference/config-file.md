@@ -23,6 +23,29 @@ Configuration files are for reviewable project, resource, environment, and deplo
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
+<h2 id="environment-config-file-health">Health policy</h2>
+
+Use `health` when the Resource should have a reusable HTTP health policy:
+
+```yaml
+health:
+  enabled: true
+  path: /ready
+  intervalSeconds: 5
+  timeoutSeconds: 5
+  retries: 10
+```
+
+Config deploy stores this as Resource health policy through `resources.configure-health` when an
+existing Resource profile apply is explicitly acknowledged. New Resources receive the same policy
+in their profile. The final deployment command still contains only Appaloft ids; health config does
+not run probes, restart workloads, mark a Resource healthy, or change historical deployment
+snapshots.
+
+`runtime.healthCheckPath` remains a shorthand for the HTTP path. Keep command health checks,
+request headers, raw probe response bodies, credentials, tokens, local file paths, and provider
+accounts outside `appaloft.yaml`.
+
 <h2 id="environment-config-file-dependencies">Application dependencies</h2>
 
 Use `dependencies` when the application needs Appaloft to manage and bind an application dependency

@@ -53,8 +53,8 @@ installer; that would blur the boundary between installing an agent skill and ru
   business surface.
 - Do not inspect Appaloft internals such as repositories, use cases, database state, Docker, SSH,
   provider SDKs, or proxy config directly when an Appaloft operation exists.
-- Do not add source, runtime, network, or access fields to `deployments.create`; configure Resource
-  profile and access operations first.
+- Do not add source, runtime, network, health, or access fields to `deployments.create`; configure
+  Resource profile, health, and access operations first.
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, or
   monitoring threshold fields to `deployments.create`; reconcile repository config declarations
   through their existing operation families first.

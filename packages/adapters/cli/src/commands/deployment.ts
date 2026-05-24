@@ -56,6 +56,7 @@ import {
   type DeploymentEnvironmentVariableSeed,
   type DeploymentPromptSeed,
   type DeploymentServerAppliedRouteSeed,
+  defaultHttpHealthCheckPolicy,
   deploymentEntryModes,
   deploymentEnvironmentVariablesFromConfig,
   deploymentPromptSeedFromConfig,
@@ -1324,6 +1325,9 @@ export const deployCommand = EffectCommand.make(
       const targetServiceNameValue = optionalValue(targetServiceName);
       const hostPortValue = optionalNumber(hostPort);
       const healthCheckPath = optionalValue(healthPath);
+      const healthCheck = healthCheckPath
+        ? defaultHttpHealthCheckPolicy({ path: healthCheckPath })
+        : undefined;
       const requestedStateBackend = optionalValue(stateBackend);
       const requestedPreviewMode = optionalValue(preview);
       const requestedPreviewId = optionalValue(previewId);
@@ -1569,6 +1573,7 @@ export const deployCommand = EffectCommand.make(
         ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
         ...(hostPortValue === undefined ? {} : { hostPort: hostPortValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
+        ...(healthCheck ? { healthCheck } : {}),
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),

@@ -615,6 +615,37 @@ describe("CLI deployment config entry workflow", () => {
     expect("resourceId" in seed).toBe(false);
   });
 
+  test("[CONFIG-FILE-PROFILE-003] runtime healthCheckPath produces a reusable health policy seed", async () => {
+    ensureReflectMetadata();
+    const { deploymentPromptSeedFromConfig } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    const seed = deploymentPromptSeedFromConfig({
+      runtime: {
+        strategy: "workspace-commands",
+        healthCheckPath: "/ready",
+      },
+    });
+
+    expect(seed.healthCheckPath).toBe("/ready");
+    expect(seed.healthCheck).toEqual({
+      enabled: true,
+      type: "http",
+      intervalSeconds: 5,
+      timeoutSeconds: 5,
+      retries: 10,
+      startPeriodSeconds: 5,
+      http: {
+        method: "GET",
+        scheme: "http",
+        host: "localhost",
+        path: "/ready",
+        expectedStatusCode: 200,
+      },
+    });
+  });
+
   test("[CONFIG-FILE-SEC-006] config env values become plain-config variables", async () => {
     ensureReflectMetadata();
     const { deploymentEnvironmentVariablesFromConfig } = await import(
@@ -3144,6 +3175,120 @@ describe("CLI deployment config entry workflow", () => {
 
     expect(queries).toEqual(["ListProjectsQuery", "ListServersQuery"]);
     expect(commands).toEqual(["SetEnvironmentVariableCommand", "SetEnvironmentVariableCommand"]);
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+  });
+
+  test("[CONFIG-FILE-PROFILE-003A] acknowledged config health policy configures existing Resource before ids-only deployment", async () => {
+    ensureReflectMetadata();
+    const { defaultHttpHealthCheckPolicy, resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: "res_existing" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            runtimeProfile: {
+              strategy: "workspace-commands",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+    const healthCheck = defaultHttpHealthCheckPolicy({ path: "/ready" });
+
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          healthCheckPath: "/ready",
+          healthCheck,
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands.map((command) => command.constructor.name)).toEqual([
+      "ConfigureResourceHealthCommand",
+    ]);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_existing",
+      healthCheck,
+    });
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+  });
+
+  test("[CONFIG-FILE-PROFILE-003B] config health policy is idempotent for existing Resource", async () => {
+    ensureReflectMetadata();
+    const { defaultHttpHealthCheckPolicy, resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const healthCheck = defaultHttpHealthCheckPolicy({ path: "/ready" });
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ id: "res_existing" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            runtimeProfile: {
+              strategy: "workspace-commands",
+              healthCheckPath: "/ready",
+              healthCheck,
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          healthCheckPath: "/ready",
+          healthCheck,
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).toHaveLength(0);
     expect(input).toEqual({
       projectId: "proj_existing",
       serverId: "srv_existing",

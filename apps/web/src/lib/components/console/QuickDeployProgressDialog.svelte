@@ -65,6 +65,8 @@
         return $t(i18nKeys.console.resources.networkProfileTitle);
       case "resources.configureRuntime":
         return $t(i18nKeys.console.resources.runtimeProfileTitle);
+      case "resources.configureHealth":
+        return $t(i18nKeys.console.resources.healthPolicy);
       case "environments.setVariable":
         return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentVariableSet);
       case "dependencyResources.provision":

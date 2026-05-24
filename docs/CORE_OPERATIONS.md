@@ -377,6 +377,14 @@ Repository config `autoDeploy` is a workflow/profile extension over
 auto-deploy policy before deployment admission, but it does not introduce a new operation key and
 does not add source-event trigger fields to `deployments.create`.
 
+Repository config `health` and `runtime.healthCheck` are workflow/profile extensions over
+`resources.configure-health`, governed by
+[ADR-073](./decisions/ADR-073-repository-config-health-policy-reconcile.md) and
+[spec 082](./specs/082-repository-config-health-policy-reconcile/spec.md). Config deploy may
+normalize and configure Resource HTTP health policy before ids-only deployment admission when an
+existing-resource profile apply is explicitly selected; default config deploy still fails first on
+unacknowledged health drift.
+
 Phase 7 storage operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

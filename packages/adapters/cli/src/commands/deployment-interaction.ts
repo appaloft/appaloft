@@ -5,6 +5,7 @@ import {
   ConfigureDependencyResourceBackupPolicyCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
+  ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
@@ -467,24 +468,45 @@ function healthCheckFromConfig(
 ): ResourceRuntimeProfileInput["healthCheck"] | undefined {
   const healthCheck = config.runtime?.healthCheck ?? config.health;
   const path = healthCheck?.path ?? config.runtime?.healthCheckPath;
-  if (!healthCheck) {
+  if (!healthCheck && !path) {
     return undefined;
   }
 
+  return defaultHttpHealthCheckPolicy({
+    enabled: healthCheck?.enabled ?? true,
+    path: path ?? "/",
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+  });
+}
+
+export function defaultHttpHealthCheckPolicy(input: {
+  enabled?: boolean;
+  path?: string;
+  intervalSeconds?: number;
+  timeoutSeconds?: number;
+  retries?: number;
+}): NonNullable<ResourceRuntimeProfileInput["healthCheck"]> {
+  const enabled = input.enabled ?? true;
   return {
-    enabled: healthCheck.enabled ?? true,
+    enabled,
     type: "http",
-    intervalSeconds: healthCheck.intervalSeconds ?? 5,
-    timeoutSeconds: healthCheck.timeoutSeconds ?? 5,
-    retries: healthCheck.retries ?? 10,
+    intervalSeconds: input.intervalSeconds ?? 5,
+    timeoutSeconds: input.timeoutSeconds ?? 5,
+    retries: input.retries ?? 10,
     startPeriodSeconds: 5,
-    http: {
-      method: "GET",
-      scheme: "http",
-      host: "localhost",
-      path: path ?? "/",
-      expectedStatusCode: 200,
-    },
+    ...(enabled
+      ? {
+          http: {
+            method: "GET",
+            scheme: "http",
+            host: "localhost",
+            path: input.path ?? "/",
+            expectedStatusCode: 200,
+          },
+        }
+      : {}),
   };
 }
 
@@ -1052,6 +1074,23 @@ function configureResourceNetwork(input: {
   });
 }
 
+function configureResourceHealth(input: {
+  resourceId: string;
+  healthCheck: NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceHealthCommand.create({
+        resourceId: input.resourceId,
+        healthCheck: input.healthCheck,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function configureResourceAccess(input: {
   resourceId: string;
   accessProfile: DeploymentGeneratedAccessProfileSeed;
@@ -1388,6 +1427,47 @@ function resolveReusableResourceRuntimeProfile(input: {
       currentRuntimeProfile: resource.runtimeProfile,
       desiredRuntimeProfile: input.runtimeProfile,
     });
+  });
+}
+
+function desiredHealthPolicyFromSeed(
+  seed: DeploymentPromptSeed,
+): NonNullable<ResourceRuntimeProfileInput["healthCheck"]> | undefined {
+  if (seed.healthCheck) {
+    return seed.healthCheck;
+  }
+
+  if (!seed.healthCheckPath) {
+    return undefined;
+  }
+
+  return defaultHttpHealthCheckPolicy({ path: seed.healthCheckPath });
+}
+
+function healthPoliciesMatch(input: {
+  current: ResourceDetail["runtimeProfile"] | undefined;
+  desired: NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
+}): boolean {
+  const current = input.current?.healthCheck;
+  return JSON.stringify(current) === JSON.stringify(input.desired);
+}
+
+function resolveReusableResourceHealthPolicy(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const desired = desiredHealthPolicyFromSeed(input.seed);
+    if (!desired) {
+      return undefined;
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    if (healthPoliciesMatch({ current: resource.runtimeProfile, desired })) {
+      return undefined;
+    }
+
+    return desired;
   });
 }
 
@@ -3335,6 +3415,10 @@ function resolveResource(input: {
             resourceId: resource.id,
             runtimeProfile: input.runtimeProfile,
           });
+          const healthCheck = yield* resolveReusableResourceHealthPolicy({
+            seed: input.seed,
+            resourceId: resource.id,
+          });
           const networkProfile = yield* resolveReusableResourceNetworkProfile({
             seed: input.seed,
             resourceId: resource.id,
@@ -3347,6 +3431,7 @@ function resolveResource(input: {
               ...(source ? { configureSource: { source } } : {}),
               ...(networkProfile ? { configureNetwork: { networkProfile } } : {}),
               ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
+              ...(healthCheck ? { configureHealth: { healthCheck } } : {}),
             },
             label: resource.label,
           } satisfies ResolvedWorkflowResourceReference;
@@ -4033,6 +4118,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return configureResourceSource(step.input);
     case "resources.configureRuntime":
       return configureResourceRuntime(step.input);
+    case "resources.configureHealth":
+      return configureResourceHealth(step.input);
     case "resources.configureNetwork":
       return configureResourceNetwork(step.input);
     case "environments.setVariable":
