@@ -104,6 +104,26 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 scheduled task that Appaloft can prove was created or adopted by this config for that preview.
 Manual or shared scheduled tasks are preserved.
 
+<h2 id="environment-config-file-auto-deploy">Auto-deploy policy</h2>
+
+Use `autoDeploy` when the Resource should deploy after matching source events:
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+  dedupeWindowSeconds: 300
+```
+
+This configures Resource auto-deploy policy before deployment. The final deployment command still
+contains only Appaloft ids; source-event ids, webhook delivery ids, provider accounts, webhook
+secrets, tokens, and passwords do not belong in `appaloft.yaml`. Use `enabled: false` to disable an
+existing auto-deploy policy from config.
+
 <h2 id="environment-config-file-env">Environment values</h2>
 
 Use `env` for non-secret values and `secrets` for references to values supplied outside the

@@ -17,6 +17,7 @@ GitHub pull_request event
   -> repository config dependency graph provisions/reuses and binds application dependencies
   -> repository config storage graph creates/reuses and attaches managed storage
   -> repository config scheduled task graph creates/reuses or configures Resource scheduled tasks
+  -> repository config auto-deploy policy configures or disables Resource source-event policy
   -> existing environment/resource/deployment commands create or update the preview target
   -> deployments.create accepts the deployment attempt with ids-only input
   -> default or custom preview access route is realized through the edge proxy when available
@@ -171,6 +172,12 @@ storage declares `preview.lifecycle: ephemeral`, cleanup may remove it only when
 link contains explicit repository-config provenance for the same preview fingerprint, Resource,
 attachment, and storage volume.
 
+Resource source-event auto-deploy policy may be declared in the selected config with top-level
+`autoDeploy`. For MVP, `trigger: git-push` is reconciled through
+`resources.configure-auto-deploy` before deployment admission. This policy describes future source
+events for the Resource; it must not add webhook payload, delivery id, provider account, or trigger
+fields to `deployments.create`.
+
 Custom route intent for PR previews should come from one of these sources:
 
 - generated/default access;
@@ -239,6 +246,7 @@ resolve preview context
   -> list/create/reuse declared managed storage volumes
   -> read/attach Resource storage mounts for declared workload paths
   -> persist preview storage provenance for config-owned ephemeral storage
+  -> read Resource detail and configure/disable declared auto-deploy policy when needed
   -> apply config env and secret references through environment operations
   -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)

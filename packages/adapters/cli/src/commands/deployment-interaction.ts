@@ -2,6 +2,7 @@ import {
   AcceptDependencyResourceProvisioningPlanCommand,
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
+  ConfigureResourceAutoDeployCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
@@ -35,6 +36,7 @@ import {
   type RegisterServerCommandInput,
   type ResourceDependencyBindingSummary,
   type ResourceDetail,
+  type ResourceDetailAutoDeployPolicy,
   type ResourceDetailProfileDiagnostic,
   ResourceEffectiveConfigQuery,
   type ResourceEffectiveConfigView,
@@ -136,6 +138,7 @@ export interface DeploymentPromptSeed {
   dependencyGraph?: DeploymentDependencySeed[];
   storageGraph?: DeploymentStorageSeed[];
   scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
+  autoDeployPolicy?: DeploymentAutoDeploySeed;
   profileDriftPreflight?: boolean;
 }
 
@@ -175,6 +178,13 @@ export interface DeploymentScheduledTaskSeed {
   concurrencyPolicy: "forbid";
   status: "enabled" | "disabled";
   previewLifecycle?: "ephemeral";
+}
+export interface DeploymentAutoDeploySeed {
+  enabled: boolean;
+  triggerKind: "git-push";
+  refs?: string[];
+  eventKinds: ("push" | "tag")[];
+  dedupeWindowSeconds?: number;
 }
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
@@ -505,6 +515,17 @@ export function deploymentPromptSeedFromConfig(
           ...(task.preview?.lifecycle ? { previewLifecycle: task.preview.lifecycle } : {}),
         }) satisfies DeploymentScheduledTaskSeed,
     );
+  const autoDeployPolicy = config.autoDeploy
+    ? ({
+        enabled: config.autoDeploy.enabled,
+        triggerKind: config.autoDeploy.trigger,
+        ...(config.autoDeploy.refs ? { refs: config.autoDeploy.refs } : {}),
+        eventKinds: config.autoDeploy.events,
+        ...(config.autoDeploy.dedupeWindowSeconds
+          ? { dedupeWindowSeconds: config.autoDeploy.dedupeWindowSeconds }
+          : {}),
+      } satisfies DeploymentAutoDeploySeed)
+    : undefined;
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -543,6 +564,7 @@ export function deploymentPromptSeedFromConfig(
     ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
     ...(storageGraph.length > 0 ? { storageGraph } : {}),
     ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
+    ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
   };
 }
 
@@ -2544,6 +2566,118 @@ function ensureRepositoryConfigScheduledTasks(input: {
   });
 }
 
+function stringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function autoDeployPolicyMatchesConfig(
+  current: ResourceDetailAutoDeployPolicy | undefined,
+  desired: DeploymentAutoDeploySeed,
+): boolean {
+  if (!desired.enabled) {
+    return !current || current.status === "disabled";
+  }
+  if (!current || current.status !== "enabled" || !desired.refs) {
+    return false;
+  }
+
+  return (
+    current.triggerKind === desired.triggerKind &&
+    stringArraysEqual(current.refs, desired.refs) &&
+    stringArraysEqual(current.eventKinds, desired.eventKinds) &&
+    current.dedupeWindowSeconds === desired.dedupeWindowSeconds
+  );
+}
+
+function autoDeployResolutionError(input: { message: string; resourceId: string; reason: string }) {
+  return domainError.validation(input.message, {
+    phase: "config-auto-deploy-resolution",
+    resourceId: input.resourceId,
+    reason: input.reason,
+  });
+}
+
+function showResourceForAutoDeploy(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowResourceQuery.create({
+        resourceId,
+        includeLatestDeployment: false,
+        includeAccessSummary: false,
+        includeProfileDiagnostics: false,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery<ResourceDetail>(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigAutoDeploy(input: {
+  resourceId: string;
+  policy: DeploymentAutoDeploySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceAutoDeployCommand.create({
+        resourceId: input.resourceId,
+        mode: input.policy.enabled ? "enable" : "disable",
+        ...(input.policy.enabled
+          ? {
+              policy: {
+                triggerKind: input.policy.triggerKind,
+                refs: input.policy.refs ?? [],
+                eventKinds: input.policy.eventKinds,
+                ...(input.policy.dedupeWindowSeconds
+                  ? { dedupeWindowSeconds: input.policy.dedupeWindowSeconds }
+                  : {}),
+              },
+            }
+          : {}),
+        idempotencyKey: "repository-config:auto-deploy",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigAutoDeploy(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.autoDeployPolicy;
+    if (!policy) {
+      return;
+    }
+
+    if (policy.enabled && (!policy.refs || policy.refs.length === 0)) {
+      return yield* Effect.fail(
+        autoDeployResolutionError({
+          message: "Repository config autoDeploy refs are required when enabled",
+          resourceId: input.resourceId,
+          reason: "refs_required",
+        }),
+      );
+    }
+
+    const detail = yield* showResourceForAutoDeploy(input.resourceId);
+    if (autoDeployPolicyMatchesConfig(detail.autoDeployPolicy, policy)) {
+      return;
+    }
+    if (!policy.enabled && !detail.autoDeployPolicy) {
+      return;
+    }
+
+    yield* configureRepositoryConfigAutoDeploy({
+      resourceId: input.resourceId,
+      policy,
+    });
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -3676,6 +3810,10 @@ export function resolveInteractiveDeploymentInput(
             ? { destinationId: deploymentInput.destinationId }
             : {}),
           environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigAutoDeploy({
+          seed: resolvedSeed,
           resourceId: deploymentInput.resourceId,
         });
         yield* persistServerAppliedRouteDesiredStateIfNeeded({

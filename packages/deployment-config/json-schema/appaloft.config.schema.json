@@ -616,6 +616,45 @@
         "description": "User-facing Resource scheduled task declaration."
       }
     },
+    "autoDeploy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "trigger": {
+          "default": "git-push",
+          "type": "string",
+          "const": "git-push"
+        },
+        "refs": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "events": {
+          "default": ["push"],
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["push", "tag"]
+          }
+        },
+        "dedupeWindowSeconds": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 86400
+        }
+      },
+      "required": ["enabled", "trigger", "events"],
+      "additionalProperties": false,
+      "description": "User-facing Resource auto-deploy policy declaration."
+    },
     "env": {
       "type": "object",
       "propertyNames": {

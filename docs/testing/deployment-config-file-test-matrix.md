@@ -24,6 +24,7 @@ Canonical assertions:
   operations before deployment;
 - `storage` declarations map to storage-volume list/create and Resource storage attachment
   operations before deployment;
+- `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -46,11 +47,15 @@ This matrix inherits:
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
 - [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
+- [ADR-068: Repository Config Scheduled Task Graph](../decisions/ADR-068-repository-config-scheduled-task-graph.md)
+- [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
 - [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
+- [Repository Config Scheduled Task Graph](../specs/077-repository-config-scheduled-task-graph/spec.md)
+- [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -74,6 +79,7 @@ This matrix inherits:
 | Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
 | Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
+| Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -177,6 +183,17 @@ This matrix inherits:
 | CONFIG-FILE-SCHED-TASK-007 | integration | Provenance conflict | Source-link scheduled task provenance points at a task for another Resource or a conflicting source fingerprint | Config deploy handles scheduled tasks | Workflow fails before deployment with safe details | `repository_config_scheduled_task_conflict`, phase `config-scheduled-task-resolution` | `scheduled-tasks.list`; no create, configure, or `deployments.create` |
 | CONFIG-FILE-SCHED-TASK-008 | integration | Scheduled task provenance unavailable | Config declares scheduled tasks but the selected entry workflow cannot persist source-link scheduled task provenance | Workflow fails before scheduled task mutation | `repository_config_scheduled_task_provenance_unavailable`, phase `config-scheduled-task-resolution` | No create, configure, or `deployments.create` |
 | CONFIG-FILE-SCHED-TASK-009 | integration | Preview ephemeral scheduled task cleanup provenance | PR preview config scheduled task declares `preview.lifecycle = ephemeral` | Config deploy creates or reuses the preview task | Source link records safe repository-config provenance for task key, resource id, task id, lifecycle, and source fingerprint | None | Scheduled task operations -> source-link provenance write -> `deployments.create` |
+
+## Auto-Deploy Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-AUTO-DEPLOY-001 | parser/schema | Git-push auto-deploy policy accepted | Config declares `autoDeploy.enabled = true`, `trigger = git-push`, refs, events, and optional dedupe window | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-AUTO-DEPLOY-002 | parser/schema | Unknown or unsafe auto-deploy fields rejected | Config declares provider account, tenant, source-event id, webhook secret value, token, raw credential, or unsupported trigger fields under `autoDeploy` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-AUTO-DEPLOY-003 | integration | Config auto-deploy configures before deployment | Selected Resource has no matching auto-deploy policy | Config deploy handles auto-deploy | Resource detail is read, policy is configured through `resources.configure-auto-deploy`, and deployment admission remains ids-only | None | `resources.show` -> `resources.configure-auto-deploy` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-004 | integration | Auto-deploy idempotency | Selected Resource already has the same enabled git-push policy | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-005 | integration | Auto-deploy drift or blocked policy replaced | Selected Resource policy differs or is blocked by source-binding change | Config deploy handles auto-deploy | Policy is reconfigured from YAML before deployment | None | `resources.show` -> `resources.configure-auto-deploy` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-006 | integration | Auto-deploy disabled from config | Config declares `autoDeploy.enabled = false` and the Resource currently has a policy | Config deploy handles auto-deploy | Policy is disabled before deployment | None | `resources.show` -> `resources.configure-auto-deploy(mode=disable)` -> `deployments.create` |
 
 ## Control-Plane Policy Matrix
 
@@ -291,7 +308,8 @@ Current implemented coverage:
 - `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
   `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
-  `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003` are covered in
+  `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
+  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
@@ -299,7 +317,8 @@ Current implemented coverage:
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
-  `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009` are covered in
+  `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and
+  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,

@@ -366,6 +366,11 @@ Implemented operations:
 | Read resource health history | Query | `resources.health-history` | `ResourceHealthHistoryQuery` | `ResourceHealthHistoryQueryInput` | `appaloft resource health-history <resourceId> --from <iso> --to <iso>` | `GET /api/resources/{resourceId}/health-history` |
 | Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
+Repository config `autoDeploy` is a workflow/profile extension over
+`resources.configure-auto-deploy`. Config deploy may configure or disable Resource git-push
+auto-deploy policy before deployment admission, but it does not introduce a new operation key and
+does not add source-event trigger fields to `deployments.create`.
+
 Phase 7 storage operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |

@@ -464,6 +464,108 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-AUTO-DEPLOY-001] accepts git-push auto-deploy policy", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "autoDeploy:",
+        "  enabled: true",
+        "  trigger: git-push",
+        "  refs:",
+        "    - main",
+        "    - refs/tags/v1.0.0",
+        "  events:",
+        "    - push",
+        "    - tag",
+        "  dedupeWindowSeconds: 300",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.autoDeploy).toEqual({
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main", "refs/tags/v1.0.0"],
+        events: ["push", "tag"],
+        dedupeWindowSeconds: 300,
+      });
+    }
+
+    const disabled = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: false,
+      },
+    });
+
+    expect(disabled.success).toBe(true);
+    if (disabled.success) {
+      expect(disabled.data.autoDeploy).toEqual({
+        enabled: false,
+        trigger: "git-push",
+        events: ["push"],
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-002] rejects unknown auto-deploy fields and unsafe material", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        providerWebhookId: "hook_123",
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["autoDeploy"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        sourceEventId: "src_evt_123",
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["autoDeploy", "sourceEventId"]);
+    }
+
+    const secret = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        webhookSecret: "plain-secret-value",
+      },
+    });
+
+    expect(secret.success).toBe(false);
+    if (!secret.success) {
+      expect(secret.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(secret.error.issues[0]?.path).toEqual(["autoDeploy", "webhookSecret"]);
+    }
+
+    const missingRefs = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+      },
+    });
+
+    expect(missingRefs.success).toBe(false);
+    if (!missingRefs.success) {
+      expect(missingRefs.error.issues[0]?.path).toEqual(["autoDeploy", "refs"]);
+    }
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

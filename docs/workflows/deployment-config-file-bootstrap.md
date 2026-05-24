@@ -19,6 +19,7 @@ source selection
   -> provision/reuse and bind declared application dependencies through dependency-resource commands
   -> create/reuse and attach declared managed storage through storage/resource commands
   -> create/reuse or configure declared scheduled tasks through scheduled-task commands
+  -> configure or disable declared Resource auto-deploy policy through resource commands
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -170,6 +171,12 @@ tasks, configures drifted provenance-owned tasks, and records safe provenance fo
 or preview cleanup. The config workflow must not add schedule, command, timeout, retry, or task id
 fields to `deployments.create`.
 
+Declared auto-deploy policy is reconciled in the same entry workflow after the target Resource is
+known and before deployment admission. The workflow reads Resource detail, configures missing or
+drifted git-push auto-deploy policy, disables existing policy when `enabled: false`, and leaves
+matching policy untouched. The config workflow must not add trigger, ref, event, source-event id,
+webhook, or delivery fields to `deployments.create`.
+
 When the entrypoint targets an SSH server without a selected control plane, the config workflow must
 resolve the SSH-server `ssh-pglite` state backend before identity resolution. Repository config
 does not become the state store; it is a versioned desired profile that is reconciled into
@@ -263,6 +270,25 @@ Scheduled task declarations create or configure Resource-owned scheduled task de
 existing scheduled-task commands. Config may not include task ids, provider-native scheduler
 handles, provider accounts, credentials, tenants, organization ids, raw secret values, raw
 connection strings with embedded credentials, or target/server identity.
+
+`autoDeploy` uses application delivery language, not source-event record language:
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+  dedupeWindowSeconds: 300
+```
+
+Auto-deploy declarations configure Resource-owned source-event policy through
+`resources.configure-auto-deploy`. Config may not include source-event ids, webhook delivery ids,
+provider accounts, credentials, tenants, organization ids, raw webhook secrets, raw tokens, or
+target/server identity. Generic signed webhook policy remains an explicit operation outside this
+MVP because it needs secret-reference custody and endpoint setup.
 
 The HTTP adapter may serve the config schema for tooling, but strict `POST /api/deployments` remains
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP
@@ -602,6 +628,7 @@ deployment admission.
 | `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
 | `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
 | `scheduledTasks.*` | Scheduled task operations | Describes Resource-owned recurring application jobs; reconciled through scheduled-task list/create/configure commands before deployment, never as deployment command fields. |
+| `autoDeploy` | Resource auto-deploy policy operation | Describes git-push source-event policy for the Resource; reconciled through `resources.configure-auto-deploy`, never as deployment command fields. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
 | `controlPlane.install.*` | Console install entry workflow | Provides non-secret defaults for `command=install-console`, including public origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and Swarm/Compose names. It never enters `deployments.create`, never selects durable deployment identity, and never carries SSH keys, tokens, raw database URLs, or raw secret values. |

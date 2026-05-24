@@ -2,6 +2,7 @@ import {
   containsScheduledTaskSecretText,
   domainError,
   err,
+  GitRefText,
   ok,
   type Result,
   resourceExposureModes,
@@ -10,6 +11,7 @@ import {
   ScheduledTaskCommandIntent,
   ScheduledTaskScheduleExpression,
   ScheduledTaskTimezone,
+  SourceEventKindValue,
 } from "@appaloft/core";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -78,6 +80,10 @@ const scheduledTaskTimezoneError =
   "config_scheduled_task_resolution: scheduledTasks.<key>.timezone must be an IANA timezone";
 const scheduledTaskCommandError =
   "config_scheduled_task_resolution: scheduledTasks.<key>.command must be a single-line command intent without secrets";
+const autoDeployRefError =
+  "config_auto_deploy_resolution: autoDeploy.refs[] must be a safe git ref";
+const autoDeployRefsRequiredError =
+  "config_auto_deploy_resolution: autoDeploy.refs is required when autoDeploy is enabled";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -102,6 +108,11 @@ const identityConfigFields = new Set([
   "destinationId",
   "taskId",
   "scheduledTaskId",
+  "sourceEvent",
+  "sourceEventId",
+  "webhookDelivery",
+  "webhookDeliveryId",
+  "deliveryId",
   "provider",
   "providerKey",
   "providerAccount",
@@ -511,6 +522,14 @@ function isSafeScheduledTaskCommand(value: string): boolean {
   return ScheduledTaskCommandIntent.create(value).isOk() && !containsScheduledTaskSecretText(value);
 }
 
+function isSafeAutoDeployRef(value: string): boolean {
+  return GitRefText.create(value).isOk();
+}
+
+function isSafeAutoDeployEvent(value: string): boolean {
+  return SourceEventKindValue.create(value).isOk();
+}
+
 const appaloftDeploymentAccessDomainConfigSchema = z
   .object({
     host: nonEmptyStringSchema.refine(
@@ -723,6 +742,33 @@ export const appaloftDeploymentScheduledTaskConfigSchema = z
   .strict()
   .describe("User-facing Resource scheduled task declaration.");
 
+export const appaloftDeploymentAutoDeployConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    trigger: z.literal("git-push").optional().default("git-push"),
+    refs: z
+      .array(nonEmptyStringSchema.refine(isSafeAutoDeployRef, autoDeployRefError))
+      .min(1)
+      .optional(),
+    events: z
+      .array(z.enum(["push", "tag"]).refine(isSafeAutoDeployEvent))
+      .min(1)
+      .optional()
+      .default(["push"]),
+    dedupeWindowSeconds: z.number().int().positive().max(86_400).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.enabled && (!value.refs || value.refs.length === 0)) {
+      context.addIssue({
+        code: "custom",
+        path: ["refs"],
+        message: autoDeployRefsRequiredError,
+      });
+    }
+  })
+  .describe("User-facing Resource auto-deploy policy declaration.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -859,6 +905,7 @@ export const appaloftDeploymentConfigSchema = z
         appaloftDeploymentScheduledTaskConfigSchema,
       )
       .optional(),
+    autoDeploy: appaloftDeploymentAutoDeployConfigSchema.optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
@@ -952,6 +999,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "dependencies" ||
     root === "storage" ||
     root === "scheduledTasks" ||
+    root === "autoDeploy" ||
     root === "controlPlane"
   );
 }

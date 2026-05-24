@@ -48,10 +48,10 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   resource configuration, and `deployments.create`.
 - Do not add source, runtime, or network fields to `deployments.create`. Those belong to the
   Resource profile and deployment snapshot.
-- Do not add dependency, storage, or scheduled task fields to `deployments.create`.
-  `appaloft.yaml` declarations for dependencies, storage, or scheduled tasks must reconcile through
-  existing dependency, storage, Resource binding, and scheduled task operations before deployment
-  admission.
+- Do not add dependency, storage, scheduled task, or auto-deploy fields to `deployments.create`.
+  `appaloft.yaml` declarations for dependencies, storage, scheduled tasks, or auto-deploy policy
+  must reconcile through existing dependency, storage, Resource binding, scheduled task, and
+  Resource auto-deploy operations before deployment admission.
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - Do not ask ordinary users for project/resource/server ids as the first step of a GitHub Action

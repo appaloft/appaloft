@@ -142,6 +142,20 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "res_1" } as T);
         case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
+        case "ConfigureResourceAutoDeployCommand": {
+          const autoDeployCommand = command as unknown as Record<string, unknown>;
+          const policy = autoDeployCommand.policy as Record<string, unknown> | undefined;
+          return ok({
+            resourceId: autoDeployCommand.resourceId,
+            status: autoDeployCommand.mode === "disable" ? "disabled" : "enabled",
+            ...(policy?.triggerKind ? { triggerKind: policy.triggerKind } : {}),
+            ...(policy?.refs ? { refs: policy.refs } : {}),
+            ...(policy?.eventKinds ? { eventKinds: policy.eventKinds } : {}),
+            ...(policy?.dedupeWindowSeconds
+              ? { dedupeWindowSeconds: policy.dedupeWindowSeconds }
+              : {}),
+          } as T);
+        }
         case "ProvisionDependencyResourceCommand":
           return ok({ id: "dep_res_db" } as T);
         case "BindResourceDependencyCommand":
@@ -459,6 +473,13 @@ describe("CLI deployment config entry workflow", () => {
           },
         },
       },
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        events: ["push"],
+        dedupeWindowSeconds: 300,
+      },
     });
 
     expect(seed).toMatchObject({
@@ -496,6 +517,13 @@ describe("CLI deployment config entry workflow", () => {
           mountMode: "read-write",
         },
       ],
+      autoDeployPolicy: {
+        enabled: true,
+        triggerKind: "git-push",
+        refs: ["main"],
+        eventKinds: ["push"],
+        dedupeWindowSeconds: 300,
+      },
     });
     expect(seed.healthCheck).toMatchObject({
       enabled: true,
@@ -4402,6 +4430,278 @@ describe("CLI deployment config entry workflow", () => {
       },
     });
     expect(commands).toEqual([]);
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-003] config auto-deploy configures before deployment admission", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-auto-deploy-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "autoDeploy:",
+        "  enabled: true",
+        "  trigger: git-push",
+        "  refs:",
+        "    - main",
+        "  events:",
+        "    - push",
+        "  dedupeWindowSeconds: 300",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_auto_deploy_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/auto-deploy",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-92",
+              "--server-host",
+              "203.0.113.92",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ShowResourceQuery");
+    expect(harness.operations.indexOf("ConfigureResourceAutoDeployCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const autoDeploy = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureResourceAutoDeployCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(autoDeploy).toMatchObject({
+      resourceId: "res_1",
+      mode: "enable",
+      policy: {
+        triggerKind: "git-push",
+        refs: ["main"],
+        eventKinds: ["push"],
+        dedupeWindowSeconds: 300,
+      },
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("autoDeploy");
+    expect(deployment).not.toHaveProperty("triggerKind");
+    expect(deployment).not.toHaveProperty("refs");
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-004] config auto-deploy is idempotent for matching policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            autoDeployPolicy: {
+              status: "enabled",
+              triggerKind: "git-push",
+              refs: ["main"],
+              eventKinds: ["push"],
+              sourceBindingFingerprint: "source-binding:fingerprint",
+              dedupeWindowSeconds: 300,
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          autoDeployPolicy: {
+            enabled: true,
+            triggerKind: "git-push",
+            refs: ["main"],
+            eventKinds: ["push"],
+            dedupeWindowSeconds: 300,
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("ConfigureResourceAutoDeployCommand");
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-005] config auto-deploy replaces drifted or blocked policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({
+          resourceId: "res_existing",
+          status: "enabled",
+          triggerKind: "git-push",
+          refs: ["main"],
+          eventKinds: ["push"],
+        } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            autoDeployPolicy: {
+              status: "blocked",
+              triggerKind: "git-push",
+              refs: ["develop"],
+              eventKinds: ["push"],
+              sourceBindingFingerprint: "source-binding:old",
+              blockedReason: "source-binding-changed",
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          autoDeployPolicy: {
+            enabled: true,
+            triggerKind: "git-push",
+            refs: ["main"],
+            eventKinds: ["push"],
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    const autoDeploy = commands.find(
+      (command) => command.constructor.name === "ConfigureResourceAutoDeployCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(autoDeploy).toMatchObject({
+      resourceId: "res_existing",
+      mode: "enable",
+      policy: {
+        triggerKind: "git-push",
+        refs: ["main"],
+        eventKinds: ["push"],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-006] config auto-deploy disables existing policy", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        return ok({ resourceId: "res_existing", status: "disabled" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            autoDeployPolicy: {
+              status: "enabled",
+              triggerKind: "git-push",
+              refs: ["main"],
+              eventKinds: ["push"],
+              sourceBindingFingerprint: "source-binding:fingerprint",
+              updatedAt: "2026-05-24T00:00:00.000Z",
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          autoDeployPolicy: {
+            enabled: false,
+            triggerKind: "git-push",
+            eventKinds: ["push"],
+          },
+        }),
+        runtime,
+      ),
+    );
+
+    const autoDeploy = commands.find(
+      (command) => command.constructor.name === "ConfigureResourceAutoDeployCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(autoDeploy).toMatchObject({
+      resourceId: "res_existing",
+      mode: "disable",
+    });
+    expect(autoDeploy?.policy).toBeUndefined();
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {
