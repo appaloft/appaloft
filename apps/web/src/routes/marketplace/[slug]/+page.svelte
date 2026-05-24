@@ -278,14 +278,14 @@
 </script>
 
 <svelte:head>
-  <title>{listing?.title ?? "Blueprint"} · Marketplace · Appaloft</title>
+  <title>{listing?.title ?? "蓝图详情"} · 应用市场 · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell
-  title={listing?.title ?? "Marketplace"}
-  description={listing?.subtitle ?? "Blueprint detail"}
+  title={listing?.title ?? "蓝图详情"}
+  description={listing?.subtitle ?? "查看官方 Blueprint 的组件、依赖资源、环境变量与部署计划。"}
   breadcrumbs={[
-    { label: "Marketplace", href: "/marketplace" },
+    { label: "应用市场", href: "/marketplace" },
     { label: listing?.title ?? slug },
   ]}
 >
@@ -299,9 +299,9 @@
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-muted-foreground" />
         <div class="space-y-1">
-          <h1 class="text-lg font-semibold">未注册 Blueprint Catalog</h1>
+          <h1 class="text-lg font-semibold">未注册蓝图目录</h1>
           <p class="text-sm leading-6 text-muted-foreground">
-            当前运行时没有提供可渲染的 Blueprint catalog extension metadata。
+            当前运行时没有提供可渲染的蓝图目录扩展元数据。
           </p>
         </div>
       </div>
@@ -311,9 +311,9 @@
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-destructive" />
         <div class="space-y-1">
-          <h1 class="text-lg font-semibold">Blueprint 暂不可用</h1>
+          <h1 class="text-lg font-semibold">蓝图暂不可用</h1>
           <p class="text-sm leading-6 text-muted-foreground">
-            无法加载这个 Marketplace Blueprint。
+            无法加载这个蓝图。
           </p>
         </div>
       </div>
@@ -334,7 +334,7 @@
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{listing.category}</Badge>
-                    <Badge variant="outline">{listing.featured ? "Featured" : "Official"}</Badge>
+                    <Badge variant="outline">{listing.featured ? "精选" : "官方"}</Badge>
                     <Badge variant="outline">{listing.publisher.name}</Badge>
                   </div>
                   <h1 class="text-3xl font-semibold tracking-normal md:text-4xl">{listing.title}</h1>
@@ -642,7 +642,7 @@
 
         <Button href="/marketplace" variant="outline" class="w-full">
           <ArrowLeft class="size-4" />
-          返回 Marketplace
+          返回应用市场
         </Button>
       </aside>
     </div>
