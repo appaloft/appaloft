@@ -121,7 +121,9 @@ apply only after trusted PR preview context selects preview scope, and none may 
 
 Use this order:
 
-1. Existing Appaloft config: `appaloft deploy <source>`.
+1. Existing Appaloft config: `appaloft deploy <source>`; `source.type: image` in config is a
+   Resource source/runtime profile declaration, not a deployment command field or registry secret
+   surface.
 2. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 3. Compose source: `appaloft deploy <source> --method docker-compose`.
 4. Dockerfile source: `appaloft deploy <source> --method dockerfile`.

@@ -526,12 +526,15 @@ export function defaultHttpHealthCheckPolicy(input: {
 export function deploymentPromptSeedFromConfig(
   config: AppaloftDeploymentConfig,
 ): DeploymentPromptSeed {
+  const sourceIsImage = config.source?.type === "image";
   const healthCheckPath =
     config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
   const sourceProfile = {
-    ...(config.source?.baseDirectory ? { baseDirectory: config.source.baseDirectory } : {}),
-    ...(config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
-    ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
+    ...(!sourceIsImage && config.source?.baseDirectory
+      ? { baseDirectory: config.source.baseDirectory }
+      : {}),
+    ...(!sourceIsImage && config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
+    ...(!sourceIsImage && config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
   const serverAppliedRoutes = config.access?.domains?.map((domain) => ({
@@ -659,13 +662,19 @@ export function deploymentPromptSeedFromConfig(
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
   return {
-    ...(config.source?.repository ? { sourceLocator: config.source.repository } : {}),
+    ...(sourceIsImage && config.source?.image
+      ? { sourceLocator: config.source.image }
+      : config.source?.repository
+        ? { sourceLocator: config.source.repository }
+        : {}),
     ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
     ...(config.runtime?.strategy
       ? { deploymentMethod: config.runtime.strategy }
-      : config.runtime?.type === "node"
-        ? { deploymentMethod: "workspace-commands" as const }
-        : {}),
+      : sourceIsImage
+        ? { deploymentMethod: "prebuilt-image" as const }
+        : config.runtime?.type === "node"
+          ? { deploymentMethod: "workspace-commands" as const }
+          : {}),
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
     ...(buildCommand ? { buildCommand } : {}),
     ...(startCommand ? { startCommand } : {}),

@@ -65,6 +65,7 @@ This workflow inherits:
 The file exists to make source-adjacent deployment profile choices reproducible:
 
 - source root and monorepo app selection;
+- prebuilt Docker/OCI image source selection;
 - runtime plan strategy;
 - install, build, start, Dockerfile, Compose, static publish, and artifact planning fields;
 - resource network profile such as `internalPort`, upstream protocol, exposure mode, and compose
@@ -85,6 +86,23 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 
 The file does not exist to choose durable Appaloft control-plane identity, provider accounts, raw
 connection strings, database passwords, or tenant/organization scope.
+
+## Source Policy
+
+Repository config may declare either a Git source or a prebuilt image source. Git source keeps the
+existing `source.repository` and optional safe `gitRef`, `commitSha`, and `baseDirectory` fields.
+Image source uses a single Docker/OCI image reference and maps to Resource source kind
+`docker-image` plus runtime strategy `prebuilt-image`:
+
+```yaml
+source:
+  type: image
+  image: ghcr.io/acme/api:1.7.3
+```
+
+When `source.type` is `image`, Git-only source fields are invalid and any explicit
+`runtime.strategy` must be `prebuilt-image`. Registry credentials, pull secrets, provider accounts,
+artifact handles, and raw tokens stay outside repository config.
 
 ## Control-Plane Mode Policy
 

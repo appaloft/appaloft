@@ -50,14 +50,13 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
   the Resource profile and deployment snapshot.
 - Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, generated
   access, monitoring threshold, or runtime prune policy fields to `deployments.create`.
-  `appaloft.yaml` declarations for
-  dependencies, dependency backup policy, storage, scheduled tasks, auto-deploy policy, generated
-  access profile, runtime monitoring thresholds, runtime prune policy, Resource health policy,
-  named `profiles.<key>` overlays, or `preview.pullRequest.profile` overlays must reconcile through
-  existing dependency,
-  backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy, Resource access,
-  runtime monitoring threshold, scheduled runtime prune policy, environment variable, and
-  `resources.configure-health` operations before deployment admission.
+  `appaloft.yaml` declarations for prebuilt image source, dependencies, dependency backup policy,
+  storage, scheduled tasks, auto-deploy policy, generated access profile, runtime monitoring
+  thresholds, runtime prune policy, Resource health policy, named `profiles.<key>` overlays, or
+  `preview.pullRequest.profile` overlays must reconcile through existing Resource source/runtime,
+  dependency, backup-policy, storage, Resource binding, scheduled task, Resource auto-deploy,
+  Resource access, runtime monitoring threshold, scheduled runtime prune policy, environment
+  variable, and `resources.configure-health` operations before deployment admission.
 - Treat `secrets.from` as a reference only. `ci-env:<NAME>` resolves from the trusted runner
   environment; `resource-secret:<KEY>` only checks an existing same-key Resource runtime secret
   reference. Do not invent external secret resolvers or put raw secret values in `appaloft.yaml`.
@@ -97,7 +96,9 @@ Use this order:
 In a shell-capable agent session, the following are the CLI forms. In Web or HTTP/API contexts, use
 the equivalent Resource and Deployment operation flow instead of shelling out.
 
-1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`.
+1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`; if the
+   config declares `source.type: image`, let config deploy select the prebuilt image source rather
+   than inventing registry credential fields.
 2. If the user names a prebuilt image, run `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 3. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
 4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.

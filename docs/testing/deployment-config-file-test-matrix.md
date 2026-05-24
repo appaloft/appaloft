@@ -14,6 +14,8 @@ Canonical assertions:
 - first-run project/resource creation uses explicit operations and source-derived defaults;
 - config-driven runs follow the same Quick Deploy project/server/environment/resource operation
   order as interactive entrypoints;
+- Git and prebuilt image source declarations map to Resource source/runtime profile commands before
+  deployment;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
 - trusted CLI/Action/Web/future-tool profile inputs mirror the repository config profile fields,
   override selected config values, and feed the same Quick Deploy bootstrap path without generating
@@ -61,6 +63,7 @@ This matrix inherits:
 - [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
 - [ADR-071: Repository Config Generated Access Profile](../decisions/ADR-071-repository-config-generated-access-profile.md)
 - [ADR-072: Repository Config Runtime Monitoring Thresholds](../decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md)
+- [ADR-076: Repository Config Prebuilt Image Source](../decisions/ADR-076-repository-config-prebuilt-image-source.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -72,6 +75,7 @@ This matrix inherits:
 - [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
 - [Repository Config Generated Access Profile](../specs/080-repository-config-generated-access-profile/spec.md)
 - [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
+- [Repository Config Prebuilt Image Source](../specs/085-repository-config-prebuilt-image-source/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -143,6 +147,11 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-003B | integration | Existing resource health policy idempotency | Config declares HTTP health policy and selected Resource already has the same policy | Workflow skips `resources.configure-health` and keeps deployment admission ids-only | None | `resources.show` -> `deployments.create` |
 | CONFIG-FILE-PROFILE-004 | integration | Unsafe source base directory | Config base directory contains `..`, URL, shell metacharacter, or host absolute path | Workflow stops before mutation | `validation_error`, phase `config-profile-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-001 | integration | Prebuilt image source parsing | Config declares `source.type = image` and `source.image` | Parser accepts the source, defaults deployment method to `prebuilt-image` when runtime strategy is absent, and JSON schema exposes the field | None | Config read -> profile normalization |
+| CONFIG-FILE-IMAGE-SOURCE-002 | integration | Unsafe image source rejected | Config declares image source with registry credentials, pull secret, provider account, artifact handle, or Git-only fields | Workflow stops before mutation | `validation_error`, phase `config-source-resolution` or `config-schema` | No write commands |
+| CONFIG-FILE-IMAGE-SOURCE-003 | integration | Prebuilt image source configures Resource profile | Config declares image source and selected Resource has no matching source/runtime profile | Workflow maps source to `docker-image`, runtime to `prebuilt-image`, and keeps deployment admission ids-only | None | `resources.create` or `resources.configure-source` / `resources.configure-runtime` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-004 | integration | Prebuilt image source idempotency | Selected Resource already has matching image source and `prebuilt-image` runtime profile | Workflow skips duplicate source/runtime configure commands | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-005 | integration | Image source requires prebuilt strategy | Config declares `source.type = image` with non-`prebuilt-image` runtime strategy | Parser rejects before mutation | `validation_error`, phase `config-source-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift blocks default config deploy | Existing resource profile differs from normalized config or trusted entry profile, or a resource-scoped effective config override would shadow an entry config key, and the workflow is not explicitly applying profile commands | Workflow stops before deployment with section, field path, config pointer when known, suggested command details, and no raw config or secret values | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show` and, when entry config exists, `resources.effective-config` -> no `deployments.create` |
 | CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration through explicit apply step | Existing resource profile differs and the entry workflow has an accepted explicit mode or step to apply profile changes | Relevant `resources.configure-*`, `resources.configure-health`, `resources.set-variable`, or `resources.unset-variable` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
 | CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |

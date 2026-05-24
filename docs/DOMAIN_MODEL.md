@@ -369,6 +369,10 @@ Boundary rule:
   extraction roots are source-side concerns; Dockerfile path, Compose file path, static publish
   directory, build target, and command defaults are runtime profile concerns; internal listener
   ports and exposure modes are network profile concerns.
+- Repository config may express a prebuilt image source as user-facing application delivery intent,
+  but the durable model remains the Resource source/runtime profile pair: `docker-image` source
+  plus `prebuilt-image` runtime strategy. Registry credentials, pull secrets, and provider account
+  identity are not repository config domain state.
 - framework and package detection is typed workload-planning evidence, not a Web/CLI shortcut and
   not durable deployment identity. `SourceInspectionSnapshot` may record runtime family,
   framework, package manager/build tool, package/project name, runtime version, lockfiles, scripts,

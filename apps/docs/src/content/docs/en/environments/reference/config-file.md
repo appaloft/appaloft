@@ -40,6 +40,18 @@ runtime:
   buildTarget: runner
 ```
 
+For prebuilt images, use `source.type: image`. Appaloft stores the image as Resource source
+profile state and uses `prebuilt-image` runtime planning:
+
+```yaml
+source:
+  type: image
+  image: ghcr.io/acme/api:1.7.3
+
+runtime:
+  strategy: prebuilt-image
+```
+
 For Compose apps, use `strategy: docker-compose` with `dockerComposeFilePath`. For static sites,
 use `strategy: static` with `publishDirectory`. These paths are relative to the selected source
 root and must not escape it. Keep provider accounts, credentials, registry pull secrets, host paths,

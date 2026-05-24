@@ -121,10 +121,15 @@
         "type": {
           "description": "Repository source kind.",
           "type": "string",
-          "const": "git"
+          "enum": ["git", "image"]
         },
         "repository": {
           "description": "Git repository URL to deploy from.",
+          "type": "string",
+          "minLength": 1
+        },
+        "image": {
+          "description": "Docker/OCI image reference to deploy as a prebuilt image.",
           "type": "string",
           "minLength": 1
         },

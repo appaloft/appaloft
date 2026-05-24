@@ -579,6 +579,13 @@ Current boundary:
   path, static publish directory, build target, command defaults, runtime naming intent, and
   health-check defaults belong to `ResourceRuntimeProfile`; listener ports and exposure belong to
   `ResourceNetworkProfile`.
+- Repository config `source.type = image` is governed by
+  [ADR-076](./decisions/ADR-076-repository-config-prebuilt-image-source.md) and
+  [spec 085](./specs/085-repository-config-prebuilt-image-source/spec.md). It is a
+  workflow/profile extension over Resource source/runtime profile operations, maps to
+  `ResourceSourceBinding(kind = docker-image)` plus `ResourceRuntimeProfile(strategy =
+  prebuilt-image)`, and must not add image fields, registry credentials, or pull secrets to
+  `deployments.create`.
 - resource runtime naming intent is reusable resource-owned profile state. Docker/Compose adapters
   must derive unique effective runtime instance names from that profile plus deployment/resource or
   preview context instead of adding Docker-native naming fields to `deployments.create`.

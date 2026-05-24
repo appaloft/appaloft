@@ -148,6 +148,92 @@ describe("Appaloft deployment config schema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-IMAGE-SOURCE-001] accepts prebuilt image source declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "source:",
+        "  type: image",
+        "  image: ghcr.io/acme/api:1.7.3",
+        "network:",
+        "  internalPort: 8080",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.source).toEqual({
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+      });
+    }
+
+    const explicitStrategy = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image:
+          "registry.example.com/acme/api@sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0",
+      },
+      runtime: {
+        strategy: "prebuilt-image",
+      },
+    });
+
+    expect(explicitStrategy.success).toBe(true);
+  });
+
+  test("[CONFIG-FILE-IMAGE-SOURCE-002][CONFIG-FILE-IMAGE-SOURCE-005] rejects unsafe image source declarations", () => {
+    const gitFields = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+        repository: "https://github.com/acme/api",
+      },
+    });
+
+    expect(gitFields.success).toBe(false);
+    if (!gitFields.success) {
+      expect(gitFields.error.issues[0]?.message).toContain("config_source_resolution");
+    }
+
+    const credentials = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "https://user:password@registry.example.com/acme/api:1.7.3",
+      },
+    });
+
+    expect(credentials.success).toBe(false);
+
+    const pullSecret = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+        pullSecret: "resource-secret:REGISTRY_TOKEN",
+      },
+    });
+
+    expect(pullSecret.success).toBe(false);
+
+    const incompatibleStrategy = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+      },
+      runtime: {
+        strategy: "workspace-commands",
+      },
+    });
+
+    expect(incompatibleStrategy.success).toBe(false);
+    if (!incompatibleStrategy.success) {
+      expect(incompatibleStrategy.error.issues[0]?.message).toContain(
+        "source.type image requires runtime.strategy prebuilt-image",
+      );
+      expect(incompatibleStrategy.error.issues[0]?.path).toEqual(["runtime", "strategy"]);
+    }
+  });
+
   test("[CONFIG-FILE-PREVIEW-OVERLAY-001] accepts and applies PR preview profile overlays", () => {
     const parsed = parseAppaloftDeploymentConfig({
       runtime: {

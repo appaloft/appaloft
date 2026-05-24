@@ -666,6 +666,33 @@ describe("CLI deployment config entry workflow", () => {
     expect("projectId" in seed).toBe(false);
     expect("serverId" in seed).toBe(false);
     expect("resourceId" in seed).toBe(false);
+
+    const imageSeed = deploymentPromptSeedFromConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+      },
+      network: {
+        internalPort: 8080,
+      },
+    });
+
+    expect(imageSeed).toMatchObject({
+      sourceLocator: "ghcr.io/acme/api:1.7.3",
+      deploymentMethod: "prebuilt-image",
+      port: 8080,
+    });
+    expect("sourceProfile" in imageSeed).toBe(false);
+    expect(
+      sourceBindingForDeploymentInput(
+        "ghcr.io/acme/api:1.7.3",
+        "prebuilt-image",
+        imageSeed.sourceProfile,
+      ),
+    ).toMatchObject({
+      kind: "docker-image",
+      locator: "ghcr.io/acme/api:1.7.3",
+    });
   });
 
   test("[CONFIG-FILE-PROFILE-003] runtime healthCheckPath produces a reusable health policy seed", async () => {
@@ -697,6 +724,146 @@ describe("CLI deployment config entry workflow", () => {
         expectedStatusCode: 200,
       },
     });
+  });
+
+  test("[CONFIG-FILE-IMAGE-SOURCE-003] config prebuilt image source creates Resource profile before deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-image-source-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "source:",
+        "  type: image",
+        "  image: ghcr.io/acme/api:1.7.3",
+        "network:",
+        "  internalPort: 8080",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.93",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(resource).toMatchObject({
+      source: {
+        kind: "docker-image",
+        locator: "ghcr.io/acme/api:1.7.3",
+      },
+      runtimeProfile: {
+        strategy: "prebuilt-image",
+      },
+      networkProfile: {
+        internalPort: 8080,
+      },
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect(deployment).not.toHaveProperty("source");
+    expect(deployment).not.toHaveProperty("runtimeProfile");
+    expect(deployment).not.toHaveProperty("image");
+  });
+
+  test("[CONFIG-FILE-IMAGE-SOURCE-004] config prebuilt image source is idempotent for existing Resource profile", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput, sourceBindingForDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok({ id: "res_existing" } as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            source: {
+              kind: "docker-image",
+              locator: "ghcr.io/acme/api:1.7.3",
+              displayName: "api-1-7-3",
+            },
+            runtimeProfile: {
+              strategy: "prebuilt-image",
+            },
+          } as T);
+        }
+
+        if (message.constructor.name === "ResourceEffectiveConfigQuery") {
+          return ok({
+            schemaVersion: "resources.effective-config/v1",
+            resourceId: "res_existing",
+            environmentId: "env_existing",
+            ownedEntries: [],
+            effectiveEntries: [],
+            overrides: [],
+            precedence: [],
+            generatedAt: "2026-05-24T00:00:00.000Z",
+          } as T);
+        }
+
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const source = sourceBindingForDeploymentInput("ghcr.io/acme/api:1.7.3", "prebuilt-image");
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: "ghcr.io/acme/api:1.7.3",
+          deploymentMethod: "prebuilt-image",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+        }),
+        runtime,
+      ),
+    );
+
+    expect(source).toMatchObject({
+      kind: "docker-image",
+      locator: "ghcr.io/acme/api:1.7.3",
+    });
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+    expect(commands).not.toContain("ConfigureResourceSourceCommand");
+    expect(commands).not.toContain("ConfigureResourceRuntimeCommand");
   });
 
   test("[CONFIG-FILE-SEC-006] config env values become plain-config variables", async () => {

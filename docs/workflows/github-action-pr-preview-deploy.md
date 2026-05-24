@@ -14,6 +14,7 @@ GitHub pull_request event
   -> appaloft/deploy-action installs and verifies the Appaloft CLI
   -> action resolves trusted PR preview context from GitHub event metadata
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
+  -> repository config source profile may select Git source or a prebuilt image source
   -> repository config dependency graph provisions/reuses and binds application dependencies
   -> repository config dependency backup policy configures owned backup policy when declared
   -> repository config storage graph creates/reuses and attaches managed storage
@@ -141,12 +142,12 @@ environment values, or custom domain intent.
 
 Config files are not required for Action preview deploys. Trusted action inputs, workflow
 environment, CLI flags, and future MCP/tool parameters may provide the same canonical profile
-fields that repository config supports: runtime strategy and commands, publish directory, network
-profile, health path, optional runtime name, non-secret env values, `ci-env:` secret references,
-and preview custom-route policy. These inputs feed the same config bootstrap/Quick Deploy profile
-path and must not be translated into `deployments.create` fields. A workflow must not generate a
-temporary config file as the normal way to pass values that the CLI/action input surface already
-models.
+fields that repository config supports: Git source profile, prebuilt image source, runtime strategy
+and commands, publish directory, network profile, health path, optional runtime name, non-secret env
+values, `ci-env:` secret references, and preview custom-route policy. These inputs feed the same
+config bootstrap/Quick Deploy profile path and must not be translated into `deployments.create`
+fields. A workflow must not generate a temporary config file as the normal way to pass values that
+the CLI/action input surface already models.
 
 Field precedence after a config file is selected follows the repository config bootstrap contract:
 
@@ -270,6 +271,7 @@ resolve preview context
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
   -> derive preview runtime name seed `preview-{pr_number}` when profile input does not override it
+  -> configure source/runtime profile when config selects a prebuilt image source
   -> list/provision/reuse declared managed dependency resources
   -> list/configure declared dependency backup policies when needed
   -> list/bind Resource dependency bindings for declared env targets

@@ -100,6 +100,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-073: Repository Config Health Policy Reconcile](./ADR-073-repository-config-health-policy-reconcile.md) | Accepted | Defines repository config `health` / `runtime.healthCheck` as Resource health policy declarations reconciled through existing Resource health operations. |
 | [ADR-074: Repository Config Preview Profile Overlays](./ADR-074-repository-config-preview-profile-overlays.md) | Accepted | Defines repository config `preview.pullRequest.profile` as a selected PR-preview overlay over existing repository config workflow operations. |
 | [ADR-075: Repository Config Named Profile Overlays](./ADR-075-repository-config-named-profile-overlays.md) | Accepted | Defines repository config `profiles.<key>` as a trusted-entrypoint-selected overlay over existing repository config workflow operations. |
+| [ADR-076: Repository Config Prebuilt Image Source](./ADR-076-repository-config-prebuilt-image-source.md) | Accepted | Defines repository config `source.type = image` as a user-facing prebuilt Docker/OCI image source profile over existing Resource source/runtime operations. |
 
 ## Authoring Rules
 

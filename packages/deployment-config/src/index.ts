@@ -105,6 +105,16 @@ const controlPlaneInstallerUrlError =
   "control_plane_config: controlPlane.install.installerUrl must be an http(s) URL without credentials, query, or fragment";
 const sourceRepositoryUrlError =
   "config_source_resolution: source.repository must be a git URL without credentials, query, or fragment";
+const sourceImageReferenceError =
+  "config_source_resolution: source.image must be a Docker/OCI image reference without credentials, query, fragment, or secret material";
+const sourceImageRequiresImageError =
+  "config_source_resolution: source.image is required when source.type is image";
+const sourceImageRejectsGitFieldsError =
+  "config_source_resolution: source.type image must not declare git repository, ref, commit, or baseDirectory fields";
+const sourceImageRuntimeStrategyError =
+  "config_source_resolution: source.type image requires runtime.strategy prebuilt-image";
+const sourceImageRuntimeTypeError =
+  "config_source_resolution: source.type image must not combine with runtime.type";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const storageMountPathError =
@@ -376,13 +386,62 @@ function isSafeGitRepositoryUrl(value: string): boolean {
   }
 }
 
+function normalizeImageReference(value: string): string {
+  return value
+    .trim()
+    .replace(/^docker:\/\//, "")
+    .replace(/^image:\/\//, "");
+}
+
+function isSafeDockerImageReference(value: string): boolean {
+  const normalized = normalizeImageReference(value);
+  if (
+    !normalized ||
+    /[\s;&|`$<>?#]/.test(normalized) ||
+    /(?:password|passwd|secret|token|credential|private[-_]?key)=/i.test(normalized) ||
+    /^https?:\/\//i.test(value.trim())
+  ) {
+    return false;
+  }
+
+  const digestSeparatorCount = normalized.split("@").length - 1;
+  if (digestSeparatorCount > 1) {
+    return false;
+  }
+
+  const [nameAndMaybeTag = "", digest] = normalized.split("@", 2);
+  if (!nameAndMaybeTag || nameAndMaybeTag.startsWith("/") || nameAndMaybeTag.endsWith("/")) {
+    return false;
+  }
+
+  if (digest && !/^sha256:[a-f0-9]{64}$/i.test(digest)) {
+    return false;
+  }
+
+  const lastSlash = nameAndMaybeTag.lastIndexOf("/");
+  const lastColon = nameAndMaybeTag.lastIndexOf(":");
+  if (lastColon > lastSlash) {
+    const tag = nameAndMaybeTag.slice(lastColon + 1);
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) {
+      return false;
+    }
+  }
+
+  const imageName = lastColon > lastSlash ? nameAndMaybeTag.slice(0, lastColon) : nameAndMaybeTag;
+  return Boolean(imageName && !imageName.includes("://") && !imageName.includes("@"));
+}
+
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
-    type: z.literal("git").optional().describe("Repository source kind."),
+    type: z.enum(["git", "image"]).optional().describe("Repository source kind."),
     repository: nonEmptyStringSchema
       .refine(isSafeGitRepositoryUrl, sourceRepositoryUrlError)
       .optional()
       .describe("Git repository URL to deploy from."),
+    image: nonEmptyStringSchema
+      .refine(isSafeDockerImageReference, sourceImageReferenceError)
+      .optional()
+      .describe("Docker/OCI image reference to deploy as a prebuilt image."),
     baseDirectory: safeRelativePathSchema
       .optional()
       .describe("Relative workspace directory to use as the deployable source root."),
@@ -398,6 +457,32 @@ export const appaloftDeploymentSourceConfigSchema = z
         code: "custom",
         path: ["repository"],
         message: "config_source_resolution: source.repository is required when source.type is git",
+      });
+    }
+
+    if (value.type === "image") {
+      if (!value.image) {
+        context.addIssue({
+          code: "custom",
+          path: ["image"],
+          message: sourceImageRequiresImageError,
+        });
+      }
+
+      if (value.repository || value.gitRef || value.commitSha || value.baseDirectory) {
+        context.addIssue({
+          code: "custom",
+          path: ["image"],
+          message: sourceImageRejectsGitFieldsError,
+        });
+      }
+    }
+
+    if (value.type !== "image" && value.image) {
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "config_source_resolution: source.image requires source.type image",
       });
     }
   })
@@ -1141,6 +1226,27 @@ export const appaloftDeploymentConfigSchema = z
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.source?.type !== "image") {
+      return;
+    }
+
+    if (value.runtime?.type) {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "type"],
+        message: sourceImageRuntimeTypeError,
+      });
+    }
+
+    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceImageRuntimeStrategyError,
+      });
+    }
+  })
   .describe("Appaloft repository deployment profile config file.");
 
 export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
