@@ -1,6 +1,8 @@
 import {
+  AcceptDependencyResourceProvisioningPlanCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
   CreateDependencyResourceBackupCommand,
+  CreateDependencyResourceProvisioningPlanCommand,
   DeleteDependencyResourceCommand,
   ImportDependencyResourceCommand,
   ListDependencyResourceBackupPoliciesQuery,
@@ -12,6 +14,7 @@ import {
   RestoreDependencyResourceBackupCommand,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
+  ShowDependencyResourceProvisioningPlanQuery,
   ShowDependencyResourceQuery,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -27,12 +30,17 @@ const environmentOption = Options.text("environment");
 const optionalProjectOption = Options.text("project").pipe(Options.optional);
 const optionalEnvironmentOption = Options.text("environment").pipe(Options.optional);
 const kindOption = Options.text("kind");
+const modeOption = Options.text("mode").pipe(Options.withDefault("create"));
 const nameOption = Options.text("name");
 const serverOption = Options.text("server").pipe(Options.optional);
 const providerKeyOption = Options.text("provider-key").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const connectionUrlOption = Options.text("connection-url");
+const optionalConnectionUrlOption = Options.text("connection-url").pipe(Options.optional);
 const secretRefOption = Options.text("secret-ref").pipe(Options.optional);
+const acknowledgeMutationOption = Options.boolean("acknowledge-mutation").pipe(
+  Options.withDefault(false),
+);
 const backupRetentionOption = Options.boolean("backup-retention-required").pipe(
   Options.withDefault(false),
 );
@@ -54,6 +62,102 @@ const dueAtOption = Options.text("due-at").pipe(Options.optional);
 function dependencyKindValue(kind: string): ManagedDependencyResourceKind {
   return kind as ManagedDependencyResourceKind;
 }
+
+const planCommand = EffectCommand.make(
+  "plan",
+  {
+    mode: modeOption,
+    kind: kindOption,
+    project: projectOption,
+    environment: environmentOption,
+    name: nameOption,
+    server: serverOption,
+    providerKey: providerKeyOption,
+    connectionUrl: optionalConnectionUrlOption,
+    secretRef: secretRefOption,
+    description: descriptionOption,
+    backupRetentionRequired: backupRetentionOption,
+    backupReason: backupReasonOption,
+  },
+  ({
+    backupReason,
+    backupRetentionRequired,
+    connectionUrl,
+    description,
+    environment,
+    kind,
+    mode,
+    name,
+    project,
+    providerKey,
+    secretRef,
+    server,
+  }) => {
+    const backupReasonValue = optionalValue(backupReason);
+    const backupRelationship =
+      backupRetentionRequired || backupReasonValue
+        ? {
+            retentionRequired: backupRetentionRequired,
+            ...(backupReasonValue ? { reason: backupReasonValue } : {}),
+          }
+        : undefined;
+
+    return runCommand(
+      CreateDependencyResourceProvisioningPlanCommand.create(
+        mode === "reuse"
+          ? {
+              mode: "reuse",
+              reuse: {
+                kind: dependencyKindValue(kind),
+                projectId: project,
+                environmentId: environment,
+                name,
+                connectionUrl: optionalValue(connectionUrl) ?? "",
+                ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
+                ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
+                ...(backupRelationship ? { backupRelationship } : {}),
+              },
+            }
+          : {
+              mode: "create",
+              create: {
+                kind: dependencyKindValue(kind),
+                projectId: project,
+                environmentId: environment,
+                name,
+                ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
+                ...(optionalValue(providerKey) ? { providerKey: optionalValue(providerKey) } : {}),
+                ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
+                ...(backupRelationship ? { backupRelationship } : {}),
+              },
+            },
+      ),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyPlan));
+
+const acceptCommand = EffectCommand.make(
+  "accept",
+  {
+    planId: Args.text({ name: "planId" }),
+    acknowledgeMutation: acknowledgeMutationOption,
+  },
+  ({ acknowledgeMutation, planId }) =>
+    runCommand(
+      AcceptDependencyResourceProvisioningPlanCommand.create({
+        planId,
+        acknowledgeMutation: acknowledgeMutation as true,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyAccept));
+
+const statusCommand = EffectCommand.make(
+  "status",
+  {
+    planId: Args.text({ name: "planId" }),
+  },
+  ({ planId }) => runQuery(ShowDependencyResourceProvisioningPlanQuery.create({ planId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyStatus));
 
 const provisionCommand = EffectCommand.make(
   "provision",
@@ -329,6 +433,9 @@ const backupCommand = EffectCommand.make("backup").pipe(
 export const dependencyCommand = EffectCommand.make("dependency").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.dependency),
   EffectCommand.withSubcommands([
+    planCommand,
+    acceptCommand,
+    statusCommand,
     provisionCommand,
     importCommand,
     backupCommand,

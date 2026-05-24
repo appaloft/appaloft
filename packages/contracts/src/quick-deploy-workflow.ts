@@ -16,6 +16,7 @@ import {
   type CreateResourceResponse,
   type CreateSshCredentialInput,
   type CreateSshCredentialResponse,
+  type DependencyResourceSummary,
   type RegisterServerInput,
   type RegisterServerResponse,
   type SetEnvironmentVariableInput,
@@ -56,6 +57,47 @@ export type QuickDeployEnvironmentVariableInput = SetEnvironmentVariableInput & 
 
 export type QuickDeploySetEnvironmentVariableInput = SetEnvironmentVariableInput & {
   environmentId: string;
+};
+
+export type QuickDeployDependencyBindingInput = {
+  targetName?: string;
+  scope?: "environment" | "release" | "build-only" | "runtime-only";
+  injectionMode?: "env" | "file" | "reference";
+};
+
+export type QuickDeployDependencyProvisioningInput =
+  | {
+      mode: "create";
+      requirementId: string;
+      kind: DependencyResourceSummary["kind"];
+      name: string;
+      providerKey?: string;
+      serverId?: string;
+      description?: string;
+      binding?: QuickDeployDependencyBindingInput;
+    }
+  | {
+      mode: "reuse";
+      requirementId: string;
+      kind: DependencyResourceSummary["kind"];
+      name: string;
+      connectionUrl: string;
+      secretRef?: string;
+      connectionSecret?: string;
+      description?: string;
+      binding?: QuickDeployDependencyBindingInput;
+    };
+
+export type QuickDeployProvisionDependencyResourcesInput = {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  items: QuickDeployDependencyProvisioningInput[];
+};
+
+export type QuickDeployProvisionDependencyResourcesResponse = {
+  dependencyResourceIds: string[];
+  bindingIds: string[];
 };
 
 export type QuickDeployServerCredential =
@@ -100,6 +142,7 @@ export type QuickDeployWorkflowInput = {
   resource: QuickDeployResourceReference;
   environmentVariable?: QuickDeployEnvironmentVariableInput;
   environmentVariables?: QuickDeployEnvironmentVariableInput[];
+  dependencyProvisioning?: QuickDeployDependencyProvisioningInput[];
   deployment?: {
     destinationId?: string;
   };
@@ -196,6 +239,10 @@ export type QuickDeployWorkflowStep =
       input: QuickDeploySetEnvironmentVariableInput;
     }
   | {
+      kind: "dependencyResources.provision";
+      input: QuickDeployProvisionDependencyResourcesInput;
+    }
+  | {
       kind: "deployments.create";
       input: CreateDeploymentInput;
     };
@@ -208,6 +255,7 @@ export type QuickDeployWorkflowStepOutput =
   | CreateResourceResponse
   | ConfigureResourceSourceResponse
   | CreateDeploymentResponse
+  | QuickDeployProvisionDependencyResourcesResponse
   | void;
 
 export type QuickDeployWorkflowExecutor = (
@@ -361,6 +409,25 @@ export function* quickDeployWorkflow(
       input: {
         ...environmentVariable,
         environmentId: environmentVariable.environmentId ?? environmentId,
+      },
+    };
+  }
+
+  if (input.dependencyProvisioning && input.dependencyProvisioning.length > 0) {
+    yield {
+      kind: "dependencyResources.provision",
+      input: {
+        projectId,
+        environmentId,
+        resourceId,
+        items: input.dependencyProvisioning.map((item) =>
+          item.mode === "create" && !item.serverId
+            ? {
+                ...item,
+                serverId,
+              }
+            : item,
+        ),
       },
     };
   }

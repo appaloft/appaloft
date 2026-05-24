@@ -2,11 +2,13 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcceptDependencyResourceProvisioningPlanCommand,
   type AppLogger,
   BindResourceDependencyCommand,
   type Command,
   type CommandBus,
   CreateDependencyResourceBackupCommand,
+  CreateDependencyResourceProvisioningPlanCommand,
   createExecutionContext,
   DeleteDependencyResourceCommand,
   type ExecutionContext,
@@ -21,6 +23,7 @@ import {
   RestoreDependencyResourceBackupCommand,
   RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceBackupQuery,
+  ShowDependencyResourceProvisioningPlanQuery,
   ShowDependencyResourceQuery,
   ShowResourceDependencyBindingQuery,
   UnbindResourceDependencyCommand,
@@ -54,6 +57,47 @@ function createHarness() {
   const commandBus = {
     execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
       commands.push(command as Command<unknown>);
+      if (command instanceof CreateDependencyResourceProvisioningPlanCommand) {
+        return ok({
+          schemaVersion: "dependency-resource-provisioning.plan/v1",
+          plan: {
+            id: "drp_1",
+            mode: "create",
+            status: "planned",
+            kind: "mysql",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            name: "Main DB",
+            providerKey: "appaloft-managed-mysql",
+            requiresAcceptance: true,
+            requestedAt: "2026-01-01T00:00:00.000Z",
+            summary: [],
+          },
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      }
+      if (command instanceof AcceptDependencyResourceProvisioningPlanCommand) {
+        return ok({
+          schemaVersion: "dependency-resource-provisioning.plan/v1",
+          plan: {
+            id: "drp_1",
+            mode: "create",
+            status: "realized",
+            kind: "mysql",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            name: "Main DB",
+            providerKey: "appaloft-managed-mysql",
+            requiresAcceptance: true,
+            requestedAt: "2026-01-01T00:00:00.000Z",
+            acceptedAt: "2026-01-01T00:00:01.000Z",
+            completedAt: "2026-01-01T00:00:02.000Z",
+            dependencyResourceId: "rsi_mysql",
+            summary: [],
+          },
+          generatedAt: "2026-01-01T00:00:02.000Z",
+        } as T);
+      }
       if (command instanceof RotateResourceDependencyBindingSecretCommand) {
         return ok({
           id: "rbd_pg",
@@ -85,6 +129,26 @@ function createHarness() {
             createdAt: "2026-01-01T00:00:00.000Z",
           },
           generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      }
+      if (query instanceof ShowDependencyResourceProvisioningPlanQuery) {
+        return ok({
+          schemaVersion: "dependency-resource-provisioning.plan/v1",
+          plan: {
+            id: "drp_1",
+            mode: "create",
+            status: "realized",
+            kind: "mysql",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            name: "Main DB",
+            providerKey: "appaloft-managed-mysql",
+            requiresAcceptance: true,
+            requestedAt: "2026-01-01T00:00:00.000Z",
+            dependencyResourceId: "rsi_mysql",
+            summary: [],
+          },
+          generatedAt: "2026-01-01T00:00:02.000Z",
         } as T);
       }
       if (query instanceof ListDependencyResourceBackupsQuery) {
@@ -178,6 +242,46 @@ function createHarness() {
 }
 
 describe("dependency resource HTTP routes", () => {
+  test("[DEP-RES-PROV-ENTRY-001] dispatches provisioning plan acceptance and status routes", async () => {
+    const { app, commands, queries } = createHarness();
+
+    const planResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/provisioning/plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "create",
+          create: {
+            kind: "mysql",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            name: "Main DB",
+          },
+        }),
+      }),
+    );
+    const acceptResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/provisioning/drp_1/accept", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          planId: "drp_1",
+          acknowledgeMutation: true,
+        }),
+      }),
+    );
+    const statusResponse = await app.handle(
+      new Request("http://localhost/api/dependency-resources/provisioning/drp_1"),
+    );
+
+    expect(planResponse.status).toBe(201);
+    expect(acceptResponse.status).toBe(202);
+    expect(statusResponse.status).toBe(200);
+    expect(commands[0]).toBeInstanceOf(CreateDependencyResourceProvisioningPlanCommand);
+    expect(commands[1]).toBeInstanceOf(AcceptDependencyResourceProvisioningPlanCommand);
+    expect(queries[0]).toBeInstanceOf(ShowDependencyResourceProvisioningPlanQuery);
+  });
+
   test("[DEP-RES-ENTRY-002] dispatches dependency provision and import through HTTP", async () => {
     const { app, commands } = createHarness();
 

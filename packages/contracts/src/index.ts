@@ -3496,6 +3496,40 @@ export const dependencyResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const dependencyResourceProvisioningPlanStatusSchema = z.enum([
+  "planned",
+  "accepted",
+  "realized",
+  "failed",
+]);
+
+export const dependencyResourceProvisioningPlanSchema = z.object({
+  id: z.string(),
+  mode: z.enum(["create", "reuse"]),
+  status: dependencyResourceProvisioningPlanStatusSchema,
+  kind: dependencyResourceKindSchema,
+  projectId: z.string(),
+  environmentId: z.string(),
+  name: z.string(),
+  providerKey: z.string().optional(),
+  serverId: z.string().optional(),
+  endpoint: z.string().optional(),
+  requiresAcceptance: z.boolean(),
+  requestedAt: z.string(),
+  acceptedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  dependencyResourceId: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+  summary: z.array(z.string()),
+});
+
+export const dependencyResourceProvisioningPlanResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resource-provisioning.plan/v1"),
+  plan: dependencyResourceProvisioningPlanSchema,
+  generatedAt: z.string(),
+});
+
 export const listDependencyResourcesResponseSchema = z.object({
   schemaVersion: z.literal("dependency-resources.list/v1"),
   items: z.array(dependencyResourceSummarySchema),
@@ -6007,6 +6041,9 @@ export type DependencyResourceRestoreAttemptSummary = z.infer<
   typeof dependencyResourceRestoreAttemptSummarySchema
 >;
 export type DependencyResourceBackupSummary = z.infer<typeof dependencyResourceBackupSummarySchema>;
+export type DependencyResourceProvisioningPlan = z.infer<
+  typeof dependencyResourceProvisioningPlanSchema
+>;
 export type ResourceDependencyBindingSummary = z.infer<
   typeof resourceDependencyBindingSummarySchema
 >;
@@ -6162,6 +6199,9 @@ export type CleanupStorageVolumeRuntimeResponse = z.infer<
   typeof cleanupStorageVolumeRuntimeResponseSchema
 >;
 export type DependencyResourceResponse = z.infer<typeof dependencyResourceResponseSchema>;
+export type DependencyResourceProvisioningPlanResponse = z.infer<
+  typeof dependencyResourceProvisioningPlanResponseSchema
+>;
 export type ListDependencyResourcesResponse = z.infer<typeof listDependencyResourcesResponseSchema>;
 export type ShowDependencyResourceResponse = z.infer<typeof showDependencyResourceResponseSchema>;
 export type ListDependencyResourceBackupsResponse = z.infer<

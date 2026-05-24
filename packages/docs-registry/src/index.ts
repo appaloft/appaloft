@@ -3200,6 +3200,21 @@ export const publicDocsOperationCoverage = [
     topicId: "dependency.resource-lifecycle",
   },
   {
+    operationKey: "dependency-resources.provisioning.plan",
+    status: "documented",
+    topicId: "dependency.resource-lifecycle",
+  },
+  {
+    operationKey: "dependency-resources.provisioning.accept",
+    status: "documented",
+    topicId: "dependency.resource-lifecycle",
+  },
+  {
+    operationKey: "dependency-resources.provisioning.status",
+    status: "documented",
+    topicId: "dependency.resource-lifecycle",
+  },
+  {
     operationKey: "dependency-resources.list",
     status: "documented",
     topicId: "dependency.resource-lifecycle",
