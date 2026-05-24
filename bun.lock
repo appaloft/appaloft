@@ -205,6 +205,20 @@
         "reflect-metadata": "^0.2.2",
       },
     },
+    "packages/blueprint-marketplace-web": {
+      "name": "@appaloft/blueprint-marketplace-web",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@sveltejs/vite-plugin-svelte": "^7.1.2",
+        "svelte": "^5.55.5",
+        "svelte-check": "^4.4.8",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.6",
+      },
+      "peerDependencies": {
+        "svelte": "^5.55.5",
+      },
+    },
     "packages/blueprints": {
       "name": "@appaloft/blueprints",
       "dependencies": {
@@ -577,6 +591,8 @@
     "@appaloft/application": ["@appaloft/application@workspace:packages/application"],
 
     "@appaloft/auth-better": ["@appaloft/auth-better@workspace:packages/auth/better"],
+
+    "@appaloft/blueprint-marketplace-web": ["@appaloft/blueprint-marketplace-web@workspace:packages/blueprint-marketplace-web"],
 
     "@appaloft/blueprints": ["@appaloft/blueprints@workspace:packages/blueprints"],
 

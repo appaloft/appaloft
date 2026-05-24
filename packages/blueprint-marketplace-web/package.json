@@ -1,0 +1,35 @@
+{
+  "name": "@appaloft/blueprint-marketplace-web",
+  "version": "0.0.0",
+  "description": "Neutral Blueprint catalog marketplace components for Appaloft web surfaces.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "svelte": "./src/index.ts",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./BlueprintMarketplacePage.svelte": {
+      "svelte": "./src/BlueprintMarketplacePage.svelte",
+      "types": "./src/BlueprintMarketplacePage.svelte",
+      "default": "./src/BlueprintMarketplacePage.svelte"
+    }
+  },
+  "peerDependencies": {
+    "svelte": "^5.55.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "svelte": "^5.55.5",
+    "svelte-check": "^4.4.8",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "test": "vitest --run",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  }
+}
