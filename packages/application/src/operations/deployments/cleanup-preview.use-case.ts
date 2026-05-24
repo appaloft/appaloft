@@ -32,10 +32,13 @@ import {
   type SourceLinkDependencyProvenanceEntry,
   type SourceLinkRecord,
   type SourceLinkRepository,
+  type SourceLinkStorageProvenanceEntry,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type DeleteDependencyResourceUseCase } from "../dependency-resources/delete-dependency-resource.use-case";
+import { type DetachResourceStorageUseCase } from "../resources/detach-resource-storage.use-case";
 import { type UnbindResourceDependencyUseCase } from "../resources/unbind-resource-dependency.use-case";
+import { type DeleteStorageVolumeUseCase } from "../storage-volumes/delete-storage-volume.use-case";
 import { type CleanupPreviewCommandInput } from "./cleanup-preview.command";
 import { previewLifecycleScope } from "./deployment-mutation-scopes";
 
@@ -47,6 +50,8 @@ export interface CleanupPreviewResult {
   removedSourceLink: boolean;
   removedDependencyBindings?: number;
   deletedDependencyResources?: number;
+  removedStorageAttachments?: number;
+  deletedStorageVolumes?: number;
   projectId?: string;
   environmentId?: string;
   resourceId?: string;
@@ -129,6 +134,29 @@ function previewDependencyProvenanceEntries(input: {
   );
 }
 
+function previewStorageProvenanceEntries(input: {
+  sourceLink: SourceLinkRecord;
+  sourceFingerprint: string;
+}): SourceLinkStorageProvenanceEntry[] {
+  const provenance = input.sourceLink.storageProvenance;
+  if (
+    provenance?.schemaVersion !== "source-link.storage-provenance/v1" ||
+    provenance.source !== "repository-config" ||
+    provenance.sourceFingerprint !== input.sourceFingerprint
+  ) {
+    return [];
+  }
+
+  return provenance.entries.filter(
+    (entry) =>
+      entry.source === "managed" &&
+      entry.lifecycle === "ephemeral" &&
+      entry.resourceId === input.sourceLink.resourceId &&
+      entry.storageVolumeId.trim().length > 0 &&
+      entry.attachmentId.trim().length > 0,
+  );
+}
+
 const missingUnbindResourceDependencyUseCase: Pick<UnbindResourceDependencyUseCase, "execute"> = {
   async execute() {
     return err(
@@ -146,6 +174,28 @@ const missingDeleteDependencyResourceUseCase: Pick<DeleteDependencyResourceUseCa
       domainError.infra("Dependency resource delete use case is not registered", {
         phase: "preview-cleanup",
         cleanupStage: "dependency-delete",
+      }),
+    );
+  },
+};
+
+const missingDetachResourceStorageUseCase: Pick<DetachResourceStorageUseCase, "execute"> = {
+  async execute() {
+    return err(
+      domainError.infra("Resource storage detach use case is not registered", {
+        phase: "preview-cleanup",
+        cleanupStage: "storage-detach",
+      }),
+    );
+  },
+};
+
+const missingDeleteStorageVolumeUseCase: Pick<DeleteStorageVolumeUseCase, "execute"> = {
+  async execute() {
+    return err(
+      domainError.infra("Storage volume delete use case is not registered", {
+        phase: "preview-cleanup",
+        cleanupStage: "storage-delete",
       }),
     );
   },
@@ -176,6 +226,16 @@ export class CleanupPreviewUseCase {
       DeleteDependencyResourceUseCase,
       "execute"
     > = missingDeleteDependencyResourceUseCase,
+    @inject(tokens.detachResourceStorageUseCase)
+    private readonly detachResourceStorageUseCase: Pick<
+      DetachResourceStorageUseCase,
+      "execute"
+    > = missingDetachResourceStorageUseCase,
+    @inject(tokens.deleteStorageVolumeUseCase)
+    private readonly deleteStorageVolumeUseCase: Pick<
+      DeleteStorageVolumeUseCase,
+      "execute"
+    > = missingDeleteStorageVolumeUseCase,
   ) {}
 
   private async findLatestDeploymentForResource(
@@ -261,6 +321,8 @@ export class CleanupPreviewUseCase {
       sourceLinkRepository,
       unbindResourceDependencyUseCase,
       deleteDependencyResourceUseCase,
+      detachResourceStorageUseCase,
+      deleteStorageVolumeUseCase,
     } = this;
     const findDeploymentById = this.findDeploymentById.bind(this);
     const findLatestDeploymentForResource = this.findLatestDeploymentForResource.bind(this);
@@ -294,6 +356,8 @@ export class CleanupPreviewUseCase {
               removedSourceLink: false,
               removedDependencyBindings: 0,
               deletedDependencyResources: 0,
+              removedStorageAttachments: 0,
+              deletedStorageVolumes: 0,
             });
           }
 
@@ -403,6 +467,52 @@ export class CleanupPreviewUseCase {
             }
           }
 
+          let removedStorageAttachments = 0;
+          let deletedStorageVolumes = 0;
+          for (const storage of previewStorageProvenanceEntries({
+            sourceLink,
+            sourceFingerprint: input.sourceFingerprint,
+          })) {
+            const detachResult = await detachResourceStorageUseCase.execute(context, {
+              resourceId: storage.resourceId,
+              attachmentId: storage.attachmentId,
+            });
+            if (detachResult.isErr() && !isNotFoundError(detachResult.error)) {
+              return err(
+                withPreviewCleanupDetails(detachResult.error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: cleanupStageFromError(detachResult.error, "storage-detach"),
+                  resourceId: storage.resourceId,
+                  attachmentId: storage.attachmentId,
+                  storageVolumeId: storage.storageVolumeId,
+                  storageKey: storage.key,
+                }),
+              );
+            }
+            if (detachResult.isOk()) {
+              removedStorageAttachments += 1;
+            }
+
+            const deleteResult = await deleteStorageVolumeUseCase.execute(context, {
+              storageVolumeId: storage.storageVolumeId,
+            });
+            if (deleteResult.isErr() && !isNotFoundError(deleteResult.error)) {
+              return err(
+                withPreviewCleanupDetails(deleteResult.error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: cleanupStageFromError(deleteResult.error, "storage-delete"),
+                  resourceId: storage.resourceId,
+                  attachmentId: storage.attachmentId,
+                  storageVolumeId: storage.storageVolumeId,
+                  storageKey: storage.key,
+                }),
+              );
+            }
+            if (deleteResult.isOk()) {
+              deletedStorageVolumes += 1;
+            }
+          }
+
           const removedLinkedServerAppliedRoute = sourceLink.serverId
             ? yield* await serverAppliedRouteStateRepository
                 .deleteOne(
@@ -465,6 +575,8 @@ export class CleanupPreviewUseCase {
               cleanedRuntime ||
               removedDependencyBindings > 0 ||
               deletedDependencyResources > 0 ||
+              removedStorageAttachments > 0 ||
+              deletedStorageVolumes > 0 ||
               removedServerAppliedRoute ||
               removedSourceLink
                 ? ("cleaned" as const)
@@ -474,6 +586,8 @@ export class CleanupPreviewUseCase {
             removedSourceLink,
             removedDependencyBindings,
             deletedDependencyResources,
+            removedStorageAttachments,
+            deletedStorageVolumes,
             projectId: sourceLink.projectId,
             environmentId: sourceLink.environmentId,
             resourceId: sourceLink.resourceId,

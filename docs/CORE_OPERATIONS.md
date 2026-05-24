@@ -470,6 +470,15 @@ Current boundary:
   Preview cleanup may unbind/delete only provenance-marked ephemeral dependencies through
   `resources.unbind-dependency` and `dependency-resources.delete`; manual/shared dependencies and
   dependencies without matching provenance are preserved by design.
+- Repository config `storage` is governed by
+  [ADR-067](./decisions/ADR-067-repository-config-storage-graph.md) and
+  [Repository Config Storage Graph](./specs/076-repository-config-storage-graph/spec.md). It is a
+  workflow/profile extension over the existing storage operation catalog, not a new operation key.
+  Config deploy may list/create managed named volumes, read/attach Resource storage mounts, and
+  persist preview source-link provenance before `deployments.create`. Preview cleanup may
+  detach/delete only provenance-marked ephemeral storage through `resources.detach-storage` and
+  `storage-volumes.delete`; manual/shared storage and storage without matching provenance are
+  preserved by design.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database

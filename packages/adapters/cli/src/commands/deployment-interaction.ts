@@ -1,5 +1,6 @@
 import {
   AcceptDependencyResourceProvisioningPlanCommand,
+  AttachResourceStorageCommand,
   BindResourceDependencyCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -13,6 +14,7 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
+  CreateStorageVolumeCommand,
   compareResourceProfileDrift,
   type DependencyResourceSummary,
   type EnvironmentSummary,
@@ -22,6 +24,7 @@ import {
   ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
   ListServersQuery,
+  ListStorageVolumesQuery,
   type ProjectSummary,
   ProvisionDependencyResourceCommand,
   RegisterServerCommand,
@@ -38,6 +41,7 @@ import {
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
   ShowResourceQuery,
+  type StorageVolumeSummary,
 } from "@appaloft/application";
 import {
   type ConfigureResourceNetworkInput,
@@ -78,6 +82,8 @@ import {
   type SourceLinkDependencyProvenance,
   type SourceLinkDependencyProvenanceEntry,
   type SourceLinkRecord,
+  type SourceLinkStorageProvenance,
+  type SourceLinkStorageProvenanceEntry,
 } from "./deployment-remote-state.js";
 import {
   type DeploymentMethod,
@@ -121,6 +127,7 @@ export interface DeploymentPromptSeed {
   stateBackendPrepared?: boolean;
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
   dependencyGraph?: DeploymentDependencySeed[];
+  storageGraph?: DeploymentStorageSeed[];
   profileDriftPreflight?: boolean;
 }
 
@@ -140,6 +147,14 @@ export interface DeploymentDependencySeed {
   kind: "postgres";
   source: "managed";
   bindEnv: string;
+  previewLifecycle?: "ephemeral";
+}
+export interface DeploymentStorageSeed {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  mountPath: string;
+  mountMode: "read-write" | "read-only";
   previewLifecycle?: "ephemeral";
 }
 export const deploymentEntryModes = ["static-site"] as const;
@@ -442,6 +457,19 @@ export function deploymentPromptSeedFromConfig(
             : {}),
         }) satisfies DeploymentDependencySeed,
     );
+  const storageGraph = Object.entries(config.storage ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, storage]) =>
+        ({
+          key,
+          kind: storage.kind,
+          source: storage.source,
+          mountPath: storage.mount.path,
+          mountMode: storage.mount.mode ?? "read-write",
+          ...(storage.preview?.lifecycle ? { previewLifecycle: storage.preview.lifecycle } : {}),
+        }) satisfies DeploymentStorageSeed,
+    );
   const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
   const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
@@ -478,6 +506,7 @@ export function deploymentPromptSeedFromConfig(
     ...(healthCheck ? { healthCheck } : {}),
     ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
     ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
+    ...(storageGraph.length > 0 ? { storageGraph } : {}),
   };
 }
 
@@ -1719,6 +1748,463 @@ function ensureRepositoryConfigDependencies(input: {
   });
 }
 
+function repositoryConfigStorageName(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  sourceFingerprint?: string;
+}): string {
+  const base =
+    input.storage.previewLifecycle === "ephemeral" && input.sourceFingerprint
+      ? `preview-${shortSourceFingerprintHash(input.sourceFingerprint)}-${input.storage.key}`
+      : `${input.resourceId}-${input.storage.key}`;
+
+  return normalizeQuickDeployGeneratedNameBase(base);
+}
+
+function isManagedStorageVolume(
+  storageVolume: StorageVolumeSummary | undefined,
+): storageVolume is StorageVolumeSummary {
+  return Boolean(
+    storageVolume &&
+      storageVolume.kind === "named-volume" &&
+      storageVolume.lifecycleStatus === "active" &&
+      !storageVolume.deletedAt &&
+      !storageVolume.sourcePath,
+  );
+}
+
+function findStorageVolumeById(
+  storageVolumes: readonly StorageVolumeSummary[],
+  storageVolumeId: string,
+): StorageVolumeSummary | undefined {
+  return storageVolumes.find((storageVolume) => storageVolume.id === storageVolumeId);
+}
+
+function findManagedStorageVolumeByName(input: {
+  storageVolumes: readonly StorageVolumeSummary[];
+  name: string;
+}): StorageVolumeSummary | undefined {
+  const slug = slugify(input.name);
+  return input.storageVolumes.find(
+    (storageVolume) =>
+      isManagedStorageVolume(storageVolume) &&
+      (storageVolume.slug === slug || slugify(storageVolume.name) === slug),
+  );
+}
+
+function repositoryConfigStorageAttachmentConflict(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  existingAttachment: NonNullable<ResourceDetail["storageAttachments"]>[number];
+  expectedStorageVolumeId?: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_attachment_conflict",
+    category: "user",
+    message: "Repository config storage mount path is already attached to another storage volume",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+      mountMode: input.storage.mountMode,
+      existingAttachmentId: input.existingAttachment.id,
+      existingStorageVolumeId: input.existingAttachment.storageVolumeId,
+      existingMountMode: input.existingAttachment.mountMode,
+      ...(input.expectedStorageVolumeId
+        ? { expectedStorageVolumeId: input.expectedStorageVolumeId }
+        : {}),
+    },
+  };
+}
+
+function repositoryConfigStorageVolumeConflict(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  storageVolume: StorageVolumeSummary;
+  sourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_volume_conflict",
+    category: "user",
+    message: "Repository config storage volume exists without matching provenance",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+      storageVolumeId: input.storageVolume.id,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigStorageProvenanceError(input: {
+  storage: DeploymentStorageSeed;
+  sourceFingerprint: string;
+  resourceId: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_provenance_unavailable",
+    category: "user",
+    message: "Preview storage cleanup provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      sourceFingerprint: input.sourceFingerprint,
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+    },
+  };
+}
+
+function repositoryConfigStorageDuplicatePathError(input: {
+  storage: DeploymentStorageSeed;
+  conflictingStorageKey: string;
+}): DomainError {
+  return domainError.validation("Repository config storage mount path is declared more than once", {
+    phase: "config-storage-resolution",
+    storageKey: input.storage.key,
+    conflictingStorageKey: input.conflictingStorageKey,
+    destinationPath: input.storage.mountPath,
+  });
+}
+
+function listStorageVolumesForConfig(input: { projectId: string; environmentId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListStorageVolumesQuery.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createRepositoryConfigStorageVolume(input: {
+  projectId: string;
+  environmentId: string;
+  name: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      CreateStorageVolumeCommand.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        name: input.name,
+        kind: "named-volume",
+        backupRelationship: {
+          retentionRequired: false,
+        },
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function attachRepositoryConfigStorage(input: {
+  resourceId: string;
+  storageVolumeId: string;
+  destinationPath: string;
+  mountMode: DeploymentStorageSeed["mountMode"];
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      AttachResourceStorageCommand.create({
+        resourceId: input.resourceId,
+        storageVolumeId: input.storageVolumeId,
+        destinationPath: input.destinationPath,
+        mountMode: input.mountMode,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function buildStorageProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkStorageProvenance;
+  entries: SourceLinkStorageProvenanceEntry[];
+}): SourceLinkStorageProvenance {
+  const byKey = new Map<string, SourceLinkStorageProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(`${entry.key}:${entry.destinationPath}`, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(`${entry.key}:${entry.destinationPath}`, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.storage-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigStorage(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const storageGraph = input.seed.storageGraph ?? [];
+    if (storageGraph.length === 0) {
+      return;
+    }
+
+    const seenMountPaths = new Map<string, string>();
+    for (const storage of storageGraph) {
+      const existingKey = seenMountPaths.get(storage.mountPath);
+      if (existingKey) {
+        return yield* Effect.fail(
+          repositoryConfigStorageDuplicatePathError({
+            storage,
+            conflictingStorageKey: existingKey,
+          }),
+        );
+      }
+      seenMountPaths.set(storage.mountPath, storage.key);
+    }
+
+    const cli = yield* CliRuntime;
+    const provenanceRequiredStorage = storageGraph.find(
+      (storage) => storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+    );
+    if (provenanceRequiredStorage && !cli.sourceLinkStore?.recordStorageProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigStorageProvenanceError({
+          storage: provenanceRequiredStorage,
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    let existingSourceLink: SourceLinkRecord | null = null;
+    if (input.seed.sourceFingerprint) {
+      const existingSourceLinkResult = yield* Effect.promise(
+        () =>
+          cli.sourceLinkStore?.read(input.seed.sourceFingerprint ?? "") ??
+          Promise.resolve(ok(null)),
+      );
+      existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    const attachments = [...(resource.storageAttachments ?? [])];
+    const storageVolumesResult = yield* listStorageVolumesForConfig({
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+    });
+    const storageVolumes = [...storageVolumesResult.items];
+    const provenanceEntries: SourceLinkStorageProvenanceEntry[] = [];
+
+    for (const storage of storageGraph) {
+      const volumeName = repositoryConfigStorageName({
+        storage,
+        resourceId: input.resourceId,
+        ...(input.seed.sourceFingerprint
+          ? { sourceFingerprint: input.seed.sourceFingerprint }
+          : {}),
+      });
+      const existingProvenanceEntry =
+        existingSourceLink &&
+        input.seed.sourceFingerprint &&
+        existingSourceLink.storageProvenance?.sourceFingerprint === input.seed.sourceFingerprint
+          ? existingSourceLink.storageProvenance.entries.find(
+              (entry) =>
+                entry.key === storage.key &&
+                entry.destinationPath === storage.mountPath &&
+                entry.resourceId === input.resourceId,
+            )
+          : undefined;
+      const activeMountAttachment = attachments.find(
+        (attachment) => attachment.destinationPath === storage.mountPath,
+      );
+      const isEphemeralPreviewStorage = Boolean(
+        storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+      );
+      const provenanceVolume = existingProvenanceEntry
+        ? findStorageVolumeById(storageVolumes, existingProvenanceEntry.storageVolumeId)
+        : undefined;
+      const namedVolume = findManagedStorageVolumeByName({
+        storageVolumes,
+        name: volumeName,
+      });
+      let storageVolume = isManagedStorageVolume(provenanceVolume)
+        ? provenanceVolume
+        : isEphemeralPreviewStorage
+          ? undefined
+          : namedVolume;
+
+      if (isEphemeralPreviewStorage && !existingProvenanceEntry && namedVolume) {
+        return yield* Effect.fail(
+          repositoryConfigStorageVolumeConflict({
+            storage,
+            resourceId: input.resourceId,
+            storageVolume: namedVolume,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (isEphemeralPreviewStorage && !existingProvenanceEntry && activeMountAttachment) {
+        return yield* Effect.fail(
+          repositoryConfigStorageAttachmentConflict({
+            storage,
+            resourceId: input.resourceId,
+            existingAttachment: activeMountAttachment,
+          }),
+        );
+      }
+
+      if (
+        isEphemeralPreviewStorage &&
+        existingProvenanceEntry &&
+        namedVolume &&
+        namedVolume.id !== existingProvenanceEntry.storageVolumeId &&
+        !provenanceVolume
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigStorageVolumeConflict({
+            storage,
+            resourceId: input.resourceId,
+            storageVolume: namedVolume,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (!storageVolume) {
+        const created = yield* createRepositoryConfigStorageVolume({
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: volumeName,
+        });
+        storageVolume = {
+          id: created.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: volumeName,
+          slug: slugify(volumeName),
+          kind: "named-volume",
+          lifecycleStatus: "active",
+          attachmentCount: 0,
+          attachments: [],
+          createdAt: new Date().toISOString(),
+        } satisfies StorageVolumeSummary;
+        storageVolumes.push(storageVolume);
+      }
+
+      if (
+        activeMountAttachment &&
+        (activeMountAttachment.storageVolumeId !== storageVolume.id ||
+          activeMountAttachment.mountMode !== storage.mountMode)
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigStorageAttachmentConflict({
+            storage,
+            resourceId: input.resourceId,
+            existingAttachment: activeMountAttachment,
+            expectedStorageVolumeId: storageVolume.id,
+          }),
+        );
+      }
+
+      const attachment = activeMountAttachment
+        ? { id: activeMountAttachment.id }
+        : yield* attachRepositoryConfigStorage({
+            resourceId: input.resourceId,
+            storageVolumeId: storageVolume.id,
+            destinationPath: storage.mountPath,
+            mountMode: storage.mountMode,
+          });
+      if (!activeMountAttachment) {
+        attachments.push({
+          id: attachment.id,
+          storageVolumeId: storageVolume.id,
+          storageVolumeName: storageVolume.name,
+          storageVolumeKind: storageVolume.kind,
+          destinationPath: storage.mountPath,
+          mountMode: storage.mountMode,
+          attachedAt: new Date().toISOString(),
+        });
+      }
+
+      if (storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint) {
+        provenanceEntries.push({
+          key: storage.key,
+          kind: storage.kind,
+          source: storage.source,
+          lifecycle: storage.previewLifecycle,
+          resourceId: input.resourceId,
+          storageVolumeId: storageVolume.id,
+          attachmentId: attachment.id,
+          destinationPath: storage.mountPath,
+          createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+        });
+      }
+    }
+
+    if (provenanceEntries.length === 0 || !input.seed.sourceFingerprint) {
+      return;
+    }
+
+    if (!cli.sourceLinkStore?.recordStorageProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigStorageProvenanceError({
+          storage: storageGraph[0] as DeploymentStorageSeed,
+          sourceFingerprint: input.seed.sourceFingerprint,
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const provenance = buildStorageProvenance({
+      sourceFingerprint: input.seed.sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingSourceLink?.storageProvenance
+        ? { existing: existingSourceLink.storageProvenance }
+        : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordStorageProvenance?.({
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          target,
+          storageProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -2824,6 +3310,16 @@ export function resolveInteractiveDeploymentInput(
           resourceId: deploymentInput.resourceId,
         });
         yield* ensureRepositoryConfigDependencies({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigStorage({
           seed: resolvedSeed,
           projectId: deploymentInput.projectId,
           serverId: deploymentInput.serverId,

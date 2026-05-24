@@ -404,11 +404,31 @@ export interface SourceLinkDependencyProvenance {
   entries: SourceLinkDependencyProvenanceEntry[];
 }
 
+export interface SourceLinkStorageProvenanceEntry {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  storageVolumeId: string;
+  attachmentId: string;
+  destinationPath: string;
+  createdAt: string;
+}
+
+export interface SourceLinkStorageProvenance {
+  schemaVersion: "source-link.storage-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkStorageProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
   dependencyProvenance?: SourceLinkDependencyProvenance;
+  storageProvenance?: SourceLinkStorageProvenance;
 }
 
 export interface SourceLinkSelectionSpecVisitor<TResult> {

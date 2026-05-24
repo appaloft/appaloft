@@ -494,6 +494,58 @@
         "description": "User-facing application dependency declaration."
       }
     },
+    "storage": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "volume",
+            "description": "Application storage dependency kind."
+          },
+          "source": {
+            "type": "string",
+            "const": "managed",
+            "description": "Managed storage volumes are created by Appaloft."
+          },
+          "mount": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Absolute workload path that receives this storage volume."
+              },
+              "mode": {
+                "default": "read-write",
+                "type": "string",
+                "enum": ["read-write", "read-only"]
+              }
+            },
+            "required": ["path", "mode"],
+            "additionalProperties": false
+          },
+          "preview": {
+            "type": "object",
+            "properties": {
+              "lifecycle": {
+                "type": "string",
+                "const": "ephemeral"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["kind", "source", "mount"],
+        "additionalProperties": false,
+        "description": "User-facing application storage declaration."
+      }
+    },
     "env": {
       "type": "object",
       "propertyNames": {

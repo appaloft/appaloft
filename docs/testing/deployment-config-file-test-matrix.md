@@ -22,6 +22,8 @@ Canonical assertions:
   deployment;
 - `dependencies` declarations map to dependency-resource list/provision and Resource binding
   operations before deployment;
+- `storage` declarations map to storage-volume list/create and Resource storage attachment
+  operations before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -43,10 +45,12 @@ This matrix inherits:
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
+- [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
+- [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -69,6 +73,7 @@ This matrix inherits:
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
 | Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
+| Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -143,6 +148,20 @@ This matrix inherits:
 | CONFIG-FILE-DEPENDENCY-007 | integration | Preview ephemeral provenance | PR preview config dependency declares `preview.lifecycle = ephemeral` | Config deploy provisions or reuses the preview dependency and binding | Source link records safe repository-config provenance for dependency key, target env, resource id, binding id, dependency resource id, and source fingerprint | None | Dependency operations -> source-link provenance write -> `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
+
+## Storage Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-STORAGE-001 | parser/schema | Managed storage accepted | Config declares `storage.uploads.kind = volume`, `source = managed`, `mount.path = /app/uploads`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration, defaults `mount.mode`, normalizes the workload path, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-STORAGE-002 | parser/schema | Unknown storage fields rejected | Config declares an unsupported field under `storage.uploads` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-STORAGE-003 | parser/schema | Storage identity, host paths, and secret material rejected | Config declares provider account, tenant, credential, host bind `sourcePath`, provider-native handle, raw secret value, or provider-specific settings under `storage` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity`, `config-secret-validation`, or `config-schema` | No write commands |
+| CONFIG-FILE-STORAGE-004 | integration | Config storage creates and attaches before deployment | Selected Resource has no matching managed named volume or storage attachment | Config deploy handles storage | Resource attachments are read, storage volumes are listed, a managed volume is created, an attachment is created, and deployment admission remains ids-only | None | `resources.show` -> `storage-volumes.list` -> `storage-volumes.create` -> `resources.attach-storage` -> `deployments.create` |
+| CONFIG-FILE-STORAGE-005 | integration | Config storage idempotency | Matching managed named volume and active Resource attachment already exist | Config deploy runs again | No duplicate create or attach command is dispatched | None | `resources.show` -> `storage-volumes.list` -> `deployments.create` |
+| CONFIG-FILE-STORAGE-006 | integration | Mount path conflict | Resource already has an active storage attachment for `/app/uploads` to a different volume or mode | Config deploy declares `storage.uploads.mount.path = /app/uploads` | Workflow fails before deployment with safe details | `repository_config_storage_attachment_conflict`, phase `config-storage-resolution` | `resources.show` -> `storage-volumes.list`; no `deployments.create` |
+| CONFIG-FILE-STORAGE-007 | integration | Preview ephemeral storage provenance | PR preview config storage declares `preview.lifecycle = ephemeral` | Config deploy creates or reuses the preview storage volume and attachment | Source link records safe repository-config provenance for storage key, destination path, resource id, attachment id, storage volume id, and source fingerprint | None | Storage operations -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-STORAGE-008 | integration | Preview ephemeral unprovenanced storage conflict | PR preview config storage declares `preview.lifecycle = ephemeral` and a matching managed storage volume or mount path exists without matching source-link provenance | Workflow refuses to adopt the storage for cleanup ownership | `repository_config_storage_volume_conflict` or `repository_config_storage_attachment_conflict`, phase `config-storage-resolution` | `resources.show` -> `storage-volumes.list`; no create, attach, or `deployments.create` |
+| CONFIG-FILE-STORAGE-009 | integration | Preview ephemeral storage provenance unavailable | PR preview config storage declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link storage provenance | Workflow fails before storage mutation | `repository_config_storage_provenance_unavailable`, phase `config-storage-resolution` | No create, attach, or `deployments.create` |
 
 ## Control-Plane Policy Matrix
 
@@ -254,10 +273,16 @@ Current implemented coverage:
 - `CONFIG-FILE-PARSE-001`, `CONFIG-FILE-DISC-001`, `CONFIG-FILE-ID-001`,
   `CONFIG-FILE-SEC-001`, and `CONFIG-FILE-UNSUPPORTED-001` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
+- `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003` and
+  `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003` are covered in
+  `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
+- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-009` and
+  `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007` are covered in
+  `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
   proving plain env mapping, public-prefix build-time exposure, supported `ci-env:` resolution,

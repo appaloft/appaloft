@@ -30,6 +30,7 @@ const safeRelativePathPattern =
 const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
 const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
 const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
+const storageKeyPattern = dependencyKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 export const appaloftDeploymentRuntimeNameTemplateVariables = ["preview_id", "pr_number"] as const;
 type AppaloftDeploymentRuntimeNameTemplateVariable =
@@ -56,6 +57,8 @@ const sourceRepositoryUrlError =
   "config_source_resolution: source.repository must be a git URL without credentials, query, or fragment";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
+const storageMountPathError =
+  "config_storage_resolution: storage.<key>.mount.path must be an absolute normalized workload path";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -453,6 +456,28 @@ function hasUnsafePathPrefixCharacter(value: string): boolean {
   return false;
 }
 
+function normalizeAbsoluteWorkloadPath(value: string): string {
+  const segments = value.trim().split("/").filter(Boolean);
+  return `/${segments.join("/")}`;
+}
+
+function isSafeStorageMountPath(value: string): boolean {
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ||
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    /^[a-z]:[\\/]/i.test(trimmed) ||
+    /[;&|`$<>]/.test(trimmed)
+  ) {
+    return false;
+  }
+
+  const segments = trimmed.split("/").filter(Boolean);
+  return segments.length > 0 && !segments.some((segment) => segment === "." || segment === "..");
+}
+
 const appaloftDeploymentAccessDomainConfigSchema = z
   .object({
     host: nonEmptyStringSchema.refine(
@@ -617,6 +642,28 @@ export const appaloftDeploymentDependencyConfigSchema = z
   .strict()
   .describe("User-facing application dependency declaration.");
 
+export const appaloftDeploymentStorageConfigSchema = z
+  .object({
+    kind: z.literal("volume").describe("Application storage dependency kind."),
+    source: z.literal("managed").describe("Managed storage volumes are created by Appaloft."),
+    mount: z
+      .object({
+        path: nonEmptyStringSchema
+          .refine(isSafeStorageMountPath, storageMountPathError)
+          .describe("Absolute workload path that receives this storage volume."),
+        mode: z.enum(["read-write", "read-only"]).optional().default("read-write"),
+      })
+      .strict(),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing application storage declaration.");
+
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -731,6 +778,17 @@ export const appaloftDeploymentConfigSchema = z
         appaloftDeploymentDependencyConfigSchema,
       )
       .optional(),
+    storage: z
+      .record(
+        z
+          .string()
+          .regex(
+            storageKeyPattern,
+            "config_storage_resolution: storage keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentStorageConfigSchema,
+      )
+      .optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
@@ -779,6 +837,22 @@ function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDe
           },
         }
       : {}),
+    ...(config.storage
+      ? {
+          storage: Object.fromEntries(
+            Object.entries(config.storage).map(([key, storage]) => [
+              key,
+              {
+                ...storage,
+                mount: {
+                  ...storage.mount,
+                  path: normalizeAbsoluteWorkloadPath(storage.mount.path),
+                },
+              },
+            ]),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -806,6 +880,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "source" ||
     root === "access" ||
     root === "dependencies" ||
+    root === "storage" ||
     root === "controlPlane"
   );
 }

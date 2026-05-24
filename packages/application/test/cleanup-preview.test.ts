@@ -370,6 +370,38 @@ class CapturingDeleteDependencyResourceUseCase {
   }
 }
 
+class CapturingDetachStorageUseCase {
+  readonly calls: Array<{ resourceId: string; attachmentId: string }> = [];
+
+  constructor(
+    private readonly result: Result<{ id: string }> = ok({ id: "rsa_preview_uploads" }),
+  ) {}
+
+  async execute(
+    _context: unknown,
+    input: { resourceId: string; attachmentId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDeleteStorageVolumeUseCase {
+  readonly calls: Array<{ storageVolumeId: string }> = [];
+
+  constructor(
+    private readonly result: Result<{ id: string }> = ok({ id: "stv_preview_uploads" }),
+  ) {}
+
+  async execute(
+    _context: unknown,
+    input: { storageVolumeId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
 class MemoryDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly items: Awaited<ReturnType<DeploymentReadModel["list"]>> = []) {}
 
@@ -419,6 +451,8 @@ describe("CleanupPreviewUseCase", () => {
       removedSourceLink: false,
       removedDependencyBindings: 0,
       deletedDependencyResources: 0,
+      removedStorageAttachments: 0,
+      deletedStorageVolumes: 0,
     });
     expect(executionBackend.canceledDeploymentIds).toEqual([]);
     expect(routeRepository.deletedTargets).toEqual([]);
@@ -500,6 +534,81 @@ describe("CleanupPreviewUseCase", () => {
     expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
   });
 
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-013] cleans only provenance-owned ephemeral storage volumes", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      storageProvenance: {
+        schemaVersion: "source-link.storage-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "uploads",
+            kind: "volume",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_preview_1",
+            storageVolumeId: "stv_preview_uploads",
+            attachmentId: "rsa_preview_uploads",
+            destinationPath: "/app/uploads",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const detachStorage = new CapturingDetachStorageUseCase();
+    const deleteStorage = new CapturingDeleteStorageVolumeUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_storage",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      detachStorage,
+      deleteStorage,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "cleaned",
+      removedStorageAttachments: 1,
+      deletedStorageVolumes: 1,
+      removedSourceLink: true,
+    });
+    expect(detachStorage.calls).toEqual([
+      {
+        resourceId: "res_preview_1",
+        attachmentId: "rsa_preview_uploads",
+      },
+    ]);
+    expect(deleteStorage.calls).toEqual([
+      {
+        storageVolumeId: "stv_preview_uploads",
+      },
+    ]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
+
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-012] preserves dependencies without matching provenance", async () => {
     const sourceLinkRepository = new MemorySourceLinkRepository({
       sourceFingerprint: previewSourceFingerprint,
@@ -542,6 +651,52 @@ describe("CleanupPreviewUseCase", () => {
     });
     expect(unbindDependency.calls).toEqual([]);
     expect(deleteDependency.calls).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-014] preserves storage without matching provenance", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const detachStorage = new CapturingDetachStorageUseCase();
+    const deleteStorage = new CapturingDeleteStorageVolumeUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_no_storage_provenance",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      detachStorage,
+      deleteStorage,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      removedStorageAttachments: 0,
+      deletedStorageVolumes: 0,
+      removedSourceLink: true,
+    });
+    expect(detachStorage.calls).toEqual([]);
+    expect(deleteStorage.calls).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-002][CONFIG-FILE-ENTRY-019] cleans runtime, route state, and source link for a preview", async () => {

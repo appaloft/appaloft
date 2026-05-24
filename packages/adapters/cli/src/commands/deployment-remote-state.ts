@@ -63,11 +63,31 @@ export interface SourceLinkDependencyProvenance {
   entries: SourceLinkDependencyProvenanceEntry[];
 }
 
+export interface SourceLinkStorageProvenanceEntry {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  storageVolumeId: string;
+  attachmentId: string;
+  destinationPath: string;
+  createdAt: string;
+}
+
+export interface SourceLinkStorageProvenance {
+  schemaVersion: "source-link.storage-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkStorageProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
   dependencyProvenance?: SourceLinkDependencyProvenance;
+  storageProvenance?: SourceLinkStorageProvenance;
 }
 
 export interface SourceLinkDiagnostics {
@@ -1091,6 +1111,49 @@ export class FileSystemSourceLinkStore {
       updatedAt: input.updatedAt,
       ...input.target,
       dependencyProvenance: input.dependencyProvenance,
+      ...(existing.value?.storageProvenance
+        ? { storageProvenance: existing.value.storageProvenance }
+        : {}),
+      ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
+    });
+  }
+
+  async recordStorageProvenance(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    storageProvenance: SourceLinkStorageProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>> {
+    const targetResult = validateTargetContext(input.target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const existing = await this.read(input.sourceFingerprint);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    if (existing.value && !sameTarget(existing.value, input.target)) {
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint: input.sourceFingerprint,
+          projectId: existing.value.projectId,
+          environmentId: existing.value.environmentId,
+          resourceId: existing.value.resourceId,
+        }),
+      );
+    }
+
+    return await this.write({
+      ...(existing.value ?? {}),
+      sourceFingerprint: input.sourceFingerprint,
+      updatedAt: input.updatedAt,
+      ...input.target,
+      ...(existing.value?.dependencyProvenance
+        ? { dependencyProvenance: existing.value.dependencyProvenance }
+        : {}),
+      storageProvenance: input.storageProvenance,
       ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
     });
   }

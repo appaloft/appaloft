@@ -231,6 +231,112 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-STORAGE-001] accepts managed storage volume declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "storage:",
+        "  uploads:",
+        "    kind: volume",
+        "    source: managed",
+        "    mount:",
+        "      path: /app/uploads",
+        "      mode: read-only",
+        "    preview:",
+        "      lifecycle: ephemeral",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.storage?.uploads).toEqual({
+        kind: "volume",
+        source: "managed",
+        mount: {
+          path: "/app/uploads",
+          mode: "read-only",
+        },
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-STORAGE-002] rejects unknown storage fields and unsafe mount paths", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          size: "10Gi",
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["storage", "uploads"]);
+    }
+
+    for (const path of ["/", "../uploads", "/app/../uploads", "https://example.com/uploads"]) {
+      const parsed = parseAppaloftDeploymentConfig({
+        storage: {
+          uploads: {
+            kind: "volume",
+            source: "managed",
+            mount: {
+              path,
+            },
+          },
+        },
+      });
+
+      expect(parsed.success, path).toBe(false);
+    }
+  });
+
+  test("[CONFIG-FILE-STORAGE-003] rejects storage identity and host/source path material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["storage", "uploads", "providerAccount"]);
+    }
+
+    const hostPath = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          sourcePath: "/var/lib/app/uploads",
+        },
+      },
+    });
+
+    expect(hostPath.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");

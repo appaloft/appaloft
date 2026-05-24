@@ -73,6 +73,7 @@ This matrix inherits:
 | SOURCE-LINK-STATE-021 | application / CLI / HTTP | List source links | Source links exist for one project/resource/server filter | `source-links.list` returns `source-links.list/v1` with safe source fingerprint link records and no mutation | None | Read model list only |
 | SOURCE-LINK-STATE-022 | application / CLI / HTTP | Show source link | A source fingerprint link exists | `source-links.show` returns `source-links.show/v1` with one safe record; missing link returns `not_found` | `not_found` for missing link | Repository read only |
 | SOURCE-LINK-STATE-023 | application / CLI / HTTP | Delete source link | A source fingerprint link exists and the operator explicitly deletes it | `source-links.delete` removes only the link mapping and returns `deleted = true`; projects/resources/deployments/runtime state are untouched | `not_found` for missing link | Source-link scoped command -> repository delete |
+| SOURCE-LINK-STATE-024 | integration | Repository config provenance persists together | Repository config writes preview dependency provenance and preview storage provenance for the same preview source fingerprint | Source-link metadata stores both provenance groups without one write dropping the other | None | Provenance write -> read source link |
 
 ## PostgreSQL / PGlite Persistence Matrix
 
@@ -99,7 +100,7 @@ through `SOURCE-LINK-STATE-003` in
 `packages/adapters/cli/test/deployment-state.test.ts`.
 
 Current implementation has adapter-level source link store and recovery coverage for
-`SOURCE-LINK-STATE-004` through `SOURCE-LINK-STATE-014` in
+`SOURCE-LINK-STATE-004` through `SOURCE-LINK-STATE-014` and `SOURCE-LINK-STATE-024` in
 `packages/adapters/cli/test/deployment-remote-state.test.ts`.
 
 Current implementation has config workflow coverage for first-run source link creation and repeated

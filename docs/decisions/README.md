@@ -91,6 +91,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-064: Storage Volume Runtime Realization And Cleanup](./ADR-064-storage-volume-runtime-realization-and-cleanup.md) | Accepted | Defines deployment-driven storage runtime realization and keeps destructive runtime volume cleanup behind an explicit dry-run-first storage operation instead of generic prune or delete. |
 | [ADR-065: Blueprint Format And Local Registry Boundary](./ADR-065-blueprint-format-and-local-registry-boundary.md) | Proposed | Defines Blueprint as the canonical portable topology definition, with open file-first format, local registry, desired-state instantiation, and MCP/tool separation. |
 | [ADR-066: Repository Config Dependency Graph](./ADR-066-repository-config-dependency-graph.md) | Accepted | Defines repository config `dependencies` as a user-facing application dependency graph that provisions/binds existing dependency resources and uses source-link provenance for safe preview cleanup. |
+| [ADR-067: Repository Config Storage Graph](./ADR-067-repository-config-storage-graph.md) | Accepted | Defines repository config `storage` as a user-facing managed storage graph that creates/attaches existing storage volumes and uses source-link provenance for safe preview cleanup. |
 
 ## Authoring Rules
 

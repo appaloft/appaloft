@@ -47,6 +47,32 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 dependency resource that Appaloft can prove was created and bound by this config for that preview.
 Manual or shared dependency resources are preserved.
 
+<h2 id="environment-config-file-storage">Application storage</h2>
+
+Use `storage` when the application needs Appaloft to manage and mount a persistent named volume
+before deployment:
+
+```yaml
+storage:
+  uploads:
+    kind: volume
+    source: managed
+    mount:
+      path: /app/uploads
+      mode: read-write
+    preview:
+      lifecycle: ephemeral
+```
+
+This declares a managed storage volume and asks Appaloft to attach it to the Resource profile at
+`/app/uploads`. The final deployment command still contains only Appaloft ids; host bind paths,
+provider accounts, provider-native handles, backup handles, and secret values do not belong in
+`appaloft.yaml`.
+
+For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup to detach and
+delete only the storage volume that Appaloft can prove was created and attached by this config for
+that preview. Manual or shared storage is preserved.
+
 <h2 id="environment-config-file-env">Environment values</h2>
 
 Use `env` for non-secret values and `secrets` for references to values supplied outside the

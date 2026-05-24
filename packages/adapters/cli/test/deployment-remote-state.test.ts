@@ -1138,6 +1138,78 @@ describe("CLI source link state", () => {
     }
   });
 
+  test("[SOURCE-LINK-STATE-024] source link stores repository config dependency and storage provenance", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemSourceLinkStore(root);
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A88";
+      const target = {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      };
+      await store.recordDependencyProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:00:00.000Z",
+        dependencyProvenance: {
+          schemaVersion: "source-link.dependency-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              dependencyResourceId: "dep_res_db",
+              bindingId: "rbd_db",
+              targetName: "DATABASE_URL",
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          ],
+        },
+      });
+
+      const stored = await store.recordStorageProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:01:00.000Z",
+        storageProvenance: {
+          schemaVersion: "source-link.storage-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "uploads",
+              kind: "volume",
+              source: "managed",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              storageVolumeId: "stv_uploads",
+              attachmentId: "rsa_uploads",
+              destinationPath: "/app/uploads",
+              createdAt: "2026-05-24T00:01:00.000Z",
+            },
+          ],
+        },
+      });
+
+      expect(stored.isOk()).toBe(true);
+      if (stored.isErr()) {
+        throw new Error(stored.error.message);
+      }
+      expect(stored.value.dependencyProvenance?.entries[0]?.dependencyResourceId).toBe(
+        "dep_res_db",
+      );
+      expect(stored.value.storageProvenance?.entries[0]?.storageVolumeId).toBe("stv_uploads");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("[SOURCE-LINK-STATE-014] recovery marker visible", async () => {
     const root = await tempStateRoot();
     try {

@@ -15,6 +15,7 @@ GitHub pull_request event
   -> action resolves trusted PR preview context from GitHub event metadata
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
   -> repository config dependency graph provisions/reuses and binds application dependencies
+  -> repository config storage graph creates/reuses and attaches managed storage
   -> existing environment/resource/deployment commands create or update the preview target
   -> deployments.create accepts the deployment attempt with ids-only input
   -> default or custom preview access route is realized through the edge proxy when available
@@ -162,6 +163,13 @@ declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the pre
 contains explicit repository-config provenance for the same preview fingerprint, Resource, binding,
 and dependency resource.
 
+Application storage may be declared in the selected preview config with top-level `storage`. For
+MVP, a managed named volume mounted at a workload path such as `/app/uploads` is reconciled before
+deployment admission through existing storage-volume and Resource attachment operations. If the
+storage declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the preview source
+link contains explicit repository-config provenance for the same preview fingerprint, Resource,
+attachment, and storage volume.
+
 Custom route intent for PR previews should come from one of these sources:
 
 - generated/default access;
@@ -227,6 +235,9 @@ resolve preview context
   -> list/provision/reuse declared managed dependency resources
   -> list/bind Resource dependency bindings for declared env targets
   -> persist preview dependency provenance for config-owned ephemeral dependencies
+  -> list/create/reuse declared managed storage volumes
+  -> read/attach Resource storage mounts for declared workload paths
+  -> persist preview storage provenance for config-owned ephemeral storage
   -> apply config env and secret references through environment operations
   -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
@@ -235,7 +246,8 @@ resolve preview context
 
 `deployments.create` remains ids-only. PR number, branch name, GitHub repository, preview domain
 template, route host, proxy kind, TLS mode, dependency kind, dependency resource id, binding target,
-and connection material must not become deployment command fields.
+storage volume id, storage attachment id, destination path, and connection material must not become
+deployment command fields.
 
 Preview deploy and preview cleanup must use logical mutation coordination, not only whole-server
 serialization. The workflow may still encounter brief backend state-root coordination during
@@ -389,6 +401,8 @@ pull_request closed
   -> user workflow runs Appaloft CLI preview cleanup or a thin wrapper over the same CLI command
   -> Appaloft resolves preview-scoped source link
   -> deployments.cleanup-preview stops current and stale preview runtime state when present
+  -> provenance-owned ephemeral dependency bindings/resources are unbound and deleted
+  -> provenance-owned ephemeral storage attachments/volumes are detached and deleted
   -> preview server-applied route desired state is deleted for the linked target and matching preview fingerprint
   -> preview source link is unlinked
   -> optional GitHub workflow step deletes GitHub preview deployment records for preview-pr-123

@@ -99,7 +99,9 @@ If binding is missing, prompt for one safe action:
 - run one trusted bootstrap deploy with complete project/environment/resource/server context.
 
 Never put tokens, SSH keys, database URLs, provider account ids, organization ids, tenant ids, raw
-secret values, or credentials into `appaloft.yml`.
+secret values, credentials, host bind source paths, or provider-native storage handles into
+`appaloft.yml`. Repository config may declare high-level application `dependencies` and `storage`,
+but deploy must reconcile them through existing operations before ids-only deployment admission.
 
 ## Entry Selection
 

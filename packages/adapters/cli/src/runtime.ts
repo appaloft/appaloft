@@ -22,6 +22,7 @@ import {
   type ServerAppliedRouteDesiredStateStore,
   type SourceLinkDependencyProvenance,
   type SourceLinkRecord,
+  type SourceLinkStorageProvenance,
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
@@ -41,6 +42,12 @@ export interface CliSourceLinkStore {
     sourceFingerprint: string;
     target: SourceLinkTarget;
     dependencyProvenance: SourceLinkDependencyProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordStorageProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    storageProvenance: SourceLinkStorageProvenance;
     updatedAt: string;
   }): Promise<Result<SourceLinkRecord>>;
 }

@@ -96,6 +96,7 @@ async function createPreviewDeployCliHarness(
     resourceEffectiveConfig?: Record<string, unknown> | null;
     dependencyResources?: unknown[];
     dependencyBindings?: unknown[];
+    storageVolumes?: unknown[];
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -107,6 +108,7 @@ async function createPreviewDeployCliHarness(
   const sourceLinkCalls: string[] = [];
   const createdLinks: unknown[] = [];
   const dependencyProvenanceWrites: unknown[] = [];
+  const storageProvenanceWrites: unknown[] = [];
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       operations.push(command.constructor.name);
@@ -142,6 +144,10 @@ async function createPreviewDeployCliHarness(
           return ok({ id: "dep_res_db" } as T);
         case "BindResourceDependencyCommand":
           return ok({ id: "rbd_db" } as T);
+        case "CreateStorageVolumeCommand":
+          return ok({ id: "stv_uploads" } as T);
+        case "AttachResourceStorageCommand":
+          return ok({ id: "rsa_uploads" } as T);
         case "CreateDeploymentCommand":
           return ok({ id: "dep_1" } as T);
         default:
@@ -193,6 +199,9 @@ async function createPreviewDeployCliHarness(
       }
       if (query.constructor.name === "ListResourceDependencyBindingsQuery") {
         return ok({ items: input.dependencyBindings ?? [] } as T);
+      }
+      if (query.constructor.name === "ListStorageVolumesQuery") {
+        return ok({ items: input.storageVolumes ?? [] } as T);
       }
       return ok({ items: [] } as T);
     },
@@ -249,6 +258,16 @@ async function createPreviewDeployCliHarness(
           dependencyProvenance: sourceLinkInput.dependencyProvenance,
         });
       },
+      recordStorageProvenance: async (sourceLinkInput) => {
+        sourceLinkCalls.push(`recordStorageProvenance:${sourceLinkInput.sourceFingerprint}`);
+        storageProvenanceWrites.push(sourceLinkInput);
+        return ok({
+          sourceFingerprint: sourceLinkInput.sourceFingerprint,
+          updatedAt: sourceLinkInput.updatedAt,
+          ...sourceLinkInput.target,
+          storageProvenance: sourceLinkInput.storageProvenance,
+        });
+      },
     },
     ...(input.withRouteStore
       ? {
@@ -292,6 +311,7 @@ async function createPreviewDeployCliHarness(
     program,
     queries,
     sourceLinkCalls,
+    storageProvenanceWrites,
   };
 }
 
@@ -378,6 +398,15 @@ describe("CLI deployment config entry workflow", () => {
           },
         ],
       },
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+        },
+      },
     });
 
     expect(seed).toMatchObject({
@@ -404,6 +433,15 @@ describe("CLI deployment config entry workflow", () => {
           host: "www.example.com",
           pathPrefix: "/",
           tlsMode: "disabled",
+        },
+      ],
+      storageGraph: [
+        {
+          key: "uploads",
+          kind: "volume",
+          source: "managed",
+          mountPath: "/app/uploads",
+          mountMode: "read-write",
         },
       ],
     });
@@ -3454,6 +3492,285 @@ describe("CLI deployment config entry workflow", () => {
       },
     });
     expect(commands).toEqual([]);
+  });
+
+  test("[CONFIG-FILE-STORAGE-004][CONFIG-FILE-STORAGE-007] config storage creates, attaches, and records preview provenance before deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-storage-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "storage:",
+        "  uploads:",
+        "    kind: volume",
+        "    source: managed",
+        "    mount:",
+        "      path: /app/uploads",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_storage_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/storage",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-88",
+              "--server-host",
+              "203.0.113.88",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("ListStorageVolumesQuery");
+    expect(harness.operations).toContain("ShowResourceQuery");
+    expect(harness.operations.indexOf("CreateStorageVolumeCommand")).toBeLessThan(
+      harness.operations.indexOf("AttachResourceStorageCommand"),
+    );
+    expect(harness.operations.indexOf("AttachResourceStorageCommand")).toBeLessThan(
+      harness.operations.indexOf("CreateDeploymentCommand"),
+    );
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect(deployment).not.toHaveProperty("storageVolumeId");
+    expect(deployment).not.toHaveProperty("destinationPath");
+    expect(harness.storageProvenanceWrites).toHaveLength(1);
+    expect(harness.storageProvenanceWrites[0]).toMatchObject({
+      target: {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      },
+      storageProvenance: {
+        source: "repository-config",
+        entries: [
+          {
+            key: "uploads",
+            kind: "volume",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_1",
+            storageVolumeId: "stv_uploads",
+            attachmentId: "rsa_uploads",
+            destinationPath: "/app/uploads",
+          },
+        ],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-STORAGE-005] config storage reuses existing volume and attachment", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            storageAttachments: [
+              {
+                id: "rsa_existing_uploads",
+                storageVolumeId: "stv_existing_uploads",
+                storageVolumeName: "res-existing-uploads",
+                storageVolumeKind: "named-volume",
+                destinationPath: "/app/uploads",
+                mountMode: "read-write",
+                attachedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListStorageVolumesQuery") {
+          return ok({
+            items: [
+              {
+                id: "stv_existing_uploads",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-uploads",
+                slug: "res-existing-uploads",
+                kind: "named-volume",
+                lifecycleStatus: "active",
+                attachmentCount: 1,
+                attachments: [],
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          storageGraph: [
+            {
+              key: "uploads",
+              kind: "volume",
+              source: "managed",
+              mountPath: "/app/uploads",
+              mountMode: "read-write",
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+    expect(commands).not.toContain("CreateStorageVolumeCommand");
+    expect(commands).not.toContain("AttachResourceStorageCommand");
+  });
+
+  test("[CONFIG-FILE-STORAGE-006] config storage fails on mount path conflicts", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>() => ok(null as T),
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            storageAttachments: [
+              {
+                id: "rsa_other_uploads",
+                storageVolumeId: "stv_other_uploads",
+                storageVolumeName: "manual-uploads",
+                storageVolumeKind: "named-volume",
+                destinationPath: "/app/uploads",
+                mountMode: "read-write",
+                attachedAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListStorageVolumesQuery") {
+          return ok({
+            items: [
+              {
+                id: "stv_expected_uploads",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "res-existing-uploads",
+                slug: "res-existing-uploads",
+                kind: "named-volume",
+                lifecycleStatus: "active",
+                attachmentCount: 0,
+                attachments: [],
+                createdAt: "2026-05-24T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            storageGraph: [
+              {
+                key: "uploads",
+                kind: "volume",
+                source: "managed",
+                mountPath: "/app/uploads",
+                mountMode: "read-write",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected storage mount path conflict");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_storage_attachment_conflict",
+      details: {
+        phase: "config-storage-resolution",
+        resourceId: "res_existing",
+        storageKey: "uploads",
+        destinationPath: "/app/uploads",
+        existingAttachmentId: "rsa_other_uploads",
+        existingStorageVolumeId: "stv_other_uploads",
+        expectedStorageVolumeId: "stv_expected_uploads",
+      },
+    });
   });
 
   test("[CONFIG-FILE-STATE-002] remote state lifecycle runs before identity queries and mutations", async () => {
