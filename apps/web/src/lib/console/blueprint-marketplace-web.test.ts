@@ -62,23 +62,47 @@ describe("Blueprint marketplace console surface", () => {
   });
 
   test("[CLOUD-BLUEPRINT-DETAIL-UX-029] keeps Marketplace inside ConsoleShell and hides raw plan JSON behind details", async () => {
-    const [listPageSource, detailPageSource, selectorSource, quickDeploySource] = await Promise.all(
-      [
-        readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
-        readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
-        readFile(
-          new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
-          "utf8",
+    const [
+      listPageSource,
+      detailPageSource,
+      selectorSource,
+      sharedPackageSource,
+      quickDeploySource,
+    ] = await Promise.all([
+      readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../../../../../packages/blueprint-marketplace-web/src/BlueprintMarketplacePage.svelte",
+          import.meta.url,
         ),
-        readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
-      ],
-    );
+        "utf8",
+      ),
+      readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+    ]);
 
     expect(listPageSource).toContain("ConsoleShell");
+    expect(listPageSource).toContain('title="应用市场"');
     expect(detailPageSource).toContain("ConsoleShell");
+    expect(detailPageSource).toContain('title={listing?.title ?? "蓝图详情"}');
     expect(selectorSource).toContain("data-blueprint-marketplace-selector");
-    expect(selectorSource).toContain("BlueprintProductIcon");
-    expect(selectorSource).not.toContain("overflow-x-auto pb-1");
+    expect(selectorSource).toContain("@appaloft/blueprint-marketplace-web");
+    expect(selectorSource).toContain("BlueprintMarketplacePage");
+    expect(selectorSource).toContain('title={catalogExtension?.title ?? "应用市场"}');
+    expect(selectorSource).toContain('badgeLabel="蓝图目录"');
+    expect(selectorSource).toContain("loading={webExtensionsQuery.isPending}");
+    expect(selectorSource).not.toContain("pluginDisplayName={catalogExtension");
+    expect(selectorSource).not.toContain("@appaloft-cloud");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
+    expect(sharedPackageSource).toContain("marketplace-skeleton-group");
+    expect(sharedPackageSource).toContain("readonly loading?: boolean");
+    expect(sharedPackageSource).toContain('title = "应用市场"');
+    expect(sharedPackageSource).not.toContain('title = "Marketplace"');
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
     expect(detailPageSource).toContain("官方网站");
