@@ -4,9 +4,9 @@
 </script>
 
 <svelte:head>
-  <title>Marketplace · Appaloft</title>
+  <title>应用市场 · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell title="Marketplace" description="选择 Blueprint 并进入部署流程。">
+<ConsoleShell title="应用市场" description="选择 Blueprint 并进入部署流程。">
   <BlueprintCatalogSelector />
 </ConsoleShell>
