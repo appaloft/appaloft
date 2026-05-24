@@ -20,6 +20,9 @@
   "peerDependencies": {
     "svelte": "^5.55.5"
   },
+  "dependencies": {
+    "@appaloft/ui": "workspace:*"
+  },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "svelte": "^5.55.5",
