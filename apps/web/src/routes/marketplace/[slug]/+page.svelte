@@ -25,6 +25,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     endpointFromTemplate,
+    findBlueprintCatalogExtensionByKey,
     findBlueprintCatalogExtension,
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
@@ -127,8 +128,30 @@
     }),
   );
 
+  const returnToSourceExtensionKey = $derived.by(() => {
+    if (!returnTo) {
+      return "";
+    }
+    try {
+      const url = new URL(returnTo, "https://appaloft.local");
+      return url.searchParams.get("sourceExtension") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const catalogExtension = $derived(
-    findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
+    findBlueprintCatalogExtensionByKey(
+      webExtensionsQuery.data?.items ?? [],
+      returnToSourceExtensionKey,
+    ) ?? findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
+  );
+  const deploySourceExtension = $derived(
+    findBlueprintCatalogExtensionByKey(
+      webExtensionsQuery.data?.items ?? [],
+      returnToSourceExtensionKey,
+    ) ??
+      findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "quick-deploy-source") ??
+      catalogExtension,
   );
   const catalogMetadata = $derived(readBlueprintCatalogExtensionMetadata(catalogExtension));
   const detailEndpoint = $derived.by(() => {
@@ -182,12 +205,16 @@
     }
 
     const nextValues = { ...parameterValues };
+    let valuesChanged = false;
     for (const parameter of detail.install.parameters) {
       if (nextValues[parameter.key] === undefined) {
         nextValues[parameter.key] = String(parameter.default ?? "");
+        valuesChanged = true;
       }
     }
-    parameterValues = nextValues;
+    if (valuesChanged) {
+      parameterValues = nextValues;
+    }
   });
 
   function iconLabel(): string {
@@ -201,7 +228,11 @@
     const url = new URL(returnTo || "/deploy", "https://appaloft.local");
     url.pathname = "/deploy";
     url.searchParams.set("source", "blueprint");
-    url.searchParams.set("sourceExtension", catalogExtension?.key ?? "");
+    const sourceExtensionKey =
+      deploySourceExtension?.key ?? url.searchParams.get("sourceExtension") ?? "";
+    if (sourceExtensionKey) {
+      url.searchParams.set("sourceExtension", sourceExtensionKey);
+    }
     url.searchParams.set("blueprintSlug", listing?.slug ?? slug);
     url.searchParams.set("blueprintTitle", listing?.title ?? slug);
     url.searchParams.set("step", "project");

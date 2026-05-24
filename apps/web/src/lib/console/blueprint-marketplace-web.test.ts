@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import {
   endpointFromTemplate,
   findBlueprintCatalogExtension,
+  findBlueprintCatalogExtensionByKey,
   readBlueprintCatalogExtensionMetadata,
 } from "./blueprint-marketplace-extension";
 
@@ -24,6 +25,11 @@ const marketplaceExtension: SystemPluginWebExtension = {
     installPlanEndpointTemplate: "/example/blueprints/{slug}/install-plan",
   },
 };
+const quickDeployExtension: SystemPluginWebExtension = {
+  ...marketplaceExtension,
+  key: "example-marketplace.quick-deploy-source",
+  placement: "quick-deploy-source",
+};
 
 describe("Blueprint marketplace console surface", () => {
   test("[CLOUD-BLUEPRINT-UI-NAV-026] renders navigation extensions at workspace level", async () => {
@@ -40,6 +46,12 @@ describe("Blueprint marketplace console surface", () => {
     expect(findBlueprintCatalogExtension([marketplaceExtension], "navigation")).toEqual(
       marketplaceExtension,
     );
+    expect(
+      findBlueprintCatalogExtensionByKey(
+        [marketplaceExtension, quickDeployExtension],
+        "example-marketplace.quick-deploy-source",
+      ),
+    ).toEqual(quickDeployExtension);
     expect(readBlueprintCatalogExtensionMetadata(marketplaceExtension)).toMatchObject({
       renderer: "blueprint-catalog",
       listEndpoint: "/example/blueprints",
