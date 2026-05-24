@@ -878,7 +878,8 @@ Profile precedence is:
 built-in defaults
   < source/framework detection
   < repository config base profile
-  < repository config environment overlay for the already-selected environment
+  < selected repository config named profile
+  < selected PR preview profile overlay
   < explicit entrypoint flags, prompts, API input, or future MCP parameters
 ```
 
@@ -1034,8 +1035,7 @@ e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
 `ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
-history, general environment overlays, and managed domain control-plane mapping remain follow-up
-work.
+history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 

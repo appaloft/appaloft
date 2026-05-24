@@ -60,7 +60,8 @@ trusted entrypoint context.
 
 ## Deferred Gaps
 
-- General environment overlays.
+- General named profile overlays are handled by ADR-075 and
+  `docs/specs/084-repository-config-named-profile-overlays`.
 - Preview-specific domains inside the overlay.
 - Dependency/storage/scheduled-task overlay deltas.
 - Resource sizing, rollout, restart, autoscaling, quota, cleanup, and alert routing fields.

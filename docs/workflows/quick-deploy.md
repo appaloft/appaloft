@@ -649,9 +649,9 @@ Profile-drift visibility is specified in
 workflows should reuse `resources.show` diagnostics and must fail before deployment admission when an
 existing resource differs from a normalized config/entry profile that the workflow is not explicitly
 applying through named resource commands. Stored/external secret lookup/application beyond `ci-env:`,
-environment overlays, managed control-plane domain mapping, and config-origin diagnostics remain
-follow-up work governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
-and [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md).
+managed control-plane domain mapping, and config-origin diagnostics remain follow-up work governed
+by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md) and
+[Source Link State Test Matrix](../testing/source-link-state-test-matrix.md).
 
 Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for
 Dockerfile path, Docker Compose path, and build target remain follow-up work. Static publish
