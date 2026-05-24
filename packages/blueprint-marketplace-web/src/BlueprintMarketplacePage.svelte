@@ -205,6 +205,19 @@
     return `${count.toString()} 个组件`;
   }
 
+  function variantSummary(item: BlueprintMarketplaceListing): string {
+    const variants = item.variants ?? [];
+    if (variants.length === 0) {
+      return "默认方案";
+    }
+
+    const defaultVariant = variants.find((variant) => variant.id === item.defaultVariant);
+    const firstLabel = defaultVariant?.label ?? variants[0]?.label ?? variants[0]?.id;
+    return variants.length === 1
+      ? (firstLabel ?? "1 个方案")
+      : `${variants.length.toString()} 个方案 · ${firstLabel ?? "默认"}`;
+  }
+
   function actionHref(item: BlueprintMarketplaceListing): string {
     if (primaryAction === "deploy") {
       return createBlueprintDeployHandoffUrl({
@@ -413,6 +426,10 @@
                   <div>
                     <dt>运行单元</dt>
                     <dd>{componentSummary(item)}</dd>
+                  </div>
+                  <div>
+                    <dt>部署方案</dt>
+                    <dd>{variantSummary(item)}</dd>
                   </div>
                   <div>
                     <dt>公开入口</dt>
@@ -871,10 +888,6 @@
     border-radius: 8px;
     background: color-mix(in srgb, #f8fafc 68%, white);
     padding: 8px 10px;
-  }
-
-  .listing-facts div:last-child {
-    grid-column: 1 / -1;
   }
 
   .listing-facts dt {

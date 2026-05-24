@@ -37,6 +37,17 @@ export interface BlueprintMarketplaceListing {
     readonly highlights?: readonly string[];
     readonly useCases?: readonly string[];
   };
+  readonly defaultVariant?: string;
+  readonly variants?: readonly {
+    readonly id: string;
+    readonly label?: string;
+    readonly summary?: string;
+  }[];
+  readonly upgrade?: {
+    readonly strategy: string;
+    readonly destructive: boolean;
+    readonly requiresManualReview?: boolean;
+  };
   readonly requirementsSummary?: {
     readonly components: number;
     readonly dependencies: readonly string[];

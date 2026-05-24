@@ -182,6 +182,40 @@
       dependencies: readonly string[];
       ports: readonly string[];
     };
+    defaultVariant?: string;
+    variants?: readonly {
+      id: string;
+      label?: string;
+      summary?: string;
+    }[];
+  };
+  type BlueprintUpgradePolicy = {
+    strategy: string;
+    destructive?: boolean;
+    instructions?: string;
+    steps?: readonly {
+      classification: "non-breaking" | "potentially-breaking" | "breaking";
+      requiresManualReview?: boolean;
+      notes?: string;
+      changes?: readonly string[];
+    }[];
+  };
+  type BlueprintManifestComponent = {
+    id: string;
+    name: string;
+    kind: string;
+    runtime: {
+      strategy: string;
+      image?: string;
+      buildCommand?: string;
+      startCommand?: string;
+      outputDirectory?: string;
+    };
+    ports: readonly { name: string; containerPort: number; protocol: string; public?: boolean }[];
+    routes: readonly { port: string; pathPrefix: string }[];
+    variables: readonly { key: string; value: string; description?: string }[];
+    usesSecrets: readonly string[];
+    usesResources: readonly string[];
   };
   type BlueprintDetailResponse = {
     listing: BlueprintCatalogListing;
@@ -191,29 +225,29 @@
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
       secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
       resources: readonly { id: string; kind: string; label: string; optional?: boolean }[];
-      components: readonly {
-        id: string;
-        name: string;
-        kind: string;
-        runtime: {
-          strategy: string;
-          image?: string;
-          buildCommand?: string;
-          startCommand?: string;
-          outputDirectory?: string;
-        };
-        ports: readonly { name: string; containerPort: number; protocol: string; public?: boolean }[];
-        routes: readonly { port: string; pathPrefix: string }[];
-        variables: readonly { key: string; value: string; description?: string }[];
-        usesSecrets: readonly string[];
-        usesResources: readonly string[];
-      }[];
+      components: readonly BlueprintManifestComponent[];
+      defaultVariant?: string;
+      variants?: Record<string, {
+        label?: string;
+        summary?: string;
+        description?: string;
+        defaultProfile?: string;
+        parameters?: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
+        secrets?: readonly { key: string; label: string; required?: boolean; description?: string }[];
+        resources?: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+        components?: readonly BlueprintManifestComponent[];
+        upgrade?: BlueprintUpgradePolicy;
+      }>;
+      upgrade?: BlueprintUpgradePolicy;
     };
     install: {
       profiles: readonly string[];
       defaultProfile: string;
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
       secrets: readonly { key: string; label: string; required?: boolean }[];
+      defaultVariant?: string;
+      variants?: readonly { id: string; label?: string; summary?: string }[];
+      upgrade?: BlueprintUpgradePolicy;
     };
   };
   type BlueprintComponent = BlueprintDetailResponse["manifest"]["components"][number];
@@ -559,6 +593,9 @@
   );
   let selectedBlueprintSlug = $state(browser ? (page.url.searchParams.get("blueprintSlug") ?? "") : "");
   let selectedBlueprintTitle = $state(browser ? (page.url.searchParams.get("blueprintTitle") ?? "") : "");
+  let selectedBlueprintVariant = $state(
+    browser ? (page.url.searchParams.get("blueprintVariant") ?? "") : "",
+  );
   let blueprintDependencyProvisioningDrafts = $state<
     Record<string, BlueprintDependencyProvisioningDraft>
   >({});
@@ -566,6 +603,7 @@
   let blueprintDetailDialogOpen = $state(false);
   let blueprintDetailSlug = $state("");
   let blueprintDetailTitle = $state("");
+  let lastBlueprintVariantForProvisioning = $state("");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
   let deployFeedback = $state<{
@@ -708,11 +746,28 @@
   const selectedBlueprintDetail = $derived(selectedBlueprintDetailQuery.data ?? null);
   const selectedBlueprintListing = $derived(selectedBlueprintDetail?.listing ?? null);
   const selectedBlueprintManifest = $derived(selectedBlueprintDetail?.manifest ?? null);
+  const selectedBlueprintVariantOptions = $derived(selectedBlueprintDetail?.install.variants ?? []);
+  const selectedBlueprintVariantDefinition = $derived(
+    selectedBlueprintManifest && selectedBlueprintVariant
+      ? selectedBlueprintManifest.variants?.[selectedBlueprintVariant]
+      : undefined,
+  );
+  const selectedBlueprintEffectiveManifest = $derived.by(() =>
+    selectedBlueprintManifest
+      ? resolveEffectiveBlueprintManifest(selectedBlueprintManifest, selectedBlueprintVariant)
+      : null,
+  );
+  const selectedBlueprintUpgrade = $derived(
+    selectedBlueprintVariantDefinition?.upgrade ??
+      selectedBlueprintDetail?.install.upgrade ??
+      selectedBlueprintManifest?.upgrade,
+  );
   const selectedBlueprintVariables = $derived(
-    selectedBlueprintManifest?.components.flatMap((component) => component.variables) ?? [],
+    selectedBlueprintEffectiveManifest?.components.flatMap((component) => component.variables) ??
+      [],
   );
   const selectedBlueprintPrimaryComponent = $derived(
-    selectedBlueprintManifest?.components[0] ?? null,
+    selectedBlueprintEffectiveManifest?.components[0] ?? null,
   );
   const selectedBlueprintDefaultPort = $derived.by(() => {
     const component = selectedBlueprintPrimaryComponent;
@@ -724,24 +779,54 @@
     return port ? String(port.containerPort) : "3000";
   });
   const selectedBlueprintProvisionableDependencies = $derived(
-    selectedBlueprintManifest?.resources.flatMap((resource): BlueprintDependencyRequirement[] =>
-      isProvisionableDependencyKind(resource.kind)
-        ? [
-            {
-              id: resource.id,
-              kind: resource.kind,
-              label: resource.label,
-              ...(resource.optional ? { optional: resource.optional } : {}),
-            },
-          ]
-        : [],
+    selectedBlueprintEffectiveManifest?.resources.flatMap(
+      (resource): BlueprintDependencyRequirement[] =>
+        isProvisionableDependencyKind(resource.kind)
+          ? [
+              {
+                id: resource.id,
+                kind: resource.kind,
+                label: resource.label,
+                ...(resource.optional ? { optional: resource.optional } : {}),
+              },
+            ]
+          : [],
     ) ?? [],
   );
   const selectedBlueprintUnsupportedDependencies = $derived(
-    selectedBlueprintManifest?.resources.filter(
+    selectedBlueprintEffectiveManifest?.resources.filter(
       (resource) => !isProvisionableDependencyKind(resource.kind),
     ) ?? [],
   );
+
+  $effect(() => {
+    if (!selectedBlueprintDetail) {
+      return;
+    }
+
+    const fallbackVariant =
+      selectedBlueprintDetail.install.defaultVariant ??
+      selectedBlueprintVariantOptions[0]?.id ??
+      "";
+    const variantIsValid = selectedBlueprintVariantOptions.some(
+      (variant) => variant.id === selectedBlueprintVariant,
+    );
+    const nextVariant = selectedBlueprintVariant
+      ? variantIsValid
+        ? selectedBlueprintVariant
+        : fallbackVariant
+      : fallbackVariant;
+
+    if (nextVariant !== selectedBlueprintVariant) {
+      selectedBlueprintVariant = nextVariant;
+      return;
+    }
+
+    if (lastBlueprintVariantForProvisioning && lastBlueprintVariantForProvisioning !== nextVariant) {
+      blueprintDependencyProvisioningDrafts = {};
+    }
+    lastBlueprintVariantForProvisioning = nextVariant;
+  });
   const blueprintDependencyProvisioningSummary = $derived.by(() => {
     if (selectedBlueprintProvisionableDependencies.length === 0) {
       return "无";
@@ -1003,6 +1088,14 @@
                 label: $t(i18nKeys.console.quickDeploy.sourceBlueprint),
                 value: selectedBlueprintSlug.trim(),
                 mono: true,
+              },
+            ]
+          : []),
+        ...(selectedBlueprintVariant
+          ? [
+              {
+                label: "部署方案",
+                value: selectedBlueprintVariantLabel(),
               },
             ]
           : []),
@@ -1752,6 +1845,7 @@
       displayName: component.name,
       metadata: {
         blueprintSlug: selectedBlueprintSlug.trim(),
+        ...(selectedBlueprintVariant ? { blueprintVariant: selectedBlueprintVariant } : {}),
         blueprintComponentId: component.id,
       },
     };
@@ -1835,6 +1929,55 @@
     return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}/install-plan`;
   }
 
+  function resolveEffectiveBlueprintManifest(
+    baseManifest: BlueprintDetailResponse["manifest"],
+    variantId: string,
+  ): BlueprintDetailResponse["manifest"] {
+    const variant = variantId ? baseManifest.variants?.[variantId] : undefined;
+    if (!variant) {
+      return baseManifest;
+    }
+
+    return {
+      ...baseManifest,
+      summary: variant.summary ?? baseManifest.summary,
+      description: variant.description ?? baseManifest.description,
+      parameters: variant.parameters ?? baseManifest.parameters,
+      secrets: variant.secrets ?? baseManifest.secrets,
+      resources: variant.resources ?? baseManifest.resources,
+      components: variant.components ?? baseManifest.components,
+      defaultVariant: variantId,
+      upgrade: variant.upgrade ?? baseManifest.upgrade,
+    };
+  }
+
+  function selectedBlueprintVariantLabel(): string {
+    if (!selectedBlueprintVariant) {
+      return "默认方案";
+    }
+    return (
+      selectedBlueprintVariantOptions.find((variant) => variant.id === selectedBlueprintVariant)
+        ?.label ??
+      selectedBlueprintVariantDefinition?.label ??
+      selectedBlueprintVariant
+    );
+  }
+
+  function blueprintUpgradeSummary(upgrade: BlueprintUpgradePolicy | undefined): string {
+    if (!upgrade) {
+      return "未声明升级策略";
+    }
+
+    return [
+      upgrade.strategy,
+      upgrade.steps?.[0]?.classification ?? "non-breaking",
+      upgrade.destructive ? "可能破坏性" : "非破坏性",
+      upgrade.steps?.some((step) => step.requiresManualReview) ? "需要确认" : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   function openBlueprintSelectorDialog(): void {
     if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
       selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension.key;
@@ -1864,6 +2007,7 @@
     if (selectedBlueprintSlug.trim() && previousKey && previousKey !== extension.key) {
       selectedBlueprintSlug = "";
       selectedBlueprintTitle = "";
+      selectedBlueprintVariant = "";
       blueprintDependencyProvisioningDrafts = {};
     }
   }
@@ -1874,6 +2018,7 @@
     }
     selectedBlueprintSlug = item.slug;
     selectedBlueprintTitle = item.title;
+    selectedBlueprintVariant = item.defaultVariant ?? item.variants?.[0]?.id ?? "";
     if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
       selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension.key;
     }
@@ -1887,7 +2032,11 @@
     if (!selectedBlueprintListing) {
       return;
     }
+    const visibleVariant = selectedBlueprintVariant;
     applyBlueprintListing(selectedBlueprintListing);
+    if (visibleVariant) {
+      selectedBlueprintVariant = visibleVariant;
+    }
     blueprintDetailDialogOpen = false;
   }
 
@@ -1924,6 +2073,7 @@
       );
       setSearchParam(params, "blueprintSlug", selectedBlueprintSlug);
       setSearchParam(params, "blueprintTitle", selectedBlueprintTitle);
+      setSearchParam(params, "blueprintVariant", selectedBlueprintVariant);
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
@@ -2071,6 +2221,7 @@
     selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
     selectedBlueprintSlug = params.get("blueprintSlug") ?? "";
     selectedBlueprintTitle = params.get("blueprintTitle") ?? "";
+    selectedBlueprintVariant = params.get("blueprintVariant") ?? "";
 
     localFolderLocator = nextSourceKind === "local-folder" ? nextSourceLocator || "." : localFolderLocator;
     githubLocator = nextSourceKind === "github" ? nextSourceLocator : githubLocator;
@@ -2861,6 +3012,7 @@
                 "content-type": "application/json",
               },
               body: JSON.stringify({
+                ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
                 profile: "production",
                 parameters: {
                   APP_NAME: selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
@@ -3312,6 +3464,23 @@
                         {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
                       </Button>
                     </div>
+                  {/if}
+                  {#if selectedBlueprintSlug.trim() && selectedBlueprintVariantOptions.length > 0}
+                    <label class="block space-y-1.5">
+                      <span class="text-xs font-medium text-muted-foreground">部署方案</span>
+                      <select
+                        class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        bind:value={selectedBlueprintVariant}
+                      >
+                        {#each selectedBlueprintVariantOptions as variant (variant.id)}
+                          <option value={variant.id}>{variant.label ?? variant.id}</option>
+                        {/each}
+                      </select>
+                      <span class="block text-xs leading-5 text-muted-foreground">
+                        {selectedBlueprintVariantDefinition?.summary ??
+                          "选择同一 Blueprint 的不同依赖资源或运行配置。"}
+                      </span>
+                    </label>
                   {/if}
                   {#if selectedBlueprintSlug.trim()}
                     <div class="space-y-3" data-blueprint-dependency-provisioning>
@@ -4701,10 +4870,24 @@
             <span class="min-w-0 break-words text-right font-medium">{projectSummary}</span>
           </div>
           {#if sourceKind === "blueprint" && selectedBlueprintSlug.trim()}
+            {#if selectedBlueprintVariant}
+              <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
+                <span class="shrink-0 text-muted-foreground">部署方案</span>
+                <span class="min-w-0 break-words text-right font-medium">
+                  {selectedBlueprintVariantLabel()}
+                </span>
+              </div>
+            {/if}
             <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
               <span class="shrink-0 text-muted-foreground">依赖资源</span>
               <span class="min-w-0 break-words text-right font-medium">
                 {blueprintDependencyProvisioningSummary}
+              </span>
+            </div>
+            <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
+              <span class="shrink-0 text-muted-foreground">升级策略</span>
+              <span class="min-w-0 break-words text-right font-medium">
+                {blueprintUpgradeSummary(selectedBlueprintUpgrade)}
               </span>
             </div>
           {/if}
@@ -4898,7 +5081,7 @@
           <Skeleton class="h-40 w-full" />
           <Skeleton class="h-40 w-full" />
         </div>
-      {:else if selectedBlueprintDetailQuery.isError || !selectedBlueprintDetail || !selectedBlueprintListing || !selectedBlueprintManifest}
+      {:else if selectedBlueprintDetailQuery.isError || !selectedBlueprintDetail || !selectedBlueprintListing || !selectedBlueprintManifest || !selectedBlueprintEffectiveManifest}
         <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
           无法加载这个蓝图详情。
         </div>
@@ -4919,6 +5102,10 @@
                     {selectedBlueprintListing.featured ? "Featured" : "Official"}
                   </Badge>
                   <Badge variant="outline">{selectedBlueprintListing.publisher.name}</Badge>
+                  {#if selectedBlueprintVariantOptions.length > 0}
+                    <Badge variant="outline">方案：{selectedBlueprintVariantLabel()}</Badge>
+                  {/if}
+                  <Badge variant="outline">{blueprintUpgradeSummary(selectedBlueprintUpgrade)}</Badge>
                 </div>
                 <div>
                   <h3 class="text-xl font-semibold">{selectedBlueprintListing.title}</h3>
@@ -4959,18 +5146,18 @@
           <section class="grid gap-3 text-sm md:grid-cols-3">
             <div class="console-subtle-panel px-3 py-2">
               <p class="text-xs text-muted-foreground">运行单元</p>
-              <p class="mt-1 font-medium">{selectedBlueprintManifest.components.length} component</p>
+              <p class="mt-1 font-medium">{selectedBlueprintEffectiveManifest.components.length} component</p>
             </div>
             <div class="console-subtle-panel px-3 py-2">
               <p class="text-xs text-muted-foreground">依赖资源</p>
               <p class="mt-1 truncate font-medium">
-                {selectedBlueprintManifest.resources.map((resource) => resource.kind).join(" / ") || "无"}
+                {selectedBlueprintEffectiveManifest.resources.map((resource) => resource.kind).join(" / ") || "无"}
               </p>
             </div>
             <div class="console-subtle-panel px-3 py-2">
               <p class="text-xs text-muted-foreground">公开入口</p>
               <p class="mt-1 truncate font-medium">
-                {selectedBlueprintManifest.components
+                {selectedBlueprintEffectiveManifest.components
                   .flatMap((component) =>
                     component.ports.map((port) => `${port.containerPort}/${port.protocol}`),
                   )
@@ -4983,7 +5170,7 @@
             <div>
               <h3 class="text-base font-semibold">介绍</h3>
               <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                {selectedBlueprintManifest.description ??
+                {selectedBlueprintEffectiveManifest.description ??
                   selectedBlueprintListing.blueprint.summary ??
                   selectedBlueprintListing.subtitle}
               </p>
@@ -5004,9 +5191,9 @@
                 <p class="text-xs font-medium uppercase text-muted-foreground">Appaloft 概念</p>
                 <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
                   {#each selectedBlueprintListing.overview?.highlights ?? [
-                    `${selectedBlueprintManifest.components.length} 个应用运行单元`,
-                    selectedBlueprintManifest.resources.length > 0
-                      ? `${selectedBlueprintManifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
+                    `${selectedBlueprintEffectiveManifest.components.length} 个应用运行单元`,
+                    selectedBlueprintEffectiveManifest.resources.length > 0
+                      ? `${selectedBlueprintEffectiveManifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
                       : "无托管依赖资源",
                     "生成项目、环境、资源、网络和部署 dry-run 计划",
                   ] as highlight (highlight)}
@@ -5023,7 +5210,7 @@
           <section class="grid gap-3 md:grid-cols-2">
             <div class="space-y-2">
               <p class="text-xs font-medium uppercase text-muted-foreground">组件</p>
-              {#each selectedBlueprintManifest.components as component (component.id)}
+              {#each selectedBlueprintEffectiveManifest.components as component (component.id)}
                 <div class="console-subtle-panel px-3 py-2 text-sm">
                   <div class="flex items-center justify-between gap-3">
                     <span class="font-medium">{component.name}</span>
@@ -5040,17 +5227,34 @@
             </div>
             <div class="space-y-2">
               <p class="text-xs font-medium uppercase text-muted-foreground">配置</p>
+              {#if selectedBlueprintVariantOptions.length > 0}
+                <label class="block space-y-1.5">
+                  <span class="text-xs text-muted-foreground">部署方案</span>
+                  <select
+                    class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    bind:value={selectedBlueprintVariant}
+                  >
+                    {#each selectedBlueprintVariantOptions as variant (variant.id)}
+                      <option value={variant.id}>{variant.label ?? variant.id}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
               <div class="console-subtle-panel px-3 py-2 text-sm">
                 <p class="text-muted-foreground">参数</p>
                 <p class="mt-1 font-medium">
-                  {selectedBlueprintDetail.install.parameters.map((parameter) => parameter.key).join(", ") || "无"}
+                  {selectedBlueprintEffectiveManifest.parameters.map((parameter) => parameter.key).join(", ") || "无"}
                 </p>
               </div>
               <div class="console-subtle-panel px-3 py-2 text-sm">
                 <p class="text-muted-foreground">密钥占位</p>
                 <p class="mt-1 font-medium">
-                  {selectedBlueprintDetail.install.secrets.map((secret) => secret.key).join(", ") || "无"}
+                  {selectedBlueprintEffectiveManifest.secrets.map((secret) => secret.key).join(", ") || "无"}
                 </p>
+              </div>
+              <div class="console-subtle-panel px-3 py-2 text-sm">
+                <p class="text-muted-foreground">升级策略</p>
+                <p class="mt-1 font-medium">{blueprintUpgradeSummary(selectedBlueprintUpgrade)}</p>
               </div>
               <div class="console-subtle-panel px-3 py-2 text-sm">
                 <p class="text-muted-foreground">环境变量</p>

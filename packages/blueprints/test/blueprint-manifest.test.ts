@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { blueprintSchemaVersion, loadBlueprintManifest, validateBlueprintManifest } from "../src";
+import {
+  blueprintManifestJsonSchema,
+  blueprintSchemaVersion,
+  loadBlueprintManifest,
+  validateBlueprintManifest,
+} from "../src";
 
 describe("Blueprint manifest schema", () => {
   test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-011] validates JSON-compatible Blueprint manifests", () => {
@@ -130,5 +135,84 @@ profiles:
     });
 
     expect(result.ok).toBe(true);
+  });
+
+  test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-032] exports JSON Schema for file validation", () => {
+    expect(blueprintManifestJsonSchema).toMatchObject({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+    });
+    expect(JSON.stringify(blueprintManifestJsonSchema)).toContain("appaloft.blueprint/v1");
+    expect(JSON.stringify(blueprintManifestJsonSchema)).toContain("variants");
+  });
+
+  test("[CLOUD-BLUEPRINT-PUBLIC-VARIANT-033] validates topology variants and upgrade metadata", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "variant-service",
+      name: "Variant Service",
+      version: "1.0.0",
+      summary: "A service with multiple dependency variants.",
+      defaultVariant: "sqlite",
+      resources: [{ id: "data", kind: "volume", label: "Local data" }],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/app:latest",
+          },
+          usesResources: ["data"],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+      variants: {
+        sqlite: {
+          label: "SQLite",
+          summary: "Single container with volume-backed state.",
+        },
+        postgres: {
+          label: "Postgres",
+          summary: "External Postgres-backed state.",
+          defaultProfile: "production",
+          resources: [{ id: "database", kind: "postgres", label: "Postgres" }],
+          components: [
+            {
+              id: "app",
+              name: "App",
+              kind: "service",
+              runtime: {
+                strategy: "container-image",
+                image: "example/app:latest",
+              },
+              usesResources: ["database"],
+            },
+          ],
+          upgrade: {
+            strategy: "blueprint-plan",
+            destructive: false,
+            steps: [
+              {
+                classification: "potentially-breaking",
+                requiresManualReview: true,
+                changes: ["Database engine changes require dependency binding review."],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.defaultVariant).toBe("sqlite");
+      expect(result.value.variants.postgres?.upgrade?.steps[0]?.classification).toBe(
+        "potentially-breaking",
+      );
+    }
   });
 });
