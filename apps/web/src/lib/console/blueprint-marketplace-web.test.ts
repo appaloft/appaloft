@@ -77,10 +77,16 @@ describe("Blueprint marketplace console surface", () => {
     expect(listPageSource).toContain("ConsoleShell");
     expect(detailPageSource).toContain("ConsoleShell");
     expect(selectorSource).toContain("data-blueprint-marketplace-selector");
+    expect(selectorSource).toContain("BlueprintProductIcon");
+    expect(selectorSource).not.toContain("overflow-x-auto pb-1");
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
+    expect(detailPageSource).toContain("官方网站");
     expect(detailPageSource).toContain("<details");
     expect(quickDeploySource).toContain("blueprintSlug");
+    expect(quickDeploySource).toContain("Dialog.Root bind:open={blueprintSelectorDialogOpen}");
+    expect(quickDeploySource).toContain("onselect={applyBlueprintListing}");
+    expect(quickDeploySource).toContain("openSelectedBlueprintDetailDialog");
     expect(quickDeploySource).toContain("selectedBlueprintDetailHref");
   });
 });
