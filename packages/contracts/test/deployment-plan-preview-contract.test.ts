@@ -29,6 +29,18 @@ describe("deployment plan preview contract", () => {
             status: "ready",
           },
         },
+        {
+          bindingId: "rbd_objects",
+          dependencyResourceId: "rsi_objects",
+          kind: "object-storage",
+          targetName: "S3_ENDPOINT",
+          scope: "runtime-only",
+          injectionMode: "env",
+          snapshotReadiness: {
+            status: "blocked",
+            reason: "provider adapter pending",
+          },
+        },
       ],
       runtimeInjection: {
         status: "ready",
@@ -169,6 +181,7 @@ describe("deployment plan preview contract", () => {
 
     expect(plan.dependencyBindings?.references[0]?.targetName).toBe("DATABASE_URL");
     expect(plan.dependencyBindings?.references[1]?.kind).toBe("redis");
+    expect(plan.dependencyBindings?.references[2]?.kind).toBe("object-storage");
     expect(show.snapshot?.dependencyBindings?.runtimeInjection.status).toBe("ready");
     expect(JSON.stringify({ plan, show })).not.toContain("postgres://");
     expect(JSON.stringify({ plan, show })).not.toContain("redis://");

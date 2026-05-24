@@ -26,7 +26,7 @@ contract.
 
 ## Discover Findings
 
-1. `dependency-resources.provision-postgres` is already the public command for Appaloft-managed
+1. `dependency-resources.provision` is already the public command for Appaloft-managed
    Postgres. This slice upgrades that command from metadata-only to managed realization when the
    selected provider supports the capability.
 2. Provider-native realization belongs behind an application/provider port. `core` continues to own
@@ -60,14 +60,14 @@ contract.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| DEP-RES-PG-NATIVE-001 | Accept managed Postgres realization | Active project/environment and provider supports managed Postgres | `dependency-resources.provision-postgres` is admitted | A `postgres` `ResourceInstance` and realization attempt are persisted, command returns `ok({ id })`, provider realization is requested, and running process-attempt visibility is recorded without leaking secrets. |
+| DEP-RES-PG-NATIVE-001 | Accept managed Postgres realization | Active project/environment and provider supports managed Postgres | `dependency-resources.provision` is admitted | A `postgres` `ResourceInstance` and realization attempt are persisted, command returns `ok({ id })`, provider realization is requested, and running process-attempt visibility is recorded without leaking secrets. |
 | DEP-RES-PG-NATIVE-002 | Mark realized provider database ready | Provider realization succeeds with safe handle and endpoint metadata | The realization result is applied | Dependency resource status becomes `ready`, connection summary is safe/masked, binding readiness is `ready`, process-attempt success is recorded, and `dependency-resource-realized` is emitted. |
 | DEP-RES-PG-NATIVE-003 | Surface provider realization failure | Provider realization fails after admission | The realization result is applied | Dependency resource status becomes `degraded`, binding readiness is `blocked`, failure code/category/phase and process-attempt failure are safe, and the original provision command remains accepted. |
 | DEP-RES-PG-NATIVE-004 | Reject bind before realization readiness | Managed Postgres is pending, failed, unsupported, or deleted | `resources.bind-dependency` is called | Command returns structured blocked/not-found/conflict result, no binding is persisted. |
 | DEP-RES-PG-NATIVE-005 | Delete managed realized Postgres safely | Realized managed Postgres has no binding, backup, snapshot, or provider safety blockers | `dependency-resources.delete` is called | Provider delete is requested/applied, process-attempt cleanup visibility is recorded, Appaloft record is tombstoned only after cleanup state is durable, and no runtime or deployment snapshot is mutated. |
 | DEP-RES-PG-NATIVE-006 | Block managed delete while protected | Resource has active binding, backup retention, retained snapshot, or provider unsafe blocker | `dependency-resources.delete` is called | Returns `dependency_resource_delete_blocked`, no provider cleanup is requested. |
-| DEP-RES-PG-NATIVE-007 | Provider unsupported | Selected provider lacks managed Postgres realization | `dependency-resources.provision-postgres` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, no resource is persisted unless caller explicitly requested metadata-only mode. |
-| DEP-RES-PG-NATIVE-008 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Postgres provider | `dependency-resources.provision-postgres` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw connection value for Appaloft-owned secret storage. |
+| DEP-RES-PG-NATIVE-007 | Provider unsupported | Selected provider lacks managed Postgres realization | `dependency-resources.provision` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, no resource is persisted unless caller explicitly requested metadata-only mode. |
+| DEP-RES-PG-NATIVE-008 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Postgres provider | `dependency-resources.provision` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw connection value for Appaloft-owned secret storage. |
 | DEP-RES-PG-NATIVE-009 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
 
 ## Domain Ownership
@@ -75,7 +75,7 @@ contract.
 - Bounded context: Dependency Resources.
 - Aggregate owner: `ResourceInstance` owns provider-native realization state, safe provider handle,
   binding readiness, lifecycle status, backup relationship blockers, and deletion admission.
-- Application owner: `dependency-resources.provision-postgres` coordinates project/environment
+- Application owner: `dependency-resources.provision` coordinates project/environment
   context, repository persistence, provider capability selection, and realization attempts.
 - Provider owner: provider packages implement managed Postgres create/delete/observe capability
   through an application/provider port. Provider SDK types do not cross into `core`.
@@ -88,9 +88,9 @@ contract.
 
 ## Public Surfaces
 
-- API/oRPC: keep `POST /api/dependency-resources/postgres/provision` for managed creation and
+- API/oRPC: use `POST /api/dependency-resources/provision` with `kind = postgres` for managed creation and
   `DELETE /api/dependency-resources/{dependencyResourceId}` for managed cleanup after safety.
-- CLI: keep `appaloft dependency postgres provision`; add optional `--server <serverId>` for the
+- CLI: use `appaloft dependency provision --kind postgres`; add optional `--server <serverId>` for the
   Docker-backed single-server target; keep `appaloft dependency delete`.
 - Web/UI: `/dependency-resources` can create Docker-backed managed Postgres on a selected
   single-server target and expose dependency rename/delete, backup create/list/acknowledged

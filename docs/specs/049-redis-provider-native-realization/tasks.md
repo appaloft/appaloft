@@ -32,7 +32,7 @@
 - [x] Extend `ResourceInstance` with any Redis-specific provider-native realization invariants not
   covered by existing generic state.
 - [x] Add managed Redis provider capability ports and fake provider adapter.
-- [x] Upgrade `dependency-resources.provision-redis` use case for realization admission.
+- [x] Upgrade `dependency-resources.provision` use case for realization admission.
 - [x] Store new Appaloft-owned Redis connection values through `DependencyResourceSecretStore`
   before binding readiness becomes ready.
 - [x] Upgrade binding admission to allow realized ready managed Redis and block not-ready refs.

@@ -25,7 +25,7 @@
 - Application:
   - Add managed Redis provider capability ports or extend a generic dependency realization port
     without exposing provider SDK types.
-  - Upgrade `ProvisionRedisDependencyResourceUseCase` to persist realization state and request the
+  - Upgrade `ProvisionDependencyResourceUseCase` to persist realization state and request the
     provider capability.
   - Store Appaloft-owned Redis connection values through `DependencyResourceSecretStore` before
     marking binding readiness ready.

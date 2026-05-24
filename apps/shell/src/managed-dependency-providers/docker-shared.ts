@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   type DependencyResourceKind,
   type ExecutionContext,
+  type ManagedDependencyResourceKind,
   type ManagedDependencySingleServerTarget,
   type ServerRepository,
   toRepositoryContext,
@@ -27,7 +28,7 @@ export const managedLabel = "appaloft.managed=dependency-resource";
 export const backupRoot = "$HOME/.appaloft/dependency-backups";
 
 export interface DockerManagedDependencyServiceDefinition {
-  kind: DependencyResourceKind;
+  kind: ManagedDependencyResourceKind;
   managedProviderKey: string;
   externalProviderKey: string;
   imageLabel: string;
@@ -49,10 +50,38 @@ export const dockerManagedDependencyServices = {
     imageLabel: "redis",
     backupFileExtension: "rdb",
   },
-} satisfies Record<DependencyResourceKind, DockerManagedDependencyServiceDefinition>;
+  mysql: {
+    kind: "mysql",
+    managedProviderKey: "appaloft-managed-mysql",
+    externalProviderKey: "external-mysql",
+    imageLabel: "mysql",
+    backupFileExtension: "sql",
+  },
+  clickhouse: {
+    kind: "clickhouse",
+    managedProviderKey: "appaloft-managed-clickhouse",
+    externalProviderKey: "external-clickhouse",
+    imageLabel: "clickhouse",
+    backupFileExtension: "tsv",
+  },
+  "object-storage": {
+    kind: "object-storage",
+    managedProviderKey: "appaloft-managed-object-storage",
+    externalProviderKey: "external-object-storage",
+    imageLabel: "minio",
+    backupFileExtension: "tar",
+  },
+  opensearch: {
+    kind: "opensearch",
+    managedProviderKey: "appaloft-managed-opensearch",
+    externalProviderKey: "external-opensearch",
+    imageLabel: "opensearch",
+    backupFileExtension: "snapshot",
+  },
+} satisfies Record<ManagedDependencyResourceKind, DockerManagedDependencyServiceDefinition>;
 
 export interface ParsedDockerHandle {
-  kind: DependencyResourceKind;
+  kind: ManagedDependencyResourceKind;
   serverId: string;
   containerName: string;
 }
@@ -69,7 +98,10 @@ interface CommandResult {
 
 export function serviceForKind(
   kind: DependencyResourceKind,
-): DockerManagedDependencyServiceDefinition {
+): DockerManagedDependencyServiceDefinition | undefined {
+  if (!isManagedDependencyKind(kind)) {
+    return undefined;
+  }
   return dockerManagedDependencyServices[kind];
 }
 
@@ -78,6 +110,9 @@ export function serviceForProvider(
   kind: DependencyResourceKind,
 ): DockerManagedDependencyServiceDefinition | undefined {
   const definition = serviceForKind(kind);
+  if (!definition) {
+    return undefined;
+  }
   if (
     definition.managedProviderKey === providerKey ||
     definition.externalProviderKey === providerKey
@@ -332,8 +367,17 @@ export function requireConnectionUrl(input: {
   }
 }
 
-function isManagedDependencyKind(input: string | undefined): input is DependencyResourceKind {
-  return input === "postgres" || input === "redis";
+function isManagedDependencyKind(
+  input: string | undefined,
+): input is ManagedDependencyResourceKind {
+  return (
+    input === "postgres" ||
+    input === "redis" ||
+    input === "mysql" ||
+    input === "clickhouse" ||
+    input === "object-storage" ||
+    input === "opensearch"
+  );
 }
 
 async function spawnCommand(args: string[]): Promise<CommandResult> {

@@ -18,6 +18,7 @@
     ProjectSummary,
     ServerSummary,
   } from "@appaloft/contracts";
+  import type { TranslationKey } from "@appaloft/i18n";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -34,7 +35,7 @@
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
-  type DependencyKind = "postgres" | "redis";
+  type DependencyKind = DependencyResourceSummary["kind"];
   type CreateDependencyResourceInput = {
     kind: DependencyKind;
     projectId: string;
@@ -46,30 +47,43 @@
       reason?: string;
     };
   };
+  type DependencyKindOption = {
+    labelKey: TranslationKey;
+  };
   type Feedback = {
     kind: "success" | "error";
     title: string;
     detail: string;
   };
 
-  const dependencyKindOptions = {
+  const dependencyKindOptions: Record<DependencyKind, DependencyKindOption> = {
     postgres: {
       labelKey: i18nKeys.console.dependencyResources.kindPostgres,
-      provision: (input: CreateDependencyResourceInput) =>
-        orpcClient.dependencyResources.provisionPostgres(input),
     },
     redis: {
       labelKey: i18nKeys.console.dependencyResources.kindRedis,
-      provision: (input: CreateDependencyResourceInput) =>
-        orpcClient.dependencyResources.provisionRedis(input),
     },
-  } satisfies Record<
-    DependencyKind,
-    {
-      labelKey: string;
-      provision(input: CreateDependencyResourceInput): Promise<{ id: string }>;
-    }
-  >;
+    mysql: {
+      labelKey: i18nKeys.console.dependencyResources.kindMysql,
+    },
+    clickhouse: {
+      labelKey: i18nKeys.console.dependencyResources.kindClickHouse,
+    },
+    "object-storage": {
+      labelKey: i18nKeys.console.dependencyResources.kindObjectStorage,
+    },
+    opensearch: {
+      labelKey: i18nKeys.console.dependencyResources.kindOpenSearch,
+    },
+  };
+  const dependencyKindOrder = [
+    "postgres",
+    "redis",
+    "mysql",
+    "clickhouse",
+    "object-storage",
+    "opensearch",
+  ] as const satisfies readonly DependencyKind[];
 
   const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
     resources: false,
@@ -183,7 +197,7 @@
 
   const createDependencyResourceMutation = createMutation(() => ({
     mutationFn: (input: CreateDependencyResourceInput) =>
-      dependencyKindOptions[input.kind].provision(input),
+      orpcClient.dependencyResources.provision(input),
     onSuccess: (result) => {
       feedback = {
         kind: "success",
@@ -599,8 +613,9 @@
             <Select.Root bind:value={createKind} type="single">
               <Select.Trigger class="w-full">{kindLabel(createKind)}</Select.Trigger>
               <Select.Content>
-                <Select.Item value="postgres">{$t(i18nKeys.console.dependencyResources.kindPostgres)}</Select.Item>
-                <Select.Item value="redis">{$t(i18nKeys.console.dependencyResources.kindRedis)}</Select.Item>
+                {#each dependencyKindOrder as dependencyKind (dependencyKind)}
+                  <Select.Item value={dependencyKind}>{kindLabel(dependencyKind)}</Select.Item>
+                {/each}
               </Select.Content>
             </Select.Root>
           </label>

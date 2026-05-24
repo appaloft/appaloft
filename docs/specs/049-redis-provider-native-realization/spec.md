@@ -27,7 +27,7 @@ single-server target when the command supplies `serverId`.
 
 ## Discover Findings
 
-1. `dependency-resources.provision-redis` is already the public command for Appaloft-managed Redis.
+1. `dependency-resources.provision` is already the public command for Appaloft-managed Redis.
    This behavior upgrades that command from metadata-only to managed realization when the selected
    provider supports Redis.
 2. The Postgres provider-native realization shape is the correct precedent: `ResourceInstance`
@@ -54,15 +54,15 @@ single-server target when the command supplies `serverId`.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| DEP-RES-REDIS-NATIVE-001 | Accept managed Redis realization | Active project/environment and provider supports managed Redis | `dependency-resources.provision-redis` is admitted | A `redis` `ResourceInstance` and realization attempt are persisted, command returns `ok({ id })`, provider realization is requested, and running process-attempt visibility is recorded without leaking secrets. |
+| DEP-RES-REDIS-NATIVE-001 | Accept managed Redis realization | Active project/environment and provider supports managed Redis | `dependency-resources.provision` is admitted | A `redis` `ResourceInstance` and realization attempt are persisted, command returns `ok({ id })`, provider realization is requested, and running process-attempt visibility is recorded without leaking secrets. |
 | DEP-RES-REDIS-NATIVE-002 | Mark realized provider Redis ready | Provider realization succeeds with safe handle, endpoint metadata, and a resolvable connection reference | The realization result is applied | Dependency resource status becomes `ready`, connection summary is safe/masked, binding readiness is `ready`, process-attempt success is recorded, and `dependency-resource-realized` is emitted for the Redis resource. |
 | DEP-RES-REDIS-NATIVE-003 | Surface provider realization failure | Provider realization fails after admission | The realization result is applied | Dependency resource status becomes `degraded`, binding readiness is `blocked`, failure code/category/phase and process-attempt failure are safe, and the original provision command remains accepted. |
 | DEP-RES-REDIS-NATIVE-004 | Reject bind before Redis realization readiness | Managed Redis is pending, failed, unsupported, deleted, or has an unresolved Appaloft-owned connection ref | `resources.bind-dependency` is called | Command returns structured blocked/not-found/conflict result, no binding is persisted, and no provider action runs. |
 | DEP-RES-REDIS-NATIVE-005 | Bind realized managed Redis | Managed Redis is realized ready with a resolvable runtime connection ref | `resources.bind-dependency` is called with a target such as `REDIS_URL` | An active `ResourceBinding` is persisted with safe runtime injection metadata, and no raw Redis connection material appears in binding read models or events. |
 | DEP-RES-REDIS-NATIVE-006 | Delete managed realized Redis safely | Realized managed Redis has no binding, backup, snapshot/reference, or provider blockers | `dependency-resources.delete` is called | Provider delete is requested/applied, process-attempt cleanup visibility is recorded, Appaloft tombstones the record only after cleanup state is durable, and no runtime state or deployment snapshot is mutated. |
 | DEP-RES-REDIS-NATIVE-007 | Block managed Redis delete while protected | Redis has active binding, backup retention, retained snapshot/reference, or provider unsafe blocker | `dependency-resources.delete` is called | Returns `dependency_resource_delete_blocked`, no provider cleanup is requested. |
-| DEP-RES-REDIS-NATIVE-008 | Provider unsupported | Selected provider lacks managed Redis realization | `dependency-resources.provision-redis` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, and no resource is persisted unless a later spec adds explicit metadata-only mode. |
-| DEP-RES-REDIS-NATIVE-009 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Redis provider | `dependency-resources.provision-redis` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw Redis URL for Appaloft-owned secret storage. |
+| DEP-RES-REDIS-NATIVE-008 | Provider unsupported | Selected provider lacks managed Redis realization | `dependency-resources.provision` is called | Admission returns `provider_capability_unsupported`, `phase = dependency-resource-realization-admission`, and no resource is persisted unless a later spec adds explicit metadata-only mode. |
+| DEP-RES-REDIS-NATIVE-009 | Realize on a single-server Docker target | Active project/environment, active `local-shell` or `generic-ssh` single-server target, and default managed Redis provider | `dependency-resources.provision` includes `serverId` | Shell provider creates/replaces a Docker container, named Docker volume, and `appaloft-edge` network attachment; returns a safe Docker provider handle, masked endpoint, and raw Redis URL for Appaloft-owned secret storage. |
 | DEP-RES-REDIS-NATIVE-010 | Entrypoint contract remains stable | CLI/oRPC/HTTP call provision/delete/bind operations | Operation catalog and transports are inspected | Existing command/query schemas are reused or explicitly extended; no provider SDK shape or raw secret field leaks into transport contracts. |
 
 ## Domain Ownership
@@ -71,7 +71,7 @@ single-server target when the command supplies `serverId`.
 - Aggregate owner: `ResourceInstance` owns Redis provider-native realization state, safe provider
   handle, lifecycle status, binding readiness, backup relationship blockers, and deletion
   admission.
-- Application owner: `dependency-resources.provision-redis` coordinates context resolution,
+- Application owner: `dependency-resources.provision` coordinates context resolution,
   repository persistence, provider capability selection, dependency secret-value storage, and
   realization attempts.
 - Provider owner: provider packages implement managed Redis create/delete/observe capability
@@ -85,10 +85,10 @@ single-server target when the command supplies `serverId`.
 
 ## Public Surfaces
 
-- API/oRPC: keep `POST /api/dependency-resources/redis/provision`,
+- API/oRPC: use `POST /api/dependency-resources/provision` with `kind = redis`,
   `POST /api/resources/{resourceId}/dependency-bindings`, and
   `DELETE /api/dependency-resources/{dependencyResourceId}` as the public operations.
-- CLI: keep `appaloft dependency redis provision`; add optional `--server <serverId>` for the
+- CLI: use `appaloft dependency provision --kind redis`; add optional `--server <serverId>` for the
   Docker-backed single-server target; keep `appaloft resource dependency bind` and
   `appaloft dependency delete`.
 - Web/UI: `/dependency-resources` can create Docker-backed managed Redis on a selected

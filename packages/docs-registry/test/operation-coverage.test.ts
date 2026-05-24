@@ -352,10 +352,8 @@ describe("public docs operation coverage", () => {
 
   test("[DEP-RES-DOCS-001] dependency resource and backup operations record public docs coverage", async () => {
     const lifecycleOperations = [
-      "dependency-resources.provision-postgres",
-      "dependency-resources.import-postgres",
-      "dependency-resources.provision-redis",
-      "dependency-resources.import-redis",
+      "dependency-resources.provision",
+      "dependency-resources.import",
       "dependency-resources.list",
       "dependency-resources.show",
       "dependency-resources.rename",
@@ -429,7 +427,7 @@ describe("public docs operation coverage", () => {
     expect(sourceOfTruth).toContain("injected provider capability");
     expect(sourceOfTruth).toContain("shell-local artifact materialization");
     expect(sourceOfTruth).toContain("shell-local realization/delete artifact materialization");
-    expect(resourcesOverview).toContain("Appaloft-managed Postgres and Redis provisioning");
+    expect(resourcesOverview).toContain("Appaloft-managed dependency provisioning");
     expect(resourcesOverview).toContain(
       "dependency backup create/list/show and acknowledged in-place restore",
     );
@@ -449,10 +447,7 @@ describe("public docs operation coverage", () => {
     expect(sourceOfTruth).not.toContain("hermetic fake provider");
     expect(sourceOfTruth).not.toContain("synchronous hermetic provider");
     expect(apiDescriptions).toContain(
-      "Provisions an Appaloft-managed Postgres dependency resource through the configured provider capability.",
-    );
-    expect(apiDescriptions).toContain(
-      "Provisions an Appaloft-managed Redis dependency resource through the configured provider capability.",
+      "Provisions an Appaloft-managed dependency resource of the requested kind through the configured provider capability.",
     );
     expect(apiDescriptions).not.toContain(
       "without creating provider-native database infrastructure",

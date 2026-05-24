@@ -109,10 +109,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource health <resourceId>` - `resources.health`
 - `appaloft resource health-history <resourceId> --from <iso> --to <iso>` - `resources.health-history`
 - `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
-- `appaloft dependency postgres provision` - `dependency-resources.provision-postgres`
-- `appaloft dependency postgres import` - `dependency-resources.import-postgres`
-- `appaloft dependency redis provision` - `dependency-resources.provision-redis`
-- `appaloft dependency redis import` - `dependency-resources.import-redis`
+- `appaloft dependency provision --kind <kind>` - `dependency-resources.provision`
+- `appaloft dependency import --kind <kind>` - `dependency-resources.import`
 - `appaloft dependency list` - `dependency-resources.list`
 - `appaloft dependency show <dependencyResourceId>` - `dependency-resources.show`
 - `appaloft dependency rename <dependencyResourceId>` - `dependency-resources.rename`

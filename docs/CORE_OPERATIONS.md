@@ -397,10 +397,8 @@ Phase 7 dependency resource operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Provision Postgres dependency resource | Command | `dependency-resources.provision-postgres` | `ProvisionPostgresDependencyResourceCommand` | `ProvisionPostgresDependencyResourceCommandInput` | `appaloft dependency postgres provision` | `POST /api/dependency-resources/postgres/provision` |
-| Import Postgres dependency resource | Command | `dependency-resources.import-postgres` | `ImportPostgresDependencyResourceCommand` | `ImportPostgresDependencyResourceCommandInput` | `appaloft dependency postgres import` | `POST /api/dependency-resources/postgres/import` |
-| Provision Redis dependency resource | Command | `dependency-resources.provision-redis` | `ProvisionRedisDependencyResourceCommand` | `ProvisionRedisDependencyResourceCommandInput` | `appaloft dependency redis provision` | `POST /api/dependency-resources/redis/provision` |
-| Import Redis dependency resource | Command | `dependency-resources.import-redis` | `ImportRedisDependencyResourceCommand` | `ImportRedisDependencyResourceCommandInput` | `appaloft dependency redis import` | `POST /api/dependency-resources/redis/import` |
+| Provision dependency resource | Command | `dependency-resources.provision` | `ProvisionDependencyResourceCommand` | `ProvisionDependencyResourceCommandInput` | `appaloft dependency provision --kind <kind>` | `POST /api/dependency-resources/provision` |
+| Import dependency resource | Command | `dependency-resources.import` | `ImportDependencyResourceCommand` | `ImportDependencyResourceCommandInput` | `appaloft dependency import --kind <kind>` | `POST /api/dependency-resources/import` |
 | List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
@@ -432,23 +430,16 @@ Current boundary:
   raw connection value through `DependencyResourceSecretStore`, and records only safe provider
   handle/endpoint metadata. Provider realization/delete attempts are mirrored into safe
   operator-work process attempts for visibility and repair.
-- Provider-native Postgres realization is implemented through the existing
-  `dependency-resources.provision-postgres`, `resources.bind-dependency`, and
-  `dependency-resources.delete` boundaries. It is governed by
-  [Postgres Provider-Native Realization](./specs/038-postgres-provider-native-realization/spec.md)
-  and must keep provider SDK types and raw secrets out of core, contracts, CLI, Web, events, and
-  read models.
-- Provider-native Redis realization is implemented at the application boundary by
-  [Redis Provider-Native Realization](./specs/049-redis-provider-native-realization/spec.md) for
-  the existing `dependency-resources.provision-redis`, `resources.bind-dependency`, and
-  `dependency-resources.delete` boundaries. When provision receives `serverId`, the shell provider
-  creates a Docker-backed Redis container and named volume on that `local-shell` or `generic-ssh`
-  single-server target, stores the raw Redis URL through `DependencyResourceSecretStore`, and
-  records only safe provider handle/endpoint metadata. Safe realization state, ready binding
-  admission, unsupported-provider admission rejection, managed Redis provider cleanup on delete,
-  deployment snapshots, single-server secret resolution, and Swarm secret handle rendering are
-  implemented. Provider realization/delete attempts are mirrored into safe operator-work process
-  attempts for visibility and repair.
+- Provider-native dependency realization is implemented through the generic
+  `dependency-resources.provision`, `resources.bind-dependency`, and `dependency-resources.delete`
+  boundaries. The same command path accepts `postgres`, `redis`, `mysql`, `clickhouse`,
+  `object-storage`, and `opensearch`; Postgres and Redis no longer have separate command, CLI, or
+  HTTP compatibility routes. It is governed by the dependency resource lifecycle specs and must
+  keep provider SDK types and raw secrets out of core, contracts, CLI, Web, events, and read models.
+- Neutral dependency resource read and contract surfaces recognize the canonical dependency kinds
+  `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, and `opensearch`. This vocabulary
+  now drives the active create/import mutation surface as well as provider packages and higher-level
+  planning surfaces. The shell provider has Docker-backed adapters for the same set of kinds.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only

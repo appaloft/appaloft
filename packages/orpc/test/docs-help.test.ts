@@ -133,10 +133,10 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.scheduledTaskRunLogs).toContain(
       apiDocsHrefs.scheduledTaskLifecycle,
     );
-    expect(apiRouteDescriptions.provisionPostgresDependencyResource).toContain(
+    expect(apiRouteDescriptions.provisionDependencyResource).toContain(
       apiDocsHrefs.dependencyResourceLifecycle,
     );
-    expect(apiRouteDescriptions.importRedisDependencyResource).toContain(
+    expect(apiRouteDescriptions.importDependencyResource).toContain(
       apiDocsHrefs.dependencyResourceLifecycle,
     );
     expect(apiRouteDescriptions.bindResourceDependency).toContain(

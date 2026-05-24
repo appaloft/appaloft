@@ -40,8 +40,9 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type ManagedDependencyProviderPort,
+  type ManagedDependencyResourceKind,
   type ManagedDependencySingleServerTarget,
-  type ManagedPostgresProviderPort,
   type ProcessAttemptRecorder,
   type ProjectRepository,
   type ServerRepository,
@@ -49,9 +50,10 @@ import {
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
-import { type ProvisionPostgresDependencyResourceCommandInput } from "./provision-postgres-dependency-resource.command";
+import { type ProvisionDependencyResourceCommandInput } from "./provision-dependency-resource.command";
 
 const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
+const provisionDependencyResourceOperation = "dependency-resources.provision";
 
 function blockedBindingReadiness(reason: string): DependencyResourceBindingReadinessState {
   return {
@@ -68,7 +70,11 @@ function isProviderOwnedDependencySecretRef(secretRef: string): boolean {
   return secretRef.startsWith("secret://");
 }
 
-async function resolveManagedPostgresBindingReadiness(input: {
+function defaultManagedProviderKey(kind: ManagedDependencyResourceKind): string {
+  return `appaloft-managed-${kind}`;
+}
+
+async function resolveManagedDependencyBindingReadiness(input: {
   context: ExecutionContext;
   dependencyResourceSecretStore: DependencyResourceSecretStore;
   secretRef?: string;
@@ -95,7 +101,7 @@ async function resolveManagedPostgresBindingReadiness(input: {
 }
 
 @injectable()
-export class ProvisionPostgresDependencyResourceUseCase {
+export class ProvisionDependencyResourceUseCase {
   constructor(
     @inject(tokens.projectRepository)
     private readonly projectRepository: ProjectRepository,
@@ -115,15 +121,15 @@ export class ProvisionPostgresDependencyResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
-    @inject(tokens.managedPostgresProvider)
-    private readonly managedPostgresProvider: ManagedPostgresProviderPort,
+    @inject(tokens.managedDependencyProvider)
+    private readonly managedDependencyProvider: ManagedDependencyProviderPort,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
     context: ExecutionContext,
-    input: ProvisionPostgresDependencyResourceCommandInput,
+    input: ProvisionDependencyResourceCommandInput,
   ): Promise<Result<{ id: string }>> {
     const repositoryContext = toRepositoryContext(context);
     const {
@@ -134,7 +140,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       eventBus,
       idGenerator,
       logger,
-      managedPostgresProvider,
+      managedDependencyProvider,
       processAttemptRecorder,
       projectRepository,
       serverRepository,
@@ -145,21 +151,22 @@ export class ProvisionPostgresDependencyResourceUseCase {
       const environmentId = yield* EnvironmentId.create(input.environmentId);
       const name = yield* ResourceInstanceName.create(input.name);
       const slug = yield* ResourceInstanceSlug.fromName(name);
-      const kind = ResourceInstanceKindValue.rehydrate("postgres");
+      const kind = ResourceInstanceKindValue.rehydrate(input.kind);
       const providerKey = yield* ProviderKey.create(
-        input.providerKey ?? "appaloft-managed-postgres",
+        input.providerKey ?? defaultManagedProviderKey(input.kind),
       );
       const createdAt = yield* CreatedAt.create(clock.now());
       const attemptedAt = yield* OccurredAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
-      if (!managedPostgresProvider.supports(providerKey.value)) {
+      if (!managedDependencyProvider.supports(providerKey.value, input.kind)) {
         return err(
           domainError.providerCapabilityUnsupported(
-            "Provider does not support managed Postgres realization",
+            "Provider does not support managed dependency realization",
             {
               phase: "dependency-resource-realization-admission",
               providerKey: providerKey.value,
-              operation: "dependency-resources.provision-postgres",
+              dependencyKind: input.kind,
+              operation: provisionDependencyResourceOperation,
             },
           ),
         );
@@ -172,7 +179,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       if (!project) {
         return err(domainError.notFound("project", projectId.value));
       }
-      yield* project.ensureCanAcceptMutation("dependency-resources.provision-postgres");
+      yield* project.ensureCanAcceptMutation(provisionDependencyResourceOperation);
 
       const environment = await environmentRepository.findOne(
         repositoryContext,
@@ -196,7 +203,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
             context,
             serverRepository,
             serverId: input.serverId,
-            operation: "dependency-resources.provision-postgres",
+            operation: provisionDependencyResourceOperation,
           })
         : ok(undefined);
       const realizationTarget = yield* realizationTargetResult;
@@ -220,7 +227,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
       const realizationAttemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
         idGenerator.next("dpr"),
       );
-      const dependencyResource = yield* ResourceInstance.createPostgresDependencyResource({
+      const dependencyResource = yield* ResourceInstance.createDependencyResource({
         id: dependencyResourceId,
         projectId,
         environmentId,
@@ -253,7 +260,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
-      await recordManagedPostgresRealizationProcessAttempt({
+      await recordManagedDependencyRealizationProcessAttempt({
         recorder: processAttemptRecorder,
         repositoryContext,
         context,
@@ -261,10 +268,11 @@ export class ProvisionPostgresDependencyResourceUseCase {
       });
       await publishDomainEventsAndReturn(context, eventBus, logger, dependencyResource, undefined);
 
-      const realization = await managedPostgresProvider.realize(context, {
+      const realization = await managedDependencyProvider.realize(context, {
         dependencyResourceId: dependencyResourceId.value,
         projectId: projectId.value,
         environmentId: environmentId.value,
+        kind: input.kind,
         providerKey: providerKey.value,
         name: name.value,
         slug: slug.value,
@@ -284,7 +292,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
             dependencyResourceId: dependencyResourceId.value,
             projectId: projectId.value,
             environmentId: environmentId.value,
-            kind: "postgres",
+            kind: input.kind,
             purpose: "connection",
             secretValue: realization.value.connectionSecretValue,
             storedAt: realizedAt.value,
@@ -298,7 +306,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
         const connectionSecretRef = realizedSecretRef
           ? DependencyResourceSecretRef.create(realizedSecretRef)
           : undefined;
-        const bindingReadiness = await resolveManagedPostgresBindingReadiness({
+        const bindingReadiness = await resolveManagedDependencyBindingReadiness({
           context,
           dependencyResourceSecretStore,
           ...(realizedSecretRef ? { secretRef: realizedSecretRef } : {}),
@@ -344,7 +352,7 @@ export class ProvisionPostgresDependencyResourceUseCase {
         dependencyResource,
         UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
       );
-      await recordManagedPostgresRealizationProcessAttempt({
+      await recordManagedDependencyRealizationProcessAttempt({
         recorder: processAttemptRecorder,
         repositoryContext,
         context,
@@ -411,7 +419,7 @@ async function resolveSingleServerTarget(input: {
   });
 }
 
-async function recordManagedPostgresRealizationProcessAttempt(input: {
+async function recordManagedDependencyRealizationProcessAttempt(input: {
   recorder: ProcessAttemptRecorder;
   repositoryContext: ReturnType<typeof toRepositoryContext>;
   context: ExecutionContext;
@@ -433,7 +441,7 @@ async function recordManagedPostgresRealizationProcessAttempt(input: {
     id: realization.attemptId.value,
     kind: "system",
     status,
-    operationKey: "dependency-resources.provision-postgres",
+    operationKey: provisionDependencyResourceOperation,
     dedupeKey: `dependency-resource-realization:${state.id.value}:${realization.attemptId.value}`,
     correlationId: input.context.requestId,
     requestId: input.context.requestId,

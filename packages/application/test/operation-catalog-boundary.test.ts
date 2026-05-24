@@ -111,10 +111,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "storage-volumes.cleanup-runtime",
       "resources.attach-storage",
       "resources.detach-storage",
-      "dependency-resources.provision-postgres",
-      "dependency-resources.import-postgres",
-      "dependency-resources.provision-redis",
-      "dependency-resources.import-redis",
+      "dependency-resources.provision",
+      "dependency-resources.import",
       "dependency-resources.list",
       "dependency-resources.show",
       "dependency-resources.rename",
@@ -222,19 +220,20 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
-  test("[DEP-RES-REDIS-NATIVE-009] Redis provider-native realization reuses stable catalog operations and schemas", () => {
+  test("[DEP-RES-NATIVE-009] Dependency provider-native realization reuses stable catalog operations and schemas", () => {
     const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
     const entriesByKey = new Map<string, OperationCatalogEntry>(
       catalogEntries.map((entry) => [entry.key, entry]),
     );
-    const nativeRedisOperations = [
+    const nativeDependencyOperations = [
       {
-        key: "dependency-resources.provision-redis",
-        messageName: "ProvisionRedisDependencyResourceCommand",
-        serviceName: "ProvisionRedisDependencyResourceUseCase",
-        cli: "appaloft dependency redis provision",
-        orpc: { method: "POST", path: "/api/dependency-resources/redis/provision" },
+        key: "dependency-resources.provision",
+        messageName: "ProvisionDependencyResourceCommand",
+        serviceName: "ProvisionDependencyResourceUseCase",
+        cli: "appaloft dependency provision --kind <kind>",
+        orpc: { method: "POST", path: "/api/dependency-resources/provision" },
         sample: {
+          kind: "redis",
           projectId: "prj_demo",
           environmentId: "env_demo",
           name: "Managed Redis",
@@ -265,7 +264,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     ];
 
-    for (const operation of nativeRedisOperations) {
+    for (const operation of nativeDependencyOperations) {
       const entry = entriesByKey.get(operation.key);
 
       expect(entry, operation.key).toMatchObject({

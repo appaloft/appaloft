@@ -34,7 +34,7 @@
 
 - [x] Extend `ResourceInstance` with provider-native realization state and transitions.
 - [x] Add managed Postgres provider capability ports and fake provider adapter.
-- [x] Upgrade `dependency-resources.provision-postgres` use case for realization admission.
+- [x] Upgrade `dependency-resources.provision` use case for realization admission.
 - [x] Upgrade binding admission to require realized ready managed Postgres.
 - [x] Upgrade `dependency-resources.delete` for managed provider cleanup after safety checks.
 - [x] Extend persistence, testkit, read models, and contracts with safe realization metadata.

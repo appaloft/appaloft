@@ -22,8 +22,7 @@ import {
   CapturedEventBus,
   FakeDependencyResourceBackupProvider,
   FakeDependencyResourceSecretStore,
-  FakeManagedPostgresProvider,
-  FakeManagedRedisProvider,
+  FakeManagedDependencyProvider,
   FixedClock,
   MemoryDependencyResourceBackupReadModel,
   MemoryDependencyResourceBackupRepository,
@@ -59,8 +58,7 @@ import {
   CreateDependencyResourceBackupUseCase,
   DeleteDependencyResourceUseCase,
   ListDependencyResourceBackupsQueryService,
-  ProvisionPostgresDependencyResourceUseCase,
-  ProvisionRedisDependencyResourceUseCase,
+  ProvisionDependencyResourceUseCase,
   RestoreDependencyResourceBackupUseCase,
   ShowDependencyResourceBackupQueryService,
 } from "../src/use-cases";
@@ -161,8 +159,7 @@ async function createHarness() {
   const servers = new MemoryServerRepository();
   const deleteSafetyReader = new MemoryDependencyResourceDeleteSafetyReader(undefined, backups);
   const eventBus = new CapturedEventBus();
-  const managedPostgresProvider = new FakeManagedPostgresProvider();
-  const managedRedisProvider = new FakeManagedRedisProvider();
+  const managedDependencyProvider = new FakeManagedDependencyProvider();
   const backupProvider = new FakeDependencyResourceBackupProvider();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
@@ -186,6 +183,19 @@ async function createHarness() {
     repositoryContext,
     environment,
     UpsertEnvironmentSpec.fromEnvironment(environment),
+  );
+
+  const provisionDependency = new ProvisionDependencyResourceUseCase(
+    projects,
+    environments,
+    servers,
+    dependencyResources,
+    dependencyResourceSecretStore,
+    clock,
+    idGenerator,
+    eventBus,
+    logger,
+    managedDependencyProvider,
   );
 
   return {
@@ -227,37 +237,12 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
-      managedPostgresProvider,
-      managedRedisProvider,
+      managedDependencyProvider,
     ),
     dependencyResources,
     eventBus,
     listBackups: new ListDependencyResourceBackupsQueryService(backupReadModel, clock),
-    provisionPostgres: new ProvisionPostgresDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedPostgresProvider,
-    ),
-    provisionRedis: new ProvisionRedisDependencyResourceUseCase(
-      projects,
-      environments,
-      servers,
-      dependencyResources,
-      dependencyResourceSecretStore,
-      clock,
-      idGenerator,
-      eventBus,
-      logger,
-      managedRedisProvider,
-      processAttemptRecorder,
-    ),
+    provisionDependencyResource: provisionDependency,
     repositoryContext,
     processAttemptRecorder,
     restoreBackup: new RestoreDependencyResourceBackupUseCase(
@@ -300,11 +285,12 @@ describe("dependency resource backup and restore use cases", () => {
       createBackup,
       eventBus,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       showBackup,
     } = await createHarness();
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -405,7 +391,7 @@ describe("dependency resource backup and restore use cases", () => {
       context,
       createBackup,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       showBackup,
     } = await createHarness();
     backupProvider.setBackupResult(
@@ -417,7 +403,8 @@ describe("dependency resource backup and restore use cases", () => {
       ),
     );
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -464,7 +451,7 @@ describe("dependency resource backup and restore use cases", () => {
       context,
       createBackupWithProcessAttemptDelivery,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       restoreBackupWithProcessAttemptDelivery,
     } = await createHarness();
     const processAttemptClaimer = new RecordingProcessAttemptClaimer(processAttemptRecorder);
@@ -478,7 +465,8 @@ describe("dependency resource backup and restore use cases", () => {
       processAttemptCompleter,
     );
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -538,10 +526,11 @@ describe("dependency resource backup and restore use cases", () => {
   });
 
   test("[DEP-RES-REDIS-CLOSED-LOOP-001] managed Redis backup and restore uses provider context", async () => {
-    const { backupProvider, context, createBackup, provisionRedis, restoreBackup } =
+    const { backupProvider, context, createBackup, provisionDependencyResource, restoreBackup } =
       await createHarness();
     const dependencyResourceId = (
-      await provisionRedis.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main Cache",
@@ -584,11 +573,12 @@ describe("dependency resource backup and restore use cases", () => {
   });
 
   test("[DEP-RES-BACKUP-004] rejects unsupported backup provider before persistence", async () => {
-    const { backupProvider, backups, context, createBackup, provisionPostgres } =
+    const { backupProvider, backups, context, createBackup, provisionDependencyResource } =
       await createHarness();
     backupProvider.setSupported([]);
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -614,12 +604,13 @@ describe("dependency resource backup and restore use cases", () => {
       context,
       createBackup,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       restoreBackup,
       showBackup,
     } = await createHarness();
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -717,12 +708,13 @@ describe("dependency resource backup and restore use cases", () => {
       context,
       createBackup,
       processAttemptRecorder,
-      provisionPostgres,
+      provisionDependencyResource,
       restoreBackup,
       showBackup,
     } = await createHarness();
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",
@@ -797,10 +789,11 @@ describe("dependency resource backup and restore use cases", () => {
   });
 
   test("[DEP-RES-BACKUP-010] retained backups block dependency resource deletion", async () => {
-    const { context, createBackup, deleteDependencyResource, provisionPostgres } =
+    const { context, createBackup, deleteDependencyResource, provisionDependencyResource } =
       await createHarness();
     const dependencyResourceId = (
-      await provisionPostgres.execute(context, {
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
         projectId: "prj_demo",
         environmentId: "env_demo",
         name: "Main DB",

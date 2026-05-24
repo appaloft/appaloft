@@ -4,6 +4,17 @@ export * from "./quick-deploy-workflow";
 
 export const apiVersion = "v1";
 
+export const dependencyResourceKinds = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+] as const;
+
+export const dependencyResourceKindSchema = z.enum(dependencyResourceKinds);
+
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),
   service: z.string(),
@@ -279,8 +290,9 @@ export const systemPluginWebExtensionSchema = z.object({
   description: z.string().optional(),
   path: z.string(),
   placement: z.enum(["auth", "navigation", "settings", "quick-deploy-source"]),
-  target: z.enum(["server-page", "external-page"]),
+  target: z.enum(["server-page", "external-page", "console-route"]),
   requiresAuth: z.boolean(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const projectSummarySchema = z.object({
@@ -2099,7 +2111,7 @@ export const dependencyResourceSummarySchema = z.object({
   environmentId: z.string(),
   name: z.string(),
   slug: z.string(),
-  kind: z.enum(["postgres", "redis"]),
+  kind: dependencyResourceKindSchema,
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),
@@ -2126,7 +2138,7 @@ export const resourceDependencyBindingSummarySchema = z.object({
   dependencyResourceId: z.string(),
   dependencyResourceName: z.string().optional(),
   dependencyResourceSlug: z.string().optional(),
-  kind: z.enum(["postgres", "redis"]),
+  kind: dependencyResourceKindSchema,
   sourceMode: z.enum(["appaloft-managed", "imported-external"]),
   providerKey: z.string(),
   providerManaged: z.boolean(),
@@ -3511,7 +3523,7 @@ export const dependencyResourceBackupSummarySchema = z.object({
   dependencyResourceId: z.string(),
   projectId: z.string(),
   environmentId: z.string(),
-  dependencyKind: z.enum(["postgres", "redis"]),
+  dependencyKind: dependencyResourceKindSchema,
   providerKey: z.string(),
   status: z.enum(["pending", "ready", "failed"]),
   attemptId: z.string(),
@@ -4389,7 +4401,7 @@ export const deploymentSummarySchema = z.object({
       z.object({
         bindingId: z.string(),
         dependencyResourceId: z.string(),
-        kind: z.enum(["postgres", "redis"]),
+        kind: dependencyResourceKindSchema,
         targetName: z.string(),
         scope: z.enum(["environment", "release", "build-only", "runtime-only"]),
         injectionMode: z.enum(["env", "file", "reference"]),
