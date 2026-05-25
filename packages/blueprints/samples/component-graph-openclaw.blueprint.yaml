@@ -1,0 +1,72 @@
+schemaVersion: appaloft.blueprint/v1
+id: component-graph-openclaw
+name: Component Graph Example
+version: 1.0.0
+summary: Web, API, worker, and database dependency graph example.
+description: Demonstrates component-to-component endpoint links while Postgres remains a dependency resource.
+tags:
+  - multi-component
+  - worker
+resources:
+  - id: database
+    kind: postgres
+    label: Application database
+components:
+  - id: web
+    name: Web
+    kind: service
+    runtime:
+      strategy: container-image
+      image: example/web:latest
+    ports:
+      - name: http
+        containerPort: 3000
+        protocol: http
+    routes:
+      - port: http
+        pathPrefix: /
+  - id: api
+    name: API
+    kind: service
+    runtime:
+      strategy: container-image
+      image: example/api:latest
+    ports:
+      - name: http
+        containerPort: 8080
+        protocol: http
+    usesResources:
+      - database
+  - id: worker
+    name: Worker
+    kind: worker
+    runtime:
+      strategy: container-image
+      image: example/worker:latest
+    usesResources:
+      - database
+componentRelations:
+  - id: web-uses-api
+    type: endpoint
+    from: web
+    to: api
+    endpoint: http
+    effects:
+      - kind: inject-env
+        name: API_BASE_URL
+        valueFrom: endpoint-url
+      - kind: private-service-discovery
+        valueFrom: endpoint-host
+  - id: worker-uses-api
+    type: endpoint
+    from: worker
+    to: api
+    endpoint: http
+    effects:
+      - kind: inject-env
+        name: WORKER_API_BASE_URL
+        valueFrom: endpoint-url
+profiles:
+  production:
+    label: Production
+    replicas: 1
