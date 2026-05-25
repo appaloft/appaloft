@@ -45,6 +45,14 @@ not a Project, not a Resource, and not a Catalog Listing. The Community boundary
 file-first, and local-registry friendly; see
 [ADR-065: Blueprint Format And Local Registry Boundary](./decisions/ADR-065-blueprint-format-and-local-registry-boundary.md).
 
+Within a Blueprint, a Component is a deployable runtime unit and a Dependency Resource is an
+external, managed, imported, shared, or separately bound dependency requirement. A Component
+Relation is a directed link from a consumer/dependent component to a provider/dependency component
+inside the same Blueprint installation. It can describe endpoint consumption, lifecycle ordering,
+private service discovery, network allowance, or telemetry attachment, but it does not create
+ownership and does not replace dependency-resource binding. See
+[ADR-078: Blueprint Component Relation Boundary](./decisions/ADR-078-blueprint-component-relation-boundary.md).
+
 ## Core Principles
 
 - aggregate boundaries follow invariants, not UI screens

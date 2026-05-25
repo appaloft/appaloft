@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  BlueprintComponentRelationGraph,
   blueprintManifestJsonSchema,
   blueprintSchemaVersion,
   loadBlueprintManifest,
@@ -213,6 +214,375 @@ profiles:
       expect(result.value.variants.postgres?.upgrade?.steps[0]?.classification).toBe(
         "potentially-breaking",
       );
+    }
+  });
+
+  test("[BP-COMP-REL-SCHEMA-001] validates endpoint component relations", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "component-relations",
+      name: "Component Relations",
+      version: "1.0.0",
+      summary: "A service and worker with an endpoint relation.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "http", containerPort: 3000 }],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+          effects: [{ kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" }],
+        },
+      ],
+      profiles: { production: { replicas: 1 } },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const relation = result.value.componentRelations[0];
+      expect(relation).toMatchObject({
+        id: "worker-uses-api",
+        required: true,
+        effects: [{ kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" }],
+      });
+    }
+  });
+
+  test("[BP-COMP-REL-SCHEMA-002][BP-COMP-REL-SCHEMA-003][BP-COMP-REL-SCHEMA-005] rejects invalid component relations", () => {
+    const missingComponent = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "missing-component-relation",
+      name: "Missing Component Relation",
+      version: "1.0.0",
+      summary: "Invalid relation.",
+      components: [
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+        },
+      ],
+    });
+    const missingEndpoint = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "missing-endpoint-relation",
+      name: "Missing Endpoint Relation",
+      version: "1.0.0",
+      summary: "Invalid endpoint relation.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "admin", containerPort: 3000 }],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+        },
+      ],
+    });
+    const invalidOutput = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-output-relation",
+      name: "Invalid Output Relation",
+      version: "1.0.0",
+      summary: "Invalid output relation.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-after-api",
+          type: "lifecycle",
+          from: "worker",
+          to: "api",
+          effects: [{ kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" }],
+        },
+      ],
+    });
+
+    expect(missingComponent.ok).toBe(false);
+    expect(missingEndpoint.ok).toBe(false);
+    expect(invalidOutput.ok).toBe(false);
+    if (!missingComponent.ok) {
+      expect(missingComponent.issues.map((issue) => issue.message).join("\n")).toContain(
+        "unknown to component api",
+      );
+    }
+    if (!missingEndpoint.ok) {
+      expect(missingEndpoint.issues.map((issue) => issue.message).join("\n")).toContain(
+        "unknown provider endpoint http",
+      );
+    }
+    if (!invalidOutput.ok) {
+      expect(invalidOutput.issues.map((issue) => issue.message).join("\n")).toContain(
+        "unavailable output endpoint-url",
+      );
+    }
+  });
+
+  test("[BP-COMP-REL-SCHEMA-006][BP-COMP-REL-SCHEMA-007] rejects duplicate relation ids and dependency resource targets", () => {
+    const duplicateIds = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "duplicate-component-relation",
+      name: "Duplicate Component Relation",
+      version: "1.0.0",
+      summary: "Invalid relation ids.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "http", containerPort: 3000 }],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+        },
+        {
+          id: "worker-uses-api",
+          type: "lifecycle",
+          from: "worker",
+          to: "api",
+          effects: [{ kind: "order-after", readiness: "healthy" }],
+        },
+      ],
+    });
+    const dependencyResourceTarget = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-resource-target-relation",
+      name: "Dependency Resource Target Relation",
+      version: "1.0.0",
+      summary: "Invalid relation target.",
+      resources: [{ id: "postgres", kind: "postgres", label: "Postgres" }],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["postgres"],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-postgres",
+          type: "lifecycle",
+          from: "worker",
+          to: "postgres",
+          effects: [{ kind: "order-after", readiness: "healthy" }],
+        },
+      ],
+    });
+
+    expect(duplicateIds.ok).toBe(false);
+    expect(dependencyResourceTarget.ok).toBe(false);
+    if (!duplicateIds.ok) {
+      expect(duplicateIds.issues.map((issue) => issue.message).join("\n")).toContain(
+        "component relation ids must be unique",
+      );
+    }
+    if (!dependencyResourceTarget.ok) {
+      expect(dependencyResourceTarget.issues.map((issue) => issue.message).join("\n")).toContain(
+        "to references dependency resource postgres",
+      );
+    }
+  });
+
+  test("[BP-COMP-REL-SCHEMA-004] rejects required lifecycle cycles and exposes topology sorting", () => {
+    const components = [
+      {
+        id: "api",
+        name: "API",
+        kind: "service" as const,
+        runtime: { strategy: "container-image" as const, image: "example/api:latest" },
+        ports: [],
+        routes: [],
+        variables: [],
+        usesSecrets: [],
+        usesResources: [],
+      },
+      {
+        id: "worker",
+        name: "Worker",
+        kind: "worker" as const,
+        runtime: { strategy: "container-image" as const, image: "example/worker:latest" },
+        ports: [],
+        routes: [],
+        variables: [],
+        usesSecrets: [],
+        usesResources: [],
+      },
+    ];
+    const relations = [
+      {
+        id: "worker-after-api",
+        type: "lifecycle" as const,
+        from: "worker",
+        to: "api",
+        required: true,
+        effects: [{ kind: "order-after" as const, readiness: "healthy" as const }],
+      },
+    ];
+    const graph = new BlueprintComponentRelationGraph({ components, relations });
+    const sorted = graph.topologicalSort();
+
+    expect(sorted.ok).toBe(true);
+    if (sorted.ok) {
+      expect(sorted.value.sortedComponentIds).toEqual(["api", "worker"]);
+      expect(sorted.value.rule).toContain("provider components before consumer components");
+    }
+    expect(graph.describeTopologicalSort()).toContain("api -> worker");
+
+    const cyclic = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "cyclic-lifecycle",
+      name: "Cyclic Lifecycle",
+      version: "1.0.0",
+      summary: "Invalid lifecycle cycle.",
+      components,
+      componentRelations: [
+        ...relations,
+        {
+          id: "api-after-worker",
+          type: "lifecycle",
+          from: "api",
+          to: "worker",
+          effects: [{ kind: "order-after", readiness: "healthy" }],
+        },
+      ],
+    });
+
+    expect(cyclic.ok).toBe(false);
+    if (!cyclic.ok) {
+      expect(cyclic.issues.map((issue) => issue.message).join("\n")).toContain("startup cycle");
+    }
+  });
+
+  test("[BP-COMP-REL-LOADER-001] loads YAML component relations", () => {
+    const result = loadBlueprintManifest({
+      format: "yaml",
+      content: `
+schemaVersion: appaloft.blueprint/v1
+id: yaml-component-relations
+name: YAML Component Relations
+version: 1.0.0
+summary: A YAML-authored component graph.
+components:
+  - id: api
+    name: API
+    kind: service
+    runtime:
+      strategy: container-image
+      image: example/api:latest
+    ports:
+      - name: http
+        containerPort: 3000
+        protocol: http
+      - name: otlp-grpc
+        containerPort: 4317
+        protocol: grpc
+  - id: worker
+    name: Worker
+    kind: worker
+    runtime:
+      strategy: container-image
+      image: example/worker:latest
+componentRelations:
+  - id: worker-uses-api
+    type: endpoint
+    from: worker
+    to: api
+    endpoint: http
+    effects:
+      - kind: inject-env
+        name: API_BASE_URL
+        valueFrom: endpoint-url
+  - id: worker-starts-after-api
+    type: lifecycle
+    from: worker
+    to: api
+    required: true
+    effects:
+      - kind: order-after
+        readiness: healthy
+`,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.componentRelations.map((relation) => relation.id)).toEqual([
+        "worker-uses-api",
+        "worker-starts-after-api",
+      ]);
+      expect(result.value.components[0]?.ports[1]?.protocol).toBe("grpc");
     }
   });
 });

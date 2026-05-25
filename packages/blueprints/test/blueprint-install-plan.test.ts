@@ -354,6 +354,211 @@ describe("Blueprint install plan", () => {
     });
   });
 
+  test("[BP-COMP-REL-PLAN-001] compiles endpoint component links into dry-run plan operations", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "endpoint-linked-app",
+      name: "Endpoint Linked App",
+      version: "1.0.0",
+      summary: "A worker uses an API endpoint.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "http", containerPort: 3000 }],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+          effects: [
+            { kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" },
+            { kind: "private-service-discovery", valueFrom: "endpoint-host" },
+          ],
+        },
+      ],
+      profiles: { production: { replicas: 1 } },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Endpoint Linked App",
+        environmentName: "production",
+      },
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const relationIndex = plan.value.operations.findIndex(
+      (operation) => operation.kind === "configure-component-link",
+    );
+    const workerDeploymentIndex = plan.value.operations.findIndex(
+      (operation) => operation.kind === "create-deployment" && operation.componentId === "worker",
+    );
+    expect(relationIndex).toBeGreaterThan(-1);
+    expect(relationIndex).toBeLessThan(workerDeploymentIndex);
+    expect(plan.value.operations[relationIndex]).toMatchObject({
+      kind: "configure-component-link",
+      relationId: "worker-uses-api",
+      relationType: "endpoint",
+      fromComponentId: "worker",
+      toComponentId: "api",
+      endpoint: "http",
+      required: true,
+      outputs: expect.arrayContaining(["endpoint-url", "endpoint-host"]),
+      effects: expect.arrayContaining([
+        { kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" },
+      ]),
+    });
+  });
+
+  test("[BP-COMP-REL-PLAN-002] topologically orders required lifecycle component links", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "lifecycle-linked-app",
+      name: "Lifecycle Linked App",
+      version: "1.0.0",
+      summary: "A worker starts after an API.",
+      components: [
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "http", containerPort: 3000 }],
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-starts-after-api",
+          type: "lifecycle",
+          from: "worker",
+          to: "api",
+          effects: [{ kind: "order-after", readiness: "healthy" }],
+        },
+      ],
+      profiles: { production: { replicas: 1 } },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Lifecycle Linked App",
+        environmentName: "production",
+      },
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(
+      plan.value.operations.flatMap((operation) =>
+        operation.kind === "create-deployment" ? [operation.componentId] : [],
+      ),
+    ).toEqual(["api", "worker"]);
+    expect(plan.value.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "configure-component-link",
+          relationId: "worker-starts-after-api",
+          effects: [{ kind: "order-after", readiness: "healthy" }],
+        }),
+      ]),
+    );
+  });
+
+  test("[BP-COMP-REL-BUNDLE-001] projects component links into application bundle relationships", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "bundle-linked-app",
+      name: "Bundle Linked App",
+      version: "1.0.0",
+      summary: "A bundle with component graph relationships.",
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          ports: [{ name: "http", containerPort: 3000 }],
+        },
+        {
+          id: "worker",
+          name: "Worker",
+          kind: "worker",
+          runtime: { strategy: "container-image", image: "example/worker:latest" },
+        },
+      ],
+      componentRelations: [
+        {
+          id: "worker-uses-api",
+          type: "endpoint",
+          from: "worker",
+          to: "api",
+          endpoint: "http",
+          effects: [{ kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" }],
+        },
+      ],
+      profiles: { production: { replicas: 1 } },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+    const installPlan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Bundle Linked App",
+        environmentName: "production",
+        resourceSlugPrefix: "linked",
+      },
+    });
+    expect(installPlan.ok).toBe(true);
+    if (!installPlan.ok) return;
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: installPlan.value });
+
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) return;
+    expect(bundle.value.relationships).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "component-links-component",
+          relationId: "worker-uses-api",
+          relationType: "endpoint",
+          fromComponentId: "worker",
+          toComponentId: "api",
+          endpoint: "http",
+          required: true,
+          effects: [{ kind: "inject-env", name: "API_BASE_URL", valueFrom: "endpoint-url" }],
+        },
+      ]),
+    );
+  });
+
   test("[CLOUD-BLUEPRINT-UPGRADE-PLAN-038] creates a dry-run upgrade plan without executing updates", () => {
     const current = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,

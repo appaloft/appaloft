@@ -1,4 +1,8 @@
 import {
+  blueprintComponentRuntimePlanFromMetadata,
+  type BlueprintComponentRuntimePlan,
+} from "@appaloft/blueprints";
+import {
   domainError,
   type DeploymentDependencyBindingReferenceState,
   err,
@@ -34,6 +38,7 @@ export interface DockerSwarmRuntimeIntentInput {
   runtimePlan: RuntimePlanLike;
   environmentSnapshot?: EnvironmentSnapshotLike;
   dependencyBindingReferences?: readonly DeploymentDependencyBindingReferenceState[];
+  componentRuntime?: BlueprintComponentRuntimePlan;
   identity: DockerSwarmRuntimeIdentityInput;
   edgeNetworkName?: string;
   resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
@@ -81,6 +86,24 @@ export interface DockerSwarmRouteIntent {
   networkName: string;
 }
 
+export interface DockerSwarmComponentLinkIntent {
+  relationId: string;
+  providerComponentId: string;
+  providerServiceName: string;
+  endpoint?: string;
+  networkName: string;
+  required: boolean;
+}
+
+export interface DockerSwarmReadinessGateIntent {
+  relationId: string;
+  providerComponentId: string;
+  providerServiceName: string;
+  kind: "order-after" | "readiness-gate";
+  readiness: "created" | "started" | "healthy";
+  required: boolean;
+}
+
 export interface DockerSwarmHealthIntent {
   enabled: boolean;
   type: "http" | "command";
@@ -120,6 +143,8 @@ export interface DockerSwarmRuntimeIntent {
   volumeRealizations: DockerStorageVolumeRealization[];
   health?: DockerSwarmHealthIntent;
   routes: DockerSwarmRouteIntent[];
+  componentLinks: DockerSwarmComponentLinkIntent[];
+  readinessGates: DockerSwarmReadinessGateIntent[];
   resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
   labels: Record<string, string>;
   warnings: string[];
@@ -139,6 +164,7 @@ export interface DockerSwarmCleanupPlan {
 }
 
 export type DockerSwarmApplyPlanStepName =
+  | "wait-for-component-readiness"
   | "create-candidate-service"
   | "deploy-candidate-stack"
   | "verify-candidate-service"
@@ -235,6 +261,10 @@ function dockerLabelFlags(labels: Record<string, string>): string {
     .join(" ");
 }
 
+function dockerNetworkFlags(networkNames: readonly string[]): string {
+  return networkNames.map((networkName) => `--network ${shellQuote(networkName)}`).join(" ");
+}
+
 function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVariableIntent[]): string {
   return environment
     .map((variable) =>
@@ -263,7 +293,7 @@ function yamlQuoted(value: string): string {
 
 function dockerComposeOverrideContent(input: {
   intent: DockerSwarmRuntimeIntent;
-  primaryNetwork: string;
+  networkNames: readonly string[];
 }): string {
   const plainEnvironment = input.intent.environment.filter((variable) => !variable.secret);
   const secretEnvironment = input.intent.environment.filter((variable) => variable.secret);
@@ -320,12 +350,14 @@ function dockerComposeOverrideContent(input: {
         ]
       : []),
     "    networks:",
-    `      - ${yamlQuoted(input.primaryNetwork)}`,
+    ...input.networkNames.map((networkName) => `      - ${yamlQuoted(networkName)}`),
   ];
   const networkLines = [
     "networks:",
-    `  ${yamlQuoted(input.primaryNetwork)}:`,
-    "    external: true",
+    ...input.networkNames.flatMap((networkName) => [
+      `  ${yamlQuoted(networkName)}:`,
+      "    external: true",
+    ]),
   ];
   const volumeLines =
     uniqueVolumeNames.length > 0
@@ -370,7 +402,7 @@ function dockerComposeOverrideContent(input: {
 function stackDeployCommand(input: {
   composeFile: string;
   intent: DockerSwarmRuntimeIntent;
-  primaryNetwork: string;
+  networkNames: readonly string[];
 }): string {
   const overrideContent = dockerComposeOverrideContent(input);
   return [
@@ -479,6 +511,17 @@ function metadataValue(
   return undefined;
 }
 
+function componentRuntimePlanFromMetadata(
+  runtimePlan: RuntimePlanState,
+  execution: RuntimeExecutionPlanState,
+): BlueprintComponentRuntimePlan | undefined {
+  const runtimeArtifactMetadata = runtimePlan.runtimeArtifact?.toState().metadata;
+  return (
+    blueprintComponentRuntimePlanFromMetadata(runtimeArtifactMetadata) ??
+    blueprintComponentRuntimePlanFromMetadata(execution.metadata)
+  );
+}
+
 function renderImageWorkload(
   runtimePlan: RuntimePlanState,
   execution: RuntimeExecutionPlanState,
@@ -544,10 +587,22 @@ function isComposeWorkload(runtimePlan: RuntimePlanState, execution: RuntimeExec
   );
 }
 
+function otelSignalEnvironmentName(signal: "traces" | "metrics" | "logs"): string {
+  switch (signal) {
+    case "traces":
+      return "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT";
+    case "metrics":
+      return "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT";
+    case "logs":
+      return "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT";
+  }
+}
+
 function renderEnvironmentVariables(
   environmentSnapshot: EnvironmentSnapshotLike | undefined,
   identity: DockerSwarmRuntimeIdentityInput,
   dependencyBindingReferences: readonly DeploymentDependencyBindingReferenceState[] = [],
+  componentRuntime: BlueprintComponentRuntimePlan | undefined,
 ): DockerSwarmEnvironmentVariableIntent[] {
   const snapshotVariables =
     environmentSnapshot
@@ -581,10 +636,29 @@ function renderEnvironmentVariables(
         targetName: reference.targetName.value,
       })}`,
     }));
+  const componentRelationVariables =
+    componentRuntime?.injectedEnv.map((variable) => ({
+      name: variable.name,
+      exposure: "runtime",
+      scope: "component-relation",
+      secret: false,
+      value: variable.value,
+    })) ?? [];
+  const telemetryVariables =
+    componentRuntime?.telemetryAttachments.map((attachment) => ({
+      name: otelSignalEnvironmentName(attachment.signal),
+      exposure: "runtime",
+      scope: "component-relation",
+      secret: false,
+      value: attachment.endpointUrl,
+    })) ?? [];
 
-  return [...snapshotVariables, ...dependencyVariables].sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
+  return [
+    ...snapshotVariables,
+    ...dependencyVariables,
+    ...componentRelationVariables,
+    ...telemetryVariables,
+  ].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function renderHealth(
@@ -779,6 +853,156 @@ function routeLabels(input: {
   return [...new Set(labels)];
 }
 
+function safeDockerLabelSegment(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "relation"
+  );
+}
+
+function providerServiceNameForComponentRuntime(input: {
+  componentRuntime: BlueprintComponentRuntimePlan;
+  providerComponentId: string;
+}): string {
+  return (
+    input.componentRuntime.serviceDiscovery.find(
+      (link) => link.providerComponentId === input.providerComponentId,
+    )?.serviceName ??
+    input.componentRuntime.readinessGates.find(
+      (gate) => gate.providerComponentId === input.providerComponentId,
+    )?.providerServiceName ??
+    input.componentRuntime.telemetryAttachments.find(
+      (attachment) => attachment.providerComponentId === input.providerComponentId,
+    )?.providerServiceName ??
+    input.providerComponentId
+  );
+}
+
+function renderComponentLinks(
+  componentRuntime: BlueprintComponentRuntimePlan | undefined,
+): DockerSwarmComponentLinkIntent[] {
+  if (!componentRuntime) {
+    return [];
+  }
+
+  const links = new Map<string, DockerSwarmComponentLinkIntent>();
+  const upsertLink = (input: {
+    readonly relationId: string;
+    readonly providerComponentId: string;
+    readonly providerServiceName?: string;
+    readonly endpoint?: string;
+    readonly required: boolean;
+    readonly networkName?: string;
+  }) => {
+    const previous = links.get(input.relationId);
+    const endpoint = input.endpoint ?? previous?.endpoint;
+    links.set(input.relationId, {
+      relationId: input.relationId,
+      providerComponentId: input.providerComponentId,
+      providerServiceName:
+        input.providerServiceName ??
+        previous?.providerServiceName ??
+        providerServiceNameForComponentRuntime({
+          componentRuntime,
+          providerComponentId: input.providerComponentId,
+        }),
+      ...(endpoint ? { endpoint } : {}),
+      networkName: input.networkName ?? previous?.networkName ?? componentRuntime.networkName,
+      required: input.required || previous?.required === true,
+    });
+  };
+
+  for (const discovery of componentRuntime.serviceDiscovery) {
+    upsertLink({
+      relationId: discovery.relationId,
+      providerComponentId: discovery.providerComponentId,
+      providerServiceName: discovery.serviceName,
+      ...(discovery.endpoint ? { endpoint: discovery.endpoint } : {}),
+      required: discovery.required,
+    });
+  }
+  for (const allow of componentRuntime.networkAllows) {
+    upsertLink({
+      relationId: allow.relationId,
+      providerComponentId: allow.providerComponentId,
+      networkName: allow.networkName,
+      required: allow.required,
+    });
+  }
+  for (const gate of componentRuntime.readinessGates) {
+    upsertLink({
+      relationId: gate.relationId,
+      providerComponentId: gate.providerComponentId,
+      providerServiceName: gate.providerServiceName,
+      required: gate.required,
+    });
+  }
+  for (const attachment of componentRuntime.telemetryAttachments) {
+    upsertLink({
+      relationId: attachment.relationId,
+      providerComponentId: attachment.providerComponentId,
+      providerServiceName: attachment.providerServiceName,
+      ...(attachment.endpoint ? { endpoint: attachment.endpoint } : {}),
+      required: attachment.required,
+    });
+  }
+
+  return [...links.values()].sort((left, right) => left.relationId.localeCompare(right.relationId));
+}
+
+function renderReadinessGates(
+  componentRuntime: BlueprintComponentRuntimePlan | undefined,
+): DockerSwarmReadinessGateIntent[] {
+  return (
+    componentRuntime?.readinessGates.map((gate) => ({
+      relationId: gate.relationId,
+      providerComponentId: gate.providerComponentId,
+      providerServiceName: gate.providerServiceName,
+      kind: gate.kind,
+      readiness: gate.readiness,
+      required: gate.required,
+    })) ?? []
+  );
+}
+
+function componentRuntimeLabels(
+  componentRuntime: BlueprintComponentRuntimePlan | undefined,
+): Record<string, string> {
+  if (!componentRuntime) {
+    return {};
+  }
+
+  const labels: Record<string, string> = {
+    "appaloft.component-id": componentRuntime.componentId,
+    "appaloft.component-service": componentRuntime.serviceName,
+  };
+
+  for (const link of renderComponentLinks(componentRuntime)) {
+    const segment = safeDockerLabelSegment(link.relationId);
+    labels[`appaloft.component-link.${segment}.provider`] = link.providerComponentId;
+    labels[`appaloft.component-link.${segment}.service`] = link.providerServiceName;
+    labels[`appaloft.component-link.${segment}.required`] = String(link.required);
+    labels[`appaloft.component-link.${segment}.network`] = link.networkName;
+    if (link.endpoint) {
+      labels[`appaloft.component-link.${segment}.endpoint`] = link.endpoint;
+    }
+  }
+
+  for (const gate of componentRuntime.readinessGates) {
+    const segment = safeDockerLabelSegment(gate.relationId);
+    labels[`appaloft.component-link.${segment}.readiness`] = gate.readiness;
+  }
+  for (const attachment of componentRuntime.telemetryAttachments) {
+    const segment = safeDockerLabelSegment(attachment.relationId);
+    labels[`appaloft.component-link.${segment}.telemetry`] = attachment.signal;
+  }
+
+  return labels;
+}
+
 export function renderDockerSwarmRuntimeIntent(
   input: DockerSwarmRuntimeIntentInput,
 ): Result<DockerSwarmRuntimeIntent> {
@@ -786,6 +1010,10 @@ export function renderDockerSwarmRuntimeIntent(
   const execution = executionState(runtimePlan);
   const stackName = renderStackName(input.identity);
   const networkName = input.edgeNetworkName ?? defaultEdgeNetworkName;
+  const componentRuntime =
+    input.componentRuntime ?? componentRuntimePlanFromMetadata(runtimePlan, execution);
+  const componentLinks = renderComponentLinks(componentRuntime);
+  const readinessGates = renderReadinessGates(componentRuntime);
 
   const workloadResult = isComposeWorkload(runtimePlan, execution)
     ? renderComposeWorkload(runtimePlan, execution)
@@ -823,6 +1051,7 @@ export function renderDockerSwarmRuntimeIntent(
       input.environmentSnapshot,
       input.identity,
       input.dependencyBindingReferences,
+      componentRuntime,
     ),
     mounts: mounts.value.map((mount) => ({
       type: mount.type,
@@ -833,10 +1062,15 @@ export function renderDockerSwarmRuntimeIntent(
     volumeRealizations: volumeRealizations.value,
     ...(health ? { health } : {}),
     routes: renderRoutes({ execution, networkName }),
+    componentLinks,
+    readinessGates,
     ...(input.resourceAccessFailureRenderer
       ? { resourceAccessFailureRenderer: input.resourceAccessFailureRenderer }
       : {}),
-    labels: runtimeIdentityLabels(input.identity),
+    labels: {
+      ...runtimeIdentityLabels(input.identity),
+      ...componentRuntimeLabels(componentRuntime),
+    },
     warnings: [],
   });
 }
@@ -865,11 +1099,44 @@ export function renderDockerSwarmCleanupPlan(
   };
 }
 
+function requiredReadinessStep(
+  gates: readonly DockerSwarmReadinessGateIntent[],
+): DockerSwarmApplyPlanStep | undefined {
+  const requiredGates = gates.filter((gate) => gate.required);
+  if (requiredGates.length === 0) {
+    return undefined;
+  }
+
+  const command = requiredGates
+    .map((gate) =>
+      [
+        `echo ${shellQuote(
+          `Waiting for ${gate.providerServiceName} before ${gate.relationId}`,
+        )}`,
+        `until docker service ps --filter ${shellQuote("desired-state=running")} ${shellQuote(
+          gate.providerServiceName,
+        )} | grep -q .; do sleep 2; done`,
+      ].join("; "),
+    )
+    .join("; ");
+
+  return {
+    step: "wait-for-component-readiness",
+    command,
+    displayCommand: command,
+  };
+}
+
 export function renderDockerSwarmApplyPlan(
   intent: DockerSwarmRuntimeIntent,
 ): Result<DockerSwarmApplyPlan> {
-  const networkNames = [...new Set(intent.routes.map((route) => route.networkName))];
-  const primaryNetwork = networkNames[0] ?? defaultEdgeNetworkName;
+  const networkNames = [
+    ...new Set([
+      ...intent.componentLinks.map((link) => link.networkName),
+      ...intent.routes.map((route) => route.networkName),
+    ]),
+  ];
+  const resolvedNetworkNames = networkNames.length > 0 ? networkNames : [defaultEdgeNetworkName];
   const labels = routeLabels({
     serviceName: intent.serviceName,
     ...(intent.workload.kind === "image" && intent.workload.port
@@ -888,7 +1155,7 @@ export function renderDockerSwarmApplyPlan(
             "docker service create",
             `--name ${shellQuote(intent.serviceName)}`,
             dockerLabelFlags(intent.labels),
-            `--network ${shellQuote(primaryNetwork)}`,
+            dockerNetworkFlags(resolvedNetworkNames),
             intent.workload.registryAuth ? "--with-registry-auth" : "",
             dockerEnvironmentFlags(intent.environment),
             dockerMountFlags(intent.mounts),
@@ -899,7 +1166,7 @@ export function renderDockerSwarmApplyPlan(
             "docker service create",
             `--name ${shellQuote(intent.serviceName)}`,
             dockerLabelFlags(intent.labels),
-            `--network ${shellQuote(primaryNetwork)}`,
+            dockerNetworkFlags(resolvedNetworkNames),
             intent.workload.registryAuth ? "--with-registry-auth" : "",
             dockerEnvironmentDisplayFlags(intent.environment),
             dockerMountFlags(intent.mounts),
@@ -912,14 +1179,15 @@ export function renderDockerSwarmApplyPlan(
           command: stackDeployCommand({
             composeFile: intent.workload.composeFile,
             intent,
-            primaryNetwork,
+            networkNames: resolvedNetworkNames,
           }),
           displayCommand: stackDeployCommand({
             composeFile: intent.workload.composeFile,
             intent,
-            primaryNetwork,
+            networkNames: resolvedNetworkNames,
           }),
         };
+  const readinessStep = requiredReadinessStep(intent.readinessGates);
 
   const verifyCommand = commandParts([
     "docker service ps",
@@ -952,6 +1220,7 @@ export function renderDockerSwarmApplyPlan(
     preservesPreviousService: true,
     routeLabels: labels,
     steps: [
+      ...(readinessStep ? [readinessStep] : []),
       createStep,
       {
         step: "verify-candidate-service",

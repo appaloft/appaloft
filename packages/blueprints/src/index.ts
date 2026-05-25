@@ -7,6 +7,10 @@ export const blueprintInstallPlanSchemaVersion = "appaloft.blueprint.install-pla
 export const blueprintUpgradePlanSchemaVersion = "appaloft.blueprint.upgrade-plan/v1" as const;
 export const blueprintApplicationBundlePlanSchemaVersion =
   "appaloft.blueprint.application-bundle-plan/v1" as const;
+export const blueprintComponentRuntimeProjectionSchemaVersion =
+  "appaloft.blueprint.component-runtime-projection/v1" as const;
+export const blueprintComponentRuntimePlanMetadataKey =
+  "appaloft.blueprint.component-runtime-plan.v1" as const;
 
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
 const envKeyPattern = /^[A-Z][A-Z0-9_]{0,127}$/;
@@ -39,7 +43,7 @@ const blueprintPortSchema = z
   .object({
     name: slugSchema,
     containerPort: z.number().int().min(1).max(65535),
-    protocol: z.enum(["http", "tcp"]).default("http"),
+    protocol: z.enum(["http", "tcp", "grpc"]).default("http"),
     public: z.boolean().default(true),
   })
   .strict();
@@ -98,6 +102,72 @@ const blueprintVariableSchema = z
     key: envKeySchema,
     value: z.string(),
     description: nonEmptyString.optional(),
+  })
+  .strict();
+
+const blueprintComponentRelationInjectEnvEffectSchema = z
+  .object({
+    kind: z.literal("inject-env"),
+    name: envKeySchema,
+    valueFrom: z.enum(["endpoint-url", "endpoint-host", "endpoint-port", "endpoint-scheme"]),
+  })
+  .strict();
+
+const blueprintComponentRelationNetworkAllowEffectSchema = z
+  .object({
+    kind: z.literal("network-allow"),
+    mode: z.literal("private").default("private"),
+  })
+  .strict();
+
+const blueprintComponentRelationPrivateServiceDiscoveryEffectSchema = z
+  .object({
+    kind: z.literal("private-service-discovery"),
+    valueFrom: z.enum(["service-name", "endpoint-host"]).default("service-name"),
+  })
+  .strict();
+
+const blueprintComponentRelationOrderAfterEffectSchema = z
+  .object({
+    kind: z.literal("order-after"),
+    readiness: z.enum(["created", "started", "healthy"]),
+  })
+  .strict();
+
+const blueprintComponentRelationReadinessGateEffectSchema = z
+  .object({
+    kind: z.literal("readiness-gate"),
+    readiness: z.enum(["started", "healthy"]),
+  })
+  .strict();
+
+const blueprintComponentRelationAttachTelemetryEffectSchema = z
+  .object({
+    kind: z.literal("attach-telemetry"),
+    signal: z.enum(["traces", "metrics", "logs"]),
+    valueFrom: z.literal("endpoint-url").default("endpoint-url"),
+  })
+  .strict();
+
+const blueprintComponentRelationEffectSchema = z.discriminatedUnion("kind", [
+  blueprintComponentRelationInjectEnvEffectSchema,
+  blueprintComponentRelationNetworkAllowEffectSchema,
+  blueprintComponentRelationPrivateServiceDiscoveryEffectSchema,
+  blueprintComponentRelationOrderAfterEffectSchema,
+  blueprintComponentRelationReadinessGateEffectSchema,
+  blueprintComponentRelationAttachTelemetryEffectSchema,
+]);
+
+const blueprintComponentRelationSchema = z
+  .object({
+    id: slugSchema,
+    type: z.enum(["endpoint", "lifecycle", "telemetry"]),
+    from: slugSchema,
+    to: slugSchema,
+    endpoint: slugSchema.optional(),
+    required: z.boolean().default(true),
+    description: nonEmptyString.optional(),
+    effects: z.array(blueprintComponentRelationEffectSchema).default([]),
   })
   .strict();
 
@@ -175,6 +245,7 @@ const blueprintVariantSchema = z
     secrets: z.array(blueprintSecretSchema).optional(),
     resources: z.array(blueprintResourceRequirementSchema).optional(),
     components: z.array(blueprintComponentSchema).min(1).optional(),
+    componentRelations: z.array(blueprintComponentRelationSchema).optional(),
     profiles: z.record(slugSchema, blueprintEnvironmentProfileSchema).optional(),
     upgrade: blueprintUpgradePolicySchema.optional(),
   })
@@ -193,6 +264,7 @@ export const blueprintManifestSchema = z
     secrets: z.array(blueprintSecretSchema).default([]),
     resources: z.array(blueprintResourceRequirementSchema).default([]),
     components: z.array(blueprintComponentSchema).min(1),
+    componentRelations: z.array(blueprintComponentRelationSchema).default([]),
     profiles: z.record(slugSchema, blueprintEnvironmentProfileSchema).default({}),
     defaultVariant: slugSchema.optional(),
     variants: z.record(slugSchema, blueprintVariantSchema).default({}),
@@ -206,7 +278,9 @@ export const blueprintManifestSchema = z
       components: manifest.components,
       secrets: manifest.secrets,
       resources: manifest.resources,
+      relations: manifest.componentRelations,
       parameters: manifest.parameters,
+      profiles: manifest.profiles,
     });
 
     if (manifest.defaultVariant && !manifest.variants[manifest.defaultVariant]) {
@@ -222,9 +296,11 @@ export const blueprintManifestSchema = z
         context,
         path: ["variants", variantId],
         components: variant.components ?? manifest.components,
+        relations: variant.componentRelations ?? manifest.componentRelations,
         secrets: variant.secrets ?? manifest.secrets,
         resources: variant.resources ?? manifest.resources,
         parameters: variant.parameters ?? manifest.parameters,
+        profiles: variant.profiles ?? manifest.profiles,
       });
 
       const profiles = variant.profiles ?? manifest.profiles;
@@ -246,14 +322,17 @@ function validateTopologyReferences(input: {
   readonly context: z.RefinementCtx;
   readonly path: readonly (number | string)[];
   readonly components: readonly z.infer<typeof blueprintComponentSchema>[];
+  readonly relations: readonly z.infer<typeof blueprintComponentRelationSchema>[];
   readonly secrets: readonly z.infer<typeof blueprintSecretSchema>[];
   readonly resources: readonly z.infer<typeof blueprintResourceRequirementSchema>[];
   readonly parameters: readonly z.infer<typeof blueprintParameterSchema>[];
+  readonly profiles: Readonly<Record<string, z.infer<typeof blueprintEnvironmentProfileSchema>>>;
 }): void {
   const componentIds = new Set(input.components.map((component) => component.id));
   const secretKeys = new Set(input.secrets.map((secret) => secret.key));
   const resourceIds = new Set(input.resources.map((resource) => resource.id));
   const parameterKeys = new Set(input.parameters.map((parameter) => parameter.key));
+  const relationIds = new Set(input.relations.map((relation) => relation.id));
 
   if (componentIds.size !== input.components.length) {
     input.context.addIssue({
@@ -281,6 +360,13 @@ function validateTopologyReferences(input: {
       code: "custom",
       message: "parameter keys must be unique",
       path: [...input.path, "parameters"],
+    });
+  }
+  if (relationIds.size !== input.relations.length) {
+    input.context.addIssue({
+      code: "custom",
+      message: "component relation ids must be unique",
+      path: [...input.path, "componentRelations"],
     });
   }
 
@@ -314,6 +400,195 @@ function validateTopologyReferences(input: {
       }
     }
   }
+
+  validateComponentRelations(input, componentIds, resourceIds, parameterKeys);
+}
+
+function validateComponentRelations(
+  input: {
+    readonly context: z.RefinementCtx;
+    readonly path: readonly (number | string)[];
+    readonly components: readonly z.infer<typeof blueprintComponentSchema>[];
+    readonly relations: readonly z.infer<typeof blueprintComponentRelationSchema>[];
+    readonly profiles: Readonly<Record<string, z.infer<typeof blueprintEnvironmentProfileSchema>>>;
+  },
+  componentIds: ReadonlySet<string>,
+  resourceIds: ReadonlySet<string>,
+  parameterKeys: ReadonlySet<string>,
+): void {
+  const componentsById = new Map(input.components.map((component) => [component.id, component]));
+  const profileVariableKeys = new Set(
+    Object.values(input.profiles).flatMap((profile) =>
+      profile.variables.map((variable) => variable.key),
+    ),
+  );
+  const injectedEnvByComponent = new Map<string, Set<string>>();
+
+  for (const [index, relation] of input.relations.entries()) {
+    const relationPath = [...input.path, "componentRelations", index];
+    const fromComponent = componentsById.get(relation.from);
+    const toComponent = componentsById.get(relation.to);
+
+    if (resourceIds.has(relation.from)) {
+      input.context.addIssue({
+        code: "custom",
+        message: `component relation ${relation.id} from references dependency resource ${relation.from}; use component dependency binding for resources`,
+        path: [...relationPath, "from"],
+      });
+    } else if (!componentIds.has(relation.from)) {
+      input.context.addIssue({
+        code: "custom",
+        message: `component relation ${relation.id} references unknown from component ${relation.from}`,
+        path: [...relationPath, "from"],
+      });
+    }
+
+    if (resourceIds.has(relation.to)) {
+      input.context.addIssue({
+        code: "custom",
+        message: `component relation ${relation.id} to references dependency resource ${relation.to}; use component dependency binding for resources`,
+        path: [...relationPath, "to"],
+      });
+    } else if (!componentIds.has(relation.to)) {
+      input.context.addIssue({
+        code: "custom",
+        message: `component relation ${relation.id} references unknown to component ${relation.to}`,
+        path: [...relationPath, "to"],
+      });
+    }
+
+    if (relation.type === "endpoint" && !relation.endpoint) {
+      input.context.addIssue({
+        code: "custom",
+        message: `endpoint component relation ${relation.id} requires endpoint`,
+        path: [...relationPath, "endpoint"],
+      });
+    }
+
+    if (relation.endpoint && toComponent) {
+      const providerPortNames = new Set(toComponent.ports.map((port) => port.name));
+      if (!providerPortNames.has(relation.endpoint)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `component relation ${relation.id} references unknown provider endpoint ${relation.endpoint}`,
+          path: [...relationPath, "endpoint"],
+        });
+      }
+    }
+
+    const outputs = new Set(componentRelationOutputs(relation));
+    for (const [effectIndex, effect] of relation.effects.entries()) {
+      const effectPath = [...relationPath, "effects", effectIndex];
+      validateComponentRelationEffect(input.context, effectPath, relation, effect, outputs);
+
+      if (effect.kind === "inject-env") {
+        const componentVariableKeys = new Set(
+          fromComponent?.variables.map((variable) => variable.key),
+        );
+        if (
+          componentVariableKeys.has(effect.name) ||
+          profileVariableKeys.has(effect.name) ||
+          parameterKeys.has(effect.name)
+        ) {
+          input.context.addIssue({
+            code: "custom",
+            message: `component relation ${relation.id} inject-env duplicates existing variable ${effect.name}`,
+            path: [...effectPath, "name"],
+          });
+        }
+
+        const injectedNames = injectedEnvByComponent.get(relation.from) ?? new Set<string>();
+        if (injectedNames.has(effect.name)) {
+          input.context.addIssue({
+            code: "custom",
+            message: `component relation ${relation.id} inject-env duplicates relation variable ${effect.name}`,
+            path: [...effectPath, "name"],
+          });
+        }
+        injectedNames.add(effect.name);
+        injectedEnvByComponent.set(relation.from, injectedNames);
+      }
+    }
+  }
+
+  const topology = new BlueprintComponentRelationGraph({
+    components: input.components,
+    relations: input.relations,
+  }).topologicalSort();
+  if (!topology.ok) {
+    input.context.addIssue({
+      code: "custom",
+      message: `required lifecycle component relations form a startup cycle: ${topology.error.cycle.join(" -> ")}`,
+      path: [...input.path, "componentRelations"],
+    });
+  }
+}
+
+function validateComponentRelationEffect(
+  context: z.RefinementCtx,
+  path: readonly (number | string)[],
+  relation: z.infer<typeof blueprintComponentRelationSchema>,
+  effect: z.infer<typeof blueprintComponentRelationEffectSchema>,
+  outputs: ReadonlySet<string>,
+): void {
+  if (
+    (effect.kind === "order-after" || effect.kind === "readiness-gate") &&
+    relation.type !== "lifecycle"
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: `${effect.kind} effect requires a lifecycle component relation`,
+      path: [...path, "kind"],
+    });
+  }
+
+  if (effect.kind === "attach-telemetry" && relation.type !== "telemetry") {
+    context.addIssue({
+      code: "custom",
+      message: "attach-telemetry effect requires a telemetry component relation",
+      path: [...path, "kind"],
+    });
+  }
+
+  const valueFrom = componentRelationEffectValueFrom(effect);
+  if (valueFrom && !outputs.has(valueFrom)) {
+    context.addIssue({
+      code: "custom",
+      message: `component relation effect references unavailable output ${valueFrom}`,
+      path: [...path, "valueFrom"],
+    });
+  }
+}
+
+function componentRelationEffectValueFrom(
+  effect: z.infer<typeof blueprintComponentRelationEffectSchema>,
+): string | undefined {
+  switch (effect.kind) {
+    case "inject-env":
+    case "private-service-discovery":
+    case "attach-telemetry":
+      return effect.valueFrom;
+    case "network-allow":
+    case "order-after":
+    case "readiness-gate":
+      return undefined;
+  }
+}
+
+function componentRelationOutputs(
+  relation: z.infer<typeof blueprintComponentRelationSchema>,
+): readonly BlueprintComponentRelationOutput[] {
+  const outputs = new Set<BlueprintComponentRelationOutput>(["service-name"]);
+  if (relation.endpoint) {
+    outputs.add("endpoint-url");
+    outputs.add("endpoint-host");
+    outputs.add("endpoint-port");
+    outputs.add("endpoint-scheme");
+  }
+  if (relation.type === "lifecycle") {
+    outputs.add("readiness-state");
+  }
+  return [...outputs];
 }
 
 export type BlueprintManifest = z.infer<typeof blueprintManifestSchema>;
@@ -322,8 +597,181 @@ export type BlueprintEnvironmentProfile = NonNullable<BlueprintManifest["profile
 export type BlueprintParameter = BlueprintManifest["parameters"][number];
 export type BlueprintSecretPlaceholder = BlueprintManifest["secrets"][number];
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
+export type BlueprintComponentRelation = BlueprintManifest["componentRelations"][number];
+export type BlueprintComponentRelationType = BlueprintComponentRelation["type"];
+export type BlueprintComponentRelationEffect = BlueprintComponentRelation["effects"][number];
+export type BlueprintComponentRelationOutput =
+  | "endpoint-url"
+  | "endpoint-host"
+  | "endpoint-port"
+  | "endpoint-scheme"
+  | "service-name"
+  | "readiness-state";
 export type BlueprintVariant = NonNullable<BlueprintManifest["variants"]>[string];
 export type BlueprintUpgradePolicy = NonNullable<BlueprintManifest["upgrade"]>;
+
+export interface BlueprintComponentRelationTopologyEdge {
+  readonly relationId: string;
+  readonly beforeComponentId: string;
+  readonly afterComponentId: string;
+  readonly readiness: "created" | "started" | "healthy";
+}
+
+export interface BlueprintComponentRelationTopologyDescription {
+  readonly rule: typeof BlueprintComponentRelationGraph.topologicalSortDescription;
+  readonly relationDirection: "from-consumer-to-provider";
+  readonly sortedComponentIds: readonly string[];
+  readonly requiredLifecycleEdges: readonly BlueprintComponentRelationTopologyEdge[];
+  readonly optionalLifecycleEdges: readonly BlueprintComponentRelationTopologyEdge[];
+}
+
+export type BlueprintComponentRelationTopologyResult =
+  | {
+      readonly ok: true;
+      readonly value: BlueprintComponentRelationTopologyDescription;
+    }
+  | {
+      readonly ok: false;
+      readonly error: {
+        readonly code: "required_lifecycle_cycle";
+        readonly cycle: readonly string[];
+        readonly relationIds: readonly string[];
+      };
+    };
+
+export class BlueprintComponentRelationGraph {
+  static readonly topologicalSortDescription =
+    "Topological sort orders provider components before consumer components for required lifecycle relations; relation direction remains from consumer/dependent to provider/dependency.";
+
+  private readonly components: readonly BlueprintComponent[];
+  private readonly relations: readonly BlueprintComponentRelation[];
+
+  constructor(input: {
+    readonly components: readonly BlueprintComponent[];
+    readonly relations: readonly BlueprintComponentRelation[];
+  }) {
+    this.components = input.components;
+    this.relations = input.relations;
+  }
+
+  topologicalSort(): BlueprintComponentRelationTopologyResult {
+    const componentOrder = new Map(
+      this.components.map((component, index) => [component.id, index]),
+    );
+    const indegree = new Map(this.components.map((component) => [component.id, 0]));
+    const adjacency = new Map<string, BlueprintComponentRelationTopologyEdge[]>(
+      this.components.map((component) => [component.id, []]),
+    );
+    const requiredLifecycleEdges = this.requiredLifecycleEdges();
+    const optionalLifecycleEdges = this.optionalLifecycleEdges();
+
+    for (const edge of requiredLifecycleEdges) {
+      adjacency.get(edge.beforeComponentId)?.push(edge);
+      indegree.set(edge.afterComponentId, (indegree.get(edge.afterComponentId) ?? 0) + 1);
+    }
+
+    const ready = this.components
+      .map((component) => component.id)
+      .filter((componentId) => indegree.get(componentId) === 0)
+      .sort((left, right) => (componentOrder.get(left) ?? 0) - (componentOrder.get(right) ?? 0));
+    const sortedComponentIds: string[] = [];
+
+    while (ready.length > 0) {
+      const componentId = ready.shift();
+      if (!componentId) break;
+      sortedComponentIds.push(componentId);
+
+      const outgoing = adjacency.get(componentId) ?? [];
+      for (const edge of outgoing) {
+        const nextIndegree = (indegree.get(edge.afterComponentId) ?? 0) - 1;
+        indegree.set(edge.afterComponentId, nextIndegree);
+        if (nextIndegree === 0) {
+          ready.push(edge.afterComponentId);
+          ready.sort(
+            (left, right) => (componentOrder.get(left) ?? 0) - (componentOrder.get(right) ?? 0),
+          );
+        }
+      }
+    }
+
+    if (sortedComponentIds.length !== this.components.length) {
+      const cycle = this.components
+        .map((component) => component.id)
+        .filter((componentId) => (indegree.get(componentId) ?? 0) > 0);
+      const cycleIds = new Set(cycle);
+      const relationIds = requiredLifecycleEdges
+        .filter(
+          (edge) => cycleIds.has(edge.beforeComponentId) && cycleIds.has(edge.afterComponentId),
+        )
+        .map((edge) => edge.relationId);
+      return {
+        ok: false,
+        error: {
+          code: "required_lifecycle_cycle",
+          cycle,
+          relationIds,
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      value: {
+        rule: BlueprintComponentRelationGraph.topologicalSortDescription,
+        relationDirection: "from-consumer-to-provider",
+        sortedComponentIds,
+        requiredLifecycleEdges,
+        optionalLifecycleEdges,
+      },
+    };
+  }
+
+  describeTopologicalSort(): string {
+    const sorted = this.topologicalSort();
+    if (!sorted.ok) {
+      return `${BlueprintComponentRelationGraph.topologicalSortDescription} Required lifecycle cycle: ${sorted.error.cycle.join(" -> ")}.`;
+    }
+    const order = sorted.value.sortedComponentIds.join(" -> ");
+    return `${BlueprintComponentRelationGraph.topologicalSortDescription} Current required lifecycle order: ${order}.`;
+  }
+
+  requiredLifecycleEdges(): readonly BlueprintComponentRelationTopologyEdge[] {
+    return this.lifecycleEdges({ required: true });
+  }
+
+  optionalLifecycleEdges(): readonly BlueprintComponentRelationTopologyEdge[] {
+    return this.lifecycleEdges({ required: false });
+  }
+
+  relationOutputs(
+    relation: BlueprintComponentRelation,
+  ): readonly BlueprintComponentRelationOutput[] {
+    return componentRelationOutputs(relation);
+  }
+
+  private lifecycleEdges(input: {
+    readonly required: boolean;
+  }): readonly BlueprintComponentRelationTopologyEdge[] {
+    const edges: BlueprintComponentRelationTopologyEdge[] = [];
+    for (const relation of this.relations) {
+      if (relation.type !== "lifecycle" || relation.required !== input.required) {
+        continue;
+      }
+      for (const effect of relation.effects) {
+        if (effect.kind !== "order-after" && effect.kind !== "readiness-gate") {
+          continue;
+        }
+        edges.push({
+          relationId: relation.id,
+          beforeComponentId: relation.to,
+          afterComponentId: relation.from,
+          readiness: effect.readiness,
+        });
+      }
+    }
+    return edges;
+  }
+}
 
 export interface BlueprintIssue {
   readonly path: readonly (number | string)[];
@@ -439,6 +887,17 @@ export type BlueprintInstallOperation =
       readonly requirementKind: BlueprintResourceRequirement["kind"];
     }
   | {
+      readonly kind: "configure-component-link";
+      readonly relationId: string;
+      readonly relationType: BlueprintComponentRelationType;
+      readonly fromComponentId: string;
+      readonly toComponentId: string;
+      readonly endpoint?: string;
+      readonly required: boolean;
+      readonly effects: readonly BlueprintComponentRelationEffect[];
+      readonly outputs: readonly BlueprintComponentRelationOutput[];
+    }
+  | {
       readonly kind: "create-deployment";
       readonly componentId: string;
       readonly reason: "blueprint-install";
@@ -524,6 +983,16 @@ export type BlueprintApplicationBundleRelationship =
       readonly componentId: string;
       readonly requirementId: string;
       readonly requirementKind: BlueprintResourceRequirement["kind"];
+    }
+  | {
+      readonly kind: "component-links-component";
+      readonly relationId: string;
+      readonly relationType: BlueprintComponentRelationType;
+      readonly fromComponentId: string;
+      readonly toComponentId: string;
+      readonly endpoint?: string;
+      readonly required: boolean;
+      readonly effects: readonly BlueprintComponentRelationEffect[];
     };
 
 export interface BlueprintApplicationBundlePlan {
@@ -549,6 +1018,79 @@ export interface BlueprintApplicationBundlePlanError {
 export type BlueprintApplicationBundlePlanResult =
   | { readonly ok: true; readonly value: BlueprintApplicationBundlePlan }
   | { readonly ok: false; readonly error: BlueprintApplicationBundlePlanError };
+
+export interface BlueprintComponentRuntimeInjectedEnv {
+  readonly relationId: string;
+  readonly relationType: BlueprintComponentRelationType;
+  readonly providerComponentId: string;
+  readonly endpoint?: string;
+  readonly name: string;
+  readonly valueFrom: "endpoint-url" | "endpoint-host" | "endpoint-port" | "endpoint-scheme";
+  readonly value: string;
+  readonly required: boolean;
+}
+
+export interface BlueprintComponentRuntimeServiceDiscovery {
+  readonly relationId: string;
+  readonly providerComponentId: string;
+  readonly serviceName: string;
+  readonly host: string;
+  readonly endpoint?: string;
+  readonly port?: number;
+  readonly scheme?: "http" | "tcp" | "grpc";
+  readonly required: boolean;
+}
+
+export interface BlueprintComponentRuntimeNetworkAllow {
+  readonly relationId: string;
+  readonly providerComponentId: string;
+  readonly mode: "private";
+  readonly networkName: string;
+  readonly required: boolean;
+}
+
+export interface BlueprintComponentRuntimeReadinessGate {
+  readonly relationId: string;
+  readonly providerComponentId: string;
+  readonly providerServiceName: string;
+  readonly kind: "order-after" | "readiness-gate";
+  readonly readiness: "created" | "started" | "healthy";
+  readonly required: boolean;
+}
+
+export interface BlueprintComponentRuntimeTelemetryAttachment {
+  readonly relationId: string;
+  readonly providerComponentId: string;
+  readonly providerServiceName: string;
+  readonly signal: "traces" | "metrics" | "logs";
+  readonly endpoint?: string;
+  readonly endpointUrl: string;
+  readonly required: boolean;
+}
+
+export interface BlueprintComponentRuntimePlan {
+  readonly componentId: string;
+  readonly serviceName: string;
+  readonly networkName: string;
+  readonly injectedEnv: readonly BlueprintComponentRuntimeInjectedEnv[];
+  readonly serviceDiscovery: readonly BlueprintComponentRuntimeServiceDiscovery[];
+  readonly networkAllows: readonly BlueprintComponentRuntimeNetworkAllow[];
+  readonly readinessGates: readonly BlueprintComponentRuntimeReadinessGate[];
+  readonly telemetryAttachments: readonly BlueprintComponentRuntimeTelemetryAttachment[];
+}
+
+export interface BlueprintComponentRuntimeProjection {
+  readonly schemaVersion: typeof blueprintComponentRuntimeProjectionSchemaVersion;
+  readonly application: BlueprintApplicationBundleIdentity;
+  readonly components: readonly BlueprintComponentRuntimePlan[];
+  readonly warnings: readonly string[];
+}
+
+export interface CreateBlueprintComponentRuntimeProjectionInput {
+  readonly applicationBundle: BlueprintApplicationBundlePlan;
+  readonly componentServiceNames?: Readonly<Record<string, string>>;
+  readonly networkName?: string;
+}
 
 export type BlueprintUpgradeClassification = "non-breaking" | "potentially-breaking" | "breaking";
 
@@ -610,6 +1152,14 @@ export type BlueprintUpgradeOperation =
       readonly requirementId: string;
       readonly fromKind?: BlueprintResourceRequirement["kind"];
       readonly toKind?: BlueprintResourceRequirement["kind"];
+      readonly classification: BlueprintUpgradeClassification;
+    }
+  | {
+      readonly kind:
+        | "add-component-relation"
+        | "remove-component-relation"
+        | "change-component-relation";
+      readonly relationId: string;
       readonly classification: BlueprintUpgradeClassification;
     }
   | {
@@ -717,6 +1267,7 @@ export function resolveBlueprintVariantManifest(input: {
       secrets: variant.secrets ?? input.manifest.secrets,
       resources: variant.resources ?? input.manifest.resources,
       components: variant.components ?? input.manifest.components,
+      componentRelations: variant.componentRelations ?? input.manifest.componentRelations,
       profiles: variant.profiles ?? input.manifest.profiles,
       defaultVariant: variantId,
       upgrade: variant.upgrade ?? input.manifest.upgrade,
@@ -828,81 +1379,73 @@ export function createBlueprintInstallPlan(
     },
   ];
 
-  for (const component of manifest.components) {
-    const slug = [input.target.resourceSlugPrefix, component.id].filter(Boolean).join("-");
-    operations.push({
-      kind: "create-resource",
-      componentId: component.id,
-      componentKind: component.kind,
-      name: component.name,
-      slug,
+  if (manifest.componentRelations.length === 0) {
+    for (const component of manifest.components) {
+      appendComponentSetupOperations(operations, {
+        component,
+        manifest,
+        profile,
+        parameters: input.parameters ?? {},
+        resourceSlugPrefix: input.target.resourceSlugPrefix,
+      });
+      operations.push({
+        kind: "create-deployment",
+        componentId: component.id,
+        reason: "blueprint-install",
+      });
+    }
+  } else {
+    const graph = new BlueprintComponentRelationGraph({
+      components: manifest.components,
+      relations: manifest.componentRelations,
     });
-    operations.push({
-      kind: "configure-runtime",
-      componentId: component.id,
-      runtime: component.runtime,
-    });
-    if (component.ports.length > 0) {
-      operations.push({
-        kind: "configure-network",
-        componentId: component.id,
-        ports: component.ports,
+    const topology = graph.topologicalSort();
+    if (!topology.ok) {
+      return {
+        ok: false,
+        issues: [
+          {
+            path: ["componentRelations"],
+            message: `Required lifecycle component relations form a startup cycle: ${topology.error.cycle.join(" -> ")}`,
+          },
+        ],
+      };
+    }
+
+    const componentsById = byId(manifest.components);
+    const sortedComponents = topology.value.sortedComponentIds
+      .map((componentId) => componentsById.get(componentId))
+      .filter((component): component is BlueprintComponent => Boolean(component));
+
+    for (const component of sortedComponents) {
+      appendComponentSetupOperations(operations, {
+        component,
+        manifest,
+        profile,
+        parameters: input.parameters ?? {},
+        resourceSlugPrefix: input.target.resourceSlugPrefix,
       });
     }
-    const routes = [...component.routes, ...profile.routes];
-    if (routes.length > 0) {
+    for (const relation of manifest.componentRelations) {
       operations.push({
-        kind: "configure-access",
-        componentId: component.id,
-        routes,
+        kind: "configure-component-link",
+        relationId: relation.id,
+        relationType: relation.type,
+        fromComponentId: relation.from,
+        toComponentId: relation.to,
+        ...(relation.endpoint ? { endpoint: relation.endpoint } : {}),
+        required: relation.required,
+        effects: relation.effects,
+        outputs: graph.relationOutputs(relation),
       });
     }
-    for (const variable of [...profile.variables, ...component.variables]) {
+    for (const component of sortedComponents) {
       operations.push({
-        kind: "set-variable",
+        kind: "create-deployment",
         componentId: component.id,
-        key: variable.key,
-        valueSource: "literal",
-        value: variable.value,
+        reason: "blueprint-install",
       });
     }
-    for (const parameter of manifest.parameters) {
-      const value = parameterValue(parameter, input.parameters ?? {});
-      operations.push({
-        kind: "set-variable",
-        componentId: component.id,
-        key: parameter.key,
-        valueSource: "parameter",
-        value,
-      });
-    }
-    for (const secretKey of component.usesSecrets) {
-      const secret = manifest.secrets.find((candidate) => candidate.key === secretKey);
-      if (secret) {
-        operations.push({
-          kind: "create-secret-reference",
-          componentId: component.id,
-          key: secret.key,
-          required: secret.required,
-        });
-      }
-    }
-    for (const requirementId of component.usesResources) {
-      const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
-      if (requirement) {
-        operations.push({
-          kind: "bind-dependency",
-          componentId: component.id,
-          requirementId: requirement.id,
-          requirementKind: requirement.kind,
-        });
-      }
-    }
-    operations.push({
-      kind: "create-deployment",
-      componentId: component.id,
-      reason: "blueprint-install",
-    });
   }
 
   return {
@@ -922,6 +1465,88 @@ export function createBlueprintInstallPlan(
       warnings: profile.replicas === 0 ? ["Selected profile has zero replicas."] : [],
     },
   };
+}
+
+function appendComponentSetupOperations(
+  operations: BlueprintInstallOperation[],
+  input: {
+    readonly component: BlueprintComponent;
+    readonly manifest: BlueprintManifest;
+    readonly profile: BlueprintEnvironmentProfile;
+    readonly parameters: Readonly<Record<string, string | number | boolean>>;
+    readonly resourceSlugPrefix: string | undefined;
+  },
+): void {
+  const { component, manifest, profile, parameters, resourceSlugPrefix } = input;
+  const slug = [resourceSlugPrefix, component.id].filter(Boolean).join("-");
+  operations.push({
+    kind: "create-resource",
+    componentId: component.id,
+    componentKind: component.kind,
+    name: component.name,
+    slug,
+  });
+  operations.push({
+    kind: "configure-runtime",
+    componentId: component.id,
+    runtime: component.runtime,
+  });
+  if (component.ports.length > 0) {
+    operations.push({
+      kind: "configure-network",
+      componentId: component.id,
+      ports: component.ports,
+    });
+  }
+  const routes = [...component.routes, ...profile.routes];
+  if (routes.length > 0) {
+    operations.push({
+      kind: "configure-access",
+      componentId: component.id,
+      routes,
+    });
+  }
+  for (const variable of [...profile.variables, ...component.variables]) {
+    operations.push({
+      kind: "set-variable",
+      componentId: component.id,
+      key: variable.key,
+      valueSource: "literal",
+      value: variable.value,
+    });
+  }
+  for (const parameter of manifest.parameters) {
+    const value = parameterValue(parameter, parameters);
+    operations.push({
+      kind: "set-variable",
+      componentId: component.id,
+      key: parameter.key,
+      valueSource: "parameter",
+      value,
+    });
+  }
+  for (const secretKey of component.usesSecrets) {
+    const secret = manifest.secrets.find((candidate) => candidate.key === secretKey);
+    if (secret) {
+      operations.push({
+        kind: "create-secret-reference",
+        componentId: component.id,
+        key: secret.key,
+        required: secret.required,
+      });
+    }
+  }
+  for (const requirementId of component.usesResources) {
+    const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
+    if (requirement) {
+      operations.push({
+        kind: "bind-dependency",
+        componentId: component.id,
+        requirementId: requirement.id,
+        requirementKind: requirement.kind,
+      });
+    }
+  }
 }
 
 type MutableBlueprintApplicationBundleComponentPlan = {
@@ -1040,6 +1665,27 @@ export function createBlueprintApplicationBundlePlan(
         });
         break;
       }
+      case "configure-component-link": {
+        const fromComponent = components.get(operation.fromComponentId);
+        const toComponent = components.get(operation.toComponentId);
+        if (!fromComponent) {
+          return missingApplicationBundleComponentResource(operation.fromComponentId);
+        }
+        if (!toComponent) {
+          return missingApplicationBundleComponentResource(operation.toComponentId);
+        }
+        relationships.push({
+          kind: "component-links-component",
+          relationId: operation.relationId,
+          relationType: operation.relationType,
+          fromComponentId: operation.fromComponentId,
+          toComponentId: operation.toComponentId,
+          ...(operation.endpoint ? { endpoint: operation.endpoint } : {}),
+          required: operation.required,
+          effects: operation.effects,
+        });
+        break;
+      }
       case "create-deployment": {
         const component = requireApplicationBundleComponent(operation, components);
         if (!component.ok) return component;
@@ -1086,6 +1732,334 @@ export function createBlueprintApplicationBundlePlan(
       ],
     },
   };
+}
+
+const defaultComponentRuntimeNetworkName = "appaloft-component-private";
+
+type ComponentLinkBundleRelationship = Extract<
+  BlueprintApplicationBundleRelationship,
+  { readonly kind: "component-links-component" }
+>;
+
+type MutableBlueprintComponentRuntimePlan = {
+  componentId: string;
+  serviceName: string;
+  networkName: string;
+  injectedEnv: BlueprintComponentRuntimeInjectedEnv[];
+  serviceDiscovery: BlueprintComponentRuntimeServiceDiscovery[];
+  networkAllows: BlueprintComponentRuntimeNetworkAllow[];
+  readinessGates: BlueprintComponentRuntimeReadinessGate[];
+  telemetryAttachments: BlueprintComponentRuntimeTelemetryAttachment[];
+};
+
+const blueprintComponentRuntimeInjectedEnvSchema = z
+  .object({
+    relationId: z.string(),
+    relationType: z.enum(["endpoint", "lifecycle", "telemetry"]),
+    providerComponentId: z.string(),
+    endpoint: z.string().optional(),
+    name: z.string(),
+    valueFrom: z.enum(["endpoint-url", "endpoint-host", "endpoint-port", "endpoint-scheme"]),
+    value: z.string(),
+    required: z.boolean(),
+  })
+  .strict();
+
+const blueprintComponentRuntimeServiceDiscoverySchema = z
+  .object({
+    relationId: z.string(),
+    providerComponentId: z.string(),
+    serviceName: z.string(),
+    host: z.string(),
+    endpoint: z.string().optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    scheme: z.enum(["http", "tcp", "grpc"]).optional(),
+    required: z.boolean(),
+  })
+  .strict();
+
+const blueprintComponentRuntimeNetworkAllowSchema = z
+  .object({
+    relationId: z.string(),
+    providerComponentId: z.string(),
+    mode: z.literal("private"),
+    networkName: z.string(),
+    required: z.boolean(),
+  })
+  .strict();
+
+const blueprintComponentRuntimeReadinessGateSchema = z
+  .object({
+    relationId: z.string(),
+    providerComponentId: z.string(),
+    providerServiceName: z.string(),
+    kind: z.enum(["order-after", "readiness-gate"]),
+    readiness: z.enum(["created", "started", "healthy"]),
+    required: z.boolean(),
+  })
+  .strict();
+
+const blueprintComponentRuntimeTelemetryAttachmentSchema = z
+  .object({
+    relationId: z.string(),
+    providerComponentId: z.string(),
+    providerServiceName: z.string(),
+    signal: z.enum(["traces", "metrics", "logs"]),
+    endpoint: z.string().optional(),
+    endpointUrl: z.string(),
+    required: z.boolean(),
+  })
+  .strict();
+
+const blueprintComponentRuntimePlanSchema = z
+  .object({
+    componentId: z.string(),
+    serviceName: z.string(),
+    networkName: z.string(),
+    injectedEnv: z.array(blueprintComponentRuntimeInjectedEnvSchema),
+    serviceDiscovery: z.array(blueprintComponentRuntimeServiceDiscoverySchema),
+    networkAllows: z.array(blueprintComponentRuntimeNetworkAllowSchema),
+    readinessGates: z.array(blueprintComponentRuntimeReadinessGateSchema),
+    telemetryAttachments: z.array(blueprintComponentRuntimeTelemetryAttachmentSchema),
+  })
+  .strict();
+
+export function createBlueprintComponentRuntimeProjection(
+  input: CreateBlueprintComponentRuntimeProjectionInput,
+): BlueprintComponentRuntimeProjection {
+  const networkName = input.networkName ?? defaultComponentRuntimeNetworkName;
+  const componentPlans = new Map<string, MutableBlueprintComponentRuntimePlan>();
+  const componentsById = new Map(
+    input.applicationBundle.components.map((component) => [component.componentId, component]),
+  );
+  const warnings: string[] = [];
+
+  for (const component of input.applicationBundle.components) {
+    componentPlans.set(component.componentId, {
+      componentId: component.componentId,
+      serviceName:
+        input.componentServiceNames?.[component.componentId] ??
+        component.resourceSlug ??
+        component.componentId,
+      networkName,
+      injectedEnv: [],
+      serviceDiscovery: [],
+      networkAllows: [],
+      readinessGates: [],
+      telemetryAttachments: [],
+    });
+  }
+
+  for (const relationship of input.applicationBundle.relationships) {
+    if (relationship.kind !== "component-links-component") {
+      continue;
+    }
+
+    const consumerPlan = componentPlans.get(relationship.fromComponentId);
+    const providerPlan = componentPlans.get(relationship.toComponentId);
+    const providerComponent = componentsById.get(relationship.toComponentId);
+    if (!consumerPlan || !providerPlan || !providerComponent) {
+      warnings.push(
+        `component relation ${relationship.relationId} references an unavailable component`,
+      );
+      continue;
+    }
+
+    appendRuntimeRelationEffects({
+      relationship,
+      consumerPlan,
+      providerPlan,
+      providerComponent,
+      networkName,
+      warnings,
+    });
+  }
+
+  return {
+    schemaVersion: blueprintComponentRuntimeProjectionSchemaVersion,
+    application: input.applicationBundle.application,
+    components: [...componentPlans.values()].map((plan) => ({
+      componentId: plan.componentId,
+      serviceName: plan.serviceName,
+      networkName: plan.networkName,
+      injectedEnv: sortByRelationAndName(plan.injectedEnv),
+      serviceDiscovery: sortByRelationAndProvider(plan.serviceDiscovery),
+      networkAllows: sortByRelationAndProvider(plan.networkAllows),
+      readinessGates: sortByRelationAndProvider(plan.readinessGates),
+      telemetryAttachments: sortByRelationAndProvider(plan.telemetryAttachments),
+    })),
+    warnings,
+  };
+}
+
+export function blueprintComponentRuntimePlanToMetadata(
+  plan: BlueprintComponentRuntimePlan,
+): Record<string, string> {
+  return {
+    [blueprintComponentRuntimePlanMetadataKey]: JSON.stringify(plan),
+  };
+}
+
+export function blueprintComponentRuntimePlanFromMetadata(
+  metadata: Readonly<Record<string, string>> | undefined,
+): BlueprintComponentRuntimePlan | undefined {
+  const raw = metadata?.[blueprintComponentRuntimePlanMetadataKey];
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    const result = blueprintComponentRuntimePlanSchema.safeParse(parsed);
+    return result.success ? (result.data as BlueprintComponentRuntimePlan) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function appendRuntimeRelationEffects(input: {
+  readonly relationship: ComponentLinkBundleRelationship;
+  readonly consumerPlan: MutableBlueprintComponentRuntimePlan;
+  readonly providerPlan: MutableBlueprintComponentRuntimePlan;
+  readonly providerComponent: BlueprintApplicationBundleComponentPlan;
+  readonly networkName: string;
+  readonly warnings: string[];
+}): void {
+  const { relationship, consumerPlan, providerPlan, providerComponent, networkName, warnings } =
+    input;
+  const endpointPort = relationship.endpoint
+    ? providerComponent.ports.find((port) => port.name === relationship.endpoint)
+    : undefined;
+  const context = {
+    relationship,
+    providerServiceName: providerPlan.serviceName,
+    endpointPort,
+  };
+
+  for (const effect of relationship.effects) {
+    switch (effect.kind) {
+      case "inject-env": {
+        const value = runtimeRelationOutput(effect.valueFrom, context);
+        if (value === undefined) {
+          warnings.push(
+            `component relation ${relationship.relationId} could not resolve ${effect.valueFrom}`,
+          );
+          continue;
+        }
+        consumerPlan.injectedEnv.push({
+          relationId: relationship.relationId,
+          relationType: relationship.relationType,
+          providerComponentId: relationship.toComponentId,
+          ...(relationship.endpoint ? { endpoint: relationship.endpoint } : {}),
+          name: effect.name,
+          valueFrom: effect.valueFrom,
+          value,
+          required: relationship.required,
+        });
+        break;
+      }
+      case "private-service-discovery": {
+        const host = runtimeRelationOutput(effect.valueFrom, context) ?? providerPlan.serviceName;
+        consumerPlan.serviceDiscovery.push({
+          relationId: relationship.relationId,
+          providerComponentId: relationship.toComponentId,
+          serviceName: providerPlan.serviceName,
+          host,
+          ...(relationship.endpoint ? { endpoint: relationship.endpoint } : {}),
+          ...(endpointPort
+            ? { port: endpointPort.containerPort, scheme: endpointPort.protocol }
+            : {}),
+          required: relationship.required,
+        });
+        break;
+      }
+      case "network-allow":
+        consumerPlan.networkAllows.push({
+          relationId: relationship.relationId,
+          providerComponentId: relationship.toComponentId,
+          mode: effect.mode,
+          networkName,
+          required: relationship.required,
+        });
+        break;
+      case "order-after":
+      case "readiness-gate":
+        consumerPlan.readinessGates.push({
+          relationId: relationship.relationId,
+          providerComponentId: relationship.toComponentId,
+          providerServiceName: providerPlan.serviceName,
+          kind: effect.kind,
+          readiness: effect.readiness,
+          required: relationship.required,
+        });
+        break;
+      case "attach-telemetry": {
+        const endpointUrl = runtimeRelationOutput(effect.valueFrom, context);
+        if (!endpointUrl) {
+          warnings.push(
+            `component relation ${relationship.relationId} could not resolve telemetry endpoint`,
+          );
+          continue;
+        }
+        consumerPlan.telemetryAttachments.push({
+          relationId: relationship.relationId,
+          providerComponentId: relationship.toComponentId,
+          providerServiceName: providerPlan.serviceName,
+          signal: effect.signal,
+          ...(relationship.endpoint ? { endpoint: relationship.endpoint } : {}),
+          endpointUrl,
+          required: relationship.required,
+        });
+        break;
+      }
+    }
+  }
+}
+
+function runtimeRelationOutput(
+  output: BlueprintComponentRelationOutput,
+  context: {
+    readonly relationship: ComponentLinkBundleRelationship;
+    readonly providerServiceName: string;
+    readonly endpointPort: BlueprintComponent["ports"][number] | undefined;
+  },
+): string | undefined {
+  switch (output) {
+    case "service-name":
+      return context.providerServiceName;
+    case "endpoint-host":
+      return context.providerServiceName;
+    case "endpoint-port":
+      return context.endpointPort ? String(context.endpointPort.containerPort) : undefined;
+    case "endpoint-scheme":
+      return context.endpointPort?.protocol;
+    case "endpoint-url":
+      return context.endpointPort
+        ? `${context.endpointPort.protocol}://${context.providerServiceName}:${context.endpointPort.containerPort}`
+        : undefined;
+    case "readiness-state":
+      return undefined;
+  }
+}
+
+function sortByRelationAndName<T extends { readonly relationId: string; readonly name: string }>(
+  values: readonly T[],
+): readonly T[] {
+  return [...values].sort((left, right) => {
+    const relationOrder = left.relationId.localeCompare(right.relationId);
+    return relationOrder === 0 ? left.name.localeCompare(right.name) : relationOrder;
+  });
+}
+
+function sortByRelationAndProvider<
+  T extends { readonly relationId: string; readonly providerComponentId: string },
+>(values: readonly T[]): readonly T[] {
+  return [...values].sort((left, right) => {
+    const relationOrder = left.relationId.localeCompare(right.relationId);
+    return relationOrder === 0
+      ? left.providerComponentId.localeCompare(right.providerComponentId)
+      : relationOrder;
+  });
 }
 
 export function createBlueprintUpgradePlan(
@@ -1166,6 +2140,7 @@ export function createBlueprintUpgradePlan(
   }
 
   operations.push(...diffComponents(currentManifest, targetManifest));
+  operations.push(...diffComponentRelations(currentManifest, targetManifest));
   operations.push(...diffResources(currentManifest, targetManifest));
   operations.push(...diffSecrets(currentManifest, targetManifest));
   operations.push(...diffParameters(currentManifest, targetManifest));
@@ -1268,6 +2243,19 @@ function duplicateApplicationBundleComponentResource(
   };
 }
 
+function missingApplicationBundleComponentResource(
+  componentId: string,
+): BlueprintApplicationBundlePlanResult {
+  return {
+    ok: false,
+    error: {
+      code: "missing_component_resource",
+      message: "Blueprint application bundle relationship references an unknown component.",
+      componentId,
+    },
+  };
+}
+
 function diffComponents(
   currentManifest: BlueprintManifest,
   targetManifest: BlueprintManifest,
@@ -1313,6 +2301,47 @@ function diffComponents(
         kind: "remove-component",
         componentId: component.id,
         classification: "breaking",
+      });
+    }
+  }
+
+  return operations;
+}
+
+function diffComponentRelations(
+  currentManifest: BlueprintManifest,
+  targetManifest: BlueprintManifest,
+): readonly BlueprintUpgradeOperation[] {
+  const operations: BlueprintUpgradeOperation[] = [];
+  const currentById = byId(currentManifest.componentRelations);
+  const targetById = byId(targetManifest.componentRelations);
+
+  for (const relation of targetManifest.componentRelations) {
+    const current = currentById.get(relation.id);
+    if (!current) {
+      operations.push({
+        kind: "add-component-relation",
+        relationId: relation.id,
+        classification: relation.required ? "potentially-breaking" : "non-breaking",
+      });
+      continue;
+    }
+    if (fingerprint(current) !== fingerprint(relation)) {
+      operations.push({
+        kind: "change-component-relation",
+        relationId: relation.id,
+        classification:
+          current.required || relation.required ? "potentially-breaking" : "non-breaking",
+      });
+    }
+  }
+
+  for (const relation of currentManifest.componentRelations) {
+    if (!targetById.has(relation.id)) {
+      operations.push({
+        kind: "remove-component-relation",
+        relationId: relation.id,
+        classification: relation.required ? "potentially-breaking" : "non-breaking",
       });
     }
   }
