@@ -113,7 +113,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("upgradePlanEndpoint");
     expect(detailPageSource).toContain("generateUpgradePlan");
     expect(detailPageSource).toContain("生成升级 dry-run");
-    expect(detailPageSource).toContain("variant: selectedVariant");
+    expect(detailPageSource).toContain("data-blueprint-upgrade-from-installed-application");
+    expect(detailPageSource).toContain("applicationId");
+    expect(detailPageSource).toContain("preservedUserConfigurationWarnings");
+    expect(detailPageSource).toContain("nonExecution?.marker");
+    expect(detailPageSource).not.toContain("currentVersion:");
     expect(detailPageSource).toContain("<details");
     expect(quickDeploySource).toContain("blueprintSlug");
     expect(quickDeploySource).toContain("blueprintVariant");

@@ -142,9 +142,56 @@
       upgrade?: BlueprintUpgradePolicy;
     };
   };
+  type BlueprintUpgradePlanResponse = {
+    current?: {
+      applicationId: string;
+      status: string;
+      source: {
+        blueprintVersion: string;
+        blueprintVariant?: string;
+        profile: string;
+      };
+      dependencyBindings?: readonly { requirementId: string; bindingStatus: string; plannedMode: string }[];
+    };
+    target?: {
+      blueprint: {
+        version: string;
+        variant?: string;
+        profile: string;
+      };
+    };
+    plan?: {
+      classification: "non-breaking" | "potentially-breaking" | "breaking";
+      destructive: boolean;
+      requiresManualReview: boolean;
+      blueprint: {
+        fromVersion: string;
+        toVersion: string;
+        fromVariant?: string;
+        toVariant?: string;
+      };
+      operations?: readonly { kind: string; classification?: string }[];
+      warnings?: readonly string[];
+    };
+    changes?: readonly { kind: string; classification: string; requiresManualReview: boolean; summary: string }[];
+    preservedUserConfigurationWarnings?: readonly string[];
+    nonExecution?: {
+      marker: string;
+      createsExternalResources: false;
+      executesUpgrade: false;
+      applyCommandAvailable: false;
+    };
+  };
 
   const slug = $derived(page.params.slug ?? "");
   const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
+  const installedApplicationIdFromUrl = $derived(
+    browser
+      ? (page.url.searchParams.get("applicationId") ??
+          page.url.searchParams.get("installedApplicationId") ??
+          "")
+      : "",
+  );
 
   let profile = $state("");
   let selectedVariant = $state(browser ? (page.url.searchParams.get("blueprintVariant") ?? "") : "");
@@ -152,11 +199,16 @@
   let planPending = $state(false);
   let planError = $state("");
   let planOutput = $state<unknown>(null);
-  let upgradeCurrentVersion = $state("");
-  let upgradeCurrentVariant = $state("");
+  let upgradeApplicationId = $state(
+    browser
+      ? (page.url.searchParams.get("applicationId") ??
+          page.url.searchParams.get("installedApplicationId") ??
+          "")
+      : "",
+  );
   let upgradePlanPending = $state(false);
   let upgradePlanError = $state("");
-  let upgradePlanOutput = $state<unknown>(null);
+  let upgradePlanOutput = $state<BlueprintUpgradePlanResponse | null>(null);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -282,8 +334,8 @@
       return;
     }
 
-    if (!upgradeCurrentVariant && selectedVariant) {
-      upgradeCurrentVariant = selectedVariant;
+    if (!upgradeApplicationId && installedApplicationIdFromUrl) {
+      upgradeApplicationId = installedApplicationIdFromUrl;
     }
 
     if (!profile || !profileNames.includes(profile)) {
@@ -369,18 +421,22 @@
     if (!upgradePlanEndpoint || !listing) {
       return;
     }
+    const applicationId = upgradeApplicationId.trim();
+    if (!applicationId) {
+      upgradePlanError = "需要已安装应用 ID 才能生成升级 dry-run。";
+      return;
+    }
 
     upgradePlanPending = true;
     upgradePlanError = "";
     try {
-      upgradePlanOutput = await request<unknown>(upgradePlanEndpoint, {
+      upgradePlanOutput = await request<BlueprintUpgradePlanResponse>(upgradePlanEndpoint, {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          currentVersion: upgradeCurrentVersion.trim() || listing.blueprint.version,
-          ...(upgradeCurrentVariant ? { currentVariant: upgradeCurrentVariant } : {}),
+          applicationId,
           ...(selectedVariant ? { targetVariant: selectedVariant } : {}),
           ...(profile ? { targetProfile: profile } : {}),
         }),
@@ -872,34 +928,33 @@
         <section class="console-side-panel space-y-4">
           <div>
             <h2 class="text-lg font-semibold">升级 dry-run</h2>
-            <p class="text-sm text-muted-foreground">预览当前版本/方案更新到目标方案的风险和差异。</p>
+            <p class="text-sm text-muted-foreground">从已安装应用读取当前状态，预览更新到目标方案的风险和差异。</p>
           </div>
 
-          <div class="space-y-3">
-            <label class="space-y-1.5">
-              <span>当前版本</span>
-              <Input
-                value={upgradeCurrentVersion}
-                oninput={(event) => {
-                  upgradeCurrentVersion = event.currentTarget.value;
-                }}
-                placeholder={listing.blueprint.version}
-              />
-            </label>
+          <label class="space-y-1.5" data-blueprint-upgrade-from-installed-application>
+            <span>已安装应用 ID</span>
+            <Input
+              value={upgradeApplicationId}
+              oninput={(event) => {
+                upgradeApplicationId = event.currentTarget.value;
+              }}
+              placeholder="cia_..."
+            />
+          </label>
 
-            {#if variantOptions.length > 0}
-              <label class="space-y-1.5">
-                <span>当前方案</span>
-                <select
-                  class="min-h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  bind:value={upgradeCurrentVariant}
-                >
-                  {#each variantOptions as variant (variant.id)}
-                    <option value={variant.id}>{variant.label ?? variant.id}</option>
-                  {/each}
-                </select>
-              </label>
-            {/if}
+          <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">目标版本</span>
+              <span class="font-mono">{listing.blueprint.version}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">目标方案</span>
+              <span class="font-medium">{selectedVariantLabel()}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">目标 Profile</span>
+              <span class="font-mono">{profile}</span>
+            </div>
           </div>
 
           <Button onclick={generateUpgradePlan} disabled={upgradePlanPending || !upgradePlanEndpoint} variant="outline" class="w-full">
@@ -916,6 +971,72 @@
           {/if}
 
           {#if upgradePlanOutput}
+            <div class="grid gap-2 rounded-md border border-border p-3 text-xs">
+              <div class="flex flex-wrap gap-2">
+                <Badge variant="outline">{upgradePlanOutput.plan?.classification ?? "unknown"}</Badge>
+                <Badge variant="outline">
+                  {upgradePlanOutput.plan?.destructive ? "destructive" : "non-destructive"}
+                </Badge>
+                <Badge variant="outline">
+                  {upgradePlanOutput.plan?.requiresManualReview ? "manual-review" : "auto-review"}
+                </Badge>
+                <Badge variant="outline">
+                  {upgradePlanOutput.nonExecution?.marker ?? "dry-run-only"}
+                </Badge>
+              </div>
+
+              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <div class="rounded-md bg-muted/40 p-2">
+                  <p class="text-muted-foreground">当前</p>
+                  <p class="mt-1 font-mono">
+                    {upgradePlanOutput.current?.source.blueprintVersion ??
+                      upgradePlanOutput.plan?.blueprint.fromVersion}
+                  </p>
+                  <p class="mt-1 truncate">
+                    {upgradePlanOutput.current?.source.blueprintVariant ??
+                      upgradePlanOutput.plan?.blueprint.fromVariant ??
+                      "default"}
+                    {" · "}
+                    {upgradePlanOutput.current?.source.profile ?? "profile"}
+                  </p>
+                </div>
+                <div class="rounded-md bg-muted/40 p-2">
+                  <p class="text-muted-foreground">目标</p>
+                  <p class="mt-1 font-mono">
+                    {upgradePlanOutput.target?.blueprint.version ??
+                      upgradePlanOutput.plan?.blueprint.toVersion}
+                  </p>
+                  <p class="mt-1 truncate">
+                    {upgradePlanOutput.target?.blueprint.variant ??
+                      upgradePlanOutput.plan?.blueprint.toVariant ??
+                      "default"}
+                    {" · "}
+                    {upgradePlanOutput.target?.blueprint.profile ?? profile}
+                  </p>
+                </div>
+              </div>
+
+              {#if upgradePlanOutput.changes?.length}
+                <ul class="space-y-1">
+                  {#each upgradePlanOutput.changes.slice(0, 5) as change (`${change.kind}-${change.summary}`)}
+                    <li class="leading-5">
+                      <span class="font-medium">{change.classification}</span>
+                      {" · "}
+                      <span>{change.summary}</span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+
+              {#if upgradePlanOutput.preservedUserConfigurationWarnings?.length}
+                <ul class="space-y-1 text-muted-foreground">
+                  {#each upgradePlanOutput.preservedUserConfigurationWarnings.slice(0, 4) as warning (warning)}
+                    <li>{warning}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+
             <details class="console-subtle-panel p-3">
               <summary class="cursor-pointer text-sm font-medium">查看 upgrade plan JSON</summary>
               <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(upgradePlanOutput, null, 2)}</pre>
