@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   appaloftDeploymentConfigFileNames,
+  appaloftDeploymentDependencyKinds,
+  applyAppaloftDeploymentConfigProfile,
+  applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
@@ -49,7 +52,7 @@ describe("Appaloft deployment config schema", () => {
       },
       secrets: {
         SSH_PRIVATE_KEY: {
-          from: "server-credential:ssh_prod",
+          from: "resource-secret:SSH_PRIVATE_KEY",
         },
       },
       preview: {
@@ -111,7 +114,28 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
-  test("[RT-CAP-SCHED-001] rejects unsafe scheduled runtime prune retention config", () => {
+  test("[CONFIG-FILE-RUNTIME-PRUNE-001][RT-CAP-SCHED-001] accepts runtime prune retention config defaults", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      retention: {
+        runtimePrune: {
+          retentionDays: 14,
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.retention?.runtimePrune).toEqual({
+        retentionDays: 14,
+        destructive: false,
+        categories: ["stopped-containers"],
+        retryOnFailure: true,
+        enabled: true,
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-RUNTIME-PRUNE-002][RT-CAP-SCHED-001] rejects unsafe scheduled runtime prune retention config", () => {
     const parsed = parseAppaloftDeploymentConfig({
       retention: {
         runtimePrune: {
@@ -122,6 +146,1248 @@ describe("Appaloft deployment config schema", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-IMAGE-SOURCE-001] accepts prebuilt image source declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "source:",
+        "  type: image",
+        "  image: ghcr.io/acme/api:1.7.3",
+        "network:",
+        "  internalPort: 8080",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.source).toEqual({
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+      });
+    }
+
+    const explicitStrategy = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image:
+          "registry.example.com/acme/api@sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0",
+      },
+      runtime: {
+        strategy: "prebuilt-image",
+      },
+    });
+
+    expect(explicitStrategy.success).toBe(true);
+  });
+
+  test("[CONFIG-FILE-IMAGE-SOURCE-002][CONFIG-FILE-IMAGE-SOURCE-005] rejects unsafe image source declarations", () => {
+    const gitFields = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+        repository: "https://github.com/acme/api",
+      },
+    });
+
+    expect(gitFields.success).toBe(false);
+    if (!gitFields.success) {
+      expect(gitFields.error.issues[0]?.message).toContain("config_source_resolution");
+    }
+
+    const credentials = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "https://user:password@registry.example.com/acme/api:1.7.3",
+      },
+    });
+
+    expect(credentials.success).toBe(false);
+
+    const pullSecret = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+        pullSecret: "resource-secret:REGISTRY_TOKEN",
+      },
+    });
+
+    expect(pullSecret.success).toBe(false);
+
+    const incompatibleStrategy = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+      },
+      runtime: {
+        strategy: "workspace-commands",
+      },
+    });
+
+    expect(incompatibleStrategy.success).toBe(false);
+    if (!incompatibleStrategy.success) {
+      expect(incompatibleStrategy.error.issues[0]?.message).toContain(
+        "source.type image requires runtime.strategy prebuilt-image",
+      );
+      expect(incompatibleStrategy.error.issues[0]?.path).toEqual(["runtime", "strategy"]);
+    }
+  });
+
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-001] accepts and applies PR preview profile overlays", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "workspace-commands",
+        startCommand: "bun run start",
+      },
+      network: {
+        internalPort: 3000,
+      },
+      env: {
+        APP_ENV: "production",
+      },
+      preview: {
+        pullRequest: {
+          domainTemplate: "pr-{pr_number}.preview.example.com",
+          profile: {
+            runtime: {
+              name: "preview-{pr_number}",
+              start: {
+                command: "bun run preview",
+              },
+            },
+            network: {
+              internalPort: 3001,
+            },
+            health: {
+              path: "/preview-ready",
+            },
+            access: {
+              generated: {
+                enabled: true,
+                pathPrefix: "/",
+              },
+            },
+            env: {
+              APP_ENV: "preview",
+            },
+            secrets: {
+              APP_SECRET: {
+                from: "ci-env:APP_SECRET",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const effective = applyAppaloftDeploymentPreviewProfile(parsed.data);
+      expect(effective.runtime?.name).toBe("preview-{pr_number}");
+      expect(effective.runtime?.start?.command).toBe("bun run preview");
+      expect(effective.network?.internalPort).toBe(3001);
+      expect(effective.health?.path).toBe("/preview-ready");
+      expect(effective.access?.generated?.enabled).toBe(true);
+      expect(effective.env?.APP_ENV).toBe("preview");
+      expect(effective.secrets?.APP_SECRET?.from).toBe("ci-env:APP_SECRET");
+    }
+  });
+
+  test("[CONFIG-FILE-PREVIEW-OVERLAY-002] rejects unsafe PR preview overlay fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            runtime: {
+              startCommand: "bun run start",
+            },
+            projectId: "proj_prod",
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+
+    const unsafeDomainOverlay = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            access: {
+              domains: [
+                {
+                  host: "preview.example.com",
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    expect(unsafeDomainOverlay.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            env: {
+              DATABASE_URL: "postgres://user:password@example/db",
+            },
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const providerHandle = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            runtime: {
+              startCommand: "bun run start",
+            },
+            providerAccount: "acct_prod",
+          },
+        },
+      },
+    });
+
+    expect(providerHandle.success).toBe(false);
+
+    const lifecycleGraphDelta = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          profile: {
+            storage: {
+              data: {
+                kind: "volume",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(lifecycleGraphDelta.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-001] accepts product-grade PR preview policy", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            sameRepositoryPreviews: true,
+            forkPreviews: "without-secrets",
+            secretBackedPreviews: false,
+            maxActivePreviews: 5,
+            previewTtlHours: 72,
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.preview?.pullRequest?.policy).toEqual({
+        sameRepositoryPreviews: true,
+        forkPreviews: "without-secrets",
+        secretBackedPreviews: false,
+        maxActivePreviews: 5,
+        previewTtlHours: 72,
+      });
+    }
+
+    const defaults = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {},
+        },
+      },
+    });
+
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data.preview?.pullRequest?.policy).toEqual({
+        sameRepositoryPreviews: true,
+        forkPreviews: "disabled",
+        secretBackedPreviews: true,
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-PREVIEW-POLICY-002] rejects unsafe PR preview policy fields", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            sameRepositoryPreviews: true,
+            providerInstallationId: "inst_123",
+          },
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["preview", "pullRequest", "policy"]);
+    }
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            webhookSecret: "plain-secret-value",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+    if (!rawSecret.success) {
+      expect(rawSecret.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawSecret.error.issues[0]?.path).toEqual([
+        "preview",
+        "pullRequest",
+        "policy",
+        "webhookSecret",
+      ]);
+    }
+
+    const invalidTtl = parseAppaloftDeploymentConfig({
+      preview: {
+        pullRequest: {
+          policy: {
+            previewTtlHours: 0,
+          },
+        },
+      },
+    });
+
+    expect(invalidTtl.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-001] accepts and applies named config profile overlays", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        strategy: "workspace-commands",
+        startCommand: "bun run start",
+      },
+      network: {
+        internalPort: 3000,
+      },
+      env: {
+        APP_ENV: "production",
+      },
+      profiles: {
+        staging: {
+          runtime: {
+            start: {
+              command: "bun run start:staging",
+            },
+          },
+          network: {
+            internalPort: 3001,
+          },
+          health: {
+            path: "/staging-ready",
+          },
+          access: {
+            generated: {
+              enabled: true,
+              pathPrefix: "/",
+            },
+          },
+          monitoring: {
+            thresholds: {
+              rules: [
+                {
+                  signal: "cpu",
+                  metric: "containerCpuPercent",
+                  warning: 70,
+                },
+              ],
+            },
+          },
+          env: {
+            APP_ENV: "staging",
+          },
+          secrets: {
+            APP_SECRET: {
+              from: "ci-env:APP_SECRET",
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const effective = applyAppaloftDeploymentConfigProfile(parsed.data, "staging");
+      expect(effective.isOk()).toBe(true);
+      if (effective.isOk()) {
+        expect(effective.value.runtime?.start?.command).toBe("bun run start:staging");
+        expect(effective.value.network?.internalPort).toBe(3001);
+        expect(effective.value.health?.path).toBe("/staging-ready");
+        expect(effective.value.access?.generated?.enabled).toBe(true);
+        expect(effective.value.monitoring?.thresholds?.rules[0]?.warning).toBe(70);
+        expect(effective.value.env?.APP_ENV).toBe("staging");
+        expect(effective.value.secrets?.APP_SECRET?.from).toBe("ci-env:APP_SECRET");
+      }
+    }
+  });
+
+  test("[CONFIG-FILE-NAMED-PROFILE-002] rejects unsafe named config profile fields", () => {
+    const providerHandle = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          runtime: {
+            startCommand: "bun run start",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(providerHandle.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          env: {
+            DATABASE_URL: "postgres://user:password@example/db",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const lifecycleGraphDelta = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          dependencies: {
+            db: {
+              kind: "postgres",
+            },
+          },
+        },
+      },
+    });
+
+    expect(lifecycleGraphDelta.success).toBe(false);
+
+    const unsupportedSizing = parseAppaloftDeploymentConfig({
+      profiles: {
+        staging: {
+          cpu: "500m",
+        },
+      },
+    });
+
+    expect(unsupportedSizing.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-001] accepts managed Postgres dependency declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "source:",
+        "  type: git",
+        "  repository: https://github.com/acme/api",
+        "runtime:",
+        "  type: node",
+        "  build:",
+        "    command: bun install && bun run build",
+        "  start:",
+        "    command: bun run start",
+        "dependencies:",
+        "  db:",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "    backup:",
+        "      enabled: true",
+        "      intervalHours: 24",
+        "      retentionDays: 7",
+        "      retryOnFailure: true",
+        "    preview:",
+        "      lifecycle: ephemeral",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.source?.repository).toBe("https://github.com/acme/api");
+      expect(parsed.data.runtime?.type).toBe("node");
+      expect(parsed.data.runtime?.build?.command).toBe("bun install && bun run build");
+      expect(parsed.data.runtime?.start?.command).toBe("bun run start");
+      expect(parsed.data.dependencies?.db).toEqual({
+        kind: "postgres",
+        source: "managed",
+        bind: {
+          env: "DATABASE_URL",
+        },
+        backup: {
+          enabled: true,
+          intervalHours: 24,
+          retentionDays: 7,
+          retryOnFailure: true,
+        },
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-010] accepts canonical managed dependency kinds", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: Object.fromEntries(
+        appaloftDeploymentDependencyKinds.map((kind) => [
+          kind.replaceAll("-", "_"),
+          {
+            kind,
+            source: "managed",
+            bind: {
+              env: `${kind.replaceAll("-", "_").toUpperCase()}_URL`,
+            },
+          },
+        ]),
+      ),
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.redis?.kind).toBe("redis");
+      expect(parsed.data.dependencies?.object_storage?.kind).toBe("object-storage");
+      expect(parsed.data.dependencies?.opensearch?.bind.env).toBe("OPENSEARCH_URL");
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-001] accepts managed dependency backup policy declarations", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+          },
+        },
+        cache: {
+          kind: "redis",
+          source: "managed",
+          bind: {
+            env: "REDIS_URL",
+          },
+          backup: {
+            enabled: false,
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.db.backup).toEqual({
+        enabled: true,
+        intervalHours: 24,
+        retentionDays: 7,
+        retryOnFailure: true,
+      });
+      expect(parsed.data.dependencies?.cache.backup).toEqual({
+        enabled: false,
+        retryOnFailure: true,
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-002] rejects unknown dependency fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          plan: "starter",
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.path).toEqual(["dependencies", "db"]);
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-003] rejects dependency identity and secret material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["dependencies", "db", "providerAccount"]);
+    }
+
+    const rawConnection = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          connectionString: "postgres://user:password@example.test/app",
+        },
+      },
+    });
+
+    expect(rawConnection.success).toBe(false);
+    if (!rawConnection.success) {
+      expect(rawConnection.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawConnection.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "db",
+        "connectionString",
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-BACKUP-002] rejects unknown and unsafe dependency backup policy material", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            schedule: "0 3 * * *",
+          },
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["dependencies", "db", "backup"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            policyId: "dbp_manual",
+          },
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["dependencies", "db", "backup", "policyId"]);
+    }
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            intervalHours: 24,
+            retentionDays: 7,
+            artifactPath: "s3://secret-token@bucket/db.dump",
+          },
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const missingRequired = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "managed",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          backup: {
+            enabled: true,
+            retentionDays: 7,
+          },
+        },
+      },
+    });
+
+    expect(missingRequired.success).toBe(false);
+    if (!missingRequired.success) {
+      expect(missingRequired.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "db",
+        "backup",
+        "intervalHours",
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-STORAGE-001] accepts managed storage volume declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "storage:",
+        "  uploads:",
+        "    kind: volume",
+        "    source: managed",
+        "    mount:",
+        "      path: /app/uploads",
+        "      mode: read-only",
+        "    preview:",
+        "      lifecycle: ephemeral",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.storage?.uploads).toEqual({
+        kind: "volume",
+        source: "managed",
+        mount: {
+          path: "/app/uploads",
+          mode: "read-only",
+        },
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-STORAGE-002] rejects unknown storage fields and unsafe mount paths", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          size: "10Gi",
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["storage", "uploads"]);
+    }
+
+    for (const path of ["/", "../uploads", "/app/../uploads", "https://example.com/uploads"]) {
+      const parsed = parseAppaloftDeploymentConfig({
+        storage: {
+          uploads: {
+            kind: "volume",
+            source: "managed",
+            mount: {
+              path,
+            },
+          },
+        },
+      });
+
+      expect(parsed.success, path).toBe(false);
+    }
+  });
+
+  test("[CONFIG-FILE-STORAGE-003] rejects storage identity and host/source path material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["storage", "uploads", "providerAccount"]);
+    }
+
+    const hostPath = parseAppaloftDeploymentConfig({
+      storage: {
+        uploads: {
+          kind: "volume",
+          source: "managed",
+          mount: {
+            path: "/app/uploads",
+          },
+          sourcePath: "/var/lib/app/uploads",
+        },
+      },
+    });
+
+    expect(hostPath.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-001] accepts scheduled task declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "scheduledTasks:",
+        "  nightly_sync:",
+        '    schedule: "0 3 * * *"',
+        "    timezone: UTC",
+        "    command: bun run sync",
+        "    timeoutSeconds: 600",
+        "    retryLimit: 2",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "  cache_warm:",
+        '    schedule: "@hourly"',
+        "    command: bun run cache:warm",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.scheduledTasks?.nightly_sync).toEqual({
+        schedule: "0 3 * * *",
+        timezone: "UTC",
+        command: "bun run sync",
+        timeoutSeconds: 600,
+        retryLimit: 2,
+        concurrencyPolicy: "forbid",
+        status: "enabled",
+        preview: {
+          lifecycle: "ephemeral",
+        },
+      });
+      expect(parsed.data.scheduledTasks?.cache_warm).toEqual({
+        schedule: "@hourly",
+        timezone: "UTC",
+        command: "bun run cache:warm",
+        timeoutSeconds: 3600,
+        retryLimit: 0,
+        concurrencyPolicy: "forbid",
+        status: "enabled",
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-002] rejects unknown scheduled task fields", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "bun run sync",
+          providerScheduleHandle: "cron-123",
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.path).toEqual(["scheduledTasks", "nightly_sync"]);
+    }
+  });
+
+  test("[CONFIG-FILE-SCHED-TASK-003] rejects scheduled task identity and secret material", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "bun run sync",
+          providerAccount: "acct_prod",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual([
+        "scheduledTasks",
+        "nightly_sync",
+        "providerAccount",
+      ]);
+    }
+
+    const credentialUrl = parseAppaloftDeploymentConfig({
+      scheduledTasks: {
+        nightly_sync: {
+          schedule: "0 3 * * *",
+          command: "psql postgres://app:secret@example.test/app -c 'select 1'",
+        },
+      },
+    });
+
+    expect(credentialUrl.success).toBe(false);
+    if (!credentialUrl.success) {
+      expect(credentialUrl.error.issues[0]?.path).toEqual([
+        "scheduledTasks",
+        "nightly_sync",
+        "command",
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-001] accepts git-push auto-deploy policy", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "autoDeploy:",
+        "  enabled: true",
+        "  trigger: git-push",
+        "  refs:",
+        "    - main",
+        "    - refs/tags/v1.0.0",
+        "  events:",
+        "    - push",
+        "    - tag",
+        "  dedupeWindowSeconds: 300",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.autoDeploy).toEqual({
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main", "refs/tags/v1.0.0"],
+        events: ["push", "tag"],
+        dedupeWindowSeconds: 300,
+      });
+    }
+
+    const disabled = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: false,
+      },
+    });
+
+    expect(disabled.success).toBe(true);
+    if (disabled.success) {
+      expect(disabled.data.autoDeploy).toEqual({
+        enabled: false,
+        trigger: "git-push",
+        events: ["push"],
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-AUTO-DEPLOY-002] rejects unknown auto-deploy fields and unsafe material", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        providerWebhookId: "hook_123",
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["autoDeploy"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        sourceEventId: "src_evt_123",
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["autoDeploy", "sourceEventId"]);
+    }
+
+    const secret = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+        refs: ["main"],
+        webhookSecret: "plain-secret-value",
+      },
+    });
+
+    expect(secret.success).toBe(false);
+    if (!secret.success) {
+      expect(secret.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(secret.error.issues[0]?.path).toEqual(["autoDeploy", "webhookSecret"]);
+    }
+
+    const missingRefs = parseAppaloftDeploymentConfig({
+      autoDeploy: {
+        enabled: true,
+        trigger: "git-push",
+      },
+    });
+
+    expect(missingRefs.success).toBe(false);
+    if (!missingRefs.success) {
+      expect(missingRefs.error.issues[0]?.path).toEqual(["autoDeploy", "refs"]);
+    }
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-001] accepts generated access profile declarations", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      ["access:", "  generated:", "    enabled: true", "    pathPrefix: /app"].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.access?.generated).toEqual({
+        enabled: true,
+        pathPrefix: "/app",
+      });
+    }
+
+    const defaults = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {},
+      },
+    });
+
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data.access?.generated).toEqual({
+        enabled: true,
+        pathPrefix: "/",
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-GENERATED-ACCESS-002] rejects unknown and unsafe generated access fields", () => {
+    const unknown = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          providerMode: "sslip",
+        },
+      },
+    });
+
+    expect(unknown.success).toBe(false);
+    if (!unknown.success) {
+      expect(unknown.error.issues[0]?.path).toEqual(["access", "generated"]);
+    }
+
+    const identity = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          routeId: "route_123",
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["access", "generated", "routeId"]);
+    }
+
+    const unsafePath = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          pathPrefix: "https://example.com/app",
+        },
+      },
+    });
+
+    expect(unsafePath.success).toBe(false);
+    if (!unsafePath.success) {
+      expect(unsafePath.error.issues[0]?.path).toEqual(["access", "generated", "pathPrefix"]);
+    }
+
+    const rawCertificate = parseAppaloftDeploymentConfig({
+      access: {
+        generated: {
+          enabled: true,
+          certificate: "-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----",
+        },
+      },
+    });
+
+    expect(rawCertificate.success).toBe(false);
+    if (!rawCertificate.success) {
+      expect(rawCertificate.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(rawCertificate.error.issues[0]?.path).toEqual(["access", "generated", "certificate"]);
+    }
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-001] accepts runtime monitoring thresholds", () => {
+    const parsed = parseAppaloftDeploymentConfigText(
+      [
+        "monitoring:",
+        "  thresholds:",
+        "    enabled: true",
+        "    rules:",
+        "      - signal: cpu",
+        "        metric: containerCpuPercent",
+        "        warning: 70",
+        "        critical: 90",
+      ].join("\n"),
+      "appaloft.yaml",
+    );
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.monitoring?.thresholds).toEqual({
+        enabled: true,
+        rules: [
+          {
+            signal: "cpu",
+            metric: "containerCpuPercent",
+            warning: 70,
+            critical: 90,
+            comparator: "greater-than-or-equal",
+          },
+        ],
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-MONITORING-THRESHOLDS-002] rejects unknown and unsafe monitoring threshold fields", () => {
+    const identity = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          policyId: "rmtp_123",
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(identity.success).toBe(false);
+    if (!identity.success) {
+      expect(identity.error.issues[0]?.message).toContain("config_identity_field");
+      expect(identity.error.issues[0]?.path).toEqual(["monitoring", "thresholds", "policyId"]);
+    }
+
+    const metricMismatch = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rules: [
+            {
+              signal: "cpu",
+              metric: "usedBytes",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(metricMismatch.success).toBe(false);
+    if (!metricMismatch.success) {
+      expect(metricMismatch.error.issues[0]?.path).toEqual([
+        "monitoring",
+        "thresholds",
+        "rules",
+        0,
+        "metric",
+      ]);
+    }
+
+    const rawPayload = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rawPayload: '{"token":"secret"}',
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+              warning: 70,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(rawPayload.success).toBe(false);
+    if (!rawPayload.success) {
+      expect(rawPayload.error.issues[0]?.message).toContain("unsupported_config_field");
+      expect(rawPayload.error.issues[0]?.path).toEqual(["monitoring", "thresholds", "rawPayload"]);
+    }
+
+    const missingBoundary = parseAppaloftDeploymentConfig({
+      monitoring: {
+        thresholds: {
+          rules: [
+            {
+              signal: "cpu",
+              metric: "containerCpuPercent",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(missingBoundary.success).toBe(false);
+    if (!missingBoundary.success) {
+      expect(missingBoundary.error.issues[0]?.path).toEqual([
+        "monitoring",
+        "thresholds",
+        "rules",
+        0,
+        "warning",
+      ]);
+    }
   });
 
   test("[CONFIG-FILE-DISC-001] declares JSON and YAML config discovery names", () => {
@@ -349,7 +1615,7 @@ describe("Appaloft deployment config schema", () => {
     const reference = parseAppaloftDeploymentConfig({
       secrets: {
         DATABASE_URL: {
-          from: "environment-secret:database_url",
+          from: "resource-secret:DATABASE_URL",
         },
       },
     });

@@ -1145,6 +1145,113 @@ describe("deployment create HTTP route", () => {
     ).toBe(true);
   });
 
+  test("[CONFIG-FILE-NAMED-PROFILE-004] Action server config endpoint applies selected config profile", async () => {
+    const capturedCommands: Command<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof ResolveActionServerConfigDeploymentTargetCommand) {
+          return ok(actionServerConfigTarget(command) as T);
+        }
+        capturedCommands.push(command as Command<unknown>);
+        return ok({ id: "dep_from_config_profile" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const actionSourcePackageConfigReader = {
+      readConfig: async () =>
+        ok({
+          text: [
+            "controlPlane:",
+            "  mode: self-hosted",
+            "  url: https://console.example.com",
+            "env:",
+            "  APP_ENV: production",
+            "profiles:",
+            "  staging:",
+            "    runtime:",
+            "      strategy: workspace-commands",
+            "      startCommand: bun run staging",
+            "    env:",
+            "      APP_ENV: staging",
+          ].join("\n"),
+          fileName: "appaloft.yml",
+        }),
+    } satisfies ActionSourcePackageConfigReader;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      actionSourcePackageConfigReader,
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/action/deployments/from-config-package", {
+        method: "POST",
+        headers: {
+          ...actionDeployTokenHeaders,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceFingerprint:
+            "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+          configPath: "appaloft.yml",
+          configProfile: "staging",
+          sourceRoot: ".",
+          sourcePackage: {
+            transport: "server-github-fetch",
+            sourceFingerprint:
+              "source-fingerprint:v1:branch%3Amain:github:github.com%2Fappaloft%2Fwww:.:appaloft.yml",
+            configPath: "appaloft.yml",
+            sourceRoot: ".",
+            revision: "abc123",
+            repositoryFullName: "appaloft/www",
+          },
+          trustedContext: {
+            projectId: "prj_console",
+            environmentId: "env_prod",
+            resourceId: "res_www",
+            serverId: "srv_prod",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(
+      capturedCommands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toMatchObject({
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        startCommand: "bun run staging",
+      },
+    });
+    expect(
+      capturedCommands.find(
+        (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+      ),
+    ).toMatchObject({
+      key: "APP_ENV",
+      value: "staging",
+      kind: "plain-config",
+    });
+    const deployment = capturedCommands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "prj_console",
+      environmentId: "env_prod",
+      resourceId: "res_www",
+      serverId: "srv_prod",
+    });
+    expect("runtimeProfile" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] Action server config endpoint resolves existing source-link context without trusted ids", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

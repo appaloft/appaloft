@@ -1,11 +1,17 @@
 import {
+  containsScheduledTaskSecretText,
   domainError,
   err,
+  GitRefText,
   ok,
   type Result,
   resourceExposureModes,
   resourceNetworkProtocols,
   runtimePlanStrategies,
+  ScheduledTaskCommandIntent,
+  ScheduledTaskScheduleExpression,
+  ScheduledTaskTimezone,
+  SourceEventKindValue,
 } from "@appaloft/core";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -29,6 +35,51 @@ const safeRelativePathPattern =
   /^(?!\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*[;&|`$<>]).+$/;
 const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
 const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
+const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
+const storageKeyPattern = dependencyKeyPattern;
+const scheduledTaskKeyPattern = dependencyKeyPattern;
+const configProfileKeyPattern = dependencyKeyPattern;
+const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
+const appaloftDeploymentMonitoringSignals = [
+  "cpu",
+  "memory",
+  "disk",
+  "inode",
+  "docker",
+  "network",
+] as const;
+const appaloftDeploymentMonitoringThresholdMetrics = [
+  "containerCpuPercent",
+  "loadAverage1m",
+  "containerUsedBytes",
+  "usedBytes",
+  "attributedBytes",
+  "used",
+  "imageBytes",
+  "buildCacheBytes",
+  "containerWritableBytes",
+  "rxBytes",
+  "txBytes",
+] as const;
+const appaloftDeploymentMonitoringSignalMetrics: Record<
+  (typeof appaloftDeploymentMonitoringSignals)[number],
+  readonly (typeof appaloftDeploymentMonitoringThresholdMetrics)[number][]
+> = {
+  cpu: ["containerCpuPercent", "loadAverage1m"],
+  memory: ["containerUsedBytes", "usedBytes"],
+  disk: ["usedBytes", "attributedBytes"],
+  inode: ["used"],
+  docker: ["imageBytes", "buildCacheBytes", "containerWritableBytes"],
+  network: ["rxBytes", "txBytes"],
+};
+export const appaloftDeploymentDependencyKinds = [
+  "postgres",
+  "redis",
+  "mysql",
+  "clickhouse",
+  "object-storage",
+  "opensearch",
+] as const;
 export const appaloftDeploymentRuntimeNameTemplateVariables = ["preview_id", "pr_number"] as const;
 type AppaloftDeploymentRuntimeNameTemplateVariable =
   (typeof appaloftDeploymentRuntimeNameTemplateVariables)[number];
@@ -44,14 +95,52 @@ const domainHostError =
   "config_domain_resolution: access.domains[].host must be a domain name without scheme, port, path, or wildcard";
 const domainPathPrefixError =
   "config_domain_resolution: access.domains[].pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
+const generatedAccessPathPrefixError =
+  "config_generated_access_resolution: access.generated.pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
 const domainRedirectToError =
   "config_domain_resolution: access.domains[].redirectTo must be a domain name without scheme, port, path, or wildcard";
 const controlPlaneUrlError =
   "control_plane_config: controlPlane.url must be an http(s) URL without credentials, query, or fragment";
 const controlPlaneInstallerUrlError =
   "control_plane_config: controlPlane.install.installerUrl must be an http(s) URL without credentials, query, or fragment";
+const sourceRepositoryUrlError =
+  "config_source_resolution: source.repository must be a git URL without credentials, query, or fragment";
+const sourceImageReferenceError =
+  "config_source_resolution: source.image must be a Docker/OCI image reference without credentials, query, fragment, or secret material";
+const sourceImageRequiresImageError =
+  "config_source_resolution: source.image is required when source.type is image";
+const sourceImageRejectsGitFieldsError =
+  "config_source_resolution: source.type image must not declare git repository, ref, commit, or baseDirectory fields";
+const sourceImageRuntimeStrategyError =
+  "config_source_resolution: source.type image requires runtime.strategy prebuilt-image";
+const sourceImageRuntimeTypeError =
+  "config_source_resolution: source.type image must not combine with runtime.type";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
+const previewPolicyMaxActivePreviewsError =
+  "preview_config: preview.pullRequest.policy.maxActivePreviews must be a non-negative integer";
+const previewPolicyTtlHoursError =
+  "preview_config: preview.pullRequest.policy.previewTtlHours must be a positive integer";
+const storageMountPathError =
+  "config_storage_resolution: storage.<key>.mount.path must be an absolute normalized workload path";
+const scheduledTaskScheduleError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.schedule must be a safe scheduled task schedule expression";
+const scheduledTaskTimezoneError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.timezone must be an IANA timezone";
+const scheduledTaskCommandError =
+  "config_scheduled_task_resolution: scheduledTasks.<key>.command must be a single-line command intent without secrets";
+const autoDeployRefError =
+  "config_auto_deploy_resolution: autoDeploy.refs[] must be a safe git ref";
+const autoDeployRefsRequiredError =
+  "config_auto_deploy_resolution: autoDeploy.refs is required when autoDeploy is enabled";
+const dependencyBackupPolicyRequiredError =
+  "config_dependency_backup_resolution: dependencies.<key>.backup intervalHours and retentionDays are required when enabled";
+const monitoringThresholdRuleRequiredError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[] requires warning or critical";
+const monitoringThresholdCriticalOrderError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[].critical must be greater than or equal to warning";
+const monitoringThresholdMetricError =
+  "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[].metric must match signal";
 const positiveIntegerSchema = z.number().int().positive();
 
 const identityConfigFields = new Set([
@@ -74,6 +163,31 @@ const identityConfigFields = new Set([
   "targets",
   "destination",
   "destinationId",
+  "taskId",
+  "scheduledTaskId",
+  "policyId",
+  "backupPolicyId",
+  "backupId",
+  "restorePointId",
+  "artifactHandle",
+  "artifactId",
+  "sourceEvent",
+  "sourceEventId",
+  "webhookDelivery",
+  "webhookDeliveryId",
+  "deliveryId",
+  "routeId",
+  "domainBindingId",
+  "certificateId",
+  "thresholdPolicyId",
+  "monitoringPolicyId",
+  "ruleId",
+  "scope",
+  "scopeId",
+  "sampleId",
+  "metricSampleId",
+  "containerId",
+  "runtimeId",
   "provider",
   "providerKey",
   "providerAccount",
@@ -110,6 +224,19 @@ const unsupportedConfigFields = new Set([
   "restartPolicy",
   "rollout",
   "deploymentStrategy",
+  "quota",
+  "reservation",
+  "reservations",
+  "alert",
+  "alerts",
+  "notification",
+  "notifications",
+  "billing",
+  "metricPayload",
+  "rawPayload",
+  "hostPath",
+  "log",
+  "logs",
   "registrySecret",
   "pullSecret",
   "ingress",
@@ -125,6 +252,7 @@ const secretLikeKeyPattern =
   /(?:secret|password|passwd|token|api[_-]?key|database[_-]?url|connection[_-]?string|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
 const rawSecretValuePattern =
   /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----|(?:ssh-rsa|ssh-ed25519) [A-Za-z0-9+/=]+/;
+const allowedSecretLikeConfigFields = new Set(["secretBackedPreviews"]);
 
 export type AppaloftDeploymentConfigViolationCode =
   | "config_identity_field"
@@ -241,8 +369,84 @@ export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
   return ok(rendered);
 }
 
+function isSafeGitRepositoryUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (/^git@[^:\s]+:[^\s]+$/.test(trimmed)) {
+    return !/[?#]/.test(trimmed);
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!["http:", "https:", "ssh:"].includes(parsed.protocol)) {
+      return false;
+    }
+
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      return false;
+    }
+
+    return Boolean(parsed.hostname && parsed.pathname && parsed.pathname !== "/");
+  } catch {
+    return false;
+  }
+}
+
+function normalizeImageReference(value: string): string {
+  return value
+    .trim()
+    .replace(/^docker:\/\//, "")
+    .replace(/^image:\/\//, "");
+}
+
+function isSafeDockerImageReference(value: string): boolean {
+  const normalized = normalizeImageReference(value);
+  if (
+    !normalized ||
+    /[\s;&|`$<>?#]/.test(normalized) ||
+    /(?:password|passwd|secret|token|credential|private[-_]?key)=/i.test(normalized) ||
+    /^https?:\/\//i.test(value.trim())
+  ) {
+    return false;
+  }
+
+  const digestSeparatorCount = normalized.split("@").length - 1;
+  if (digestSeparatorCount > 1) {
+    return false;
+  }
+
+  const [nameAndMaybeTag = "", digest] = normalized.split("@", 2);
+  if (!nameAndMaybeTag || nameAndMaybeTag.startsWith("/") || nameAndMaybeTag.endsWith("/")) {
+    return false;
+  }
+
+  if (digest && !/^sha256:[a-f0-9]{64}$/i.test(digest)) {
+    return false;
+  }
+
+  const lastSlash = nameAndMaybeTag.lastIndexOf("/");
+  const lastColon = nameAndMaybeTag.lastIndexOf(":");
+  if (lastColon > lastSlash) {
+    const tag = nameAndMaybeTag.slice(lastColon + 1);
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) {
+      return false;
+    }
+  }
+
+  const imageName = lastColon > lastSlash ? nameAndMaybeTag.slice(0, lastColon) : nameAndMaybeTag;
+  return Boolean(imageName && !imageName.includes("://") && !imageName.includes("@"));
+}
+
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
+    type: z.enum(["git", "image"]).optional().describe("Repository source kind."),
+    repository: nonEmptyStringSchema
+      .refine(isSafeGitRepositoryUrl, sourceRepositoryUrlError)
+      .optional()
+      .describe("Git repository URL to deploy from."),
+    image: nonEmptyStringSchema
+      .refine(isSafeDockerImageReference, sourceImageReferenceError)
+      .optional()
+      .describe("Docker/OCI image reference to deploy as a prebuilt image."),
     baseDirectory: safeRelativePathSchema
       .optional()
       .describe("Relative workspace directory to use as the deployable source root."),
@@ -252,6 +456,41 @@ export const appaloftDeploymentSourceConfigSchema = z
       .describe("Immutable git commit SHA to record with the source profile."),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.type === "git" && !value.repository) {
+      context.addIssue({
+        code: "custom",
+        path: ["repository"],
+        message: "config_source_resolution: source.repository is required when source.type is git",
+      });
+    }
+
+    if (value.type === "image") {
+      if (!value.image) {
+        context.addIssue({
+          code: "custom",
+          path: ["image"],
+          message: sourceImageRequiresImageError,
+        });
+      }
+
+      if (value.repository || value.gitRef || value.commitSha || value.baseDirectory) {
+        context.addIssue({
+          code: "custom",
+          path: ["image"],
+          message: sourceImageRejectsGitFieldsError,
+        });
+      }
+    }
+
+    if (value.type !== "image" && value.image) {
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "config_source_resolution: source.image requires source.type image",
+      });
+    }
+  })
   .describe("Source profile fields. This object must not choose projects or resources.");
 
 export const appaloftDeploymentHealthCheckConfigSchema = z
@@ -265,12 +504,21 @@ export const appaloftDeploymentHealthCheckConfigSchema = z
   .strict()
   .describe("Health-check profile fields.");
 
+const appaloftDeploymentRuntimeCommandConfigSchema = z
+  .object({
+    command: nonEmptyStringSchema,
+  })
+  .strict();
+
 export const appaloftDeploymentRuntimeConfigSchema = z
   .object({
+    type: z.literal("node").optional().describe("Application runtime type shorthand."),
     strategy: z.enum(deploymentMethods).optional().describe("Requested runtime plan strategy."),
     installCommand: nonEmptyStringSchema.optional(),
     buildCommand: nonEmptyStringSchema.optional(),
     startCommand: nonEmptyStringSchema.optional(),
+    build: appaloftDeploymentRuntimeCommandConfigSchema.optional(),
+    start: appaloftDeploymentRuntimeCommandConfigSchema.optional(),
     name: runtimeNameConfigSchema.optional(),
     publishDirectory: safeRelativePathSchema.optional(),
     dockerfilePath: safeRelativePathSchema.optional(),
@@ -280,6 +528,39 @@ export const appaloftDeploymentRuntimeConfigSchema = z
     healthCheck: appaloftDeploymentHealthCheckConfigSchema.optional(),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.type === "node" && value.strategy && value.strategy !== "workspace-commands") {
+      context.addIssue({
+        code: "custom",
+        path: ["strategy"],
+        message: "runtime.type node requires runtime.strategy workspace-commands when both are set",
+      });
+    }
+
+    if (
+      value.buildCommand &&
+      value.build?.command &&
+      value.buildCommand.trim() !== value.build.command.trim()
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["build", "command"],
+        message: "runtime.build.command must match runtime.buildCommand when both are set",
+      });
+    }
+
+    if (
+      value.startCommand &&
+      value.start?.command &&
+      value.startCommand.trim() !== value.start.command.trim()
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["start", "command"],
+        message: "runtime.start.command must match runtime.startCommand when both are set",
+      });
+    }
+  })
   .describe("Runtime profile fields copied into resource creation for quick deploy.");
 
 export const appaloftDeploymentNetworkConfigSchema = z
@@ -371,6 +652,48 @@ function hasUnsafePathPrefixCharacter(value: string): boolean {
   return false;
 }
 
+function normalizeAbsoluteWorkloadPath(value: string): string {
+  const segments = value.trim().split("/").filter(Boolean);
+  return `/${segments.join("/")}`;
+}
+
+function isSafeStorageMountPath(value: string): boolean {
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ||
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    /^[a-z]:[\\/]/i.test(trimmed) ||
+    /[;&|`$<>]/.test(trimmed)
+  ) {
+    return false;
+  }
+
+  const segments = trimmed.split("/").filter(Boolean);
+  return segments.length > 0 && !segments.some((segment) => segment === "." || segment === "..");
+}
+
+function isSafeScheduledTaskSchedule(value: string): boolean {
+  return ScheduledTaskScheduleExpression.create(value).isOk();
+}
+
+function isSafeScheduledTaskTimezone(value: string): boolean {
+  return ScheduledTaskTimezone.create(value).isOk();
+}
+
+function isSafeScheduledTaskCommand(value: string): boolean {
+  return ScheduledTaskCommandIntent.create(value).isOk() && !containsScheduledTaskSecretText(value);
+}
+
+function isSafeAutoDeployRef(value: string): boolean {
+  return GitRefText.create(value).isOk();
+}
+
+function isSafeAutoDeployEvent(value: string): boolean {
+  return SourceEventKindValue.create(value).isOk();
+}
+
 const appaloftDeploymentAccessDomainConfigSchema = z
   .object({
     host: nonEmptyStringSchema.refine(
@@ -392,14 +715,36 @@ const appaloftDeploymentAccessDomainConfigSchema = z
   .strict()
   .describe("Provider-neutral server-applied domain intent.");
 
+const appaloftDeploymentGeneratedAccessConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    pathPrefix: nonEmptyStringSchema
+      .optional()
+      .default("/")
+      .pipe(z.string().refine(isSafeDomainPathPrefix, generatedAccessPathPrefixError)),
+  })
+  .strict()
+  .describe("Resource generated access profile intent.");
+
 export const appaloftDeploymentAccessConfigSchema = z
   .object({
-    domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1),
+    domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1).optional(),
+    generated: appaloftDeploymentGeneratedAccessConfigSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
-    const byHost = new Map<string, (typeof value.domains)[number]>();
-    for (const domain of value.domains) {
+    const domains = value.domains ?? [];
+    if (domains.length === 0 && !value.generated) {
+      context.addIssue({
+        code: "custom",
+        path: ["domains"],
+        message: "config_domain_resolution: access requires domains or generated",
+      });
+      return;
+    }
+
+    const byHost = new Map<string, NonNullable<typeof value.domains>[number]>();
+    for (const domain of domains) {
       const existing = byHost.get(domain.host);
       if (existing) {
         context.addIssue({
@@ -412,7 +757,7 @@ export const appaloftDeploymentAccessConfigSchema = z
       byHost.set(domain.host, domain);
     }
 
-    for (const domain of value.domains) {
+    for (const domain of domains) {
       if (domain.redirectStatus && !domain.redirectTo) {
         context.addIssue({
           code: "custom",
@@ -484,6 +829,261 @@ function isSafePreviewDomainTemplate(value: string): boolean {
   return isDomainName(rendered);
 }
 
+const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+export const appaloftDeploymentSecretReferenceSchema = z
+  .object({
+    from: nonEmptyStringSchema.describe(
+      "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET.",
+    ),
+    required: z.boolean().optional(),
+    description: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const appaloftDeploymentDependencyBackupConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    intervalHours: z.number().int().min(1).max(8_760).optional(),
+    retentionDays: z.number().int().min(1).max(3_650).optional(),
+    retryOnFailure: z.boolean().optional().default(true),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.enabled && (!value.intervalHours || !value.retentionDays)) {
+      context.addIssue({
+        code: "custom",
+        path: ["intervalHours"],
+        message: dependencyBackupPolicyRequiredError,
+      });
+    }
+  })
+  .describe("User-facing dependency resource scheduled backup policy declaration.");
+
+export const appaloftDeploymentDependencyConfigSchema = z
+  .object({
+    kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
+    source: z.literal("managed").describe("Managed dependencies are created by Appaloft."),
+    bind: z
+      .object({
+        env: nonEmptyStringSchema
+          .regex(
+            environmentVariableNamePattern,
+            "config_dependency_resolution: dependencies.<key>.bind.env must be an environment variable name",
+          )
+          .describe("Runtime environment variable target for this dependency."),
+      })
+      .strict(),
+    backup: appaloftDeploymentDependencyBackupConfigSchema.optional(),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing application dependency declaration.");
+
+export const appaloftDeploymentStorageConfigSchema = z
+  .object({
+    kind: z.literal("volume").describe("Application storage dependency kind."),
+    source: z.literal("managed").describe("Managed storage volumes are created by Appaloft."),
+    mount: z
+      .object({
+        path: nonEmptyStringSchema
+          .refine(isSafeStorageMountPath, storageMountPathError)
+          .describe("Absolute workload path that receives this storage volume."),
+        mode: z.enum(["read-write", "read-only"]).optional().default("read-write"),
+      })
+      .strict(),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing application storage declaration.");
+
+export const appaloftDeploymentScheduledTaskConfigSchema = z
+  .object({
+    schedule: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskSchedule, scheduledTaskScheduleError)
+      .describe("Safe scheduled task schedule expression."),
+    timezone: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskTimezone, scheduledTaskTimezoneError)
+      .optional()
+      .default("UTC"),
+    command: nonEmptyStringSchema
+      .refine(isSafeScheduledTaskCommand, scheduledTaskCommandError)
+      .describe("Single-line scheduled task command intent."),
+    timeoutSeconds: z.number().int().min(1).max(86_400).optional().default(3_600),
+    retryLimit: z.number().int().min(0).max(10).optional().default(0),
+    concurrencyPolicy: z.enum(["forbid"]).optional().default("forbid"),
+    status: z.enum(["enabled", "disabled"]).optional().default("enabled"),
+    preview: z
+      .object({
+        lifecycle: z.literal("ephemeral").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe("User-facing Resource scheduled task declaration.");
+
+export const appaloftDeploymentAutoDeployConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    trigger: z.literal("git-push").optional().default("git-push"),
+    refs: z
+      .array(nonEmptyStringSchema.refine(isSafeAutoDeployRef, autoDeployRefError))
+      .min(1)
+      .optional(),
+    events: z
+      .array(z.enum(["push", "tag"]).refine(isSafeAutoDeployEvent))
+      .min(1)
+      .optional()
+      .default(["push"]),
+    dedupeWindowSeconds: z.number().int().positive().max(86_400).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.enabled && (!value.refs || value.refs.length === 0)) {
+      context.addIssue({
+        code: "custom",
+        path: ["refs"],
+        message: autoDeployRefsRequiredError,
+      });
+    }
+  })
+  .describe("User-facing Resource auto-deploy policy declaration.");
+
+const appaloftDeploymentMonitoringThresholdRuleConfigSchema = z
+  .object({
+    signal: z.enum(appaloftDeploymentMonitoringSignals),
+    metric: z.enum(appaloftDeploymentMonitoringThresholdMetrics),
+    warning: z.number().finite().nonnegative().optional(),
+    critical: z.number().finite().nonnegative().optional(),
+    comparator: z.literal("greater-than-or-equal").optional().default("greater-than-or-equal"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.warning === undefined && value.critical === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["warning"],
+        message: monitoringThresholdRuleRequiredError,
+      });
+    }
+    if (
+      value.warning !== undefined &&
+      value.critical !== undefined &&
+      value.critical < value.warning
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["critical"],
+        message: monitoringThresholdCriticalOrderError,
+      });
+    }
+    if (!appaloftDeploymentMonitoringSignalMetrics[value.signal].includes(value.metric)) {
+      context.addIssue({
+        code: "custom",
+        path: ["metric"],
+        message: monitoringThresholdMetricError,
+      });
+    }
+  })
+  .describe("Resource runtime monitoring threshold rule.");
+
+export const appaloftDeploymentMonitoringConfigSchema = z
+  .object({
+    thresholds: z
+      .object({
+        enabled: z.boolean().optional().default(true),
+        rules: z.array(appaloftDeploymentMonitoringThresholdRuleConfigSchema).min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.thresholds) {
+      context.addIssue({
+        code: "custom",
+        path: ["thresholds"],
+        message: "config_monitoring_thresholds_resolution: monitoring requires thresholds",
+      });
+    }
+  })
+  .describe("Resource runtime monitoring config declarations.");
+
+const appaloftDeploymentPreviewAccessProfileConfigSchema = z
+  .object({
+    generated: appaloftDeploymentGeneratedAccessConfigSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.generated) {
+      context.addIssue({
+        code: "custom",
+        path: ["generated"],
+        message: "preview_config: preview.pullRequest.profile.access requires generated",
+      });
+    }
+  })
+  .describe("Preview profile access overlay fields.");
+
+export const appaloftDeploymentPreviewPolicyConfigSchema = z
+  .object({
+    sameRepositoryPreviews: z.boolean().optional().default(true),
+    forkPreviews: z
+      .enum(["disabled", "without-secrets", "with-secrets"])
+      .optional()
+      .default("disabled"),
+    secretBackedPreviews: z.boolean().optional().default(true),
+    maxActivePreviews: z
+      .number()
+      .int(previewPolicyMaxActivePreviewsError)
+      .nonnegative(previewPolicyMaxActivePreviewsError)
+      .optional(),
+    previewTtlHours: z
+      .number()
+      .int(previewPolicyTtlHoursError)
+      .positive(previewPolicyTtlHoursError)
+      .optional(),
+  })
+  .strict()
+  .describe("Product-grade pull request preview policy declaration.");
+
+export const appaloftDeploymentPreviewProfileConfigSchema = z
+  .object({
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentPreviewAccessProfileConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+  })
+  .strict()
+  .describe("Selected PR preview profile overlay fields.");
+
+export const appaloftDeploymentNamedProfileConfigSchema = z
+  .object({
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentAccessConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+  })
+  .strict()
+  .describe("Trusted-entrypoint-selected named config profile overlay fields.");
+
 export const appaloftDeploymentPreviewConfigSchema = z
   .object({
     pullRequest: z
@@ -492,24 +1092,14 @@ export const appaloftDeploymentPreviewConfigSchema = z
           .refine(isSafePreviewDomainTemplate, previewDomainTemplateError)
           .optional(),
         tlsMode: z.enum(["auto", "disabled"]).optional(),
+        policy: appaloftDeploymentPreviewPolicyConfigSchema.optional(),
+        profile: appaloftDeploymentPreviewProfileConfigSchema.optional(),
       })
       .strict()
       .optional(),
   })
   .strict()
   .describe("Preview deployment policy read by trusted entrypoints such as GitHub Actions.");
-
-const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
-
-export const appaloftDeploymentSecretReferenceSchema = z
-  .object({
-    from: nonEmptyStringSchema.describe(
-      "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod.",
-    ),
-    required: z.boolean().optional(),
-    description: z.string().trim().min(1).optional(),
-  })
-  .strict();
 
 function isSafeControlPlaneUrl(value: string): boolean {
   try {
@@ -613,15 +1203,141 @@ export const appaloftDeploymentConfigSchema = z
     retention: appaloftDeploymentRetentionConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
+    monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),
+    profiles: z
+      .record(
+        z
+          .string()
+          .regex(
+            configProfileKeyPattern,
+            "config_profile_resolution: profile keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentNamedProfileConfigSchema,
+      )
+      .optional(),
+    dependencies: z
+      .record(
+        z
+          .string()
+          .regex(
+            dependencyKeyPattern,
+            "config_dependency_resolution: dependency keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentDependencyConfigSchema,
+      )
+      .optional(),
+    storage: z
+      .record(
+        z
+          .string()
+          .regex(
+            storageKeyPattern,
+            "config_storage_resolution: storage keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentStorageConfigSchema,
+      )
+      .optional(),
+    scheduledTasks: z
+      .record(
+        z
+          .string()
+          .regex(
+            scheduledTaskKeyPattern,
+            "config_scheduled_task_resolution: scheduled task keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentScheduledTaskConfigSchema,
+      )
+      .optional(),
+    autoDeploy: appaloftDeploymentAutoDeployConfigSchema.optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.source?.type !== "image") {
+      return;
+    }
+
+    if (value.runtime?.type) {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "type"],
+        message: sourceImageRuntimeTypeError,
+      });
+    }
+
+    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceImageRuntimeStrategyError,
+      });
+    }
+  })
   .describe("Appaloft repository deployment profile config file.");
 
 export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
 export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
+
+type AppaloftDeploymentConfigProfileOverlay = Pick<
+  Partial<AppaloftDeploymentConfig>,
+  "runtime" | "network" | "health" | "access" | "monitoring" | "env" | "secrets"
+>;
+
+function applyAppaloftDeploymentProfileOverlay(
+  config: AppaloftDeploymentConfig,
+  profile: AppaloftDeploymentConfigProfileOverlay,
+): AppaloftDeploymentConfig {
+  return normalizeDeploymentConfig({
+    ...config,
+    ...(profile.runtime ? { runtime: { ...config.runtime, ...profile.runtime } } : {}),
+    ...(profile.network ? { network: { ...config.network, ...profile.network } } : {}),
+    ...(profile.health ? { health: { ...config.health, ...profile.health } } : {}),
+    ...(profile.access ? { access: { ...config.access, ...profile.access } } : {}),
+    ...(profile.monitoring ? { monitoring: { ...config.monitoring, ...profile.monitoring } } : {}),
+    ...(profile.env ? { env: { ...config.env, ...profile.env } } : {}),
+    ...(profile.secrets ? { secrets: { ...config.secrets, ...profile.secrets } } : {}),
+  });
+}
+
+export function applyAppaloftDeploymentConfigProfile(
+  config: AppaloftDeploymentConfig,
+  profileName: string,
+): Result<AppaloftDeploymentConfig> {
+  const normalizedProfileName = profileName.trim();
+  if (!configProfileKeyPattern.test(normalizedProfileName)) {
+    return err(
+      domainError.validation("Deployment config profile key is invalid", {
+        phase: "config-profile-resolution",
+        profile: normalizedProfileName,
+      }),
+    );
+  }
+
+  const profile = config.profiles?.[normalizedProfileName];
+  if (!profile) {
+    return err(
+      domainError.validation("Deployment config profile was not found", {
+        phase: "config-profile-resolution",
+        profile: normalizedProfileName,
+      }),
+    );
+  }
+
+  return ok(applyAppaloftDeploymentProfileOverlay(config, profile));
+}
+
+export function applyAppaloftDeploymentPreviewProfile(
+  config: AppaloftDeploymentConfig,
+): AppaloftDeploymentConfig {
+  const profile = config.preview?.pullRequest?.profile;
+  if (!profile) {
+    return config;
+  }
+
+  return applyAppaloftDeploymentProfileOverlay(config, profile);
+}
 
 function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
   return {
@@ -645,21 +1361,42 @@ function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDe
     ...(config.access
       ? {
           access: {
-            domains: config.access.domains.map((domain) => {
-              const normalizedDomain = {
-                ...domain,
-                host: domain.host.toLowerCase(),
-                ...(domain.redirectTo ? { redirectTo: domain.redirectTo.toLowerCase() } : {}),
-              };
+            ...(config.access.domains
+              ? {
+                  domains: config.access.domains.map((domain) => {
+                    const normalizedDomain = {
+                      ...domain,
+                      host: domain.host.toLowerCase(),
+                      ...(domain.redirectTo ? { redirectTo: domain.redirectTo.toLowerCase() } : {}),
+                    };
 
-              return normalizedDomain.redirectTo && !normalizedDomain.redirectStatus
-                ? {
-                    ...normalizedDomain,
-                    redirectStatus: 308,
-                  }
-                : normalizedDomain;
-            }),
+                    return normalizedDomain.redirectTo && !normalizedDomain.redirectStatus
+                      ? {
+                          ...normalizedDomain,
+                          redirectStatus: 308,
+                        }
+                      : normalizedDomain;
+                  }),
+                }
+              : {}),
+            ...(config.access.generated ? { generated: config.access.generated } : {}),
           },
+        }
+      : {}),
+    ...(config.storage
+      ? {
+          storage: Object.fromEntries(
+            Object.entries(config.storage).map(([key, storage]) => [
+              key,
+              {
+                ...storage,
+                mount: {
+                  ...storage.mount,
+                  path: normalizeAbsoluteWorkloadPath(storage.mount.path),
+                },
+              },
+            ]),
+          ),
         }
       : {}),
   };
@@ -688,14 +1425,20 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "network" ||
     root === "source" ||
     root === "access" ||
+    root === "dependencies" ||
+    root === "storage" ||
+    root === "scheduledTasks" ||
+    root === "autoDeploy" ||
+    root === "monitoring" ||
+    root === "profiles" ||
     root === "controlPlane"
   );
 }
 
 function isAllowedSecretReference(path: (string | number)[], value: unknown): boolean {
   return (
-    path.length === 2 &&
-    path[0] === "secrets" &&
+    path.length >= 2 &&
+    path[path.length - 2] === "secrets" &&
     isRecord(value) &&
     typeof value.from === "string" &&
     value.from.trim().length > 0
@@ -703,7 +1446,11 @@ function isAllowedSecretReference(path: (string | number)[], value: unknown): bo
 }
 
 function shouldTreatSecretField(path: (string | number)[], key: string, value: unknown): boolean {
-  if (path.length === 0 && key === "secrets" && isRecord(value)) {
+  if (key === "secrets" && isRecord(value)) {
+    return false;
+  }
+
+  if (allowedSecretLikeConfigFields.has(key)) {
     return false;
   }
 

@@ -100,6 +100,7 @@ Logical request shape:
 type ActionServerConfigDeployRequest = {
   sourceFingerprint: string;
   configPath: string;
+  configProfile?: string;
   sourceRoot: string;
   sourcePackage: SourcePackageManifest;
   sourcePackageCredentials?: {
@@ -127,6 +128,10 @@ type ActionServerConfigDeployRequest = {
   };
 };
 ```
+
+`configProfile` is trusted entrypoint selection of `profiles.<key>` inside the selected config
+file. It is not an Appaloft Environment selector and must be applied before server-side
+profile/env/domain command derivation.
 
 `trustedContext` is trusted entrypoint/server context. The recommended steady-state request carries
 GitHub repository/ref/revision facts and no Appaloft deployment ids. The deploy-action wrapper may
@@ -343,7 +348,9 @@ console output.
   before build or runtime plan execution. Provider-scoped credentials may be used transiently for
   GitHub submodule URL rewrites, but raw tokens must not be persisted or echoed in logs, errors,
   summaries, or read models.
-- When the validated config contains runtime, network, or health profile fields, the endpoint
+- When `configProfile` is supplied, the endpoint first selects and merges `profiles.<key>` from the
+  validated config. Missing profiles fail before mutation with `config-profile-resolution`.
+- When the effective config contains runtime, network, or health profile fields, the endpoint
   applies them through `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` before dispatching `deployments.create`.
 - When the validated config contains plain `env` values, the endpoint applies them through

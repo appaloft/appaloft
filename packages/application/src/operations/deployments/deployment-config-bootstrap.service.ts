@@ -74,6 +74,7 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
+import { deploymentSnapshotRuntimePrunePolicyId } from "../servers/configure-scheduled-runtime-prune-policy.command";
 import { type ScheduledRuntimePrunePolicyRepository } from "../servers/scheduled-runtime-prune.service";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 
@@ -153,10 +154,6 @@ function normalizeDeploymentResourceInput(
     ...(resource.description ? { description: resource.description } : {}),
     ...(resource.services ? { services: resource.services } : {}),
   };
-}
-
-function deploymentSnapshotRuntimePrunePolicyId(serverId: string): string {
-  return `rpp_deployment_snapshot_${serverId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 @injectable()

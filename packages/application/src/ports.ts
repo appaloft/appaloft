@@ -385,10 +385,68 @@ export interface SourceLinkTarget {
   destinationId?: string;
 }
 
+export interface SourceLinkDependencyProvenanceEntry {
+  key: string;
+  kind: ManagedDependencyResourceKind;
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  dependencyResourceId: string;
+  bindingId: string;
+  targetName: string;
+  createdAt: string;
+}
+
+export interface SourceLinkDependencyProvenance {
+  schemaVersion: "source-link.dependency-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}
+
+export interface SourceLinkStorageProvenanceEntry {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  storageVolumeId: string;
+  attachmentId: string;
+  destinationPath: string;
+  createdAt: string;
+}
+
+export interface SourceLinkStorageProvenance {
+  schemaVersion: "source-link.storage-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkStorageProvenanceEntry[];
+}
+
+export interface SourceLinkScheduledTaskProvenanceEntry {
+  key: string;
+  source: "repository-config";
+  lifecycle: "persistent" | "ephemeral";
+  resourceId: string;
+  taskId: string;
+  commandFingerprint: string;
+  createdAt: string;
+}
+
+export interface SourceLinkScheduledTaskProvenance {
+  schemaVersion: "source-link.scheduled-task-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkScheduledTaskProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
+  dependencyProvenance?: SourceLinkDependencyProvenance;
+  storageProvenance?: SourceLinkStorageProvenance;
+  scheduledTaskProvenance?: SourceLinkScheduledTaskProvenance;
 }
 
 export interface SourceLinkSelectionSpecVisitor<TResult> {

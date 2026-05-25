@@ -124,6 +124,25 @@ When enabled, the policy belongs to one Resource and is bound to that Resource's
 profile. If the Resource source changes later, the old policy becomes blocked until a user
 explicitly acknowledges that the new source should still trigger auto-deploy.
 
+<h2 id="source-auto-deploy-config-file">Declare auto-deploy in appaloft.yaml</h2>
+
+For repository-driven deploys, the common git-push policy can live in the config file:
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+```
+
+Config deploy reconciles this through `resources.configure-auto-deploy` before the next deployment
+attempt. Generic signed webhook secret references and endpoint setup remain explicit operations.
+Do not commit webhook secrets, provider tokens, source-event ids, or delivery ids in
+`appaloft.yaml`.
+
 <h2 id="source-auto-deploy-signatures">Signatures and secrets</h2>
 
 Git provider webhooks and generic signed webhooks must be verified before policy matching. Generic

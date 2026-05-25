@@ -82,6 +82,9 @@ Current status:
   Repository config docs now describe `controlPlane.mode`, safe `controlPlane.url` usage, and the
   narrow advanced-bootstrap role of `controlPlane.deploymentContext` under
   `environments/reference/config-file#environment-config-file-control-plane`.
+  Repository config docs now also describe source/runtime fields, including Dockerfile path,
+  Docker Compose file path, Docker build target, and static publish directory, under
+  `environments/reference/config-file#environment-config-file-runtime`.
   CLI remote control-plane client docs now describe login/profile/context storage, local fallback,
   remote typed SDK dispatch, explicit unsupported-operation behavior, and the no-adoption/no-secret
   boundary under `reference/cli#cli-remote-control-plane-login` and
@@ -113,6 +116,24 @@ Current status:
   `self-hosting.organization-team-management` help topic for HTTP/API routes, CLI commands, session
   input, safe outputs, owner-retention recovery, current organization switching, and apps/web
   `/organization` member/deploy-token management.
+  Repository config docs now cover user-facing application graphs for `dependencies`,
+  `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`,
+  `monitoring.thresholds`, `preview.pullRequest.policy`, `profiles.<key>`,
+  `preview.pullRequest.profile`, plus Resource health policy through
+  `health`, including ids-only deployment admission, preview provenance cleanup
+  where applicable, dependency backup policy reconciliation, Resource auto-deploy policy
+  reconciliation, Resource generated access profile reconciliation, exact Resource-scope
+  non-enforcing monitoring threshold reconciliation, Resource preview policy reconciliation,
+  selected named profile overlay application,
+  selected PR preview overlay application, Resource health policy reconciliation, and the
+  no-secret/no-provider-handle boundary
+  under
+  `environments/reference/config-file#environment-config-file-dependencies`,
+  `#environment-config-file-storage`, `#environment-config-file-generated-access`,
+  `#environment-config-file-monitoring-thresholds`, `#environment-config-file-named-profiles`,
+  `#environment-config-file-preview-profile`, `#environment-config-file-preview-policy`,
+  `#environment-config-file-health`,
+  `#environment-config-file-scheduled-tasks`, and `#environment-config-file-auto-deploy`.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,

@@ -19,7 +19,9 @@ This matrix covers Phase 7 storage volume lifecycle and resource attachment base
 - [Storage Volume Lifecycle Workflow](../workflows/storage-volume-lifecycle.md)
 - [Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
 - [Storage Volume Runtime Realization And Cleanup](../specs/070-storage-volume-runtime-realization-and-cleanup/spec.md)
+- [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
 - [ADR-064: Storage Volume Runtime Realization And Cleanup](../decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md)
+- [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
 - [Resource Profile Lifecycle](../workflows/resource-profile-lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -57,6 +59,8 @@ This matrix covers Phase 7 storage volume lifecycle and resource attachment base
 | STOR-ENTRY-001 | Operation catalog | Catalog | Storage operations are public. | Operation catalog and `CORE_OPERATIONS.md` contain one row per operation; no generic update. | `packages/application/test/operation-catalog-boundary.test.ts`; `packages/docs-registry/test/operation-coverage.test.ts` |
 | STOR-ENTRY-002 | CLI | Entrypoint | Storage and attach/detach commands submitted. | CLI dispatches command/query bus using application schema. | `packages/adapters/cli/test/storage-volume-command.test.ts` |
 | STOR-ENTRY-003 | oRPC/HTTP | Entrypoint | Storage and attach/detach routes submitted. | Routes dispatch command/query bus using application schema. | `packages/orpc/test/storage-volume.http.test.ts` |
+| STOR-CONFIG-001 | Repository config | Entrypoint workflow | `appaloft.yaml` declares managed storage mounted at a workload path. | Config deploy lists/creates a managed named volume, reads/attaches Resource storage, writes preview provenance when ephemeral, and keeps `deployments.create` ids-only. | `packages/deployment-config/test/appaloft-config.test.ts`; `packages/adapters/cli/test/deployment-config.test.ts` |
+| STOR-CONFIG-002 | Preview cleanup | Application workflow | Preview source link has repository-config storage provenance. | `deployments.cleanup-preview` detaches/deletes only provenance-owned ephemeral storage and preserves manual/shared storage without provenance. | `packages/application/test/cleanup-preview.test.ts` |
 | STOR-WEB-001 | Web Resource detail | Entrypoint | Operator opens Resource settings storage section. | Web lists project/environment storage volumes, displays current `resources.show` storage attachments, dispatches `resources.attach-storage` and `resources.detach-storage` through shared oRPC clients, and links the public storage-volume docs anchor. It does not provision provider-native volumes or delete provider-native storage. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
 | STOR-WEB-002 | Web Resource detail | Entrypoint | Operator manages provider-neutral storage volume records from the Resource storage section. | Web dispatches `storage-volumes.create`, `storage-volumes.rename`, and `storage-volumes.delete` through shared oRPC clients with i18n text and keeps provider-native provisioning out of the UI. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` covers create route behavior. |
 | STOR-WEB-003 | Web Resource detail | Entrypoint | Operator runs storage runtime cleanup from the Resource storage section. | Web dispatches `storage-volumes.cleanup-runtime` through the shared oRPC client, defaults the operator flow to dry-run preview, and requires destructive confirmation before sending `dryRun = false`. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
@@ -71,6 +75,8 @@ Tests must assert storage commands do not:
 - explicitly provision provider-native Docker/Compose/Swarm volumes outside deployment execution;
 - run runtime volume cleanup through `servers.capacity.prune` or `storage-volumes.delete`;
 - delete bind-mount source paths;
+- accept host bind source paths, provider-native handles, or provider accounts from repository
+  config;
 - bind or unbind dependency resources;
 - perform backup or restore;
 - expose secrets, credentials, auth headers, cookies, provider tokens, or private keys.

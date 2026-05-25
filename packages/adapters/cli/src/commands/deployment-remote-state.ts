@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { type ManagedDependencyResourceKind } from "@appaloft/application";
 import {
   type DomainError,
   domainError,
@@ -44,10 +45,68 @@ export interface SourceLinkTarget {
   destinationId?: string;
 }
 
+export interface SourceLinkDependencyProvenanceEntry {
+  key: string;
+  kind: ManagedDependencyResourceKind;
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  dependencyResourceId: string;
+  bindingId: string;
+  targetName: string;
+  createdAt: string;
+}
+
+export interface SourceLinkDependencyProvenance {
+  schemaVersion: "source-link.dependency-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}
+
+export interface SourceLinkStorageProvenanceEntry {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  lifecycle: "ephemeral";
+  resourceId: string;
+  storageVolumeId: string;
+  attachmentId: string;
+  destinationPath: string;
+  createdAt: string;
+}
+
+export interface SourceLinkStorageProvenance {
+  schemaVersion: "source-link.storage-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkStorageProvenanceEntry[];
+}
+
+export interface SourceLinkScheduledTaskProvenanceEntry {
+  key: string;
+  source: "repository-config";
+  lifecycle: "persistent" | "ephemeral";
+  resourceId: string;
+  taskId: string;
+  commandFingerprint: string;
+  createdAt: string;
+}
+
+export interface SourceLinkScheduledTaskProvenance {
+  schemaVersion: "source-link.scheduled-task-provenance/v1";
+  source: "repository-config";
+  sourceFingerprint: string;
+  entries: SourceLinkScheduledTaskProvenanceEntry[];
+}
+
 export interface SourceLinkRecord extends SourceLinkTarget {
   sourceFingerprint: string;
   updatedAt: string;
   reason?: string;
+  dependencyProvenance?: SourceLinkDependencyProvenance;
+  storageProvenance?: SourceLinkStorageProvenance;
+  scheduledTaskProvenance?: SourceLinkScheduledTaskProvenance;
 }
 
 export interface SourceLinkDiagnostics {
@@ -1035,6 +1094,135 @@ export class FileSystemSourceLinkStore {
       sourceFingerprint: input.sourceFingerprint,
       updatedAt: input.updatedAt,
       ...input.target,
+    });
+  }
+
+  async recordDependencyProvenance(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    dependencyProvenance: SourceLinkDependencyProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>> {
+    const targetResult = validateTargetContext(input.target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const existing = await this.read(input.sourceFingerprint);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    if (existing.value && !sameTarget(existing.value, input.target)) {
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint: input.sourceFingerprint,
+          projectId: existing.value.projectId,
+          environmentId: existing.value.environmentId,
+          resourceId: existing.value.resourceId,
+        }),
+      );
+    }
+
+    return await this.write({
+      ...(existing.value ?? {}),
+      sourceFingerprint: input.sourceFingerprint,
+      updatedAt: input.updatedAt,
+      ...input.target,
+      dependencyProvenance: input.dependencyProvenance,
+      ...(existing.value?.storageProvenance
+        ? { storageProvenance: existing.value.storageProvenance }
+        : {}),
+      ...(existing.value?.scheduledTaskProvenance
+        ? { scheduledTaskProvenance: existing.value.scheduledTaskProvenance }
+        : {}),
+      ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
+    });
+  }
+
+  async recordStorageProvenance(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    storageProvenance: SourceLinkStorageProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>> {
+    const targetResult = validateTargetContext(input.target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const existing = await this.read(input.sourceFingerprint);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    if (existing.value && !sameTarget(existing.value, input.target)) {
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint: input.sourceFingerprint,
+          projectId: existing.value.projectId,
+          environmentId: existing.value.environmentId,
+          resourceId: existing.value.resourceId,
+        }),
+      );
+    }
+
+    return await this.write({
+      ...(existing.value ?? {}),
+      sourceFingerprint: input.sourceFingerprint,
+      updatedAt: input.updatedAt,
+      ...input.target,
+      ...(existing.value?.dependencyProvenance
+        ? { dependencyProvenance: existing.value.dependencyProvenance }
+        : {}),
+      storageProvenance: input.storageProvenance,
+      ...(existing.value?.scheduledTaskProvenance
+        ? { scheduledTaskProvenance: existing.value.scheduledTaskProvenance }
+        : {}),
+      ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
+    });
+  }
+
+  async recordScheduledTaskProvenance(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    scheduledTaskProvenance: SourceLinkScheduledTaskProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>> {
+    const targetResult = validateTargetContext(input.target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const existing = await this.read(input.sourceFingerprint);
+    if (existing.isErr()) {
+      return err(existing.error);
+    }
+    if (existing.value && !sameTarget(existing.value, input.target)) {
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint: input.sourceFingerprint,
+          projectId: existing.value.projectId,
+          environmentId: existing.value.environmentId,
+          resourceId: existing.value.resourceId,
+        }),
+      );
+    }
+
+    return await this.write({
+      ...(existing.value ?? {}),
+      sourceFingerprint: input.sourceFingerprint,
+      updatedAt: input.updatedAt,
+      ...input.target,
+      ...(existing.value?.dependencyProvenance
+        ? { dependencyProvenance: existing.value.dependencyProvenance }
+        : {}),
+      ...(existing.value?.storageProvenance
+        ? { storageProvenance: existing.value.storageProvenance }
+        : {}),
+      scheduledTaskProvenance: input.scheduledTaskProvenance,
+      ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
     });
   }
 

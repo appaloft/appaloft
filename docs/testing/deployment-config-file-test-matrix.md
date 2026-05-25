@@ -14,12 +14,29 @@ Canonical assertions:
 - first-run project/resource creation uses explicit operations and source-derived defaults;
 - config-driven runs follow the same Quick Deploy project/server/environment/resource operation
   order as interactive entrypoints;
+- Git and prebuilt image source declarations map to Resource source/runtime profile commands before
+  deployment;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
 - trusted CLI/Action/Web/future-tool profile inputs mirror the repository config profile fields,
   override selected config values, and feed the same Quick Deploy bootstrap path without generating
   temporary config files;
-- non-secret env values and resolved secret references map to environment commands before
-  deployment;
+- non-secret env values and `ci-env:` resolved secret references map to environment commands before
+  deployment, while `resource-secret:` references check existing Resource secrets without copying
+  values;
+- `dependencies` declarations map to dependency-resource list/provision and Resource binding
+  operations before deployment;
+- `dependencies.<key>.backup` declarations map to dependency-resource backup policy operations
+  before deployment without mutating manual policies;
+- `storage` declarations map to storage-volume list/create and Resource storage attachment
+  operations before deployment;
+- `autoDeploy` declarations map to Resource auto-deploy policy configuration before deployment;
+- `preview.pullRequest.policy` declarations map to Resource preview policy show/configure before
+  ordinary trusted deployments and are skipped during PR preview mutation;
+- `access.generated` declarations map to Resource access profile configuration before deployment;
+- `monitoring.thresholds` declarations map to exact Resource-scope runtime monitoring threshold
+  policy configuration before deployment;
+- `retention.runtimePrune` declarations map to deployment-snapshot scheduled runtime prune policy
+  configuration for the trusted selected server before deployment;
 - final `deployments.create` input remains ids-only;
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
@@ -40,9 +57,29 @@ This matrix inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-055: Scheduled Runtime Prune Automation](../decisions/ADR-055-scheduled-runtime-prune-automation.md)
+- [ADR-066: Repository Config Dependency Graph](../decisions/ADR-066-repository-config-dependency-graph.md)
+- [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
+- [ADR-068: Repository Config Scheduled Task Graph](../decisions/ADR-068-repository-config-scheduled-task-graph.md)
+- [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
+- [ADR-070: Repository Config Dependency Backup Policy](../decisions/ADR-070-repository-config-dependency-backup-policy.md)
+- [ADR-071: Repository Config Generated Access Profile](../decisions/ADR-071-repository-config-generated-access-profile.md)
+- [ADR-072: Repository Config Runtime Monitoring Thresholds](../decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md)
+- [ADR-076: Repository Config Prebuilt Image Source](../decisions/ADR-076-repository-config-prebuilt-image-source.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
+- [Scheduled Runtime Prune Automation](../specs/061-scheduled-runtime-prune-automation/spec.md)
+- [Repository Config Dependency Graph](../specs/075-repository-config-dependency-graph/spec.md)
+- [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
+- [Repository Config Scheduled Task Graph](../specs/077-repository-config-scheduled-task-graph/spec.md)
+- [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
+- [Repository Config Dependency Backup Policy](../specs/079-repository-config-dependency-backup-policy/spec.md)
+- [Repository Config Generated Access Profile](../specs/080-repository-config-generated-access-profile/spec.md)
+- [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
+- [Repository Config Prebuilt Image Source](../specs/085-repository-config-prebuilt-image-source/spec.md)
+- [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -63,7 +100,15 @@ This matrix inherits:
 | Remote state | SSH-server `ssh-pglite` default, local-only override, locking, migration, and source identity reuse. |
 | Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
-| Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
+| Environment and secret reference commands | Non-secret variables, `ci-env:` secret values, and existing `resource-secret:` requirements are handled before deployment snapshot without leaking raw secret values. |
+| Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
+| Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
+| Storage graph | Managed application storage is listed/created/reused/attached before deployment admission, with preview provenance when ephemeral. |
+| Auto-deploy policy | Resource source-event auto-deploy policy is configured or disabled before deployment admission and never becomes a deployment field. |
+| Preview policy | Resource product-grade preview policy is configured before ordinary trusted deployment admission, skipped during PR preview deploy mutation, and never becomes a deployment field. |
+| Generated access profile | Resource generated access preference and generated route path prefix are configured before deployment admission and never become deployment fields. |
+| Monitoring thresholds | Resource-scope runtime monitoring warning/critical policy is configured before deployment admission, never becomes a deployment field, and never enforces sizing or cleanup. |
+| Runtime prune policy | Deployment-snapshot scheduled runtime prune policy is configured for the trusted selected server before deployment admission and never becomes a deployment field or broad target selector. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
 | HTTP/oRPC | Strict ids-only deployment endpoint; schema serving only unless future workflow command exists. |
 | Diagnostics/read models | Safe config-origin metadata appears without leaking secret values. |
@@ -103,8 +148,15 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-001A | e2e-preferred | Runtime name from config | Config declares `runtime.name` | Value maps to `ResourceRuntimeProfile.runtimeName`; deployment remains ids-only and runtime adapters derive the effective runtime/container/project name later | None | `resources.create` or resource profile update -> `deployments.create` |
 | CONFIG-FILE-PROFILE-002 | e2e-preferred | Network profile from config | Config declares `network.internalPort`, upstream protocol, exposure mode, and target service when needed | Values map to `ResourceNetworkProfile` | None | `resources.create` or network profile update -> `deployments.create` |
 | CONFIG-FILE-PROFILE-003 | e2e-preferred | Health policy from config | Config declares HTTP health policy | Values map to resource runtime/health policy | None | Resource profile/health operation -> `deployments.create` |
+| CONFIG-FILE-PROFILE-003A | integration | Existing resource health policy configuration | Config declares HTTP health policy, selected Resource has no matching policy, and explicit profile apply is acknowledged | Workflow dispatches `resources.configure-health` before ids-only deployment admission | None | `resources.show` -> `resources.configure-health` -> `deployments.create` |
+| CONFIG-FILE-PROFILE-003B | integration | Existing resource health policy idempotency | Config declares HTTP health policy and selected Resource already has the same policy | Workflow skips `resources.configure-health` and keeps deployment admission ids-only | None | `resources.show` -> `deployments.create` |
 | CONFIG-FILE-PROFILE-004 | integration | Unsafe source base directory | Config base directory contains `..`, URL, shell metacharacter, or host absolute path | Workflow stops before mutation | `validation_error`, phase `config-profile-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-001 | integration | Prebuilt image source parsing | Config declares `source.type = image` and `source.image` | Parser accepts the source, defaults deployment method to `prebuilt-image` when runtime strategy is absent, and JSON schema exposes the field | None | Config read -> profile normalization |
+| CONFIG-FILE-IMAGE-SOURCE-002 | integration | Unsafe image source rejected | Config declares image source with registry credentials, pull secret, provider account, artifact handle, or Git-only fields | Workflow stops before mutation | `validation_error`, phase `config-source-resolution` or `config-schema` | No write commands |
+| CONFIG-FILE-IMAGE-SOURCE-003 | integration | Prebuilt image source configures Resource profile | Config declares image source and selected Resource has no matching source/runtime profile | Workflow maps source to `docker-image`, runtime to `prebuilt-image`, and keeps deployment admission ids-only | None | `resources.create` or `resources.configure-source` / `resources.configure-runtime` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-004 | integration | Prebuilt image source idempotency | Selected Resource already has matching image source and `prebuilt-image` runtime profile | Workflow skips duplicate source/runtime configure commands | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-IMAGE-SOURCE-005 | integration | Image source requires prebuilt strategy | Config declares `source.type = image` with non-`prebuilt-image` runtime strategy | Parser rejects before mutation | `validation_error`, phase `config-source-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift blocks default config deploy | Existing resource profile differs from normalized config or trusted entry profile, or a resource-scoped effective config override would shadow an entry config key, and the workflow is not explicitly applying profile commands | Workflow stops before deployment with section, field path, config pointer when known, suggested command details, and no raw config or secret values | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show` and, when entry config exists, `resources.effective-config` -> no `deployments.create` |
 | CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration through explicit apply step | Existing resource profile differs and the entry workflow has an accepted explicit mode or step to apply profile changes | Relevant `resources.configure-*`, `resources.configure-health`, `resources.set-variable`, or `resources.unset-variable` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
 | CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |
@@ -124,6 +176,84 @@ This matrix inherits:
 | CONFIG-FILE-SEC-008 | integration | Required CI secret reference missing | Config declares required `ci-env:API_TOKEN` but the entrypoint environment does not contain `API_TOKEN` | Workflow stops before mutation and does not include the secret key value in details | `validation_error`, phase `config-secret-resolution` | No write commands |
 | CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
 | CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
+| CONFIG-FILE-SEC-011 | integration | Existing Resource secret reference accepted | Config declares `secrets.APP_SECRET.from: resource-secret:APP_SECRET` and the selected Resource already has that runtime secret reference | Workflow verifies the masked Resource secret reference and does not copy the secret value into environment commands or deployment input | None | resource resolution -> `resources.secrets.show(resourceId, APP_SECRET)` -> `deployments.create` |
+| CONFIG-FILE-SEC-012 | integration | Required Resource secret reference missing | Config declares required `resource-secret:APP_SECRET` but the selected Resource has no matching runtime secret reference | Workflow stops before deployment with safe key/reference metadata only | `validation_error`, phase `config-secret-resolution` | `resources.secrets.show`; no `deployments.create` |
+
+## Dependency Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-DEPENDENCY-001 | parser/schema | Managed dependency accepted | Config declares `dependencies.db.kind = postgres`, `source = managed`, `bind.env = DATABASE_URL`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-002 | parser/schema | Unknown dependency fields rejected | Config declares an unsupported field under `dependencies.db` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-DEPENDENCY-003 | parser/schema | Dependency identity and secret material rejected | Config declares provider account, tenant, credential, raw `databaseUrl`, `connectionString`, password, or provider-specific settings under `dependencies` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity` or `config-secret-validation` | No write commands |
+| CONFIG-FILE-DEPENDENCY-004 | integration | Config dependency provisions and binds before deployment | Selected Resource has no matching managed dependency resource or binding | Config deploy handles dependencies | Dependency resource is listed by declared kind, provisioned, bindings are listed, binding is created, and deployment admission remains ids-only | None | `dependency-resources.list` -> `dependency-resources.provision` -> `resources.list-dependency-bindings` -> `resources.bind-dependency` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-005 | integration | Config dependency idempotency | Matching managed dependency resource and active binding already exist | Config deploy runs again | No duplicate provision or bind command is dispatched | None | `dependency-resources.list` -> `resources.list-dependency-bindings` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-006 | integration | Env target conflict | Resource already has active binding for `DATABASE_URL` to a different dependency resource | Config deploy declares `dependencies.db.bind.env = DATABASE_URL` | Workflow fails before deployment with safe details | `repository_config_dependency_binding_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-007 | integration | Preview ephemeral provenance | PR preview config dependency declares `preview.lifecycle = ephemeral` | Config deploy provisions or reuses the preview dependency and binding | Source link records safe repository-config provenance for dependency key, target env, resource id, binding id, dependency resource id, and source fingerprint | None | Dependency operations -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-010 | parser/integration | Canonical managed dependency kinds | Config declares managed `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` dependencies with env bindings | Parser accepts canonical kinds; config deploy filters/provisions using the declared kind and records provenance with that same kind | None | Parse or `dependency-resources.list(kind)` -> `dependency-resources.provision(kind)` -> bind |
+
+## Dependency Backup Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-DEPENDENCY-BACKUP-001 | parser/schema | Managed dependency backup policy accepted | Config declares `dependencies.db.backup.enabled = true`, interval hours, retention days, and retry policy | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-BACKUP-002 | parser/schema | Unknown or unsafe backup fields rejected | Config declares provider key, policy id, backup id, restore point id, artifact handle, raw path, token, credential, or raw secret under `dependencies.db.backup` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-DEPENDENCY-BACKUP-003 | integration | Config backup policy creates before deployment | Selected/provisioned dependency resource has no repository-config-owned backup policy | Config deploy handles dependencies | Backup policies are listed and a repository-config-owned policy is configured before dependency binding and deployment admission | None | dependency resource resolution -> `dependency-resources.backup-policies.list` -> `dependency-resources.backup-policies.configure` -> `resources.bind-dependency` -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-004 | integration | Backup policy idempotency | Repository-config-owned policy already matches YAML | Config deploy runs again | No duplicate configure command is dispatched | None | dependency resource resolution -> backup policy list -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-005 | integration | Owned backup policy drift | Repository-config-owned policy exists but differs from YAML | Config deploy handles dependencies | Policy is reconfigured with the same deterministic policy id before deployment | None | dependency resource resolution -> backup policy list -> configure -> `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-006 | integration | Manual backup policy conflict | Dependency resource has only a manually created policy with different values | Config deploy handles dependencies | Workflow fails before mutating manual policy | `repository_config_dependency_backup_policy_conflict`, phase `config-dependency-backup-resolution` | backup policy list; no configure or `deployments.create` |
+| CONFIG-FILE-DEPENDENCY-BACKUP-007 | integration | Backup policy disabled from config | Config declares `backup.enabled = false` and repository-config-owned policy exists | Config deploy handles dependencies | Owned policy is disabled before deployment | None | dependency resource resolution -> backup policy list -> configure(enabled=false) -> `deployments.create` |
+
+## Storage Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-STORAGE-001 | parser/schema | Managed storage accepted | Config declares `storage.uploads.kind = volume`, `source = managed`, `mount.path = /app/uploads`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration, defaults `mount.mode`, normalizes the workload path, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-STORAGE-002 | parser/schema | Unknown storage fields rejected | Config declares an unsupported field under `storage.uploads` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-STORAGE-003 | parser/schema | Storage identity, host paths, and secret material rejected | Config declares provider account, tenant, credential, host bind `sourcePath`, provider-native handle, raw secret value, or provider-specific settings under `storage` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity`, `config-secret-validation`, or `config-schema` | No write commands |
+| CONFIG-FILE-STORAGE-004 | integration | Config storage creates and attaches before deployment | Selected Resource has no matching managed named volume or storage attachment | Config deploy handles storage | Resource attachments are read, storage volumes are listed, a managed volume is created, an attachment is created, and deployment admission remains ids-only | None | `resources.show` -> `storage-volumes.list` -> `storage-volumes.create` -> `resources.attach-storage` -> `deployments.create` |
+| CONFIG-FILE-STORAGE-005 | integration | Config storage idempotency | Matching managed named volume and active Resource attachment already exist | Config deploy runs again | No duplicate create or attach command is dispatched | None | `resources.show` -> `storage-volumes.list` -> `deployments.create` |
+| CONFIG-FILE-STORAGE-006 | integration | Mount path conflict | Resource already has an active storage attachment for `/app/uploads` to a different volume or mode | Config deploy declares `storage.uploads.mount.path = /app/uploads` | Workflow fails before deployment with safe details | `repository_config_storage_attachment_conflict`, phase `config-storage-resolution` | `resources.show` -> `storage-volumes.list`; no `deployments.create` |
+| CONFIG-FILE-STORAGE-007 | integration | Preview ephemeral storage provenance | PR preview config storage declares `preview.lifecycle = ephemeral` | Config deploy creates or reuses the preview storage volume and attachment | Source link records safe repository-config provenance for storage key, destination path, resource id, attachment id, storage volume id, and source fingerprint | None | Storage operations -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-STORAGE-008 | integration | Preview ephemeral unprovenanced storage conflict | PR preview config storage declares `preview.lifecycle = ephemeral` and a matching managed storage volume or mount path exists without matching source-link provenance | Workflow refuses to adopt the storage for cleanup ownership | `repository_config_storage_volume_conflict` or `repository_config_storage_attachment_conflict`, phase `config-storage-resolution` | `resources.show` -> `storage-volumes.list`; no create, attach, or `deployments.create` |
+| CONFIG-FILE-STORAGE-009 | integration | Preview ephemeral storage provenance unavailable | PR preview config storage declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link storage provenance | Workflow fails before storage mutation | `repository_config_storage_provenance_unavailable`, phase `config-storage-resolution` | No create, attach, or `deployments.create` |
+
+## Scheduled Task Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-SCHED-TASK-001 | parser/schema | Managed scheduled task accepted | Config declares `scheduledTasks.nightly_sync.schedule`, `command`, and optional `preview.lifecycle = ephemeral` | Parser accepts the declaration, defaults timezone, timeout, retry, concurrency, and status, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-SCHED-TASK-002 | parser/schema | Unknown scheduled task fields rejected | Config declares an unsupported field under `scheduledTasks.nightly_sync` | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-SCHED-TASK-003 | parser/schema | Scheduled task identity and secret material rejected | Config declares provider account, tenant, credential, task id, raw token, private key, or credential-bearing connection string under `scheduledTasks` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-identity`, `config-secret-validation`, or `config-schema` | No write commands |
+| CONFIG-FILE-SCHED-TASK-004 | integration | Config scheduled task creates before deployment | Selected Resource has no matching provenance-owned scheduled task | Config deploy handles scheduled tasks | Scheduled tasks are listed, a task is created, provenance is recorded, and deployment admission remains ids-only | None | `scheduled-tasks.list` -> `scheduled-tasks.create` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-005 | integration | Config scheduled task configure idempotency | Source-link provenance maps the YAML key to an existing task whose schedule or command differs | Config deploy runs again | Existing task is configured and no duplicate create command is dispatched | None | `scheduled-tasks.list` -> `scheduled-tasks.configure` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-006 | integration | Exact task adoption | A same-Resource task exactly matches the YAML declaration but no provenance entry exists yet | Config deploy handles scheduled tasks | The workflow records provenance for the exact match and does not create a duplicate | None | `scheduled-tasks.list` -> source-link provenance write -> `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-007 | integration | Provenance conflict | Source-link scheduled task provenance points at a task for another Resource or a conflicting source fingerprint | Config deploy handles scheduled tasks | Workflow fails before deployment with safe details | `repository_config_scheduled_task_conflict`, phase `config-scheduled-task-resolution` | `scheduled-tasks.list`; no create, configure, or `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-008 | integration | Scheduled task provenance unavailable | Config declares scheduled tasks but the selected entry workflow cannot persist source-link scheduled task provenance | Workflow fails before scheduled task mutation | `repository_config_scheduled_task_provenance_unavailable`, phase `config-scheduled-task-resolution` | No create, configure, or `deployments.create` |
+| CONFIG-FILE-SCHED-TASK-009 | integration | Preview ephemeral scheduled task cleanup provenance | PR preview config scheduled task declares `preview.lifecycle = ephemeral` | Config deploy creates or reuses the preview task | Source link records safe repository-config provenance for task key, resource id, task id, lifecycle, and source fingerprint | None | Scheduled task operations -> source-link provenance write -> `deployments.create` |
+
+## Auto-Deploy Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-AUTO-DEPLOY-001 | parser/schema | Git-push auto-deploy policy accepted | Config declares `autoDeploy.enabled = true`, `trigger = git-push`, refs, events, and optional dedupe window | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-AUTO-DEPLOY-002 | parser/schema | Unknown or unsafe auto-deploy fields rejected | Config declares provider account, tenant, source-event id, webhook secret value, token, raw credential, or unsupported trigger fields under `autoDeploy` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-AUTO-DEPLOY-003 | integration | Config auto-deploy configures before deployment | Selected Resource has no matching auto-deploy policy | Config deploy handles auto-deploy | Resource detail is read, policy is configured through `resources.configure-auto-deploy`, and deployment admission remains ids-only | None | `resources.show` -> `resources.configure-auto-deploy` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-004 | integration | Auto-deploy idempotency | Selected Resource already has the same enabled git-push policy | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-005 | integration | Auto-deploy drift or blocked policy replaced | Selected Resource policy differs or is blocked by source-binding change | Config deploy handles auto-deploy | Policy is reconfigured from YAML before deployment | None | `resources.show` -> `resources.configure-auto-deploy` -> `deployments.create` |
+| CONFIG-FILE-AUTO-DEPLOY-006 | integration | Auto-deploy disabled from config | Config declares `autoDeploy.enabled = false` and the Resource currently has a policy | Config deploy handles auto-deploy | Policy is disabled before deployment | None | `resources.show` -> `resources.configure-auto-deploy(mode=disable)` -> `deployments.create` |
+
+## Preview Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-PREVIEW-POLICY-001 | parser/schema | Product-grade preview policy accepted | Config declares `preview.pullRequest.policy` with same-repository, fork, secret-backed, quota, and TTL settings | Parser accepts the declaration, defaults omitted safe fields, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-PREVIEW-POLICY-002 | parser/schema | Unknown or unsafe preview policy fields rejected | Config declares provider account, tenant/org identity, GitHub installation id, webhook secret, token, raw credential, cleanup credential, project/global scope selector, or unknown field under `preview.pullRequest.policy` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-PREVIEW-POLICY-003 | integration | Config preview policy configures before deployment | Selected Resource has no matching configured preview policy | Ordinary trusted config deploy handles preview policy | Effective preview policy is read, a Resource-scoped policy is configured through `preview-policies.configure`, and deployment admission remains ids-only | None | `preview-policies.show(resource)` -> `preview-policies.configure(resource)` -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-POLICY-004 | integration | Preview policy idempotency | Selected Resource already has an exact configured preview policy matching YAML | Config deploy runs again | No duplicate configure command is dispatched | None | `preview-policies.show(resource)` -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-POLICY-005 | integration | PR preview deploy skips policy mutation | PR preview deploy reads config that declares `preview.pullRequest.policy` | The deploy runs with trusted PR preview context | No preview policy show/configure command is dispatched from the PR branch and deployment admission remains ids-only | None | trusted PR context -> profile/env/resource reconciliation -> `deployments.create` |
 
 ## Control-Plane Policy Matrix
 
@@ -178,6 +308,34 @@ This matrix inherits:
 | CONFIG-FILE-DOMAIN-008 | integration | Canonical redirect graph rejected | Config redirects to itself, to a missing host, to another redirect entry, or forms a loop | Workflow stops before mutation | `validation_error`, phase `config-domain-resolution` | No write commands |
 | CONFIG-FILE-DOMAIN-009 | e2e-preferred, GitHub Actions secret-gated + local explicit SSH | Canonical redirect reaches canonical host | SSH deploy has reverse-proxy network profile, a served canonical host, and an alias host redirecting to it | Request to target edge with `Host: <alias>` returns the configured redirect status and `Location` for the canonical host while `Host: <canonical>` reaches the service; read/proxy diagnostics report applied redirect route state | None or structured proxy error | Remote state -> `deployments.create` -> provider redirect route apply/reload -> alias redirect verification -> canonical route verification/read model |
 
+## Generated Access Profile Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-GENERATED-ACCESS-001 | parser/schema | Generated access profile accepted | Config declares `access.generated.enabled` and optional `pathPrefix` | Parser accepts the declaration, defaults `pathPrefix` to `/`, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-GENERATED-ACCESS-002 | parser/schema | Unknown or unsafe generated access fields rejected | Config declares provider account, DNS/certificate provider identity, route id, certificate id, server id, destination id, token, credential, raw certificate material, or unsafe path under `access.generated` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-domain-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-GENERATED-ACCESS-003 | integration | Config generated access profile configures before deployment | Selected Resource has no matching generated access profile | Config deploy handles Resource profile reconciliation | Resource detail is read, access profile is configured through `resources.configure-access`, and deployment admission remains ids-only | None | `resources.show` -> `resources.configure-access` -> `deployments.create` |
+| CONFIG-FILE-GENERATED-ACCESS-004 | integration | Generated access idempotency | Selected Resource already has the same generated access profile | Config deploy runs again | No duplicate configure command is dispatched | None | `resources.show` -> `deployments.create` |
+| CONFIG-FILE-GENERATED-ACCESS-005 | integration | Generated access disabled from config | Config declares `access.generated.enabled = false` | Config deploy handles Resource profile reconciliation | Resource access profile is configured with generated access disabled before deployment | None | `resources.show` -> `resources.configure-access(mode=disabled)` -> `deployments.create` |
+
+## Runtime Monitoring Threshold Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-MONITORING-THRESHOLDS-001 | parser/schema | Monitoring thresholds accepted | Config declares `monitoring.thresholds.enabled` and one or more signal/metric rules | Parser accepts the declaration, defaults `enabled` and comparator, validates signal/metric pairs, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-MONITORING-THRESHOLDS-002 | parser/schema | Unknown or unsafe monitoring threshold fields rejected | Config declares policy id, scope/resource/server/project/deployment id, provider account, container id, sample id, token, credential, raw metric payload, log text, host path, or mismatched signal/metric under `monitoring.thresholds` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-capability-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-MONITORING-THRESHOLDS-003 | integration | Config monitoring thresholds configure before deployment | Selected Resource has no exact matching Resource-scope threshold policy | Config deploy handles monitoring threshold reconciliation | Threshold readback is requested, an exact Resource-scope policy is configured, and deployment admission remains ids-only | None | `runtime-monitoring.thresholds.show(resource)` -> `runtime-monitoring.thresholds.configure(resource)` -> `deployments.create` |
+| CONFIG-FILE-MONITORING-THRESHOLDS-004 | integration | Monitoring threshold idempotency | Selected Resource already has an exact matching threshold policy | Config deploy runs again | No duplicate configure command is dispatched | None | `runtime-monitoring.thresholds.show(resource)` -> `deployments.create` |
+| CONFIG-FILE-MONITORING-THRESHOLDS-005 | integration | Inherited threshold policy not mutated | Threshold readback returns an inherited parent-scope policy | Config deploy handles Resource YAML | Config deploy creates an exact Resource-scope override and does not pass the inherited parent policy id | None | `runtime-monitoring.thresholds.show(resource)` -> `runtime-monitoring.thresholds.configure(resource without inherited policyId)` -> `deployments.create` |
+
+## Runtime Prune Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-RUNTIME-PRUNE-001 | parser/schema | Runtime prune policy accepted | Config declares `retention.runtimePrune.retentionDays`, category list, destructive flag, retry policy, and enabled flag | Parser accepts the declaration, defaults safe fields, and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-RUNTIME-PRUNE-002 | parser/schema | Unknown or unsafe runtime prune fields rejected | Config declares policy id, server id, organization/project/environment/deployment id, provider account, credential, host path, raw Docker/SSH command, volume prune, audit/event/log retention, legal hold, or secret value under `retention.runtimePrune` | Parser fails before mutation and sanitizes diagnostics | `validation_error`, phase `config-schema`, `config-identity`, `config-capability-resolution`, or `config-secret-validation` | No write commands |
+| CONFIG-FILE-RUNTIME-PRUNE-003 | integration | Config runtime prune policy configures before deployment | Config deploy resolves a trusted selected server and declares `retention.runtimePrune` | Workflow configures a deterministic `deployment-snapshot` scheduled runtime prune policy for that server before ids-only deployment admission | None | trusted target resolution -> `scheduled-runtime-prune-policies.configure(scope=deployment-snapshot)` -> `deployments.create` |
+
 ## Resource Sizing And Runtime Target Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -216,10 +374,20 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-018 | contract | Deploy action PR preview fork safety | Default example workflow skips fork PR preview deployment before secrets or SSH credentials are exposed, and docs explain that fork previews require explicit reduced-credential policy. |
 | CONFIG-FILE-ENTRY-019 | integration | Deploy action PR preview cleanup | A user-authored `pull_request.closed` workflow invokes CLI/action preview cleanup with trusted PR context; Appaloft derives the preview-scoped source fingerprint, stops preview runtime when present, deletes preview server-applied route desired state, unlinks the preview source link, and returns success when cleanup is done or already clean. |
 | CONFIG-FILE-ENTRY-020 | integration | Deploy action PR preview explicit config path | With `preview=pull-request` and `config: appaloft.preview.yml`, the action/CLI uses the preview config origin, does not read production-only root config fields, creates/reuses preview environment/resource identity from trusted PR context, and dispatches ids-only `deployments.create`. |
-| CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
-| CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
+| CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or selected generated access profile overlay. |
+| CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
 | CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
 | CONFIG-FILE-ENTRY-023A | integration | Config PR preview env templates | Selected preview config declares non-secret env values with `{preview_id}` or `{pr_number}` placeholders, and trusted PR preview context is present | CLI renders placeholders from trusted preview context before applying `plain-config` variables; without preview context, admission fails in `config-template-resolution` before mutation | None | Preview context resolution -> config template resolution -> environment variable commands |
+| CONFIG-FILE-PREVIEW-OVERLAY-001 | parser/schema | Preview profile overlay accepted | Config declares `preview.pullRequest.profile.runtime`, `network`, `health`, `access.generated`, `monitoring`, `env`, or `secrets` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-PREVIEW-OVERLAY-002 | parser/schema | Preview profile overlay rejects unsafe fields | Config declares unknown fields, identity selectors, raw secret material, provider handles, `access.domains`, dependency/storage/scheduled-task deltas, or unsupported resource sizing under `preview.pullRequest.profile` | Parser fails before mutation and diagnostics are sanitized | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-PREVIEW-OVERLAY-003 | integration | Ordinary deploy ignores preview overlay | Root config declares production runtime/env values and `preview.pullRequest.profile` declares preview-only runtime/env values | Non-preview config deploy uses the root values and does not apply preview overlay | None | Root profile operations -> `deployments.create` |
+| CONFIG-FILE-PREVIEW-OVERLAY-004 | integration | PR preview applies preview overlay | Trusted PR preview context is present and config declares `preview.pullRequest.profile` | The overlay is merged before prompt seed/env normalization, existing operations receive the merged profile, and deployment admission remains ids-only | None | Preview context resolution -> overlay merge -> profile/env operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-001 | parser/schema | Named config profile overlay accepted | Config declares `profiles.staging.runtime`, `network`, `health`, `access`, `monitoring`, `env`, or `secrets` | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-NAMED-PROFILE-002 | parser/schema | Named config profile rejects unsafe fields | Config declares unknown fields, identity selectors, raw secret material, provider handles, dependency/storage/scheduled-task graph deltas, auto-deploy, control-plane, retention, source, or unsupported sizing under `profiles.<key>` | Parser fails before mutation and diagnostics are sanitized | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-NAMED-PROFILE-003 | integration | Unselected named profile is ignored | Root config declares production runtime/env values and `profiles.staging` declares staging-only runtime/env values | Config deploy without trusted profile selection uses root values and does not apply the named overlay | None | Root profile operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-004 | integration | Selected named profile applies | Trusted CLI/Action input selects `--config-profile staging` | The overlay is merged before prompt seed/env normalization, existing operations receive the merged profile, and deployment admission remains ids-only | None | Profile selection -> overlay merge -> profile/env operations -> `deployments.create` |
+| CONFIG-FILE-NAMED-PROFILE-005 | integration | Missing selected named profile fails | Trusted CLI/Action input selects a profile key not present in config | Workflow fails before mutation with sanitized profile name metadata | `validation_error`, phase `config-profile-resolution` | No write commands |
+| CONFIG-FILE-NAMED-PROFILE-006 | integration | Trusted flags override named profile | Selected named profile and trusted CLI/Action flags set the same runtime/network/env/route fields | Trusted flags win over the selected profile | None | Profile selection -> overlay merge -> trusted flag merge -> profile/env operations -> `deployments.create` |
 | CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 | CONFIG-FILE-ENTRY-026 | integration | Deploy action PR preview output file | When preview mode is selected, the CLI can write an action-safe preview output file with schema version, deployment id, resource id, preview id, deployment status, and resolved public preview URL; the wrapper passes a temp file and publishes `preview-url` from that file to GitHub outputs. |
 | CONFIG-FILE-ENTRY-027 | contract | Deploy action optional PR comment | With `pr-comment=true`, trusted PR context, and an explicit GitHub token, the wrapper posts or updates one marker-based PR comment with available preview URL, console URL, deployment id, or cleanup status; without `pr-comment`, no GitHub comment permission is required. |
@@ -235,14 +403,42 @@ Current implemented coverage:
 - `CONFIG-FILE-PARSE-001`, `CONFIG-FILE-DISC-001`, `CONFIG-FILE-ID-001`,
   `CONFIG-FILE-SEC-001`, and `CONFIG-FILE-UNSUPPORTED-001` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
+- `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
+  `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
+  `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
+  `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
+  `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
+  `CONFIG-FILE-AUTO-DEPLOY-001` through `CONFIG-FILE-AUTO-DEPLOY-002`,
+  `CONFIG-FILE-GENERATED-ACCESS-001` through `CONFIG-FILE-GENERATED-ACCESS-002`, and
+  `CONFIG-FILE-MONITORING-THRESHOLDS-001` through
+  `CONFIG-FILE-MONITORING-THRESHOLDS-002`, and
+  `CONFIG-FILE-PREVIEW-POLICY-001` through `CONFIG-FILE-PREVIEW-POLICY-002`, and
+  `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002`, and
+  `CONFIG-FILE-NAMED-PROFILE-001` through `CONFIG-FILE-NAMED-PROFILE-002` are covered in
+  `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
+- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
+  `CONFIG-FILE-DEPENDENCY-BACKUP-003` through `CONFIG-FILE-DEPENDENCY-BACKUP-007`,
+  `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
+  `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and
+  `CONFIG-FILE-AUTO-DEPLOY-003` through `CONFIG-FILE-AUTO-DEPLOY-006`,
+  `CONFIG-FILE-GENERATED-ACCESS-003` through `CONFIG-FILE-GENERATED-ACCESS-005`, and
+  `CONFIG-FILE-MONITORING-THRESHOLDS-003` through
+  `CONFIG-FILE-MONITORING-THRESHOLDS-005`,
+  `CONFIG-FILE-PREVIEW-POLICY-003` through `CONFIG-FILE-PREVIEW-POLICY-005`, and
+  `CONFIG-FILE-PREVIEW-OVERLAY-003` through
+  `CONFIG-FILE-PREVIEW-OVERLAY-004`, and `CONFIG-FILE-NAMED-PROFILE-003` through
+  `CONFIG-FILE-NAMED-PROFILE-006` are covered in
+  `packages/adapters/cli/test/deployment-config.test.ts`.
 - `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
-  `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
-  proving plain env mapping, public-prefix build-time exposure, supported `ci-env:` resolution,
-  required missing-secret failure, and unsupported required resolver failure.
+  `CONFIG-FILE-SEC-010` through `CONFIG-FILE-SEC-012` are covered in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving plain env mapping,
+  public-prefix build-time exposure, supported `ci-env:` resolution, required missing-secret
+  failure, supported `resource-secret:` existence checks, and unsupported required resolver
+  failure.
 - `CONFIG-FILE-ENTRY-008` has migration coverage in `packages/config/test/index.test.ts`, proving
   the old headless CI default to embedded local PGlite without `DATABASE_URL`. After ADR-024, that
   coverage is local-only migration coverage, not the SSH target behavior.
@@ -310,13 +506,34 @@ CLI/filesystem discovery use the same parser.
 Current config schema rejects `project`, `environment`, `resource`, `targets`, `servers`, raw
 secret material, secret-looking inline env values, unknown fields, unsafe domain/TLS-like fields,
 and unsupported sizing/rollout fields before mutation. It now accepts `access.domains[]` with
-provider-neutral `host`, `pathPrefix`, and `tlsMode` fields. SSH CLI config deploy now persists
+provider-neutral `host`, `pathPrefix`, and `tlsMode` fields, `access.generated` with generated
+access eligibility and path prefix fields, and `monitoring.thresholds` with non-enforcing
+Resource-scope warning/critical rules. SSH CLI config deploy now persists
 server-applied route desired state under the selected SSH-server state backend before
 `deployments.create`; deployment planning consumes that desired state and records applied/failed
-status after deployment-finished route outcomes. Resource access, health, and diagnostic summaries
-expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
-`tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
-managed-domain mapping remains follow-up work.
+status after deployment-finished route outcomes. Selected named config profiles merge
+`profiles.<key>` for runtime/network/health/access/monitoring/env/secret profile fields only after
+trusted CLI/Action input selects the profile. Selected PR preview config deploy merges
+`preview.pullRequest.profile` after named profiles for runtime/network/health/generated-access,
+monitoring, env, and secret profile fields only after trusted preview context exists, and ordinary
+deploy ignores that overlay.
+Resource access, health, and diagnostic summaries expose the latest server-applied route
+URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are exposed through proxy
+configuration/resource diagnostics. Control-plane managed-domain mapping remains follow-up work.
+Config generated access profile is reconciled through `resources.configure-access` before ids-only
+deployment admission and does not mutate domain bindings, certificates, default access policies, or
+proxy routes directly. Config runtime monitoring thresholds are reconciled through
+`runtime-monitoring.thresholds.configure` and `runtime-monitoring.thresholds.show` before ids-only
+deployment admission and do not enforce runtime sizing, cleanup, alert routing, autoscaling, or
+billing policy. Config preview policy is reconciled through `preview-policies.show` and
+`preview-policies.configure` before ordinary trusted ids-only deployment admission; PR preview
+deploys skip preview policy mutation so a PR branch cannot change the policy that admits previews.
+Config `retention.runtimePrune` is reconciled through
+`scheduled-runtime-prune-policies.configure` as a deterministic `deployment-snapshot` policy for
+the trusted selected server before ids-only deployment admission; it does not select broad server
+identity or become a deployment field. Config health policy is reconciled through
+`resources.configure-health` during explicit existing-resource profile apply and remains fail-first
+drift guidance by default.
 
 PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).
@@ -367,9 +584,10 @@ and `CONTROL-PLANE-HANDSHAKE-012`. This proves wrapper metadata,
 version/target install contract shape,
 SSH secret temp-key command mapping, PR preview flag mapping, CLI preview-output-file handling,
 preview cleanup command mapping, trusted multiline Action `environment-variables`/`secret-variables`
-pass-through to CLI `--env`/`--secret`, optional marker-based PR comment feedback, Marketplace README
-fork-safety/cleanup examples, no-config default behavior, unsupported control-plane input rejection,
-self-hosted preview cleanup API routing, and self-hosted preview deploy API routing in this
+pass-through to CLI `--env`/`--secret`, trusted `config-profile` mapping to CLI, optional
+marker-based PR comment feedback, Marketplace README fork-safety/cleanup examples, no-config
+default behavior, unsupported control-plane input rejection, self-hosted preview cleanup API
+routing, and self-hosted preview deploy API routing in this
 repository.
 
 `scripts/test/deploy-action-wrapper.test.ts`, `packages/orpc/test/deployment-create.http.test.ts`,
@@ -380,7 +598,8 @@ ids, repository/ref/revision facts travel as trusted context, the server validat
 before mutation, existing source links and complete deploy-token scope can resolve the target,
 explicit bootstrap ids are narrow advanced context that conflict-checks before mutation, and pull
 request preview policy can complete a target when the Action supplies partial placement hints but no
-resource id.
+resource id. The server config endpoint also applies selected `configProfile` overlays before
+resource profile/env commands.
 
 Public `appaloft/deploy-action` release coverage is not complete yet. The main repository release
 workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
@@ -394,10 +613,10 @@ operation sequencing through explicit apply steps using
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, and
 `resources.unset-variable`,
-stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping,
-operational provisioning of the external SSH e2e secrets/target, server-applied domain route
-realization e2e, managed control-plane domain mapping, and resource sizing support remain target
-coverage rows, not implemented baseline behavior.
+stored/external secret adapters beyond `ci-env:` and `resource-secret:`, operational provisioning of
+the external SSH e2e
+secrets/target, server-applied domain route realization e2e, managed control-plane domain mapping,
+and resource sizing support remain target coverage rows, not implemented baseline behavior.
 
 ## Open Questions
 

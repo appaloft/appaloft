@@ -255,9 +255,8 @@ rejects legacy raw GitHub tree locators before runtime planning.
 Current GitHub tree URL normalization handles the common single-segment ref form, such as
 `/tree/v4.x/bun`, and callers may supply explicit `gitRef` and `baseDirectory` for slash-containing
 refs. Provider-backed disambiguation for slash-containing Git refs remains future integration work.
-Dockerfile paths, Compose paths, build targets, and richer runtime profile variant fields are still
-pending typed resource runtime-profile implementation. Static publish directory now has a typed
-runtime-profile value for the static strategy.
+Dockerfile paths, Compose paths, Docker build targets, and static publish directory are now typed
+resource runtime-profile fields. Broader runtime variant fields remain governed follow-up work.
 
 Current framework/runtime detection for first-deploy resource defaults covers initial
 JavaScript/TypeScript planner evidence, FastAPI/Django/Flask Python evidence, Python package

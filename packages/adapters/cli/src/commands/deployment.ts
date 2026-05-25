@@ -35,6 +35,8 @@ import {
   type AppaloftDeploymentConfig,
   appaloftDeploymentAccessConfigSchema,
   appaloftDeploymentConfigFileNames,
+  applyAppaloftDeploymentConfigProfile,
+  applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
@@ -56,6 +58,7 @@ import {
   type DeploymentEnvironmentVariableSeed,
   type DeploymentPromptSeed,
   type DeploymentServerAppliedRouteSeed,
+  defaultHttpHealthCheckPolicy,
   deploymentEntryModes,
   deploymentEnvironmentVariablesFromConfig,
   deploymentPromptSeedFromConfig,
@@ -106,6 +109,7 @@ const resourceDescriptionOption = Options.text("resource-description").pipe(Opti
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const entryModeOption = Options.choice("as", deploymentEntryModes).pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
+const configProfileOption = Options.text("config-profile").pipe(Options.optional);
 const previewModes = ["pull-request"] as const;
 const previewOption = Options.choice("preview", previewModes).pipe(Options.optional);
 const previewIdOption = Options.text("preview-id").pipe(Options.optional);
@@ -322,6 +326,10 @@ function phaseFromConfigIssues(issues: { message: string }[]): string {
 
   if (messages.includes("config_domain_resolution")) {
     return "config-domain-resolution";
+  }
+
+  if (messages.includes("config_profile_resolution")) {
+    return "config-profile-resolution";
   }
 
   if (messages.includes("unsupported_config_field")) {
@@ -710,7 +718,7 @@ function resolvePreviewDomainTemplateRoutes(
   }
 
   return ok(
-    parsed.data.domains.map((domain) => ({
+    (parsed.data.domains ?? []).map((domain) => ({
       host: domain.host,
       pathPrefix: domain.pathPrefix,
       tlsMode: domain.tlsMode,
@@ -1199,6 +1207,7 @@ export const deployCommand = EffectCommand.make(
     method: methodOption,
     entryMode: entryModeOption,
     config: configOption,
+    configProfile: configProfileOption,
     preview: previewOption,
     previewId: previewIdOption,
     previewDomainTemplate: previewDomainTemplateOption,
@@ -1233,6 +1242,7 @@ export const deployCommand = EffectCommand.make(
     build,
     buildTarget,
     config,
+    configProfile,
     destination,
     dockerComposeFilePath,
     dockerfilePath,
@@ -1281,6 +1291,7 @@ export const deployCommand = EffectCommand.make(
       const requestedEntryMode = optionalValue(entryMode);
       const requestedDeploymentMethodFromFlag = optionalValue(method);
       const publishDirectoryFromFlag = optionalValue(publishDir);
+      const requestedConfigProfile = optionalValue(configProfile);
       const urlFirstEntry = yield* resultToEffect(
         normalizeUrlFirstDeploymentEntry({
           ...(requestedDeploymentMethodFromFlag
@@ -1324,6 +1335,9 @@ export const deployCommand = EffectCommand.make(
       const targetServiceNameValue = optionalValue(targetServiceName);
       const hostPortValue = optionalNumber(hostPort);
       const healthCheckPath = optionalValue(healthPath);
+      const healthCheck = healthCheckPath
+        ? defaultHttpHealthCheckPolicy({ path: healthCheckPath })
+        : undefined;
       const requestedStateBackend = optionalValue(stateBackend);
       const requestedPreviewMode = optionalValue(preview);
       const requestedPreviewId = optionalValue(previewId);
@@ -1371,6 +1385,7 @@ export const deployCommand = EffectCommand.make(
           targetServiceNameValue ||
           hostPortValue !== undefined ||
           healthCheckPath ||
+          requestedConfigProfile ||
           flagEnvironmentVariables.length > 0 ||
           previewDomainRoutes,
       );
@@ -1407,8 +1422,26 @@ export const deployCommand = EffectCommand.make(
           ...(configFilePath ? { configFilePath } : {}),
         }),
       );
+      if (requestedConfigProfile && !configResolution) {
+        return yield* Effect.fail(
+          domainError.validation("Deployment config profile requires a config file", {
+            phase: "config-profile-resolution",
+            profile: requestedConfigProfile,
+          }),
+        );
+      }
+      const selectedConfig =
+        configResolution && requestedConfigProfile
+          ? yield* resultToEffect(
+              applyAppaloftDeploymentConfigProfile(configResolution.config, requestedConfigProfile),
+            )
+          : configResolution?.config;
+      const effectiveConfig =
+        selectedConfig && previewContext
+          ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
+          : selectedConfig;
       const configSeed = applyPreviewRoutePrecedence({
-        configSeed: configResolution ? deploymentPromptSeedFromConfig(configResolution.config) : {},
+        configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
         ...(configResolution ? { configResolution } : {}),
         ...(previewContext ? { previewContext } : {}),
         ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
@@ -1422,7 +1455,7 @@ export const deployCommand = EffectCommand.make(
       );
       const configEnvironmentVariables = configResolution
         ? yield* resultToEffect(
-            deploymentEnvironmentVariablesFromConfig(configResolution.config, {
+            deploymentEnvironmentVariablesFromConfig(effectiveConfig ?? configResolution.config, {
               ...(previewContext
                 ? {
                     previewContext: {
@@ -1437,10 +1470,18 @@ export const deployCommand = EffectCommand.make(
       const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
       const configAnchoredSourceLocator =
-        resolveConfigAnchoredSourceLocator({
-          ...(sourceLocator ? { sourceLocator } : {}),
-          ...(configResolution ? { configResolution } : {}),
-        }) ?? (configResolution ? "." : undefined);
+        effectiveConfig?.source?.type === "image" && configSeed.sourceLocator
+          ? configSeed.sourceLocator
+          : sourceLocator
+            ? resolveConfigAnchoredSourceLocator({
+                sourceLocator,
+                ...(configResolution ? { configResolution } : {}),
+              })
+            : (configSeed.sourceLocator ??
+              resolveConfigAnchoredSourceLocator({
+                ...(configResolution ? { configResolution } : {}),
+              }) ??
+              (configResolution ? "." : undefined));
       const normalizedSourceLocator = configAnchoredSourceLocator
         ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
         : undefined;
@@ -1564,9 +1605,11 @@ export const deployCommand = EffectCommand.make(
         ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
         ...(hostPortValue === undefined ? {} : { hostPort: hostPortValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
+        ...(healthCheck ? { healthCheck } : {}),
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
+        ...(previewContext ? { isPullRequestPreview: true } : {}),
         ...(configResolution && !acknowledgeResourceProfileDrift
           ? { profileDriftPreflight: true }
           : {}),

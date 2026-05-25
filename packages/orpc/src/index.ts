@@ -696,6 +696,8 @@ import {
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
+  applyAppaloftDeploymentConfigProfile,
+  applyAppaloftDeploymentPreviewProfile,
   parseAppaloftDeploymentConfigText,
   renderAppaloftDeploymentRuntimeNameTemplate,
 } from "@appaloft/deployment-config";
@@ -828,6 +830,7 @@ const actionServerConfigDeployBodySchema = z
   .object({
     sourceFingerprint: z.string().trim().min(1),
     configPath: z.string().trim().min(1),
+    configProfile: z.string().trim().min(1).optional(),
     sourceRoot: z.string().trim().min(1),
     sourcePackage: sourcePackageManifestSchema,
     sourcePackageCredentials: sourcePackageCredentialsSchema.optional(),
@@ -6425,6 +6428,10 @@ function phaseFromDeploymentConfigIssues(issues: { message: string }[]): string 
     return "config-domain-resolution";
   }
 
+  if (messages.includes("config_profile_resolution")) {
+    return "config-profile-resolution";
+  }
+
   if (messages.includes("unsupported_config_field")) {
     return "config-capability-resolution";
   }
@@ -6653,16 +6660,24 @@ function orderedActionServerConfigDomains(
 
 function effectiveActionServerConfigForRequest(input: {
   config: AppaloftDeploymentConfig;
+  configProfile?: string;
   environmentVariables?: Record<string, string>;
   preview?: ActionServerConfigDeployBody["preview"];
   previewRoute?: ActionServerConfigDeployBody["previewRoute"];
 }): Result<AppaloftDeploymentConfig> {
+  const selectedConfig = input.configProfile
+    ? applyAppaloftDeploymentConfigProfile(input.config, input.configProfile)
+    : ok(input.config);
+  if (selectedConfig.isErr()) {
+    return err(selectedConfig.error);
+  }
+
   const mergedEnv = {
-    ...(input.config.env ?? {}),
+    ...(selectedConfig.value.env ?? {}),
     ...(input.environmentVariables ?? {}),
   };
   let configWithRuntimeEnv: AppaloftDeploymentConfig = {
-    ...input.config,
+    ...selectedConfig.value,
     ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
   };
 
@@ -6697,7 +6712,7 @@ function effectiveActionServerConfigForRequest(input: {
     return ok(configWithRuntimeEnv);
   }
 
-  const previewConfig: AppaloftDeploymentConfig = { ...configWithRuntimeEnv };
+  const previewConfig = applyAppaloftDeploymentPreviewProfile(configWithRuntimeEnv);
   delete previewConfig.access;
   return ok(previewConfig);
 }
@@ -7289,6 +7304,7 @@ async function handleActionServerConfigDeploymentRoute(input: {
 
   const effectiveConfig = effectiveActionServerConfigForRequest({
     config: parsedConfig.data,
+    ...(body.data.configProfile ? { configProfile: body.data.configProfile } : {}),
     ...(body.data.environmentVariables
       ? { environmentVariables: body.data.environmentVariables }
       : {}),

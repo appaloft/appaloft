@@ -104,6 +104,48 @@ function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLi
       };
       return repository.upsert(record, UpsertSourceLinkSpec.fromRecord(record));
     },
+    recordDependencyProvenance: async (input) => {
+      const existing = await repository.findOne(
+        SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
+      );
+      if (existing.isErr()) {
+        return err(existing.error);
+      }
+      if (existing.value) {
+        const record = existing.value;
+        if (
+          record.projectId !== input.target.projectId ||
+          record.environmentId !== input.target.environmentId ||
+          record.resourceId !== input.target.resourceId ||
+          record.serverId !== input.target.serverId ||
+          record.destinationId !== input.target.destinationId
+        ) {
+          return err(
+            domainError.validation("Source link points at another deployment context", {
+              phase: "source-link-resolution",
+              sourceFingerprint: input.sourceFingerprint,
+              projectId: record.projectId,
+              environmentId: record.environmentId,
+              resourceId: record.resourceId,
+            }),
+          );
+        }
+      }
+
+      const record: SourceLinkRecord = {
+        ...(existing.value ?? {}),
+        sourceFingerprint: input.sourceFingerprint,
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        updatedAt: input.updatedAt,
+        ...(input.target.serverId ? { serverId: input.target.serverId } : {}),
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+        dependencyProvenance: input.dependencyProvenance,
+        ...(existing.value?.reason ? { reason: existing.value.reason } : {}),
+      };
+      return repository.upsert(record, UpsertSourceLinkSpec.fromRecord(record));
+    },
   };
 }
 

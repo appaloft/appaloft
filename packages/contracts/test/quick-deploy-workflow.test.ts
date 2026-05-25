@@ -759,6 +759,60 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[CONFIG-FILE-PROFILE-003A]",
+      name: "shared workflow configures existing resource health policy before ids-only deployment",
+      input: workflowInput({
+        resource: {
+          mode: "existing",
+          id: "res_existing",
+          configureHealth: {
+            healthCheck: {
+              enabled: true,
+              type: "http",
+              intervalSeconds: 5,
+              timeoutSeconds: 5,
+              retries: 10,
+              startPeriodSeconds: 5,
+              http: {
+                method: "GET",
+                scheme: "http",
+                host: "localhost",
+                path: "/ready",
+                expectedStatusCode: 200,
+              },
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.configureHealth", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureHealth").input).toEqual({
+          resourceId: "res_existing",
+          healthCheck: {
+            enabled: true,
+            type: "http",
+            intervalSeconds: 5,
+            timeoutSeconds: 5,
+            retries: 10,
+            startPeriodSeconds: 5,
+            http: {
+              method: "GET",
+              scheme: "http",
+              host: "localhost",
+              path: "/ready",
+              expectedStatusCode: 200,
+            },
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+        });
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-WF-039]",
       name: "workflow executor can report per-step progress and stop on failed steps",
       input: workflowInput({ resource: { mode: "create", input: resourceInput() } }),
@@ -1539,6 +1593,8 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
     case "resources.configureNetwork":
       return { id: "res_1" };
     case "resources.configureRuntime":
+      return { id: "res_1" };
+    case "resources.configureHealth":
       return { id: "res_1" };
     case "environments.setVariable":
       return;

@@ -342,6 +342,102 @@ class CapturingExecutionBackend implements ExecutionBackend {
   }
 }
 
+class CapturingUnbindDependencyUseCase {
+  readonly calls: Array<{ resourceId: string; bindingId: string }> = [];
+
+  constructor(private readonly result: Result<{ id: string }> = ok({ id: "rbd_preview_db" })) {}
+
+  async execute(
+    _context: unknown,
+    input: { resourceId: string; bindingId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDeleteDependencyResourceUseCase {
+  readonly calls: Array<{ dependencyResourceId: string }> = [];
+
+  constructor(private readonly result: Result<{ id: string }> = ok({ id: "dep_res_preview_db" })) {}
+
+  async execute(
+    _context: unknown,
+    input: { dependencyResourceId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDetachStorageUseCase {
+  readonly calls: Array<{ resourceId: string; attachmentId: string }> = [];
+
+  constructor(
+    private readonly result: Result<{ id: string }> = ok({ id: "rsa_preview_uploads" }),
+  ) {}
+
+  async execute(
+    _context: unknown,
+    input: { resourceId: string; attachmentId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDeleteStorageVolumeUseCase {
+  readonly calls: Array<{ storageVolumeId: string }> = [];
+
+  constructor(
+    private readonly result: Result<{ id: string }> = ok({ id: "stv_preview_uploads" }),
+  ) {}
+
+  async execute(
+    _context: unknown,
+    input: { storageVolumeId: string },
+  ): Promise<Result<{ id: string }>> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class CapturingDeleteScheduledTaskUseCase {
+  readonly calls: Array<{ resourceId: string; taskId: string }> = [];
+
+  constructor(
+    private readonly result: Result<{
+      schemaVersion: "scheduled-tasks.delete/v1";
+      taskId: string;
+      resourceId: string;
+      status: "deleted";
+      deletedAt: string;
+    }> = ok({
+      schemaVersion: "scheduled-tasks.delete/v1",
+      taskId: "tsk_preview_sync",
+      resourceId: "res_preview_1",
+      status: "deleted",
+      deletedAt: "2026-04-21T00:00:00.000Z",
+    }),
+  ) {}
+
+  async execute(
+    _context: unknown,
+    input: { resourceId: string; taskId: string },
+  ): Promise<
+    Result<{
+      schemaVersion: "scheduled-tasks.delete/v1";
+      taskId: string;
+      resourceId: string;
+      status: "deleted";
+      deletedAt: string;
+    }>
+  > {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
 class MemoryDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly items: Awaited<ReturnType<DeploymentReadModel["list"]>> = []) {}
 
@@ -389,11 +485,382 @@ describe("CleanupPreviewUseCase", () => {
       cleanedRuntime: false,
       removedServerAppliedRoute: false,
       removedSourceLink: false,
+      removedDependencyBindings: 0,
+      deletedDependencyResources: 0,
+      removedStorageAttachments: 0,
+      deletedStorageVolumes: 0,
+      deletedScheduledTasks: 0,
     });
     expect(executionBackend.canceledDeploymentIds).toEqual([]);
     expect(routeRepository.deletedTargets).toEqual([]);
     expect(routeRepository.deletedSourceFingerprints).toEqual([]);
     expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-011] cleans only provenance-owned ephemeral dependencies", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      destinationId: "dst_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      dependencyProvenance: {
+        schemaVersion: "source-link.dependency-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "db",
+            kind: "postgres",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_preview_1",
+            dependencyResourceId: "dep_res_preview_db",
+            bindingId: "rbd_preview_db",
+            targetName: "DATABASE_URL",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const unbindDependency = new CapturingUnbindDependencyUseCase();
+    const deleteDependency = new CapturingDeleteDependencyResourceUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_dependency",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      unbindDependency,
+      deleteDependency,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "cleaned",
+      removedDependencyBindings: 1,
+      deletedDependencyResources: 1,
+      removedSourceLink: true,
+    });
+    expect(unbindDependency.calls).toEqual([
+      {
+        resourceId: "res_preview_1",
+        bindingId: "rbd_preview_db",
+      },
+    ]);
+    expect(deleteDependency.calls).toEqual([
+      {
+        dependencyResourceId: "dep_res_preview_db",
+      },
+    ]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-013] cleans only provenance-owned ephemeral storage volumes", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      storageProvenance: {
+        schemaVersion: "source-link.storage-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "uploads",
+            kind: "volume",
+            source: "managed",
+            lifecycle: "ephemeral",
+            resourceId: "res_preview_1",
+            storageVolumeId: "stv_preview_uploads",
+            attachmentId: "rsa_preview_uploads",
+            destinationPath: "/app/uploads",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const detachStorage = new CapturingDetachStorageUseCase();
+    const deleteStorage = new CapturingDeleteStorageVolumeUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_storage",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      detachStorage,
+      deleteStorage,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "cleaned",
+      removedStorageAttachments: 1,
+      deletedStorageVolumes: 1,
+      removedSourceLink: true,
+    });
+    expect(detachStorage.calls).toEqual([
+      {
+        resourceId: "res_preview_1",
+        attachmentId: "rsa_preview_uploads",
+      },
+    ]);
+    expect(deleteStorage.calls).toEqual([
+      {
+        storageVolumeId: "stv_preview_uploads",
+      },
+    ]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-012] preserves dependencies without matching provenance", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const unbindDependency = new CapturingUnbindDependencyUseCase();
+    const deleteDependency = new CapturingDeleteDependencyResourceUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_no_dependency_provenance",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      unbindDependency,
+      deleteDependency,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      removedDependencyBindings: 0,
+      deletedDependencyResources: 0,
+      removedSourceLink: true,
+    });
+    expect(unbindDependency.calls).toEqual([]);
+    expect(deleteDependency.calls).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-014] preserves storage without matching provenance", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const detachStorage = new CapturingDetachStorageUseCase();
+    const deleteStorage = new CapturingDeleteStorageVolumeUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_no_storage_provenance",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      detachStorage,
+      deleteStorage,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      removedStorageAttachments: 0,
+      deletedStorageVolumes: 0,
+      removedSourceLink: true,
+    });
+    expect(detachStorage.calls).toEqual([]);
+    expect(deleteStorage.calls).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-015][SCHED-TASK-CONFIG-002] cleans only provenance-owned ephemeral scheduled tasks", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      scheduledTaskProvenance: {
+        schemaVersion: "source-link.scheduled-task-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "nightly_sync",
+            source: "repository-config",
+            lifecycle: "ephemeral",
+            resourceId: "res_preview_1",
+            taskId: "tsk_preview_sync",
+            commandFingerprint: "sha256:preview-sync",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const deleteScheduledTask = new CapturingDeleteScheduledTaskUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_scheduled_task",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      deleteScheduledTask,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "cleaned",
+      deletedScheduledTasks: 1,
+      removedSourceLink: true,
+    });
+    expect(deleteScheduledTask.calls).toEqual([
+      {
+        resourceId: "res_preview_1",
+        taskId: "tsk_preview_sync",
+      },
+    ]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-016] preserves scheduled tasks without matching ephemeral provenance", async () => {
+    const sourceLinkRepository = new MemorySourceLinkRepository({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_1",
+      serverId: "srv_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      scheduledTaskProvenance: {
+        schemaVersion: "source-link.scheduled-task-provenance/v1",
+        source: "repository-config",
+        sourceFingerprint: previewSourceFingerprint,
+        entries: [
+          {
+            key: "nightly_sync",
+            source: "repository-config",
+            lifecycle: "persistent",
+            resourceId: "res_preview_1",
+            taskId: "tsk_persistent_sync",
+            commandFingerprint: "sha256:persistent-sync",
+            createdAt: "2026-04-21T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
+    const deleteScheduledTask = new CapturingDeleteScheduledTaskUseCase();
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_preserve_scheduled_task",
+    });
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkRepository,
+      routeRepository,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+      new PassThroughMutationCoordinator(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      deleteScheduledTask,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      deletedScheduledTasks: 0,
+      removedSourceLink: true,
+    });
+    expect(deleteScheduledTask.calls).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-002][CONFIG-FILE-ENTRY-019] cleans runtime, route state, and source link for a preview", async () => {

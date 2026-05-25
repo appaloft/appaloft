@@ -1,9 +1,18 @@
 import {
   AcceptDependencyResourceProvisioningPlanCommand,
+  AttachResourceStorageCommand,
   BindResourceDependencyCommand,
+  ConfigureDependencyResourceBackupPolicyCommand,
+  ConfigurePreviewPolicyCommand,
+  ConfigureResourceAccessCommand,
+  ConfigureResourceAutoDeployCommand,
+  ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
+  ConfigureRuntimeMonitoringThresholdsCommand,
+  ConfigureScheduledRuntimePrunePolicyCommand,
+  ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
   CreateDependencyResourceProvisioningPlanCommand,
@@ -11,28 +20,54 @@ import {
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
+  CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
+  CreateStorageVolumeCommand,
   compareResourceProfileDrift,
+  type DependencyResourceBackupPolicyRead,
+  type DependencyResourceSummary,
+  type DeploymentConfiguredRuntimePrunePolicy,
+  deploymentSnapshotRuntimePrunePolicyId,
   type EnvironmentSummary,
+  ListDependencyResourceBackupPoliciesQuery,
+  ListDependencyResourcesQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
+  ListResourceDependencyBindingsQuery,
   ListResourcesQuery,
+  ListScheduledTasksQuery,
   ListServersQuery,
+  ListStorageVolumesQuery,
+  type ManagedDependencyResourceKind,
+  type PreviewPolicySettings,
+  type PreviewPolicySummary,
   type ProjectSummary,
+  ProvisionDependencyResourceCommand,
   RegisterServerCommand,
   type RegisterServerCommandInput,
+  type ResourceDependencyBindingSummary,
   type ResourceDetail,
+  type ResourceDetailAutoDeployPolicy,
   type ResourceDetailProfileDiagnostic,
   ResourceEffectiveConfigQuery,
   type ResourceEffectiveConfigView,
   type ResourceProfileConfigurationEntry,
   type ResourceSummary,
+  type RuntimeMonitoringSignal,
+  type RuntimeMonitoringThresholdMetric,
+  type RuntimeMonitoringThresholdRule,
+  type RuntimeMonitoringThresholdsReadback,
   resourceProfileFromResourceDetail,
+  type ScheduledTaskDefinitionSummary,
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
+  ShowPreviewPolicyQuery,
   ShowResourceQuery,
+  ShowResourceSecretReferenceQuery,
+  ShowRuntimeMonitoringThresholdsQuery,
+  type StorageVolumeSummary,
 } from "@appaloft/application";
 import {
   type ConfigureResourceNetworkInput,
@@ -70,6 +105,13 @@ import { CliRuntime, resultToEffect } from "../runtime.js";
 import {
   type RemoteStateSession,
   type ServerAppliedRouteDomainIntent,
+  type SourceLinkDependencyProvenance,
+  type SourceLinkDependencyProvenanceEntry,
+  type SourceLinkRecord,
+  type SourceLinkScheduledTaskProvenance,
+  type SourceLinkScheduledTaskProvenanceEntry,
+  type SourceLinkStorageProvenance,
+  type SourceLinkStorageProvenanceEntry,
 } from "./deployment-remote-state.js";
 import {
   type DeploymentMethod,
@@ -112,6 +154,16 @@ export interface DeploymentPromptSeed {
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
+  dependencyGraph?: DeploymentDependencySeed[];
+  storageGraph?: DeploymentStorageSeed[];
+  scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
+  autoDeployPolicy?: DeploymentAutoDeploySeed;
+  generatedAccessProfile?: DeploymentGeneratedAccessProfileSeed;
+  monitoringThresholds?: DeploymentMonitoringThresholdsSeed;
+  runtimePrunePolicy?: DeploymentRuntimePrunePolicySeed;
+  resourceSecretRequirements?: DeploymentResourceSecretRequirementSeed[];
+  previewPolicy?: DeploymentPreviewPolicySeed;
+  isPullRequestPreview?: boolean;
   profileDriftPreflight?: boolean;
 }
 
@@ -126,6 +178,68 @@ type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["ne
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
+export interface DeploymentDependencySeed {
+  key: string;
+  kind: ManagedDependencyResourceKind;
+  source: "managed";
+  bindEnv: string;
+  backupPolicy?: DeploymentDependencyBackupPolicySeed;
+  previewLifecycle?: "ephemeral";
+}
+export interface DeploymentDependencyBackupPolicySeed {
+  enabled: boolean;
+  intervalHours?: number;
+  retentionDays?: number;
+  retryOnFailure: boolean;
+}
+export interface DeploymentStorageSeed {
+  key: string;
+  kind: "volume";
+  source: "managed";
+  mountPath: string;
+  mountMode: "read-write" | "read-only";
+  previewLifecycle?: "ephemeral";
+}
+export interface DeploymentScheduledTaskSeed {
+  key: string;
+  schedule: string;
+  timezone: string;
+  command: string;
+  timeoutSeconds: number;
+  retryLimit: number;
+  concurrencyPolicy: "forbid";
+  status: "enabled" | "disabled";
+  previewLifecycle?: "ephemeral";
+}
+export interface DeploymentAutoDeploySeed {
+  enabled: boolean;
+  triggerKind: "git-push";
+  refs?: string[];
+  eventKinds: ("push" | "tag")[];
+  dedupeWindowSeconds?: number;
+}
+export interface DeploymentGeneratedAccessProfileSeed {
+  generatedAccessMode: "inherit" | "disabled";
+  pathPrefix: string;
+}
+export interface DeploymentMonitoringThresholdRuleSeed {
+  signal: RuntimeMonitoringSignal;
+  metric: RuntimeMonitoringThresholdMetric;
+  warning?: number;
+  critical?: number;
+  comparator: "greater-than-or-equal";
+}
+export interface DeploymentMonitoringThresholdsSeed {
+  enabled: boolean;
+  rules: DeploymentMonitoringThresholdRuleSeed[];
+}
+export type DeploymentRuntimePrunePolicySeed = DeploymentConfiguredRuntimePrunePolicy;
+export interface DeploymentResourceSecretRequirementSeed {
+  key: string;
+  refKey: string;
+  required: boolean;
+}
+export type DeploymentPreviewPolicySeed = PreviewPolicySettings;
 export const deploymentEntryModes = ["static-site"] as const;
 export type DeploymentEntryMode = (typeof deploymentEntryModes)[number];
 
@@ -179,6 +293,7 @@ const defaultApplicationInternalPort = 3000;
 const defaultStaticInternalPort = 80;
 const defaultStaticPublishDirectory = "/dist";
 const ciEnvSecretReferencePrefix = "ci-env:";
+const resourceSecretReferencePrefix = "resource-secret:";
 
 function cliRuntimeEffect<A, E>(
   effect: Effect.Effect<A, E, unknown>,
@@ -373,52 +488,216 @@ function healthCheckFromConfig(
 ): ResourceRuntimeProfileInput["healthCheck"] | undefined {
   const healthCheck = config.runtime?.healthCheck ?? config.health;
   const path = healthCheck?.path ?? config.runtime?.healthCheckPath;
-  if (!healthCheck) {
+  if (!healthCheck && !path) {
     return undefined;
   }
 
+  return defaultHttpHealthCheckPolicy({
+    enabled: healthCheck?.enabled ?? true,
+    path: path ?? "/",
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+  });
+}
+
+export function defaultHttpHealthCheckPolicy(input: {
+  enabled?: boolean;
+  path?: string;
+  intervalSeconds?: number;
+  timeoutSeconds?: number;
+  retries?: number;
+}): NonNullable<ResourceRuntimeProfileInput["healthCheck"]> {
+  const enabled = input.enabled ?? true;
   return {
-    enabled: healthCheck.enabled ?? true,
+    enabled,
     type: "http",
-    intervalSeconds: healthCheck.intervalSeconds ?? 5,
-    timeoutSeconds: healthCheck.timeoutSeconds ?? 5,
-    retries: healthCheck.retries ?? 10,
+    intervalSeconds: input.intervalSeconds ?? 5,
+    timeoutSeconds: input.timeoutSeconds ?? 5,
+    retries: input.retries ?? 10,
     startPeriodSeconds: 5,
-    http: {
-      method: "GET",
-      scheme: "http",
-      host: "localhost",
-      path: path ?? "/",
-      expectedStatusCode: 200,
-    },
+    ...(enabled
+      ? {
+          http: {
+            method: "GET",
+            scheme: "http",
+            host: "localhost",
+            path: input.path ?? "/",
+            expectedStatusCode: 200,
+          },
+        }
+      : {}),
   };
 }
 
 export function deploymentPromptSeedFromConfig(
   config: AppaloftDeploymentConfig,
 ): DeploymentPromptSeed {
+  const sourceIsImage = config.source?.type === "image";
   const healthCheckPath =
     config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
   const sourceProfile = {
-    ...(config.source?.baseDirectory ? { baseDirectory: config.source.baseDirectory } : {}),
-    ...(config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
-    ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
+    ...(!sourceIsImage && config.source?.baseDirectory
+      ? { baseDirectory: config.source.baseDirectory }
+      : {}),
+    ...(!sourceIsImage && config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
+    ...(!sourceIsImage && config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
-  const serverAppliedRoutes = config.access?.domains.map((domain) => ({
+  const serverAppliedRoutes = config.access?.domains?.map((domain) => ({
     host: domain.host,
     pathPrefix: domain.pathPrefix,
     tlsMode: domain.tlsMode,
     ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
     ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
   }));
+  const dependencyGraph = Object.entries(config.dependencies ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, dependency]) =>
+        ({
+          key,
+          kind: dependency.kind,
+          source: dependency.source,
+          bindEnv: dependency.bind.env,
+          ...(dependency.backup
+            ? {
+                backupPolicy: {
+                  enabled: dependency.backup.enabled,
+                  ...(dependency.backup.intervalHours
+                    ? { intervalHours: dependency.backup.intervalHours }
+                    : {}),
+                  ...(dependency.backup.retentionDays
+                    ? { retentionDays: dependency.backup.retentionDays }
+                    : {}),
+                  retryOnFailure: dependency.backup.retryOnFailure,
+                },
+              }
+            : {}),
+          ...(dependency.preview?.lifecycle
+            ? { previewLifecycle: dependency.preview.lifecycle }
+            : {}),
+        }) satisfies DeploymentDependencySeed,
+    );
+  const storageGraph = Object.entries(config.storage ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, storage]) =>
+        ({
+          key,
+          kind: storage.kind,
+          source: storage.source,
+          mountPath: storage.mount.path,
+          mountMode: storage.mount.mode ?? "read-write",
+          ...(storage.preview?.lifecycle ? { previewLifecycle: storage.preview.lifecycle } : {}),
+        }) satisfies DeploymentStorageSeed,
+    );
+  const scheduledTaskGraph = Object.entries(config.scheduledTasks ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([key, task]) =>
+        ({
+          key,
+          schedule: task.schedule,
+          timezone: task.timezone,
+          command: task.command,
+          timeoutSeconds: task.timeoutSeconds,
+          retryLimit: task.retryLimit,
+          concurrencyPolicy: task.concurrencyPolicy,
+          status: task.status,
+          ...(task.preview?.lifecycle ? { previewLifecycle: task.preview.lifecycle } : {}),
+        }) satisfies DeploymentScheduledTaskSeed,
+    );
+  const autoDeployPolicy = config.autoDeploy
+    ? ({
+        enabled: config.autoDeploy.enabled,
+        triggerKind: config.autoDeploy.trigger,
+        ...(config.autoDeploy.refs ? { refs: config.autoDeploy.refs } : {}),
+        eventKinds: config.autoDeploy.events,
+        ...(config.autoDeploy.dedupeWindowSeconds
+          ? { dedupeWindowSeconds: config.autoDeploy.dedupeWindowSeconds }
+          : {}),
+      } satisfies DeploymentAutoDeploySeed)
+    : undefined;
+  const generatedAccessProfile = config.access?.generated
+    ? ({
+        generatedAccessMode: config.access.generated.enabled ? "inherit" : "disabled",
+        pathPrefix: config.access.generated.pathPrefix,
+      } satisfies DeploymentGeneratedAccessProfileSeed)
+    : undefined;
+  const monitoringThresholds = config.monitoring?.thresholds
+    ? ({
+        enabled: config.monitoring.thresholds.enabled,
+        rules: config.monitoring.thresholds.rules.map(
+          (rule) =>
+            ({
+              signal: rule.signal,
+              metric: rule.metric,
+              ...(rule.warning !== undefined ? { warning: rule.warning } : {}),
+              ...(rule.critical !== undefined ? { critical: rule.critical } : {}),
+              comparator: rule.comparator,
+            }) satisfies DeploymentMonitoringThresholdRuleSeed,
+        ),
+      } satisfies DeploymentMonitoringThresholdsSeed)
+    : undefined;
+  const runtimePrunePolicy = config.retention?.runtimePrune
+    ? ({
+        retentionDays: config.retention.runtimePrune.retentionDays,
+        destructive: config.retention.runtimePrune.destructive,
+        categories: [...config.retention.runtimePrune.categories],
+        retryOnFailure: config.retention.runtimePrune.retryOnFailure,
+        enabled: config.retention.runtimePrune.enabled,
+      } satisfies DeploymentRuntimePrunePolicySeed)
+    : undefined;
+  const previewPolicy = config.preview?.pullRequest?.policy
+    ? ({
+        sameRepositoryPreviews: config.preview.pullRequest.policy.sameRepositoryPreviews,
+        forkPreviews: config.preview.pullRequest.policy.forkPreviews,
+        secretBackedPreviews: config.preview.pullRequest.policy.secretBackedPreviews,
+        ...(config.preview.pullRequest.policy.maxActivePreviews !== undefined
+          ? { maxActivePreviews: config.preview.pullRequest.policy.maxActivePreviews }
+          : {}),
+        ...(config.preview.pullRequest.policy.previewTtlHours !== undefined
+          ? { previewTtlHours: config.preview.pullRequest.policy.previewTtlHours }
+          : {}),
+      } satisfies DeploymentPreviewPolicySeed)
+    : undefined;
+  const resourceSecretRequirements = Object.entries(config.secrets ?? {})
+    .sort(compareConfigKeys)
+    .flatMap(([key, reference]) => {
+      const secretRef = reference.from.trim();
+      if (!secretRef.startsWith(resourceSecretReferencePrefix)) {
+        return [];
+      }
+
+      return [
+        {
+          key,
+          refKey: secretRef.slice(resourceSecretReferencePrefix.length).trim(),
+          required: reference.required ?? true,
+        } satisfies DeploymentResourceSecretRequirementSeed,
+      ];
+    });
+  const buildCommand = config.runtime?.buildCommand ?? config.runtime?.build?.command;
+  const startCommand = config.runtime?.startCommand ?? config.runtime?.start?.command;
 
   return {
+    ...(sourceIsImage && config.source?.image
+      ? { sourceLocator: config.source.image }
+      : config.source?.repository
+        ? { sourceLocator: config.source.repository }
+        : {}),
     ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
-    ...(config.runtime?.strategy ? { deploymentMethod: config.runtime.strategy } : {}),
+    ...(config.runtime?.strategy
+      ? { deploymentMethod: config.runtime.strategy }
+      : sourceIsImage
+        ? { deploymentMethod: "prebuilt-image" as const }
+        : config.runtime?.type === "node"
+          ? { deploymentMethod: "workspace-commands" as const }
+          : {}),
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
-    ...(config.runtime?.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
-    ...(config.runtime?.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(buildCommand ? { buildCommand } : {}),
+    ...(startCommand ? { startCommand } : {}),
     ...(config.runtime?.name ? { runtimeNameTemplate: config.runtime.name } : {}),
     ...(config.runtime?.publishDirectory
       ? { publishDirectory: config.runtime.publishDirectory }
@@ -440,6 +719,15 @@ export function deploymentPromptSeedFromConfig(
     ...(healthCheckPath ? { healthCheckPath } : {}),
     ...(healthCheck ? { healthCheck } : {}),
     ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
+    ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
+    ...(storageGraph.length > 0 ? { storageGraph } : {}),
+    ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
+    ...(autoDeployPolicy ? { autoDeployPolicy } : {}),
+    ...(generatedAccessProfile ? { generatedAccessProfile } : {}),
+    ...(monitoringThresholds ? { monitoringThresholds } : {}),
+    ...(runtimePrunePolicy ? { runtimePrunePolicy } : {}),
+    ...(resourceSecretRequirements.length > 0 ? { resourceSecretRequirements } : {}),
+    ...(previewPolicy ? { previewPolicy } : {}),
   };
 }
 
@@ -535,6 +823,10 @@ export function deploymentEnvironmentVariablesFromConfig(
   for (const [key, reference] of Object.entries(config.secrets ?? {}).sort(compareConfigKeys)) {
     const secretRef = reference.from.trim();
     const required = reference.required ?? true;
+
+    if (secretRef.startsWith(resourceSecretReferencePrefix)) {
+      continue;
+    }
 
     if (!secretRef.startsWith(ciEnvSecretReferencePrefix)) {
       if (!required) {
@@ -856,6 +1148,99 @@ function configureResourceNetwork(input: {
   });
 }
 
+function configureResourceHealth(input: {
+  resourceId: string;
+  healthCheck: NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceHealthCommand.create({
+        resourceId: input.resourceId,
+        healthCheck: input.healthCheck,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureResourceAccess(input: {
+  resourceId: string;
+  accessProfile: DeploymentGeneratedAccessProfileSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceAccessCommand.create({
+        resourceId: input.resourceId,
+        accessProfile: input.accessProfile,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function showRuntimeMonitoringThresholds(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(
+      ShowRuntimeMonitoringThresholdsQuery.create({
+        scope: { kind: "resource", resourceId },
+      }),
+    );
+    const result = yield* Effect.promise(() =>
+      cli.executeQuery<RuntimeMonitoringThresholdsReadback>(query),
+    );
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRuntimeMonitoringThresholds(input: {
+  resourceId: string;
+  thresholds: DeploymentMonitoringThresholdsSeed;
+  policyId?: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureRuntimeMonitoringThresholdsCommand.create({
+        ...(input.policyId ? { policyId: input.policyId } : {}),
+        scope: { kind: "resource", resourceId: input.resourceId },
+        enabled: input.thresholds.enabled,
+        rules: input.thresholds.rules,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRuntimePrunePolicy(input: {
+  serverId: string;
+  policy: DeploymentRuntimePrunePolicySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureScheduledRuntimePrunePolicyCommand.create({
+        policyId: deploymentSnapshotRuntimePrunePolicyId(input.serverId),
+        version: "repository-config",
+        scope: "deployment-snapshot",
+        serverId: input.serverId,
+        retentionDays: input.policy.retentionDays,
+        destructive: input.policy.destructive,
+        categories: input.policy.categories,
+        retryOnFailure: input.policy.retryOnFailure,
+        enabled: input.policy.enabled,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function showResource(resourceId: string) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -870,6 +1255,98 @@ function showResource(resourceId: string) {
     const result = yield* Effect.promise(() => cli.executeQuery(message));
     return yield* resultToEffect(result);
   });
+}
+
+function showResourceSecretReference(input: {
+  resourceId: string;
+  key: string;
+  exposure: "runtime";
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowResourceSecretReferenceQuery.create({
+        resourceId: input.resourceId,
+        key: input.key,
+        exposure: input.exposure,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function generatedAccessProfileMatchesConfig(input: {
+  current: ResourceDetail["accessProfile"] | undefined;
+  desired: DeploymentGeneratedAccessProfileSeed;
+}): boolean {
+  return (
+    input.current?.generatedAccessMode === input.desired.generatedAccessMode &&
+    input.current?.pathPrefix === input.desired.pathPrefix
+  );
+}
+
+function runtimeMonitoringRuleMatchesConfig(input: {
+  current: RuntimeMonitoringThresholdRule | undefined;
+  desired: DeploymentMonitoringThresholdRuleSeed | undefined;
+}): boolean {
+  return (
+    input.current?.signal === input.desired?.signal &&
+    input.current?.metric === input.desired?.metric &&
+    input.current?.warning === input.desired?.warning &&
+    input.current?.critical === input.desired?.critical &&
+    input.current?.comparator === input.desired?.comparator
+  );
+}
+
+function runtimeMonitoringThresholdsMatchConfig(input: {
+  current: RuntimeMonitoringThresholdsReadback["policy"] | undefined | null;
+  desired: DeploymentMonitoringThresholdsSeed;
+  resourceId: string;
+}): boolean {
+  const current = input.current;
+  if (
+    !current ||
+    current.scope.kind !== "resource" ||
+    current.scope.resourceId !== input.resourceId ||
+    current.enabled !== input.desired.enabled ||
+    current.rules.length !== input.desired.rules.length
+  ) {
+    return false;
+  }
+
+  return current.rules.every((rule, index) =>
+    runtimeMonitoringRuleMatchesConfig({
+      current: rule,
+      desired: input.desired.rules[index],
+    }),
+  );
+}
+
+function previewPolicyMatchesConfig(input: {
+  current: PreviewPolicySummary | undefined | null;
+  desired: DeploymentPreviewPolicySeed;
+  projectId: string;
+  resourceId: string;
+}): boolean {
+  const current = input.current;
+  if (
+    !current ||
+    current.source !== "configured" ||
+    current.scope.kind !== "resource" ||
+    current.scope.projectId !== input.projectId ||
+    current.scope.resourceId !== input.resourceId
+  ) {
+    return false;
+  }
+
+  return (
+    current.settings.sameRepositoryPreviews === input.desired.sameRepositoryPreviews &&
+    current.settings.forkPreviews === input.desired.forkPreviews &&
+    current.settings.secretBackedPreviews === input.desired.secretBackedPreviews &&
+    current.settings.maxActivePreviews === input.desired.maxActivePreviews &&
+    current.settings.previewTtlHours === input.desired.previewTtlHours
+  );
 }
 
 function sourceProfilesMatch(input: {
@@ -1096,6 +1573,47 @@ function resolveReusableResourceRuntimeProfile(input: {
   });
 }
 
+function desiredHealthPolicyFromSeed(
+  seed: DeploymentPromptSeed,
+): NonNullable<ResourceRuntimeProfileInput["healthCheck"]> | undefined {
+  if (seed.healthCheck) {
+    return seed.healthCheck;
+  }
+
+  if (!seed.healthCheckPath) {
+    return undefined;
+  }
+
+  return defaultHttpHealthCheckPolicy({ path: seed.healthCheckPath });
+}
+
+function healthPoliciesMatch(input: {
+  current: ResourceDetail["runtimeProfile"] | undefined;
+  desired: NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
+}): boolean {
+  const current = input.current?.healthCheck;
+  return JSON.stringify(current) === JSON.stringify(input.desired);
+}
+
+function resolveReusableResourceHealthPolicy(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const desired = desiredHealthPolicyFromSeed(input.seed);
+    if (!desired) {
+      return undefined;
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    if (healthPoliciesMatch({ current: resource.runtimeProfile, desired })) {
+      return undefined;
+    }
+
+    return desired;
+  });
+}
+
 function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -1184,6 +1702,1756 @@ function provisionDependencyResources(input: QuickDeployProvisionDependencyResou
       dependencyResourceIds,
       bindingIds,
     };
+  });
+}
+
+function shortSourceFingerprintHash(sourceFingerprint: string): string {
+  return new Bun.CryptoHasher("sha256").update(sourceFingerprint).digest("hex").slice(0, 10);
+}
+
+function repositoryConfigDependencyName(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  sourceFingerprint?: string;
+}): string {
+  const base =
+    input.dependency.previewLifecycle === "ephemeral" && input.sourceFingerprint
+      ? `preview-${shortSourceFingerprintHash(input.sourceFingerprint)}-${input.dependency.key}`
+      : `${input.resourceId}-${input.dependency.key}`;
+
+  return normalizeQuickDeployGeneratedNameBase(base);
+}
+
+function isManagedDependencyResource(
+  resource: DependencyResourceSummary | undefined,
+  dependency: DeploymentDependencySeed,
+): resource is DependencyResourceSummary {
+  return Boolean(
+    resource &&
+      resource.kind === dependency.kind &&
+      !resource.deletedAt &&
+      (resource.providerManaged || resource.sourceMode === "appaloft-managed"),
+  );
+}
+
+function findDependencyResourceById(
+  resources: readonly DependencyResourceSummary[],
+  dependencyResourceId: string,
+): DependencyResourceSummary | undefined {
+  return resources.find((resource) => resource.id === dependencyResourceId);
+}
+
+function findManagedDependencyResourceByName(input: {
+  resources: readonly DependencyResourceSummary[];
+  dependency: DeploymentDependencySeed;
+  name: string;
+}): DependencyResourceSummary | undefined {
+  const slug = slugify(input.name);
+  return input.resources.find(
+    (resource) =>
+      isManagedDependencyResource(resource, input.dependency) &&
+      (resource.slug === slug || slugify(resource.name) === slug),
+  );
+}
+
+function repositoryConfigDependencyConflict(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  targetName: string;
+  existingBinding: ResourceDependencyBindingSummary;
+  expectedDependencyResourceId?: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_binding_conflict",
+    category: "user",
+    message: "Repository config dependency target is already bound to another dependency",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+      existingBindingId: input.existingBinding.id,
+      existingDependencyResourceId: input.existingBinding.dependencyResourceId,
+      ...(input.expectedDependencyResourceId
+        ? { expectedDependencyResourceId: input.expectedDependencyResourceId }
+        : {}),
+    },
+  };
+}
+
+function repositoryConfigDependencyResourceConflict(input: {
+  dependency: DeploymentDependencySeed;
+  resourceId: string;
+  targetName: string;
+  dependencyResource: DependencyResourceSummary;
+  sourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_resource_conflict",
+    category: "user",
+    message: "Repository config dependency resource exists without matching provenance",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+      dependencyResourceId: input.dependencyResource.id,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigDependencyProvenanceError(input: {
+  dependency: DeploymentDependencySeed;
+  sourceFingerprint: string;
+  resourceId: string;
+  targetName: string;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_provenance_unavailable",
+    category: "user",
+    message: "Preview dependency cleanup provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      sourceFingerprint: input.sourceFingerprint,
+      resourceId: input.resourceId,
+      dependencyKey: input.dependency.key,
+      targetName: input.targetName,
+    },
+  };
+}
+
+function listDependencyResourcesForConfig(input: {
+  projectId: string;
+  environmentId: string;
+  kind: DeploymentDependencySeed["kind"];
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListDependencyResourcesQuery.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        kind: input.kind,
+        limit: 100,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function listResourceDependencyBindingsForConfig(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListResourceDependencyBindingsQuery.create({
+        resourceId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function provisionRepositoryConfigDependency(input: {
+  dependency: DeploymentDependencySeed;
+  projectId: string;
+  environmentId: string;
+  serverId: string;
+  name: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ProvisionDependencyResourceCommand.create({
+        kind: input.dependency.kind,
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        serverId: input.serverId,
+        name: input.name,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function bindRepositoryConfigDependency(input: {
+  resourceId: string;
+  dependencyResourceId: string;
+  targetName: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      BindResourceDependencyCommand.create({
+        resourceId: input.resourceId,
+        dependencyResourceId: input.dependencyResourceId,
+        targetName: input.targetName,
+        scope: "runtime-only",
+        injectionMode: "env",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function repositoryConfigDependencyBackupPolicyId(dependencyResourceId: string): string {
+  return `dbp_cfg_${new Bun.CryptoHasher("sha256")
+    .update(`repository-config:${dependencyResourceId}`)
+    .digest("hex")
+    .slice(0, 24)}`;
+}
+
+function dependencyBackupPolicyMatchesConfig(
+  current: DependencyResourceBackupPolicyRead,
+  desired: DeploymentDependencyBackupPolicySeed,
+): boolean {
+  if (!desired.enabled) {
+    return current.enabled === false;
+  }
+  if (!desired.intervalHours || !desired.retentionDays) {
+    return false;
+  }
+  return (
+    current.enabled === true &&
+    current.scheduleIntervalHours === desired.intervalHours &&
+    current.retentionDays === desired.retentionDays &&
+    current.retryOnFailure === desired.retryOnFailure &&
+    current.providerKey === null
+  );
+}
+
+function repositoryConfigDependencyBackupPolicyConflict(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  existingPolicy: DependencyResourceBackupPolicyRead;
+}): DomainError {
+  return {
+    code: "repository_config_dependency_backup_policy_conflict",
+    category: "user",
+    message: "Repository config dependency backup policy would mutate a manual policy",
+    retryable: false,
+    details: {
+      phase: "config-dependency-backup-resolution",
+      dependencyKey: input.dependency.key,
+      dependencyResourceId: input.dependencyResourceId,
+      existingPolicyId: input.existingPolicy.id,
+    },
+  };
+}
+
+function repositoryConfigDependencyBackupPolicyError(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  reason: string;
+}) {
+  return domainError.validation("Repository config dependency backup policy is invalid", {
+    phase: "config-dependency-backup-resolution",
+    dependencyKey: input.dependency.key,
+    dependencyResourceId: input.dependencyResourceId,
+    reason: input.reason,
+  });
+}
+
+function listDependencyBackupPoliciesForConfig(dependencyResourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListDependencyResourceBackupPoliciesQuery.create({
+        dependencyResourceId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigDependencyBackupPolicy(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+  policyId: string;
+  currentPolicy?: DependencyResourceBackupPolicyRead;
+}) {
+  return Effect.gen(function* () {
+    const desired = input.dependency.backupPolicy;
+    if (!desired) {
+      return;
+    }
+    if (desired.enabled && (!desired.intervalHours || !desired.retentionDays)) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyBackupPolicyError({
+          dependency: input.dependency,
+          dependencyResourceId: input.dependencyResourceId,
+          reason: "interval_and_retention_required",
+        }),
+      );
+    }
+
+    const retentionDays = desired.enabled
+      ? (desired.retentionDays as number)
+      : input.currentPolicy?.retentionDays;
+    const scheduleIntervalHours = desired.enabled
+      ? (desired.intervalHours as number)
+      : input.currentPolicy?.scheduleIntervalHours;
+    if (!retentionDays || !scheduleIntervalHours) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureDependencyResourceBackupPolicyCommand.create({
+        policyId: input.policyId,
+        dependencyResourceId: input.dependencyResourceId,
+        retentionDays,
+        scheduleIntervalHours,
+        retryOnFailure: desired.retryOnFailure,
+        enabled: desired.enabled,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigDependencyBackupPolicy(input: {
+  dependency: DeploymentDependencySeed;
+  dependencyResourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const desired = input.dependency.backupPolicy;
+    if (!desired) {
+      return;
+    }
+
+    const policyId = repositoryConfigDependencyBackupPolicyId(input.dependencyResourceId);
+    const policies = yield* listDependencyBackupPoliciesForConfig(input.dependencyResourceId);
+    const ownedPolicy = policies.items.find((policy) => policy.id === policyId);
+
+    if (ownedPolicy && dependencyBackupPolicyMatchesConfig(ownedPolicy, desired)) {
+      return;
+    }
+
+    if (!ownedPolicy) {
+      const matchingManualPolicy = policies.items.find((policy) =>
+        dependencyBackupPolicyMatchesConfig(policy, desired),
+      );
+      if (matchingManualPolicy || !desired.enabled) {
+        return;
+      }
+      const manualPolicy = policies.items[0];
+      if (manualPolicy) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyBackupPolicyConflict({
+            dependency: input.dependency,
+            dependencyResourceId: input.dependencyResourceId,
+            existingPolicy: manualPolicy,
+          }),
+        );
+      }
+    }
+
+    yield* configureRepositoryConfigDependencyBackupPolicy({
+      dependency: input.dependency,
+      dependencyResourceId: input.dependencyResourceId,
+      policyId,
+      ...(ownedPolicy ? { currentPolicy: ownedPolicy } : {}),
+    });
+  });
+}
+
+function buildDependencyProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkDependencyProvenance;
+  entries: SourceLinkDependencyProvenanceEntry[];
+}): SourceLinkDependencyProvenance {
+  const byKey = new Map<string, SourceLinkDependencyProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(`${entry.key}:${entry.targetName}`, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(`${entry.key}:${entry.targetName}`, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.dependency-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigDependencies(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const dependencyGraph = input.seed.dependencyGraph ?? [];
+    if (dependencyGraph.length === 0) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const provenanceRequiredDependency = dependencyGraph.find(
+      (dependency) => dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+    );
+    if (provenanceRequiredDependency && !cli.sourceLinkStore?.recordDependencyProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyProvenanceError({
+          dependency: provenanceRequiredDependency,
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          resourceId: input.resourceId,
+          targetName: provenanceRequiredDependency.bindEnv,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    let existingSourceLink: SourceLinkRecord | null = null;
+    if (input.seed.sourceFingerprint) {
+      const existingSourceLinkResult = yield* Effect.promise(
+        () =>
+          cli.sourceLinkStore?.read(input.seed.sourceFingerprint ?? "") ??
+          Promise.resolve(ok(null)),
+      );
+      existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    }
+    const bindingsResult = yield* listResourceDependencyBindingsForConfig(input.resourceId);
+    const bindings = [...bindingsResult.items];
+    const provenanceEntries: SourceLinkDependencyProvenanceEntry[] = [];
+
+    for (const dependency of dependencyGraph) {
+      const targetName = dependency.bindEnv;
+      const resourceName = repositoryConfigDependencyName({
+        dependency,
+        resourceId: input.resourceId,
+        ...(input.seed.sourceFingerprint
+          ? { sourceFingerprint: input.seed.sourceFingerprint }
+          : {}),
+      });
+      const dependencyResourcesResult = yield* listDependencyResourcesForConfig({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        kind: dependency.kind,
+      });
+      const dependencyResources = [...dependencyResourcesResult.items];
+      const existingProvenanceEntry =
+        existingSourceLink &&
+        input.seed.sourceFingerprint &&
+        existingSourceLink.dependencyProvenance?.sourceFingerprint === input.seed.sourceFingerprint
+          ? existingSourceLink.dependencyProvenance.entries.find(
+              (entry) =>
+                entry.key === dependency.key &&
+                entry.targetName === targetName &&
+                entry.resourceId === input.resourceId,
+            )
+          : undefined;
+      const activeTargetBinding = bindings.find(
+        (binding) => binding.status === "active" && binding.target.targetName === targetName,
+      );
+      const isEphemeralPreviewDependency = Boolean(
+        dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+      );
+      const provenanceResource = existingProvenanceEntry
+        ? findDependencyResourceById(
+            dependencyResources,
+            existingProvenanceEntry.dependencyResourceId,
+          )
+        : undefined;
+      const namedResource = findManagedDependencyResourceByName({
+        resources: dependencyResources,
+        dependency,
+        name: resourceName,
+      });
+      let dependencyResource = isManagedDependencyResource(provenanceResource, dependency)
+        ? provenanceResource
+        : isEphemeralPreviewDependency
+          ? undefined
+          : namedResource;
+
+      if (isEphemeralPreviewDependency && !existingProvenanceEntry && namedResource) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyResourceConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            dependencyResource: namedResource,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (isEphemeralPreviewDependency && !existingProvenanceEntry && activeTargetBinding) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            existingBinding: activeTargetBinding,
+          }),
+        );
+      }
+
+      if (
+        isEphemeralPreviewDependency &&
+        existingProvenanceEntry &&
+        namedResource &&
+        namedResource.id !== existingProvenanceEntry.dependencyResourceId &&
+        !provenanceResource
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyResourceConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            dependencyResource: namedResource,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (!dependencyResource && activeTargetBinding) {
+        const activeBindingResource = findDependencyResourceById(
+          dependencyResources,
+          activeTargetBinding.dependencyResourceId,
+        );
+        if (
+          dependency.previewLifecycle !== "ephemeral" &&
+          isManagedDependencyResource(activeBindingResource, dependency)
+        ) {
+          dependencyResource = activeBindingResource;
+        }
+      }
+
+      if (!dependencyResource) {
+        const provisioned = yield* provisionRepositoryConfigDependency({
+          dependency,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          serverId: input.serverId,
+          name: resourceName,
+        });
+        dependencyResource = {
+          id: provisioned.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: resourceName,
+          slug: slugify(resourceName),
+          kind: dependency.kind,
+          sourceMode: "appaloft-managed",
+          providerKey: "",
+          providerManaged: true,
+          lifecycleStatus: "provisioning",
+          bindingReadiness: { status: "blocked", reason: "provisioning" },
+          createdAt: new Date().toISOString(),
+        } satisfies DependencyResourceSummary;
+        dependencyResources.push(dependencyResource);
+      }
+
+      if (
+        activeTargetBinding &&
+        activeTargetBinding.dependencyResourceId !== dependencyResource.id
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigDependencyConflict({
+            dependency,
+            resourceId: input.resourceId,
+            targetName,
+            existingBinding: activeTargetBinding,
+            expectedDependencyResourceId: dependencyResource.id,
+          }),
+        );
+      }
+
+      yield* ensureRepositoryConfigDependencyBackupPolicy({
+        dependency,
+        dependencyResourceId: dependencyResource.id,
+      });
+
+      const binding = activeTargetBinding
+        ? { id: activeTargetBinding.id }
+        : yield* bindRepositoryConfigDependency({
+            resourceId: input.resourceId,
+            dependencyResourceId: dependencyResource.id,
+            targetName,
+          });
+      if (!activeTargetBinding) {
+        bindings.push({
+          id: binding.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          resourceId: input.resourceId,
+          dependencyResourceId: dependencyResource.id,
+          kind: dependency.kind,
+          sourceMode: "appaloft-managed",
+          providerKey: dependencyResource.providerKey,
+          providerManaged: true,
+          lifecycleStatus: dependencyResource.lifecycleStatus,
+          target: {
+            targetName,
+            scope: "runtime-only",
+            injectionMode: "env",
+          },
+          bindingReadiness: { status: "ready" },
+          snapshotReadiness: { status: "deferred" },
+          status: "active",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      if (dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint) {
+        provenanceEntries.push({
+          key: dependency.key,
+          kind: dependency.kind,
+          source: dependency.source,
+          lifecycle: dependency.previewLifecycle,
+          resourceId: input.resourceId,
+          dependencyResourceId: dependencyResource.id,
+          bindingId: binding.id,
+          targetName,
+          createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+        });
+      }
+    }
+
+    if (provenanceEntries.length === 0 || !input.seed.sourceFingerprint) {
+      return;
+    }
+
+    if (!cli.sourceLinkStore?.recordDependencyProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigDependencyProvenanceError({
+          dependency: dependencyGraph[0] as DeploymentDependencySeed,
+          sourceFingerprint: input.seed.sourceFingerprint,
+          resourceId: input.resourceId,
+          targetName: provenanceEntries[0]?.targetName ?? "",
+        }),
+      );
+    }
+
+    const provenance = buildDependencyProvenance({
+      sourceFingerprint: input.seed.sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingSourceLink?.dependencyProvenance
+        ? { existing: existingSourceLink.dependencyProvenance }
+        : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordDependencyProvenance?.({
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          target,
+          dependencyProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
+function repositoryConfigStorageName(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  sourceFingerprint?: string;
+}): string {
+  const base =
+    input.storage.previewLifecycle === "ephemeral" && input.sourceFingerprint
+      ? `preview-${shortSourceFingerprintHash(input.sourceFingerprint)}-${input.storage.key}`
+      : `${input.resourceId}-${input.storage.key}`;
+
+  return normalizeQuickDeployGeneratedNameBase(base);
+}
+
+function isManagedStorageVolume(
+  storageVolume: StorageVolumeSummary | undefined,
+): storageVolume is StorageVolumeSummary {
+  return Boolean(
+    storageVolume &&
+      storageVolume.kind === "named-volume" &&
+      storageVolume.lifecycleStatus === "active" &&
+      !storageVolume.deletedAt &&
+      !storageVolume.sourcePath,
+  );
+}
+
+function findStorageVolumeById(
+  storageVolumes: readonly StorageVolumeSummary[],
+  storageVolumeId: string,
+): StorageVolumeSummary | undefined {
+  return storageVolumes.find((storageVolume) => storageVolume.id === storageVolumeId);
+}
+
+function findManagedStorageVolumeByName(input: {
+  storageVolumes: readonly StorageVolumeSummary[];
+  name: string;
+}): StorageVolumeSummary | undefined {
+  const slug = slugify(input.name);
+  return input.storageVolumes.find(
+    (storageVolume) =>
+      isManagedStorageVolume(storageVolume) &&
+      (storageVolume.slug === slug || slugify(storageVolume.name) === slug),
+  );
+}
+
+function repositoryConfigStorageAttachmentConflict(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  existingAttachment: NonNullable<ResourceDetail["storageAttachments"]>[number];
+  expectedStorageVolumeId?: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_attachment_conflict",
+    category: "user",
+    message: "Repository config storage mount path is already attached to another storage volume",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+      mountMode: input.storage.mountMode,
+      existingAttachmentId: input.existingAttachment.id,
+      existingStorageVolumeId: input.existingAttachment.storageVolumeId,
+      existingMountMode: input.existingAttachment.mountMode,
+      ...(input.expectedStorageVolumeId
+        ? { expectedStorageVolumeId: input.expectedStorageVolumeId }
+        : {}),
+    },
+  };
+}
+
+function repositoryConfigStorageVolumeConflict(input: {
+  storage: DeploymentStorageSeed;
+  resourceId: string;
+  storageVolume: StorageVolumeSummary;
+  sourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_volume_conflict",
+    category: "user",
+    message: "Repository config storage volume exists without matching provenance",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+      storageVolumeId: input.storageVolume.id,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigStorageProvenanceError(input: {
+  storage: DeploymentStorageSeed;
+  sourceFingerprint: string;
+  resourceId: string;
+}): DomainError {
+  return {
+    code: "repository_config_storage_provenance_unavailable",
+    category: "user",
+    message: "Preview storage cleanup provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-storage-resolution",
+      sourceFingerprint: input.sourceFingerprint,
+      resourceId: input.resourceId,
+      storageKey: input.storage.key,
+      destinationPath: input.storage.mountPath,
+    },
+  };
+}
+
+function repositoryConfigStorageDuplicatePathError(input: {
+  storage: DeploymentStorageSeed;
+  conflictingStorageKey: string;
+}): DomainError {
+  return domainError.validation("Repository config storage mount path is declared more than once", {
+    phase: "config-storage-resolution",
+    storageKey: input.storage.key,
+    conflictingStorageKey: input.conflictingStorageKey,
+    destinationPath: input.storage.mountPath,
+  });
+}
+
+function listStorageVolumesForConfig(input: { projectId: string; environmentId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListStorageVolumesQuery.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createRepositoryConfigStorageVolume(input: {
+  projectId: string;
+  environmentId: string;
+  name: string;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      CreateStorageVolumeCommand.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        name: input.name,
+        kind: "named-volume",
+        backupRelationship: {
+          retentionRequired: false,
+        },
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function attachRepositoryConfigStorage(input: {
+  resourceId: string;
+  storageVolumeId: string;
+  destinationPath: string;
+  mountMode: DeploymentStorageSeed["mountMode"];
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      AttachResourceStorageCommand.create({
+        resourceId: input.resourceId,
+        storageVolumeId: input.storageVolumeId,
+        destinationPath: input.destinationPath,
+        mountMode: input.mountMode,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function buildStorageProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkStorageProvenance;
+  entries: SourceLinkStorageProvenanceEntry[];
+}): SourceLinkStorageProvenance {
+  const byKey = new Map<string, SourceLinkStorageProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(`${entry.key}:${entry.destinationPath}`, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(`${entry.key}:${entry.destinationPath}`, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.storage-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigStorage(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const storageGraph = input.seed.storageGraph ?? [];
+    if (storageGraph.length === 0) {
+      return;
+    }
+
+    const seenMountPaths = new Map<string, string>();
+    for (const storage of storageGraph) {
+      const existingKey = seenMountPaths.get(storage.mountPath);
+      if (existingKey) {
+        return yield* Effect.fail(
+          repositoryConfigStorageDuplicatePathError({
+            storage,
+            conflictingStorageKey: existingKey,
+          }),
+        );
+      }
+      seenMountPaths.set(storage.mountPath, storage.key);
+    }
+
+    const cli = yield* CliRuntime;
+    const provenanceRequiredStorage = storageGraph.find(
+      (storage) => storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+    );
+    if (provenanceRequiredStorage && !cli.sourceLinkStore?.recordStorageProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigStorageProvenanceError({
+          storage: provenanceRequiredStorage,
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    let existingSourceLink: SourceLinkRecord | null = null;
+    if (input.seed.sourceFingerprint) {
+      const existingSourceLinkResult = yield* Effect.promise(
+        () =>
+          cli.sourceLinkStore?.read(input.seed.sourceFingerprint ?? "") ??
+          Promise.resolve(ok(null)),
+      );
+      existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    const attachments = [...(resource.storageAttachments ?? [])];
+    const storageVolumesResult = yield* listStorageVolumesForConfig({
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+    });
+    const storageVolumes = [...storageVolumesResult.items];
+    const provenanceEntries: SourceLinkStorageProvenanceEntry[] = [];
+
+    for (const storage of storageGraph) {
+      const volumeName = repositoryConfigStorageName({
+        storage,
+        resourceId: input.resourceId,
+        ...(input.seed.sourceFingerprint
+          ? { sourceFingerprint: input.seed.sourceFingerprint }
+          : {}),
+      });
+      const existingProvenanceEntry =
+        existingSourceLink &&
+        input.seed.sourceFingerprint &&
+        existingSourceLink.storageProvenance?.sourceFingerprint === input.seed.sourceFingerprint
+          ? existingSourceLink.storageProvenance.entries.find(
+              (entry) =>
+                entry.key === storage.key &&
+                entry.destinationPath === storage.mountPath &&
+                entry.resourceId === input.resourceId,
+            )
+          : undefined;
+      const activeMountAttachment = attachments.find(
+        (attachment) => attachment.destinationPath === storage.mountPath,
+      );
+      const isEphemeralPreviewStorage = Boolean(
+        storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint,
+      );
+      const provenanceVolume = existingProvenanceEntry
+        ? findStorageVolumeById(storageVolumes, existingProvenanceEntry.storageVolumeId)
+        : undefined;
+      const namedVolume = findManagedStorageVolumeByName({
+        storageVolumes,
+        name: volumeName,
+      });
+      let storageVolume = isManagedStorageVolume(provenanceVolume)
+        ? provenanceVolume
+        : isEphemeralPreviewStorage
+          ? undefined
+          : namedVolume;
+
+      if (isEphemeralPreviewStorage && !existingProvenanceEntry && namedVolume) {
+        return yield* Effect.fail(
+          repositoryConfigStorageVolumeConflict({
+            storage,
+            resourceId: input.resourceId,
+            storageVolume: namedVolume,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (isEphemeralPreviewStorage && !existingProvenanceEntry && activeMountAttachment) {
+        return yield* Effect.fail(
+          repositoryConfigStorageAttachmentConflict({
+            storage,
+            resourceId: input.resourceId,
+            existingAttachment: activeMountAttachment,
+          }),
+        );
+      }
+
+      if (
+        isEphemeralPreviewStorage &&
+        existingProvenanceEntry &&
+        namedVolume &&
+        namedVolume.id !== existingProvenanceEntry.storageVolumeId &&
+        !provenanceVolume
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigStorageVolumeConflict({
+            storage,
+            resourceId: input.resourceId,
+            storageVolume: namedVolume,
+            ...(input.seed.sourceFingerprint
+              ? { sourceFingerprint: input.seed.sourceFingerprint }
+              : {}),
+          }),
+        );
+      }
+
+      if (!storageVolume) {
+        const created = yield* createRepositoryConfigStorageVolume({
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: volumeName,
+        });
+        storageVolume = {
+          id: created.id,
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: volumeName,
+          slug: slugify(volumeName),
+          kind: "named-volume",
+          lifecycleStatus: "active",
+          attachmentCount: 0,
+          attachments: [],
+          createdAt: new Date().toISOString(),
+        } satisfies StorageVolumeSummary;
+        storageVolumes.push(storageVolume);
+      }
+
+      if (
+        activeMountAttachment &&
+        (activeMountAttachment.storageVolumeId !== storageVolume.id ||
+          activeMountAttachment.mountMode !== storage.mountMode)
+      ) {
+        return yield* Effect.fail(
+          repositoryConfigStorageAttachmentConflict({
+            storage,
+            resourceId: input.resourceId,
+            existingAttachment: activeMountAttachment,
+            expectedStorageVolumeId: storageVolume.id,
+          }),
+        );
+      }
+
+      const attachment = activeMountAttachment
+        ? { id: activeMountAttachment.id }
+        : yield* attachRepositoryConfigStorage({
+            resourceId: input.resourceId,
+            storageVolumeId: storageVolume.id,
+            destinationPath: storage.mountPath,
+            mountMode: storage.mountMode,
+          });
+      if (!activeMountAttachment) {
+        attachments.push({
+          id: attachment.id,
+          storageVolumeId: storageVolume.id,
+          storageVolumeName: storageVolume.name,
+          storageVolumeKind: storageVolume.kind,
+          destinationPath: storage.mountPath,
+          mountMode: storage.mountMode,
+          attachedAt: new Date().toISOString(),
+        });
+      }
+
+      if (storage.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint) {
+        provenanceEntries.push({
+          key: storage.key,
+          kind: storage.kind,
+          source: storage.source,
+          lifecycle: storage.previewLifecycle,
+          resourceId: input.resourceId,
+          storageVolumeId: storageVolume.id,
+          attachmentId: attachment.id,
+          destinationPath: storage.mountPath,
+          createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+        });
+      }
+    }
+
+    if (provenanceEntries.length === 0 || !input.seed.sourceFingerprint) {
+      return;
+    }
+
+    if (!cli.sourceLinkStore?.recordStorageProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigStorageProvenanceError({
+          storage: storageGraph[0] as DeploymentStorageSeed,
+          sourceFingerprint: input.seed.sourceFingerprint,
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const provenance = buildStorageProvenance({
+      sourceFingerprint: input.seed.sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingSourceLink?.storageProvenance
+        ? { existing: existingSourceLink.storageProvenance }
+        : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordStorageProvenance?.({
+          sourceFingerprint: input.seed.sourceFingerprint ?? "",
+          target,
+          storageProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
+function scheduledTaskCommandFingerprint(task: DeploymentScheduledTaskSeed): string {
+  return new Bun.CryptoHasher("sha256")
+    .update(
+      [
+        task.schedule,
+        task.timezone,
+        task.command,
+        String(task.timeoutSeconds),
+        String(task.retryLimit),
+        task.concurrencyPolicy,
+        task.status,
+      ].join("\0"),
+    )
+    .digest("hex");
+}
+
+function repositoryConfigScheduledTaskProvenanceError(input: {
+  task: DeploymentScheduledTaskSeed;
+  sourceFingerprint?: string;
+  resourceId: string;
+}): DomainError {
+  return {
+    code: "repository_config_scheduled_task_provenance_unavailable",
+    category: "user",
+    message: "Repository config scheduled task provenance could not be recorded",
+    retryable: false,
+    details: {
+      phase: "config-scheduled-task-resolution",
+      resourceId: input.resourceId,
+      taskKey: input.task.key,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    },
+  };
+}
+
+function repositoryConfigScheduledTaskConflict(input: {
+  task: DeploymentScheduledTaskSeed;
+  resourceId: string;
+  sourceFingerprint: string;
+  existingTaskId?: string;
+  existingResourceId?: string;
+  provenanceSourceFingerprint?: string;
+}): DomainError {
+  return {
+    code: "repository_config_scheduled_task_conflict",
+    category: "user",
+    message: "Repository config scheduled task provenance points at another context",
+    retryable: false,
+    details: {
+      phase: "config-scheduled-task-resolution",
+      resourceId: input.resourceId,
+      taskKey: input.task.key,
+      sourceFingerprint: input.sourceFingerprint,
+      ...(input.existingTaskId ? { existingTaskId: input.existingTaskId } : {}),
+      ...(input.existingResourceId ? { existingResourceId: input.existingResourceId } : {}),
+      ...(input.provenanceSourceFingerprint
+        ? { provenanceSourceFingerprint: input.provenanceSourceFingerprint }
+        : {}),
+    },
+  };
+}
+
+function scheduledTaskMatchesConfig(
+  task: ScheduledTaskDefinitionSummary,
+  seed: DeploymentScheduledTaskSeed,
+): boolean {
+  return (
+    task.schedule === seed.schedule &&
+    task.timezone === seed.timezone &&
+    task.commandIntent === seed.command &&
+    task.timeoutSeconds === seed.timeoutSeconds &&
+    task.retryLimit === seed.retryLimit &&
+    task.concurrencyPolicy === seed.concurrencyPolicy &&
+    task.status === seed.status
+  );
+}
+
+function findScheduledTaskById(
+  tasks: readonly ScheduledTaskDefinitionSummary[],
+  taskId: string,
+): ScheduledTaskDefinitionSummary | undefined {
+  return tasks.find((task) => task.taskId === taskId);
+}
+
+function findExactScheduledTask(
+  tasks: readonly ScheduledTaskDefinitionSummary[],
+  seed: DeploymentScheduledTaskSeed,
+): ScheduledTaskDefinitionSummary | undefined {
+  return tasks.find((task) => scheduledTaskMatchesConfig(task, seed));
+}
+
+function listScheduledTasksForConfig(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ListScheduledTasksQuery.create({
+        resourceId,
+        limit: 100,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createRepositoryConfigScheduledTask(input: {
+  resourceId: string;
+  task: DeploymentScheduledTaskSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      CreateScheduledTaskCommand.create({
+        resourceId: input.resourceId,
+        schedule: input.task.schedule,
+        timezone: input.task.timezone,
+        commandIntent: input.task.command,
+        timeoutSeconds: input.task.timeoutSeconds,
+        retryLimit: input.task.retryLimit,
+        concurrencyPolicy: input.task.concurrencyPolicy,
+        status: input.task.status,
+        idempotencyKey: `repository-config:${input.task.key}`,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigScheduledTask(input: {
+  taskId: string;
+  resourceId: string;
+  task: DeploymentScheduledTaskSeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureScheduledTaskCommand.create({
+        taskId: input.taskId,
+        resourceId: input.resourceId,
+        schedule: input.task.schedule,
+        timezone: input.task.timezone,
+        commandIntent: input.task.command,
+        timeoutSeconds: input.task.timeoutSeconds,
+        retryLimit: input.task.retryLimit,
+        concurrencyPolicy: input.task.concurrencyPolicy,
+        status: input.task.status,
+        idempotencyKey: `repository-config:${input.task.key}`,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function buildScheduledTaskProvenance(input: {
+  sourceFingerprint: string;
+  existing?: SourceLinkScheduledTaskProvenance;
+  entries: SourceLinkScheduledTaskProvenanceEntry[];
+}): SourceLinkScheduledTaskProvenance {
+  const byKey = new Map<string, SourceLinkScheduledTaskProvenanceEntry>();
+  for (const entry of input.existing?.entries ?? []) {
+    byKey.set(entry.key, entry);
+  }
+  for (const entry of input.entries) {
+    byKey.set(entry.key, entry);
+  }
+
+  return {
+    schemaVersion: "source-link.scheduled-task-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: input.sourceFingerprint,
+    entries: [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key)),
+  };
+}
+
+function ensureRepositoryConfigScheduledTasks(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}) {
+  return Effect.gen(function* () {
+    const scheduledTaskGraph = input.seed.scheduledTaskGraph ?? [];
+    if (scheduledTaskGraph.length === 0) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    const firstTask = scheduledTaskGraph[0] as DeploymentScheduledTaskSeed;
+    const sourceFingerprint = input.seed.sourceFingerprint;
+    if (!sourceFingerprint || !cli.sourceLinkStore?.recordScheduledTaskProvenance) {
+      return yield* Effect.fail(
+        repositoryConfigScheduledTaskProvenanceError({
+          task: firstTask,
+          ...(sourceFingerprint ? { sourceFingerprint } : {}),
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    const existingSourceLinkResult = yield* Effect.promise(
+      () => cli.sourceLinkStore?.read(sourceFingerprint) ?? Promise.resolve(ok(null)),
+    );
+    const existingSourceLink = yield* resultToEffect(existingSourceLinkResult);
+    const existingProvenance = existingSourceLink?.scheduledTaskProvenance;
+    if (existingProvenance && existingProvenance.sourceFingerprint !== sourceFingerprint) {
+      return yield* Effect.fail(
+        repositoryConfigScheduledTaskConflict({
+          task: firstTask,
+          resourceId: input.resourceId,
+          sourceFingerprint,
+          provenanceSourceFingerprint: existingProvenance.sourceFingerprint,
+        }),
+      );
+    }
+
+    const tasksResult = yield* listScheduledTasksForConfig(input.resourceId);
+    const tasks = [...tasksResult.items];
+    const provenanceEntries: SourceLinkScheduledTaskProvenanceEntry[] = [];
+
+    for (const task of scheduledTaskGraph) {
+      const existingProvenanceEntry = existingProvenance?.entries.find(
+        (entry) => entry.key === task.key,
+      );
+      if (existingProvenanceEntry && existingProvenanceEntry.resourceId !== input.resourceId) {
+        return yield* Effect.fail(
+          repositoryConfigScheduledTaskConflict({
+            task,
+            resourceId: input.resourceId,
+            sourceFingerprint,
+            existingTaskId: existingProvenanceEntry.taskId,
+            existingResourceId: existingProvenanceEntry.resourceId,
+          }),
+        );
+      }
+
+      const provenanceTask = existingProvenanceEntry
+        ? findScheduledTaskById(tasks, existingProvenanceEntry.taskId)
+        : undefined;
+      const exactTask = provenanceTask ? undefined : findExactScheduledTask(tasks, task);
+      let resolvedTask = provenanceTask ?? exactTask;
+
+      if (resolvedTask && !scheduledTaskMatchesConfig(resolvedTask, task)) {
+        const configured = yield* configureRepositoryConfigScheduledTask({
+          taskId: resolvedTask.taskId,
+          resourceId: input.resourceId,
+          task,
+        });
+        resolvedTask = configured.task;
+        const taskIndex = tasks.findIndex((item) => item.taskId === resolvedTask?.taskId);
+        if (taskIndex >= 0) {
+          tasks[taskIndex] = configured.task;
+        }
+      }
+
+      if (!resolvedTask) {
+        const created = yield* createRepositoryConfigScheduledTask({
+          resourceId: input.resourceId,
+          task,
+        });
+        resolvedTask = created.task;
+        tasks.push(created.task);
+      }
+
+      provenanceEntries.push({
+        key: task.key,
+        source: "repository-config",
+        lifecycle: task.previewLifecycle === "ephemeral" ? "ephemeral" : "persistent",
+        resourceId: input.resourceId,
+        taskId: resolvedTask.taskId,
+        commandFingerprint: scheduledTaskCommandFingerprint(task),
+        createdAt: existingProvenanceEntry?.createdAt ?? new Date().toISOString(),
+      });
+    }
+
+    const provenance = buildScheduledTaskProvenance({
+      sourceFingerprint,
+      entries: provenanceEntries,
+      ...(existingProvenance ? { existing: existingProvenance } : {}),
+    });
+    const persisted = yield* Effect.promise(
+      () =>
+        cli.sourceLinkStore?.recordScheduledTaskProvenance?.({
+          sourceFingerprint,
+          target,
+          scheduledTaskProvenance: provenance,
+          updatedAt: new Date().toISOString(),
+        }) ?? Promise.resolve(ok(null as never)),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
+function stringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function autoDeployPolicyMatchesConfig(
+  current: ResourceDetailAutoDeployPolicy | undefined,
+  desired: DeploymentAutoDeploySeed,
+): boolean {
+  if (!desired.enabled) {
+    return !current || current.status === "disabled";
+  }
+  if (!current || current.status !== "enabled" || !desired.refs) {
+    return false;
+  }
+
+  return (
+    current.triggerKind === desired.triggerKind &&
+    stringArraysEqual(current.refs, desired.refs) &&
+    stringArraysEqual(current.eventKinds, desired.eventKinds) &&
+    current.dedupeWindowSeconds === desired.dedupeWindowSeconds
+  );
+}
+
+function autoDeployResolutionError(input: { message: string; resourceId: string; reason: string }) {
+  return domainError.validation(input.message, {
+    phase: "config-auto-deploy-resolution",
+    resourceId: input.resourceId,
+    reason: input.reason,
+  });
+}
+
+function showResourceForAutoDeploy(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowResourceQuery.create({
+        resourceId,
+        includeLatestDeployment: false,
+        includeAccessSummary: false,
+        includeProfileDiagnostics: false,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery<ResourceDetail>(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigAutoDeploy(input: {
+  resourceId: string;
+  policy: DeploymentAutoDeploySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceAutoDeployCommand.create({
+        resourceId: input.resourceId,
+        mode: input.policy.enabled ? "enable" : "disable",
+        ...(input.policy.enabled
+          ? {
+              policy: {
+                triggerKind: input.policy.triggerKind,
+                refs: input.policy.refs ?? [],
+                eventKinds: input.policy.eventKinds,
+                ...(input.policy.dedupeWindowSeconds
+                  ? { dedupeWindowSeconds: input.policy.dedupeWindowSeconds }
+                  : {}),
+              },
+            }
+          : {}),
+        idempotencyKey: "repository-config:auto-deploy",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigAutoDeploy(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.autoDeployPolicy;
+    if (!policy) {
+      return;
+    }
+
+    if (policy.enabled && (!policy.refs || policy.refs.length === 0)) {
+      return yield* Effect.fail(
+        autoDeployResolutionError({
+          message: "Repository config autoDeploy refs are required when enabled",
+          resourceId: input.resourceId,
+          reason: "refs_required",
+        }),
+      );
+    }
+
+    const detail = yield* showResourceForAutoDeploy(input.resourceId);
+    if (autoDeployPolicyMatchesConfig(detail.autoDeployPolicy, policy)) {
+      return;
+    }
+    if (!policy.enabled && !detail.autoDeployPolicy) {
+      return;
+    }
+
+    yield* configureRepositoryConfigAutoDeploy({
+      resourceId: input.resourceId,
+      policy,
+    });
+  });
+}
+
+function ensureRepositoryConfigGeneratedAccessProfile(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const accessProfile = input.seed.generatedAccessProfile;
+    if (!accessProfile) {
+      return;
+    }
+
+    const detail = yield* showResource(input.resourceId);
+    if (
+      generatedAccessProfileMatchesConfig({
+        current: detail.accessProfile,
+        desired: accessProfile,
+      })
+    ) {
+      return;
+    }
+
+    yield* configureResourceAccess({
+      resourceId: input.resourceId,
+      accessProfile,
+    });
+  });
+}
+
+function ensureRepositoryConfigMonitoringThresholds(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const thresholds = input.seed.monitoringThresholds;
+    if (!thresholds) {
+      return;
+    }
+
+    const readback = yield* showRuntimeMonitoringThresholds(input.resourceId);
+    if (
+      runtimeMonitoringThresholdsMatchConfig({
+        current: readback.policy,
+        desired: thresholds,
+        resourceId: input.resourceId,
+      })
+    ) {
+      return;
+    }
+
+    const exactPolicy =
+      readback.policy?.scope.kind === "resource" &&
+      readback.policy.scope.resourceId === input.resourceId
+        ? readback.policy
+        : undefined;
+    yield* configureRuntimeMonitoringThresholds({
+      resourceId: input.resourceId,
+      thresholds,
+      ...(exactPolicy ? { policyId: exactPolicy.policyId } : {}),
+    });
+  });
+}
+
+function showPreviewPolicy(input: { projectId: string; resourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowPreviewPolicyQuery.create({
+        scope: {
+          kind: "resource",
+          projectId: input.projectId,
+          resourceId: input.resourceId,
+        },
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureRepositoryConfigPreviewPolicy(input: {
+  projectId: string;
+  resourceId: string;
+  policy: DeploymentPreviewPolicySeed;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigurePreviewPolicyCommand.create({
+        scope: {
+          kind: "resource",
+          projectId: input.projectId,
+          resourceId: input.resourceId,
+        },
+        policy: input.policy,
+        idempotencyKey: "repository-config:preview-policy",
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function ensureRepositoryConfigPreviewPolicy(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.previewPolicy;
+    if (!policy || input.seed.isPullRequestPreview) {
+      return;
+    }
+
+    const readback = yield* showPreviewPolicy({
+      projectId: input.projectId,
+      resourceId: input.resourceId,
+    });
+    if (
+      previewPolicyMatchesConfig({
+        current: readback.policy,
+        desired: policy,
+        projectId: input.projectId,
+        resourceId: input.resourceId,
+      })
+    ) {
+      return;
+    }
+
+    yield* configureRepositoryConfigPreviewPolicy({
+      projectId: input.projectId,
+      resourceId: input.resourceId,
+      policy,
+    });
+  });
+}
+
+function ensureRepositoryConfigRuntimePrunePolicy(input: {
+  seed: DeploymentPromptSeed;
+  serverId: string;
+}) {
+  return Effect.gen(function* () {
+    const policy = input.seed.runtimePrunePolicy;
+    if (!policy) {
+      return;
+    }
+
+    yield* configureRuntimePrunePolicy({
+      serverId: input.serverId,
+      policy,
+    });
+  });
+}
+
+function ensureRepositoryConfigResourceSecretRequirements(input: {
+  seed: DeploymentPromptSeed;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const requirements = input.seed.resourceSecretRequirements ?? [];
+    for (const requirement of requirements) {
+      const secretRef = `${resourceSecretReferencePrefix}${requirement.refKey}`;
+      if (!requirement.refKey) {
+        if (!requirement.required) {
+          continue;
+        }
+
+        return yield* Effect.fail(
+          secretResolutionError({
+            message: "Deployment config Resource secret reference is missing a secret key",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      if (requirement.refKey !== requirement.key) {
+        return yield* Effect.fail(
+          secretResolutionError({
+            message:
+              "Deployment config Resource secret references must use the same key as the target",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      const result = yield* Effect.either(
+        showResourceSecretReference({
+          resourceId: input.resourceId,
+          key: requirement.refKey,
+          exposure: "runtime",
+        }),
+      );
+      if (Either.isRight(result)) {
+        continue;
+      }
+
+      if (!requirement.required && hasDomainErrorCode(result.left, "not_found")) {
+        continue;
+      }
+
+      if (hasDomainErrorCode(result.left, "not_found")) {
+        return yield* Effect.fail(
+          secretResolutionError({
+            message: "Required deployment config Resource secret reference was not found",
+            secretKey: requirement.key,
+            secretRef,
+          }),
+        );
+      }
+
+      return yield* Effect.fail(result.left);
+    }
   });
 }
 
@@ -1444,6 +3712,10 @@ function resolveResource(input: {
             resourceId: resource.id,
             runtimeProfile: input.runtimeProfile,
           });
+          const healthCheck = yield* resolveReusableResourceHealthPolicy({
+            seed: input.seed,
+            resourceId: resource.id,
+          });
           const networkProfile = yield* resolveReusableResourceNetworkProfile({
             seed: input.seed,
             resourceId: resource.id,
@@ -1456,6 +3728,7 @@ function resolveResource(input: {
               ...(source ? { configureSource: { source } } : {}),
               ...(networkProfile ? { configureNetwork: { networkProfile } } : {}),
               ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
+              ...(healthCheck ? { configureHealth: { healthCheck } } : {}),
             },
             label: resource.label,
           } satisfies ResolvedWorkflowResourceReference;
@@ -2142,6 +4415,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return configureResourceSource(step.input);
     case "resources.configureRuntime":
       return configureResourceRuntime(step.input);
+    case "resources.configureHealth":
+      return configureResourceHealth(step.input);
     case "resources.configureNetwork":
       return configureResourceNetwork(step.input);
     case "environments.setVariable":
@@ -2289,6 +4564,61 @@ export function resolveInteractiveDeploymentInput(
             ? { destinationId: deploymentInput.destinationId }
             : {}),
           environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigDependencies({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigStorage({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigScheduledTasks({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigRuntimePrunePolicy({
+          seed: resolvedSeed,
+          serverId: deploymentInput.serverId,
+        });
+        yield* ensureRepositoryConfigResourceSecretRequirements({
+          seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigGeneratedAccessProfile({
+          seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigMonitoringThresholds({
+          seed: resolvedSeed,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigPreviewPolicy({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* ensureRepositoryConfigAutoDeploy({
+          seed: resolvedSeed,
           resourceId: deploymentInput.resourceId,
         });
         yield* persistServerAppliedRouteDesiredStateIfNeeded({

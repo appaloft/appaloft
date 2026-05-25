@@ -183,10 +183,9 @@ config is safe for PR deploys. Repositories that keep `appaloft.yml` environment
 that file deliberately, but preview docs should make the choice explicit.
 
 Preview-specific application values should come from GitHub environment variables or secrets
-selected by the job environment and referenced from config with `ci-env:<NAME>`. A future
-config-profile or environment-overlay input may select overlay fields after the parser supports
-them, but overlays must apply only after the action has selected the PR preview environment from
-trusted GitHub event context.
+selected by the job environment and referenced from config with `ci-env:<NAME>`. `config-profile`
+may select a safe named config profile, and PR preview overlays may apply after the action has
+selected the PR preview environment from trusted GitHub event context.
 
 When preview-specific profile input does not supply a runtime name, the action/CLI should derive a
 preview runtime name seed `preview-{pr_number}` from trusted GitHub event context before resource

@@ -131,9 +131,9 @@ Implement in ordered slices:
      `config: appaloft.preview.yml` deliberately or provide the preview profile entirely through
      trusted action/CLI flags. The action must not edit root config, generate temporary config as
      the primary path, or assume root domains/env values are preview-safe.
-   - Treat future preview config-profile or environment overlay support as a follow-up parser slice:
-     overlays may adjust fields only after trusted PR entrypoint context has selected the preview
-     environment, and they must not select identity or credentials.
+   - Use named config profiles and preview profile overlays only after trusted entrypoint context
+     selects the target environment or PR preview scope. Overlays may adjust safe profile fields,
+     but they must not select identity or credentials.
 
 8. Server-applied domains
    - Parse and validate `access.domains[]`.

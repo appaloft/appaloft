@@ -1,6 +1,8 @@
 import { customAlphabet } from "nanoid";
 
 import {
+  type ConfigureResourceHealthInput,
+  type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkInput,
   type ConfigureResourceRuntimeInput,
   type ConfigureResourceSourceInput,
@@ -129,6 +131,7 @@ export type QuickDeployResourceReference =
       configureSource?: Omit<ConfigureResourceSourceInput, "resourceId">;
       configureNetwork?: Omit<ConfigureResourceNetworkInput, "resourceId">;
       configureRuntime?: Omit<ConfigureResourceRuntimeInput, "resourceId">;
+      configureHealth?: Omit<ConfigureResourceHealthInput, "resourceId">;
     }
   | {
       mode: "create";
@@ -235,6 +238,10 @@ export type QuickDeployWorkflowStep =
       input: ConfigureResourceRuntimeInput;
     }
   | {
+      kind: "resources.configureHealth";
+      input: ConfigureResourceHealthInput;
+    }
+  | {
       kind: "environments.setVariable";
       input: QuickDeploySetEnvironmentVariableInput;
     }
@@ -254,6 +261,7 @@ export type QuickDeployWorkflowStepOutput =
   | CreateEnvironmentResponse
   | CreateResourceResponse
   | ConfigureResourceSourceResponse
+  | ConfigureResourceHealthResponse
   | CreateDeploymentResponse
   | QuickDeployProvisionDependencyResourcesResponse
   | void;
@@ -386,6 +394,16 @@ export function* quickDeployWorkflow(
       input: {
         resourceId,
         ...input.resource.configureRuntime,
+      },
+    };
+  }
+
+  if (input.resource.mode === "existing" && input.resource.configureHealth) {
+    yield {
+      kind: "resources.configureHealth",
+      input: {
+        resourceId,
+        ...input.resource.configureHealth,
       },
     };
   }

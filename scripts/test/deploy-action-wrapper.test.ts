@@ -74,6 +74,7 @@ describe("deploy-action wrapper reference", () => {
       "source to build the deploy CLI from the checked-out Appaloft source tree",
     );
     expect(actionYaml).toContain("command:");
+    expect(actionYaml).toContain("config-profile");
     expect(actionYaml).toContain("install-console");
     expect(actionYaml).toContain("console-domain");
     expect(actionYaml).toContain("console-database");
@@ -280,6 +281,7 @@ describe("deploy-action wrapper reference", () => {
   test("[CONFIG-FILE-ENTRY-010][CONFIG-FILE-ENTRY-015] maps trusted action inputs to CLI preview flags", () => {
     const result = runDeploy({
       INPUT_CONFIG: "appaloft.preview.yml",
+      INPUT_CONFIG_PROFILE: "staging",
       INPUT_SOURCE: ".",
       INPUT_RUNTIME_NAME: "preview-42",
       INPUT_SSH_HOST: "203.0.113.10",
@@ -308,6 +310,8 @@ describe("deploy-action wrapper reference", () => {
         "--config",
       ]);
       expect(result.argv).toContain("appaloft.preview.yml");
+      expect(result.argv).toContain("--config-profile");
+      expect(result.argv).toContain("staging");
       expect(result.argv).toContain("--runtime-name");
       expect(result.argv).toContain("preview-42");
       expect(result.argv).toContain("--server-host");
