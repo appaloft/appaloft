@@ -677,13 +677,14 @@ function resolveRequiredPreviewContext(input: {
 function resolvePreviewDomainTemplateRoutes(
   previewDomainTemplate: string | undefined,
   previewTlsMode: (typeof previewTlsModes)[number] | undefined,
+  previewContext: PreviewDeployContext | undefined,
 ): Result<DeploymentServerAppliedRouteSeed[] | undefined> {
-  const host = previewDomainTemplate?.trim();
-  if (!host) {
+  const template = previewDomainTemplate?.trim();
+  if (!template) {
     return ok(undefined);
   }
 
-  if (host.includes("${{") || host.includes("}}")) {
+  if (template.includes("${{") || template.includes("}}")) {
     return err(
       domainError.validation("Preview domain template contains unresolved GitHub expression", {
         phase: "preview-domain-template-resolution",
@@ -691,6 +692,12 @@ function resolvePreviewDomainTemplateRoutes(
       }),
     );
   }
+
+  const rendered = renderPreviewDomainTemplate(template, previewContext);
+  if (rendered.isErr()) {
+    return err(rendered.error);
+  }
+  const host = rendered.value;
 
   const parsed = appaloftDeploymentAccessConfigSchema.safeParse({
     domains: [
@@ -724,6 +731,60 @@ function resolvePreviewDomainTemplateRoutes(
       tlsMode: domain.tlsMode,
     })),
   );
+}
+
+function renderPreviewDomainTemplate(
+  template: string,
+  previewContext: PreviewDeployContext | undefined,
+): Result<string> {
+  const normalizedTemplate = template.trim().toLowerCase();
+  let missingVariable: "preview_id" | "pr_number" | undefined;
+  let unsupportedVariable = false;
+  const rendered = normalizedTemplate.replace(/\{([^{}]+)\}/g, (_, rawToken: string) => {
+    const token = rawToken.trim().toLowerCase();
+    if (token === "preview_id") {
+      const previewId = previewContext?.previewId.trim().toLowerCase();
+      if (!previewId) {
+        missingVariable = token;
+        return "";
+      }
+
+      return previewId;
+    }
+    if (token === "pr_number") {
+      const pullRequestNumber = previewContext?.pullRequestNumber;
+      if (!pullRequestNumber) {
+        missingVariable = token;
+        return "";
+      }
+
+      return String(pullRequestNumber);
+    }
+
+    unsupportedVariable = true;
+    return "";
+  });
+
+  if (unsupportedVariable || /[{}]/.test(rendered)) {
+    return err(
+      domainError.validation("Preview domain template includes unsupported variables", {
+        phase: "preview-domain-template-resolution",
+        previewDomainTemplate: normalizedTemplate,
+      }),
+    );
+  }
+
+  if (missingVariable) {
+    return err(
+      domainError.validation("Preview domain template requires preview context", {
+        phase: "preview-domain-template-resolution",
+        previewDomainTemplate: normalizedTemplate,
+        variable: missingVariable,
+      }),
+    );
+  }
+
+  return ok(rendered);
 }
 
 function applyPreviewRoutePrecedence(input: {
@@ -1357,9 +1418,6 @@ export const deployCommand = EffectCommand.make(
           env: Bun.env,
         }),
       );
-      const previewDomainRoutes = yield* resultToEffect(
-        resolvePreviewDomainTemplateRoutes(requestedPreviewDomainTemplate, requestedPreviewTlsMode),
-      );
       const flagEnvironmentVariables = yield* resultToEffect(
         deploymentEnvironmentVariablesFromCliFlags({
           envFlags: env,
@@ -1387,7 +1445,8 @@ export const deployCommand = EffectCommand.make(
           healthCheckPath ||
           requestedConfigProfile ||
           flagEnvironmentVariables.length > 0 ||
-          previewDomainRoutes,
+          requestedPreviewDomainTemplate ||
+          requestedPreviewTlsMode,
       );
 
       if (
@@ -1440,6 +1499,19 @@ export const deployCommand = EffectCommand.make(
         selectedConfig && previewContext
           ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
           : selectedConfig;
+      const configPreviewDomainTemplate = previewContext
+        ? effectiveConfig?.preview?.pullRequest?.domainTemplate
+        : undefined;
+      const configPreviewTlsMode = previewContext
+        ? effectiveConfig?.preview?.pullRequest?.tlsMode
+        : undefined;
+      const previewDomainRoutes = yield* resultToEffect(
+        resolvePreviewDomainTemplateRoutes(
+          requestedPreviewDomainTemplate ?? configPreviewDomainTemplate,
+          requestedPreviewTlsMode ?? configPreviewTlsMode,
+          previewContext,
+        ),
+      );
       const configSeed = applyPreviewRoutePrecedence({
         configSeed: effectiveConfig ? deploymentPromptSeedFromConfig(effectiveConfig) : {},
         ...(configResolution ? { configResolution } : {}),
