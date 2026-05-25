@@ -2306,6 +2306,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         dockerCommandBuilder.runContainer({
           image,
           containerName,
+          restartPolicy: "unless-stopped",
           env: dockerEnvVariables,
           labels,
           mounts: storageMounts.value,
