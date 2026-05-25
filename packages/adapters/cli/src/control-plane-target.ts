@@ -94,6 +94,7 @@ const remoteCapableTopLevelCommands = new Set([
   "server",
   "source-event",
   "source-links",
+  "static-artifacts",
   "storage",
   "terminal-session",
   "upgrade",

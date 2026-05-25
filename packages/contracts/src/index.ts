@@ -2673,6 +2673,50 @@ export const createResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const staticArtifactFileDigestResponseSchema = z.object({
+  pathDigest: z.string(),
+  contentDigest: z.string(),
+  sizeBytes: z.number(),
+  mimeType: z.string(),
+});
+
+export const publishStaticArtifactResponseSchema = z.object({
+  schemaVersion: z.literal("static-artifacts.publish/v1"),
+  publicationId: z.string(),
+  projectId: z.string(),
+  resourceId: z.string(),
+  artifactId: z.string(),
+  manifestDigest: z.string(),
+  fileCount: z.number(),
+  totalBytes: z.number(),
+  files: z.array(staticArtifactFileDigestResponseSchema),
+  storageRef: z.string(),
+  storageProviderKey: z.string(),
+  routeUrl: z.string().optional(),
+  routeProviderKey: z.string().optional(),
+});
+
+export const staticArtifactPublicationSummaryResponseSchema = z.object({
+  publicationId: z.string(),
+  projectId: z.string(),
+  resourceId: z.string(),
+  artifactId: z.string(),
+  manifestDigest: z.string(),
+  fileCount: z.number(),
+  totalBytes: z.number(),
+  storageRef: z.string(),
+  storageProviderKey: z.string(),
+  routeUrl: z.string().optional(),
+  routeProviderKey: z.string().optional(),
+  publishedAt: z.string().optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const listStaticArtifactPublicationsResponseSchema = z.object({
+  schemaVersion: z.literal("static-artifacts.publications.list/v1"),
+  items: z.array(staticArtifactPublicationSummaryResponseSchema),
+});
+
 export const archiveResourceInputSchema = z.object({
   resourceId: z.string().min(1),
   reason: z.string().min(1).max(280).optional(),
@@ -6059,6 +6103,10 @@ export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInp
 export type ResourceRuntimeProfileInput = z.infer<typeof resourceRuntimeProfileInputSchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
+export type PublishStaticArtifactResponse = z.infer<typeof publishStaticArtifactResponseSchema>;
+export type ListStaticArtifactPublicationsResponse = z.infer<
+  typeof listStaticArtifactPublicationsResponseSchema
+>;
 export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
 export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
 export type DeleteResourceInput = z.infer<typeof deleteResourceInputSchema>;

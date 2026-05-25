@@ -1,13 +1,34 @@
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
 import {
+  mkdir,
+  readdir as readDir,
+  readFile as readFileBytes,
+  stat as statPath,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { inflateRawSync } from "node:zlib";
+import {
+  type ActivateStaticArtifactRouteInput,
   appaloftTraceAttributes,
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
   type ExecutionContext,
+  type ListStaticArtifactPublicationsInput,
+  type RecordStaticArtifactPublicationInput,
   type SourceDetectionResult,
   type SourceDetector,
+  type StaticArtifactFilePayload,
+  type StaticArtifactPayloadReaderPort,
+  type StaticArtifactPayloadReadResult,
+  type StaticArtifactPublicationJournalPort,
+  type StaticArtifactPublicationReadModelPort,
+  type StaticArtifactPublicationSummary,
+  type StaticArtifactRouteProviderPort,
+  type StaticArtifactStorePort,
+  type StoreStaticArtifactManifestInput,
 } from "@appaloft/application";
 import {
   DisplayNameText,
@@ -15,6 +36,7 @@ import {
   err,
   FilePathText,
   ok,
+  ProviderKey,
   type Result,
   type SourceApplicationShape,
   SourceApplicationShapeValue,
@@ -34,6 +56,17 @@ import {
   type SourceRuntimeFamily,
   SourceRuntimeFamilyValue,
   SourceRuntimeVersionText,
+  StaticArtifactByteSize,
+  StaticArtifactDigest,
+  StaticArtifactFileCount,
+  StaticArtifactFileDigest,
+  StaticArtifactId,
+  StaticArtifactManifest,
+  StaticArtifactMimeType,
+  StaticArtifactRouteActivation,
+  StaticArtifactRouteUrl,
+  StaticArtifactStorageRef,
+  StaticArtifactStoredManifest,
 } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
@@ -1365,4 +1398,764 @@ export class FileSystemDeploymentConfigReader implements DeploymentConfigReader 
       },
     );
   }
+}
+
+export interface FileSystemStaticArtifactStoreOptions {
+  rootPath: string;
+  providerKey?: string;
+}
+
+export class FileSystemStaticArtifactPayloadReader implements StaticArtifactPayloadReaderPort {
+  async read(
+    _context: ExecutionContext,
+    input: {
+      artifactId: string;
+      sourcePath: string;
+      metadata?: Record<string, string> | undefined;
+    },
+  ): Promise<Result<StaticArtifactPayloadReadResult>> {
+    const sourceRoot = resolve(input.sourcePath);
+    let sourceStats: Awaited<ReturnType<typeof statPath>>;
+    try {
+      sourceStats = await statPath(sourceRoot);
+    } catch {
+      return err(
+        domainError.validation("Static artifact source path was not found", {
+          sourcePath: input.sourcePath,
+        }),
+      );
+    }
+
+    if (sourceStats.isFile() && sourceRoot.toLowerCase().endsWith(".zip")) {
+      return readStaticArtifactPayloads(input.artifactId, sourceRoot, "archive");
+    }
+
+    if (!sourceStats.isDirectory()) {
+      return err(
+        domainError.validation("Static artifact source path must be a directory or .zip archive", {
+          sourcePath: input.sourcePath,
+        }),
+      );
+    }
+
+    const filePaths = await listStaticArtifactFiles(sourceRoot);
+    if (filePaths.isErr()) return err(filePaths.error);
+    if (filePaths.value.length === 0) {
+      return err(
+        domainError.validation("Static artifact source directory must contain at least one file", {
+          sourcePath: input.sourcePath,
+        }),
+      );
+    }
+
+    return readStaticArtifactPayloads(input.artifactId, sourceRoot, "directory", filePaths.value);
+  }
+}
+
+export class FileSystemStaticArtifactStore implements StaticArtifactStorePort {
+  private readonly rootPath: string;
+  private readonly providerKey: string;
+
+  constructor(options: FileSystemStaticArtifactStoreOptions) {
+    this.rootPath = resolve(options.rootPath);
+    this.providerKey = options.providerKey ?? "filesystem-static-artifact-store";
+  }
+
+  async storeManifest(
+    _context: ExecutionContext,
+    input: StoreStaticArtifactManifestInput,
+  ): Promise<Result<StaticArtifactStoredManifest>> {
+    const manifestState = input.manifest.toState();
+    const artifactId = manifestState.artifactId.value;
+    const manifestDigest = manifestState.manifestDigest.value;
+    const artifactRoot = resolveChild(this.rootPath, [artifactId, manifestDigest]);
+    if (artifactRoot.isErr()) return err(artifactRoot.error);
+
+    const payloadValidation = validateStaticArtifactPayloads(input);
+    if (payloadValidation.isErr()) return err(payloadValidation.error);
+
+    try {
+      await mkdir(artifactRoot.value, { recursive: true });
+      await writeStaticArtifactFiles(artifactRoot.value, input.files ?? []);
+      await writeFile(
+        join(artifactRoot.value, "manifest.json"),
+        `${JSON.stringify(
+          {
+            schemaVersion: "appaloft-filesystem-static-artifact-store/v1",
+            projectId: input.projectId,
+            resourceId: input.resourceId,
+            artifactId,
+            manifestDigest,
+            fileCount: manifestState.fileCount.value,
+            totalBytes: manifestState.totalBytes.value,
+            files: manifestState.files.map((file) => {
+              const fileState = file.toState();
+              return {
+                pathDigest: fileState.pathDigest.value,
+                contentDigest: fileState.contentDigest.value,
+                sizeBytes: fileState.sizeBytes.value,
+                mimeType: fileState.mimeType.value,
+              };
+            }),
+            metadata: input.metadata ?? {},
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+    } catch (error) {
+      return err(
+        domainError.provider("Static artifact filesystem store failed", {
+          rootPath: this.rootPath,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+
+    return StaticArtifactStoredManifest.create({
+      artifactId: manifestState.artifactId,
+      manifestDigest: manifestState.manifestDigest,
+      storageRef: StaticArtifactStorageRef.rehydrate(
+        `filesystem-static-artifact://${artifactId}/${manifestDigest}`,
+      ),
+      providerKey: ProviderKey.rehydrate(this.providerKey),
+    });
+  }
+}
+
+export class FileSystemStaticArtifactPublicationJournal
+  implements StaticArtifactPublicationJournalPort, StaticArtifactPublicationReadModelPort
+{
+  private readonly rootPath: string;
+
+  constructor(options: FileSystemStaticArtifactStoreOptions) {
+    this.rootPath = resolve(options.rootPath);
+  }
+
+  async recordPublication(
+    _context: ExecutionContext,
+    input: RecordStaticArtifactPublicationInput,
+  ): Promise<Result<StaticArtifactPublicationSummary>> {
+    const summary = staticArtifactPublicationSummary(input);
+    const publicationPath = resolveChild(this.rootPath, [
+      "publications",
+      `${summary.publicationId}.json`,
+    ]);
+    if (publicationPath.isErr()) return err(publicationPath.error);
+
+    try {
+      await mkdir(dirname(publicationPath.value), { recursive: true });
+      await writeFile(
+        publicationPath.value,
+        `${JSON.stringify(
+          {
+            schemaVersion: "appaloft-filesystem-static-artifact-publication/v1",
+            ...summary,
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+      return ok(summary);
+    } catch (error) {
+      return err(
+        domainError.provider("Static artifact filesystem publication journal failed", {
+          rootPath: this.rootPath,
+          publicationId: summary.publicationId,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+
+  async listPublications(
+    _context: ExecutionContext,
+    input: ListStaticArtifactPublicationsInput = {},
+  ): Promise<Result<{ items: StaticArtifactPublicationSummary[] }>> {
+    const publicationsRoot = resolveChild(this.rootPath, ["publications"]);
+    if (publicationsRoot.isErr()) return err(publicationsRoot.error);
+
+    try {
+      const entries = await readDir(publicationsRoot.value, { withFileTypes: true }).catch(
+        (error: unknown) => {
+          if (isNodeErrorCode(error, "ENOENT")) return [];
+          throw error;
+        },
+      );
+      const items = (
+        await Promise.all(
+          entries
+            .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+            .map(async (entry) =>
+              readStaticArtifactPublicationSummary(join(publicationsRoot.value, entry.name)),
+            ),
+        )
+      )
+        .filter((item): item is StaticArtifactPublicationSummary => item !== undefined)
+        .filter((item) => !input.projectId || item.projectId === input.projectId)
+        .filter((item) => !input.resourceId || item.resourceId === input.resourceId)
+        .sort(compareStaticArtifactPublicationSummaries)
+        .slice(0, input.limit ?? 50);
+
+      return ok({ items });
+    } catch (error) {
+      return err(
+        domainError.provider("Static artifact filesystem publication read model failed", {
+          rootPath: this.rootPath,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+}
+
+function staticArtifactPublicationSummary(
+  input: RecordStaticArtifactPublicationInput,
+): StaticArtifactPublicationSummary {
+  const publicationState = input.publication.toState();
+  const manifestState = publicationState.manifest.toState();
+  const storedManifestState = publicationState.storedManifest.toState();
+  const routeActivationState = publicationState.routeActivation?.toState();
+
+  return {
+    publicationId: publicationState.publicationId.value,
+    projectId: publicationState.projectId.value,
+    resourceId: publicationState.resourceId.value,
+    artifactId: manifestState.artifactId.value,
+    manifestDigest: manifestState.manifestDigest.value,
+    storageRef: storedManifestState.storageRef.value,
+    storeProviderKey: storedManifestState.providerKey.value,
+    ...(routeActivationState
+      ? {
+          routeUrl: routeActivationState.url.value,
+          routeProviderKey: routeActivationState.providerKey.value,
+        }
+      : {}),
+    fileCount: manifestState.fileCount.value,
+    totalBytes: manifestState.totalBytes.value,
+    publishedAt: input.publishedAt ?? new Date().toISOString(),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  };
+}
+
+async function readStaticArtifactPublicationSummary(
+  path: string,
+): Promise<StaticArtifactPublicationSummary | undefined> {
+  const raw = JSON.parse((await readFileBytes(path)).toString("utf8")) as {
+    readonly schemaVersion?: string;
+  } & StaticArtifactPublicationSummary;
+  if (raw.schemaVersion !== "appaloft-filesystem-static-artifact-publication/v1") {
+    return undefined;
+  }
+
+  return {
+    publicationId: raw.publicationId,
+    projectId: raw.projectId,
+    resourceId: raw.resourceId,
+    artifactId: raw.artifactId,
+    manifestDigest: raw.manifestDigest,
+    storageRef: raw.storageRef,
+    storeProviderKey: raw.storeProviderKey,
+    ...(raw.routeUrl ? { routeUrl: raw.routeUrl } : {}),
+    ...(raw.routeProviderKey ? { routeProviderKey: raw.routeProviderKey } : {}),
+    fileCount: raw.fileCount,
+    totalBytes: raw.totalBytes,
+    ...(raw.publishedAt ? { publishedAt: raw.publishedAt } : {}),
+    ...(raw.metadata ? { metadata: raw.metadata } : {}),
+  };
+}
+
+function compareStaticArtifactPublicationSummaries(
+  left: StaticArtifactPublicationSummary,
+  right: StaticArtifactPublicationSummary,
+): number {
+  return (
+    (right.publishedAt ?? "").localeCompare(left.publishedAt ?? "") ||
+    right.publicationId.localeCompare(left.publicationId)
+  );
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { readonly code?: unknown }).code === code
+  );
+}
+
+export interface FileSystemStaticArtifactRouteProviderOptions {
+  baseUrl: string;
+  providerKey?: string;
+  rootPath?: string;
+}
+
+export class FileSystemStaticArtifactRouteProvider implements StaticArtifactRouteProviderPort {
+  private readonly baseUrl: string;
+  private readonly providerKey: string;
+  private readonly rootPath: string | undefined;
+
+  constructor(options: FileSystemStaticArtifactRouteProviderOptions) {
+    this.baseUrl = trimTrailingSlash(options.baseUrl);
+    this.providerKey = options.providerKey ?? "filesystem-static-artifact-route";
+    this.rootPath = options.rootPath ? resolve(options.rootPath) : undefined;
+  }
+
+  async activateRoute(
+    _context: ExecutionContext,
+    input: ActivateStaticArtifactRouteInput,
+  ): Promise<Result<StaticArtifactRouteActivation>> {
+    const publicationState = input.publication.toState();
+    const manifestState = publicationState.manifest.toState();
+    const artifactId = manifestState.artifactId.value;
+    const manifestDigest = manifestState.manifestDigest.value;
+    const projectId = publicationState.projectId.value;
+    const resourceId = publicationState.resourceId.value;
+    if (input.routeKind === "alias" && this.rootPath) {
+      const alias = await writeStaticArtifactAlias(this.rootPath, {
+        artifactId,
+        manifestDigest,
+        projectId,
+        publicationId: publicationState.publicationId.value,
+        resourceId,
+      });
+      if (alias.isErr()) return err(alias.error);
+    }
+
+    const routeUrl =
+      input.routeKind === "alias"
+        ? `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/resources/${encodeURIComponent(resourceId)}/current/`
+        : `${this.baseUrl}/artifacts/${encodeURIComponent(artifactId)}/${encodeURIComponent(manifestDigest)}/`;
+    const url = StaticArtifactRouteUrl.create(routeUrl);
+    if (url.isErr()) return err(url.error);
+
+    return StaticArtifactRouteActivation.create({
+      publicationId: publicationState.publicationId,
+      url: url.value,
+      providerKey: ProviderKey.rehydrate(this.providerKey),
+    });
+  }
+}
+
+async function writeStaticArtifactAlias(
+  rootPath: string,
+  input: {
+    artifactId: string;
+    manifestDigest: string;
+    projectId: string;
+    publicationId: string;
+    resourceId: string;
+  },
+): Promise<Result<undefined>> {
+  const aliasPath = resolveChild(rootPath, [
+    "aliases",
+    "projects",
+    encodeURIComponent(input.projectId),
+    "resources",
+    encodeURIComponent(input.resourceId),
+    "current.json",
+  ]);
+  if (aliasPath.isErr()) return err(aliasPath.error);
+
+  try {
+    await mkdir(dirname(aliasPath.value), { recursive: true });
+    await writeFile(
+      aliasPath.value,
+      `${JSON.stringify(
+        {
+          schemaVersion: "appaloft-filesystem-static-artifact-alias/v1",
+          projectId: input.projectId,
+          resourceId: input.resourceId,
+          publicationId: input.publicationId,
+          artifactId: input.artifactId,
+          manifestDigest: input.manifestDigest,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      domainError.provider("Static artifact filesystem alias activation failed", {
+        rootPath,
+        projectId: input.projectId,
+        resourceId: input.resourceId,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+}
+
+function validateStaticArtifactPayloads(
+  input: StoreStaticArtifactManifestInput,
+): Result<undefined> {
+  if (!input.files) return ok(undefined);
+
+  const manifestFiles = input.manifest.toState().files.map((file) => file.toState());
+  if (input.files.length !== manifestFiles.length) {
+    return err(
+      domainError.validation("Static artifact file payload count must match manifest file count", {
+        filePayloadCount: input.files.length,
+        manifestFileCount: manifestFiles.length,
+      }),
+    );
+  }
+
+  for (const payload of input.files) {
+    const matchingManifestFile = manifestFiles.find(
+      (file) =>
+        file.contentDigest.value === payload.contentDigest &&
+        file.sizeBytes.value === payload.sizeBytes &&
+        file.mimeType.value === payload.mimeType,
+    );
+    if (!matchingManifestFile) {
+      return err(
+        domainError.validation("Static artifact file payload must match manifest digest metadata", {
+          path: payload.path,
+          contentDigest: payload.contentDigest,
+        }),
+      );
+    }
+  }
+
+  return ok(undefined);
+}
+
+async function listStaticArtifactFiles(sourceRoot: string): Promise<Result<string[]>> {
+  const files: string[] = [];
+
+  async function visit(directoryPath: string): Promise<void> {
+    const entries = await readDir(directoryPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = join(directoryPath, entry.name);
+      if (entry.isDirectory()) {
+        await visit(entryPath);
+        continue;
+      }
+      if (entry.isFile()) {
+        files.push(entryPath);
+      }
+    }
+  }
+
+  try {
+    await visit(sourceRoot);
+  } catch (error) {
+    return err(
+      domainError.provider("Static artifact source directory could not be read", {
+        sourcePath: sourceRoot,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+
+  return ok(files.sort());
+}
+
+async function readStaticArtifactPayloads(
+  artifactId: string,
+  sourcePath: string,
+  sourceKind: "archive" | "directory",
+  filePaths?: readonly string[],
+): Promise<Result<StaticArtifactPayloadReadResult>> {
+  try {
+    const payloads =
+      sourceKind === "archive"
+        ? await createStaticArtifactPayloadsFromZip(sourcePath)
+        : ok(
+            await Promise.all(
+              (filePaths ?? []).map(async (path) => createStaticArtifactPayload(sourcePath, path)),
+            ),
+          );
+    if (payloads.isErr()) return err(payloads.error);
+
+    return createStaticArtifactPayloadReadResult(artifactId, payloads.value);
+  } catch (error) {
+    return err(
+      domainError.provider("Static artifact filesystem payload read failed", {
+        sourcePath,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+}
+
+function createStaticArtifactPayloadReadResult(
+  artifactId: string,
+  payloads: readonly StaticArtifactFilePayload[],
+): Result<StaticArtifactPayloadReadResult> {
+  const orderedPayloads = [...payloads].sort((left, right) => left.path.localeCompare(right.path));
+  const files = orderedPayloads.map((payload) =>
+    StaticArtifactFileDigest.create({
+      pathDigest: StaticArtifactDigest.rehydrate(digestText(payload.path)),
+      contentDigest: StaticArtifactDigest.rehydrate(payload.contentDigest),
+      sizeBytes: StaticArtifactByteSize.rehydrate(payload.sizeBytes),
+      mimeType: StaticArtifactMimeType.rehydrate(payload.mimeType),
+    })._unsafeUnwrap(),
+  );
+  const manifestDigest = digestText(
+    orderedPayloads
+      .map((payload) => `${payload.path}:${payload.contentDigest}:${payload.sizeBytes}`)
+      .join("\n"),
+  );
+  const manifest = StaticArtifactManifest.create({
+    artifactId: StaticArtifactId.rehydrate(artifactId),
+    manifestDigest: StaticArtifactDigest.rehydrate(manifestDigest),
+    fileCount: StaticArtifactFileCount.rehydrate(files.length),
+    totalBytes: StaticArtifactByteSize.rehydrate(
+      orderedPayloads.reduce((sum, payload) => sum + payload.sizeBytes, 0),
+    ),
+    files,
+  });
+  if (manifest.isErr()) return err(manifest.error);
+
+  return ok({
+    manifest: manifest.value,
+    files: orderedPayloads,
+  });
+}
+
+async function createStaticArtifactPayload(
+  sourceRoot: string,
+  absolutePath: string,
+): Promise<StaticArtifactFilePayload> {
+  const relativePath = normalizeStaticArtifactPayloadPath(
+    relative(sourceRoot, absolutePath).split(sepPattern).join("/"),
+  )._unsafeUnwrap();
+  const bytes = await readFileBytes(absolutePath);
+
+  return {
+    path: relativePath,
+    sizeBytes: bytes.byteLength,
+    mimeType: inferStaticArtifactMimeType(relativePath),
+    contentDigest: digestBytes(bytes),
+    async readBytes() {
+      return bytes;
+    },
+  };
+}
+
+async function createStaticArtifactPayloadsFromZip(
+  archivePath: string,
+): Promise<Result<readonly StaticArtifactFilePayload[]>> {
+  const archiveBytes = await readFileBytes(archivePath);
+  const entries = readZipCentralDirectory(archiveBytes);
+  if (entries.isErr()) return err(entries.error);
+
+  const seenPaths = new Set<string>();
+  const payloads: StaticArtifactFilePayload[] = [];
+  for (const entry of entries.value) {
+    if (entry.path.endsWith("/")) continue;
+    const normalizedPath = normalizeStaticArtifactPayloadPath(entry.path);
+    if (normalizedPath.isErr()) return err(normalizedPath.error);
+    if (seenPaths.has(normalizedPath.value)) {
+      return err(
+        domainError.validation("Static artifact archive contains duplicate file paths", {
+          path: normalizedPath.value,
+        }),
+      );
+    }
+    seenPaths.add(normalizedPath.value);
+
+    const bytes = readZipEntryBytes(archiveBytes, entry);
+    if (bytes.isErr()) return err(bytes.error);
+    payloads.push({
+      path: normalizedPath.value,
+      sizeBytes: bytes.value.byteLength,
+      mimeType: inferStaticArtifactMimeType(normalizedPath.value),
+      contentDigest: digestBytes(bytes.value),
+      async readBytes() {
+        return bytes.value;
+      },
+    });
+  }
+
+  if (payloads.length === 0) {
+    return err(
+      domainError.validation("Static artifact archive must contain at least one file", {
+        sourcePath: archivePath,
+      }),
+    );
+  }
+
+  return ok(payloads);
+}
+
+interface ZipCentralDirectoryEntry {
+  readonly path: string;
+  readonly compressionMethod: number;
+  readonly compressedSize: number;
+  readonly uncompressedSize: number;
+  readonly localHeaderOffset: number;
+}
+
+function readZipCentralDirectory(bytes: Uint8Array): Result<readonly ZipCentralDirectoryEntry[]> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const endOfCentralDirectoryOffset = findZipEndOfCentralDirectory(view);
+  if (endOfCentralDirectoryOffset === undefined) {
+    return err(domainError.validation("Static artifact archive must be a valid .zip file"));
+  }
+
+  const entryCount = view.getUint16(endOfCentralDirectoryOffset + 10, true);
+  const centralDirectoryOffset = view.getUint32(endOfCentralDirectoryOffset + 16, true);
+  const entries: ZipCentralDirectoryEntry[] = [];
+  let cursor = centralDirectoryOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) {
+      return err(domainError.validation("Static artifact archive central directory is invalid"));
+    }
+
+    const compressionMethod = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const fileNameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localHeaderOffset = view.getUint32(cursor + 42, true);
+    const fileNameStart = cursor + 46;
+    const fileNameEnd = fileNameStart + fileNameLength;
+    entries.push({
+      path: new TextDecoder().decode(bytes.slice(fileNameStart, fileNameEnd)),
+      compressionMethod,
+      compressedSize,
+      uncompressedSize,
+      localHeaderOffset,
+    });
+    cursor = fileNameEnd + extraLength + commentLength;
+  }
+
+  return ok(entries);
+}
+
+function findZipEndOfCentralDirectory(view: DataView): number | undefined {
+  if (view.byteLength < 22) return undefined;
+  const minimumOffset = Math.max(0, view.byteLength - 65_557);
+  for (let offset = view.byteLength - 22; offset >= minimumOffset; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  return undefined;
+}
+
+function readZipEntryBytes(
+  archiveBytes: Uint8Array,
+  entry: ZipCentralDirectoryEntry,
+): Result<Uint8Array> {
+  const view = new DataView(archiveBytes.buffer, archiveBytes.byteOffset, archiveBytes.byteLength);
+  if (view.getUint32(entry.localHeaderOffset, true) !== 0x04034b50) {
+    return err(domainError.validation("Static artifact archive local header is invalid"));
+  }
+
+  const fileNameLength = view.getUint16(entry.localHeaderOffset + 26, true);
+  const extraLength = view.getUint16(entry.localHeaderOffset + 28, true);
+  const dataStart = entry.localHeaderOffset + 30 + fileNameLength + extraLength;
+  const dataEnd = dataStart + entry.compressedSize;
+  if (dataEnd > archiveBytes.byteLength) {
+    return err(domainError.validation("Static artifact archive entry is truncated"));
+  }
+
+  const compressed = archiveBytes.slice(dataStart, dataEnd);
+  if (entry.compressionMethod === 0) return ok(compressed);
+  if (entry.compressionMethod === 8) {
+    const inflated = inflateRawSync(compressed);
+    if (inflated.byteLength !== entry.uncompressedSize) {
+      return err(domainError.validation("Static artifact archive entry size is invalid"));
+    }
+    return ok(inflated);
+  }
+
+  return err(
+    domainError.validation("Static artifact archive entry compression is unsupported", {
+      compressionMethod: entry.compressionMethod,
+    }),
+  );
+}
+
+async function writeStaticArtifactFiles(
+  artifactRoot: string,
+  files: StoreStaticArtifactManifestInput["files"],
+): Promise<void> {
+  const filesRoot = join(artifactRoot, "files");
+  await mkdir(filesRoot, { recursive: true });
+
+  for (const file of files ?? []) {
+    const safePath = resolvePayloadPath(filesRoot, file.path);
+    if (safePath.isErr()) {
+      throw new Error(safePath.error.message);
+    }
+    await mkdir(dirname(safePath.value), { recursive: true });
+    await writeFile(safePath.value, await file.readBytes());
+  }
+}
+
+function resolvePayloadPath(rootPath: string, payloadPath: string): Result<string> {
+  const normalized = normalizeStaticArtifactPayloadPath(payloadPath);
+  if (normalized.isErr()) return err(normalized.error);
+
+  return resolveChild(rootPath, normalized.value.split("/"));
+}
+
+function normalizeStaticArtifactPayloadPath(payloadPath: string): Result<string> {
+  const segments = payloadPath.split(/[\\/]+/).filter((segment) => segment.length > 0);
+  if (isAbsolute(payloadPath) || segments.length === 0 || segments.some(isUnsafePathSegment)) {
+    return err(
+      domainError.validation("Static artifact file payload path must be relative and safe", {
+        path: payloadPath,
+      }),
+    );
+  }
+
+  return ok(segments.join("/"));
+}
+
+function isUnsafePathSegment(segment: string): boolean {
+  return segment === "." || segment === ".." || segment.includes(":") || segment.includes("\0");
+}
+
+function resolveChild(rootPath: string, segments: readonly string[]): Result<string> {
+  const root = resolve(rootPath);
+  const child = resolve(root, ...segments);
+  const childRelativePath = relative(root, child);
+  if (childRelativePath.startsWith("..") || isAbsolute(childRelativePath)) {
+    return err(
+      domainError.validation("Static artifact filesystem path escapes storage root", {
+        rootPath: root,
+        relativePath: childRelativePath,
+      }),
+    );
+  }
+
+  return ok(child);
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+const sepPattern = /[\\/]+/g;
+
+function inferStaticArtifactMimeType(path: string): string {
+  const lowerPath = path.toLowerCase();
+  if (lowerPath.endsWith(".html") || lowerPath.endsWith(".htm")) return "text/html";
+  if (lowerPath.endsWith(".css")) return "text/css";
+  if (lowerPath.endsWith(".js") || lowerPath.endsWith(".mjs")) return "text/javascript";
+  if (lowerPath.endsWith(".json")) return "application/json";
+  if (lowerPath.endsWith(".svg")) return "image/svg+xml";
+  if (lowerPath.endsWith(".png")) return "image/png";
+  if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) return "image/jpeg";
+  if (lowerPath.endsWith(".gif")) return "image/gif";
+  if (lowerPath.endsWith(".webp")) return "image/webp";
+  if (lowerPath.endsWith(".txt")) return "text/plain";
+  return "application/octet-stream";
+}
+
+function digestBytes(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function digestText(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
