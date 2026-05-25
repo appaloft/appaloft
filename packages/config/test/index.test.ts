@@ -224,10 +224,12 @@ describe("resolveConfig", () => {
         APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME: "Admin Organization",
         APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG: "admin-organization",
         APPALOFT_FIRST_ADMIN_PASSWORD: "local-admin-password",
+        APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH: "4",
       },
     });
 
     expect(config.bootstrapFirstAdminOutputFile).toBe("/tmp/appaloft-bootstrap/first-admin.json");
+    expect(config.betterAuthMinPasswordLength).toBe(4);
     expect(config.firstAdminDisplayName).toBe("Admin User");
     expect(config.firstAdminEmail).toBe("admin@example.com");
     expect(config.firstAdminOrganizationName).toBe("Admin Organization");

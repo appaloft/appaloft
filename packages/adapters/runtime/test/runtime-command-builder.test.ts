@@ -23,6 +23,22 @@ describe("runtime command builder", () => {
     );
   });
 
+  test("renders Docker image builds with ownership labels", () => {
+    const spec = RuntimeCommandBuilder.docker().buildImage({
+      image: "appaloft-image-dep_1:latest",
+      dockerfilePath: "/srv/app/Dockerfile.appaloft",
+      contextPath: "/srv/app",
+      labels: dockerLabelsFromAssignments([
+        "appaloft.managed=true",
+        "appaloft.source-fingerprint=source-fingerprint:v1:preview%3Apr%3A14",
+      ]),
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toContain(
+      "--label 'appaloft.source-fingerprint=source-fingerprint:v1:preview%3Apr%3A14'",
+    );
+  });
+
   test("renders Docker container runs with structured env labels ports and network", () => {
     const docker = RuntimeCommandBuilder.docker();
     const spec = docker.runContainer({

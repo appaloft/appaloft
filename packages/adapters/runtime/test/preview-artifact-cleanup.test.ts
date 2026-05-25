@@ -62,6 +62,7 @@ describe("preview artifact cleanup plan", () => {
       }),
     ).toEqual({
       remoteWorkdir: "/var/lib/appaloft/runtime/ssh-deployments/dep_preview_3/source",
+      remoteRuntimeRoot: "/var/lib/appaloft/runtime/ssh-deployments/dep_preview_3",
       imageName: "preview-image-dep_preview_3",
     });
   });

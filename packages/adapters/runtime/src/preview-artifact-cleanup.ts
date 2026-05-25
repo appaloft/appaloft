@@ -25,6 +25,7 @@ export interface PreviewRuntimeArtifactCleanupPlanInput {
 export interface PreviewRuntimeArtifactCleanupPlan {
   localSourceDir?: string;
   remoteWorkdir?: string;
+  remoteRuntimeRoot?: string;
   imageName?: string;
 }
 
@@ -93,6 +94,7 @@ export function createPreviewRuntimeArtifactCleanupPlan(
     isRemoteChildPath(input.remoteRuntimeRoot, input.remoteWorkdir)
   ) {
     plan.remoteWorkdir = input.remoteWorkdir;
+    plan.remoteRuntimeRoot = input.remoteRuntimeRoot;
   }
 
   if (canRemoveGeneratedImage(input)) {

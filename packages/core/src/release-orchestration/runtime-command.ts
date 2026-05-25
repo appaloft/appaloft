@@ -74,6 +74,7 @@ export interface DockerBuildImageCommandSpec {
   image: ImageReference;
   dockerfilePath: FilePathText;
   contextPath: FilePathText;
+  labels: readonly RuntimeCommandLabel[];
   workingDirectory?: FilePathText;
 }
 

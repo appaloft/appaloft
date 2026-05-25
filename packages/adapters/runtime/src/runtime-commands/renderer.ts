@@ -92,6 +92,9 @@ function renderDockerBuildImageCommand(
     options.quote(spec.image.value),
     "-f",
     options.quote(spec.dockerfilePath.value),
+    ...spec.labels.map((label) =>
+      `--label ${options.quote(`${label.name.value}=${label.value.value}`)}`,
+    ),
     options.quote(spec.contextPath.value),
   ].join(" ");
 }
