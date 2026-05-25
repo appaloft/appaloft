@@ -1138,6 +1138,107 @@ describe("CLI source link state", () => {
     }
   });
 
+  test("[SOURCE-LINK-STATE-024] source link stores repository config provenance groups", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemSourceLinkStore(root);
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A88";
+      const target = {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      };
+      await store.recordDependencyProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:00:00.000Z",
+        dependencyProvenance: {
+          schemaVersion: "source-link.dependency-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "cache",
+              kind: "redis",
+              source: "managed",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              dependencyResourceId: "dep_res_cache",
+              bindingId: "rbd_cache",
+              targetName: "REDIS_URL",
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          ],
+        },
+      });
+
+      const storageStored = await store.recordStorageProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:01:00.000Z",
+        storageProvenance: {
+          schemaVersion: "source-link.storage-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "uploads",
+              kind: "volume",
+              source: "managed",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              storageVolumeId: "stv_uploads",
+              attachmentId: "rsa_uploads",
+              destinationPath: "/app/uploads",
+              createdAt: "2026-05-24T00:01:00.000Z",
+            },
+          ],
+        },
+      });
+
+      expect(storageStored.isOk()).toBe(true);
+      if (storageStored.isErr()) {
+        throw new Error(storageStored.error.message);
+      }
+
+      const stored = await store.recordScheduledTaskProvenance({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-05-24T00:02:00.000Z",
+        scheduledTaskProvenance: {
+          schemaVersion: "source-link.scheduled-task-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "nightly_sync",
+              source: "repository-config",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              taskId: "tsk_nightly",
+              commandFingerprint: "sha256:nightly",
+              createdAt: "2026-05-24T00:02:00.000Z",
+            },
+          ],
+        },
+      });
+
+      expect(stored.isOk()).toBe(true);
+      if (stored.isErr()) {
+        throw new Error(stored.error.message);
+      }
+      expect(stored.value.dependencyProvenance?.entries[0]?.dependencyResourceId).toBe(
+        "dep_res_cache",
+      );
+      expect(stored.value.dependencyProvenance?.entries[0]?.kind).toBe("redis");
+      expect(stored.value.storageProvenance?.entries[0]?.storageVolumeId).toBe("stv_uploads");
+      expect(stored.value.scheduledTaskProvenance?.entries[0]?.taskId).toBe("tsk_nightly");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("[SOURCE-LINK-STATE-014] recovery marker visible", async () => {
     const root = await tempStateRoot();
     try {

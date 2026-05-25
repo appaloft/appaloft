@@ -214,6 +214,12 @@ Runtime monitoring operations:
 | Configure runtime monitoring thresholds | Command | `runtime-monitoring.thresholds.configure` | Application command/use case, PG/PGlite exact-scope policy persistence, CLI, HTTP/oRPC, server/resource Web Monitor exact-scope CPU/memory/disk threshold configuration, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Writes stay exact-scope; Web creates an exact-scope override when saving inherited readback. Thresholds are non-enforcing observation policy only. |
 | Show runtime monitoring thresholds | Query | `runtime-monitoring.thresholds.show` | Application query service, PG/PGlite policy readback/evaluation, sample-evidence-based parent policy inheritance, CLI, HTTP/oRPC, server/resource Web Monitor readback, SDK metadata, and generated MCP/tool descriptor/handler dispatch implemented. Readback only, no runtime enforcement. |
 
+- Repository config `monitoring.thresholds` is governed by
+  [ADR-072](./decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md) and
+  [spec 081](./specs/081-repository-config-runtime-monitoring-thresholds/spec.md). It is a
+  workflow/profile extension over `runtime-monitoring.thresholds.configure` and
+  `runtime-monitoring.thresholds.show`, not a new operation key; it must reconcile exact
+  Resource-scope non-enforcing threshold policy before ids-only deployment admission.
 - Runtime monitoring is governed by
   [ADR-063: Runtime Monitoring Observation Boundary](./decisions/ADR-063-runtime-monitoring-observation-boundary.md)
   [Runtime Monitoring Observation Boundary](./specs/069-runtime-monitoring-observation-boundary/spec.md),
@@ -366,6 +372,33 @@ Implemented operations:
 | Read resource health history | Query | `resources.health-history` | `ResourceHealthHistoryQuery` | `ResourceHealthHistoryQueryInput` | `appaloft resource health-history <resourceId> --from <iso> --to <iso>` | `GET /api/resources/{resourceId}/health-history` |
 | Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
+Repository config `autoDeploy` is a workflow/profile extension over
+`resources.configure-auto-deploy`. Config deploy may configure or disable Resource git-push
+auto-deploy policy before deployment admission, but it does not introduce a new operation key and
+does not add source-event trigger fields to `deployments.create`.
+
+Repository config `health` and `runtime.healthCheck` are workflow/profile extensions over
+`resources.configure-health`, governed by
+[ADR-073](./decisions/ADR-073-repository-config-health-policy-reconcile.md) and
+[spec 082](./specs/082-repository-config-health-policy-reconcile/spec.md). Config deploy may
+normalize and configure Resource HTTP health policy before ids-only deployment admission when an
+existing-resource profile apply is explicitly selected; default config deploy still fails first on
+unacknowledged health drift.
+
+Repository config `preview.pullRequest.profile` is a selected PR-preview overlay governed by
+[ADR-074](./decisions/ADR-074-repository-config-preview-profile-overlays.md) and
+[spec 083](./specs/083-repository-config-preview-profile-overlays/spec.md). It is a workflow
+extension over existing profile/env/access/monitoring/health operations, not a new operation key.
+The overlay is ignored for ordinary deploys, applies only after trusted preview context selects the
+preview scope, and never adds profile fields to `deployments.create`.
+
+Repository config `profiles.<key>` is a trusted-entrypoint-selected named overlay governed by
+[ADR-075](./decisions/ADR-075-repository-config-named-profile-overlays.md) and
+[spec 084](./specs/084-repository-config-named-profile-overlays/spec.md). It is a workflow
+extension over existing profile/env/access/monitoring/health operations, not a new operation key.
+Unselected profiles are ignored; selected profiles merge before preview overlays and before
+ids-only deployment admission.
+
 Phase 7 storage operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
@@ -392,6 +425,11 @@ Phase 7 scheduled task operations:
 | List scheduled task runs | Query | `scheduled-task-runs.list` | `ListScheduledTaskRunsQuery` | `ListScheduledTaskRunsQueryInput` | `appaloft scheduled-task runs list` | `GET /api/scheduled-task-runs` |
 | Show scheduled task run | Query | `scheduled-task-runs.show` | `ShowScheduledTaskRunQuery` | `ShowScheduledTaskRunQueryInput` | `appaloft scheduled-task runs show <runId>` | `GET /api/scheduled-task-runs/{runId}` |
 | Read scheduled task run logs | Query | `scheduled-task-runs.logs` | `ScheduledTaskRunLogsQuery` | `ScheduledTaskRunLogsQueryInput` | `appaloft scheduled-task runs logs <runId>` | `GET /api/scheduled-task-runs/{runId}/logs` |
+
+Repository config `scheduledTasks.*` is a workflow/profile extension over the existing scheduled
+task operations. Config deploy may list, create, or configure Resource-owned scheduled tasks before
+ids-only deployment admission, and preview cleanup may delete only source-link provenance-owned
+ephemeral tasks. No new operation-catalog key is introduced.
 
 Phase 7 dependency resource operations:
 
@@ -461,6 +499,33 @@ Current boundary:
   Appaloft-owned refs, managed Redis refs, single-server runtimes, Docker Swarm, and retained
   rotated binding refs. Managed Postgres and Redis closed loops have end-to-end
   application/read-model verification.
+- Repository config `dependencies` is governed by
+  [ADR-066](./decisions/ADR-066-repository-config-dependency-graph.md) and
+  [Repository Config Dependency Graph](./specs/075-repository-config-dependency-graph/spec.md).
+  It is a workflow/profile extension over the existing dependency operation catalog, not a new
+  operation key. Config supports the canonical managed dependency kinds `postgres`, `redis`,
+  `mysql`, `clickhouse`, `object-storage`, and `opensearch`. Config deploy may list/provision
+  managed dependency resources, list/bind Resource dependency bindings, and persist preview
+  source-link provenance before `deployments.create`.
+  Preview cleanup may unbind/delete only provenance-marked ephemeral dependencies through
+  `resources.unbind-dependency` and `dependency-resources.delete`; manual/shared dependencies and
+  dependencies without matching provenance are preserved by design.
+- Repository config `dependencies.<key>.backup` is governed by
+  [ADR-070](./decisions/ADR-070-repository-config-dependency-backup-policy.md) and
+  [Repository Config Dependency Backup Policy](./specs/079-repository-config-dependency-backup-policy/spec.md).
+  It is a workflow/profile extension over existing dependency backup policy operations, not a new
+  operation key. Config deploy may create, update, or disable a repository-config-owned scheduled
+  backup policy for a managed dependency resource, but it does not run backups, restore backups,
+  mutate manual backup policies without provenance, or add backup fields to `deployments.create`.
+- Repository config `storage` is governed by
+  [ADR-067](./decisions/ADR-067-repository-config-storage-graph.md) and
+  [Repository Config Storage Graph](./specs/076-repository-config-storage-graph/spec.md). It is a
+  workflow/profile extension over the existing storage operation catalog, not a new operation key.
+  Config deploy may list/create managed named volumes, read/attach Resource storage mounts, and
+  persist preview source-link provenance before `deployments.create`. Preview cleanup may
+  detach/delete only provenance-marked ephemeral storage through `resources.detach-storage` and
+  `storage-volumes.delete`; manual/shared storage and storage without matching provenance are
+  preserved by design.
 - `resources.rotate-dependency-binding-secret` rotates only the binding-scoped safe secret
   reference/version for future deployment snapshot references. It requires explicit acknowledgement
   that historical snapshots remain unchanged, and it does not rotate provider-native database
@@ -514,6 +579,13 @@ Current boundary:
   path, static publish directory, build target, command defaults, runtime naming intent, and
   health-check defaults belong to `ResourceRuntimeProfile`; listener ports and exposure belong to
   `ResourceNetworkProfile`.
+- Repository config `source.type = image` is governed by
+  [ADR-076](./decisions/ADR-076-repository-config-prebuilt-image-source.md) and
+  [spec 085](./specs/085-repository-config-prebuilt-image-source/spec.md). It is a
+  workflow/profile extension over Resource source/runtime profile operations, maps to
+  `ResourceSourceBinding(kind = docker-image)` plus `ResourceRuntimeProfile(strategy =
+  prebuilt-image)`, and must not add image fields, registry credentials, or pull secrets to
+  `deployments.create`.
 - resource runtime naming intent is reusable resource-owned profile state. Docker/Compose adapters
   must derive unique effective runtime instance names from that profile plus deployment/resource or
   preview context instead of adding Docker-native naming fields to `deployments.create`.
@@ -537,6 +609,11 @@ Current boundary:
   route path prefix for future planned/deployment route resolution; it does not change system or
   server default access policy, bind custom domains, issue certificates, or apply proxy routes to
   existing runtime state
+- Repository config `access.generated` is governed by
+  [ADR-071](./decisions/ADR-071-repository-config-generated-access-profile.md) and
+  [spec 080](./specs/080-repository-config-generated-access-profile/spec.md). It is a
+  workflow/profile extension over `resources.configure-access`, not a new operation key; it must
+  reconcile generated access preference and path prefix before ids-only deployment admission.
 - project/resource console ownership is governed by
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived
@@ -1076,6 +1153,11 @@ Current boundary:
   Compatibility preview Resources that live in preview-kind Environments are omitted from default
   `resources.list` results and may be deleted through explicit operator confirmation without
   treating retained preview deployment/audit rows as product Resource blockers.
+- Repository config `preview.pullRequest.policy` is governed by ADR-077/spec 086 as a
+  workflow/profile extension over existing `preview-policies.configure` and
+  `preview-policies.show`. Ordinary trusted config deploy reconciles a Resource-scoped preview
+  policy before ids-only deployment admission; PR preview deploys skip policy mutation so a PR
+  branch cannot change the policy that admits previews. No new operation-catalog key is introduced.
 
 Product-grade preview policy operations:
 

@@ -20,7 +20,10 @@ import { Context, Effect, Layer, Option } from "effect";
 import {
   type RemoteStateSession,
   type ServerAppliedRouteDesiredStateStore,
+  type SourceLinkDependencyProvenance,
   type SourceLinkRecord,
+  type SourceLinkScheduledTaskProvenance,
+  type SourceLinkStorageProvenance,
   type SourceLinkTarget,
 } from "./commands/deployment-remote-state.js";
 import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
@@ -34,6 +37,24 @@ export interface CliSourceLinkStore {
   createIfMissing(input: {
     sourceFingerprint: string;
     target: SourceLinkTarget;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordDependencyProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    dependencyProvenance: SourceLinkDependencyProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordStorageProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    storageProvenance: SourceLinkStorageProvenance;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  recordScheduledTaskProvenance?(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    scheduledTaskProvenance: SourceLinkScheduledTaskProvenance;
     updatedAt: string;
   }): Promise<Result<SourceLinkRecord>>;
 }

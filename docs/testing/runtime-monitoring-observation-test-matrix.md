@@ -18,6 +18,8 @@ general dashboard/query engine.
 - [runtime-monitoring.rollup Query Spec](../queries/runtime-monitoring.rollup.md)
 - [runtime-monitoring.thresholds.configure Command Spec](../commands/runtime-monitoring-thresholds.configure.md)
 - [runtime-monitoring.thresholds.show Query Spec](../queries/runtime-monitoring-thresholds.show.md)
+- [ADR-072: Repository Config Runtime Monitoring Thresholds](../decisions/ADR-072-repository-config-runtime-monitoring-thresholds.md)
+- [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
 - [Runtime Usage Attribution Test Matrix](./runtime-usage-attribution-test-matrix.md)
 - [Runtime Target Capacity Test Matrix](./runtime-target-capacity-test-matrix.md)
 - [Adapter Command/Query Boundary](../architecture/adapter-command-query-boundary.md)
@@ -38,6 +40,7 @@ general dashboard/query engine.
 | RT-MON-008 | Resource Observe surface shows resource-level charts, current health/access/proxy state, latest deployment markers, runtime logs, deployment logs, diagnostics links, and a handoff to storage cleanup dry-run from typed DTOs and i18n keys. | Web | Resource Monitor tab, retained sample readback, rollup summary/latest marker/top-contributor readback, threshold-state readback, logs/events/diagnostics/cleanup links, browser-local fallback samples, and i18n wiring are covered in `apps/web/src/lib/console/runtime-usage.test.ts`; resource Monitor WebView rendering and cleanup handoff are automated in `apps/web/test/e2e-webview/home.webview.test.ts`. |
 | RT-MON-009 | Project and environment monitoring stays rollup-only with top contributors and deep links to resource/server detail; those scopes do not become owners of runtime state or resource-level diagnosis. | Application/Web | Application shallow project rollup and top-contributor ordering are automated in `packages/application/test/runtime-monitoring-query.test.ts`; Project detail Web rollup-only readback for project and selected environment scopes is automated in `apps/web/src/lib/console/runtime-usage.test.ts`; project/environment rollup WebView rendering and scoped request dispatch are automated in `apps/web/test/e2e-webview/home.webview.test.ts`. |
 | RT-MON-010 | Prometheus-compatible storage/querying, custom metric ingestion, APM/tracing, dashboard builders, alert routing, billing analytics, quota, autoscaling, cleanup, and enforcement remain out of Appaloft runtime monitoring scope. | Contract/docs/review | Operation catalog scope guard is automated in `packages/application/test/operation-catalog-boundary.test.ts`; public docs handoff coverage is automated in `packages/docs-registry/test/help-topics.test.ts`. |
+| RT-MON-011 | Repository config may declare exact Resource-scope non-enforcing threshold policy through `monitoring.thresholds`; config deploy must not mutate inherited parent policies or add monitoring fields to `deployments.create`. | Config workflow | Parser and CLI workflow coverage is tracked by `CONFIG-FILE-MONITORING-THRESHOLDS-001` through `CONFIG-FILE-MONITORING-THRESHOLDS-005` in `docs/testing/deployment-config-file-test-matrix.md` and automated in `packages/deployment-config/test/appaloft-config.test.ts` plus `packages/adapters/cli/test/deployment-config.test.ts`. |
 
 ## Current Implementation Notes And Governed Follow-Ups
 

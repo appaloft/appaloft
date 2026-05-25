@@ -314,6 +314,15 @@ come from generated/default access, trusted `preview-domain-template`, or
 `preview.pullRequest.domainTemplate` in an explicitly selected preview config file. Production
 `access.domains[]` should not be reinterpreted as pull request preview hostnames.
 
+Use `config-profile` when one config file contains reviewable named variants:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  with:
+    config: appaloft.yml
+    config-profile: staging
+```
+
 ```yaml
 preview:
   pullRequest:
@@ -420,10 +429,11 @@ cleanup retries, scheduler ownership, quotas, audit, and managed route/domain fo
 
 Use product-grade previews when you want Appaloft to own preview lifecycle and cleanup instead of
 requiring every repository to maintain deploy and close-event workflow files.
-Explicit action inputs override config values. Project, environment, resource, and server ids are
-advanced bootstrap/debug inputs; ordinary deploys should rely on source-link state, deploy-token
-scope, source binding, or the Appaloft server. Tokens, SSH identity, database identity, and provider
-account identity must never come from committed config.
+Explicit action inputs override config values. `config-profile` is a trusted selector for
+`profiles.<key>` in the repository config; it is not an Appaloft Environment selector. Project,
+environment, resource, and server ids are advanced bootstrap/debug inputs; ordinary deploys should
+rely on source-link state, deploy-token scope, source binding, or the Appaloft server. Tokens, SSH
+identity, database identity, and provider account identity must never come from committed config.
 
 ## Inputs
 
@@ -432,6 +442,7 @@ account identity must never come from committed config.
 | `command` | `deploy` | `deploy`, `preview-cleanup`, or `install-console`. |
 | `version` | `latest` | Appaloft release tag such as `v0.9.0`, `latest`, or `source`. `source` builds a deploy CLI from the checked-out Appaloft source tree without packaging embedded console or docs assets, and requires Bun on `PATH`. Release values are also used for self-hosted console install. |
 | `config` | empty | Optional Appaloft config path. If omitted, `appaloft.yml` is used only when present. |
+| `config-profile` | empty | Trusted selector for `profiles.<key>` in the selected config file. Does not select project, environment, resource, server, destination, or provider identity. |
 | `source` | `.` | Source path or locator passed to the CLI. |
 | `source-revision` | `GITHUB_SHA` | Explicit revision for self-hosted server config deploy source packages. Use the PR head SHA when deploying a checked-out pull request head. |
 | `runtime-name` | empty | Trusted runtime name override for pure SSH deploy. |

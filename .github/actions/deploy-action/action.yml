@@ -14,6 +14,10 @@ inputs:
     description: Optional Appaloft config path. When omitted, appaloft.yml is used only if it exists.
     required: false
     default: ""
+  config-profile:
+    description: Trusted selector for profiles.<key> in the selected config file. Does not select Appaloft project/environment/resource/server identity.
+    required: false
+    default: ""
   source:
     description: Source path or locator passed to appaloft deploy.
     required: false
@@ -272,6 +276,7 @@ runs:
         INPUT_COMMAND: ${{ inputs.command }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_CONFIG_PROFILE: ${{ inputs.config-profile }}
         INPUT_SOURCE: ${{ inputs.source }}
         INPUT_SOURCE_REVISION: ${{ inputs.source-revision }}
         INPUT_RUNTIME_NAME: ${{ inputs.runtime-name }}

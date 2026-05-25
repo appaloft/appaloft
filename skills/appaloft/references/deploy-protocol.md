@@ -6,8 +6,8 @@ For deployment work, use this Appaloft deploy protocol:
 2. Select the deployment mode before asking for Appaloft ids.
 3. Select or create project, server, environment, and resource context only through Appaloft
    operations or trusted bootstrap context.
-4. Configure source, runtime, network, health, access, variables, dependencies, and storage on the
-   Resource profile.
+4. Configure source, runtime, network, health, access, variables, dependencies, storage, and
+   scheduled tasks on the Resource profile.
 5. Run plan/preview when useful.
 6. Create or clean up deployment through Appaloft.
 7. Observe deployment detail, logs, resource health, diagnostics, and recovery readiness.
@@ -99,13 +99,33 @@ If binding is missing, prompt for one safe action:
 - run one trusted bootstrap deploy with complete project/environment/resource/server context.
 
 Never put tokens, SSH keys, database URLs, provider account ids, organization ids, tenant ids, raw
-secret values, or credentials into `appaloft.yml`.
+secret values, credentials, host bind source paths, provider-native storage handles, task ids,
+provider-native scheduler handles, backup policy ids, backup artifact handles, restore point ids,
+source-event ids, webhook delivery ids, monitoring policy ids, runtime prune policy ids, metric
+sample ids, log payloads, raw Docker/SSH cleanup commands, or webhook secret values into
+`appaloft.yml`. Repository config may declare high-level application
+`dependencies`, `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`,
+`preview.pullRequest.policy`, `access.generated`, `monitoring.thresholds`,
+`retention.runtimePrune`, `health`, `env`, supported `secrets` references, selected
+`profiles.<key>` overlays, and selected `preview.pullRequest.profile` overlays, but deploy must
+reconcile them through existing operations before ids-only deployment admission. Supported
+`secrets` references are trusted runner `ci-env:<NAME>` values and same-key existing Resource
+secret checks via `resource-secret:<KEY>`; external secret adapters are not repository config
+resolvers yet. Resource health policy declarations use `resources.configure-health`; runtime prune
+declarations configure only the trusted selected server's `deployment-snapshot` scheduled runtime
+prune policy; preview policy declarations configure only the selected Resource policy during
+ordinary trusted deploys and are skipped during PR preview deploy mutation; named config profiles
+apply only after trusted CLI/Action `config-profile` selection, preview profile overlays apply only
+after trusted PR preview context selects preview scope, and none may be added to
+`deployments.create`.
 
 ## Entry Selection
 
 Use this order:
 
-1. Existing Appaloft config: `appaloft deploy <source>`.
+1. Existing Appaloft config: `appaloft deploy <source>`; `source.type: image` in config is a
+   Resource source/runtime profile declaration, not a deployment command field or registry secret
+   surface.
 2. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 3. Compose source: `appaloft deploy <source> --method docker-compose`.
 4. Dockerfile source: `appaloft deploy <source> --method dockerfile`.

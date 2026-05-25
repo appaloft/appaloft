@@ -20,6 +20,8 @@ catalog entry and schemas.
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [ADR-037: Source Event Auto Deploy Ownership](../decisions/ADR-037-source-event-auto-deploy-ownership.md)
+- [ADR-069: Repository Config Auto-Deploy Policy](../decisions/ADR-069-repository-config-auto-deploy-policy.md)
+- [Repository Config Auto-Deploy Policy](../specs/078-repository-config-auto-deploy-policy/spec.md)
 - [resources.configure-auto-deploy](../commands/resources.configure-auto-deploy.md)
 - [source-events.ingest](../commands/source-events.ingest.md)
 - [source-events.prune](../commands/source-events.prune.md)
@@ -39,6 +41,7 @@ catalog entry and schemas.
 | `SRC-AUTO-POLICY-002` | Resource has no compatible source binding. | Configure command rejects with stable source binding blocker. | `packages/core/test/resource.test.ts`; `packages/application/test/configure-resource-auto-deploy.test.ts` | Passing |
 | `SRC-AUTO-POLICY-003` | Source binding changes after policy creation. | Policy becomes blocked pending explicit acknowledgement and cannot create deployments. | `packages/core/test/resource.test.ts`; `packages/persistence/pg/test/resource-auto-deploy-policy.pglite.test.ts` | Passing |
 | `SRC-AUTO-POLICY-004` | Generic signed webhook policy is configured with a secret reference. | Configure accepts only the first Resource-scoped `resource-secret:<KEY>` family and rejects arbitrary, environment, dependency, certificate, or provider secret references before persistence/events. | `packages/core/test/resource.test.ts`; `packages/application/test/configure-resource-auto-deploy.test.ts` | Passing |
+| `SRC-AUTO-POLICY-005` | Repository config declares git-push auto-deploy policy. | Config deploy reads current Resource detail, configures missing/drifted policy through `resources.configure-auto-deploy`, leaves matching policy alone, disables existing policy when requested, and keeps `deployments.create` ids-only. | `packages/deployment-config/test/appaloft-config.test.ts`; `packages/adapters/cli/test/deployment-config.test.ts` | Passing |
 
 ## Event Coverage
 

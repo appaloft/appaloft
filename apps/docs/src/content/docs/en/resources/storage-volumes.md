@@ -55,6 +55,29 @@ appaloft resource storage attach res_web vol_uploads --destination-path /app/upl
 A Resource cannot have two storage attachments at the same destination path. The destination path is
 an absolute path inside the workload container, not a host path.
 
+<h2 id="storage-volume-config-file">Declare storage in appaloft.yaml</h2>
+
+For repository-driven deploys, you can ask Appaloft to create or reuse a managed named volume and
+attach it before deployment:
+
+```yaml
+storage:
+  uploads:
+    kind: volume
+    source: managed
+    mount:
+      path: /app/uploads
+```
+
+`mount.path` is the path inside the workload container. It is not a host bind source path. The
+config workflow keeps deployment admission ids-only: it reconciles storage through
+`storage-volumes.list`, `storage-volumes.create`, `resources.show`, and
+`resources.attach-storage`, then creates the deployment from the selected ids.
+
+For pull request previews, add `preview.lifecycle: ephemeral` only when the preview storage should
+be cleaned up on PR close. Preview cleanup removes storage only when the source link proves that
+repository config created and attached that exact preview volume.
+
 <h2 id="storage-volume-delete-safety">Delete safety</h2>
 
 Before deleting a storage volume, Appaloft must confirm that no active Resource attachment, backup

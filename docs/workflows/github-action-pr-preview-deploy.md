@@ -14,6 +14,12 @@ GitHub pull_request event
   -> appaloft/deploy-action installs and verifies the Appaloft CLI
   -> action resolves trusted PR preview context from GitHub event metadata
   -> repository config bootstrap resolves profile fields, SSH state, source link, and identity
+  -> repository config source profile may select Git source or a prebuilt image source
+  -> repository config dependency graph provisions/reuses and binds application dependencies
+  -> repository config dependency backup policy configures owned backup policy when declared
+  -> repository config storage graph creates/reuses and attaches managed storage
+  -> repository config scheduled task graph creates/reuses or configures Resource scheduled tasks
+  -> repository config auto-deploy policy configures or disables Resource source-event policy
   -> existing environment/resource/deployment commands create or update the preview target
   -> deployments.create accepts the deployment attempt with ids-only input
   -> default or custom preview access route is realized through the edge proxy when available
@@ -118,6 +124,17 @@ with:
   preview-id: pr-${{ github.event.pull_request.number }}
 ```
 
+When one config file carries reviewable variants, the action may select a named config profile with
+trusted input:
+
+```yaml
+with:
+  config: appaloft.yml
+  config-profile: staging
+  preview: pull-request
+  preview-id: pr-${{ github.event.pull_request.number }}
+```
+
 Using `appaloft.yml` is valid only when that file is intentionally environment-neutral or the
 repository owner explicitly accepts it for previews. Preview docs and generated examples should not
 assume a root config is safe for PR deploys because it may contain production runtime choices,
@@ -125,12 +142,12 @@ environment values, or custom domain intent.
 
 Config files are not required for Action preview deploys. Trusted action inputs, workflow
 environment, CLI flags, and future MCP/tool parameters may provide the same canonical profile
-fields that repository config supports: runtime strategy and commands, publish directory, network
-profile, health path, optional runtime name, non-secret env values, `ci-env:` secret references,
-and preview custom-route policy. These inputs feed the same config bootstrap/Quick Deploy profile
-path and must not be translated into `deployments.create` fields. A workflow must not generate a
-temporary config file as the normal way to pass values that the CLI/action input surface already
-models.
+fields that repository config supports: Git source profile, prebuilt image source, runtime strategy
+and commands, publish directory, network profile, health path, optional runtime name, non-secret env
+values, `ci-env:` secret references, and preview custom-route policy. These inputs feed the same
+config bootstrap/Quick Deploy profile path and must not be translated into `deployments.create`
+fields. A workflow must not generate a temporary config file as the normal way to pass values that
+the CLI/action input surface already models.
 
 Field precedence after a config file is selected follows the repository config bootstrap contract:
 
@@ -138,21 +155,59 @@ Field precedence after a config file is selected follows the repository config b
 built-in defaults
   < source/framework detection
   < selected repository config base profile
-  < selected repository config overlay for the already-selected preview environment
+  < selected named repository config profile
+  < selected PR preview profile for the already-selected preview environment
   < trusted action inputs, workflow env, CLI flags, or future MCP parameters
 ```
 
-The current parser does not need to support preview overlays before Action preview can ship. The
-preview-safe first implementation is a separate config path such as `appaloft.preview.yml` plus
-trusted GitHub Actions environment variables and secrets. A future schema may add explicit
-environment/profile overlays, but those overlays may apply only after the PR entrypoint has selected
-`preview-pr-123`; a committed config overlay must not select or retarget the environment, project,
-resource, server, destination, or credentials.
+The parser supports `profiles.<key>` selected by trusted `config-profile` input and
+`preview.pullRequest.profile` selected only after PR preview context exists. Both overlays may apply
+only after the entrypoint has selected `preview-pr-123`; a committed config overlay must not select
+or retarget the environment, project, resource, server, destination, or credentials.
 
 Application values that differ in preview should be supplied through preview-scoped GitHub
 environment variables or secrets and referenced either from config with `ci-env:<NAME>` or from a
 trusted action/CLI secret flag that resolves the same `ci-env:<NAME>` reference. The action sees
 only the runner environment after GitHub policy has selected the job environment.
+
+Application dependencies may be declared in the selected preview config with top-level
+`dependencies`. Managed canonical dependency kinds such as Postgres and Redis are reconciled before
+deployment admission through existing dependency-resource and binding operations. If the dependency
+declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the preview source link
+contains explicit repository-config provenance for the same preview fingerprint, Resource, binding,
+and dependency resource.
+
+Dependency declarations may also include `backup` policy. Config deploy reconciles that scheduled
+backup policy through `dependency-resources.backup-policies.configure` after the dependency resource
+is selected or provisioned. PR preview cleanup does not run backup or restore operations; it relies
+on dependency resource cleanup safety after provenance-marked ephemeral dependency ownership is
+proven.
+
+Application storage may be declared in the selected preview config with top-level `storage`. For
+MVP, a managed named volume mounted at a workload path such as `/app/uploads` is reconciled before
+deployment admission through existing storage-volume and Resource attachment operations. If the
+storage declares `preview.lifecycle: ephemeral`, cleanup may remove it only when the preview source
+link contains explicit repository-config provenance for the same preview fingerprint, Resource,
+attachment, and storage volume.
+
+Resource source-event auto-deploy policy may be declared in the selected config with top-level
+`autoDeploy`. For MVP, `trigger: git-push` is reconciled through
+`resources.configure-auto-deploy` before deployment admission. This policy describes future source
+events for the Resource; it must not add webhook payload, delivery id, provider account, or trigger
+fields to `deployments.create`.
+
+Resource generated access preference may be declared in the selected config with
+`access.generated`. The action/CLI reconciles it through `resources.configure-access` before
+deployment admission. This can disable generated/default preview access for a Resource or set a
+generated route path prefix, but it does not create custom domain bindings, issue certificates,
+change default access provider policy, or add access fields to `deployments.create`.
+
+Runtime monitoring thresholds may be declared in the selected config with
+`monitoring.thresholds`. The action/CLI reconciles them through
+`runtime-monitoring.thresholds.show` and `runtime-monitoring.thresholds.configure` for the selected
+Resource before deployment admission. These thresholds are non-enforcing observation policy; they
+do not resize, scale, reject, restart, clean up, alert, bill, or add monitoring fields to
+`deployments.create`.
 
 Custom route intent for PR previews should come from one of these sources:
 
@@ -216,6 +271,15 @@ resolve preview context
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
   -> derive preview runtime name seed `preview-{pr_number}` when profile input does not override it
+  -> configure source/runtime profile when config selects a prebuilt image source
+  -> list/provision/reuse declared managed dependency resources
+  -> list/configure declared dependency backup policies when needed
+  -> list/bind Resource dependency bindings for declared env targets
+  -> persist preview dependency provenance for config-owned ephemeral dependencies
+  -> list/create/reuse declared managed storage volumes
+  -> read/attach Resource storage mounts for declared workload paths
+  -> persist preview storage provenance for config-owned ephemeral storage
+  -> read Resource detail and configure/disable declared auto-deploy policy when needed
   -> apply config env and secret references through environment operations
   -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
@@ -223,7 +287,9 @@ resolve preview context
 ```
 
 `deployments.create` remains ids-only. PR number, branch name, GitHub repository, preview domain
-template, route host, proxy kind, and TLS mode must not become deployment command fields.
+template, route host, proxy kind, TLS mode, dependency kind, dependency resource id, binding target,
+storage volume id, storage attachment id, destination path, and connection material must not become
+deployment command fields.
 
 Preview deploy and preview cleanup must use logical mutation coordination, not only whole-server
 serialization. The workflow may still encounter brief backend state-root coordination during
@@ -377,6 +443,8 @@ pull_request closed
   -> user workflow runs Appaloft CLI preview cleanup or a thin wrapper over the same CLI command
   -> Appaloft resolves preview-scoped source link
   -> deployments.cleanup-preview stops current and stale preview runtime state when present
+  -> provenance-owned ephemeral dependency bindings/resources are unbound and deleted
+  -> provenance-owned ephemeral storage attachments/volumes are detached and deleted
   -> preview server-applied route desired state is deleted for the linked target and matching preview fingerprint
   -> preview source link is unlinked
   -> optional GitHub workflow step deletes GitHub preview deployment records for preview-pr-123
@@ -410,6 +478,8 @@ The active product-grade preview baseline supports:
 - no workflow file required when GitHub App execution is selected;
 - PR comments and check runs from the Appaloft GitHub App;
 - preview policy list/show/update;
+- repository config `preview.pullRequest.policy` applied only from trusted non-PR-preview config
+  deploys;
 - preview environment list/show/delete;
 - scoped preview environment variables and secrets;
 - durable audit and operator-work visibility;
@@ -423,7 +493,11 @@ Future public enablement work adds:
   those integrations.
 
 The same repository config and operation contracts still apply. Product-grade preview orchestration
-must not add source/runtime/domain fields to `deployments.create`.
+must not add source/runtime/domain fields to `deployments.create`. When `appaloft.yaml` declares
+`preview.pullRequest.policy`, ordinary trusted config deploy may reconcile the selected Resource
+policy before deployment. A PR preview deploy itself must not apply policy changes from the PR
+branch; the policy that admits previews must come from trusted default-branch, Web, CLI,
+HTTP/oRPC, or control-plane configuration.
 
 The governing product-grade preview artifact is
 [Product-Grade Preview Deployments](../specs/046-product-grade-preview-deployments/spec.md), with
@@ -498,4 +572,6 @@ surfaces, close/expiry/delete cleanup retry state, scheduler-runner wiring, and 
 recording for comments/checks. Remaining product-grade preview work is public enablement and
 hardening: GitHub App installation-token onboarding, broader provider smoke coverage beyond the
 secret-gated PR-comment feedback smoke, managed-domain mapping, DNS observation, and certificate
-lifecycle when the control plane owns those integrations.
+lifecycle when the control plane owns those integrations. Repository config
+`preview.pullRequest.policy` is now a trusted-deploy policy declaration over those existing
+preview policy operations, not a PR-branch mutation path.

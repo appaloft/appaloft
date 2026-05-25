@@ -1,11 +1,18 @@
 import {
+  dependencyResourceKinds,
   type RepositoryContext,
   type SourceLinkBySourceFingerprintSpec,
+  type SourceLinkDependencyProvenance,
+  type SourceLinkDependencyProvenanceEntry,
   type SourceLinkReadModel,
   type SourceLinkRecord,
   type SourceLinkRepository,
+  type SourceLinkScheduledTaskProvenance,
+  type SourceLinkScheduledTaskProvenanceEntry,
   type SourceLinkSelectionSpec,
   type SourceLinkSelectionSpecVisitor,
+  type SourceLinkStorageProvenance,
+  type SourceLinkStorageProvenanceEntry,
   type SourceLinkUpsertSpec,
   type SourceLinkUpsertSpecVisitor,
   type UpsertSourceLinkSpec,
@@ -50,7 +57,7 @@ class KyselySourceLinkUpsertVisitor
         destination_id: spec.record.destinationId ?? null,
         updated_at: spec.record.updatedAt,
         reason: spec.record.reason ?? null,
-        metadata: {},
+        metadata: sourceLinkMetadataFromRecord(spec.record),
       },
     };
   }
@@ -102,7 +109,160 @@ function normalizeTimestamp(value: unknown): string {
   return String(value);
 }
 
+function isDependencyProvenanceEntry(value: unknown): value is SourceLinkDependencyProvenanceEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.key === "string" &&
+    typeof record.kind === "string" &&
+    dependencyResourceKinds.includes(record.kind as (typeof dependencyResourceKinds)[number]) &&
+    record.source === "managed" &&
+    record.lifecycle === "ephemeral" &&
+    typeof record.resourceId === "string" &&
+    typeof record.dependencyResourceId === "string" &&
+    typeof record.bindingId === "string" &&
+    typeof record.targetName === "string" &&
+    typeof record.createdAt === "string"
+  );
+}
+
+function dependencyProvenanceFromMetadata(
+  metadata: unknown,
+): SourceLinkDependencyProvenance | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+  const provenance = (metadata as Record<string, unknown>).dependencyProvenance;
+  if (!provenance || typeof provenance !== "object") {
+    return undefined;
+  }
+  const record = provenance as Record<string, unknown>;
+  if (
+    record.schemaVersion !== "source-link.dependency-provenance/v1" ||
+    record.source !== "repository-config" ||
+    typeof record.sourceFingerprint !== "string" ||
+    !Array.isArray(record.entries) ||
+    !record.entries.every(isDependencyProvenanceEntry)
+  ) {
+    return undefined;
+  }
+
+  return {
+    schemaVersion: "source-link.dependency-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: record.sourceFingerprint,
+    entries: record.entries,
+  };
+}
+
+function isStorageProvenanceEntry(value: unknown): value is SourceLinkStorageProvenanceEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.key === "string" &&
+    record.kind === "volume" &&
+    record.source === "managed" &&
+    record.lifecycle === "ephemeral" &&
+    typeof record.resourceId === "string" &&
+    typeof record.storageVolumeId === "string" &&
+    typeof record.attachmentId === "string" &&
+    typeof record.destinationPath === "string" &&
+    typeof record.createdAt === "string"
+  );
+}
+
+function storageProvenanceFromMetadata(metadata: unknown): SourceLinkStorageProvenance | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+  const provenance = (metadata as Record<string, unknown>).storageProvenance;
+  if (!provenance || typeof provenance !== "object") {
+    return undefined;
+  }
+  const record = provenance as Record<string, unknown>;
+  if (
+    record.schemaVersion !== "source-link.storage-provenance/v1" ||
+    record.source !== "repository-config" ||
+    typeof record.sourceFingerprint !== "string" ||
+    !Array.isArray(record.entries) ||
+    !record.entries.every(isStorageProvenanceEntry)
+  ) {
+    return undefined;
+  }
+
+  return {
+    schemaVersion: "source-link.storage-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: record.sourceFingerprint,
+    entries: record.entries,
+  };
+}
+
+function isScheduledTaskProvenanceEntry(
+  value: unknown,
+): value is SourceLinkScheduledTaskProvenanceEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.key === "string" &&
+    record.source === "repository-config" &&
+    (record.lifecycle === "persistent" || record.lifecycle === "ephemeral") &&
+    typeof record.resourceId === "string" &&
+    typeof record.taskId === "string" &&
+    typeof record.commandFingerprint === "string" &&
+    typeof record.createdAt === "string"
+  );
+}
+
+function scheduledTaskProvenanceFromMetadata(
+  metadata: unknown,
+): SourceLinkScheduledTaskProvenance | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+  const provenance = (metadata as Record<string, unknown>).scheduledTaskProvenance;
+  if (!provenance || typeof provenance !== "object") {
+    return undefined;
+  }
+  const record = provenance as Record<string, unknown>;
+  if (
+    record.schemaVersion !== "source-link.scheduled-task-provenance/v1" ||
+    record.source !== "repository-config" ||
+    typeof record.sourceFingerprint !== "string" ||
+    !Array.isArray(record.entries) ||
+    !record.entries.every(isScheduledTaskProvenanceEntry)
+  ) {
+    return undefined;
+  }
+
+  return {
+    schemaVersion: "source-link.scheduled-task-provenance/v1",
+    source: "repository-config",
+    sourceFingerprint: record.sourceFingerprint,
+    entries: record.entries,
+  };
+}
+
+function sourceLinkMetadataFromRecord(record: SourceLinkRecord): Record<string, unknown> {
+  return {
+    ...(record.dependencyProvenance ? { dependencyProvenance: record.dependencyProvenance } : {}),
+    ...(record.storageProvenance ? { storageProvenance: record.storageProvenance } : {}),
+    ...(record.scheduledTaskProvenance
+      ? { scheduledTaskProvenance: record.scheduledTaskProvenance }
+      : {}),
+  };
+}
+
 function mapRow(row: SourceLinkRow): SourceLinkRecord {
+  const dependencyProvenance = dependencyProvenanceFromMetadata(row.metadata);
+  const storageProvenance = storageProvenanceFromMetadata(row.metadata);
+  const scheduledTaskProvenance = scheduledTaskProvenanceFromMetadata(row.metadata);
   return {
     sourceFingerprint: row.source_fingerprint,
     projectId: row.project_id,
@@ -112,6 +272,9 @@ function mapRow(row: SourceLinkRow): SourceLinkRecord {
     ...(row.server_id ? { serverId: row.server_id } : {}),
     ...(row.destination_id ? { destinationId: row.destination_id } : {}),
     ...(row.reason ? { reason: row.reason } : {}),
+    ...(dependencyProvenance ? { dependencyProvenance } : {}),
+    ...(storageProvenance ? { storageProvenance } : {}),
+    ...(scheduledTaskProvenance ? { scheduledTaskProvenance } : {}),
   };
 }
 
@@ -172,6 +335,7 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
             destination_id: mutation.values.destination_id,
             updated_at: mutation.values.updated_at,
             reason: mutation.values.reason,
+            metadata: mutation.values.metadata,
           }),
         )
         .returningAll()

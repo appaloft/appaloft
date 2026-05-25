@@ -24,6 +24,9 @@ relatedOperations:
   - dependency-resources.list-backups
   - dependency-resources.show-backup
   - dependency-resources.restore-backup
+  - dependency-resources.backup-policies.configure
+  - dependency-resources.backup-policies.list
+  - dependency-resources.backup-policies.show
   - resources.bind-dependency
   - resources.unbind-dependency
   - resources.rotate-dependency-binding-secret
@@ -60,6 +63,65 @@ appaloft resource dependency bind res_web --dependency dep_db --target DATABASE_
 
 Unbind removes only the association. It does not delete the database, restart runtime, or rewrite
 historical deployment snapshots.
+
+<h2 id="dependency-config-file">Declare dependencies in appaloft.yaml</h2>
+
+Repository config can declare an application dependency graph for config-driven CLI and GitHub
+Action deployments:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
+    preview:
+      lifecycle: ephemeral
+```
+
+During config deploy, Appaloft lists existing dependency resources and bindings, provisions a
+managed dependency when needed, binds the selected Resource to the requested environment variable,
+and then creates the deployment with ids only. Repository config accepts `postgres`, `redis`,
+`mysql`, `clickhouse`, `object-storage`, and `opensearch` for managed dependency declarations. The
+runtime receives the value through the same safe dependency runtime injection path described below.
+
+Do not put provider accounts, tenants, credentials, database passwords, raw connection strings, or
+secret values in `appaloft.yaml`. `controlPlane.install.database` is only for the Appaloft
+control-plane installer database and is not an application dependency database.
+
+For PR previews, `preview.lifecycle: ephemeral` lets preview cleanup unbind and delete only the
+dependency that has explicit repository-config provenance for that preview. Shared, manually bound,
+imported, or otherwise unproven dependencies are not deleted by preview cleanup.
+
+Use `backup` when a managed dependency should have scheduled restore points:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+      retryOnFailure: true
+```
+
+Config deploy reconciles this through dependency backup policy operations. It does not run backup or
+restore work, and `appaloft.yaml` must not contain policy ids, provider keys, backup artifact
+handles, restore point ids, raw dump paths, provider accounts, credentials, or secret values.
 
 <h2 id="dependency-runtime-injection">Deploy with bound dependencies</h2>
 

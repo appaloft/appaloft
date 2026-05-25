@@ -255,6 +255,34 @@ If a change is intentionally not relevant to the Appaloft skill, record the not-
 the Sync Round report. Do not mark a user-facing behavior complete while required skill updates are
 missing.
 
+## Appaloft YAML Sync Gate
+
+Run this gate with the same priority as public docs, source-of-truth docs, and operation catalog
+sync whenever a business capability, workflow profile, entrypoint, domain concept, or user-facing
+configuration surface is introduced, renamed, or behaviorally changed.
+
+For Appaloft:
+
+- inspect `packages/deployment-config/src/index.ts`,
+  `packages/deployment-config/json-schema/appaloft.config.schema.json`,
+  `docs/testing/deployment-config-file-test-matrix.md`, repository-config workflow docs, public
+  config-file docs, and relevant AI-facing deploy skill docs before reporting the work complete;
+- decide whether `appaloft.yaml` should accept a new user-facing declaration, keep rejecting the
+  field as unsupported, or document that the behavior remains deliberately outside repository
+  config;
+- if repository config support is added, update parser schema, generated JSON schema, parser tests,
+  CLI/Action workflow tests, lifecycle/cleanup tests when applicable, workflow specs, public docs,
+  and test matrix rows in the same change;
+- if repository config support is intentionally not added, keep or add explicit unsupported-field
+  validation and document the reason in the spec, test matrix, or Sync Round report;
+- preserve the repository config boundary: no provider accounts, credentials, tenant/org identity,
+  raw secret values, passwords, private keys, raw connection strings, or broad deployment target
+  identity may be committed to `appaloft.yaml`;
+- keep `deployments.create` ids-only. Repository config orchestration must dispatch existing
+  command/query operations through adapters and buses, not add hidden deployment command fields.
+
+Do not mark a user-facing behavior complete while the `appaloft.yaml` sync decision is missing.
+
 ## Code Round
 
 Use `domain-driven-develop` Code Round and relevant references before implementation.

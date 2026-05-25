@@ -130,6 +130,7 @@ not run through `servers.capacity.prune`, and it must not be implied by
 | CLI | Separate `appaloft storage volume ...` and `appaloft resource storage attach/detach` commands. No generic `storage update`. |
 | oRPC / HTTP | Routes reuse command/query schemas and dispatch through bus. |
 | Web | Resource detail Storage section reads `resources.show.storageAttachments`, lists project/environment storage volumes through `storage-volumes.list`, dispatches `storage-volumes.create/rename/delete`, dispatches `resources.attach-storage` / `resources.detach-storage`, and exposes `storage-volumes.cleanup-runtime` as a dry-run-first server-scoped control with destructive confirmation. |
+| Repository config | `appaloft.yaml` top-level `storage` may declare managed named volumes and workload mount paths. Config deploy dispatches existing storage/query and Resource attachment operations before ids-only `deployments.create`; preview cleanup deletes only provenance-owned ephemeral config storage. |
 | Automation / MCP | Generated tool descriptors map one-to-one to operation keys. |
 
 ## Current Implementation Notes And Governed Follow-Ups

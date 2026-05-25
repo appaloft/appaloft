@@ -155,6 +155,9 @@ CLI/API. Saving inherited readback creates an exact-scope override. Thresholds a
 observation-only state; they never throttle, resize, restart, redeploy, prune, reject deployments,
 change billing, or trigger automated repair.
 
+Repository config can also declare Resource-scope threshold policy with
+[`monitoring.thresholds`](../environments/reference/config-file#environment-config-file-monitoring-thresholds).
+
 ```bash title="Configure a non-enforcing threshold"
 appaloft runtime-monitoring thresholds configure resource:res_api --rule '{"signal":"cpu","metric":"containerCpuPercent","warning":70,"critical":90,"comparator":"greater-than-or-equal"}'
 ```

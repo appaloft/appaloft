@@ -47,6 +47,8 @@ active CLI/API/Web/MCP entrypoints.
 | SCHED-TASK-LOGS-001 | Query/log adapter | Run emits output. | `scheduled-task-runs.logs` reads run-scoped logs; deployment and resource runtime logs are unchanged. |
 | SCHED-TASK-SECRET-001 | Redaction | Task input references secrets. | Definitions, runs, logs, errors, diagnostics, and tool descriptors expose only safe references and masked values. |
 | SCHED-TASK-ENTRY-001 | CLI/API/Web/MCP | Entrypoints are active. | CLI, HTTP/oRPC, and Web controls dispatch command/query messages through catalog schemas; generated MCP descriptors consume the catalog entries; public docs/help links target stable scheduled-task anchors. |
+| SCHED-TASK-CONFIG-001 | Repository config / CLI | `appaloft.yaml` declares a Resource-owned scheduled task. | Config deploy lists Resource scheduled tasks, creates or configures the provenance-owned task, records source-link provenance, and keeps `deployments.create` ids-only. |
+| SCHED-TASK-CONFIG-002 | Repository config / cleanup | PR preview scheduled task declaration is ephemeral. | Preview cleanup deletes only source-link provenance-owned ephemeral scheduled tasks and preserves manual/shared/unproven scheduled tasks. |
 
 ## Current Implementation Notes
 
@@ -67,6 +69,10 @@ unsafe command output masking for
 `packages/application/test/scheduled-task-update.test.ts`.
 `SCHED-TASK-DELETE-001` and `SCHED-TASK-DELETE-002` have application delete-admission
 coverage in `packages/application/test/scheduled-task-delete.test.ts`.
+`SCHED-TASK-CONFIG-001` has parser and CLI config-deploy workflow coverage in
+`packages/deployment-config/test/appaloft-config.test.ts` and
+`packages/adapters/cli/test/deployment-config.test.ts`. `SCHED-TASK-CONFIG-002` has cleanup
+coverage in `packages/application/test/cleanup-preview.test.ts`.
 `SCHED-TASK-RUN-001`, `SCHED-TASK-RUN-002`, and ADR-054 accepted-work durable state coverage for
 `PROC-DELIVERY-001` have application run-now admission coverage in
 `packages/application/test/scheduled-task-run-now.test.ts`.

@@ -18,6 +18,8 @@ export class CleanupPreviewCommandHandler
         cleanedRuntime: boolean;
         removedServerAppliedRoute: boolean;
         removedSourceLink: boolean;
+        removedDependencyBindings?: number;
+        deletedDependencyResources?: number;
         projectId?: string;
         environmentId?: string;
         resourceId?: string;

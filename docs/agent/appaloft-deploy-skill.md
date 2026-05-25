@@ -46,13 +46,32 @@ something. The deploy protocol is part of the full Appaloft skill, not a separat
 - Do not create a separate `quick-deploy.create` operation. Quick Deploy remains a workflow over
   `projects.create`, `servers.register`, `environments.create`, `resources.create`, optional
   resource configuration, and `deployments.create`.
-- Do not add source, runtime, or network fields to `deployments.create`. Those belong to the
-  Resource profile and deployment snapshot.
+- Do not add source, runtime, network, or health fields to `deployments.create`. Those belong to
+  the Resource profile and deployment snapshot.
+- Do not add dependency, dependency backup policy, storage, scheduled task, auto-deploy, preview
+  policy, generated access, monitoring threshold, or runtime prune policy fields to
+  `deployments.create`.
+  `appaloft.yaml` declarations for prebuilt image source, dependencies, dependency backup policy,
+  storage, scheduled tasks, auto-deploy policy, product-grade preview policy, generated access
+  profile, runtime monitoring thresholds, runtime prune policy, Resource health policy, named
+  `profiles.<key>` overlays, or `preview.pullRequest.profile` overlays must reconcile through
+  existing Resource source/runtime, dependency, backup-policy, storage, Resource binding, scheduled
+  task, Resource auto-deploy, preview policy, Resource access, runtime monitoring threshold,
+  scheduled runtime prune policy, environment variable, and `resources.configure-health`
+  operations before deployment admission. PR preview deploys must not mutate preview policy from
+  the PR branch.
+- Treat `secrets.from` as a reference only. `ci-env:<NAME>` resolves from the trusted runner
+  environment; `resource-secret:<KEY>` only checks an existing same-key Resource runtime secret
+  reference. Do not invent external secret resolvers or put raw secret values in `appaloft.yaml`.
 - Prefer the user's BYOS target. Appaloft should not silently upload artifacts to a hosted cloud
   service unless the user explicitly selects a hosted feature that documents that behavior.
 - Do not ask ordinary users for project/resource/server ids as the first step of a GitHub Action
   deploy. Prefer source-link state, repository binding, deploy-token scope, or one-time trusted
   bootstrap context.
+- Apply `preview.pullRequest.profile` only after trusted PR preview context selects preview scope.
+  It is a profile overlay, not a way for committed YAML to choose preview identity.
+- Apply `profiles.<key>` only when trusted CLI/Action input selects `--config-profile` or
+  `config-profile`. It is a config overlay, not an Appaloft Environment selector.
 - For local static output, use `appaloft deploy ./dist --as static-site` or the equivalent Web/API
   workflow. This is only one Appaloft deploy mode; Dockerfile, Compose, prebuilt image, and
   workspace-command deployments still use the same resource and deployment operation boundary.
@@ -80,7 +99,9 @@ Use this order:
 In a shell-capable agent session, the following are the CLI forms. In Web or HTTP/API contexts, use
 the equivalent Resource and Deployment operation flow instead of shelling out.
 
-1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`.
+1. If the repository has an Appaloft deployment config, run `appaloft deploy <source>`; if the
+   config declares `source.type: image`, let config deploy select the prebuilt image source rather
+   than inventing registry credential fields.
 2. If the user names a prebuilt image, run `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 3. If Docker Compose is the clearest source of truth, run `appaloft deploy <source> --method docker-compose`.
 4. If a Dockerfile is the clearest source of truth, run `appaloft deploy <source> --method dockerfile`.

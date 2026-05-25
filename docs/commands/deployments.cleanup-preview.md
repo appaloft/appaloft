@@ -31,6 +31,10 @@ type CleanupPreviewResult = Result<
     cleanedArtifacts?: boolean;
     removedServerAppliedRoute: boolean;
     removedSourceLink: boolean;
+    removedDependencyBindings?: number;
+    deletedDependencyResources?: number;
+    removedStorageAttachments?: number;
+    deletedStorageVolumes?: number;
     projectId?: string;
     environmentId?: string;
     resourceId?: string;
@@ -49,9 +53,13 @@ The command contract is:
 - when preview state exists, the command stops the latest runtime for the linked resource and also
   stops any additional preview deployments in the same linked preview scope that still carry the
   selected preview source fingerprint, removes preview-owned inert runtime artifacts and
-  materialized workspaces when ownership can be proven, removes preview route desired state for the
-  linked target and any matching preview-fingerprint route rows, unlinks the preview source
-  fingerprint, and returns `ok({ status: "cleaned", ... })`;
+  materialized workspaces when ownership can be proven, unbinds and deletes only dependency
+  resources proven by preview source-link repository-config provenance to be ephemeral and
+  preview-owned, detaches and deletes only storage volumes proven by preview source-link
+  repository-config provenance to be ephemeral and preview-owned, removes preview route desired
+  state for the linked target and any matching preview-fingerprint route rows, unlinks the preview
+  source fingerprint, and returns
+  `ok({ status: "cleaned", ... })`;
 - runtime cleanup failure is terminal for the command and must stop later cleanup stages so route
   state and source-link identity are not removed ahead of runtime cleanup.
 
@@ -63,6 +71,7 @@ This command inherits:
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [GitHub Action PR Preview Deploy Workflow](../workflows/github-action-pr-preview-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md)
@@ -135,11 +144,17 @@ The cleanup boundary is intentionally narrow:
 8. Remove preview-owned inert runtime artifacts and materialized workspaces when the runtime backend
    can prove ownership without deleting active runtime, retained rollback candidates, Docker
    volumes, or remote Appaloft state.
-9. Delete server-applied preview route desired state for the linked project/environment/resource/
+9. Unbind and delete repository-config-owned ephemeral dependencies recorded in preview source-link
+   provenance, after runtime cleanup succeeds and before route/source-link deletion.
+10. Detach and delete repository-config-owned ephemeral storage recorded in preview source-link
+   provenance, after runtime cleanup succeeds and before route/source-link deletion.
+11. Delete repository-config-owned ephemeral scheduled tasks recorded in preview source-link
+   provenance, after runtime cleanup succeeds and before route/source-link deletion.
+12. Delete server-applied preview route desired state for the linked project/environment/resource/
    server/destination target when the preview link owns a server target, and also delete any
    additional server-applied route rows that still carry the selected preview source fingerprint.
-10. Unlink the preview source fingerprint.
-11. Return safe ids describing what was cleaned.
+13. Unlink the preview source fingerprint.
+13. Return safe ids and counts describing what was cleaned.
 
 The command must not:
 
@@ -175,6 +190,30 @@ The command must not:
   locks, source links for other fingerprints, server-applied routes for other fingerprints,
   `sync-revision.txt`, or the backend marker. Console/Postgres-managed cleanup must not create a
   remote PGlite backup as a side effect.
+- Preview dependency cleanup must be provenance-scoped. It may unbind/delete only dependency
+  entries recorded on the selected preview source link with repository-config source, matching
+  source fingerprint, matching resource id, `managed` source, and `ephemeral` lifecycle. It must not
+  delete dependencies based on names, env targets, project/environment alone, or the absence of
+  current runtime state.
+- Dependency delete safety still applies. If a provenance-marked dependency resource is shared,
+  manually rebound, protected by backup/snapshot retention, or provider-blocked, cleanup must stop
+  before source-link deletion so the provenance remains available for retry or operator repair.
+- Preview storage cleanup must be provenance-scoped. It may detach/delete only storage entries
+  recorded on the selected preview source link with repository-config source, matching source
+  fingerprint, matching resource id, `managed` source, and `ephemeral` lifecycle. It must not delete
+  storage based on names, mount paths, project/environment alone, or the absence of current runtime
+  state.
+- Storage delete safety still applies. If a provenance-marked storage volume is shared, manually
+  reattached, protected by backup/snapshot retention, or provider-blocked, cleanup must stop before
+  source-link deletion so the provenance remains available for retry or operator repair.
+- Preview scheduled task cleanup must be provenance-scoped. It may delete only scheduled task
+  entries recorded on the selected preview source link with repository-config source, matching
+  source fingerprint, matching resource id, and `ephemeral` lifecycle. It must not delete scheduled
+  tasks based on names, commands, schedules, project/environment alone, disabled state, or the
+  absence of current runtime state.
+- Repository config preview policy is not cleanup provenance. `preview.pullRequest.policy`
+  controls product-grade preview admission through preview policy operations, while cleanup remains
+  scoped to source-link and repository-config ephemeral resource provenance.
 - Inability to prove or complete inert artifact cleanup must be surfaced as
   `cleanedArtifacts = false` or a future diagnostic warning, but must not keep preview routes or
   source links live after runtime cleanup succeeded.
@@ -199,6 +238,9 @@ The command must not:
 | `server_state_backend_mismatch` | `server-state-backend` | No | The selected state backend conflicts with the server backend marker; explicit adopt/migrate is required before switching between `ssh-pglite` and `postgres-control-plane`. |
 | `infra_error` | `preview-cleanup` | Conditional | State backend read/write, route-state deletion, source-link unlink, or runtime cleanup failed. |
 | `provider_error` | `preview-cleanup` | Conditional | Runtime backend/provider rejected preview runtime cleanup. |
+| `dependency_resource_delete_blocked` | `preview-cleanup` | Conditional | A provenance-marked ephemeral dependency could not be safely deleted because existing dependency delete safety found a blocker. |
+| `storage_volume_delete_blocked` | `preview-cleanup` | Conditional | A provenance-marked ephemeral storage volume could not be safely deleted because existing storage delete safety found a blocker. |
+| `not_found` | `preview-cleanup` | No | Provenance-marked ephemeral dependencies, storage, or scheduled tasks that are already gone are treated as idempotent cleanup skips. |
 | `runtime_target_resource_exhausted` | `preview-cleanup` | Yes after cleanup, prune, or target resize | Target disk, inode, Docker image, or build-cache capacity prevented safe runtime/artifact cleanup or inspection. Details should include `cleanupStage = artifact-cleanup` when available. |
 
 `preview-cleanup` failures must include `cleanupStage` in safe details when available, for example
@@ -213,6 +255,12 @@ At minimum, Test-First and Code Round coverage must prove:
 - idempotent already-clean behavior when the preview link is missing;
 - runtime, route desired state, and source-link cleanup for a linked preview;
 - runtime cleanup failure stops later cleanup stages;
+- preview dependency cleanup unbinds/deletes only repository-config provenance-marked ephemeral
+  dependencies and preserves manual/shared dependencies;
+- preview storage cleanup detaches/deletes only repository-config provenance-marked ephemeral
+  storage and preserves manual/shared storage;
+- preview scheduled task cleanup deletes only repository-config provenance-marked ephemeral tasks
+  and preserves manual/shared tasks;
 - CLI preview cleanup derives the preview fingerprint from trusted preview context and resolves the
   same remote-state lifecycle path as preview deploy.
 
@@ -229,10 +277,13 @@ dispatched.
 
 Current implementation cleans preview runtime state through the injected execution backend, sweeps
 additional stale preview deployments in the same linked project/environment scope when their runtime
-metadata still carries the selected preview source fingerprint, deletes PG/PGlite or
-filesystem-backed server-applied preview route desired state both for the linked target and for
-additional matching preview-fingerprint route rows, and unlinks the preview source fingerprint from
-the selected state backend. Resource access read models suppress current-route projection for
+metadata still carries the selected preview source fingerprint, unbinds/deletes repository-config
+provenance-owned ephemeral dependencies, detaches/deletes repository-config provenance-owned
+ephemeral storage, deletes repository-config provenance-owned ephemeral scheduled tasks, deletes
+PG/PGlite or filesystem-backed server-applied preview route desired state both for the linked target
+and for additional matching preview-fingerprint route rows, and unlinks the preview source
+fingerprint from the selected state backend. Resource access read models suppress
+current-route projection for
 preview environment deployment snapshots after their preview source link is absent, while retaining
 deployment history for audit. Product-grade Web deletion is active through
 `preview-environments.delete`; direct Web entry of an arbitrary preview `sourceFingerprint` remains

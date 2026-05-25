@@ -16,6 +16,14 @@ source selection
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
   -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
      or stop with structured profile drift guidance before deployment admission
+  -> provision/reuse and bind declared application dependencies through dependency-resource commands
+  -> configure declared dependency backup policies through dependency-resource backup policy commands
+  -> create/reuse and attach declared managed storage through storage/resource commands
+  -> create/reuse or configure declared scheduled tasks through scheduled-task commands
+  -> configure or disable declared Resource auto-deploy policy through resource commands
+  -> configure declared Resource preview policy through preview policy commands when not running a PR preview
+  -> configure declared deployment-snapshot runtime prune policy through server capacity policy commands
+  -> configure declared Resource health policy through resource commands when profile apply is explicit
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -38,6 +46,7 @@ This workflow inherits:
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-077: Repository Config Preview Policy](../decisions/ADR-077-repository-config-preview-policy.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
@@ -46,6 +55,7 @@ This workflow inherits:
 - [GitHub Action PR Preview Deploy](./github-action-pr-preview-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
+- [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
@@ -58,19 +68,45 @@ This workflow inherits:
 The file exists to make source-adjacent deployment profile choices reproducible:
 
 - source root and monorepo app selection;
+- prebuilt Docker/OCI image source selection;
 - runtime plan strategy;
 - install, build, start, Dockerfile, Compose, static publish, and artifact planning fields;
 - resource network profile such as `internalPort`, upstream protocol, exposure mode, and compose
   target service;
 - reusable health-check defaults;
+- user-facing application dependency graph declarations such as managed Postgres or Redis bound to
+  runtime env targets;
+- user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
+- user-facing scheduled task graph declarations such as a nightly sync command;
+- product-grade pull request preview policy declarations for the selected Resource;
+- target-scoped runtime prune policy declarations for selected deployment-snapshot cleanup;
 - non-secret environment variable declarations and required secret references;
+- trusted-entrypoint-selected named config profile overlays for staging/production/smoke variants;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
   file for identity and credentials;
 - non-secret control-plane connection policy for selecting no control plane, trusted auto
   detection, Appaloft Cloud, or a self-hosted Appaloft control plane;
 - future provider-neutral resource sizing and rollout policy after their own ADR/spec coverage.
 
-The file does not exist to choose durable Appaloft control-plane identity.
+The file does not exist to choose durable Appaloft control-plane identity, provider accounts, raw
+connection strings, database passwords, or tenant/organization scope.
+
+## Source Policy
+
+Repository config may declare either a Git source or a prebuilt image source. Git source keeps the
+existing `source.repository` and optional safe `gitRef`, `commitSha`, and `baseDirectory` fields.
+Image source uses a single Docker/OCI image reference and maps to Resource source kind
+`docker-image` plus runtime strategy `prebuilt-image`:
+
+```yaml
+source:
+  type: image
+  image: ghcr.io/acme/api:1.7.3
+```
+
+When `source.type` is `image`, Git-only source fields are invalid and any explicit
+`runtime.strategy` must be `prebuilt-image`. Registry credentials, pull secrets, provider accounts,
+artifact handles, and raw tokens stay outside repository config.
 
 ## Control-Plane Mode Policy
 
@@ -114,6 +150,9 @@ Rules:
   origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and
   Swarm/Compose names. SSH host/key, tokens, raw database credentials, and resource identity remain
   trusted entrypoint inputs or server-owned state.
+- `controlPlane.install.database` selects the database backend for installing the Appaloft
+  control plane itself. It is not an application dependency database. Application dependencies must
+  be declared under top-level `dependencies`.
 - Config `controlPlane` cannot retarget source link identity. Identity comes from trusted
   entrypoint input, authenticated control-plane scope, GitHub repository identity, source link
   state, adoption markers, or explicit relink/adoption operations.
@@ -137,6 +176,40 @@ The config file is not a separate deploy API and does not introduce a hidden wor
 headless executor may skip prompts by using trusted action inputs, CLI flags, link state, or
 source-derived defaults, but it must still dispatch explicit operations and keep the final
 deployment admission ids-only.
+
+Declared dependencies are reconciled as part of the same Quick Deploy entry workflow after the
+target Resource is known and before deployment admission. The workflow lists current dependency
+resources and Resource bindings, provisions a missing managed dependency resource when needed, binds
+the Resource to the requested env target, and then lets existing dependency runtime injection
+materialize the deployment snapshot. The config workflow must not add dependency-specific fields to
+`deployments.create`.
+
+Declared dependency backup policy is reconciled after the dependency resource is selected or
+provisioned and before deployment admission. The workflow lists existing dependency backup
+policies, creates or updates the repository-config-owned policy when needed, disables that owned
+policy when `enabled: false`, and refuses to mutate drifted manual policies without provenance. The
+config workflow must not run backups, restore backups, expose backup artifact handles, or add backup
+policy fields to `deployments.create`.
+
+Declared storage is reconciled in the same entry workflow after the target Resource is known and
+before deployment admission. The workflow reads Resource storage attachments through
+`resources.show`, lists project/environment storage volumes, creates a missing managed named volume
+when needed, attaches the Resource at the requested workload path, and then lets existing Resource
+profile snapshot materialization carry mount metadata. The config workflow must not add storage
+volume, attachment, or destination path fields to `deployments.create`.
+
+Declared scheduled tasks are reconciled in the same entry workflow after the target Resource is
+known and before deployment admission. The workflow lists Resource scheduled tasks, uses source-link
+scheduled-task provenance to locate the task owned by each repository config key, creates missing
+tasks, configures drifted provenance-owned tasks, and records safe provenance for future idempotency
+or preview cleanup. The config workflow must not add schedule, command, timeout, retry, or task id
+fields to `deployments.create`.
+
+Declared auto-deploy policy is reconciled in the same entry workflow after the target Resource is
+known and before deployment admission. The workflow reads Resource detail, configures missing or
+drifted git-push auto-deploy policy, disables existing policy when `enabled: false`, and leaves
+matching policy untouched. The config workflow must not add trigger, ref, event, source-event id,
+webhook, or delivery fields to `deployments.create`.
 
 When the entrypoint targets an SSH server without a selected control plane, the config workflow must
 resolve the SSH-server `ssh-pglite` state backend before identity resolution. Repository config
@@ -169,6 +242,196 @@ instead of choosing by accident.
 Schema validation is strict. Unknown fields, deprecated identity fields, unsupported future fields,
 and malformed profile fields must fail before any write command is dispatched unless the entrypoint
 is running an explicit migration command.
+
+`dependencies` uses application language, not Appaloft internal object language:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+  cache:
+    kind: redis
+    source: managed
+    bind:
+      env: REDIS_URL
+    preview:
+      lifecycle: ephemeral
+```
+
+Managed dependency declarations support `postgres`, `redis`, `mysql`, `clickhouse`,
+`object-storage`, and `opensearch`. Config may not include provider accounts, credentials, tenants,
+organization ids, raw connection strings, database passwords, secret values, or provider-specific
+realization settings. Those values stay in Appaloft/provider state or trusted entrypoint secret
+stores.
+
+`dependencies.<key>.backup` uses dependency backup policy language:
+
+```yaml
+dependencies:
+  db:
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+    backup:
+      enabled: true
+      intervalHours: 24
+      retentionDays: 7
+      retryOnFailure: true
+```
+
+Backup policy declarations configure scheduled backup policy through
+`dependency-resources.backup-policies.configure`. Config may not include policy ids, provider keys,
+provider accounts, backup ids, restore point ids, artifact handles, raw dump paths, raw connection
+strings, credentials, or secret values. Manual backup creation and restore remain explicit
+operations outside config deploy.
+
+`storage` uses application language, not Appaloft internal object language:
+
+```yaml
+storage:
+  uploads:
+    kind: volume
+    source: managed
+    mount:
+      path: /app/uploads
+      mode: read-write
+    preview:
+      lifecycle: ephemeral
+```
+
+The MVP supports managed named volumes only. `mount.path` is an absolute workload/container path,
+not a host bind source path. Config may not include provider accounts, credentials, tenants,
+organization ids, host source paths, provider-native storage handles, backup handles, raw secret
+values, or storage provider-specific settings.
+
+`access.generated` uses Resource access language:
+
+```yaml
+access:
+  generated:
+    enabled: true
+    pathPrefix: /
+```
+
+Generated access declarations configure the Resource access profile through
+`resources.configure-access`. `enabled: true` keeps the Resource eligible for generated default
+access when the selected default access policy, network profile, deployment target, and edge proxy
+allow it. `enabled: false` disables generated default access for that Resource only.
+`pathPrefix` applies only to generated default access routes. Config may not include provider
+accounts, DNS/certificate provider identity, route ids, certificate ids, server ids, destination
+ids, credentials, private keys, tokens, raw certificate material, or secret values.
+
+`monitoring.thresholds` uses runtime observation language:
+
+```yaml
+monitoring:
+  thresholds:
+    enabled: true
+    rules:
+      - signal: cpu
+        metric: containerCpuPercent
+        warning: 70
+        critical: 90
+```
+
+Monitoring threshold declarations configure an exact Resource-scope non-enforcing runtime
+monitoring threshold policy through `runtime-monitoring.thresholds.configure`.
+`runtime-monitoring.thresholds.show` is used first so an already matching exact Resource policy can
+be reused and inherited parent-scope policies are not mutated. Config may not include policy ids,
+scope ids, provider accounts, provider-native monitoring ids, container ids, sample ids, host
+paths, raw metric payloads, log lines, credentials, private keys, tokens, raw secret values, quota,
+autoscaling, alert routing, cleanup, billing, or runtime sizing fields.
+
+`retention.runtimePrune` uses runtime target maintenance language:
+
+```yaml
+retention:
+  runtimePrune:
+    retentionDays: 14
+    destructive: false
+    categories:
+      - stopped-containers
+      - preview-workspaces
+    retryOnFailure: true
+    enabled: true
+```
+
+Runtime prune declarations configure a deterministic `deployment-snapshot` scoped scheduled
+runtime prune policy for the trusted selected server after target resolution and before deployment
+admission. They reuse `scheduled-runtime-prune-policies.configure` and never become fields on
+`deployments.create`. `destructive` defaults to `false`; destructive scheduled cleanup is still
+policy-gated and routed through the existing `servers.capacity.prune` safety boundary. Config may
+not include policy ids, server ids, organization/project/environment ids, provider accounts,
+credentials, host paths, raw Docker or SSH commands, broad `docker system prune` settings, volume
+prune, audit/event/log retention policy, legal hold, or secret values.
+
+`scheduledTasks` uses application language, not Appaloft internal object language:
+
+```yaml
+scheduledTasks:
+  nightly_sync:
+    schedule: "0 3 * * *"
+    timezone: UTC
+    command: bun run sync
+    timeoutSeconds: 600
+    retryLimit: 2
+    preview:
+      lifecycle: ephemeral
+```
+
+Scheduled task declarations create or configure Resource-owned scheduled task definitions through
+existing scheduled-task commands. Config may not include task ids, provider-native scheduler
+handles, provider accounts, credentials, tenants, organization ids, raw secret values, raw
+connection strings with embedded credentials, or target/server identity.
+
+`autoDeploy` uses application delivery language, not source-event record language:
+
+```yaml
+autoDeploy:
+  enabled: true
+  trigger: git-push
+  refs:
+    - main
+  events:
+    - push
+  dedupeWindowSeconds: 300
+```
+
+Auto-deploy declarations configure Resource-owned source-event policy through
+`resources.configure-auto-deploy`. Config may not include source-event ids, webhook delivery ids,
+provider accounts, credentials, tenants, organization ids, raw webhook secrets, raw tokens, or
+target/server identity. Generic signed webhook policy remains an explicit operation outside this
+MVP because it needs secret-reference custody and endpoint setup.
+
+`preview.pullRequest.policy` uses product-grade preview policy language:
+
+```yaml
+preview:
+  pullRequest:
+    policy:
+      sameRepositoryPreviews: true
+      forkPreviews: disabled
+      secretBackedPreviews: true
+      maxActivePreviews: 5
+      previewTtlHours: 72
+```
+
+Preview policy declarations configure a Resource-scoped policy through
+`preview-policies.configure` during ordinary trusted config deploys. `preview-policies.show` is
+used first so an already matching configured Resource policy can be reused. Pull request preview
+deploys must not mutate preview policy from the PR branch; they ignore this declaration for policy
+mutation and continue applying preview profile/env/dependency/storage workflow steps. Config may
+not include GitHub App installation ids, webhook secrets, feedback tokens, provider accounts,
+credentials, tenants, organization ids, project/global scope selectors, raw secret values, or
+cleanup credentials.
 
 The HTTP adapter may serve the config schema for tooling, but strict `POST /api/deployments` remains
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP
@@ -255,7 +518,11 @@ Recovery requirements:
 CI-provided secrets are resolver inputs, not committed config values. For GitHub Actions, the
 workflow maps GitHub secrets into runner environment variables, and the Appaloft config references
 them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
-changing the repository config contract.
+changing the repository config contract. Existing Resource-owned secret references are resolver
+requirements, not value carriers: `resource-secret:<KEY>` requires the selected Resource to already
+own a matching runtime secret reference with the same key, verifies it through
+`resources.secrets.show`, and never reads or copies the secret value into environment commands or
+`deployments.create`.
 
 Non-secret `env` values may use `{preview_id}` and `{pr_number}` placeholders only when the
 entrypoint has already established trusted pull request preview context. Missing preview context
@@ -302,7 +569,7 @@ The minimal supported action inputs are:
 - `source`, defaulting to `.`;
 - runtime/profile flags that mirror repository config fields: deployment strategy, install/build/
   start commands, publish directory, network profile, health path, non-secret env values, and
-  `ci-env:` secret references;
+  `ci-env:` / `resource-secret:` secret references;
 - `ssh-host`, `ssh-user`, `ssh-port`, and either `ssh-private-key` or `ssh-private-key-file`;
 - `server-proxy-kind` and `state-backend` as optional trusted entrypoint overrides;
 - `args` as a last-resort pass-through for CLI flags not modeled as action inputs yet.
@@ -346,6 +613,7 @@ The action may expose preview inputs such as:
 | `preview-domain-template` | Optional trusted host template such as `pr-${{ github.event.pull_request.number }}.preview.example.com`; requires user-owned wildcard DNS in Action-only mode. |
 | `preview-tls-mode` | Optional TLS policy for the custom preview host. `auto` requires provider-owned certificate automation; `disabled` emits and verifies an HTTP preview URL. |
 | `require-preview-url` | Optional boolean. When true, missing generated/custom access fails before or during route resolution instead of reporting a deploy without public URL. |
+| `config-profile` | Optional trusted named config profile key. Selects `profiles.<key>` after parsing and before preview overlays; it must not select Appaloft identity. |
 
 Preview profile selection is explicit. If the repository root `appaloft.yml` contains production
 runtime choices, production environment values, or production custom domains, the workflow should
@@ -389,8 +657,9 @@ Access behavior:
   Action-only mode; it does not update DNS.
 - Production `access.domains[]` from a root config must not be reinterpreted as PR preview domain
   intent. Preview route intent should come from generated/default access, trusted
-  `preview-domain-template`, an explicitly selected preview config file, or a future selected
-  preview overlay.
+  `preview-domain-template`, or an explicitly selected preview config file. A selected
+  `preview.pullRequest.profile` overlay may adjust generated access profile and runtime/env
+  profile fields, but it must not carry preview domain hosts.
 - A public preview URL requires reverse-proxy exposure and edge proxy readiness. The workflow must
   not publish direct host ports as a fallback.
 - If no generated or custom route is available and `require-preview-url` is false, deployment may
@@ -480,18 +749,33 @@ hidden deploy side effect. Relink may update link state only; it must not mutate
 source/runtime/network profile fields, deployment history, environment variables, or server
 credentials.
 
-Environment-specific config overlays are allowed only as overlays for an environment selected by
-the entrypoint or trusted link state. A committed config file must not be the only reason a
-deployment moves from `staging` to `production`.
+Environment-specific config differences use top-level named config profiles such as
+`profiles.staging`, selected by trusted entrypoint input such as `--config-profile staging` or
+Action `config-profile: staging`. A named config profile is an overlay, not an Appaloft Environment
+selector. A committed config file must not be the only reason a deployment moves from `staging` to
+`production`.
 
-The same rule applies to PR preview environments. A future preview overlay may adjust profile fields
-for the already selected `preview-pr-123` environment, but it must not create the preview identity,
-select a different durable environment, or retarget project/resource/server/destination state.
+The same rule applies to PR preview environments. `preview.pullRequest.profile` may adjust profile
+fields for the already selected `preview-pr-123` environment, but it must not create the preview
+identity, select a different durable environment, or retarget project/resource/server/destination
+state. The overlay is selected only after trusted PR preview context exists, and trusted CLI/Action
+flags still override the merged config profile.
 
 ## Profile Mapping
 
 Accepted config profile fields map to resource-owned or environment-owned contracts before
 deployment admission.
+
+`profiles.<key>` is selected only by trusted CLI/Action input. It is ignored when unselected,
+merged before prompt seed/env normalization when selected, and never adds fields to
+`deployments.create`. A selected named profile may overlay only runtime, network, health, access,
+monitoring, env, and secrets. Dependency, storage, scheduled task, auto-deploy, retention,
+control-plane, source, and unsupported sizing/rollout deltas remain outside named profiles until a
+later ADR defines their lifecycle behavior.
+
+`preview.pullRequest.profile` is a PR-preview-specific overlay over the same profile fields. It is
+ignored for ordinary deploys, merged after a selected named profile for trusted PR preview deploys,
+and never adds fields to `deployments.create`.
 
 | Config concern | Canonical owner | Rule |
 | --- | --- | --- |
@@ -504,7 +788,13 @@ deployment admission.
 | `internalPort`, upstream protocol, exposure mode, target service | `ResourceNetworkProfile` | Must become resource network state; never a deployment command field. |
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. In PR preview context, `{preview_id}` and `{pr_number}` render from trusted entrypoint context before variables are applied. |
-| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
+| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. Existing Resource-owned runtime secrets support `resource-secret:<KEY>` as a same-key requirement checked through `resources.secrets.show`. |
+| `dependencies.*` | Dependency Resource and ResourceBinding operations | Describes application dependency needs such as managed Postgres or Redis bound to runtime env targets; reconciled through dependency-resource and binding commands before deployment, never as deployment command fields. |
+| `dependencies.*.backup` | Dependency Resource backup policy operations | Describes scheduled backup policy for a managed application dependency; reconciled through dependency backup policy commands before deployment, never as deployment command fields or backup execution. |
+| `storage.*` | StorageVolume and Resource storage attachment operations | Describes application storage needs such as managed volume mounted at `/app/uploads`; reconciled through storage and Resource attachment commands before deployment, never as deployment command fields. |
+| `scheduledTasks.*` | Scheduled task operations | Describes Resource-owned recurring application jobs; reconciled through scheduled-task list/create/configure commands before deployment, never as deployment command fields. |
+| `autoDeploy` | Resource auto-deploy policy operation | Describes git-push source-event policy for the Resource; reconciled through `resources.configure-auto-deploy`, never as deployment command fields. |
+| `retention.runtimePrune` | Scheduled runtime prune policy operation | Describes selected-target deployment-snapshot runtime cleanup policy; reconciled through `scheduled-runtime-prune-policies.configure` after trusted server resolution, never as deployment command fields or broad server identity selection. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
 | `controlPlane.install.*` | Console install entry workflow | Provides non-secret defaults for `command=install-console`, including public origin/domain, database backend selector, Docker orchestrator selector, bind port, image, and Swarm/Compose names. It never enters `deployments.create`, never selects durable deployment identity, and never carries SSH keys, tokens, raw database URLs, or raw secret values. |
@@ -537,6 +827,12 @@ override would shadow an entry config key; raw config and secret values must not
 error. Current Resource profile versus latest deployment snapshot drift is informational and must
 not block a config deploy when the normalized profile already matches the current Resource profile.
 
+When the entrypoint explicitly applies Resource profile changes, declared health policy is
+reconciled through `resources.configure-health` after Resource identity is known and before
+ids-only deployment admission. `runtime.healthCheckPath` is only a shorthand for the same Resource
+HTTP health policy. The workflow must not smuggle health fields through `resources.configure-runtime`
+or `deployments.create`.
+
 ## Secret And Credential Rules
 
 Committed config files must not store raw secret material. This includes SSH private keys, deploy
@@ -547,7 +843,8 @@ Allowed secret-related declarations are:
 
 - required secret keys without values;
 - `ci-env:<NAME>` references that are resolved from the trusted CI runner environment at entry time;
-- references to secrets already stored in Appaloft or a configured external secret adapter;
+- `resource-secret:<KEY>` references that require an existing same-key Resource-owned runtime
+  secret reference and expose only masked readback;
 - references to reusable SSH credentials created through credential commands;
 - `local-ssh-agent` style credential use when the runtime target supports it;
 - generated-secret requests only after a secret-generation operation is specified.
@@ -561,6 +858,12 @@ admission must fail with `validation_error` in phase `config-secret-resolution` 
 command is dispatched. Optional unresolved references are skipped without creating an environment
 variable.
 
+If a required `resource-secret:<KEY>` reference cannot be read from the selected Resource's runtime
+secret references, admission must fail with `validation_error` in phase
+`config-secret-resolution` before `deployments.create`. Optional missing Resource secret references
+are skipped. Repository config does not create, rotate, delete, or alias Resource secrets because
+those operations require raw secret value custody outside the committed file.
+
 SSH server credentials are target credential state. The config file may declare that a deployment
 requires an SSH-capable target, but it must not register a server with an inline key or password.
 
@@ -568,6 +871,15 @@ requires an SSH-capable target, but it must not register a server with an inline
 
 The target repository config schema may accept provider-neutral domain intent under
 `access.domains[]`.
+
+It may also accept Resource generated access intent under `access.generated`. Generated access
+intent is reconciled through `resources.configure-access` and does not create managed
+`DomainBinding` records, issue certificates, or apply proxy routes directly.
+
+It may also accept Resource runtime monitoring threshold intent under `monitoring.thresholds`.
+Threshold intent is reconciled through `runtime-monitoring.thresholds.show` and
+`runtime-monitoring.thresholds.configure`; it creates or updates only exact Resource-scope
+non-enforcing observation policy and does not add monitoring fields to `deployments.create`.
 
 Each domain entry must stay within this shape:
 
@@ -647,7 +959,8 @@ Profile precedence is:
 built-in defaults
   < source/framework detection
   < repository config base profile
-  < repository config environment overlay for the already-selected environment
+  < selected repository config named profile
+  < selected PR preview profile overlay
   < explicit entrypoint flags, prompts, API input, or future MCP parameters
 ```
 
@@ -729,8 +1042,11 @@ Current CLI deploy supports explicit `--config` and implicit source-root discove
 config source/runtime/network/health profile fields into quick-deploy resource creation input,
 supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
 plain `env` declarations and `ci-env:` secret references into environment variable commands,
+checks `resource-secret:` requirements through Resource secret readback,
 bootstraps project/server/environment/resource records in explicit local PGlite mode when ids are
-not provided, then dispatches ids-only `deployments.create`. For config-driven SSH targets, the CLI
+not provided, and reconciles declared health policy through `resources.configure-health` when
+existing-resource profile apply is explicitly acknowledged, then dispatches ids-only
+`deployments.create`. For config-driven SSH targets, the CLI
 now resolves `ssh-pglite` as the default state backend, carries a trusted SSH target into the state
 decision, and shell-built CLI programs run an SSH transport-backed remote-state lifecycle adapter
 before identity queries or mutations. The shell CLI also mirrors the selected SSH server's PGlite
@@ -750,7 +1066,8 @@ CLI/filesystem entry paths.
 
 Current executable tests prove parser safety, Git-root filesystem discovery, CLI init shape,
 profile-to-quick-deploy seed mapping, headless local PGlite defaulting, no-id non-TTY context
-bootstrap, `ci-env:` secret resolution, environment command sequencing, and ids-only
+bootstrap, `ci-env:` secret resolution, `resource-secret:` readback, environment command
+sequencing, and ids-only
 `deployments.create`. After ADR-024, local PGlite bootstrap is narrowed to explicit local-only mode.
 
 CLI resolver-level tests now cover state backend selection for `ssh-pglite`, `local-pglite`, and
@@ -799,14 +1116,11 @@ server-applied route state. The GitHub Actions secret-gated and local explicit S
 verifies Traefik-backed server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI
 e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
-`ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
+`ci-env:` and `resource-secret:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
 history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 
-- Config-file changes to an existing resource must sequence the accepted candidate commands
-  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
-  when those profile fields drift after first deploy.
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?
