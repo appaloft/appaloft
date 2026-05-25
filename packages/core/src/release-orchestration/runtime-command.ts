@@ -53,6 +53,7 @@ export interface RuntimeCommandLabel {
 }
 
 export type DockerPortPublishMode = "loopback-ephemeral" | "host-same-port";
+export type DockerRestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 
 export interface DockerPublishedPortSpec {
   containerPort: PortNumber;
@@ -83,6 +84,7 @@ export interface DockerRunContainerCommandSpec {
   image: ImageReference;
   containerName: DisplayNameText;
   detach: boolean;
+  restartPolicy?: DockerRestartPolicy;
   env: readonly RuntimeCommandEnvironmentVariable[];
   labels: readonly RuntimeCommandLabel[];
   publishedPorts: readonly DockerPublishedPortSpec[];

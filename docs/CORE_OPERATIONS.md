@@ -972,6 +972,9 @@ Current boundary:
   pull, or otherwise reference an OCI/Docker image artifact, or materialize a Docker Compose project
   whose runnable services are backed by OCI/Docker images. This substrate rule is governed by
   [ADR-021: Docker/OCI Workload Substrate](./decisions/ADR-021-docker-oci-workload-substrate.md).
+- Single-server Docker runtime containers use the Docker `unless-stopped` restart policy so transient
+  host OOM or daemon restarts do not leave an accepted deployment permanently down. This is runtime
+  target resilience, not a user-configurable resource restart policy field.
 - Docker/OCI is the workload artifact substrate, not a permanent single-node-only orchestration
   boundary. Runtime target backend selection is internal to `deployments.create` and is governed by
   [ADR-023: Runtime Orchestration Target Boundary](./decisions/ADR-023-runtime-orchestration-target-boundary.md).

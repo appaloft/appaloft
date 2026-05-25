@@ -2043,6 +2043,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const runCommandSpec = dockerCommandBuilder.runContainer({
       image,
       containerName,
+      restartPolicy: "unless-stopped",
       env: dockerEnvVariables,
       labels,
       mounts: storageMounts.value,
