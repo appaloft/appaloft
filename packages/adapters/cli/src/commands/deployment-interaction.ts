@@ -25,6 +25,7 @@ import {
   type CreateSshCredentialCommandInput,
   CreateStorageVolumeCommand,
   compareResourceProfileDrift,
+  DeleteDependencyResourceCommand,
   type DependencyResourceBackupPolicyRead,
   type DependencyResourceSummary,
   type DeploymentConfiguredRuntimePrunePolicy,
@@ -1734,6 +1735,20 @@ function isManagedDependencyResource(
   );
 }
 
+function isReadyManagedDependencyResource(
+  resource: DependencyResourceSummary | undefined,
+  dependency: DeploymentDependencySeed,
+): boolean {
+  return Boolean(
+    isManagedDependencyResource(resource, dependency) &&
+      resource.lifecycleStatus === "ready" &&
+      resource.bindingReadiness.status === "ready" &&
+      (resource.sourceMode !== "appaloft-managed" ||
+        !resource.providerManaged ||
+        resource.providerRealization?.status === "ready"),
+  );
+}
+
 function findDependencyResourceById(
   resources: readonly DependencyResourceSummary[],
   dependencyResourceId: string,
@@ -1873,6 +1888,19 @@ function provisionRepositoryConfigDependency(input: {
         environmentId: input.environmentId,
         serverId: input.serverId,
         name: input.name,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function deleteRepositoryConfigDependency(input: { dependencyResourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      DeleteDependencyResourceCommand.create({
+        dependencyResourceId: input.dependencyResourceId,
       }),
     );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
@@ -2183,6 +2211,31 @@ function ensureRepositoryConfigDependencies(input: {
         : isEphemeralPreviewDependency
           ? undefined
           : namedResource;
+
+      if (
+        isEphemeralPreviewDependency &&
+        existingProvenanceEntry &&
+        provenanceResource &&
+        !isReadyManagedDependencyResource(provenanceResource, dependency) &&
+        (!activeTargetBinding || activeTargetBinding.dependencyResourceId === provenanceResource.id)
+      ) {
+        if (activeTargetBinding) {
+          return yield* Effect.fail(
+            repositoryConfigDependencyConflict({
+              dependency,
+              resourceId: input.resourceId,
+              targetName,
+              existingBinding: activeTargetBinding,
+              expectedDependencyResourceId: provenanceResource.id,
+            }),
+          );
+        }
+
+        yield* deleteRepositoryConfigDependency({
+          dependencyResourceId: provenanceResource.id,
+        });
+        dependencyResource = undefined;
+      }
 
       if (isEphemeralPreviewDependency && !existingProvenanceEntry && namedResource) {
         return yield* Effect.fail(

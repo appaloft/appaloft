@@ -108,19 +108,24 @@ export class DeleteDependencyResourceUseCase {
       if (shouldDeleteProviderManagedDependency && dependencyKind) {
         const providerRealization = dependencyState.providerRealization;
         if (
-          providerRealization?.status.value === "ready" &&
+          (providerRealization?.status.value === "ready" ||
+            providerRealization?.status.value === "delete-pending") &&
           providerRealization.providerResourceHandle
         ) {
-          const attemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
-            idGenerator.next("dpd"),
-          );
-          const requestedAt = yield* OccurredAt.create(clock.now());
-          yield* dependencyResource.markProviderDeleteRequested({ attemptId, requestedAt });
-          await dependencyResourceRepository.upsert(
-            repositoryContext,
-            dependencyResource,
-            UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
-          );
+          let attemptId = providerRealization.attemptId;
+          let requestedAt = providerRealization.attemptedAt;
+          if (providerRealization.status.value === "ready") {
+            attemptId = DependencyResourceProviderRealizationAttemptId.rehydrate(
+              idGenerator.next("dpd"),
+            );
+            requestedAt = yield* OccurredAt.create(clock.now());
+            yield* dependencyResource.markProviderDeleteRequested({ attemptId, requestedAt });
+            await dependencyResourceRepository.upsert(
+              repositoryContext,
+              dependencyResource,
+              UpsertResourceInstanceSpec.fromResourceInstance(dependencyResource),
+            );
+          }
           await recordProviderDeleteProcessAttempt({
             recorder: processAttemptRecorder,
             repositoryContext,
