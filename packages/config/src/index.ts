@@ -685,12 +685,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       fileConfig.betterAuthSecret ??
       defaults.betterAuthSecret,
     ...(source.flags?.betterAuthMinPasswordLength ||
-    env.APPALOFT_BETTER_AUTH_MIN_PASSWORD_LENGTH ||
+    env.APPALOFT_BETTER_AUTH_LOCAL_CREDENTIAL_MIN_LENGTH ||
     fileConfig.betterAuthMinPasswordLength
       ? {
           betterAuthMinPasswordLength:
             source.flags?.betterAuthMinPasswordLength ??
-            parsePositiveInteger(env.APPALOFT_BETTER_AUTH_MIN_PASSWORD_LENGTH) ??
+            parsePositiveInteger(env.APPALOFT_BETTER_AUTH_LOCAL_CREDENTIAL_MIN_LENGTH) ??
             fileConfig.betterAuthMinPasswordLength,
         }
       : {}),
