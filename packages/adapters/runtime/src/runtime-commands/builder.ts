@@ -14,6 +14,7 @@ import type {
   DockerPublishedPortSpec,
   DockerRemoveContainerCommandSpec,
   DockerRemoveResourceContainersCommandSpec,
+  DockerRestartPolicy,
   DockerRunContainerCommandSpec,
   DockerRunMountSpec,
   DockerRunMountType,
@@ -33,6 +34,7 @@ export interface DockerRunContainerInput {
   image: string;
   containerName: string;
   detach?: boolean;
+  restartPolicy?: DockerRestartPolicy;
   env?: readonly DockerEnvironmentVariableInput[];
   labels?: readonly RuntimeCommandLabel[];
   mounts?: readonly DockerRunMountInput[];
@@ -98,6 +100,7 @@ export class DockerCommandBuilder {
       image: ImageReference.rehydrate(input.image),
       containerName: DisplayNameText.rehydrate(input.containerName),
       detach: input.detach ?? true,
+      ...(input.restartPolicy ? { restartPolicy: input.restartPolicy } : {}),
       env: (input.env ?? []).map((variable): RuntimeCommandEnvironmentVariable => ({
         name: ConfigKey.rehydrate(variable.name),
         value: ConfigValueText.rehydrate(variable.value),

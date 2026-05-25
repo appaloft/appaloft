@@ -1,6 +1,10 @@
 import { join } from "node:path";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
-import { createDatabase, type DatabaseConnection } from "@appaloft/persistence-pg";
+import {
+  createDatabase,
+  type DatabaseConnection,
+  type PgliteRuntimeAssets,
+} from "@appaloft/persistence-pg";
 
 type MergeableTableName =
   | "projects"
@@ -164,6 +168,7 @@ export interface MergeRemotePgliteStateInput {
   baseDataRoot: string;
   localDataRoot: string;
   targetDataRoot: string;
+  pgliteRuntimeAssets?: PgliteRuntimeAssets;
 }
 
 export async function mergeRemotePgliteState(
@@ -172,14 +177,17 @@ export async function mergeRemotePgliteState(
   const base = await createDatabase({
     driver: "pglite",
     pgliteDataDir: join(input.baseDataRoot, "pglite"),
+    ...(input.pgliteRuntimeAssets ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets } : {}),
   });
   const local = await createDatabase({
     driver: "pglite",
     pgliteDataDir: join(input.localDataRoot, "pglite"),
+    ...(input.pgliteRuntimeAssets ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets } : {}),
   });
   const target = await createDatabase({
     driver: "pglite",
     pgliteDataDir: join(input.targetDataRoot, "pglite"),
+    ...(input.pgliteRuntimeAssets ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets } : {}),
   });
 
   try {

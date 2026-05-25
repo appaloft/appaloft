@@ -972,6 +972,9 @@ Current boundary:
   pull, or otherwise reference an OCI/Docker image artifact, or materialize a Docker Compose project
   whose runnable services are backed by OCI/Docker images. This substrate rule is governed by
   [ADR-021: Docker/OCI Workload Substrate](./decisions/ADR-021-docker-oci-workload-substrate.md).
+- Single-server Docker runtime containers use the Docker `unless-stopped` restart policy so transient
+  host OOM or daemon restarts do not leave an accepted deployment permanently down. This is runtime
+  target resilience, not a user-configurable resource restart policy field.
 - Docker/OCI is the workload artifact substrate, not a permanent single-node-only orchestration
   boundary. Runtime target backend selection is internal to `deployments.create` and is governed by
   [ADR-023: Runtime Orchestration Target Boundary](./decisions/ADR-023-runtime-orchestration-target-boundary.md).
@@ -1099,15 +1102,10 @@ Current boundary:
   to create a preview-scoped source fingerprint and environment/resource selection outside
   committed config, derive preview runtime naming intent, then dispatch ids-only
   `deployments.create`.
-- This repository dogfoods that path for PR-scoped Web console previews through
-  `.github/workflows/deploy-console-preview.yml`. The workflow deploys the PR source with the
-  repository `Dockerfile` as an application Resource through the CLI to the shared SSH target,
-  serves Web assets and `/api` from the same preview origin, configures preview-scoped auth origin
-  values through trusted environment flags, and uses a backend-preview config fingerprint so it does
-  not drift against earlier static console preview Resources. The workflow also runs legacy static
-  preview cleanup before deploying the backend preview so an older static route cannot keep the same
-  PR hostname. Full operator-owned self-hosted control-plane installation remains owned by
-  `.github/workflows/deploy-console.yml` and `command: install-console`.
+- This repository does not carry a PR-triggered Web console preview deployment workflow by default.
+  Downstream repositories that want preview deploys must install their own workflow and own the
+  target SSH/runtime capacity. Full operator-owned self-hosted control-plane installation remains
+  owned by `.github/workflows/deploy-console.yml` and `command: install-console`.
 - When preview-specific profile input does not override runtime naming, the default preview runtime
   name seed is `preview-{pr_number}` so effective runtime/container names remain human-recognizable
   while adapters still preserve uniqueness during safe replacement.

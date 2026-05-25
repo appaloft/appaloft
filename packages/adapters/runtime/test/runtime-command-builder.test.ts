@@ -138,6 +138,18 @@ describe("runtime command builder", () => {
     expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toContain("-p 80:3001");
   });
 
+  test("renders Docker container restart policies", () => {
+    const spec = RuntimeCommandBuilder.docker().runContainer({
+      image: "app:latest",
+      containerName: "appaloft-dep_3",
+      restartPolicy: "unless-stopped",
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+      "docker run -d --name 'appaloft-dep_3' --restart 'unless-stopped' 'app:latest'",
+    );
+  });
+
   test("renders Compose up with an executor working directory", () => {
     const spec = RuntimeCommandBuilder.docker().composeUp({
       composeFile: "/srv/app/docker-compose.yml",

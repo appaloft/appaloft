@@ -108,6 +108,7 @@ function renderDockerRunContainerCommand(
     spec.detach ? "-d" : "",
     "--name",
     options.quote(spec.containerName.value),
+    spec.restartPolicy ? `--restart ${options.quote(spec.restartPolicy)}` : "",
     spec.networkName ? `--network ${options.quote(spec.networkName.value)}` : "",
     ...spec.publishedPorts.map((port) =>
       renderPublishedPort(port.mode, port.containerPort.value, port.hostPort?.value),

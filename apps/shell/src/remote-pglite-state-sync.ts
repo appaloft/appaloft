@@ -12,6 +12,7 @@ import {
 } from "@appaloft/adapter-cli";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import { type PgliteRuntimeAssets } from "@appaloft/persistence-pg";
 import { mergeRemotePgliteState } from "./pglite-remote-state-merge";
 
 export interface RemotePgliteStateSyncPlan {
@@ -70,6 +71,7 @@ export interface PrepareRemotePgliteStateSyncInput {
   argv: readonly string[];
   env?: NodeJS.ProcessEnv;
   config?: AppConfig;
+  pgliteRuntimeAssets?: PgliteRuntimeAssets;
   runner?: RemotePgliteArchiveRunner;
 }
 
@@ -939,6 +941,9 @@ export async function prepareRemotePgliteStateSync(
               baseDataRoot: baseSnapshotRoot,
               localDataRoot: planValue.localDataRoot,
               targetDataRoot: mergedLocalRoot,
+              ...(input.pgliteRuntimeAssets
+                ? { pgliteRuntimeAssets: input.pgliteRuntimeAssets }
+                : {}),
             });
             if (merged.isErr()) {
               firstError = merged.error;

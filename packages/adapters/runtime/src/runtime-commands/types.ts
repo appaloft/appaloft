@@ -11,6 +11,7 @@ export type {
   DockerPublishedPortSpec,
   DockerRemoveContainerCommandSpec,
   DockerRemoveResourceContainersCommandSpec,
+  DockerRestartPolicy,
   DockerRunContainerCommandSpec,
   ProcessExecCommandSpec,
   RuntimeCommandEnvironmentVariable,

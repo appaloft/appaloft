@@ -273,6 +273,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
   const remotePgliteStateSync = await prepareRemotePgliteStateSync({
     argv: cliArgv,
     env: process.env,
+    ...(options?.pgliteRuntimeAssets ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets } : {}),
   });
   if (remotePgliteStateSync.isErr()) {
     writeDomainError(remotePgliteStateSync.error);
