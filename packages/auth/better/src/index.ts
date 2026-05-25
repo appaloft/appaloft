@@ -81,6 +81,7 @@ export interface BetterAuthRuntimeConfig {
   baseURL: string;
   secret: string;
   database?: BetterAuthOptions["database"];
+  minPasswordLength?: number;
   githubClientId?: string;
   githubClientSecret?: string;
   githubRedirectUri?: string;
@@ -169,6 +170,9 @@ export class BetterAuthRuntime implements AuthRuntime {
       },
       emailAndPassword: {
         enabled: true,
+        ...(this.config.minPasswordLength
+          ? { minPasswordLength: this.config.minPasswordLength }
+          : {}),
       },
       plugins: [
         bearer(),

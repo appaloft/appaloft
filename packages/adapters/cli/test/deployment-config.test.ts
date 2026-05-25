@@ -2528,6 +2528,73 @@ describe("CLI deployment config entry workflow", () => {
     expect("tlsMode" in (deployment as Record<string, unknown>)).toBe(false);
   });
 
+  test("[CONFIG-FILE-ENTRY-017B] deploy action PR preview reads domain template from config", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-config-domain-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "network:",
+        "  internalPort: 4310",
+        "  exposureMode: reverse-proxy",
+        "preview:",
+        "  pullRequest:",
+        "    domainTemplate: pr-{pr_number}.preview.example.com",
+        "    tlsMode: disabled",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({ withRouteStore: true });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_config_domain_repo",
+          GITHUB_REF: "refs/pull/123/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-123",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.desiredRoutes).toHaveLength(1);
+    expect(harness.desiredRoutes[0]).toMatchObject({
+      domains: [
+        {
+          host: "pr-123.preview.example.com",
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        },
+      ],
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-023] deploy action PR preview accepts a flag-only profile", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-flag-profile-"));
@@ -4100,6 +4167,134 @@ describe("CLI deployment config entry workflow", () => {
             source: "managed",
             lifecycle: "ephemeral",
             resourceId: "res_1",
+            dependencyResourceId: "dep_res_db",
+            bindingId: "rbd_db",
+            targetName: "DATABASE_URL",
+          },
+        ],
+      },
+    });
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-011] preview ephemeral dependencies replace stale provenanced resources", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-stale-dependency-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A91";
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "dependencies:",
+        "  db:",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "    preview:",
+        "      lifecycle: ephemeral",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        sourceFingerprint,
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+        updatedAt: "2026-05-24T00:00:00.000Z",
+        dependencyProvenance: {
+          schemaVersion: "source-link.dependency-provenance/v1",
+          source: "repository-config",
+          sourceFingerprint,
+          entries: [
+            {
+              key: "db",
+              kind: "postgres",
+              source: "managed",
+              lifecycle: "ephemeral",
+              resourceId: "res_1",
+              dependencyResourceId: "dep_res_stale_db",
+              bindingId: "rbd_stale_db",
+              targetName: "DATABASE_URL",
+              createdAt: "2026-05-24T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+      dependencyResources: [
+        {
+          id: "dep_res_stale_db",
+          projectId: "proj_1",
+          environmentId: "env_1",
+          name: "preview-stale-db",
+          slug: "preview-stale-db",
+          kind: "postgres",
+          sourceMode: "appaloft-managed",
+          providerKey: "generic-ssh",
+          providerManaged: true,
+          lifecycleStatus: "ready",
+          providerRealization: {
+            status: "delete-pending",
+            attemptId: "dpd_stale",
+            attemptedAt: "2026-05-24T00:00:00.000Z",
+            providerResourceHandle:
+              "docker-single-server:v1:postgres:srv_1:appaloft-postgres-stale",
+          },
+          bindingReadiness: { status: "ready" },
+          createdAt: "2026-05-24T00:00:00.000Z",
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/api",
+          GITHUB_REPOSITORY_ID: "R_stale_dependency_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/db",
+          GITHUB_SHA: "stale123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-91",
+              "--server-host",
+              "203.0.113.91",
+              "--server-provider",
+              "generic-ssh",
+              "--acknowledge-resource-profile-drift",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations.indexOf("DeleteDependencyResourceCommand")).toBeLessThan(
+      harness.operations.indexOf("ProvisionDependencyResourceCommand"),
+    );
+    expect(harness.operations.indexOf("ProvisionDependencyResourceCommand")).toBeLessThan(
+      harness.operations.indexOf("BindResourceDependencyCommand"),
+    );
+    expect(harness.dependencyProvenanceWrites[0]).toMatchObject({
+      dependencyProvenance: {
+        entries: [
+          {
+            key: "db",
             dependencyResourceId: "dep_res_db",
             bindingId: "rbd_db",
             targetName: "DATABASE_URL",

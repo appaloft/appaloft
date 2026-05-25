@@ -51,6 +51,7 @@ export interface DockerBuildImageInput {
   image: string;
   dockerfilePath: string;
   contextPath: string;
+  labels?: readonly RuntimeCommandLabel[];
   workingDirectory?: string;
 }
 
@@ -84,6 +85,7 @@ export class DockerCommandBuilder {
       image: ImageReference.rehydrate(input.image),
       dockerfilePath: FilePathText.rehydrate(input.dockerfilePath),
       contextPath: FilePathText.rehydrate(input.contextPath),
+      labels: input.labels ?? [],
       ...(input.workingDirectory
         ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }
         : {}),

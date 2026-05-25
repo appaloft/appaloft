@@ -108,6 +108,7 @@ export interface AppConfig {
   authProvider: "better-auth" | "none";
   betterAuthBaseUrl: string;
   betterAuthSecret: string;
+  betterAuthMinPasswordLength?: number;
   actionDeployToken?: string;
   actionDeployTokenScope?: ActionDeployTokenScopeConfig;
   bootstrapDeployTokenOutputFile?: string;
@@ -683,6 +684,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_BETTER_AUTH_SECRET ??
       fileConfig.betterAuthSecret ??
       defaults.betterAuthSecret,
+    ...(source.flags?.betterAuthMinPasswordLength ||
+    env.APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH ||
+    fileConfig.betterAuthMinPasswordLength
+      ? {
+          betterAuthMinPasswordLength:
+            source.flags?.betterAuthMinPasswordLength ??
+            parsePositiveInteger(env.APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH) ??
+            fileConfig.betterAuthMinPasswordLength,
+        }
+      : {}),
     ...(source.flags?.actionDeployToken ||
     env.APPALOFT_ACTION_DEPLOY_TOKEN ||
     fileConfig.actionDeployToken

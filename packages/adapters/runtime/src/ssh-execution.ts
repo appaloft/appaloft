@@ -34,6 +34,7 @@ import {
   ok,
   type AccessRoute,
   type Deployment,
+  type DeploymentState,
   type Result,
   type RuntimeExecutionPlan,
   type RuntimeVerificationStep,
@@ -295,6 +296,75 @@ function localSourceWorkdir(root: string, metadata?: Record<string, string>): st
 function remoteSourceWorkdir(root: string, metadata?: Record<string, string>): string {
   const baseDirectory = sourceBaseDirectory(metadata);
   return baseDirectory ? `${root}/${baseDirectory}` : root;
+}
+
+const previewArtifactMarkerFileName = ".appaloft-preview-artifact.json";
+
+function previewSourceFingerprintFromMetadata(
+  metadata: Record<string, string> | undefined,
+): string | undefined {
+  return metadata?.["access.sourceFingerprint"] ?? metadata?.["context.sourceFingerprint"];
+}
+
+function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: DeploymentState): string {
+  const metadata = state.runtimePlan.execution.metadata ?? {};
+  const sourceFingerprint = previewSourceFingerprintFromMetadata(metadata);
+  if (!sourceFingerprint) {
+    return `mkdir -p ${shellQuote(remoteRoot)}`;
+  }
+
+  const marker = {
+    schemaVersion: "appaloft.preview-runtime-artifact/v1",
+    deploymentId: state.id.value,
+    sourceFingerprint,
+    projectId: state.projectId.value,
+    environmentId: state.environmentId.value,
+    resourceId: state.resourceId.value,
+    serverId: state.serverId.value,
+    destinationId: state.destinationId.value,
+    previewId: metadata["preview.id"],
+    previewNumber: metadata["preview.number"],
+    previewMode: metadata["preview.mode"],
+  };
+  const encoded = Buffer.from(JSON.stringify(marker, null, 2), "utf8").toString("base64");
+
+  return [
+    `mkdir -p ${shellQuote(remoteRoot)}`,
+    `printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(
+      `${remoteRoot}/${previewArtifactMarkerFileName}`,
+    )}`,
+  ].join(" && ");
+}
+
+function remotePreviewArtifactSweepCommand(input: {
+  remoteRuntimeRoot: string;
+  sourceFingerprint: string;
+}): string {
+  const deploymentsRoot = `${input.remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments`;
+  const sourceFingerprintLabel = `label=appaloft.source-fingerprint=${input.sourceFingerprint}`;
+  const markerSweepScript = [
+    "fingerprint=$1",
+    "shift",
+    "for marker do",
+    'if grep -Fq "$fingerprint" "$marker"; then',
+    'root=$(dirname "$marker")',
+    'rm -rf "$root"',
+    'printf "preview-workspace:%s\\n" "$root"',
+    "fi",
+    "done",
+  ].join("; ");
+
+  return [
+    `containers="$(docker ps -aq --filter ${shellQuote(sourceFingerprintLabel)} 2>/dev/null || true)"; if [ -n "$containers" ]; then printf '%s\\n' "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true; printf 'preview-containers\\n'; fi`,
+    `images="$(docker image ls -q --filter ${shellQuote(sourceFingerprintLabel)} 2>/dev/null | sort -u || true)"; if [ -n "$images" ]; then printf '%s\\n' "$images" | xargs -r docker image rm -f >/dev/null 2>&1 || true; printf 'preview-images\\n'; fi`,
+    `if [ -d ${shellQuote(deploymentsRoot)} ]; then find ${shellQuote(
+      deploymentsRoot,
+    )} -mindepth 2 -maxdepth 2 -name ${shellQuote(
+      previewArtifactMarkerFileName,
+    )} -type f -exec sh -c ${shellQuote(markerSweepScript)} sh ${shellQuote(
+      input.sourceFingerprint,
+    )} {} +; fi`,
+  ].join(" && ");
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -1130,6 +1200,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const remoteSourceRoot = `${input.remoteRoot}/source`;
     const remoteWorkdir = remoteSourceWorkdir(remoteSourceRoot, source.metadata);
+    const previewArtifactMarkerCommand = remotePreviewArtifactMarkerCommand(input.remoteRoot, state);
 
     if (isRemoteGitSourceKind(source.kind)) {
       if (source.kind === "git-public" && hasUrlCredentials(source.locator)) {
@@ -1248,6 +1319,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? `--branch ${shellQuote(source.metadata.gitRef)} `
         : "";
       const cloneCommand = [
+        previewArtifactMarkerCommand,
         `rm -rf ${shellQuote(remoteSourceRoot)}`,
         `mkdir -p ${shellQuote(remoteSourceRoot)}`,
         ...(setupCommand ? [setupCommand] : []),
@@ -1468,6 +1540,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const writeInlineSource = await this.runRemoteCommand({
         target: input.target,
         command: [
+          previewArtifactMarkerCommand,
           `rm -rf ${shellQuote(remoteSourceRoot)}`,
           `mkdir -p ${shellQuote(remoteSourceRoot)}`,
           `mkdir -p "$(dirname ${shellQuote(remoteTargetFile)})"`,
@@ -1568,7 +1641,9 @@ export class SshExecutionBackend implements ExecutionBackend {
       status: "running",
       message: "Upload source workspace over SSH",
     });
-    const remotePrepareCommand = `rm -rf ${shellQuote(remoteWorkdir)} && mkdir -p ${shellQuote(remoteWorkdir)} && tar -xzf - -C ${shellQuote(remoteWorkdir)}`;
+    const remotePrepareCommand = `${previewArtifactMarkerCommand} && rm -rf ${shellQuote(
+      remoteWorkdir,
+    )} && mkdir -p ${shellQuote(remoteWorkdir)} && tar -xzf - -C ${shellQuote(remoteWorkdir)}`;
     const uploadCommand = buildLocalWorkspaceUploadCommand({
       localWorkdir,
       remotePrepareCommand,
@@ -1881,6 +1956,9 @@ export class SshExecutionBackend implements ExecutionBackend {
               dockerfilePath,
               contextPath: ".",
               workingDirectory: remoteWorkdir,
+              labels: dockerLabelsFromAssignments(
+                appaloftDockerContainerLabelsForDeployment(state),
+              ),
             }),
             { quote: shellQuote },
           );
@@ -3095,10 +3173,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         remoteRuntimeRoot: remoteRoot,
         remoteWorkdir,
       });
-      if (artifactCleanup.remoteWorkdir) {
+      const remoteArtifactRoot = artifactCleanup.remoteRuntimeRoot ?? artifactCleanup.remoteWorkdir;
+      if (remoteArtifactRoot) {
         const workspaceCleanup = await this.runRemoteCommand({
           target,
-          command: `rm -rf ${shellQuote(artifactCleanup.remoteWorkdir)}`,
+          command: `rm -rf ${shellQuote(remoteArtifactRoot)}`,
           cwd: runtimeDir,
           env,
           redactions,
@@ -3109,13 +3188,13 @@ export class SshExecutionBackend implements ExecutionBackend {
               phase: "runtime-cleanup",
               cleanupStage: "artifact-cleanup",
               deploymentId: state.id.value,
-              remoteWorkdir: artifactCleanup.remoteWorkdir,
+              remoteWorkdir: remoteArtifactRoot,
               errorMessage: workspaceCleanup.reason ?? workspaceCleanup.stderr,
             }),
           );
         }
         logs.push(
-          phaseLog("deploy", `Removed SSH preview source workspace ${artifactCleanup.remoteWorkdir}`),
+          phaseLog("deploy", `Removed SSH preview source workspace ${remoteArtifactRoot}`),
         );
       }
       if (artifactCleanup.imageName) {
@@ -3127,6 +3206,35 @@ export class SshExecutionBackend implements ExecutionBackend {
           redactions,
         });
         logs.push(phaseLog("deploy", `Removed SSH preview image ${artifactCleanup.imageName}`));
+      }
+      const sourceFingerprint = previewSourceFingerprintFromMetadata(metadata);
+      if (sourceFingerprint) {
+        const siblingArtifactCleanup = await this.runRemoteCommand({
+          target,
+          command: remotePreviewArtifactSweepCommand({
+            remoteRuntimeRoot: this.remoteRuntimeRoot,
+            sourceFingerprint,
+          }),
+          cwd: runtimeDir,
+          env,
+          redactions,
+        });
+        if (siblingArtifactCleanup.failed) {
+          return err(
+            domainError.infra("Preview SSH sibling artifact cleanup failed", {
+              phase: "runtime-cleanup",
+              cleanupStage: "artifact-cleanup",
+              deploymentId: state.id.value,
+              errorMessage:
+                siblingArtifactCleanup.reason ?? siblingArtifactCleanup.stderr,
+            }),
+          );
+        }
+        if (siblingArtifactCleanup.stdout.trim().length > 0) {
+          logs.push(
+            phaseLog("deploy", "Removed SSH preview sibling artifacts for source fingerprint"),
+          );
+        }
       }
     } finally {
       this.cleanupPrivateKey(target);

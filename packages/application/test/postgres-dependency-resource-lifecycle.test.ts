@@ -795,6 +795,91 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     ]);
   });
 
+  test("[DEP-RES-PG-NATIVE-005] deletes managed Postgres state when provider artifact is already gone", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
+    const created = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Missing Artifact DB",
+      })
+    )._unsafeUnwrap();
+    managedDependencyProvider.setDeleteResult(
+      err(domainError.notFound("managed_dependency_artifact", `postgres/${created.id}`)),
+    );
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(managedDependencyProvider.deleted).toContainEqual(
+      expect.objectContaining({
+        dependencyResourceId: created.id,
+        kind: "postgres",
+      }),
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: created.id })._unsafeUnwrap(),
+    );
+    expect(shown.isErr()).toBe(true);
+    expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+  });
+
+  test("[DEP-RES-PG-NATIVE-006] retries delete-pending managed Postgres cleanup", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
+    const created = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Retry Delete DB",
+      })
+    )._unsafeUnwrap();
+    managedDependencyProvider.setDeleteResult(
+      err(
+        domainError.provider("Delete failed", {
+          phase: "dependency-resource-provider-delete",
+          providerKey: "appaloft-managed-postgres",
+        }),
+      ),
+    );
+
+    const failedDelete = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+    managedDependencyProvider.setDeleteResult(
+      err(domainError.notFound("managed_dependency_artifact", `postgres/${created.id}`)),
+    );
+    const retriedDelete = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: created.id,
+    });
+
+    expect(failedDelete.isErr()).toBe(true);
+    expect(retriedDelete.isOk()).toBe(true);
+    expect(managedDependencyProvider.deleted).toHaveLength(2);
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: created.id })._unsafeUnwrap(),
+    );
+    expect(shown.isErr()).toBe(true);
+    expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+  });
+
   test("[DEP-RES-PG-DELETE-002] blocks bound dependency delete", async () => {
     const { context, deleteDependencyResource, deleteSafetyReader, importDependencyResource } =
       await createHarness();

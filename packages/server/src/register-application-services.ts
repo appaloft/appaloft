@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -254,6 +256,7 @@ import {
   type ManagedDependencyRealizationInput,
   type ManagedDependencyRealizationResult,
   type ManagedDependencyResourceKind,
+  type ManagedDependencySingleServerTarget,
   type ManagedPostgresDeleteInput,
   type ManagedPostgresDeleteResult,
   type ManagedPostgresProviderPort,
@@ -381,6 +384,7 @@ import {
   ScheduledTaskRunLogsQueryService,
   ScheduledTaskRunWorker,
   ScheduledTaskScheduler,
+  type ServerRepository,
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
@@ -447,6 +451,7 @@ import {
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
   tokens,
+  toRepositoryContext,
   UnbindResourceDependencyCommandHandler,
   UnbindResourceDependencyUseCase,
   UnlockEnvironmentCommandHandler,
@@ -455,7 +460,15 @@ import {
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
 } from "@appaloft/application";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
 import { ShellDeploymentEventObserver } from "./deployment-event-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
@@ -825,7 +838,10 @@ const shellManagedDependencyKinds: readonly ManagedDependencyResourceKind[] = [
 ];
 
 export class ShellManagedDependencyProvider implements ManagedDependencyProviderPort {
-  constructor(private readonly dataDir = ".appaloft/data") {}
+  constructor(
+    private readonly dataDir = ".appaloft/data",
+    private readonly serverRepository?: ServerRepository,
+  ) {}
 
   supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
     return (
@@ -838,6 +854,35 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
     input: ManagedDependencyRealizationInput,
   ): Promise<Result<ManagedDependencyRealizationResult, DomainError>> {
     void context;
+    if (input.target && input.kind === "postgres") {
+      const container = dockerManagedDependencyContainerName(
+        input.kind,
+        input.dependencyResourceId,
+      );
+      const volume = dockerManagedDependencyVolumeName(container);
+      const spec = dockerManagedPostgresRealizationSpec(input, container, volume);
+      const result = await runManagedDependencyTargetCommand(input.target, spec.command);
+      if (result.exitCode !== 0) {
+        return managedDependencyDockerCommandFailure({
+          message: "Docker-backed managed postgres realization failed",
+          providerKey: input.providerKey,
+          operation: "dependency-resources.provision",
+          exitCode: result.exitCode,
+        });
+      }
+
+      return ok({
+        providerResourceHandle: dockerManagedDependencyHandle({
+          kind: input.kind,
+          serverId: input.target.serverId,
+          containerName: container,
+        }),
+        endpoint: spec.endpoint,
+        connectionSecretValue: spec.connectionSecretValue,
+        realizedAt: input.requestedAt,
+      });
+    }
+
     const endpoint = shellManagedEndpoint(input);
     const result: ManagedDependencyRealizationResult = {
       providerResourceHandle: `${input.kind}/${input.dependencyResourceId}`,
@@ -880,7 +925,64 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
     context: ExecutionContext,
     input: ManagedDependencyDeleteInput,
   ): Promise<Result<ManagedDependencyDeleteResult, DomainError>> {
-    void context;
+    const dockerHandle = parseDockerManagedDependencyHandle(input.providerResourceHandle);
+    if (dockerHandle) {
+      if (dockerHandle.kind !== input.kind) {
+        return err(
+          domainError.providerCapabilityUnsupported(
+            "Provider resource handle does not match dependency resource kind",
+            {
+              phase: "managed-dependency-docker-delete",
+              providerKey: input.providerKey,
+              dependencyKind: input.kind,
+            },
+          ),
+        );
+      }
+      if (!this.serverRepository) {
+        return err(
+          domainError.providerCapabilityUnsupported(
+            "Server repository is required for Docker-backed dependency deletion",
+            {
+              phase: "managed-dependency-target-resolution",
+              providerKey: input.providerKey,
+              dependencyKind: input.kind,
+            },
+          ),
+        );
+      }
+
+      const target = await resolveManagedDependencySingleServerTarget({
+        context,
+        serverRepository: this.serverRepository,
+        serverId: dockerHandle.serverId,
+        operation: "dependency-resources.delete",
+      });
+      if (target.isErr()) {
+        return err(target.error);
+      }
+      const result = await runManagedDependencyTargetCommand(
+        target.value,
+        [
+          "set -eu",
+          `docker rm -f ${shellQuote(dockerHandle.containerName)} >/dev/null 2>&1 || true`,
+          `docker volume rm ${shellQuote(
+            dockerManagedDependencyVolumeName(dockerHandle.containerName),
+          )} >/dev/null 2>&1 || true`,
+        ].join("\n"),
+      );
+      if (result.exitCode !== 0) {
+        return managedDependencyDockerCommandFailure({
+          message: "Docker-backed managed dependency deletion failed",
+          providerKey: input.providerKey,
+          operation: "dependency-resources.delete",
+          exitCode: result.exitCode,
+        });
+      }
+
+      return ok({ deletedAt: input.requestedAt });
+    }
+
     const artifact = await this.readArtifact(
       input.kind,
       input.dependencyResourceId,
@@ -955,6 +1057,15 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
       }
       return ok(parsed);
     } catch (cause) {
+      if (isMissingFileError(cause)) {
+        return err(
+          domainError.notFound(
+            "managed_dependency_artifact",
+            `${dependencyKind}/${dependencyResourceId}`,
+          ),
+        );
+      }
+
       return err(
         shellManagedProviderError(
           "Managed dependency artifact could not be read",
@@ -968,6 +1079,332 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
       );
     }
   }
+}
+
+interface DockerManagedDependencyHandle {
+  kind: ManagedDependencyResourceKind;
+  serverId: string;
+  containerName: string;
+}
+
+interface DockerManagedDependencyRealizationSpec {
+  command: string;
+  endpoint: ManagedDependencyRealizationResult["endpoint"];
+  connectionSecretValue: string;
+}
+
+interface ManagedDependencyCommandResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+const dockerSingleServerHandlePrefix = "docker-single-server:v1";
+const dockerManagedDependencyNetworkName = "appaloft-edge";
+const managedDependencyCommandTimeoutMs = 120_000;
+
+function dockerManagedDependencyHandle(input: DockerManagedDependencyHandle): string {
+  return [dockerSingleServerHandlePrefix, input.kind, input.serverId, input.containerName].join(
+    ":",
+  );
+}
+
+function parseDockerManagedDependencyHandle(
+  providerResourceHandle: string,
+): DockerManagedDependencyHandle | undefined {
+  const [prefix, version, kind, serverId, containerName] = providerResourceHandle.split(":");
+  if (
+    `${prefix}:${version}` !== dockerSingleServerHandlePrefix ||
+    !shellManagedDependencyKinds.includes(kind as ManagedDependencyResourceKind) ||
+    !serverId ||
+    !containerName
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: kind as ManagedDependencyResourceKind,
+    serverId,
+    containerName,
+  };
+}
+
+function safeDockerToken(input: string): string {
+  const normalized = input
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_.-]/g, "-")
+    .replaceAll(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+  return normalized || "resource";
+}
+
+function shortDockerToken(input: string, maxLength: number): string {
+  const token = safeDockerToken(input);
+  return token.length <= maxLength ? token : token.slice(0, maxLength).replaceAll(/[-_.]+$/g, "");
+}
+
+function dockerManagedDependencyContainerName(
+  kind: ManagedDependencyResourceKind,
+  dependencyResourceId: string,
+): string {
+  return shortDockerToken(`appaloft-${shellManagedHostSegment(kind)}-${dependencyResourceId}`, 58);
+}
+
+function dockerManagedDependencyVolumeName(containerName: string): string {
+  return shortDockerToken(`${containerName}-data`, 63);
+}
+
+function randomManagedDependencyPassword(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function dockerNetworkEnsureCommand(): string {
+  return `docker network inspect ${shellQuote(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${shellQuote(
+    dockerManagedDependencyNetworkName,
+  )}`;
+}
+
+function dockerManagedDependencyVolumeCreateCommand(
+  volumeName: string,
+  dependencyResourceId: string,
+): string {
+  return `docker volume create --label ${shellQuote(
+    "appaloft.managed=dependency-resource",
+  )} --label ${shellQuote(
+    `appaloft.dependency-resource-id=${dependencyResourceId}`,
+  )} ${shellQuote(volumeName)} >/dev/null`;
+}
+
+function dockerManagedDependencyLabels(dependencyResourceId: string): string {
+  return [
+    `--label ${shellQuote("appaloft.managed=dependency-resource")}`,
+    `--label ${shellQuote(`appaloft.dependency-resource-id=${dependencyResourceId}`)}`,
+  ].join(" ");
+}
+
+function dockerManagedDependencyRemoveContainerCommand(containerName: string): string {
+  return `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`;
+}
+
+function dockerManagedPostgresRealizationSpec(
+  input: ManagedDependencyRealizationInput,
+  containerName: string,
+  volumeName: string,
+): DockerManagedDependencyRealizationSpec {
+  const databaseName = shellManagedDatabaseName(input.kind, input.slug) ?? "app";
+  const user = "app";
+  const password = randomManagedDependencyPassword();
+  const connectionSecretValue = `postgres://${user}:${password}@${containerName}:5432/${databaseName}`;
+
+  return {
+    endpoint: {
+      host: containerName,
+      port: 5432,
+      databaseName,
+      maskedConnection: `postgres://${user}:********@${containerName}:5432/${databaseName}`,
+    },
+    connectionSecretValue,
+    command: [
+      "set -eu",
+      dockerNetworkEnsureCommand(),
+      dockerManagedDependencyVolumeCreateCommand(volumeName, input.dependencyResourceId),
+      dockerManagedDependencyRemoveContainerCommand(containerName),
+      [
+        "docker run -d",
+        `--name ${shellQuote(containerName)}`,
+        `--network ${shellQuote(dockerManagedDependencyNetworkName)}`,
+        "--restart unless-stopped",
+        dockerManagedDependencyLabels(input.dependencyResourceId),
+        `-e ${shellQuote(`POSTGRES_DB=${databaseName}`)}`,
+        `-e ${shellQuote(`POSTGRES_USER=${user}`)}`,
+        `-e ${shellQuote(`POSTGRES_PASSWORD=${password}`)}`,
+        `-v ${shellQuote(`${volumeName}:/var/lib/postgresql/data`)}`,
+        "postgres:16-alpine",
+      ].join(" "),
+      [
+        "for attempt in $(seq 1 60); do",
+        `  if PGPASSWORD=${shellQuote(password)} docker exec -e PGPASSWORD ${shellQuote(
+          containerName,
+        )} pg_isready -U ${shellQuote(user)} -d ${shellQuote(databaseName)} >/dev/null 2>&1; then`,
+        "    exit 0",
+        "  fi",
+        "  sleep 1",
+        "done",
+        "exit 1",
+      ].join("\n"),
+    ].join("\n"),
+  };
+}
+
+function managedDependencyDockerCommandFailure(input: {
+  message: string;
+  providerKey: string;
+  operation: string;
+  exitCode: number | null;
+}): Result<never, DomainError> {
+  return err(
+    domainError.provider(input.message, {
+      phase: "managed-dependency-docker-execution",
+      providerKey: input.providerKey,
+      operation: input.operation,
+      exitCode: input.exitCode ?? -1,
+    }),
+  );
+}
+
+async function resolveManagedDependencySingleServerTarget(input: {
+  context: ExecutionContext;
+  serverRepository: ServerRepository;
+  serverId: string;
+  operation: string;
+}): Promise<Result<ManagedDependencySingleServerTarget>> {
+  const serverId = DeploymentTargetId.rehydrate(input.serverId);
+  const server = await input.serverRepository.findOne(
+    toRepositoryContext(input.context),
+    DeploymentTargetByIdSpec.create(serverId),
+  );
+  if (!server) {
+    return err(domainError.notFound("server", input.serverId));
+  }
+
+  const lifecycleGuard = server.ensureCanAcceptNewWork(input.operation);
+  if (lifecycleGuard.isErr()) {
+    return err(lifecycleGuard.error);
+  }
+
+  const state = server.toState();
+  const providerKey = state.providerKey.value;
+  if (state.targetKind.value !== "single-server") {
+    return err(
+      domainError.providerCapabilityUnsupported("Managed dependency target must be single-server", {
+        phase: "managed-dependency-target-resolution",
+        serverId: input.serverId,
+        targetKind: state.targetKind.value,
+        operation: input.operation,
+      }),
+    );
+  }
+  if (providerKey !== "local-shell" && providerKey !== "generic-ssh") {
+    return err(
+      domainError.providerCapabilityUnsupported(
+        "Managed dependency target must use local-shell or generic-ssh",
+        {
+          phase: "managed-dependency-target-resolution",
+          serverId: input.serverId,
+          providerKey,
+          operation: input.operation,
+        },
+      ),
+    );
+  }
+
+  return ok({
+    serverId: state.id.value,
+    providerKey,
+    targetKind: "single-server",
+    host: state.host.value,
+    port: state.port.value,
+    ...(state.credential?.username ? { username: state.credential.username.value } : {}),
+    ...(state.credential?.privateKey ? { privateKey: state.credential.privateKey.value } : {}),
+  });
+}
+
+async function runManagedDependencyTargetCommand(
+  target: ManagedDependencySingleServerTarget,
+  command: string,
+): Promise<ManagedDependencyCommandResult> {
+  if (target.providerKey === "local-shell") {
+    return spawnManagedDependencyCommand(["sh", "-lc", command]);
+  }
+
+  const identity = target.privateKey ? writeSshIdentityFile(target.privateKey) : undefined;
+  try {
+    return await spawnManagedDependencyCommand([
+      "ssh",
+      ...sshManagedDependencyArgs({
+        target,
+        remoteCommand: command,
+        ...(identity ? { identityFile: identity.identityFile } : {}),
+      }),
+    ]);
+  } finally {
+    identity?.cleanup();
+  }
+}
+
+async function spawnManagedDependencyCommand(
+  args: string[],
+): Promise<ManagedDependencyCommandResult> {
+  const child = Bun.spawn(args, {
+    env: process.env,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const timeout = setTimeout(() => child.kill(), managedDependencyCommandTimeoutMs);
+  try {
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    return { exitCode, stdout, stderr };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function writeSshIdentityFile(privateKey: string): { identityFile: string; cleanup(): void } {
+  const sshDir = mkdtempSync(join(tmpdir(), "appaloft-managed-dependency-ssh-"));
+  const identityFile = join(sshDir, "id_managed_dependency");
+  writeFileSync(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+    mode: 0o600,
+  });
+  chmodSync(identityFile, 0o600);
+  return {
+    identityFile,
+    cleanup: () => rmSync(sshDir, { recursive: true, force: true }),
+  };
+}
+
+function sshManagedDependencyArgs(input: {
+  target: ManagedDependencySingleServerTarget;
+  remoteCommand: string;
+  identityFile?: string;
+}): string[] {
+  return [
+    "-p",
+    String(input.target.port),
+    ...(input.identityFile ? ["-i", input.identityFile, "-o", "IdentitiesOnly=yes"] : []),
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "PreferredAuthentications=publickey",
+    "-o",
+    "PasswordAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no",
+    "-o",
+    "NumberOfPasswordPrompts=0",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    hostWithUsername(input.target.host, input.target.username),
+    input.remoteCommand,
+  ];
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
+}
+
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function isMissingFileError(cause: unknown): boolean {
+  return (
+    cause instanceof Error && "code" in cause && (cause as NodeJS.ErrnoException).code === "ENOENT"
+  );
 }
 
 function shellManagedProviderKey(kind: ManagedDependencyResourceKind): string {
@@ -1904,7 +2341,13 @@ export function registerApplicationServices(
     ShellCertificateProviderSelectionPolicy,
   );
   container.register(tokens.managedDependencyProvider, {
-    useValue: new ShellManagedDependencyProvider(input.dataDir),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ShellManagedDependencyProvider(
+          input.dataDir,
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+    ),
   });
   container.register(tokens.dependencyResourceBackupProvider, {
     useFactory: instanceCachingFactory((dependencyContainer) => {
