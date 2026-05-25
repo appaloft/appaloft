@@ -106,9 +106,11 @@ follow-up work.
 `DEPLOYMENTS-CLEANUP-PREVIEW-007` is implemented for ownership-scoped generated source-workspace,
 stopped container, and generated-image cleanup through the runtime cleanup boundary. Current
 coverage proves that preview cleanup preserves `artifact-cleanup` failure classification, removes
-only generated preview workspaces under Appaloft-owned runtime roots, skips local user workspaces
-and prebuilt images, and never invokes Docker volume deletion. Build-cache pruning remains governed
-by `servers.capacity.prune` opt-in categories rather than preview cleanup.
+only generated preview workspaces under Appaloft-owned runtime roots, labels Docker build images
+with preview ownership, skips local user workspaces and prebuilt images, and never invokes Docker
+volume deletion. SSH preview source uploads also write a preview artifact marker so interrupted
+deployments can be swept by the same source fingerprint on later cleanup. Build-cache pruning
+remains governed by `servers.capacity.prune` opt-in categories rather than preview cleanup.
 `DEPLOYMENTS-CLEANUP-PREVIEW-010` is covered at the shell/state-backend lifecycle by
 `apps/shell/test/remote-pglite-state-sync.test.ts`, and remote-state marker preservation is covered
 in `packages/adapters/runtime/test/runtime-target-capacity-prune.test.ts`. Preview cleanup itself

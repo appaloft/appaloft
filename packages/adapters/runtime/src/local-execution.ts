@@ -1633,6 +1633,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             image,
             dockerfilePath,
             contextPath: workdir,
+            labels: dockerLabelsFromAssignments(appaloftDockerContainerLabelsForDeployment(state)),
           }),
           { quote: shellQuote },
         );
