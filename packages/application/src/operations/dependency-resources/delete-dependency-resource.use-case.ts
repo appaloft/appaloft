@@ -143,16 +143,21 @@ export class DeleteDependencyResourceUseCase {
             requestedAt: requestedAt.value,
           });
           if (providerDelete.isErr()) {
-            await recordProviderDeleteProcessAttempt({
-              recorder: processAttemptRecorder,
-              repositoryContext,
-              context,
-              dependencyResource,
-              failureCode: providerDelete.error.code,
-            });
-            return err(providerDelete.error);
+            if (providerDelete.error.code === "not_found") {
+              allowProviderManaged = true;
+            } else {
+              await recordProviderDeleteProcessAttempt({
+                recorder: processAttemptRecorder,
+                repositoryContext,
+                context,
+                dependencyResource,
+                failureCode: providerDelete.error.code,
+              });
+              return err(providerDelete.error);
+            }
+          } else {
+            allowProviderManaged = true;
           }
-          allowProviderManaged = true;
         }
       }
 
