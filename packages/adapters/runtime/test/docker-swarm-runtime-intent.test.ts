@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  blueprintComponentRuntimePlanToMetadata,
+  type BlueprintComponentRuntimePlan,
+} from "@appaloft/blueprints";
+import {
   AccessRoute,
   BuildStrategyKindValue,
   ConfigKey,
@@ -108,6 +112,68 @@ function runtimeEnvironmentSnapshot(): EnvironmentConfigSnapshot {
       },
     ],
   });
+}
+
+function workerComponentRuntimePlan(): BlueprintComponentRuntimePlan {
+  return {
+    componentId: "worker",
+    serviceName: "worker.internal",
+    networkName: "appaloft-blueprint-private",
+    injectedEnv: [
+      {
+        relationId: "worker-uses-api",
+        relationType: "endpoint",
+        providerComponentId: "api",
+        endpoint: "http",
+        name: "API_BASE_URL",
+        valueFrom: "endpoint-url",
+        value: "http://api.internal:3000",
+        required: true,
+      },
+    ],
+    serviceDiscovery: [
+      {
+        relationId: "worker-uses-api",
+        providerComponentId: "api",
+        serviceName: "api.internal",
+        host: "api.internal",
+        endpoint: "http",
+        port: 3000,
+        scheme: "http",
+        required: true,
+      },
+    ],
+    networkAllows: [
+      {
+        relationId: "worker-uses-api",
+        providerComponentId: "api",
+        mode: "private",
+        networkName: "appaloft-blueprint-private",
+        required: true,
+      },
+    ],
+    readinessGates: [
+      {
+        relationId: "worker-starts-after-api",
+        providerComponentId: "api",
+        providerServiceName: "api.internal",
+        kind: "order-after",
+        readiness: "healthy",
+        required: true,
+      },
+    ],
+    telemetryAttachments: [
+      {
+        relationId: "worker-traces-to-jaeger",
+        providerComponentId: "jaeger",
+        providerServiceName: "jaeger.internal",
+        signal: "traces",
+        endpoint: "otlp-grpc",
+        endpointUrl: "grpc://jaeger.internal:4317",
+        required: false,
+      },
+    ],
+  };
 }
 
 function imageRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
@@ -286,6 +352,103 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     });
     expect(JSON.stringify(intent)).not.toContain("appaloft://dependency-resources");
     expect(JSON.stringify(intent)).not.toContain("postgres://");
+  });
+
+  test("[BP-COMP-REL-RUNTIME-002][SWARM-COMP-REL-RUNTIME-001] renders Blueprint component relation runtime effects into Swarm intent", () => {
+    const componentRuntime = workerComponentRuntimePlan();
+    const result = renderDockerSwarmRuntimeIntent({
+      runtimePlan: imageRuntimePlan(blueprintComponentRuntimePlanToMetadata(componentRuntime)),
+      identity: {
+        resourceId: "res_worker",
+        deploymentId: "dep_worker",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const intent = result._unsafeUnwrap();
+
+    expect(intent.environment).toContainEqual({
+      name: "API_BASE_URL",
+      exposure: "runtime",
+      scope: "component-relation",
+      secret: false,
+      value: "http://api.internal:3000",
+    });
+    expect(intent.environment).toContainEqual({
+      name: "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+      exposure: "runtime",
+      scope: "component-relation",
+      secret: false,
+      value: "grpc://jaeger.internal:4317",
+    });
+    expect(intent.componentLinks).toEqual([
+      {
+        relationId: "worker-starts-after-api",
+        providerComponentId: "api",
+        providerServiceName: "api.internal",
+        networkName: "appaloft-blueprint-private",
+        required: true,
+      },
+      {
+        relationId: "worker-traces-to-jaeger",
+        providerComponentId: "jaeger",
+        providerServiceName: "jaeger.internal",
+        endpoint: "otlp-grpc",
+        networkName: "appaloft-blueprint-private",
+        required: false,
+      },
+      {
+        relationId: "worker-uses-api",
+        providerComponentId: "api",
+        providerServiceName: "api.internal",
+        endpoint: "http",
+        networkName: "appaloft-blueprint-private",
+        required: true,
+      },
+    ]);
+    expect(intent.readinessGates).toEqual([
+      {
+        relationId: "worker-starts-after-api",
+        providerComponentId: "api",
+        providerServiceName: "api.internal",
+        kind: "order-after",
+        readiness: "healthy",
+        required: true,
+      },
+    ]);
+    expect(intent.labels).toMatchObject({
+      "appaloft.component-id": "worker",
+      "appaloft.component-link.worker-uses-api.provider": "api",
+      "appaloft.component-link.worker-uses-api.service": "api.internal",
+      "appaloft.component-link.worker-uses-api.endpoint": "http",
+      "appaloft.component-link.worker-uses-api.network": "appaloft-blueprint-private",
+      "appaloft.component-link.worker-starts-after-api.readiness": "healthy",
+      "appaloft.component-link.worker-traces-to-jaeger.telemetry": "traces",
+    });
+
+    const plan = renderDockerSwarmApplyPlan(intent)._unsafeUnwrap();
+    expect(plan.steps.map((step) => step.step)).toEqual([
+      "wait-for-component-readiness",
+      "create-candidate-service",
+      "verify-candidate-service",
+      "promote-route-target",
+      "cleanup-superseded-services",
+    ]);
+    expect(plan.steps[0]?.command ?? "").toContain("docker service ps");
+    expect(plan.steps[0]?.command ?? "").toContain("api.internal");
+
+    const createCommand = plan.steps[1]?.command ?? "";
+    expect(createCommand).toContain("--network 'appaloft-blueprint-private'");
+    expect(createCommand).toContain("--network 'appaloft-edge'");
+    expect(createCommand).toContain("--env 'API_BASE_URL=http://api.internal:3000'");
+    expect(createCommand).toContain(
+      "--env 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=grpc://jaeger.internal:4317'",
+    );
+    expect(createCommand).toContain(
+      "--label 'appaloft.component-link.worker-uses-api.provider=api'",
+    );
   });
 
   test("[DEP-RES-REDIS-NATIVE-005] renders realized managed Redis runtime secret handles without exposing raw values", () => {

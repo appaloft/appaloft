@@ -1,0 +1,61 @@
+schemaVersion: appaloft.blueprint/v1
+id: pocketbase-jaeger
+name: PocketBase with Jaeger
+version: 1.0.0
+summary: PocketBase application with a bundled tracing backend component.
+description: Deploys PocketBase and a private Jaeger component, then links PocketBase telemetry to Jaeger.
+tags:
+  - database
+  - tracing
+resources:
+  - id: data
+    kind: volume
+    label: PocketBase data
+components:
+  - id: pocketbase
+    name: PocketBase
+    kind: service
+    runtime:
+      strategy: container-image
+      image: ghcr.io/muchobien/pocketbase:latest
+    ports:
+      - name: http
+        containerPort: 8090
+        protocol: http
+    routes:
+      - port: http
+        pathPrefix: /
+    usesResources:
+      - data
+  - id: jaeger
+    name: Jaeger
+    kind: service
+    runtime:
+      strategy: container-image
+      image: jaegertracing/all-in-one:latest
+    ports:
+      - name: otlp-grpc
+        containerPort: 4317
+        protocol: grpc
+        public: false
+      - name: web-ui
+        containerPort: 16686
+        protocol: http
+componentRelations:
+  - id: pocketbase-traces-to-jaeger
+    type: telemetry
+    from: pocketbase
+    to: jaeger
+    endpoint: otlp-grpc
+    required: false
+    effects:
+      - kind: attach-telemetry
+        signal: traces
+        valueFrom: endpoint-url
+      - kind: inject-env
+        name: OTEL_EXPORTER_OTLP_ENDPOINT
+        valueFrom: endpoint-url
+profiles:
+  production:
+    label: Production
+    replicas: 1

@@ -1,0 +1,39 @@
+schemaVersion: appaloft.blueprint/v1
+id: worker-api-readiness
+name: Worker API Readiness
+version: 1.0.0
+summary: Worker starts after API readiness.
+description: Demonstrates a required lifecycle relation from a worker to an API component.
+tags:
+  - worker
+  - lifecycle
+components:
+  - id: worker
+    name: Worker
+    kind: worker
+    runtime:
+      strategy: container-image
+      image: example/worker:latest
+  - id: api
+    name: API
+    kind: service
+    runtime:
+      strategy: container-image
+      image: example/api:latest
+    ports:
+      - name: http
+        containerPort: 8080
+        protocol: http
+componentRelations:
+  - id: worker-starts-after-api
+    type: lifecycle
+    from: worker
+    to: api
+    required: true
+    effects:
+      - kind: order-after
+        readiness: healthy
+profiles:
+  production:
+    label: Production
+    replicas: 1
