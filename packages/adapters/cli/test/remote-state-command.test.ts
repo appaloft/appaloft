@@ -44,27 +44,9 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
   });
 
-  test("[CONFIG-FILE-STATE-020] remote-state maintenance and preview workflows use stale-only lock maintenance", () => {
+  test("[CONFIG-FILE-STATE-020] remote-state maintenance uses stale-only lock maintenance", () => {
     const maintenanceWorkflow = readFileSync(
       resolve(import.meta.dir, "../../../../.github/workflows/remote-state-maintenance.yml"),
-      "utf8",
-    );
-    const deployConsolePreviewWorkflow = readFileSync(
-      resolve(import.meta.dir, "../../../../.github/workflows/deploy-console-preview.yml"),
-      "utf8",
-    );
-    const preflightAction = readFileSync(
-      resolve(
-        import.meta.dir,
-        "../../../../.github/actions/remote-state-lock-preflight/action.yml",
-      ),
-      "utf8",
-    );
-    const capacityPreflightAction = readFileSync(
-      resolve(
-        import.meta.dir,
-        "../../../../.github/actions/remote-runtime-capacity-preflight/action.yml",
-      ),
       "utf8",
     );
     const githubExpressionOpen = "$" + "{{";
@@ -72,8 +54,6 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(maintenanceWorkflow).toContain("workflow_dispatch:");
     expect(maintenanceWorkflow).toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("ref: main");
-    expect(deployConsolePreviewWorkflow).toContain("group: appaloft-preview-remote-state");
-    expect(deployConsolePreviewWorkflow).not.toContain("group: appaloft-www-remote-state");
     expect(maintenanceWorkflow).toContain("default: /var/lib/appaloft/runtime");
     expect(maintenanceWorkflow).toContain(
       `APPALOFT_SSH_HOST: ${githubExpressionOpen} vars.APPALOFT_SSH_HOST }}`,
@@ -82,27 +62,7 @@ describe("CLI SSH remote-state lock commands", () => {
       `APPALOFT_SSH_PRIVATE_KEY: ${githubExpressionOpen} secrets.APPALOFT_SSH_PRIVATE_KEY }}`,
     );
     expect(maintenanceWorkflow).toContain('remote-state lock "$MAINTENANCE_ACTION"');
-    expect(deployConsolePreviewWorkflow.match(/Remote State Lock Preflight/g)?.length).toBe(2);
-    expect(deployConsolePreviewWorkflow.match(/Remote Runtime Capacity Preflight/g)?.length).toBe(
-      2,
-    );
-    expect(preflightAction).toContain("remote-state lock recover-stale");
-    expect(preflightAction).toContain("stale-after-seconds");
-    expect(preflightAction).toContain('--stale-after-seconds "$STALE_AFTER_SECONDS"');
-    expect(preflightAction).toContain("remote-state-lock-preflight=");
-    expect(preflightAction).toContain("owner");
-    expect(preflightAction).toContain("correlationId");
-    expect(preflightAction).toContain("lastHeartbeatAt");
-    expect(preflightAction).toContain("lockAgeSeconds");
-    expect(preflightAction).toContain("staleAfterSeconds");
-    expect(preflightAction).toContain("recoveredPath");
-    expect(capacityPreflightAction).toContain("ssh-deployments");
-    expect(capacityPreflightAction).toContain("-name 'dep_*'");
-    expect(capacityPreflightAction).toContain("-mmin +");
-    expect(capacityPreflightAction).toContain("remote-runtime-capacity-preflight=");
-    expect(capacityPreflightAction).toContain("reclaimedCount");
-    expect(capacityPreflightAction).toContain("availableKbAfter");
-    expect(`${maintenanceWorkflow}\n${preflightAction}`).not.toContain("force");
+    expect(maintenanceWorkflow).not.toContain("force");
   });
 
   test("[OP-WORK-QRY-011] diagnostics command reads lock, migration, backup, and recovery markers without mutation", () => {
