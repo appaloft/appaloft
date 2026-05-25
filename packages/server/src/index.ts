@@ -587,6 +587,9 @@ export async function createAppaloftServer(
         db: database.db,
         type: "postgres",
       },
+      ...(config.betterAuthMinPasswordLength
+        ? { minPasswordLength: config.betterAuthMinPasswordLength }
+        : {}),
       ...(config.githubClientId ? { githubClientId: config.githubClientId } : {}),
       ...(config.githubClientSecret ? { githubClientSecret: config.githubClientSecret } : {}),
       ...(config.githubRedirectUri ? { githubRedirectUri: config.githubRedirectUri } : {}),

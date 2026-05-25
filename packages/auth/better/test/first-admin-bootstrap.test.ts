@@ -63,6 +63,40 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("local-admin-password");
   });
 
+  test("[FIRST-ADMIN-BOOTSTRAP-008] honors configured local password length for test runtimes", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      minPasswordLength: 1,
+    });
+
+    const result = await runtime.bootstrapFirstAdmin(context, {
+      email: "admin@example.com",
+      displayName: "Admin User",
+      organizationName: "Self-hosted Appaloft",
+      organizationSlug: "self-hosted-appaloft",
+      password: "admin",
+    });
+
+    expect(result.isOk()).toBe(true);
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "admin@example.com",
+          password: "admin",
+        }),
+      }),
+    );
+    expect(signedIn.status).toBe(200);
+  });
+
   test("[PRODUCT-AUTH-SIGNUP-001] ordinary signup creates a session and organization", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
