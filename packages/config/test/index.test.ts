@@ -224,7 +224,7 @@ describe("resolveConfig", () => {
         APPALOFT_FIRST_ADMIN_ORGANIZATION_NAME: "Admin Organization",
         APPALOFT_FIRST_ADMIN_ORGANIZATION_SLUG: "admin-organization",
         APPALOFT_FIRST_ADMIN_PASSWORD: "local-admin-password",
-        APPALOFT_BETTER_AUTH_LOCAL_CREDENTIAL_MIN_LENGTH: "4",
+        APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH: "4",
       },
     });
 
