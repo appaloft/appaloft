@@ -9,8 +9,7 @@ import { type UpsertGitHubAppInstallationUseCase } from "./upsert-github-app-ins
 @CommandHandler(UpsertGitHubAppInstallationCommand)
 @injectable()
 export class UpsertGitHubAppInstallationCommandHandler
-  implements
-    CommandHandlerContract<UpsertGitHubAppInstallationCommand, GitHubAppConnectionStatus>
+  implements CommandHandlerContract<UpsertGitHubAppInstallationCommand, GitHubAppConnectionStatus>
 {
   constructor(
     @inject(tokens.upsertGitHubAppInstallationUseCase)

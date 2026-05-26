@@ -26,9 +26,7 @@ export interface GitHubAppConnectionStatus {
   webhookUrl?: string;
 }
 
-export type GitHubAppConnectionQueryInput = z.input<
-  typeof githubAppConnectionQueryInputSchema
->;
+export type GitHubAppConnectionQueryInput = z.input<typeof githubAppConnectionQueryInputSchema>;
 export type UpsertGitHubAppInstallationCommandInput = z.input<
   typeof upsertGitHubAppInstallationCommandInputSchema
 >;

@@ -18,7 +18,7 @@ export class PgGitHubAppInstallationRepository implements GitHubAppInstallationR
     context: RepositoryContext,
     input: { tenantId: string; providerKey: "github" },
   ): Promise<Result<GitHubAppInstallationRecord | null>> {
-    const row = await resolveRepositoryExecutor(context, this.db)
+    const row = await resolveRepositoryExecutor(this.db, context)
       .selectFrom("github_app_installations")
       .selectAll()
       .where("tenant_id", "=", input.tenantId)
@@ -32,7 +32,7 @@ export class PgGitHubAppInstallationRepository implements GitHubAppInstallationR
     context: RepositoryContext,
     input: { installationId: string; providerKey: "github" },
   ): Promise<Result<GitHubAppInstallationRecord | null>> {
-    const row = await resolveRepositoryExecutor(context, this.db)
+    const row = await resolveRepositoryExecutor(this.db, context)
       .selectFrom("github_app_installations")
       .selectAll()
       .where("provider_key", "=", input.providerKey)
@@ -47,7 +47,7 @@ export class PgGitHubAppInstallationRepository implements GitHubAppInstallationR
     record: GitHubAppInstallationRecord,
   ): Promise<Result<GitHubAppInstallationRecord>> {
     const values = valuesFromRecord(record);
-    const row = await resolveRepositoryExecutor(context, this.db)
+    const row = await resolveRepositoryExecutor(this.db, context)
       .insertInto("github_app_installations")
       .values(values)
       .onConflict((oc) =>
@@ -73,7 +73,7 @@ export class PgGitHubAppInstallationRepository implements GitHubAppInstallationR
     context: RepositoryContext,
     input: { installationId: string; providerKey: "github"; suspendedAt: string },
   ): Promise<Result<GitHubAppInstallationRecord | null>> {
-    const row = await resolveRepositoryExecutor(context, this.db)
+    const row = await resolveRepositoryExecutor(this.db, context)
       .updateTable("github_app_installations")
       .set({
         suspended_at: input.suspendedAt,
@@ -108,19 +108,18 @@ function valuesFromRecord(
 
 function recordFromRow(row: GitHubAppInstallationRow): GitHubAppInstallationRecord {
   return {
-    accountId: row.account_id ?? undefined,
-    accountLogin: row.account_login ?? undefined,
-    accountType: row.account_type ?? undefined,
     installationId: row.installation_id,
     installedAt: row.installed_at,
     providerKey: "github",
-    repositoriesSelection:
-      row.repositories_selection === "all" || row.repositories_selection === "selected"
-        ? row.repositories_selection
-        : undefined,
-    repositoryCount: row.repository_count ?? undefined,
-    suspendedAt: row.suspended_at ?? undefined,
     tenantId: row.tenant_id,
     updatedAt: row.updated_at,
+    ...(row.account_id ? { accountId: row.account_id } : {}),
+    ...(row.account_login ? { accountLogin: row.account_login } : {}),
+    ...(row.account_type ? { accountType: row.account_type } : {}),
+    ...(row.repositories_selection === "all" || row.repositories_selection === "selected"
+      ? { repositoriesSelection: row.repositories_selection }
+      : {}),
+    ...(row.repository_count !== null ? { repositoryCount: row.repository_count } : {}),
+    ...(row.suspended_at ? { suspendedAt: row.suspended_at } : {}),
   };
 }

@@ -1674,17 +1674,25 @@ export function registerRuntimeDependencies(
       () =>
         new InMemoryIntegrationRegistry([
           createGitHubIntegrationDescriptor({
-            appId: input.config.githubAppId,
-            callbackUrl: input.config.githubAppCallbackUrl,
-            connectionMode: input.config.githubConnectionMode,
-            installUrl: input.config.githubAppInstallUrl,
-            owner: input.config.githubAppOwner,
             privateKeyConfigured: Boolean(
               input.config.githubAppPrivateKey || input.config.githubAppPrivateKeyBase64,
             ),
-            slug: input.config.githubAppSlug,
             webhookSecretConfigured: Boolean(input.config.githubAppWebhookSecret),
-            webhookUrl: input.config.githubAppWebhookUrl,
+            ...(input.config.githubAppId ? { appId: input.config.githubAppId } : {}),
+            ...(input.config.githubAppCallbackUrl
+              ? { callbackUrl: input.config.githubAppCallbackUrl }
+              : {}),
+            ...(input.config.githubConnectionMode
+              ? { connectionMode: input.config.githubConnectionMode }
+              : {}),
+            ...(input.config.githubAppInstallUrl
+              ? { installUrl: input.config.githubAppInstallUrl }
+              : {}),
+            ...(input.config.githubAppOwner ? { owner: input.config.githubAppOwner } : {}),
+            ...(input.config.githubAppSlug ? { slug: input.config.githubAppSlug } : {}),
+            ...(input.config.githubAppWebhookUrl
+              ? { webhookUrl: input.config.githubAppWebhookUrl }
+              : {}),
           }),
           gitlabIntegration,
         ]),
@@ -1722,9 +1730,13 @@ export function registerRuntimeDependencies(
   container.register(tokens.githubAppRuntime, {
     useFactory: instanceCachingFactory(() =>
       createGitHubAppRuntime({
-        appId: input.config.githubAppId,
-        privateKey: input.config.githubAppPrivateKey,
-        privateKeyBase64: input.config.githubAppPrivateKeyBase64,
+        ...(input.config.githubAppId ? { appId: input.config.githubAppId } : {}),
+        ...(input.config.githubAppPrivateKey
+          ? { privateKey: input.config.githubAppPrivateKey }
+          : {}),
+        ...(input.config.githubAppPrivateKeyBase64
+          ? { privateKeyBase64: input.config.githubAppPrivateKeyBase64 }
+          : {}),
       }),
     ),
   });

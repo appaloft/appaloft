@@ -217,8 +217,8 @@ import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
-import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
+import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
 import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";

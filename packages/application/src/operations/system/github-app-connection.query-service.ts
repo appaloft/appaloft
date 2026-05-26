@@ -1,10 +1,7 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import {
-  type GitHubAppInstallationRepository,
-  type IntegrationRegistry,
-} from "../../ports";
+import { type GitHubAppInstallationRepository, type IntegrationRegistry } from "../../ports";
 import { tokens } from "../../tokens";
 import { type GitHubAppConnectionStatus } from "./github-app-connection.schema";
 
@@ -52,7 +49,9 @@ export class GitHubAppConnectionQueryService {
       ...(installation.value?.installationId
         ? { installationId: installation.value.installationId }
         : {}),
-      ...(installation.value?.accountLogin ? { accountLogin: installation.value.accountLogin } : {}),
+      ...(installation.value?.accountLogin
+        ? { accountLogin: installation.value.accountLogin }
+        : {}),
       ...(installation.value?.accountType ? { accountType: installation.value.accountType } : {}),
       ...(installation.value?.repositoryCount !== undefined
         ? { repositoryCount: installation.value.repositoryCount }

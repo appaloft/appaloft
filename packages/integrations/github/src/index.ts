@@ -76,7 +76,8 @@ export const githubIntegration: IntegrationDescriptor = {
 export function createGitHubIntegrationDescriptor(
   options: GitHubAppIntegrationOptions = {},
 ): IntegrationDescriptor {
-  const connectionMode = options.connectionMode ?? githubIntegration.defaultConnectionModeKey;
+  const connectionMode =
+    options.connectionMode ?? githubIntegration.defaultConnectionModeKey ?? "user-oauth";
   const appMode =
     connectionMode === "hosted-provider-app" || connectionMode === "operator-managed-app";
   const missing: string[] = [];
@@ -104,25 +105,29 @@ export function createGitHubIntegrationDescriptor(
   return {
     ...githubIntegration,
     defaultConnectionModeKey: connectionMode,
-    setup: appMode
+    ...(appMode
       ? {
-          providerApp: {
-            ...(options.installUrl ? { installUrl: options.installUrl } : {}),
-            ...(options.callbackUrl ? { callbackUrl: options.callbackUrl } : {}),
-            ...(options.webhookUrl ? { webhookUrl: options.webhookUrl } : {}),
+          setup: {
+            providerApp: {
+              ...(options.installUrl ? { installUrl: options.installUrl } : {}),
+              ...(options.callbackUrl ? { callbackUrl: options.callbackUrl } : {}),
+              ...(options.webhookUrl ? { webhookUrl: options.webhookUrl } : {}),
+            },
           },
         }
-      : undefined,
-    configuration: appMode
+      : {}),
+    ...(appMode
       ? {
-          status,
-          diagnostics: missing.map((code) => ({
-            code,
-            severity: "error" as const,
-            message: `GitHub App configuration is missing ${code.replace("github_app_", "").replaceAll("_", " ")}.`,
-          })),
+          configuration: {
+            status,
+            diagnostics: missing.map((code) => ({
+              code,
+              severity: "error" as const,
+              message: `GitHub App configuration is missing ${code.replace("github_app_", "").replaceAll("_", " ")}.`,
+            })),
+          },
         }
-      : undefined,
+      : {}),
   };
 }
 
@@ -319,12 +324,14 @@ export class GitHubApiAppRuntime implements GitHubAppRuntime {
 
     const payload = (await response.json()) as GitHubInstallationApiRecord;
     return ok({
-      accountId: payload.account?.id ? String(payload.account.id) : undefined,
-      accountLogin: payload.account?.login,
-      accountType: payload.account?.type,
       installationId: String(payload.id),
-      repositoriesSelection: payload.repository_selection,
-      suspendedAt: payload.suspended_at ?? undefined,
+      ...(payload.account?.id ? { accountId: String(payload.account.id) } : {}),
+      ...(payload.account?.login ? { accountLogin: payload.account.login } : {}),
+      ...(payload.account?.type ? { accountType: payload.account.type } : {}),
+      ...(payload.repository_selection
+        ? { repositoriesSelection: payload.repository_selection }
+        : {}),
+      ...(payload.suspended_at ? { suspendedAt: payload.suspended_at } : {}),
     });
   }
 
