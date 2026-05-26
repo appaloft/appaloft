@@ -213,6 +213,8 @@ import {
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
   ListGitHubRepositoriesQueryService,
+  ListIntegrationsQueryHandler,
+  ListIntegrationsQueryService,
   ListOperatorWorkQueryHandler,
   ListOrganizationInvitationsQueryHandler,
   ListOrganizationInvitationsQueryService,
@@ -2295,6 +2297,7 @@ export function registerApplicationServices(
   container.registerSingleton(CloseTerminalSessionCommandHandler);
   container.registerSingleton(ExpireTerminalSessionsCommandHandler);
   container.registerSingleton(ListDeployTokensQueryHandler);
+  container.registerSingleton(ListIntegrationsQueryHandler);
   container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
@@ -3058,6 +3061,7 @@ export function registerApplicationServices(
     ResourceProxyConfigurationPreviewQueryService,
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
+  container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(
     tokens.listGitHubRepositoriesQueryService,

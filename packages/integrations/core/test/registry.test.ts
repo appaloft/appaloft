@@ -8,6 +8,25 @@ describe("integration registry contract", () => {
         key: "github",
         title: "GitHub",
         capabilities: ["repository-browser", "oauth"],
+        defaultConnectionModeKey: "user-oauth",
+        connectionModes: [
+          {
+            key: "user-oauth",
+            title: "User OAuth",
+            audience: "end-user",
+            externalSetup: "none",
+            createsExternalResources: false,
+            secretMaterialRequired: false,
+          },
+          {
+            key: "operator-managed-app",
+            title: "Operator-managed app",
+            audience: "instance-admin",
+            externalSetup: "manual-provider-app",
+            createsExternalResources: false,
+            secretMaterialRequired: true,
+          },
+        ],
       },
       {
         key: "gitlab",
@@ -21,6 +40,19 @@ describe("integration registry contract", () => {
         expect.objectContaining({
           key: "github",
           capabilities: ["repository-browser", "oauth"],
+          defaultConnectionModeKey: "user-oauth",
+          connectionModes: expect.arrayContaining([
+            expect.objectContaining({
+              key: "user-oauth",
+              externalSetup: "none",
+              secretMaterialRequired: false,
+            }),
+            expect.objectContaining({
+              key: "operator-managed-app",
+              externalSetup: "manual-provider-app",
+              secretMaterialRequired: true,
+            }),
+          ]),
         }),
         expect.objectContaining({
           key: "gitlab",

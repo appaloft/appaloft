@@ -22,6 +22,29 @@ export const githubIntegration: IntegrationDescriptor = {
   key: "github",
   title: "GitHub",
   capabilities: ["repository-import", "webhook-ready", "future-pr-comment"],
+  defaultConnectionModeKey: "user-oauth",
+  connectionModes: [
+    {
+      key: "user-oauth",
+      title: "User OAuth",
+      audience: "end-user",
+      externalSetup: "none",
+      createsExternalResources: false,
+      secretMaterialRequired: false,
+      description:
+        "Browse repositories with the signed-in user's GitHub account without storing GitHub App private key material.",
+    },
+    {
+      key: "operator-managed-app",
+      title: "Operator-managed app",
+      audience: "instance-admin",
+      externalSetup: "manual-provider-app",
+      createsExternalResources: false,
+      secretMaterialRequired: true,
+      description:
+        "Use a GitHub App owned by the Appaloft instance operator for repository events and installation-scoped access.",
+    },
+  ],
 };
 
 interface GitHubRepositoryApiRecord {

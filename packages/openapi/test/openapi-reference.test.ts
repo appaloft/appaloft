@@ -74,6 +74,7 @@ describe("Appaloft OpenAPI reference package", () => {
       "Observability",
     ]);
     expect(spec.paths?.["/domain-events/prune"]?.post?.tags).toEqual(["Observability"]);
+    expect(spec.paths?.["/integrations"]?.get?.tags).toEqual(["Integrations"]);
     expect(spec.paths?.["/integrations/github/repositories"]?.get?.tags).toEqual(["Integrations"]);
   });
 
@@ -135,6 +136,21 @@ describe("Appaloft OpenAPI reference package", () => {
     expect(streamDeploymentEvents).toMatchObject({
       "x-appaloft-operation-key": "deployments.stream-events",
       "x-appaloft-streaming": true,
+    });
+  });
+
+  test("[INTEGRATION-SOURCE-001] annotates integration catalog as a neutral system operation", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+    const listIntegrations = spec.paths?.["/integrations"]?.get;
+
+    expect(listIntegrations).toMatchObject({
+      "x-appaloft-operation-key": "system.integrations.list",
+      "x-appaloft-operation-kind": "query",
+      "x-appaloft-operation-domain": "system",
+      "x-appaloft-message-name": "ListIntegrationsQuery",
+      "x-appaloft-auth-policy": "product-session",
+      "x-appaloft-error-family": "structured-platform-error",
+      "x-appaloft-streaming": false,
     });
   });
 

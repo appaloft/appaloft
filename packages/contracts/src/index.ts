@@ -5813,8 +5813,31 @@ export const providerDescriptorSchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
+export const integrationConnectionModeSchema = z.object({
+  key: z.enum(["user-oauth", "hosted-provider-app", "operator-managed-app"]),
+  title: z.string(),
+  audience: z.enum(["end-user", "instance-admin", "operator"]),
+  externalSetup: z.enum(["none", "provider-installation", "manual-provider-app"]),
+  createsExternalResources: z.boolean(),
+  secretMaterialRequired: z.boolean(),
+  description: z.string().optional(),
+});
+
+export const integrationDescriptorSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  capabilities: z.array(z.string()),
+  defaultConnectionModeKey: z.string().optional(),
+  connectionModes: z.array(integrationConnectionModeSchema).optional(),
+  configuration: systemConfigurationSummarySchema.optional(),
+});
+
 export const listProvidersResponseSchema = z.object({
   items: z.array(providerDescriptorSchema),
+});
+
+export const listIntegrationsResponseSchema = z.object({
+  items: z.array(integrationDescriptorSchema),
 });
 
 export const listPluginsResponseSchema = z.object({
@@ -5896,6 +5919,7 @@ export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyRe
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
+export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
@@ -6495,6 +6519,7 @@ export type TerminalSessionFrame = z.infer<typeof terminalSessionFrameSchema>;
 export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
+export type ListIntegrationsResponse = z.infer<typeof listIntegrationsResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;
 export type ListGitHubRepositoriesInput = z.infer<typeof listGitHubRepositoriesInputSchema>;
 export type ListGitHubRepositoriesResponse = z.infer<typeof listGitHubRepositoriesResponseSchema>;

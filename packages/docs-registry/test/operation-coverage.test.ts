@@ -770,6 +770,7 @@ describe("public docs operation coverage", () => {
   test("[SYSTEM-DIAG-DOCS-001] system diagnostics operations record safe docs coverage", async () => {
     const providerCoverage = getPublicDocsOperationCoverage("system.providers.list");
     const pluginCoverage = getPublicDocsOperationCoverage("system.plugins.list");
+    const integrationCoverage = getPublicDocsOperationCoverage("system.integrations.list");
     const providerTopic = publicDocsHelpTopics["advanced.provider-boundary"];
     const pluginTopic = publicDocsHelpTopics["advanced.plugin-boundary"];
 
@@ -782,6 +783,11 @@ describe("public docs operation coverage", () => {
       operationKey: "system.plugins.list",
       status: "documented",
       topicId: "advanced.plugin-boundary",
+    });
+    expect(integrationCoverage).toMatchObject({
+      operationKey: "system.integrations.list",
+      status: "documented",
+      topicId: "deployment.source",
     });
     expect(providerTopic.specReferences).toEqual(
       expect.arrayContaining([

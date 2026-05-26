@@ -3626,6 +3626,11 @@ export const publicDocsOperationCoverage = [
     topicId: "advanced.plugin-boundary",
   },
   {
+    operationKey: "system.integrations.list",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
     operationKey: "system.github-repositories.list",
     status: "documented",
     topicId: "deployment.source",

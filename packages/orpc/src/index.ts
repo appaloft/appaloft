@@ -211,6 +211,7 @@ import {
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListGitHubRepositoriesQuery,
+  ListIntegrationsQuery,
   ListOperatorWorkQuery,
   ListOrganizationInvitationsQuery,
   ListOrganizationMembersQuery,
@@ -594,6 +595,7 @@ import {
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
   listGitHubRepositoriesResponseSchema,
+  listIntegrationsResponseSchema,
   listOperatorWorkResponseSchema,
   listOrganizationInvitationsResponseSchema,
   listOrganizationMembersResponseSchema,
@@ -5396,6 +5398,15 @@ export const listProvidersProcedure = base
   .output(listProvidersResponseSchema)
   .handler(async ({ context }) => executeQuery(context, ListProvidersQuery.create()));
 
+export const listIntegrationsProcedure = base
+  .route({
+    method: "GET",
+    path: "/integrations",
+    successStatus: 200,
+  })
+  .output(listIntegrationsResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListIntegrationsQuery.create()));
+
 export const listPluginsProcedure = base
   .route({
     method: "GET",
@@ -5753,6 +5764,7 @@ export const appaloftOrpcRouter = {
     doctor: doctorProcedure,
   },
   integrations: {
+    list: listIntegrationsProcedure,
     github: {
       repositories: {
         list: listGitHubRepositoriesProcedure,
@@ -8077,6 +8089,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/providers",
     "/api/plugins",
     "/api/system/doctor",
+    "/api/integrations",
     "/api/integrations/github/repositories",
   ] as const;
 

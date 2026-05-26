@@ -249,6 +249,7 @@ export * from "./operations/system/db-migrate.use-case";
 export * from "./operations/system/db-status.query-service";
 export * from "./operations/system/doctor.query-service";
 export * from "./operations/system/list-github-repositories.query-service";
+export * from "./operations/system/list-integrations.query-service";
 export * from "./operations/system/list-plugins.query-service";
 export * from "./operations/system/list-providers.query-service";
 export * from "./operations/terminal-sessions/open-terminal-session.use-case";

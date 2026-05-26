@@ -53,6 +53,7 @@
     CreateResourceInput,
     EnvironmentSummary,
     GitHubRepositorySummary,
+    IntegrationDescriptor,
     ProjectSummary,
     RegisterServerInput,
     ResourceSummary,
@@ -451,6 +452,13 @@
       enabled: browser && enabled,
     }),
   );
+  const integrationsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["integrations"],
+      queryFn: () => orpcClient.integrations.list(),
+      enabled: browser && enabled,
+    }),
+  );
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["system-plugins", "web-extensions"],
@@ -706,6 +714,27 @@
   const environments = $derived((environmentsQuery.data?.items ?? []) as EnvironmentSummary[]);
   const resources = $derived((resourcesQuery.data?.items ?? []) as ResourceSummary[]);
   const providers = $derived((providersQuery.data?.items ?? []) as ProviderSummary[]);
+  const integrations = $derived((integrationsQuery.data?.items ?? []) as IntegrationDescriptor[]);
+  const githubIntegration = $derived(
+    integrations.find((integration) => integration.key === "github") ?? null,
+  );
+  const githubConnectionMode = $derived.by(() => {
+    const modes = githubIntegration?.connectionModes ?? [];
+    const defaultModeKey = githubIntegration?.defaultConnectionModeKey;
+
+    return modes.find((mode) => mode.key === defaultModeKey) ?? modes[0] ?? null;
+  });
+  const githubUsesHostedProviderApp = $derived(githubConnectionMode?.key === "hosted-provider-app");
+  const githubHostedProviderAppConfigured = $derived(
+    githubIntegration?.configuration?.status === "configured",
+  );
+  const githubRepositoryBrowsingEnabled = $derived.by(() => {
+    if (githubUsesHostedProviderApp) {
+      return githubHostedProviderAppConfigured;
+    }
+
+    return Boolean(githubProvider?.configured) && Boolean(githubProvider?.connected);
+  });
   const quickDeploySourceExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "quick-deploy-source")
@@ -1398,7 +1427,13 @@
 
   const githubRepositoriesQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["integrations", "github", "repositories", githubRepositorySearch.trim()],
+      queryKey: [
+        "integrations",
+        "github",
+        githubConnectionMode?.key ?? "user-oauth",
+        "repositories",
+        githubRepositorySearch.trim(),
+      ],
       queryFn: () =>
         orpcClient.integrations.github.repositories.list({
           ...(githubRepositorySearch.trim() ? { search: githubRepositorySearch.trim() } : {}),
@@ -1408,8 +1443,7 @@
         enabled &&
         sourceKind === "github" &&
         githubSourceMode === "browser" &&
-        Boolean(githubProvider?.configured) &&
-        Boolean(githubProvider?.connected),
+        githubRepositoryBrowsingEnabled,
     }),
   );
   const githubRepositories = $derived(
@@ -1579,6 +1613,13 @@
 
     if (changed) {
       blueprintDependencyProvisioningDrafts = nextDrafts;
+    }
+  });
+
+  $effect(() => {
+    if (sourceKind === "github" && githubUsesHostedProviderApp && githubSourceMode !== "browser") {
+      githubSourceMode = "browser";
+      githubSourceModeTouched = false;
     }
   });
 
@@ -2269,7 +2310,11 @@
         resourceInternalPort = "80";
       }
     }
-    if (kind === "github" && githubConnected && !githubLocator.trim()) {
+    if (
+      kind === "github" &&
+      (githubUsesHostedProviderApp || githubConnected) &&
+      !githubLocator.trim()
+    ) {
       githubSourceMode = "browser";
       githubSourceModeTouched = false;
     }
@@ -2279,6 +2324,12 @@
   }
 
   function selectGithubSourceMode(mode: GithubSourceMode): void {
+    if (githubUsesHostedProviderApp && mode === "url") {
+      githubSourceMode = "browser";
+      githubSourceModeTouched = false;
+      return;
+    }
+
     githubSourceMode = mode;
     githubSourceModeTouched = true;
     if (mode === "url") {
@@ -2620,6 +2671,15 @@
 
   async function connectGitHub(): Promise<void> {
     try {
+      if (githubUsesHostedProviderApp) {
+        deployFeedback = {
+          kind: "error",
+          title: $t(i18nKeys.common.actions.connectGitHub),
+          detail: $t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending),
+        };
+        return;
+      }
+
       githubSourceMode = "browser";
       const endpoint =
         authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social";
@@ -3331,14 +3391,16 @@
             </div>
             {#if sourceKind === "github"}
               <div class="space-y-3">
-                <div class="grid gap-2 sm:grid-cols-2">
-                  <Button
-                    type="button"
-                    variant={githubSourceMode === "url" ? "selected" : "outline"}
-                    onclick={() => selectGithubSourceMode("url")}
-                  >
-                    {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
-                  </Button>
+                <div class={githubUsesHostedProviderApp ? "grid gap-2" : "grid gap-2 sm:grid-cols-2"}>
+                  {#if !githubUsesHostedProviderApp}
+                    <Button
+                      type="button"
+                      variant={githubSourceMode === "url" ? "selected" : "outline"}
+                      onclick={() => selectGithubSourceMode("url")}
+                    >
+                      {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
+                    </Button>
+                  {/if}
                   <Button
                     type="button"
                     variant={githubSourceMode === "browser" ? "selected" : "outline"}
@@ -3791,9 +3853,17 @@
               <div class="flex items-center justify-between gap-2">
                 <div>
                   <p class="text-sm font-medium">{$t(i18nKeys.console.quickDeploy.githubRepository)}</p>
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.quickDeploy.githubOnlyLoginWhenNeeded)}</p>
+                  <p class="text-xs text-muted-foreground">
+                    {githubUsesHostedProviderApp
+                      ? $t(i18nKeys.console.quickDeploy.githubHostedProviderAppHint)
+                      : $t(i18nKeys.console.quickDeploy.githubOnlyLoginWhenNeeded)}
+                  </p>
                 </div>
-                {#if githubConnected}
+                {#if githubUsesHostedProviderApp && githubHostedProviderAppConfigured}
+                  <Badge>{$t(i18nKeys.common.status.configured)}</Badge>
+                {:else if githubUsesHostedProviderApp}
+                  <Badge variant="outline">{$t(i18nKeys.common.status.notConfigured)}</Badge>
+                {:else if githubConnected}
                   <Badge>{$t(i18nKeys.common.status.connected)}</Badge>
                 {:else}
                   <Badge variant="outline">{$t(i18nKeys.common.status.onDemandAuthorization)}</Badge>
@@ -3806,11 +3876,18 @@
                 </div>
               {/if}
 
-              {#if !githubProvider?.configured}
+              {#if githubUsesHostedProviderApp && !githubHostedProviderAppConfigured}
+                <div class="console-subtle-panel space-y-2 px-3 py-3 text-sm text-muted-foreground">
+                  <p>{$t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending)}</p>
+                  {#each githubIntegration?.configuration?.diagnostics ?? [] as diagnostic (diagnostic.code)}
+                    <p>{diagnostic.message}</p>
+                  {/each}
+                </div>
+              {:else if !githubUsesHostedProviderApp && !githubProvider?.configured}
                 <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.githubOAuthNotConfigured)}
                 </div>
-              {:else if !githubConnected}
+              {:else if !githubUsesHostedProviderApp && !githubConnected}
                 <Button variant="outline" class="w-full" onclick={connectGitHub}>
                   <GitHubIcon class="size-4" />
                   {$t(i18nKeys.common.actions.connectGitHub)}

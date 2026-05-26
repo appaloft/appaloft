@@ -8778,11 +8778,42 @@ export interface IntegrationDescriptor {
   key: string;
   title: string;
   capabilities: string[];
+  defaultConnectionModeKey?: string;
+  connectionModes?: IntegrationConnectionMode[];
+  configuration?: {
+    status: "configured" | "not-configured" | "partial" | "unknown";
+    diagnostics: {
+      code: string;
+      severity: "info" | "warning" | "error";
+      message: string;
+      documentationHref?: string;
+    }[];
+  };
 }
 
 export interface ProviderRegistry {
   list(): ProviderDescriptor[];
   findByKey(key: string): ProviderDescriptor | null;
+}
+
+export type IntegrationConnectionModeAudience = "end-user" | "instance-admin" | "operator";
+export type IntegrationConnectionModeExternalSetup =
+  | "none"
+  | "provider-installation"
+  | "manual-provider-app";
+export type IntegrationConnectionModeKey =
+  | "user-oauth"
+  | "hosted-provider-app"
+  | "operator-managed-app";
+
+export interface IntegrationConnectionMode {
+  key: IntegrationConnectionModeKey;
+  title: string;
+  audience: IntegrationConnectionModeAudience;
+  externalSetup: IntegrationConnectionModeExternalSetup;
+  createsExternalResources: boolean;
+  secretMaterialRequired: boolean;
+  description?: string;
 }
 
 export interface IntegrationRegistry {

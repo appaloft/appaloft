@@ -3764,6 +3764,23 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "system.integrations.list",
+    operationGroup: "system",
+    operationMethod: "integrationsList",
+    operationId: "integrations.list",
+    kind: "query",
+    domain: "system",
+    messageName: "ListIntegrationsQuery",
+    route: {
+      method: "GET",
+      path: "/integrations",
+    },
+    docsHref: "/docs/deploy/sources/#deployment-source",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "system.plugins.list",
     operationGroup: "system",
     operationMethod: "pluginsList",
