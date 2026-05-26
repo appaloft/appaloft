@@ -587,12 +587,8 @@ export async function createAppaloftServer(
         db: database.db,
         type: "postgres",
       },
-      ...(config.betterAuthCookieDomain
-        ? { cookieDomain: config.betterAuthCookieDomain }
-        : {}),
-      ...(config.betterAuthCookiePrefix
-        ? { cookiePrefix: config.betterAuthCookiePrefix }
-        : {}),
+      ...(config.betterAuthCookieDomain ? { cookieDomain: config.betterAuthCookieDomain } : {}),
+      ...(config.betterAuthCookiePrefix ? { cookiePrefix: config.betterAuthCookiePrefix } : {}),
       ...(config.betterAuthMinPasswordLength
         ? { minPasswordLength: config.betterAuthMinPasswordLength }
         : {}),
