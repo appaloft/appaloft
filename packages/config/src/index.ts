@@ -358,6 +358,19 @@ function parsePositiveInteger(value: string | number | undefined): number | unde
   return normalized > 0 ? normalized : undefined;
 }
 
+function defaultBetterAuthCallbackUrl(baseUrl: string, path: string): string | undefined {
+  try {
+    const url = new URL(baseUrl);
+    url.pathname = `${url.pathname.replace(/\/+$/g, "")}${path}`;
+    url.search = "";
+    url.hash = "";
+
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 function normalizeOtlpTraceEndpointFromBase(endpoint: string): string {
   const trimmed = endpoint.trim().replace(/\/+$/, "");
 
@@ -658,6 +671,55 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_BOOTSTRAP_DEPLOY_TOKEN_OUTPUT_FILE ??
       fileConfig.bootstrapDeployTokenOutputFile)
     : undefined;
+  const betterAuthBaseUrl =
+    source.flags?.betterAuthBaseUrl ??
+    env.APPALOFT_BETTER_AUTH_URL ??
+    fileConfig.betterAuthBaseUrl ??
+    defaults.betterAuthBaseUrl;
+  const webOrigin =
+    source.flags?.webOrigin ??
+    env.APPALOFT_WEB_ORIGIN ??
+    fileConfig.webOrigin ??
+    defaults.webOrigin;
+  const githubClientId =
+    source.flags?.githubClientId ?? env.APPALOFT_GITHUB_CLIENT_ID ?? fileConfig.githubClientId;
+  const githubClientSecret =
+    source.flags?.githubClientSecret ??
+    env.APPALOFT_GITHUB_CLIENT_SECRET ??
+    fileConfig.githubClientSecret;
+  const githubRedirectUri =
+    source.flags?.githubRedirectUri ??
+    env.APPALOFT_GITHUB_REDIRECT_URI ??
+    fileConfig.githubRedirectUri ??
+    (githubClientId && githubClientSecret
+      ? defaultBetterAuthCallbackUrl(betterAuthBaseUrl, "/api/auth/callback/github")
+      : undefined);
+  const googleClientId =
+    source.flags?.googleClientId ?? env.APPALOFT_GOOGLE_CLIENT_ID ?? fileConfig.googleClientId;
+  const googleClientSecret =
+    source.flags?.googleClientSecret ??
+    env.APPALOFT_GOOGLE_CLIENT_SECRET ??
+    fileConfig.googleClientSecret;
+  const googleRedirectUri =
+    source.flags?.googleRedirectUri ??
+    env.APPALOFT_GOOGLE_REDIRECT_URI ??
+    fileConfig.googleRedirectUri ??
+    (googleClientId && googleClientSecret
+      ? defaultBetterAuthCallbackUrl(betterAuthBaseUrl, "/api/auth/callback/google")
+      : undefined);
+  const oidcClientId =
+    source.flags?.oidcClientId ?? env.APPALOFT_OIDC_CLIENT_ID ?? fileConfig.oidcClientId;
+  const oidcClientSecret =
+    source.flags?.oidcClientSecret ??
+    env.APPALOFT_OIDC_CLIENT_SECRET ??
+    fileConfig.oidcClientSecret;
+  const oidcRedirectUri =
+    source.flags?.oidcRedirectUri ??
+    env.APPALOFT_OIDC_REDIRECT_URI ??
+    fileConfig.oidcRedirectUri ??
+    (oidcClientId && oidcClientSecret
+      ? defaultBetterAuthCallbackUrl(betterAuthBaseUrl, "/api/auth/oauth2/callback/oidc")
+      : undefined);
 
   return {
     appName:
@@ -677,11 +739,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       (env.APPALOFT_AUTH_PROVIDER as AppConfig["authProvider"] | undefined) ??
       fileConfig.authProvider ??
       defaults.authProvider,
-    betterAuthBaseUrl:
-      source.flags?.betterAuthBaseUrl ??
-      env.APPALOFT_BETTER_AUTH_URL ??
-      fileConfig.betterAuthBaseUrl ??
-      defaults.betterAuthBaseUrl,
+    betterAuthBaseUrl,
     ...(source.flags?.betterAuthCookieDomain ||
     env.APPALOFT_BETTER_AUTH_COOKIE_DOMAIN ||
     fileConfig.betterAuthCookieDomain
@@ -799,78 +857,14 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             fileConfig.firstAdminOrganizationSlug,
         }
       : {}),
-    ...(source.flags?.githubClientId || env.APPALOFT_GITHUB_CLIENT_ID || fileConfig.githubClientId
-      ? {
-          githubClientId:
-            source.flags?.githubClientId ??
-            env.APPALOFT_GITHUB_CLIENT_ID ??
-            fileConfig.githubClientId,
-        }
-      : {}),
-    ...(source.flags?.githubClientSecret ||
-    env.APPALOFT_GITHUB_CLIENT_SECRET ||
-    fileConfig.githubClientSecret
-      ? {
-          githubClientSecret:
-            source.flags?.githubClientSecret ??
-            env.APPALOFT_GITHUB_CLIENT_SECRET ??
-            fileConfig.githubClientSecret,
-        }
-      : {}),
-    ...(source.flags?.githubRedirectUri ||
-    env.APPALOFT_GITHUB_REDIRECT_URI ||
-    fileConfig.githubRedirectUri
-      ? {
-          githubRedirectUri:
-            source.flags?.githubRedirectUri ??
-            env.APPALOFT_GITHUB_REDIRECT_URI ??
-            fileConfig.githubRedirectUri,
-        }
-      : {}),
-    ...(source.flags?.googleClientId || env.APPALOFT_GOOGLE_CLIENT_ID || fileConfig.googleClientId
-      ? {
-          googleClientId:
-            source.flags?.googleClientId ??
-            env.APPALOFT_GOOGLE_CLIENT_ID ??
-            fileConfig.googleClientId,
-        }
-      : {}),
-    ...(source.flags?.googleClientSecret ||
-    env.APPALOFT_GOOGLE_CLIENT_SECRET ||
-    fileConfig.googleClientSecret
-      ? {
-          googleClientSecret:
-            source.flags?.googleClientSecret ??
-            env.APPALOFT_GOOGLE_CLIENT_SECRET ??
-            fileConfig.googleClientSecret,
-        }
-      : {}),
-    ...(source.flags?.googleRedirectUri ||
-    env.APPALOFT_GOOGLE_REDIRECT_URI ||
-    fileConfig.googleRedirectUri
-      ? {
-          googleRedirectUri:
-            source.flags?.googleRedirectUri ??
-            env.APPALOFT_GOOGLE_REDIRECT_URI ??
-            fileConfig.googleRedirectUri,
-        }
-      : {}),
-    ...(source.flags?.oidcClientId || env.APPALOFT_OIDC_CLIENT_ID || fileConfig.oidcClientId
-      ? {
-          oidcClientId:
-            source.flags?.oidcClientId ?? env.APPALOFT_OIDC_CLIENT_ID ?? fileConfig.oidcClientId,
-        }
-      : {}),
-    ...(source.flags?.oidcClientSecret ||
-    env.APPALOFT_OIDC_CLIENT_SECRET ||
-    fileConfig.oidcClientSecret
-      ? {
-          oidcClientSecret:
-            source.flags?.oidcClientSecret ??
-            env.APPALOFT_OIDC_CLIENT_SECRET ??
-            fileConfig.oidcClientSecret,
-        }
-      : {}),
+    ...(githubClientId ? { githubClientId } : {}),
+    ...(githubClientSecret ? { githubClientSecret } : {}),
+    ...(githubRedirectUri ? { githubRedirectUri } : {}),
+    ...(googleClientId ? { googleClientId } : {}),
+    ...(googleClientSecret ? { googleClientSecret } : {}),
+    ...(googleRedirectUri ? { googleRedirectUri } : {}),
+    ...(oidcClientId ? { oidcClientId } : {}),
+    ...(oidcClientSecret ? { oidcClientSecret } : {}),
     ...(source.flags?.oidcDiscoveryUrl ||
     env.APPALOFT_OIDC_DISCOVERY_URL ||
     fileConfig.oidcDiscoveryUrl
@@ -886,16 +880,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
           oidcIssuer: source.flags?.oidcIssuer ?? env.APPALOFT_OIDC_ISSUER ?? fileConfig.oidcIssuer,
         }
       : {}),
-    ...(source.flags?.oidcRedirectUri ||
-    env.APPALOFT_OIDC_REDIRECT_URI ||
-    fileConfig.oidcRedirectUri
-      ? {
-          oidcRedirectUri:
-            source.flags?.oidcRedirectUri ??
-            env.APPALOFT_OIDC_REDIRECT_URI ??
-            fileConfig.oidcRedirectUri,
-        }
-      : {}),
+    ...(oidcRedirectUri ? { oidcRedirectUri } : {}),
     ...(source.flags?.githubWebhookSecret ||
     env.APPALOFT_GITHUB_WEBHOOK_SECRET ||
     fileConfig.githubWebhookSecret
@@ -921,11 +906,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     httpPort: Number(
       source.flags?.httpPort ?? env.APPALOFT_HTTP_PORT ?? fileConfig.httpPort ?? defaults.httpPort,
     ),
-    webOrigin:
-      source.flags?.webOrigin ??
-      env.APPALOFT_WEB_ORIGIN ??
-      fileConfig.webOrigin ??
-      defaults.webOrigin,
+    webOrigin,
     ...(resourceAccessFailureRendererUrl ? { resourceAccessFailureRendererUrl } : {}),
     ...(source.flags?.webStaticDir || env.APPALOFT_WEB_STATIC_DIR || fileConfig.webStaticDir
       ? {

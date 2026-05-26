@@ -64,6 +64,33 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     ).toBe(true);
   });
 
+  test("[AUTH-GITHUB-OAUTH-001] derives GitHub callback URL from the Better Auth base URL", () => {
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://app.appaloft.com",
+      secret: "test-secret-at-least-long-enough",
+      githubClientId: "github-client-id",
+      githubClientSecret: "github-client-secret",
+      trustedOrigins: ["https://app.appaloft.com"],
+    });
+
+    expect(options.socialProviders).toMatchObject({
+      github: {
+        clientId: "github-client-id",
+        clientSecret: "github-client-secret",
+        redirectURI: "https://app.appaloft.com/api/auth/callback/github",
+      },
+    });
+    expect(
+      resolveAppaloftBetterAuthProviderConfig({
+        baseURL: "https://app.appaloft.com",
+        secret: "test-secret-at-least-long-enough",
+        githubClientId: "github-client-id",
+        githubClientSecret: "github-client-secret",
+        trustedOrigins: ["https://app.appaloft.com"],
+      }).github,
+    ).toBe(true);
+  });
+
   test("[AUTH-SESSION-001] requires a login when better-auth is enabled and no session exists", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,

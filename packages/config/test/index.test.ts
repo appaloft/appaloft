@@ -282,6 +282,20 @@ describe("resolveConfig", () => {
     );
   });
 
+  test("[AUTH-GITHUB-OAUTH-001] derives the GitHub redirect URI from Better Auth URL", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_BETTER_AUTH_URL: "https://app.appaloft.com",
+        APPALOFT_GITHUB_CLIENT_ID: "github-client-id",
+        APPALOFT_GITHUB_CLIENT_SECRET: "github-client-secret",
+      },
+    });
+
+    expect(config.githubClientId).toBe("github-client-id");
+    expect(config.githubClientSecret).toBe("github-client-secret");
+    expect(config.githubRedirectUri).toBe("https://app.appaloft.com/api/auth/callback/github");
+  });
+
   test("[AUTH-COOKIE-CONFIG-001] reads optional Better Auth shared-cookie settings", () => {
     const config = resolveConfig({
       env: {
