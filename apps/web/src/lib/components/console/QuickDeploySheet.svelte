@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import {
     CheckCircle2,
+    ChevronDown,
     ExternalLink,
     Eye,
     FolderOpen,
@@ -1380,6 +1381,9 @@
     selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
   );
   const canAdvance = $derived(stepIsComplete(activeStep));
+  const quickDeployReady = $derived(
+    stepIsComplete("source") && stepIsComplete("project") && stepIsComplete("server"),
+  );
   const quickDeployDiagnosticSummaryButtonLabel = $derived.by(() => {
     if (diagnosticSummaryLoading) {
       return $t(i18nKeys.console.resources.diagnosticSummaryLoading);
@@ -3290,52 +3294,15 @@
 
 </script>
 
-<div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+<div class="grid min-w-0 gap-5 pb-24 md:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
   <div class="min-w-0 space-y-5">
-      <section class="min-w-0 space-y-6">
+      <div class="min-w-0 space-y-6">
         <div class="space-y-2">
-          <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.deploymentEntryTitle, { stepTitle: activeStepDetails.title })}</h2>
-          <p class="text-sm text-muted-foreground">{activeStepDetails.description}</p>
+          <h2 class="text-lg font-semibold">部署入口</h2>
+          <p class="text-sm text-muted-foreground">选择来源，并在同一页确认项目、服务器与运行配置。</p>
         </div>
         <div class="space-y-6">
-          <div class="console-stepper grid grid-cols-2 gap-1.5 rounded-md border border-border/70 px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
-            {#each deploymentSteps as step, index (step.key)}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class={`console-stepper-button h-8 min-w-0 justify-start gap-1.5 rounded-md px-2.5 text-xs sm:w-auto ${
-                  activeStep === step.key
-                    ? "is-active"
-                    : stepIsComplete(step.key)
-                      ? "is-complete"
-                      : "is-idle"
-                } ${canVisitStep(index) ? "" : "cursor-not-allowed opacity-40"}`}
-                disabled={!canVisitStep(index)}
-                aria-current={activeStep === step.key ? "step" : undefined}
-                title={step.description}
-                onclick={() => goToStep(step.key, index)}
-              >
-                <span class={`console-stepper-marker flex size-4 items-center justify-center rounded-sm border text-[10px] font-medium ${
-                  activeStep === step.key
-                    ? "is-active"
-                    : stepIsComplete(step.key)
-                      ? "is-complete"
-                      : "is-idle"
-                }`}>
-                  {#if stepIsComplete(step.key)}
-                    <CheckCircle2 class="size-3" />
-                  {:else}
-                    {index + 1}
-                  {/if}
-                </span>
-                <step.icon class="size-3.5 text-muted-foreground" />
-                <span class="min-w-0 truncate">{step.title}</span>
-              </Button>
-            {/each}
-          </div>
-
-          {#if activeStep === "source"}
+          <section class="space-y-3">
           <div class="space-y-3">
             <div class="flex items-center gap-2 text-sm font-medium">
               <Waypoints class="size-4 text-muted-foreground" />
@@ -3887,8 +3854,17 @@
             </div>
           {/if}
 
-          {:else if activeStep === "project"}
-          <div class="space-y-3">
+          </section>
+
+          <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("project")}>
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.project)}</span>
+                <span class="mt-1 block break-words text-xs text-muted-foreground">{projectSummary}</span>
+              </span>
+              <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+            </summary>
+          <div class="mt-3 space-y-3">
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Package class="size-4 text-muted-foreground" />
@@ -3955,9 +3931,18 @@
               </div>
             {/if}
           </div>
+          </details>
 
-          {:else if activeStep === "server"}
-          <div class="space-y-3">
+          <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("server")}>
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.server)}</span>
+                <span class="mt-1 block break-words text-xs text-muted-foreground">{serverSummary}</span>
+                <span class="mt-1 block break-words text-xs text-muted-foreground">{serverCredentialSummary}</span>
+              </span>
+              <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+            </summary>
+          <div class="mt-3 space-y-3">
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Server class="size-4 text-muted-foreground" />
@@ -4019,9 +4004,17 @@
               />
             {/if}
           </div>
+          </details>
 
-          {:else if activeStep === "environment"}
-          <div class="space-y-3">
+          <details class="group rounded-md border bg-card px-3 py-3">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</span>
+                <span class="mt-1 block break-words text-xs text-muted-foreground">{environmentSummary}</span>
+              </span>
+              <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+            </summary>
+          <div class="mt-3 space-y-3">
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Settings2 class="size-4 text-muted-foreground" />
@@ -4095,92 +4088,18 @@
               </div>
             {/if}
           </div>
+          </details>
 
-          {:else if activeStep === "variables"}
-          <div class="space-y-3">
-            <Separator />
-            <div class="flex items-center gap-2 text-sm font-medium">
-              <TerminalSquare class="size-4 text-muted-foreground" />
-              <span>{$t(i18nKeys.console.quickDeploy.firstVariable)}</span>
-              <DocsHelpLink
-                href={webDocsHrefs.environmentVariablePrecedence}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-              />
-            </div>
-            <div class="space-y-3">
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="variable-key">
-                    Key
-                  </label>
-                  <Input id="variable-key" bind:value={variableKey} placeholder="DATABASE_URL" />
-                </div>
-                <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="variable-value">
-                    Value
-                  </label>
-                  <Input id="variable-value" bind:value={variableValue} placeholder="postgres://..." />
-                </div>
-              </div>
-              <Button
-                variant={variableIsSecret ? "selected" : "outline"}
-                size="sm"
-                onclick={() => {
-                  variableIsSecret = !variableIsSecret;
-                }}
-              >
-                {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
-              </Button>
-            </div>
-          </div>
-          {:else}
-            <div class="space-y-4">
+          <div class="space-y-4">
               <Separator />
               <div class="space-y-2">
                 <div class="flex items-center gap-2 text-sm font-medium">
                   <ShieldCheck class="size-4 text-muted-foreground" />
-                  <span>{$t(i18nKeys.console.quickDeploy.reviewDeployment)}</span>
+                  <span>部署配置</span>
                 </div>
                 <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.quickDeploy.reviewBody)}
+                  项目、环境、资源和变量默认使用当前检测结果；需要覆盖时打开对应编辑。
                 </p>
-              </div>
-              <div class="grid min-w-0 gap-3 text-sm md:grid-cols-2">
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
-                  <p class="mt-1 break-all font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
-                  <p class="mt-1 break-words font-medium">{projectSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
-                  <p class="mt-1 break-words font-medium">{serverSummary}</p>
-                  <p class="mt-1 break-words text-xs text-muted-foreground">{serverCredentialSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
-                  <p class="mt-1 break-words font-medium">{environmentSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
-                  <p class="mt-1 break-words font-medium">{resourceSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
-                  </p>
-                  <p class="mt-1 break-words font-medium">{resourceHealthCheckSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
-                  <p class="mt-1 break-all font-medium">{domainBindingSummary}</p>
-                </div>
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
-                  <p class="mt-1 break-words font-medium">{variableSummary}</p>
-                </div>
               </div>
 
               <div class="space-y-3">
@@ -4791,42 +4710,11 @@
                 </div>
               </div>
             </div>
-          {/if}
-        </div>
-        <div class="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-xs text-muted-foreground">
-            {$t(i18nKeys.console.quickDeploy.step, { current: currentStepIndex + 1, total: deploymentSteps.length, title: activeStepDetails.title })}
-          </p>
-          <div class="flex w-full gap-2 sm:w-auto">
-            <Button
-              class="flex-1 sm:flex-none"
-              variant="outline"
-              disabled={currentStepIndex === 0}
-              onclick={goToPreviousStep}
-            >
-              {$t(i18nKeys.common.actions.previous)}
-            </Button>
-            {#if activeStep === "source" && sourceKind === "blueprint" && !selectedBlueprintSlug.trim()}
-              <Button
-                type="button"
-                class="flex-1 sm:flex-none"
-                disabled={!selectedBlueprintSourceExtension}
-                onclick={openBlueprintSelectorDialog}
-              >
-                {$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
-              </Button>
-            {:else if activeStep !== "review"}
-              <Button class="flex-1 sm:flex-none" disabled={!canAdvance} onclick={goToNextStep}>
-                {$t(i18nKeys.common.actions.next)}
-              </Button>
-            {/if}
           </div>
         </div>
-      </section>
+      </div>
 
-  </div>
-
-  <aside class="min-w-0 space-y-5 xl:sticky xl:top-5 xl:self-start">
+  <aside class="min-w-0 space-y-5 md:sticky md:top-20 md:max-h-[calc(100svh-10rem)] md:self-start md:overflow-y-auto md:pb-3">
       <section class="console-side-panel min-w-0 space-y-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
@@ -4918,35 +4806,21 @@
             <span class="min-w-0 break-words text-right font-medium">{variableSummary}</span>
           </div>
         </div>
-        {#if activeStep === "review"}
-          <div class="flex flex-col items-stretch gap-3">
-            <Button class="w-full" disabled={deployPending} onclick={handleQuickDeploy}>
-              {#if deployPending}
-                <LoaderCircle class="size-4 animate-spin" />
-                {$t(i18nKeys.console.quickDeploy.submitPending)}
-              {:else if sourceKind === "blueprint"}
-                <Play class="size-4" />
-                查看 Blueprint 安装计划
-              {:else}
-                <Play class="size-4" />
-                {$t(i18nKeys.common.actions.createAndDeploy)}
-              {/if}
+        <div class="space-y-3">
+          {#if workflowProgressItems.length > 0}
+            <Button
+              type="button"
+              class="w-full"
+              variant="outline"
+              onclick={() => {
+                workflowProgressDialogOpen = true;
+              }}
+            >
+              {$t(i18nKeys.common.actions.viewProgress)}
             </Button>
-            {#if workflowProgressItems.length > 0}
-              <Button
-                type="button"
-                class="w-full"
-                variant="outline"
-                onclick={() => {
-                  workflowProgressDialogOpen = true;
-                }}
-              >
-                {$t(i18nKeys.common.actions.viewProgress)}
-              </Button>
-            {/if}
-            <pre class="max-w-full overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
-          </div>
-        {/if}
+          {/if}
+          <pre class="max-w-full overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
+        </div>
       </section>
 
       {#if deployFeedback}
@@ -5026,6 +4900,34 @@
         </section>
       {/if}
   </aside>
+</div>
+
+<div class="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+  <div class="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 md:px-6">
+    <p class="min-w-0 text-xs text-muted-foreground">
+      {#if quickDeployReady}
+        来源、项目和服务器已就绪。
+      {:else}
+        请先完善来源、项目和服务器。
+      {/if}
+    </p>
+    <Button
+      class="min-w-36 shrink-0"
+      disabled={deployPending || !quickDeployReady}
+      onclick={handleQuickDeploy}
+    >
+      {#if deployPending}
+        <LoaderCircle class="size-4 animate-spin" />
+        {$t(i18nKeys.console.quickDeploy.submitPending)}
+      {:else if sourceKind === "blueprint"}
+        <Play class="size-4" />
+        查看安装计划
+      {:else}
+        <Play class="size-4" />
+        {$t(i18nKeys.common.actions.createAndDeploy)}
+      {/if}
+    </Button>
+  </div>
 </div>
 
 <QuickDeployProgressDialog
