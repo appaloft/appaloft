@@ -84,6 +84,7 @@ import { projectOrganizationOwnershipMigration } from "./migrations/075_project_
 import { deploymentSupersededForwardReferenceMigration } from "./migrations/076_deployment_superseded_forward_reference";
 import { serverOrganizationOwnershipMigration } from "./migrations/077_server_organization_ownership";
 import { sshCredentialOrganizationOwnershipMigration } from "./migrations/078_ssh_credential_organization_ownership";
+import { githubAppInstallationsMigration } from "./migrations/079_github_app_installations";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -258,6 +259,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "076_deployment_superseded_forward_reference": deploymentSupersededForwardReferenceMigration,
       "077_server_organization_ownership": serverOrganizationOwnershipMigration,
       "078_ssh_credential_organization_ownership": sshCredentialOrganizationOwnershipMigration,
+      "079_github_app_installations": githubAppInstallationsMigration,
     };
   }
 }

@@ -250,6 +250,7 @@ export * from "./operations/static-artifacts/list-static-artifact-publications.q
 export * from "./operations/static-artifacts/publish-static-artifact.command";
 export * from "./operations/static-artifacts/publish-static-artifact-archive.command";
 export * from "./operations/static-artifacts/publish-static-artifact-payload.command";
+export * from "./operations/system/github-app-connection.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";
 export * from "./operations/terminal-sessions/terminal-session-lifecycle.schema";

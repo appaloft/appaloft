@@ -8780,6 +8780,7 @@ export interface IntegrationDescriptor {
   capabilities: string[];
   defaultConnectionModeKey?: string;
   connectionModes?: IntegrationConnectionMode[];
+  setup?: IntegrationSetupDescriptor;
   configuration?: {
     status: "configured" | "not-configured" | "partial" | "unknown";
     diagnostics: {
@@ -8816,6 +8817,14 @@ export interface IntegrationConnectionMode {
   description?: string;
 }
 
+export interface IntegrationSetupDescriptor {
+  providerApp?: {
+    installUrl?: string;
+    callbackUrl?: string;
+    webhookUrl?: string;
+  };
+}
+
 export interface IntegrationRegistry {
   list(): IntegrationDescriptor[];
   findByKey(key: string): IntegrationDescriptor | null;
@@ -8823,6 +8832,65 @@ export interface IntegrationRegistry {
 
 export interface IntegrationAuthPort {
   getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;
+}
+
+export interface GitHubAppInstallationRecord {
+  accountId?: string;
+  accountLogin?: string;
+  accountType?: "Organization" | "User" | string;
+  installationId: string;
+  installedAt: string;
+  providerKey: "github";
+  repositoriesSelection?: "all" | "selected";
+  repositoryCount?: number;
+  suspendedAt?: string;
+  tenantId: string;
+  updatedAt: string;
+}
+
+export interface GitHubAppInstallationRepository {
+  findForTenant(
+    context: RepositoryContext,
+    input: { tenantId: string; providerKey: "github" },
+  ): Promise<Result<GitHubAppInstallationRecord | null>>;
+  findByInstallationId(
+    context: RepositoryContext,
+    input: { installationId: string; providerKey: "github" },
+  ): Promise<Result<GitHubAppInstallationRecord | null>>;
+  upsert(
+    context: RepositoryContext,
+    record: GitHubAppInstallationRecord,
+  ): Promise<Result<GitHubAppInstallationRecord>>;
+  markSuspended(
+    context: RepositoryContext,
+    input: { installationId: string; providerKey: "github"; suspendedAt: string },
+  ): Promise<Result<GitHubAppInstallationRecord | null>>;
+}
+
+export interface GitHubAppInstallationReadback {
+  accountId?: string;
+  accountLogin?: string;
+  accountType?: "Organization" | "User" | string;
+  installationId: string;
+  repositoriesSelection?: "all" | "selected";
+  repositoryCount?: number;
+  suspendedAt?: string;
+}
+
+export interface GitHubAppInstallationToken {
+  expiresAt: string;
+  token: string;
+}
+
+export interface GitHubAppRuntime {
+  createInstallationAccessToken(
+    context: ExecutionContext,
+    input: { installationId: string },
+  ): Promise<Result<GitHubAppInstallationToken>>;
+  readInstallation(
+    context: ExecutionContext,
+    input: { installationId: string },
+  ): Promise<Result<GitHubAppInstallationReadback>>;
 }
 
 export type ProductLoginMethodKey = "local-password" | "github" | "google" | "oidc";
@@ -8898,6 +8966,7 @@ export interface GitHubRepositoryBrowser {
     context: ExecutionContext,
     input: {
       accessToken: string;
+      accessTokenKind?: "installation" | "user";
       search?: string;
     },
   ): Promise<GitHubRepositorySummary[]>;

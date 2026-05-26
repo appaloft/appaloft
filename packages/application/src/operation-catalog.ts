@@ -217,6 +217,7 @@ import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
+import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
@@ -3496,6 +3497,19 @@ export const operationCatalog = [
     serviceToken: tokens.listGitHubRepositoriesQueryService,
     transports: {
       orpc: { method: "GET", path: "/api/integrations/github/repositories" },
+    },
+  },
+  {
+    key: "system.github-app-connection.show",
+    kind: "query",
+    domain: "system",
+    messageName: "GitHubAppConnectionQuery",
+    handlerName: "GitHubAppConnectionQueryHandler",
+    serviceName: "GitHubAppConnectionQueryService",
+    inputSchema: githubAppConnectionQueryInputSchema,
+    serviceToken: tokens.githubAppConnectionQueryService,
+    transports: {
+      orpc: { method: "GET", path: "/api/integrations/github/app-connection" },
     },
   },
   {

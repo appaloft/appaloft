@@ -109,11 +109,12 @@ import {
 } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
+  createGitHubAppRuntime,
+  createGitHubIntegrationDescriptor,
   createGitHubPreviewFeedbackWriter,
   createGitHubPreviewPullRequestWebhookVerifier,
   createGitHubRepositoryBrowser,
   createGitHubSourceEventWebhookVerifier,
-  githubIntegration,
 } from "@appaloft/integration-github";
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
@@ -149,6 +150,7 @@ import {
   PgDomainRouteFailureCandidateReader,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
+  PgGitHubAppInstallationRepository,
   PgMutationCoordinator,
   PgPreviewCleanupAttemptRecorder,
   PgPreviewCleanupRetryCandidateReader,
@@ -1669,7 +1671,31 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.integrationRegistry, {
     useFactory: instanceCachingFactory(
-      () => new InMemoryIntegrationRegistry([githubIntegration, gitlabIntegration]),
+      () =>
+        new InMemoryIntegrationRegistry([
+          createGitHubIntegrationDescriptor({
+            privateKeyConfigured: Boolean(
+              input.config.githubAppPrivateKey || input.config.githubAppPrivateKeyBase64,
+            ),
+            webhookSecretConfigured: Boolean(input.config.githubAppWebhookSecret),
+            ...(input.config.githubAppId ? { appId: input.config.githubAppId } : {}),
+            ...(input.config.githubAppCallbackUrl
+              ? { callbackUrl: input.config.githubAppCallbackUrl }
+              : {}),
+            ...(input.config.githubConnectionMode
+              ? { connectionMode: input.config.githubConnectionMode }
+              : {}),
+            ...(input.config.githubAppInstallUrl
+              ? { installUrl: input.config.githubAppInstallUrl }
+              : {}),
+            ...(input.config.githubAppOwner ? { owner: input.config.githubAppOwner } : {}),
+            ...(input.config.githubAppSlug ? { slug: input.config.githubAppSlug } : {}),
+            ...(input.config.githubAppWebhookUrl
+              ? { webhookUrl: input.config.githubAppWebhookUrl }
+              : {}),
+          }),
+          gitlabIntegration,
+        ]),
     ),
   });
   container.register(tokens.pluginRegistry, {
@@ -1694,6 +1720,24 @@ export function registerRuntimeDependencies(
           input.authRuntime,
           dependencyContainer.resolve(tokens.logger),
         ),
+    ),
+  });
+  container.register(tokens.githubAppInstallationRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgGitHubAppInstallationRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.githubAppRuntime, {
+    useFactory: instanceCachingFactory(() =>
+      createGitHubAppRuntime({
+        ...(input.config.githubAppId ? { appId: input.config.githubAppId } : {}),
+        ...(input.config.githubAppPrivateKey
+          ? { privateKey: input.config.githubAppPrivateKey }
+          : {}),
+        ...(input.config.githubAppPrivateKeyBase64
+          ? { privateKeyBase64: input.config.githubAppPrivateKeyBase64 }
+          : {}),
+      }),
     ),
   });
   container.register(tokens.githubRepositoryBrowser, {

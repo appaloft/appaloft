@@ -296,6 +296,28 @@ describe("resolveConfig", () => {
     expect(config.githubRedirectUri).toBe("https://app.appaloft.com/api/auth/callback/github");
   });
 
+  test("[GITHUB-APP-CONFIG-001] loads GitHub App runtime configuration", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_GITHUB_CONNECTION_MODE: "operator-managed-app",
+        APPALOFT_GITHUB_APP_ID: "3869940",
+        APPALOFT_GITHUB_APP_SLUG: "appaloft-cloud",
+        APPALOFT_GITHUB_APP_INSTALL_URL: "https://github.com/apps/appaloft-cloud/installations/new",
+        APPALOFT_GITHUB_APP_PRIVATE_KEY_BASE64: "base64-private-key",
+        APPALOFT_GITHUB_APP_WEBHOOK_SECRET: "webhook-secret",
+      },
+    });
+
+    expect(config.githubConnectionMode).toBe("operator-managed-app");
+    expect(config.githubAppId).toBe("3869940");
+    expect(config.githubAppSlug).toBe("appaloft-cloud");
+    expect(config.githubAppInstallUrl).toBe(
+      "https://github.com/apps/appaloft-cloud/installations/new",
+    );
+    expect(config.githubAppPrivateKeyBase64).toBe("base64-private-key");
+    expect(JSON.stringify(config.githubAppInstallUrl)).not.toContain("base64-private-key");
+  });
+
   test("[AUTH-COOKIE-CONFIG-001] reads optional Better Auth shared-cookie settings", () => {
     const config = resolveConfig({
       env: {

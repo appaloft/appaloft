@@ -585,6 +585,12 @@ export const tokens = {
   providerRegistry: Symbol.for("appaloft.provider_registry"),
   integrationRegistry: Symbol.for("appaloft.integration_registry"),
   integrationAuthPort: Symbol.for("appaloft.integration_auth_port"),
+  githubAppInstallationRepository: Symbol.for("appaloft.github_app_installation_repository"),
+  githubAppRuntime: Symbol.for("appaloft.github_app_runtime"),
+  githubAppConnectionQueryService: Symbol.for("appaloft.github_app_connection_query_service"),
+  upsertGitHubAppInstallationUseCase: Symbol.for(
+    "appaloft.upsert_github_app_installation_use_case",
+  ),
   githubRepositoryBrowser: Symbol.for("appaloft.github_repository_browser"),
   pluginRegistry: Symbol.for("appaloft.plugin_registry"),
   listGitHubRepositoriesQueryService: Symbol.for("appaloft.list_github_repositories_query_service"),

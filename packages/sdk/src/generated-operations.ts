@@ -3713,6 +3713,22 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "system.github-app-connection.show",
+    operationGroup: "system",
+    operationMethod: "githubAppConnectionShow",
+    operationId: "integrations.github.appConnection.show",
+    kind: "query",
+    domain: "system",
+    messageName: "GitHubAppConnectionQuery",
+    route: {
+      method: "GET",
+      path: "/integrations/github/app-connection",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "system.github-repositories.list",
     operationGroup: "system",
     operationMethod: "githubRepositoriesList",

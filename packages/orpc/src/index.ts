@@ -177,10 +177,12 @@ import {
   findOperationCatalogEntryByMessageName,
   GetAuthBootstrapStatusQuery,
   GetCurrentOrganizationContextQuery,
+  GitHubAppConnectionQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   getAuthBootstrapStatusQueryInputSchema,
   getCurrentOrganizationContextQueryInputSchema,
+  githubAppConnectionQueryInputSchema,
   ImportCertificateCommand,
   ImportDependencyResourceCommand,
   ImportResourceVariablesCommand,
@@ -576,6 +578,7 @@ import {
   expireTerminalSessionsResponseSchema,
   exportAuditEventsResponseSchema,
   exportGlobalAuditEventsResponseSchema,
+  githubAppConnectionResponseSchema,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
   inspectRuntimeUsageResponseSchema,
@@ -5439,6 +5442,18 @@ export const listGitHubRepositoriesProcedure = base
     executeQuery(context, ListGitHubRepositoriesQuery.create(input)),
   );
 
+export const githubAppConnectionProcedure = base
+  .route({
+    method: "GET",
+    path: "/integrations/github/app-connection",
+    successStatus: 200,
+  })
+  .input(githubAppConnectionQueryInputSchema)
+  .output(githubAppConnectionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, GitHubAppConnectionQuery.create(input)),
+  );
+
 export const appaloftOrpcRouter = {
   auth: {
     bootstrapStatus: authBootstrapStatusProcedure,
@@ -5766,6 +5781,9 @@ export const appaloftOrpcRouter = {
   integrations: {
     list: listIntegrationsProcedure,
     github: {
+      appConnection: {
+        show: githubAppConnectionProcedure,
+      },
       repositories: {
         list: listGitHubRepositoriesProcedure,
       },
@@ -8090,6 +8108,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/plugins",
     "/api/system/doctor",
     "/api/integrations",
+    "/api/integrations/github/app-connection",
     "/api/integrations/github/repositories",
   ] as const;
 
