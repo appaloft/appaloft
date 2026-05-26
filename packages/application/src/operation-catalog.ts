@@ -3474,6 +3474,18 @@ export const operationCatalog = [
     },
   },
   {
+    key: "system.integrations.list",
+    kind: "query",
+    domain: "system",
+    messageName: "ListIntegrationsQuery",
+    handlerName: "ListIntegrationsQueryHandler",
+    serviceName: "ListIntegrationsQueryService",
+    serviceToken: tokens.integrationsQueryService,
+    transports: {
+      orpc: { method: "GET", path: "/api/integrations" },
+    },
+  },
+  {
     key: "system.github-repositories.list",
     kind: "query",
     domain: "system",

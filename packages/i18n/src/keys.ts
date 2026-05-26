@@ -1576,6 +1576,9 @@ export const i18nKeys = {
       dockerfilePath: "console:quickDeploy.dockerfilePath",
       dockerImage: "console:quickDeploy.dockerImage",
       dockerImagePlaceholder: "console:quickDeploy.dockerImagePlaceholder",
+      githubHostedProviderAppHint: "console:quickDeploy.githubHostedProviderAppHint",
+      githubHostedProviderAppSetupPending:
+        "console:quickDeploy.githubHostedProviderAppSetupPending",
       githubOAuthNotConfigured: "console:quickDeploy.githubOAuthNotConfigured",
       githubOnlyLoginWhenNeeded: "console:quickDeploy.githubOnlyLoginWhenNeeded",
       githubRepository: "console:quickDeploy.githubRepository",

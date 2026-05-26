@@ -564,6 +564,7 @@ export const tokens = {
   deploymentFactory: Symbol.for("appaloft.deployment_factory"),
   deploymentLifecycleService: Symbol.for("appaloft.deployment_lifecycle_service"),
   providersQueryService: Symbol.for("appaloft.providers_query_service"),
+  integrationsQueryService: Symbol.for("appaloft.integrations_query_service"),
   pluginsQueryService: Symbol.for("appaloft.plugins_query_service"),
   doctorQueryService: Symbol.for("appaloft.doctor_query_service"),
   maintenanceWorkerStatusReader: Symbol.for("appaloft.maintenance_worker_status_reader"),

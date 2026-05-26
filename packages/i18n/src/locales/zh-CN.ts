@@ -1628,6 +1628,10 @@ export const zhCN = {
       dockerfilePath: "Dockerfile 路径",
       dockerImage: "Docker 镜像",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
+      githubHostedProviderAppHint:
+        "安装或授权已配置的 provider app 后再浏览仓库；这里不输入 GitHub App credential。",
+      githubHostedProviderAppSetupPending:
+        "仓库浏览正在等待 operator 完成已配置 provider app 的外部 setup。",
       githubOAuthNotConfigured: "后端尚未配置 GitHub OAuth。",
       githubOnlyLoginWhenNeeded: "只有需要导入 GitHub 时才会触发登录。",
       githubRepository: "GitHub 仓库",

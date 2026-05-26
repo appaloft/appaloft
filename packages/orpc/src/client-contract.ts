@@ -267,6 +267,7 @@ import {
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
   type ListGitHubRepositoriesResponse,
+  type ListIntegrationsResponse,
   type ListOperatorWorkResponse,
   type ListOrganizationInvitationsResponse,
   type ListOrganizationMembersResponse,
@@ -1661,6 +1662,7 @@ export type AppaloftOrpcClientContract = {
     doctor: Client<AppaloftClientContext, undefined, DoctorResponse, AppaloftClientError>;
   };
   integrations: {
+    list: Client<AppaloftClientContext, undefined, ListIntegrationsResponse, AppaloftClientError>;
     github: {
       repositories: {
         list: Client<

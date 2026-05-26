@@ -12,6 +12,7 @@ searchAliases:
   - "static site"
 relatedOperations:
   - deployments.create
+  - system.integrations.list
   - source-links.relink
   - resources.configure-auto-deploy
   - source-events.ingest
@@ -45,6 +46,20 @@ Common kinds:
 | Static site | Frontend static output. | Build command and publish directory. |
 
 If unsure, choose the kind closest to the artifact you already have. The runtime profile explains how Appaloft should run it.
+
+<h2 id="deployment-source-integration-connection-modes">Integration connection modes</h2>
+
+External source integrations can declare connection modes so Web, CLI, and tools share neutral language for who completes provider setup.
+
+Common modes include:
+
+| Mode | Meaning |
+| --- | --- |
+| `user-oauth` | The end user authorizes with their own provider account, useful for personal or team browsing flows. |
+| `hosted-provider-app` | The operator provides a provider app, and the end user only installs or authorizes that app. |
+| `operator-managed-app` | The instance operator creates the provider app and manages credential references in instance configuration. |
+
+`GET /api/integrations` returns these modes and safe configuration status. It describes capabilities, audience, whether provider installation is required, and whether operator secret material is required; it does not return tokens, private keys, webhook secrets, or raw provider payloads.
 
 <h2 id="deployment-source-validation">Input checks</h2>
 

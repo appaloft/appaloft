@@ -154,6 +154,23 @@ describe("generated SDK operation metadata", () => {
     });
   });
 
+  test("[INTEGRATION-SOURCE-001][TS-SDK-GEN-001] exposes integration catalog metadata", () => {
+    expect(
+      generatedSdkOperations.find(
+        (operation) => operation.operationKey === "system.integrations.list",
+      ),
+    ).toMatchObject({
+      operationGroup: "system",
+      operationMethod: "integrationsList",
+      kind: "query",
+      route: {
+        method: "GET",
+        path: "/integrations",
+      },
+      docsHref: "/docs/deploy/sources/#deployment-source",
+    });
+  });
+
   test("[SYSTEM-DIAG-004][TS-SDK-GEN-001] exposes system doctor operation metadata", () => {
     expect(
       generatedSdkOperations.find((operation) => operation.operationKey === "system.doctor"),
