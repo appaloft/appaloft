@@ -232,6 +232,7 @@ import {
   ListSourceEventsQuery,
   ListSourceLinksQuery,
   ListSshCredentialsQuery,
+  ListStaticArtifactPublicationsQuery,
   ListStorageVolumesQuery,
   ListTerminalSessionsQuery,
   ListUsageIntentRecordsQuery,
@@ -271,6 +272,7 @@ import {
   listSourceEventsQueryInputSchema,
   listSourceLinksQueryInputSchema,
   listSshCredentialsQueryInputSchema,
+  listStaticArtifactPublicationsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   listTerminalSessionsQueryInputSchema,
   listUsageIntentRecordsInputSchema,
@@ -294,6 +296,9 @@ import {
   PruneResourceRuntimeLogArchivesCommand,
   PruneServerCapacityCommand,
   PruneSourceEventsCommand,
+  PublishStaticArtifactArchiveCommand,
+  PublishStaticArtifactCommand,
+  PublishStaticArtifactPayloadCommand,
   promoteEnvironmentCommandInputSchema,
   provisionDependencyResourceCommandInputSchema,
   pruneAuditEventArchivesCommandInputSchema,
@@ -306,6 +311,9 @@ import {
   pruneResourceRuntimeLogArchivesCommandInputSchema,
   pruneServerCapacityCommandInputSchema,
   pruneSourceEventsCommandInputSchema,
+  publishStaticArtifactArchiveCommandInputSchema,
+  publishStaticArtifactCommandInputSchema,
+  publishStaticArtifactPayloadCommandInputSchema,
   type Query,
   type QueryBus,
   QueryCapabilitiesQuery,
@@ -432,6 +440,7 @@ import {
   ShowTerminalSessionQuery,
   type SourceEventVerificationPort,
   StartResourceRuntimeCommand,
+  type StaticArtifactPublicationSummary,
   StopResourceRuntimeCommand,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
@@ -603,6 +612,7 @@ import {
   listServersResponseSchema,
   listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
+  listStaticArtifactPublicationsResponseSchema,
   listStorageVolumesResponseSchema,
   listTerminalSessionsResponseSchema,
   lockEnvironmentResponseSchema,
@@ -619,6 +629,7 @@ import {
   pruneResourceRuntimeLogArchivesResponseSchema,
   pruneServerCapacityResponseSchema,
   pruneSourceEventsResponseSchema,
+  publishStaticArtifactResponseSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   removeOrganizationMemberResponseSchema,
@@ -693,7 +704,14 @@ import {
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  type Result,
+  type StaticArtifactPublication,
+} from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
   applyAppaloftDeploymentConfigProfile,
@@ -2128,6 +2146,59 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
   );
 }
 
+function staticArtifactPublicationResponse(publication: StaticArtifactPublication) {
+  const publicationState = publication.toState();
+  const manifestState = publicationState.manifest.toState();
+  const storedManifestState = publicationState.storedManifest.toState();
+  const routeActivationState = publicationState.routeActivation?.toState();
+
+  return {
+    schemaVersion: "static-artifacts.publish/v1" as const,
+    publicationId: publicationState.publicationId.value,
+    projectId: publicationState.projectId.value,
+    resourceId: publicationState.resourceId.value,
+    artifactId: manifestState.artifactId.value,
+    manifestDigest: manifestState.manifestDigest.value,
+    fileCount: manifestState.fileCount.value,
+    totalBytes: manifestState.totalBytes.value,
+    files: manifestState.files.map((file) => {
+      const fileState = file.toState();
+      return {
+        pathDigest: fileState.pathDigest.value,
+        contentDigest: fileState.contentDigest.value,
+        sizeBytes: fileState.sizeBytes.value,
+        mimeType: fileState.mimeType.value,
+      };
+    }),
+    storageRef: storedManifestState.storageRef.value,
+    storageProviderKey: storedManifestState.providerKey.value,
+    ...(routeActivationState
+      ? {
+          routeUrl: routeActivationState.url.value,
+          routeProviderKey: routeActivationState.providerKey.value,
+        }
+      : {}),
+  };
+}
+
+function staticArtifactPublicationSummaryResponse(summary: StaticArtifactPublicationSummary) {
+  return {
+    publicationId: summary.publicationId,
+    projectId: summary.projectId,
+    resourceId: summary.resourceId,
+    artifactId: summary.artifactId,
+    manifestDigest: summary.manifestDigest,
+    fileCount: summary.fileCount,
+    totalBytes: summary.totalBytes,
+    storageRef: summary.storageRef,
+    storageProviderKey: summary.storeProviderKey,
+    ...(summary.routeUrl ? { routeUrl: summary.routeUrl } : {}),
+    ...(summary.routeProviderKey ? { routeProviderKey: summary.routeProviderKey } : {}),
+    ...(summary.publishedAt ? { publishedAt: summary.publishedAt } : {}),
+    ...(summary.metadata ? { metadata: summary.metadata } : {}),
+  };
+}
+
 async function executeQuery<TMessage extends Query<TResult>, TResult>(
   context: AppaloftOrpcRequestContext,
   message: Result<TMessage>,
@@ -3230,6 +3301,67 @@ export const createResourceProcedure = base
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateResourceCommand.create(input)),
   );
+
+export const publishStaticArtifactProcedure = base
+  .route({
+    method: "POST",
+    path: "/static-artifacts/publish",
+    successStatus: 201,
+  })
+  .input(publishStaticArtifactCommandInputSchema)
+  .output(publishStaticArtifactResponseSchema)
+  .handler(async ({ input, context }) =>
+    staticArtifactPublicationResponse(
+      await executeCommand(context, PublishStaticArtifactCommand.create(input)),
+    ),
+  );
+
+export const publishStaticArtifactPayloadProcedure = base
+  .route({
+    method: "POST",
+    path: "/static-artifacts/publish-payload",
+    successStatus: 201,
+  })
+  .input(publishStaticArtifactPayloadCommandInputSchema)
+  .output(publishStaticArtifactResponseSchema)
+  .handler(async ({ input, context }) =>
+    staticArtifactPublicationResponse(
+      await executeCommand(context, PublishStaticArtifactPayloadCommand.create(input)),
+    ),
+  );
+
+export const publishStaticArtifactArchiveProcedure = base
+  .route({
+    method: "POST",
+    path: "/static-artifacts/publish-archive",
+    successStatus: 201,
+  })
+  .input(publishStaticArtifactArchiveCommandInputSchema)
+  .output(publishStaticArtifactResponseSchema)
+  .handler(async ({ input, context }) =>
+    staticArtifactPublicationResponse(
+      await executeCommand(context, PublishStaticArtifactArchiveCommand.create(input)),
+    ),
+  );
+
+export const listStaticArtifactPublicationsProcedure = base
+  .route({
+    method: "GET",
+    path: "/static-artifacts/publications",
+    successStatus: 200,
+  })
+  .input(listStaticArtifactPublicationsQueryInputSchema)
+  .output(listStaticArtifactPublicationsResponseSchema)
+  .handler(async ({ input, context }) => {
+    const result = await executeQuery<
+      ListStaticArtifactPublicationsQuery,
+      { items: StaticArtifactPublicationSummary[] }
+    >(context, ListStaticArtifactPublicationsQuery.create(input));
+    return {
+      schemaVersion: "static-artifacts.publications.list/v1" as const,
+      items: result.items.map(staticArtifactPublicationSummaryResponse),
+    };
+  });
 
 export const archiveResourceProcedure = base
   .route({
@@ -5463,6 +5595,12 @@ export const appaloftOrpcRouter = {
       list: listResourceDependencyBindingsProcedure,
       show: showResourceDependencyBindingProcedure,
     },
+  },
+  staticArtifacts: {
+    listPublications: listStaticArtifactPublicationsProcedure,
+    publish: publishStaticArtifactProcedure,
+    publishArchive: publishStaticArtifactArchiveProcedure,
+    publishPayload: publishStaticArtifactPayloadProcedure,
   },
   storageVolumes: {
     create: createStorageVolumeProcedure,
@@ -7896,6 +8034,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/source-links",
     "/api/source-links/relink",
     "/api/source-links/:sourceFingerprint",
+    "/api/static-artifacts/publications",
+    "/api/static-artifacts/publish",
+    "/api/static-artifacts/publish-archive",
+    "/api/static-artifacts/publish-payload",
     "/api/dependency-resources",
     "/api/dependency-resources/provisioning/plan",
     "/api/dependency-resources/provisioning/:planId",

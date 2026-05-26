@@ -243,6 +243,7 @@ import {
   ListSourceEventsQueryHandler,
   ListSourceEventsQueryService,
   ListSshCredentialsQueryService,
+  ListStaticArtifactPublicationsQueryHandler,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
   ListTerminalSessionsQueryHandler,
@@ -303,6 +304,9 @@ import {
   PruneResourceRuntimeLogArchivesUseCase,
   PruneServerCapacityCommandHandler,
   PruneServerCapacityUseCase,
+  PublishStaticArtifactArchiveCommandHandler,
+  PublishStaticArtifactCommandHandler,
+  PublishStaticArtifactPayloadCommandHandler,
   QueryCapabilitiesQueryHandler,
   QueryCapabilitiesQueryService,
   QueryEntitlementsQueryHandler,
@@ -2253,6 +2257,10 @@ export function registerApplicationServices(
   container.registerSingleton(RetryDomainBindingVerificationCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ResolveActionServerConfigDeploymentTargetCommandHandler);
+  container.registerSingleton(ListStaticArtifactPublicationsQueryHandler);
+  container.registerSingleton(PublishStaticArtifactCommandHandler);
+  container.registerSingleton(PublishStaticArtifactArchiveCommandHandler);
+  container.registerSingleton(PublishStaticArtifactPayloadCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(CancelOperatorWorkCommandHandler);
   container.registerSingleton(DeadLetterOperatorWorkCommandHandler);

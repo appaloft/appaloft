@@ -13,6 +13,16 @@ export const tokens = {
   usageIntentPort: Symbol.for("appaloft.usage_intent_port"),
   deploymentOverlayPort: Symbol.for("appaloft.deployment_overlay_port"),
   routeSurfacePort: Symbol.for("appaloft.route_surface_port"),
+  staticArtifactPayloadReaderPort: Symbol.for("appaloft.static_artifact_payload_reader_port"),
+  staticArtifactStorePort: Symbol.for("appaloft.static_artifact_store_port"),
+  staticArtifactRouteProviderPort: Symbol.for("appaloft.static_artifact_route_provider_port"),
+  staticArtifactPublisherPort: Symbol.for("appaloft.static_artifact_publisher_port"),
+  staticArtifactPublicationJournalPort: Symbol.for(
+    "appaloft.static_artifact_publication_journal_port",
+  ),
+  staticArtifactPublicationReadModelPort: Symbol.for(
+    "appaloft.static_artifact_publication_read_model_port",
+  ),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),

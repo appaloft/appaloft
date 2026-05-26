@@ -625,7 +625,20 @@ server Dockerfiles for local/generic-SSH execution. Web QuickDeploy and CLI depl
 static draft fields that map to `resources.create`, with browser-level Web entry coverage and CLI
 entry helper coverage. Local Docker static smoke coverage now exercises the generated nginx image
 path, and the generic-SSH Docker path has GitHub Actions secret-gated plus local explicit static
-smoke coverage through `APPALOFT_E2E_SSH_QUICK_DEPLOY=true`.
+smoke coverage. Direct static artifact publishing remains a separate extension-point slice:
+[ADR-079](./decisions/ADR-079-static-artifact-publishing-extension-point.md) defines neutral
+manifest, payload reader, storage, route, and publisher ports plus the `static-artifacts.publish`
+application command, `appaloft static-artifacts publish <dist-or-zip>` CLI transport that packages
+local dist directories or `.zip` archives into portable payload/archive commands,
+`POST /api/static-artifacts/publish` API source-path transport, public local filesystem runtime
+transport, `POST /api/static-artifacts/publish-payload` inline JSON payload transport,
+`POST /api/static-artifacts/publish-archive` inline base64 zip archive transport, public local
+filesystem runtime composition with dist-directory and server-local `.zip` payload reading,
+immutable HTTP serving from `dataDir/static-artifacts`, and local project/resource-scoped
+alias/current serving for `promoteAlias`. `GET /api/static-artifacts/publications` lists
+provider-neutral publication summaries through the read-model port. Browser multipart upload,
+remote URL fetch upload, hosted alias/default-domain routing, and hosted provider behavior remain
+follow-up work.
 
 URL-first deployment entry experience is positioned as a future user-layer workflow refinement, not
 as a new business operation. It is governed by

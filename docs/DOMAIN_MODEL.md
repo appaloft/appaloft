@@ -905,6 +905,52 @@ Current scope:
 - foundational aggregate in `core`
 - not yet persisted or exposed through commands
 
+### Static Artifact Publication
+
+Meaning:
+- provider-neutral record that a prebuilt static artifact manifest has been stored and optionally
+  routed for a Resource
+
+Rules:
+- static artifact manifests are content-addressed and must keep file count and byte totals
+  consistent with their file digests
+- publication storage references and route activations are adapter outputs, not hosted or provider
+  strategy
+- publication journal/read-model ports provide provider-neutral readback after publish
+- payload readers translate a source path or staging area into manifest and file payloads before
+  publication
+- `static-artifacts.publish` is the public application command for server-local source-path direct
+  static artifact publish intent; `appaloft static-artifacts publish <dist-or-zip>` packages local
+  directories or `.zip` archives into portable payload/archive commands before CLI dispatch
+- `POST /api/static-artifacts/publish` dispatches the same application command for authenticated
+  API callers using a server-local source path and returns a provider-neutral publication DTO
+- `POST /api/static-artifacts/publish-payload` dispatches inline base64 file payloads through
+  `PublishStaticArtifactPayloadCommand` for Web, agent, or skill callers that have a prebuilt
+  static artifact but no server-local source path
+- `POST /api/static-artifacts/publish-archive` dispatches a base64 `.zip` archive through
+  `PublishStaticArtifactArchiveCommand`, expanding safe archive entries into the same manifest and
+  file payload model
+- `GET /api/static-artifacts/publications` lists provider-neutral publication summaries through
+  `StaticArtifactPublicationReadModelPort`
+- public server/shell composition wires a local filesystem payload reader/store/route/publisher
+  default; the payload reader accepts dist directories and server-local `.zip` archives, the local
+  journal records publication summaries, and the public HTTP adapter serves immutable local artifact
+  URLs from `dataDir/static-artifacts`
+- `promoteAlias` on the local filesystem adapter records a current pointer for the project/resource
+  and serves `/static-artifacts/projects/{projectId}/resources/{resourceId}/current/`
+- direct static artifact publishing is separate from the existing static-server Docker/OCI
+  deployment path
+
+Current scope:
+- public core value objects, application ports, application command, CLI/API source-path dispatch,
+  inline JSON payload API dispatch, inline base64 zip archive API dispatch, local filesystem adapter
+  with dist-directory and server-local `.zip` payload reading, public runtime composition, local
+  publication readback, immutable local HTTP serving, and local alias/current serving
+- public server runtime can publish a base64 zip archive through
+  `POST /api/static-artifacts/publish-archive` and serve the promoted current URL locally
+- no browser multipart upload, remote URL fetch upload, hosted provider implementation, hosted
+  default-domain alias routing, billing, or abuse policy
+
 ### Resource
 
 Meaning:

@@ -228,6 +228,15 @@ export * from "./operations/source-links/create-action-source-link-deployment.us
 export * from "./operations/source-links/delete-source-link.use-case";
 export * from "./operations/source-links/relink-source-link.use-case";
 export * from "./operations/source-links/resolve-action-server-config-deployment-target.use-case";
+export * from "./operations/static-artifacts/list-static-artifact-publications.handler";
+export * from "./operations/static-artifacts/list-static-artifact-publications.query";
+export * from "./operations/static-artifacts/publish-static-artifact.command";
+export * from "./operations/static-artifacts/publish-static-artifact.handler";
+export * from "./operations/static-artifacts/publish-static-artifact-archive.command";
+export * from "./operations/static-artifacts/publish-static-artifact-archive.handler";
+export * from "./operations/static-artifacts/publish-static-artifact-payload.command";
+export * from "./operations/static-artifacts/publish-static-artifact-payload.handler";
+export * from "./operations/static-artifacts/static-artifact-publisher.service";
 export * from "./operations/storage-volumes/cleanup-storage-volume-runtime.use-case";
 export * from "./operations/storage-volumes/create-storage-volume.use-case";
 export * from "./operations/storage-volumes/delete-storage-volume.use-case";
