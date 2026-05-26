@@ -728,9 +728,18 @@
   const githubHostedProviderAppConfigured = $derived(
     githubIntegration?.configuration?.status === "configured",
   );
+  const githubAppConnectionQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["integrations", "github", "app-connection"],
+      queryFn: () => orpcClient.integrations.github.appConnection.show({}),
+      enabled: browser && enabled && sourceKind === "github" && githubUsesHostedProviderApp,
+    }),
+  );
+  const githubAppConnection = $derived(githubAppConnectionQuery.data ?? null);
+  const githubAppConnected = $derived(Boolean(githubAppConnection?.connected));
   const githubRepositoryBrowsingEnabled = $derived.by(() => {
     if (githubUsesHostedProviderApp) {
-      return githubHostedProviderAppConfigured;
+      return githubHostedProviderAppConfigured && githubAppConnected;
     }
 
     return Boolean(githubProvider?.configured) && Boolean(githubProvider?.connected);
@@ -2672,6 +2681,18 @@
   async function connectGitHub(): Promise<void> {
     try {
       if (githubUsesHostedProviderApp) {
+        const installUrl = githubAppConnection?.installUrl ?? githubIntegration?.setup?.providerApp?.installUrl;
+        if (githubHostedProviderAppConfigured && installUrl && browser) {
+          const url = new URL(installUrl);
+          const state = buildDeployStateUrl();
+          state.searchParams.set("source", "github");
+          state.searchParams.set("githubMode", "browser");
+          state.searchParams.set("step", "source");
+          url.searchParams.set("state", state.toString());
+          window.location.href = url.toString();
+          return;
+        }
+
         deployFeedback = {
           kind: "error",
           title: $t(i18nKeys.common.actions.connectGitHub),
@@ -3859,7 +3880,9 @@
                       : $t(i18nKeys.console.quickDeploy.githubOnlyLoginWhenNeeded)}
                   </p>
                 </div>
-                {#if githubUsesHostedProviderApp && githubHostedProviderAppConfigured}
+                {#if githubUsesHostedProviderApp && githubAppConnected}
+                  <Badge>{$t(i18nKeys.common.status.connected)}</Badge>
+                {:else if githubUsesHostedProviderApp && githubHostedProviderAppConfigured}
                   <Badge>{$t(i18nKeys.common.status.configured)}</Badge>
                 {:else if githubUsesHostedProviderApp}
                   <Badge variant="outline">{$t(i18nKeys.common.status.notConfigured)}</Badge>
@@ -3882,6 +3905,18 @@
                   {#each githubIntegration?.configuration?.diagnostics ?? [] as diagnostic (diagnostic.code)}
                     <p>{diagnostic.message}</p>
                   {/each}
+                </div>
+              {:else if githubUsesHostedProviderApp && !githubAppConnected}
+                <div class="space-y-2">
+                  <Button variant="outline" class="w-full" onclick={connectGitHub}>
+                    <GitHubIcon class="size-4" />
+                    {$t(i18nKeys.console.quickDeploy.githubInstallApp)}
+                  </Button>
+                  {#if githubAppConnectionQuery.isError}
+                    <p class="text-xs text-destructive">
+                      {readErrorMessage(githubAppConnectionQuery.error)}
+                    </p>
+                  {/if}
                 </div>
               {:else if !githubUsesHostedProviderApp && !githubProvider?.configured}
                 <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">

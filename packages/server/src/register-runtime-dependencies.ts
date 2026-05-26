@@ -109,11 +109,12 @@ import {
 } from "@appaloft/core";
 import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
 import {
+  createGitHubAppRuntime,
+  createGitHubIntegrationDescriptor,
   createGitHubPreviewFeedbackWriter,
   createGitHubPreviewPullRequestWebhookVerifier,
   createGitHubRepositoryBrowser,
   createGitHubSourceEventWebhookVerifier,
-  githubIntegration,
 } from "@appaloft/integration-github";
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
@@ -149,6 +150,7 @@ import {
   PgDomainRouteFailureCandidateReader,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
+  PgGitHubAppInstallationRepository,
   PgMutationCoordinator,
   PgPreviewCleanupAttemptRecorder,
   PgPreviewCleanupRetryCandidateReader,
@@ -1669,7 +1671,23 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.integrationRegistry, {
     useFactory: instanceCachingFactory(
-      () => new InMemoryIntegrationRegistry([githubIntegration, gitlabIntegration]),
+      () =>
+        new InMemoryIntegrationRegistry([
+          createGitHubIntegrationDescriptor({
+            appId: input.config.githubAppId,
+            callbackUrl: input.config.githubAppCallbackUrl,
+            connectionMode: input.config.githubConnectionMode,
+            installUrl: input.config.githubAppInstallUrl,
+            owner: input.config.githubAppOwner,
+            privateKeyConfigured: Boolean(
+              input.config.githubAppPrivateKey || input.config.githubAppPrivateKeyBase64,
+            ),
+            slug: input.config.githubAppSlug,
+            webhookSecretConfigured: Boolean(input.config.githubAppWebhookSecret),
+            webhookUrl: input.config.githubAppWebhookUrl,
+          }),
+          gitlabIntegration,
+        ]),
     ),
   });
   container.register(tokens.pluginRegistry, {
@@ -1694,6 +1712,20 @@ export function registerRuntimeDependencies(
           input.authRuntime,
           dependencyContainer.resolve(tokens.logger),
         ),
+    ),
+  });
+  container.register(tokens.githubAppInstallationRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgGitHubAppInstallationRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.githubAppRuntime, {
+    useFactory: instanceCachingFactory(() =>
+      createGitHubAppRuntime({
+        appId: input.config.githubAppId,
+        privateKey: input.config.githubAppPrivateKey,
+        privateKeyBase64: input.config.githubAppPrivateKeyBase64,
+      }),
     ),
   });
   container.register(tokens.githubRepositoryBrowser, {

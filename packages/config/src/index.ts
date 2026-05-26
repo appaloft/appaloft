@@ -124,6 +124,18 @@ export interface AppConfig {
   githubClientId?: string;
   githubClientSecret?: string;
   githubRedirectUri?: string;
+  githubConnectionMode?: "user-oauth" | "hosted-provider-app" | "operator-managed-app";
+  githubAppOwner?: string;
+  githubAppSlug?: string;
+  githubAppId?: string;
+  githubAppClientId?: string;
+  githubAppClientSecret?: string;
+  githubAppInstallUrl?: string;
+  githubAppCallbackUrl?: string;
+  githubAppWebhookUrl?: string;
+  githubAppWebhookSecret?: string;
+  githubAppPrivateKey?: string;
+  githubAppPrivateKeyBase64?: string;
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUri?: string;
@@ -694,6 +706,49 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     (githubClientId && githubClientSecret
       ? defaultBetterAuthCallbackUrl(betterAuthBaseUrl, "/api/auth/callback/github")
       : undefined);
+  const githubConnectionMode =
+    source.flags?.githubConnectionMode ??
+    (env.APPALOFT_GITHUB_CONNECTION_MODE as AppConfig["githubConnectionMode"] | undefined) ??
+    fileConfig.githubConnectionMode;
+  const githubAppOwner =
+    source.flags?.githubAppOwner ?? env.APPALOFT_GITHUB_APP_OWNER ?? fileConfig.githubAppOwner;
+  const githubAppSlug =
+    source.flags?.githubAppSlug ?? env.APPALOFT_GITHUB_APP_SLUG ?? fileConfig.githubAppSlug;
+  const githubAppId =
+    source.flags?.githubAppId ?? env.APPALOFT_GITHUB_APP_ID ?? fileConfig.githubAppId;
+  const githubAppClientId =
+    source.flags?.githubAppClientId ??
+    env.APPALOFT_GITHUB_APP_CLIENT_ID ??
+    fileConfig.githubAppClientId;
+  const githubAppClientSecret =
+    source.flags?.githubAppClientSecret ??
+    env.APPALOFT_GITHUB_APP_CLIENT_SECRET ??
+    fileConfig.githubAppClientSecret;
+  const githubAppInstallUrl =
+    source.flags?.githubAppInstallUrl ??
+    env.APPALOFT_GITHUB_APP_INSTALL_URL ??
+    fileConfig.githubAppInstallUrl ??
+    (githubAppSlug ? `https://github.com/apps/${githubAppSlug}/installations/new` : undefined);
+  const githubAppCallbackUrl =
+    source.flags?.githubAppCallbackUrl ??
+    env.APPALOFT_GITHUB_APP_CALLBACK_URL ??
+    fileConfig.githubAppCallbackUrl;
+  const githubAppWebhookUrl =
+    source.flags?.githubAppWebhookUrl ??
+    env.APPALOFT_GITHUB_APP_WEBHOOK_URL ??
+    fileConfig.githubAppWebhookUrl;
+  const githubAppWebhookSecret =
+    source.flags?.githubAppWebhookSecret ??
+    env.APPALOFT_GITHUB_APP_WEBHOOK_SECRET ??
+    fileConfig.githubAppWebhookSecret;
+  const githubAppPrivateKey =
+    source.flags?.githubAppPrivateKey ??
+    env.APPALOFT_GITHUB_APP_PRIVATE_KEY ??
+    fileConfig.githubAppPrivateKey;
+  const githubAppPrivateKeyBase64 =
+    source.flags?.githubAppPrivateKeyBase64 ??
+    env.APPALOFT_GITHUB_APP_PRIVATE_KEY_BASE64 ??
+    fileConfig.githubAppPrivateKeyBase64;
   const googleClientId =
     source.flags?.googleClientId ?? env.APPALOFT_GOOGLE_CLIENT_ID ?? fileConfig.googleClientId;
   const googleClientSecret =
@@ -860,6 +915,18 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     ...(githubClientId ? { githubClientId } : {}),
     ...(githubClientSecret ? { githubClientSecret } : {}),
     ...(githubRedirectUri ? { githubRedirectUri } : {}),
+    ...(githubConnectionMode ? { githubConnectionMode } : {}),
+    ...(githubAppOwner ? { githubAppOwner } : {}),
+    ...(githubAppSlug ? { githubAppSlug } : {}),
+    ...(githubAppId ? { githubAppId } : {}),
+    ...(githubAppClientId ? { githubAppClientId } : {}),
+    ...(githubAppClientSecret ? { githubAppClientSecret } : {}),
+    ...(githubAppInstallUrl ? { githubAppInstallUrl } : {}),
+    ...(githubAppCallbackUrl ? { githubAppCallbackUrl } : {}),
+    ...(githubAppWebhookUrl ? { githubAppWebhookUrl } : {}),
+    ...(githubAppWebhookSecret ? { githubAppWebhookSecret } : {}),
+    ...(githubAppPrivateKey ? { githubAppPrivateKey } : {}),
+    ...(githubAppPrivateKeyBase64 ? { githubAppPrivateKeyBase64 } : {}),
     ...(googleClientId ? { googleClientId } : {}),
     ...(googleClientSecret ? { googleClientSecret } : {}),
     ...(googleRedirectUri ? { googleRedirectUri } : {}),

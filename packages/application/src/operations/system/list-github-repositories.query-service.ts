@@ -1,10 +1,13 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-import { type ExecutionContext } from "../../execution-context";
+import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
+  type GitHubAppInstallationRepository,
+  type GitHubAppRuntime,
   type GitHubRepositoryBrowser,
   type GitHubRepositorySummary,
   type IntegrationAuthPort,
+  type IntegrationRegistry,
 } from "../../ports";
 import { tokens } from "../../tokens";
 
@@ -15,6 +18,12 @@ export class ListGitHubRepositoriesQueryService {
     private readonly integrationAuthPort: IntegrationAuthPort,
     @inject(tokens.githubRepositoryBrowser)
     private readonly githubRepositoryBrowser: GitHubRepositoryBrowser,
+    @inject(tokens.integrationRegistry)
+    private readonly integrationRegistry: IntegrationRegistry,
+    @inject(tokens.githubAppInstallationRepository)
+    private readonly githubAppInstallationRepository: GitHubAppInstallationRepository,
+    @inject(tokens.githubAppRuntime)
+    private readonly githubAppRuntime: GitHubAppRuntime,
   ) {}
 
   async execute(
@@ -23,6 +32,13 @@ export class ListGitHubRepositoriesQueryService {
       search?: string;
     },
   ): Promise<Result<{ items: GitHubRepositorySummary[] }>> {
+    const githubIntegration = this.integrationRegistry.findByKey("github");
+    const mode = githubIntegration?.defaultConnectionModeKey ?? "user-oauth";
+
+    if (mode === "hosted-provider-app" || mode === "operator-managed-app") {
+      return this.listRepositoriesWithProviderApp(context, input);
+    }
+
     const accessToken = await this.integrationAuthPort.getProviderAccessToken(context, "github");
 
     if (!accessToken) {
@@ -36,6 +52,7 @@ export class ListGitHubRepositoriesQueryService {
     try {
       const repositories = await this.githubRepositoryBrowser.listRepositories(context, {
         accessToken,
+        accessTokenKind: "user",
         ...(input?.search ? { search: input.search } : {}),
       });
 
@@ -45,6 +62,68 @@ export class ListGitHubRepositoriesQueryService {
     } catch (error) {
       return err(
         domainError.provider("Failed to load GitHub repositories", {
+          message: error instanceof Error ? error.message : "Unknown GitHub API error",
+        }),
+      );
+    }
+  }
+
+  private async listRepositoriesWithProviderApp(
+    context: ExecutionContext,
+    input?: {
+      search?: string;
+    },
+  ): Promise<Result<{ items: GitHubRepositorySummary[] }>> {
+    const tenantId = context.tenant?.tenantId;
+    if (!tenantId) {
+      return err(
+        domainError.validation("GitHub App repository browsing requires a tenant context", {
+          phase: "github-app-repository-browser",
+        }),
+      );
+    }
+
+    const installation = await this.githubAppInstallationRepository.findForTenant(
+      toRepositoryContext(context),
+      {
+        providerKey: "github",
+        tenantId,
+      },
+    );
+    if (installation.isErr()) {
+      return err(installation.error);
+    }
+    if (!installation.value || installation.value.suspendedAt) {
+      return err(
+        domainError.validation(
+          "GitHub App is not installed for this workspace. Install the GitHub App before browsing repositories.",
+          {
+            phase: "github-app-repository-browser",
+          },
+        ),
+      );
+    }
+
+    const token = await this.githubAppRuntime.createInstallationAccessToken(context, {
+      installationId: installation.value.installationId,
+    });
+    if (token.isErr()) {
+      return err(token.error);
+    }
+
+    try {
+      const repositories = await this.githubRepositoryBrowser.listRepositories(context, {
+        accessToken: token.value.token,
+        accessTokenKind: "installation",
+        ...(input?.search ? { search: input.search } : {}),
+      });
+
+      return ok({
+        items: repositories,
+      });
+    } catch (error) {
+      return err(
+        domainError.provider("Failed to load GitHub App installation repositories", {
           message: error instanceof Error ? error.message : "Unknown GitHub API error",
         }),
       );

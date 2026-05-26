@@ -212,6 +212,8 @@ import {
   ListDeployTokensQueryService,
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
+  GitHubAppConnectionQueryHandler,
+  GitHubAppConnectionQueryService,
   ListGitHubRepositoriesQueryService,
   ListIntegrationsQueryHandler,
   ListIntegrationsQueryService,
@@ -465,6 +467,8 @@ import {
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
+  UpsertGitHubAppInstallationCommandHandler,
+  UpsertGitHubAppInstallationUseCase,
 } from "@appaloft/application";
 import {
   DeploymentTargetByIdSpec,
@@ -2298,6 +2302,8 @@ export function registerApplicationServices(
   container.registerSingleton(ExpireTerminalSessionsCommandHandler);
   container.registerSingleton(ListDeployTokensQueryHandler);
   container.registerSingleton(ListIntegrationsQueryHandler);
+  container.registerSingleton(GitHubAppConnectionQueryHandler);
+  container.registerSingleton(UpsertGitHubAppInstallationCommandHandler);
   container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
@@ -3062,6 +3068,14 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
+  container.registerSingleton(
+    tokens.githubAppConnectionQueryService,
+    GitHubAppConnectionQueryService,
+  );
+  container.registerSingleton(
+    tokens.upsertGitHubAppInstallationUseCase,
+    UpsertGitHubAppInstallationUseCase,
+  );
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(
     tokens.listGitHubRepositoriesQueryService,

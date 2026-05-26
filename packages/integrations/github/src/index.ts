@@ -1,7 +1,11 @@
+import { createSign } from "node:crypto";
 import {
   appaloftTraceAttributes,
   createAdapterSpanName,
   type ExecutionContext,
+  type GitHubAppInstallationReadback,
+  type GitHubAppInstallationToken,
+  type GitHubAppRuntime,
   type GitHubPreviewPullRequestAction,
   type GitHubPreviewPullRequestWebhookVerificationInput,
   type GitHubPreviewPullRequestWebhookVerificationResult,
@@ -17,6 +21,18 @@ import {
   type PreviewFeedbackWriterResult,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
+
+export interface GitHubAppIntegrationOptions {
+  callbackUrl?: string;
+  connectionMode?: "user-oauth" | "hosted-provider-app" | "operator-managed-app";
+  installUrl?: string;
+  owner?: string;
+  privateKeyConfigured?: boolean;
+  slug?: string;
+  appId?: string;
+  webhookSecretConfigured?: boolean;
+  webhookUrl?: string;
+}
 
 export const githubIntegration: IntegrationDescriptor = {
   key: "github",
@@ -35,6 +51,16 @@ export const githubIntegration: IntegrationDescriptor = {
         "Browse repositories with the signed-in user's GitHub account without storing GitHub App private key material.",
     },
     {
+      key: "hosted-provider-app",
+      title: "Hosted provider app",
+      audience: "end-user",
+      externalSetup: "provider-installation",
+      createsExternalResources: false,
+      secretMaterialRequired: false,
+      description:
+        "Install the Appaloft instance's GitHub App for repository events and installation-scoped access.",
+    },
+    {
       key: "operator-managed-app",
       title: "Operator-managed app",
       audience: "instance-admin",
@@ -46,6 +72,59 @@ export const githubIntegration: IntegrationDescriptor = {
     },
   ],
 };
+
+export function createGitHubIntegrationDescriptor(
+  options: GitHubAppIntegrationOptions = {},
+): IntegrationDescriptor {
+  const connectionMode = options.connectionMode ?? githubIntegration.defaultConnectionModeKey;
+  const appMode =
+    connectionMode === "hosted-provider-app" || connectionMode === "operator-managed-app";
+  const missing: string[] = [];
+
+  if (appMode) {
+    if (!options.appId) {
+      missing.push("github_app_id_missing");
+    }
+    if (!options.privateKeyConfigured) {
+      missing.push("github_app_private_key_missing");
+    }
+    if (!options.installUrl && !options.slug) {
+      missing.push("github_app_install_url_missing");
+    }
+  }
+
+  const status: NonNullable<IntegrationDescriptor["configuration"]>["status"] = appMode
+    ? missing.length === 0
+      ? "configured"
+      : missing.length === 3
+        ? "not-configured"
+        : "partial"
+    : "unknown";
+
+  return {
+    ...githubIntegration,
+    defaultConnectionModeKey: connectionMode,
+    setup: appMode
+      ? {
+          providerApp: {
+            ...(options.installUrl ? { installUrl: options.installUrl } : {}),
+            ...(options.callbackUrl ? { callbackUrl: options.callbackUrl } : {}),
+            ...(options.webhookUrl ? { webhookUrl: options.webhookUrl } : {}),
+          },
+        }
+      : undefined,
+    configuration: appMode
+      ? {
+          status,
+          diagnostics: missing.map((code) => ({
+            code,
+            severity: "error" as const,
+            message: `GitHub App configuration is missing ${code.replace("github_app_", "").replaceAll("_", " ")}.`,
+          })),
+        }
+      : undefined,
+  };
+}
 
 interface GitHubRepositoryApiRecord {
   id: number;
@@ -62,6 +141,27 @@ interface GitHubRepositoryApiRecord {
   };
 }
 
+interface GitHubInstallationApiRecord {
+  account: {
+    id?: number;
+    login?: string;
+    type?: string;
+  } | null;
+  id: number;
+  repository_selection?: "all" | "selected";
+  suspended_at?: string | null;
+}
+
+interface GitHubInstallationAccessTokenResponse {
+  expires_at: string;
+  token: string;
+}
+
+interface GitHubInstallationRepositoriesResponse {
+  repositories: GitHubRepositoryApiRecord[];
+  total_count?: number;
+}
+
 export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
   constructor(
     private readonly fetcher: typeof fetch = fetch,
@@ -72,6 +172,7 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
     context: ExecutionContext,
     input: {
       accessToken: string;
+      accessTokenKind?: "installation" | "user";
       search?: string;
     },
   ): Promise<GitHubRepositorySummary[]> {
@@ -83,10 +184,15 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
         },
       },
       async () => {
-        const url = new URL("/user/repos", this.apiBaseUrl);
+        const url = new URL(
+          input.accessTokenKind === "installation" ? "/installation/repositories" : "/user/repos",
+          this.apiBaseUrl,
+        );
         url.searchParams.set("sort", "updated");
         url.searchParams.set("per_page", "100");
-        url.searchParams.set("affiliation", "owner,collaborator,organization_member");
+        if (input.accessTokenKind !== "installation") {
+          url.searchParams.set("affiliation", "owner,collaborator,organization_member");
+        }
 
         const response = await this.fetcher(url, {
           headers: {
@@ -101,10 +207,13 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
           throw new Error(`GitHub API returned ${response.status}`);
         }
 
-        const payload = (await response.json()) as GitHubRepositoryApiRecord[];
+        const payload = (await response.json()) as
+          | GitHubRepositoryApiRecord[]
+          | GitHubInstallationRepositoriesResponse;
+        const records = Array.isArray(payload) ? payload : payload.repositories;
         const search = input.search?.trim().toLowerCase();
 
-        return payload
+        return records
           .filter((repository) =>
             search
               ? [
@@ -134,6 +243,164 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
       },
     );
   }
+}
+
+export interface GitHubAppRuntimeConfig {
+  apiBaseUrl?: string;
+  appId?: string;
+  privateKey?: string;
+  privateKeyBase64?: string;
+}
+
+export class GitHubApiAppRuntime implements GitHubAppRuntime {
+  constructor(
+    private readonly config: GitHubAppRuntimeConfig,
+    private readonly fetcher: typeof fetch = fetch,
+  ) {}
+
+  async createInstallationAccessToken(
+    context: ExecutionContext,
+    input: { installationId: string },
+  ): Promise<Result<GitHubAppInstallationToken>> {
+    const jwt = this.createJwt(context);
+    if (jwt.isErr()) {
+      return err(jwt.error);
+    }
+
+    const response = await this.fetcher(
+      new URL(
+        `/app/installations/${encodeURIComponent(input.installationId)}/access_tokens`,
+        this.apiBaseUrl(),
+      ),
+      {
+        method: "POST",
+        headers: this.appHeaders(jwt.value),
+      },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.provider("GitHub App installation token exchange failed", {
+          phase: "github-app-token-exchange",
+          status: response.status,
+        }),
+      );
+    }
+
+    const payload = (await response.json()) as GitHubInstallationAccessTokenResponse;
+    return ok({
+      expiresAt: payload.expires_at,
+      token: payload.token,
+    });
+  }
+
+  async readInstallation(
+    context: ExecutionContext,
+    input: { installationId: string },
+  ): Promise<Result<GitHubAppInstallationReadback>> {
+    const jwt = this.createJwt(context);
+    if (jwt.isErr()) {
+      return err(jwt.error);
+    }
+
+    const response = await this.fetcher(
+      new URL(`/app/installations/${encodeURIComponent(input.installationId)}`, this.apiBaseUrl()),
+      {
+        headers: this.appHeaders(jwt.value),
+      },
+    );
+    if (!response.ok) {
+      return err(
+        domainError.provider("GitHub App installation readback failed", {
+          phase: "github-app-installation-readback",
+          status: response.status,
+        }),
+      );
+    }
+
+    const payload = (await response.json()) as GitHubInstallationApiRecord;
+    return ok({
+      accountId: payload.account?.id ? String(payload.account.id) : undefined,
+      accountLogin: payload.account?.login,
+      accountType: payload.account?.type,
+      installationId: String(payload.id),
+      repositoriesSelection: payload.repository_selection,
+      suspendedAt: payload.suspended_at ?? undefined,
+    });
+  }
+
+  private appHeaders(jwt: string) {
+    return {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${jwt}`,
+      "user-agent": "appaloft-control-plane",
+      "x-github-api-version": "2022-11-28",
+    };
+  }
+
+  private apiBaseUrl() {
+    return this.config.apiBaseUrl ?? "https://api.github.com";
+  }
+
+  private createJwt(context: ExecutionContext): Result<string> {
+    const appId = this.config.appId?.trim();
+    const privateKey = normalizeGitHubAppPrivateKey(this.config);
+    if (!appId || !privateKey) {
+      return err(
+        domainError.validation("GitHub App runtime is not configured", {
+          phase: "github-app-jwt",
+        }),
+      );
+    }
+
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
+      const payload = base64UrlJson({
+        exp: now + 540,
+        iat: now - 60,
+        iss: appId,
+      });
+      const signingInput = `${header}.${payload}`;
+      const signer = createSign("RSA-SHA256");
+      signer.update(signingInput);
+      signer.end();
+      const signature = signer.sign(privateKey);
+      return ok(`${signingInput}.${base64Url(signature)}`);
+    } catch (error) {
+      return err(
+        domainError.provider("GitHub App JWT signing failed", {
+          phase: "github-app-jwt",
+          requestId: context.requestId,
+          message: error instanceof Error ? error.message : "Unknown signing error",
+        }),
+      );
+    }
+  }
+}
+
+export function createGitHubAppRuntime(
+  config: GitHubAppRuntimeConfig,
+  fetcher?: typeof fetch,
+): GitHubAppRuntime {
+  return new GitHubApiAppRuntime(config, fetcher);
+}
+
+function normalizeGitHubAppPrivateKey(config: GitHubAppRuntimeConfig): string | null {
+  if (config.privateKey?.trim()) {
+    return config.privateKey.trim();
+  }
+  if (!config.privateKeyBase64?.trim()) {
+    return null;
+  }
+  return Buffer.from(config.privateKeyBase64.trim(), "base64").toString("utf8").trim();
+}
+
+function base64UrlJson(value: unknown): string {
+  return base64Url(Buffer.from(JSON.stringify(value), "utf8"));
+}
+
+function base64Url(value: Buffer): string {
+  return value.toString("base64").replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
 export function createGitHubRepositoryBrowser(

@@ -78,6 +78,7 @@ import {
   type ListDeployTokensQueryInput,
   type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
+  type GitHubAppConnectionQueryInput,
   type ListGitHubRepositoriesQueryInput,
   type ListOperatorWorkQueryInput,
   type ListOrganizationInvitationsQueryInput,
@@ -266,6 +267,7 @@ import {
   type ListDeployTokensResponse,
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
+  type GitHubAppConnectionResponse,
   type ListGitHubRepositoriesResponse,
   type ListIntegrationsResponse,
   type ListOperatorWorkResponse,
@@ -1664,6 +1666,14 @@ export type AppaloftOrpcClientContract = {
   integrations: {
     list: Client<AppaloftClientContext, undefined, ListIntegrationsResponse, AppaloftClientError>;
     github: {
+      appConnection: {
+        show: Client<
+          AppaloftClientContext,
+          GitHubAppConnectionQueryInput,
+          GitHubAppConnectionResponse,
+          AppaloftClientError
+        >;
+      };
       repositories: {
         list: Client<
           AppaloftClientContext,

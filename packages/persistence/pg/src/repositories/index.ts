@@ -25,6 +25,7 @@ export * from "./domain-route-binding-reader";
 export * from "./domain-route-failure-candidate-reader";
 export * from "./environment-read-model";
 export * from "./environment-repository";
+export * from "./github-app-installation-repository";
 export * from "./preview-cleanup-attempt-recorder";
 export * from "./preview-environment-repository";
 export * from "./preview-feedback-recorder";
