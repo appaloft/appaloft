@@ -23,6 +23,7 @@ export interface ProjectsTable {
 
 export interface ServersTable {
   id: string;
+  organization_id: ColumnType<string, string | undefined, string>;
   name: string;
   host: string;
   port: number;
@@ -48,6 +49,7 @@ export interface ServersTable {
 
 export interface SshCredentialsTable {
   id: string;
+  organization_id: ColumnType<string, string | undefined, string>;
   name: string;
   kind: string;
   username: string | null;

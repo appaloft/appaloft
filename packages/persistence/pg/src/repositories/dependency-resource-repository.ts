@@ -51,6 +51,7 @@ import { type Database } from "../schema";
 import {
   defaultReadModelListLimit,
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   withRepositoryTransaction,
 } from "./shared";
@@ -425,12 +426,22 @@ export class PgDependencyResourceRepository implements DependencyResourceReposit
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("dependency_resources").selectAll(),
-            new KyselyResourceInstanceSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("dependency_resources").selectAll(),
+          new KyselyResourceInstanceSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
         return row ? rehydrateResourceInstance(row) : null;
       },
     );
@@ -547,11 +558,22 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("dependency_resources")
           .selectAll()
           .where("lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);
         }
@@ -589,15 +611,25 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
         },
       },
       async () => {
-        const row = await spec
-          .accept(
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor
+            .selectFrom("dependency_resources")
+            .selectAll()
+            .where("lifecycle_status", "!=", "deleted"),
+          new KyselyResourceInstanceSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
             executor
-              .selectFrom("dependency_resources")
-              .selectAll()
-              .where("lifecycle_status", "!=", "deleted"),
-            new KyselyResourceInstanceSelectionVisitor(),
-          )
-          .executeTakeFirst();
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
         if (!row) {
           return null;
         }

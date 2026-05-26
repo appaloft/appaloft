@@ -20,6 +20,7 @@ import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder 
 import { type Database } from "../schema";
 import {
   rehydrateDomainBindingRow,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   serializeDomainDnsObservation,
   serializeDomainRouteFailure,
@@ -159,12 +160,23 @@ export class PgDomainBindingRepository implements DomainBindingRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("domain_bindings").selectAll(),
-            new KyselyDomainBindingSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("domain_bindings").selectAll(),
+          new KyselyDomainBindingSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? DomainBinding.rehydrate(rehydrateDomainBindingRow(row)) : null;
       },

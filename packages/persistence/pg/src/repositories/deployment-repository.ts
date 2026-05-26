@@ -30,6 +30,7 @@ import {
 import { type Database } from "../schema";
 import {
   rehydrateDeploymentRow,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   serializeDeploymentDependencyBindingReferences,
   serializeDeploymentLogs,
@@ -310,12 +311,22 @@ export class PgDeploymentRepository implements DeploymentRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("deployments").selectAll(),
-            new KyselyDeploymentSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("deployments").selectAll(),
+          new KyselyDeploymentSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;

@@ -14,7 +14,11 @@ import {
 import { type Insertable, type Kysely, type Selectable } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type PreviewPolicyRow = Selectable<Database["preview_policies"]>;
 
@@ -35,11 +39,21 @@ export class PgPreviewPolicyRepository implements PreviewPolicyRepository, Previ
         },
       },
       async () => {
-        const row = await executor
+        let query = executor
           .selectFrom("preview_policies")
           .selectAll()
-          .where("scope_key", "=", scopeKey(scope))
-          .executeTakeFirst();
+          .where("scope_key", "=", scopeKey(scope));
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("project_id", "in", (subquery) =>
+            subquery
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? recordFromRow(row) : null;
       },
@@ -62,6 +76,29 @@ export class PgPreviewPolicyRepository implements PreviewPolicyRepository, Previ
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          const owner =
+            record.scope.kind === "resource"
+              ? await executor
+                  .selectFrom("resources")
+                  .innerJoin("projects", "projects.id", "resources.project_id")
+                  .select("resources.id")
+                  .where("resources.id", "=", record.scope.resourceId)
+                  .where("resources.project_id", "=", record.scope.projectId)
+                  .where("projects.organization_id", "=", organizationId)
+                  .executeTakeFirst()
+              : await executor
+                  .selectFrom("projects")
+                  .select("id")
+                  .where("id", "=", record.scope.projectId)
+                  .where("organization_id", "=", organizationId)
+                  .executeTakeFirst();
+          if (!owner) {
+            throw new Error("Preview policy scope does not belong to repository context");
+          }
+        }
+
         const row = await executor
           .insertInto("preview_policies")
           .values(values)
@@ -102,11 +139,21 @@ export class PgPreviewPolicyRepository implements PreviewPolicyRepository, Previ
         },
       },
       async () => {
-        const row = await executor
+        let query = executor
           .selectFrom("preview_policies")
           .selectAll()
-          .where("scope_key", "=", scopeKey(scope))
-          .executeTakeFirst();
+          .where("scope_key", "=", scopeKey(scope));
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("project_id", "in", (subquery) =>
+            subquery
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? summaryFromRow(row) : defaultSummary(scope);
       },

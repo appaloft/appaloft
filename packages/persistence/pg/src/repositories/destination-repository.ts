@@ -17,7 +17,11 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { rehydrateDestination, resolveRepositoryExecutor } from "./shared";
+import {
+  rehydrateDestination,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type DestinationSelectionQuery = SelectQueryBuilder<
   Database,
@@ -108,12 +112,21 @@ export class PgDestinationRepository implements DestinationRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("destinations").selectAll(),
-            new KyselyDestinationSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("destinations").selectAll(),
+          new KyselyDestinationSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("server_id", "in", (subquery) =>
+            subquery
+              .selectFrom("servers")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? Destination.rehydrate(rehydrateDestination(row)) : null;
       },

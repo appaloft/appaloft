@@ -38,7 +38,11 @@ import {
   type RuntimeMonitoringSamplesTable,
   type RuntimeMonitoringThresholdPoliciesTable,
 } from "../schema";
-import { type RepositoryExecutor, resolveRepositoryExecutor } from "./shared";
+import {
+  type RepositoryExecutor,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type RuntimeMonitoringSampleRow = Selectable<RuntimeMonitoringSamplesTable>;
 type RuntimeMonitoringThresholdPolicyRow = Selectable<RuntimeMonitoringThresholdPoliciesTable>;
@@ -81,7 +85,7 @@ export class PgRuntimeMonitoringSampleReadModel implements RuntimeMonitoringSamp
 
     try {
       const signals = input.signals ?? allSignals;
-      const scopedSamplesQuery = applySampleScopeFilter(
+      let scopedSamplesQuery = applySampleScopeFilter(
         executor.selectFrom("runtime_monitoring_samples").selectAll(),
         input.scope,
       )
@@ -89,6 +93,25 @@ export class PgRuntimeMonitoringSampleReadModel implements RuntimeMonitoringSamp
         .where("observed_at", "<=", input.window.to)
         .orderBy("observed_at", "asc")
         .limit(input.limit);
+      const organizationId = resolveRepositoryContextOrganizationId(toRepositoryContext(context));
+      if (organizationId) {
+        scopedSamplesQuery = scopedSamplesQuery.where((eb) =>
+          eb.or([
+            eb("project_id", "in", (subquery) =>
+              subquery
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+            eb("server_id", "in", (subquery) =>
+              subquery
+                .selectFrom("servers")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+          ]),
+        );
+      }
 
       const [rows, retention] = await Promise.all([
         scopedSamplesQuery.execute(),
@@ -127,7 +150,7 @@ export class PgRuntimeMonitoringMarkerReadModel implements RuntimeMonitoringMark
     const executor = resolveRepositoryExecutor(this.db, toRepositoryContext(context));
 
     try {
-      const rows = await applyDeploymentScopeFilter(
+      let query = applyDeploymentScopeFilter(
         executor
           .selectFrom("deployments")
           .select([
@@ -140,10 +163,18 @@ export class PgRuntimeMonitoringMarkerReadModel implements RuntimeMonitoringMark
             "finished_at",
           ]),
         input.scope,
-      )
-        .orderBy("created_at", "desc")
-        .limit(200)
-        .execute();
+      );
+      const organizationId = resolveRepositoryContextOrganizationId(toRepositoryContext(context));
+      if (organizationId) {
+        query = query.where("project_id", "in", (subquery) =>
+          subquery
+            .selectFrom("projects")
+            .select("id")
+            .where("organization_id", "=", organizationId),
+        );
+      }
+
+      const rows = await query.orderBy("created_at", "desc").limit(200).execute();
 
       return ok(
         rows

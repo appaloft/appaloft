@@ -12,7 +12,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Selectable } from "kysely";
 
 import { type Database } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type ScheduledRuntimePrunePolicyRow = Selectable<Database["scheduled_runtime_prune_policies"]>;
 
@@ -81,11 +81,26 @@ export class PgScheduledRuntimePrunePolicyReadModel
     const executor = resolveRepositoryExecutor(this.db, context);
 
     try {
-      const row = await executor
+      let query = executor
         .selectFrom("scheduled_runtime_prune_policies")
         .selectAll()
-        .where("id", "=", policyId)
-        .executeTakeFirst();
+        .where("id", "=", policyId);
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        query = query.where((eb) =>
+          eb.or([
+            eb("server_id", "=", "*"),
+            eb("server_id", "in", (subquery) =>
+              subquery
+                .selectFrom("servers")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+          ]),
+        );
+      }
+
+      const row = await query.executeTakeFirst();
 
       return ok(row ? toPolicyRecord(row) : null);
     } catch (error) {
@@ -133,6 +148,20 @@ export class PgScheduledRuntimePrunePolicyReadModel
 
     try {
       let query = executor.selectFrom("scheduled_runtime_prune_policies").selectAll();
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        query = query.where((eb) =>
+          eb.or([
+            eb("server_id", "=", "*"),
+            eb("server_id", "in", (subquery) =>
+              subquery
+                .selectFrom("servers")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+          ]),
+        );
+      }
 
       if (filter.enabledOnly === true) {
         query = query.where("enabled", "=", true);

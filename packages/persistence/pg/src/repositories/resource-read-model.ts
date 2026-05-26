@@ -20,6 +20,7 @@ import { rowToRuntimeControlAttempt } from "./resource-runtime-control-attempts"
 import {
   defaultReadModelListLimit,
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedResourceAccessProfile,
   type SerializedResourceNetworkProfile,
@@ -246,11 +247,22 @@ export class PgResourceReadModel implements ResourceReadModel {
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("resources")
           .selectAll()
           .where("lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (!input?.includePreviewResources) {
           query = query.where(
@@ -369,12 +381,22 @@ export class PgResourceReadModel implements ResourceReadModel {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("resources").selectAll().where("lifecycle_status", "!=", "deleted"),
-            new KyselyResourceSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("resources").selectAll().where("lifecycle_status", "!=", "deleted"),
+          new KyselyResourceSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;

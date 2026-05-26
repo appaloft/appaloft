@@ -21,6 +21,7 @@ import { type Database } from "../schema";
 import {
   type RepositoryExecutor,
   rehydrateEnvironmentRow,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   withRepositoryTransaction,
 } from "./shared";
@@ -180,12 +181,22 @@ export class PgEnvironmentRepository implements EnvironmentRepository {
         },
       },
       async () => {
-        const environmentRow = await spec
-          .accept(
-            executor.selectFrom("environments").selectAll(),
-            new KyselyEnvironmentSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("environments").selectAll(),
+          new KyselyEnvironmentSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const environmentRow = await query.executeTakeFirst();
 
         if (!environmentRow) {
           return null;

@@ -17,6 +17,7 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   OccurredAt,
+  OrganizationId,
   Project,
   ProjectId,
   ProjectName,
@@ -276,6 +277,177 @@ describe("dependency resource persistence", () => {
       });
       expect(JSON.stringify(managedRedisSummary)).not.toContain("super-secret");
       expect(JSON.stringify(managedSummary)).not.toContain("password");
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[DEP-RES-PG-TENANT-003] repository and read model scope dependency resources to context organization", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-dependency-resource-tenant-"));
+    const {
+      createDatabase,
+      createMigrator,
+      PgDependencyResourceReadModel,
+      PgDependencyResourceRepository,
+      PgEnvironmentRepository,
+      PgProjectRepository,
+    } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const systemContext = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_dependency_resource_tenant_seed",
+          entrypoint: "system",
+        }),
+      );
+      const alphaContext = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_dependency_resource_tenant_alpha",
+          entrypoint: "rpc",
+          principal: {
+            kind: "user",
+            actorId: "usr_alpha",
+            userId: "usr_alpha",
+            activeOrganization: {
+              organizationId: "org_alpha",
+              role: "owner",
+              productRole: "owner",
+            },
+          },
+        }),
+      );
+      const betaContext = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_dependency_resource_tenant_beta",
+          entrypoint: "rpc",
+          principal: {
+            kind: "user",
+            actorId: "usr_beta",
+            userId: "usr_beta",
+            activeOrganization: {
+              organizationId: "org_beta",
+              role: "owner",
+              productRole: "owner",
+            },
+          },
+        }),
+      );
+      const dependencyResources = new PgDependencyResourceRepository(database.db);
+      const readModel = new PgDependencyResourceReadModel(database.db);
+      const projects = new PgProjectRepository(database.db);
+      const environments = new PgEnvironmentRepository(database.db);
+      const createdAt = CreatedAt.rehydrate("2026-01-01T00:00:00.000Z");
+      const alphaProject = Project.create({
+        id: ProjectId.rehydrate("prj_alpha"),
+        organizationId: OrganizationId.rehydrate("org_alpha"),
+        name: ProjectName.rehydrate("Alpha"),
+        createdAt,
+      })._unsafeUnwrap();
+      const betaProject = Project.create({
+        id: ProjectId.rehydrate("prj_beta"),
+        organizationId: OrganizationId.rehydrate("org_beta"),
+        name: ProjectName.rehydrate("Beta"),
+        createdAt,
+      })._unsafeUnwrap();
+      const alphaEnvironment = Environment.create({
+        id: EnvironmentId.rehydrate("env_alpha"),
+        projectId: ProjectId.rehydrate("prj_alpha"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const betaEnvironment = Environment.create({
+        id: EnvironmentId.rehydrate("env_beta"),
+        projectId: ProjectId.rehydrate("prj_beta"),
+        name: EnvironmentName.rehydrate("Production"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt,
+      })._unsafeUnwrap();
+      const alphaResource = ResourceInstance.createPostgresDependencyResource({
+        id: ResourceInstanceId.rehydrate("rsi_alpha_pg"),
+        projectId: ProjectId.rehydrate("prj_alpha"),
+        environmentId: EnvironmentId.rehydrate("env_alpha"),
+        name: ResourceInstanceName.rehydrate("Alpha DB"),
+        kind: ResourceInstanceKindValue.rehydrate("postgres"),
+        sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+        providerKey: ProviderKey.rehydrate("external-postgres"),
+        endpoint: {
+          host: "alpha-db.example.com",
+          maskedConnection: "postgres://********@alpha-db.example.com/app",
+        },
+        providerManaged: false,
+        createdAt,
+      })._unsafeUnwrap();
+      const betaResource = ResourceInstance.createPostgresDependencyResource({
+        id: ResourceInstanceId.rehydrate("rsi_beta_pg"),
+        projectId: ProjectId.rehydrate("prj_beta"),
+        environmentId: EnvironmentId.rehydrate("env_beta"),
+        name: ResourceInstanceName.rehydrate("Beta DB"),
+        kind: ResourceInstanceKindValue.rehydrate("postgres"),
+        sourceMode: DependencyResourceSourceModeValue.rehydrate("imported-external"),
+        providerKey: ProviderKey.rehydrate("external-postgres"),
+        endpoint: {
+          host: "beta-db.example.com",
+          maskedConnection: "postgres://********@beta-db.example.com/app",
+        },
+        providerManaged: false,
+        createdAt,
+      })._unsafeUnwrap();
+
+      await projects.upsert(
+        systemContext,
+        alphaProject,
+        UpsertProjectSpec.fromProject(alphaProject),
+      );
+      await projects.upsert(systemContext, betaProject, UpsertProjectSpec.fromProject(betaProject));
+      await environments.upsert(
+        systemContext,
+        alphaEnvironment,
+        UpsertEnvironmentSpec.fromEnvironment(alphaEnvironment),
+      );
+      await environments.upsert(
+        systemContext,
+        betaEnvironment,
+        UpsertEnvironmentSpec.fromEnvironment(betaEnvironment),
+      );
+      await dependencyResources.upsert(
+        systemContext,
+        alphaResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(alphaResource),
+      );
+      await dependencyResources.upsert(
+        systemContext,
+        betaResource,
+        UpsertResourceInstanceSpec.fromResourceInstance(betaResource),
+      );
+
+      await expect(readModel.list(alphaContext)).resolves.toEqual([
+        expect.objectContaining({ id: "rsi_alpha_pg", projectId: "prj_alpha" }),
+      ]);
+      await expect(readModel.list(betaContext)).resolves.toEqual([
+        expect.objectContaining({ id: "rsi_beta_pg", projectId: "prj_beta" }),
+      ]);
+      await expect(
+        readModel.findOne(
+          alphaContext,
+          ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_beta_pg")),
+        ),
+      ).resolves.toBeNull();
+      await expect(
+        dependencyResources.findOne(
+          alphaContext,
+          ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate("rsi_beta_pg")),
+        ),
+      ).resolves.toBeNull();
+      await expect(readModel.list(systemContext)).resolves.toHaveLength(2);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
