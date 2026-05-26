@@ -68,6 +68,9 @@ environments，或已经记录为 retry-scheduled 的 cleanup attempts。
 | `APPALOFT_BETTER_AUTH_COOKIE_DOMAIN` | unset | 可选 Better Auth cookie domain；需要跨同一 site 的多个子域共享 product session 时设置，例如 `.example.com`。 |
 | `APPALOFT_BETTER_AUTH_COOKIE_PREFIX` | Better Auth 默认值 | 可选 Better Auth cookie prefix；多个 Appaloft origin 共享 session 时应保持一致。 |
 | `APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS` | `false` | 在受信任反向代理后运行时，允许 Better Auth 读取 proxy headers 还原外部 origin。 |
+| `APPALOFT_GITHUB_CLIENT_ID` | unset | 可选 GitHub OAuth App client id；与 `APPALOFT_GITHUB_CLIENT_SECRET` 一起配置后，登录和注册页面会显示 GitHub 登录。 |
+| `APPALOFT_GITHUB_CLIENT_SECRET` | unset | 可选 GitHub OAuth App client secret；必须通过 secret store/env 注入，不能写入仓库。 |
+| `APPALOFT_GITHUB_REDIRECT_URI` | `<APPALOFT_BETTER_AUTH_URL>/api/auth/callback/github` | 可选 GitHub OAuth callback 覆盖值；大多数部署只需要把 GitHub OAuth App callback 设置成默认值。 |
 | `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` | retained monitoring raw samples 的默认保留小时数。 |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | `7` | SSH remote PGlite `state/backups/sync-*` upload backups 的恢复窗口。 |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` | `20` | SSH remote PGlite `state/backups/sync-*` upload backups 的数量上限；超过上限时保留最新备份。 |
