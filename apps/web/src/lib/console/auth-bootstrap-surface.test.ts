@@ -18,7 +18,11 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
 
     expect(loginPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(loginPageSource).not.toContain("createAdmin");
+    expect(loginPageSource).toContain("/api/auth/session");
+    expect(loginPageSource).toContain("signInWithGithub");
     expect(signupPageSource).not.toContain("/bootstrap/auth/first-admin");
+    expect(signupPageSource).toContain("/api/auth/session");
+    expect(signupPageSource).toContain("signUpWithGithub");
     expect(signupPageSource).toContain("/api/auth/sign-up/email");
     expect(signupPageSource).toContain("/api/auth/organization/create");
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");

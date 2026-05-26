@@ -30,29 +30,55 @@ export interface AppaloftBetterAuthProviderConfig {
   oidc: boolean;
 }
 
+function joinBaseUrlPath(baseURL: string, path: string): string | undefined {
+  try {
+    const url = new URL(baseURL);
+    url.pathname = `${url.pathname.replace(/\/+$/g, "")}${path}`;
+    url.search = "";
+    url.hash = "";
+
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveAppaloftBetterAuthRedirectUri(
+  config: AppaloftBetterAuthConfig,
+  provider: "github" | "google" | "oidc",
+): string | undefined {
+  if (provider === "github") {
+    return config.githubRedirectUri ?? joinBaseUrlPath(config.baseURL, "/api/auth/callback/github");
+  }
+  if (provider === "google") {
+    return config.googleRedirectUri ?? joinBaseUrlPath(config.baseURL, "/api/auth/callback/google");
+  }
+
+  return (
+    config.oidcRedirectUri ?? joinBaseUrlPath(config.baseURL, "/api/auth/oauth2/callback/oidc")
+  );
+}
+
 export function resolveAppaloftBetterAuthProviderConfig(
   config: AppaloftBetterAuthConfig,
 ): AppaloftBetterAuthProviderConfig {
   const hasTrustedOrigin = Boolean(config.trustedOrigins?.length);
+  const githubRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "github");
+  const googleRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "google");
+  const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
 
   return {
     github: Boolean(
-      config.githubClientId &&
-        config.githubClientSecret &&
-        config.githubRedirectUri &&
-        hasTrustedOrigin,
+      config.githubClientId && config.githubClientSecret && githubRedirectUri && hasTrustedOrigin,
     ),
     google: Boolean(
-      config.googleClientId &&
-        config.googleClientSecret &&
-        config.googleRedirectUri &&
-        hasTrustedOrigin,
+      config.googleClientId && config.googleClientSecret && googleRedirectUri && hasTrustedOrigin,
     ),
     oidc: Boolean(
       config.oidcClientId &&
         config.oidcClientSecret &&
         config.oidcDiscoveryUrl &&
-        config.oidcRedirectUri &&
+        oidcRedirectUri &&
         hasTrustedOrigin,
     ),
   };
@@ -63,28 +89,22 @@ export function createAppaloftBetterAuthOptions(
 ): BetterAuthOptions {
   const providers = resolveAppaloftBetterAuthProviderConfig(config);
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
-  if (
-    providers.github &&
-    config.githubClientId &&
-    config.githubClientSecret &&
-    config.githubRedirectUri
-  ) {
+  const githubRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "github");
+  const googleRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "google");
+  const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
+
+  if (providers.github && config.githubClientId && config.githubClientSecret && githubRedirectUri) {
     socialProviders.github = {
       clientId: config.githubClientId,
       clientSecret: config.githubClientSecret,
-      redirectURI: config.githubRedirectUri,
+      redirectURI: githubRedirectUri,
     };
   }
-  if (
-    providers.google &&
-    config.googleClientId &&
-    config.googleClientSecret &&
-    config.googleRedirectUri
-  ) {
+  if (providers.google && config.googleClientId && config.googleClientSecret && googleRedirectUri) {
     socialProviders.google = {
       clientId: config.googleClientId,
       clientSecret: config.googleClientSecret,
-      redirectURI: config.googleRedirectUri,
+      redirectURI: googleRedirectUri,
     };
   }
 
@@ -122,7 +142,7 @@ export function createAppaloftBetterAuthOptions(
       config.oidcClientId &&
       config.oidcClientSecret &&
       config.oidcDiscoveryUrl &&
-      config.oidcRedirectUri
+      oidcRedirectUri
         ? [
             genericOAuth({
               config: [
@@ -131,7 +151,7 @@ export function createAppaloftBetterAuthOptions(
                   clientId: config.oidcClientId,
                   clientSecret: config.oidcClientSecret,
                   discoveryUrl: config.oidcDiscoveryUrl,
-                  redirectURI: config.oidcRedirectUri,
+                  redirectURI: oidcRedirectUri,
                   scopes: ["openid", "email", "profile"],
                   pkce: true,
                   ...(config.oidcIssuer
@@ -152,12 +172,13 @@ export function createAppaloftBetterAuthOptions(
 
 export function createAppaloftBetterAuth(config: AppaloftBetterAuthConfig) {
   const providers = resolveAppaloftBetterAuthProviderConfig(config);
+  const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
   if (
     providers.oidc &&
     config.oidcClientId &&
     config.oidcClientSecret &&
     config.oidcDiscoveryUrl &&
-    config.oidcRedirectUri
+    oidcRedirectUri
   ) {
     return betterAuth({
       ...createAppaloftBetterAuthOptions(config),
@@ -171,7 +192,7 @@ export function createAppaloftBetterAuth(config: AppaloftBetterAuthConfig) {
               clientId: config.oidcClientId,
               clientSecret: config.oidcClientSecret,
               discoveryUrl: config.oidcDiscoveryUrl,
-              redirectURI: config.oidcRedirectUri,
+              redirectURI: oidcRedirectUri,
               scopes: ["openid", "email", "profile"],
               pkce: true,
               ...(config.oidcIssuer

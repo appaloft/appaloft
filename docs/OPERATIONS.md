@@ -121,8 +121,10 @@ http://localhost:3001/api/auth/callback/github
 
 The OAuth App cannot be fully created in Appaloft source code because GitHub issues the client id and
 client secret. Appaloft reads those values from `APPALOFT_GITHUB_CLIENT_ID` and
-`APPALOFT_GITHUB_CLIENT_SECRET`, then stores Better Auth users, sessions, linked accounts, and provider
-tokens in the configured Postgres-compatible database.
+`APPALOFT_GITHUB_CLIENT_SECRET`; `APPALOFT_GITHUB_REDIRECT_URI` is optional and defaults to the
+callback URL derived from `APPALOFT_BETTER_AUTH_URL`. Once configured, the login and sign-up pages
+offer GitHub as a first-party Better Auth sign-in method, and Appaloft stores Better Auth users,
+sessions, linked accounts, and provider tokens in the configured Postgres-compatible database.
 
 Run web only:
 
