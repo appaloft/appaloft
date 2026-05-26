@@ -5,6 +5,7 @@ import {
   type SshCredentialRepository,
 } from "@appaloft/application";
 import {
+  defaultSelfHostedOrganizationId,
   type RotateSshCredentialSpec,
   SshCredential,
   type SshCredentialByIdSpec,
@@ -25,7 +26,11 @@ import {
 } from "kysely";
 
 import { type Database } from "../schema";
-import { rehydrateSshCredential, resolveRepositoryExecutor } from "./shared";
+import {
+  rehydrateSshCredential,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type SshCredentialSelectionQuery = SelectQueryBuilder<
   Database,
@@ -95,10 +100,13 @@ class KyselySshCredentialDeleteVisitor
 class KyselySshCredentialMutationVisitor
   implements SshCredentialMutationSpecVisitor<{ values: Insertable<Database["ssh_credentials"]> }>
 {
+  constructor(private readonly organizationId: string) {}
+
   private valuesFromState(state: UpsertSshCredentialSpec["state"]) {
     return {
       values: {
         id: state.id.value,
+        organization_id: this.organizationId,
         name: state.name.value,
         kind: state.kind.value,
         username: state.username?.value ?? null,
@@ -129,7 +137,11 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
   ): Promise<void> {
     void credential;
     const executor = resolveRepositoryExecutor(this.db, context);
-    const mutation = spec.accept(new KyselySshCredentialMutationVisitor());
+    const mutation = spec.accept(
+      new KyselySshCredentialMutationVisitor(
+        resolveRepositoryContextOrganizationId(context) ?? defaultSelfHostedOrganizationId,
+      ),
+    );
     await context.tracer.startActiveSpan(
       createRepositorySpanName("ssh_credential", "upsert"),
       {
@@ -144,6 +156,7 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
           .values(mutation.values)
           .onConflict((conflict) =>
             conflict.column("id").doUpdateSet({
+              organization_id: mutation.values.organization_id,
               name: mutation.values.name,
               kind: mutation.values.kind,
               username: mutation.values.username,
@@ -171,12 +184,16 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("ssh_credentials").selectAll(),
-            new KyselySshCredentialSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("ssh_credentials").selectAll(),
+          new KyselySshCredentialSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? SshCredential.rehydrate(rehydrateSshCredential(row)) : null;
       },
@@ -190,7 +207,11 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
   ): Promise<boolean> {
     void credential;
     const executor = resolveRepositoryExecutor(this.db, context);
-    const mutation = spec.accept(new KyselySshCredentialMutationVisitor());
+    const mutation = spec.accept(
+      new KyselySshCredentialMutationVisitor(
+        resolveRepositoryContextOrganizationId(context) ?? defaultSelfHostedOrganizationId,
+      ),
+    );
     return context.tracer.startActiveSpan(
       createRepositorySpanName("ssh_credential", "update_one"),
       {
@@ -200,7 +221,7 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
         },
       },
       async () => {
-        const updated = await executor
+        let query = executor
           .updateTable("ssh_credentials")
           .set({
             name: mutation.values.name,
@@ -210,9 +231,13 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
             private_key: mutation.values.private_key,
             rotated_at: mutation.values.rotated_at,
           })
-          .where("id", "=", mutation.values.id)
-          .returning("id")
-          .executeTakeFirst();
+          .where("id", "=", mutation.values.id);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const updated = await query.returning("id").executeTakeFirst();
 
         return Boolean(updated);
       },
@@ -230,10 +255,16 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
         },
       },
       async () => {
-        const deleted = await spec
-          .accept(executor.deleteFrom("ssh_credentials"), new KyselySshCredentialDeleteVisitor())
-          .returning("id")
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.deleteFrom("ssh_credentials"),
+          new KyselySshCredentialDeleteVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const deleted = await query.returning("id").executeTakeFirst();
         return Boolean(deleted);
       },
     );

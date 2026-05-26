@@ -58,7 +58,12 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransaction } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+  withRepositoryTransaction,
+} from "./shared";
 
 type ScheduledTaskDefinitionRow = Selectable<Database["scheduled_task_definitions"]>;
 type ScheduledTaskRunAttemptRow = Selectable<Database["scheduled_task_run_attempts"]>;
@@ -753,6 +758,17 @@ export class PgScheduledTaskReadModel implements ScheduledTaskReadModel {
           .innerJoin("resources", "resources.id", "scheduled_task_definitions.resource_id")
           .selectAll("scheduled_task_definitions")
           .limit(limit + 1);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resources.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input.projectId) {
           query = query.where("resources.project_id", "=", input.projectId);
@@ -806,11 +822,23 @@ export class PgScheduledTaskReadModel implements ScheduledTaskReadModel {
       async () => {
         let query = executor
           .selectFrom("scheduled_task_definitions")
-          .selectAll()
-          .where("id", "=", input.taskId);
+          .innerJoin("resources", "resources.id", "scheduled_task_definitions.resource_id")
+          .selectAll("scheduled_task_definitions")
+          .where("scheduled_task_definitions.id", "=", input.taskId);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resources.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input.resourceId) {
-          query = query.where("resource_id", "=", input.resourceId);
+          query = query.where("scheduled_task_definitions.resource_id", "=", input.resourceId);
         }
 
         const row = await query.executeTakeFirst();
@@ -844,26 +872,41 @@ export class PgScheduledTaskRunReadModel implements ScheduledTaskRunReadModel {
         const limit = input.limit ?? 50;
         let query = executor
           .selectFrom("scheduled_task_run_attempts")
-          .selectAll()
+          .innerJoin("resources", "resources.id", "scheduled_task_run_attempts.resource_id")
+          .selectAll("scheduled_task_run_attempts")
           .limit(limit + 1);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resources.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input.taskId) {
-          query = query.where("task_id", "=", input.taskId);
+          query = query.where("scheduled_task_run_attempts.task_id", "=", input.taskId);
         }
         if (input.resourceId) {
-          query = query.where("resource_id", "=", input.resourceId);
+          query = query.where("scheduled_task_run_attempts.resource_id", "=", input.resourceId);
         }
         if (input.status) {
-          query = query.where("status", "=", input.status);
+          query = query.where("scheduled_task_run_attempts.status", "=", input.status);
         }
         if (input.triggerKind) {
-          query = query.where("trigger_kind", "=", input.triggerKind);
+          query = query.where("scheduled_task_run_attempts.trigger_kind", "=", input.triggerKind);
         }
         if (input.cursor) {
-          query = query.where("created_at", "<", input.cursor);
+          query = query.where("scheduled_task_run_attempts.created_at", "<", input.cursor);
         }
 
-        const rows = await query.orderBy("created_at", "desc").orderBy("id", "desc").execute();
+        const rows = await query
+          .orderBy("scheduled_task_run_attempts.created_at", "desc")
+          .orderBy("scheduled_task_run_attempts.id", "desc")
+          .execute();
         const pageRows = rows.slice(0, limit);
         const nextCursor = rows.length > limit ? pageRows.at(-1)?.created_at : undefined;
 
@@ -890,14 +933,26 @@ export class PgScheduledTaskRunReadModel implements ScheduledTaskRunReadModel {
       async () => {
         let query = executor
           .selectFrom("scheduled_task_run_attempts")
-          .selectAll()
-          .where("id", "=", input.runId);
+          .innerJoin("resources", "resources.id", "scheduled_task_run_attempts.resource_id")
+          .selectAll("scheduled_task_run_attempts")
+          .where("scheduled_task_run_attempts.id", "=", input.runId);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resources.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input.taskId) {
-          query = query.where("task_id", "=", input.taskId);
+          query = query.where("scheduled_task_run_attempts.task_id", "=", input.taskId);
         }
         if (input.resourceId) {
-          query = query.where("resource_id", "=", input.resourceId);
+          query = query.where("scheduled_task_run_attempts.resource_id", "=", input.resourceId);
         }
 
         const row = await query.executeTakeFirst();
@@ -925,14 +980,34 @@ export class PgScheduledTaskRunLogReadModel implements ScheduledTaskRunLogReadMo
       async () => {
         let runQuery = executor
           .selectFrom("scheduled_task_run_attempts")
-          .select(["id", "task_id", "resource_id"])
-          .where("id", "=", input.runId);
+          .innerJoin("resources", "resources.id", "scheduled_task_run_attempts.resource_id")
+          .select([
+            "scheduled_task_run_attempts.id as id",
+            "scheduled_task_run_attempts.task_id as task_id",
+            "scheduled_task_run_attempts.resource_id as resource_id",
+          ])
+          .where("scheduled_task_run_attempts.id", "=", input.runId);
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          runQuery = runQuery.where(
+            "resources.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input.taskId) {
-          runQuery = runQuery.where("task_id", "=", input.taskId);
+          runQuery = runQuery.where("scheduled_task_run_attempts.task_id", "=", input.taskId);
         }
         if (input.resourceId) {
-          runQuery = runQuery.where("resource_id", "=", input.resourceId);
+          runQuery = runQuery.where(
+            "scheduled_task_run_attempts.resource_id",
+            "=",
+            input.resourceId,
+          );
         }
 
         const run = await runQuery.executeTakeFirst();

@@ -47,7 +47,7 @@ import {
 } from "kysely";
 
 import { type Database, type DeployTokenScopeJson } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type DeployTokenSelectionQuery = SelectQueryBuilder<
   Database,
@@ -136,12 +136,16 @@ export class PgDeployTokenRepository implements DeployTokenRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("deploy_tokens").selectAll(),
-            new KyselyDeployTokenSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("deploy_tokens").selectAll(),
+          new KyselyDeployTokenSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? mapRow(row) : null;
       },
@@ -165,6 +169,21 @@ export class PgDeployTokenRepository implements DeployTokenRepository {
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId && mutation.values.organization_id !== organizationId) {
+          throw new Error("Deploy token organization does not match repository context");
+        }
+        if (organizationId) {
+          const existing = await executor
+            .selectFrom("deploy_tokens")
+            .select("organization_id")
+            .where("id", "=", mutation.values.id)
+            .executeTakeFirst();
+          if (existing && existing.organization_id !== organizationId) {
+            throw new Error("Deploy token belongs to a different organization");
+          }
+        }
+
         await executor
           .insertInto("deploy_tokens")
           .values(mutation.values)
@@ -204,7 +223,12 @@ export class PgDeployTokenRepository implements DeployTokenRepository {
         },
       },
       async () => {
-        const updated = await executor
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId && mutation.values.organization_id !== organizationId) {
+          return false;
+        }
+
+        let query = executor
           .updateTable("deploy_tokens")
           .set({
             organization_id: mutation.values.organization_id,
@@ -218,9 +242,12 @@ export class PgDeployTokenRepository implements DeployTokenRepository {
             rotated_at: mutation.values.rotated_at,
             revoked_at: mutation.values.revoked_at,
           })
-          .where("id", "=", mutation.values.id)
-          .returning("id")
-          .executeTakeFirst();
+          .where("id", "=", mutation.values.id);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const updated = await query.returning("id").executeTakeFirst();
 
         return Boolean(updated);
       },
@@ -244,6 +271,11 @@ export class PgDeployTokenReadModel implements DeployTokenReadModel {
         },
       },
       async () => {
+        const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+        if (contextOrganizationId && input.organizationId !== contextOrganizationId) {
+          return [];
+        }
+
         let query = safeSelect(executor)
           .where("organization_id", "=", input.organizationId)
           .orderBy("created_at", "desc")
@@ -279,6 +311,11 @@ export class PgDeployTokenReadModel implements DeployTokenReadModel {
         },
       },
       async () => {
+        const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+        if (contextOrganizationId && input.organizationId !== contextOrganizationId) {
+          return null;
+        }
+
         const row = await safeSelect(executor)
           .where("organization_id", "=", input.organizationId)
           .where("id", "=", input.tokenId)

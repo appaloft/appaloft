@@ -12,7 +12,12 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { defaultReadModelListLimit, normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import {
+  defaultReadModelListLimit,
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type ServerSelectionQuery = SelectQueryBuilder<
   Database,
@@ -128,6 +133,10 @@ export class PgServerReadModel implements ServerReadModel {
           .select("ssh_credentials.name as credential_name")
           .where("servers.lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("servers.organization_id", "=", organizationId);
+        }
 
         query = query.limit(input?.limit ?? defaultReadModelListLimit);
 
@@ -147,10 +156,15 @@ export class PgServerReadModel implements ServerReadModel {
         },
       },
       async () => {
-        const row = await spec
+        let query = spec
           .accept(executor.selectFrom("servers").selectAll(), new KyselyServerSelectionVisitor())
-          .where("lifecycle_status", "!=", "deleted")
-          .executeTakeFirst();
+          .where("lifecycle_status", "!=", "deleted");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;

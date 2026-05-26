@@ -19,6 +19,7 @@ async function seedPreviewPolicyOwners(db: Kysely<Database>) {
     .insertInto("projects")
     .values({
       id: "prj_preview_policy",
+      organization_id: "org_preview",
       name: "Preview Policy Project",
       slug: "preview-policy-project",
       description: null,
@@ -77,6 +78,25 @@ function contextFixture() {
     createExecutionContext({
       requestId: "req_preview_policy_pglite_test",
       entrypoint: "system",
+    }),
+  );
+}
+
+function organizationContextFixture(organizationId: string) {
+  return toRepositoryContext(
+    createExecutionContext({
+      requestId: `req_preview_policy_pglite_${organizationId}`,
+      entrypoint: "system",
+      principal: {
+        kind: "user",
+        actorId: `usr_${organizationId}`,
+        userId: `usr_${organizationId}`,
+        activeOrganization: {
+          organizationId,
+          role: "owner",
+          productRole: "owner",
+        },
+      },
     }),
   );
 }
@@ -230,6 +250,65 @@ describe("preview policy persistence", () => {
         updatedAt: "2026-05-06T01:10:00.000Z",
         idempotencyKey: "idem_preview_policy_resource_2",
       });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
+  test("[TENANT-REPOSITORY-PREVIEW-POLICY-001] filters and rejects cross-org policy scope access", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-preview-policy-tenant-"));
+    const { createDatabase, createMigrator, PgPreviewPolicyRepository } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await seedPreviewPolicyOwners(database.db);
+      const orgPreviewContext = organizationContextFixture("org_preview");
+      const orgOtherContext = organizationContextFixture("org_other");
+      const repository = new PgPreviewPolicyRepository(database.db);
+      const scope = {
+        kind: "resource" as const,
+        projectId: "prj_preview_policy",
+        resourceId: "res_preview_policy_api",
+      };
+      const record: PreviewPolicyRecord = {
+        id: "pvp_preview_tenant",
+        scope,
+        settings: {
+          sameRepositoryPreviews: true,
+          forkPreviews: "without-secrets",
+          secretBackedPreviews: false,
+        },
+        updatedAt: "2026-05-06T02:00:00.000Z",
+      };
+
+      await repository.upsert(orgPreviewContext, record);
+
+      expect(await repository.findOne(orgPreviewContext, scope)).toEqual(record);
+      expect(await repository.findOne(orgOtherContext, scope)).toBeNull();
+      expect(await repository.findOneSummary(orgOtherContext, scope)).toEqual({
+        scope,
+        source: "default",
+        settings: {
+          sameRepositoryPreviews: true,
+          forkPreviews: "disabled",
+          secretBackedPreviews: true,
+        },
+      });
+
+      let rejected = false;
+      try {
+        await repository.upsert(orgOtherContext, record);
+      } catch {
+        rejected = true;
+      }
+      expect(rejected).toBe(true);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

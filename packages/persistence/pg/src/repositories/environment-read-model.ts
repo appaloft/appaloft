@@ -16,6 +16,7 @@ import {
   defaultReadModelListLimit,
   type EnvironmentVariableRow,
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
 } from "./shared";
 
@@ -125,7 +126,18 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor.selectFrom("environments").selectAll().orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);
@@ -157,12 +169,22 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("environments").selectAll(),
-            new KyselyEnvironmentSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("environments").selectAll(),
+          new KyselyEnvironmentSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;

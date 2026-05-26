@@ -1,10 +1,15 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type ExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../../execution-context";
 import {
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkReadModel,
   type SourceLinkRepository,
+  type SourceLinkSelectionSpec,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type ListSourceLinksQuery, type ListSourceLinksResult } from "./list-source-links.query";
@@ -13,6 +18,11 @@ import { type ShowSourceLinkQuery, type ShowSourceLinkResult } from "./show-sour
 function sourceLinkNotFound(sourceFingerprint: string) {
   return domainError.notFound("Source link", sourceFingerprint);
 }
+
+type ContextAwareFindOne = (
+  context: RepositoryContext,
+  spec: SourceLinkSelectionSpec,
+) => Promise<Result<ShowSourceLinkResult["sourceLink"] | null>>;
 
 @injectable()
 export class SourceLinkQueryService {
@@ -40,10 +50,16 @@ export class SourceLinkQueryService {
     });
   }
 
-  async show(query: ShowSourceLinkQuery): Promise<Result<ShowSourceLinkResult>> {
-    const sourceLink = await this.sourceLinkRepository.findOne(
-      SourceLinkBySourceFingerprintSpec.create(query.sourceFingerprint),
-    );
+  async show(
+    context: ExecutionContext,
+    query: ShowSourceLinkQuery,
+  ): Promise<Result<ShowSourceLinkResult>> {
+    const spec = SourceLinkBySourceFingerprintSpec.create(query.sourceFingerprint);
+    const findOne = this.sourceLinkRepository.findOne.bind(this.sourceLinkRepository);
+    const sourceLink =
+      findOne.length >= 2
+        ? await (findOne as unknown as ContextAwareFindOne)(toRepositoryContext(context), spec)
+        : await findOne(spec);
 
     if (sourceLink.isErr()) {
       return err(sourceLink.error);

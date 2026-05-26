@@ -16,6 +16,7 @@ import { type Database } from "../schema";
 import {
   defaultReadModelListLimit,
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedDeploymentDependencyBindingReference,
   type SerializedDeploymentLog,
@@ -297,7 +298,18 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor.selectFrom("deployments").selectAll().orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);
@@ -330,12 +342,22 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("deployments").selectAll(),
-            new KyselyDeploymentSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("deployments").selectAll(),
+          new KyselyDeploymentSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         return row ? toDeploymentSummary(row) : null;
       },

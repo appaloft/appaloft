@@ -513,6 +513,18 @@ export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
 
 export const defaultReadModelListLimit = 100;
 
+export function resolveRepositoryContextOrganizationId(
+  context: RepositoryContext,
+): string | undefined {
+  const tenantOrganizationId = context.tenant?.organizationId?.trim();
+  if (tenantOrganizationId) {
+    return tenantOrganizationId;
+  }
+
+  const activeOrganizationId = context.principal?.activeOrganization?.organizationId.trim();
+  return activeOrganizationId || undefined;
+}
+
 function isRepositoryExecutor(value: unknown): value is RepositoryExecutor {
   return Boolean(
     value &&

@@ -25,6 +25,7 @@ import { type Insertable, type Kysely, type Selectable, sql } from "kysely";
 import { type Database, type SourceEventsTable } from "../schema";
 import {
   type RepositoryExecutor,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedResourceAutoDeployPolicy,
   type SerializedResourceSourceBinding,
@@ -150,14 +151,21 @@ export class PgSourceEventRepository
   }
 
   async list(
-    _context: RepositoryContext,
+    context: RepositoryContext,
     input: SourceEventListInput,
   ): Promise<SourceEventListPage> {
     const limit = input.limit ?? 50;
-    let query = this.db
+    const executor = resolveRepositoryExecutor(this.db, context);
+    let query = executor
       .selectFrom("source_events")
       .selectAll()
       .limit(limit + 1);
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where("project_id", "in", (subquery) =>
+        subquery.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
 
     if (input.projectId) {
       query = query.where("project_id", "=", input.projectId);
@@ -190,13 +198,20 @@ export class PgSourceEventRepository
   }
 
   async findOne(
-    _context: RepositoryContext,
+    context: RepositoryContext,
     input: SourceEventShowInput,
   ): Promise<SourceEventDetail | null> {
-    let query = this.db
+    const executor = resolveRepositoryExecutor(this.db, context);
+    let query = executor
       .selectFrom("source_events")
       .selectAll()
       .where("id", "=", input.sourceEventId);
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where("project_id", "in", (subquery) =>
+        subquery.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
 
     if (input.projectId) {
       query = query.where("project_id", "=", input.projectId);
