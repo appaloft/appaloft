@@ -282,6 +282,20 @@ describe("resolveConfig", () => {
     );
   });
 
+  test("[AUTH-COOKIE-CONFIG-001] reads optional Better Auth shared-cookie settings", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_BETTER_AUTH_COOKIE_DOMAIN: ".appaloft.com",
+        APPALOFT_BETTER_AUTH_COOKIE_PREFIX: "appaloft-auth",
+        APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS: "true",
+      },
+    });
+
+    expect(config.betterAuthCookieDomain).toBe(".appaloft.com");
+    expect(config.betterAuthCookiePrefix).toBe("appaloft-auth");
+    expect(config.betterAuthTrustedProxyHeaders).toBe(true);
+  });
+
   test("enables Docker Swarm execution by default and accepts explicit shell opt-out", () => {
     const defaults = resolveConfig();
     const configured = resolveConfig({

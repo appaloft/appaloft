@@ -107,8 +107,11 @@ export interface AppConfig {
   runtimeMode: "self-hosted" | "hosted-control-plane";
   authProvider: "better-auth" | "none";
   betterAuthBaseUrl: string;
+  betterAuthCookieDomain?: string;
+  betterAuthCookiePrefix?: string;
   betterAuthSecret: string;
   betterAuthMinPasswordLength?: number;
+  betterAuthTrustedProxyHeaders?: boolean;
   actionDeployToken?: string;
   actionDeployTokenScope?: ActionDeployTokenScopeConfig;
   bootstrapDeployTokenOutputFile?: string;
@@ -679,11 +682,41 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_BETTER_AUTH_URL ??
       fileConfig.betterAuthBaseUrl ??
       defaults.betterAuthBaseUrl,
+    ...(source.flags?.betterAuthCookieDomain ||
+    env.APPALOFT_BETTER_AUTH_COOKIE_DOMAIN ||
+    fileConfig.betterAuthCookieDomain
+      ? {
+          betterAuthCookieDomain:
+            source.flags?.betterAuthCookieDomain ??
+            env.APPALOFT_BETTER_AUTH_COOKIE_DOMAIN ??
+            fileConfig.betterAuthCookieDomain,
+        }
+      : {}),
+    ...(source.flags?.betterAuthCookiePrefix ||
+    env.APPALOFT_BETTER_AUTH_COOKIE_PREFIX ||
+    fileConfig.betterAuthCookiePrefix
+      ? {
+          betterAuthCookiePrefix:
+            source.flags?.betterAuthCookiePrefix ??
+            env.APPALOFT_BETTER_AUTH_COOKIE_PREFIX ??
+            fileConfig.betterAuthCookiePrefix,
+        }
+      : {}),
     betterAuthSecret:
       source.flags?.betterAuthSecret ??
       env.APPALOFT_BETTER_AUTH_SECRET ??
       fileConfig.betterAuthSecret ??
       defaults.betterAuthSecret,
+    ...(source.flags?.betterAuthTrustedProxyHeaders !== undefined ||
+    env.APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS ||
+    fileConfig.betterAuthTrustedProxyHeaders !== undefined
+      ? {
+          betterAuthTrustedProxyHeaders:
+            source.flags?.betterAuthTrustedProxyHeaders ??
+            parseBoolean(env.APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS) ??
+            fileConfig.betterAuthTrustedProxyHeaders,
+        }
+      : {}),
     ...(source.flags?.betterAuthMinPasswordLength ||
     env.APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH ||
     fileConfig.betterAuthMinPasswordLength

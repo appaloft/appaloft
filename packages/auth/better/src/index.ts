@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import {
   type ActionDeployTokenAuthorizationInput,
   type ActionDeployTokenAuthorizationPort,
@@ -50,9 +52,12 @@ import {
   type Result,
   SourceRepositoryFullName,
 } from "@appaloft/core";
-import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { bearer, organization } from "better-auth/plugins";
-import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import {
+  type AppaloftBetterAuth,
+  type AppaloftBetterAuthConfig,
+  createAppaloftBetterAuth,
+  resolveAppaloftBetterAuthProviderConfig,
+} from "./shared";
 
 type AuthProviderKey = "github" | "google" | "oidc";
 
@@ -76,24 +81,8 @@ export interface AuthSessionStatus {
   providers: AuthProviderStatus[];
 }
 
-export interface BetterAuthRuntimeConfig {
+export interface BetterAuthRuntimeConfig extends AppaloftBetterAuthConfig {
   enabled: boolean;
-  baseURL: string;
-  secret: string;
-  database?: BetterAuthOptions["database"];
-  minPasswordLength?: number;
-  githubClientId?: string;
-  githubClientSecret?: string;
-  githubRedirectUri?: string;
-  googleClientId?: string;
-  googleClientSecret?: string;
-  googleRedirectUri?: string;
-  oidcClientId?: string;
-  oidcClientSecret?: string;
-  oidcDiscoveryUrl?: string;
-  oidcIssuer?: string;
-  oidcRedirectUri?: string;
-  trustedOrigins?: readonly string[];
 }
 
 export interface AuthRuntime
@@ -130,87 +119,17 @@ function buildProviderStatus(
 }
 
 export class BetterAuthRuntime implements AuthRuntime {
-  private readonly auth;
+  private readonly auth: AppaloftBetterAuth;
   private readonly githubConfigured: boolean;
   private readonly googleConfigured: boolean;
   private readonly oidcConfigured: boolean;
 
   constructor(private readonly config: BetterAuthRuntimeConfig) {
-    const hasTrustedOrigin = Boolean(config.trustedOrigins?.length);
-    this.githubConfigured = Boolean(
-      config.githubClientId &&
-        config.githubClientSecret &&
-        config.githubRedirectUri &&
-        hasTrustedOrigin,
-    );
-    this.googleConfigured = Boolean(
-      config.googleClientId &&
-        config.googleClientSecret &&
-        config.googleRedirectUri &&
-        hasTrustedOrigin,
-    );
-    this.oidcConfigured = Boolean(
-      config.oidcClientId &&
-        config.oidcClientSecret &&
-        config.oidcDiscoveryUrl &&
-        config.oidcRedirectUri &&
-        hasTrustedOrigin,
-    );
-    const socialProviders = this.socialProviders();
-    this.auth = betterAuth({
-      baseURL: this.config.baseURL,
-      basePath: "/api/auth",
-      secret: this.config.secret,
-      ...(this.config.database ? { database: this.config.database } : {}),
-      ...(this.config.trustedOrigins?.length
-        ? { trustedOrigins: [...this.config.trustedOrigins] }
-        : {}),
-      account: {
-        storeAccountCookie: true,
-      },
-      emailAndPassword: {
-        enabled: true,
-        ...(this.config.minPasswordLength
-          ? { minPasswordLength: this.config.minPasswordLength }
-          : {}),
-      },
-      plugins: [
-        bearer(),
-        organization(),
-        ...(this.oidcConfigured &&
-        this.config.oidcClientId &&
-        this.config.oidcClientSecret &&
-        this.config.oidcDiscoveryUrl &&
-        this.config.oidcRedirectUri
-          ? [
-              genericOAuth({
-                config: [
-                  {
-                    providerId: "oidc",
-                    clientId: this.config.oidcClientId,
-                    clientSecret: this.config.oidcClientSecret,
-                    discoveryUrl: this.config.oidcDiscoveryUrl,
-                    redirectURI: this.config.oidcRedirectUri,
-                    scopes: ["openid", "email", "profile"],
-                    pkce: true,
-                    ...(this.config.oidcIssuer
-                      ? {
-                          issuer: this.config.oidcIssuer,
-                          requireIssuerValidation: true,
-                        }
-                      : {}),
-                  },
-                ],
-              }),
-            ]
-          : []),
-      ],
-      ...(Object.keys(socialProviders).length > 0
-        ? {
-            socialProviders,
-          }
-        : {}),
-    });
+    const providers = resolveAppaloftBetterAuthProviderConfig(config);
+    this.githubConfigured = providers.github;
+    this.googleConfigured = providers.google;
+    this.oidcConfigured = providers.oidc;
+    this.auth = createAppaloftBetterAuth(config);
   }
 
   async getSessionStatus(request: Request): Promise<AuthSessionStatus> {
@@ -307,35 +226,6 @@ export class BetterAuthRuntime implements AuthRuntime {
 
   private hasConfiguredOAuthProvider(): boolean {
     return this.githubConfigured || this.googleConfigured || this.oidcConfigured;
-  }
-
-  private socialProviders(): NonNullable<BetterAuthOptions["socialProviders"]> {
-    const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
-    if (
-      this.githubConfigured &&
-      this.config.githubClientId &&
-      this.config.githubClientSecret &&
-      this.config.githubRedirectUri
-    ) {
-      socialProviders.github = {
-        clientId: this.config.githubClientId,
-        clientSecret: this.config.githubClientSecret,
-        redirectURI: this.config.githubRedirectUri,
-      };
-    }
-    if (
-      this.googleConfigured &&
-      this.config.googleClientId &&
-      this.config.googleClientSecret &&
-      this.config.googleRedirectUri
-    ) {
-      socialProviders.google = {
-        clientId: this.config.googleClientId,
-        clientSecret: this.config.googleClientSecret,
-        redirectURI: this.config.googleRedirectUri,
-      };
-    }
-    return socialProviders;
   }
 
   private async firstVisibleOrganizationId(headers: Headers): Promise<string | undefined> {

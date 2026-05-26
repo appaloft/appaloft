@@ -65,6 +65,9 @@ environments，或已经记录为 retry-scheduled 的 cleanup attempts。
 | `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多采集的 runtime monitoring targets。 |
 | `APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS` | `3600` | `terminal-session expire` 未传明确 cutoff 时使用的、会随输入/resize/输出刷新的 active terminal session 年龄上限。 |
 | `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | `65536` | active terminal transport 重连时只在内存中回放的有界终端输出尾部；设为 `0` 可关闭回放。 |
+| `APPALOFT_BETTER_AUTH_COOKIE_DOMAIN` | unset | 可选 Better Auth cookie domain；需要跨同一 site 的多个子域共享 product session 时设置，例如 `.example.com`。 |
+| `APPALOFT_BETTER_AUTH_COOKIE_PREFIX` | Better Auth 默认值 | 可选 Better Auth cookie prefix；多个 Appaloft origin 共享 session 时应保持一致。 |
+| `APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS` | `false` | 在受信任反向代理后运行时，允许 Better Auth 读取 proxy headers 还原外部 origin。 |
 | `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` | retained monitoring raw samples 的默认保留小时数。 |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | `7` | SSH remote PGlite `state/backups/sync-*` upload backups 的恢复窗口。 |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` | `20` | SSH remote PGlite `state/backups/sync-*` upload backups 的数量上限；超过上限时保留最新备份。 |

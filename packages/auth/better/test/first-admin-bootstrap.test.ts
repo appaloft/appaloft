@@ -5,6 +5,10 @@ import { describe, expect, test } from "bun:test";
 import { type ExecutionContext } from "@appaloft/application";
 
 import { createBetterAuthRuntime } from "../src";
+import {
+  createAppaloftBetterAuthOptions,
+  resolveAppaloftBetterAuthProviderConfig,
+} from "../src/shared";
 
 const context = {
   entrypoint: "system",
@@ -19,6 +23,47 @@ const context = {
 } as ExecutionContext;
 
 describe("Better Auth first-admin bootstrap adapter", () => {
+  test("[AUTH-SHARED-COOKIE-002] builds reusable Better Auth options for shared website sessions", () => {
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://www.appaloft.com",
+      secret: "test-secret-at-least-long-enough",
+      cookieDomain: ".appaloft.com",
+      cookiePrefix: "better-auth",
+      githubClientId: "github-client-id",
+      githubClientSecret: "github-client-secret",
+      githubRedirectUri: "https://www.appaloft.com/api/auth/callback/github",
+      trustedOrigins: ["https://www.appaloft.com", "https://app.appaloft.com"],
+      trustedProxyHeaders: true,
+    });
+
+    expect(options.basePath).toBe("/api/auth");
+    expect(options.advanced).toMatchObject({
+      cookiePrefix: "better-auth",
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: ".appaloft.com",
+      },
+      trustedProxyHeaders: true,
+    });
+    expect(options.socialProviders).toMatchObject({
+      github: {
+        clientId: "github-client-id",
+        clientSecret: "github-client-secret",
+        redirectURI: "https://www.appaloft.com/api/auth/callback/github",
+      },
+    });
+    expect(
+      resolveAppaloftBetterAuthProviderConfig({
+        baseURL: "https://www.appaloft.com",
+        secret: "test-secret-at-least-long-enough",
+        githubClientId: "github-client-id",
+        githubClientSecret: "github-client-secret",
+        githubRedirectUri: "https://www.appaloft.com/api/auth/callback/github",
+        trustedOrigins: ["https://www.appaloft.com"],
+      }).github,
+    ).toBe(true);
+  });
+
   test("[AUTH-SESSION-001] requires a login when better-auth is enabled and no session exists", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
