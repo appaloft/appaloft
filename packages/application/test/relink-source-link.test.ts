@@ -328,7 +328,7 @@ describe("SourceLinkQueryService", () => {
   });
 
   test("[SOURCE-LINK-STATE-022] shows one source fingerprint link", async () => {
-    const { sourceLinkRepository } = await createRelinkFixture();
+    const { context, sourceLinkRepository } = await createRelinkFixture();
     const query = ShowSourceLinkQuery.create({
       sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
     });
@@ -341,7 +341,7 @@ describe("SourceLinkQueryService", () => {
       sourceLinkRepository,
     );
 
-    const result = await service.show(query.value);
+    const result = await service.show(context, query.value);
 
     expect(result.isOk()).toBe(true);
     if (result.isErr()) {

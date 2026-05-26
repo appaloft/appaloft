@@ -10,7 +10,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Selectable } from "kysely";
 
 import { type Database } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type RetentionDefaultRow = Selectable<Database["retention_defaults"]>;
 
@@ -79,6 +79,15 @@ export class PgRetentionDefaultRepository implements RetentionDefaultRepository 
         query = query.where("scope", "=", input.scope);
       }
 
+      const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+      if (
+        contextOrganizationId &&
+        input.organizationId !== undefined &&
+        input.organizationId !== contextOrganizationId
+      ) {
+        return ok(null);
+      }
+
       query =
         input.organizationId === undefined
           ? query.where("organization_id", "is", null)
@@ -106,13 +115,24 @@ export class PgRetentionDefaultRepository implements RetentionDefaultRepository 
 
     try {
       let query = executor.selectFrom("retention_defaults").selectAll();
+      const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
 
       if (filter.scope) {
         query = query.where("scope", "=", filter.scope);
       }
 
       if (filter.organizationId !== undefined) {
+        if (contextOrganizationId && filter.organizationId !== contextOrganizationId) {
+          return ok([]);
+        }
         query = query.where("organization_id", "=", filter.organizationId);
+      } else if (contextOrganizationId) {
+        query = query.where((eb) =>
+          eb.or([
+            eb("organization_id", "is", null),
+            eb("organization_id", "=", contextOrganizationId),
+          ]),
+        );
       }
 
       if (filter.category) {
@@ -148,6 +168,15 @@ export class PgRetentionDefaultRepository implements RetentionDefaultRepository 
     const executor = resolveRepositoryExecutor(this.db, context);
 
     try {
+      const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+      if (
+        contextOrganizationId &&
+        record.organizationId !== undefined &&
+        record.organizationId !== contextOrganizationId
+      ) {
+        return err(domainError.notFound("organization", record.organizationId));
+      }
+
       await executor
         .insertInto("retention_defaults")
         .values({

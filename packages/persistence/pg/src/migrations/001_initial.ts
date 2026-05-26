@@ -25,6 +25,9 @@ export const initialMigration = {
     await db.schema
       .createTable("servers")
       .addColumn("id", "text", (column) => column.primaryKey())
+      .addColumn("organization_id", "text", (column) =>
+        column.notNull().defaultTo("org_self_hosted"),
+      )
       .addColumn("name", "text", (column) => column.notNull())
       .addColumn("host", "text", (column) => column.notNull())
       .addColumn("port", "integer", (column) => column.notNull())
@@ -34,6 +37,12 @@ export const initialMigration = {
       .addColumn("credential_public_key", "text")
       .addColumn("credential_private_key", "text")
       .addColumn("created_at", "timestamptz", (column) => column.notNull())
+      .execute();
+
+    await db.schema
+      .createIndex("servers_organization_id_idx")
+      .on("servers")
+      .column("organization_id")
       .execute();
 
     await db.schema

@@ -13,7 +13,12 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { defaultReadModelListLimit, normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import {
+  defaultReadModelListLimit,
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type ProjectSelectionQuery = SelectQueryBuilder<
   Database,
@@ -70,10 +75,14 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
         },
       },
       async () => {
+        const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("projects")
           .selectAll()
           .where("lifecycle_status", "!=", "deleted");
+        if (contextOrganizationId) {
+          query = query.where("organization_id", "=", contextOrganizationId);
+        }
         if (input?.organizationId) {
           query = query.where("organization_id", "=", input.organizationId);
         }
@@ -104,10 +113,14 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
         },
       },
       async () => {
-        const row = await spec
+        const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec
           .accept(executor.selectFrom("projects").selectAll(), new KyselyProjectSelectionVisitor())
-          .where("lifecycle_status", "!=", "deleted")
-          .executeTakeFirst();
+          .where("lifecycle_status", "!=", "deleted");
+        if (contextOrganizationId) {
+          query = query.where("organization_id", "=", contextOrganizationId);
+        }
+        const row = await query.executeTakeFirst();
 
         return row ? toProjectSummary(row) : null;
       },
@@ -116,11 +129,15 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
 
   async findProjectOrganization(context: RepositoryContext, input: { projectId: string }) {
     const executor = resolveRepositoryExecutor(this.db, context);
-    const row = await executor
+    const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+    let query = executor
       .selectFrom("projects")
       .select(["id", "organization_id"])
-      .where("id", "=", input.projectId)
-      .executeTakeFirst();
+      .where("id", "=", input.projectId);
+    if (contextOrganizationId) {
+      query = query.where("organization_id", "=", contextOrganizationId);
+    }
+    const row = await query.executeTakeFirst();
 
     return row ? { projectId: row.id, organizationId: row.organization_id } : null;
   }

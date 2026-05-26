@@ -6,6 +6,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExecutionContext, toRepositoryContext } from "@appaloft/application";
 
+function organizationContext(organizationId: string) {
+  return toRepositoryContext(
+    createExecutionContext({
+      requestId: `req_retention_defaults_${organizationId}`,
+      entrypoint: "system",
+      principal: {
+        kind: "user",
+        actorId: `usr_${organizationId}`,
+        userId: `usr_${organizationId}`,
+        activeOrganization: {
+          organizationId,
+          role: "owner",
+          productRole: "owner",
+        },
+      },
+    }),
+  );
+}
+
 describe("retention defaults persistence", () => {
   test("[ORG-RETENTION-DEFAULTS-001] [ORG-RETENTION-DEFAULTS-002] persists and reads safe defaults", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-retention-defaults-"));
@@ -94,6 +113,26 @@ describe("retention defaults persistence", () => {
 
       const all = await repository.list(context);
       const enabled = await repository.list(context, { enabledOnly: true });
+      const orgPrimaryContext = organizationContext("org_primary");
+      const orgOtherContext = organizationContext("org_other");
+      const orgPrimaryVisible = await repository.list(orgPrimaryContext);
+      const orgOtherVisible = await repository.list(orgOtherContext);
+      const crossOrgFind = await repository.findOne(orgOtherContext, {
+        scope: "organization",
+        organizationId: "org_primary",
+        category: "domain-event-streams",
+      });
+      const crossOrgWrite = await repository.upsert(orgOtherContext, {
+        id: "rdf_cross_org",
+        scope: "organization",
+        organizationId: "org_primary",
+        category: "domain-event-streams",
+        retentionDays: 10,
+        dryRunSchedulingEnabled: true,
+        destructiveSchedulingEnabled: false,
+        enabled: true,
+        updatedAt: "2026-02-04T00:00:00.000Z",
+      });
 
       expect(all.isOk()).toBe(true);
       expect(all._unsafeUnwrap().map((record) => record.id)).toEqual([
@@ -102,6 +141,13 @@ describe("retention defaults persistence", () => {
       ]);
       expect(enabled.isOk()).toBe(true);
       expect(enabled._unsafeUnwrap().map((record) => record.id)).toEqual(["rdf_domain_events"]);
+      expect(orgPrimaryVisible._unsafeUnwrap().map((record) => record.id)).toEqual([
+        "rdf_domain_events",
+        "rdf_disabled",
+      ]);
+      expect(orgOtherVisible._unsafeUnwrap().map((record) => record.id)).toEqual(["rdf_disabled"]);
+      expect(crossOrgFind._unsafeUnwrap()).toBeNull();
+      expect(crossOrgWrite.isErr()).toBe(true);
       expect(JSON.stringify(all._unsafeUnwrap())).not.toContain("PRIVATE_KEY");
     } finally {
       await database.close();

@@ -21,6 +21,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database, type SourceLinksTable } from "../schema";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type SourceLinkRow = Selectable<SourceLinksTable>;
 type SourceLinkSelectionQuery = SelectQueryBuilder<
@@ -289,7 +290,12 @@ function persistenceError(message: string, error: unknown) {
 export class PgSourceLinkRepository implements SourceLinkRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async findOne(spec: SourceLinkSelectionSpec): Promise<Result<SourceLinkRecord | null>> {
+  async findOne(
+    contextOrSpec: RepositoryContext | SourceLinkSelectionSpec,
+    maybeSpec?: SourceLinkSelectionSpec,
+  ): Promise<Result<SourceLinkRecord | null>> {
+    const context = maybeSpec ? (contextOrSpec as RepositoryContext) : undefined;
+    const spec = maybeSpec ?? (contextOrSpec as SourceLinkSelectionSpec);
     const validation = spec.accept(ok(undefined), {
       visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) =>
         validateSourceFingerprint(sourceFingerprintSpec.sourceFingerprint),
@@ -299,12 +305,22 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
     }
 
     try {
-      const row = await spec
-        .accept(
-          this.db.selectFrom("source_links").selectAll(),
-          new KyselySourceLinkSelectionVisitor<SourceLinkSelectionQuery>(),
-        )
-        .executeTakeFirst();
+      const executor = context ? resolveRepositoryExecutor(this.db, context) : this.db;
+      let query = spec.accept(
+        executor.selectFrom("source_links").selectAll(),
+        new KyselySourceLinkSelectionVisitor<SourceLinkSelectionQuery>(),
+      );
+      const organizationId = context ? resolveRepositoryContextOrganizationId(context) : undefined;
+      if (organizationId) {
+        query = query.where("project_id", "in", (subquery) =>
+          subquery
+            .selectFrom("projects")
+            .select("id")
+            .where("organization_id", "=", organizationId),
+        );
+      }
+
+      const row = await query.executeTakeFirst();
 
       return ok(row ? mapRow(row) : null);
     } catch (error) {
@@ -313,17 +329,37 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
   }
 
   async upsert(
-    record: SourceLinkRecord,
-    spec: SourceLinkUpsertSpec,
+    contextOrRecord: RepositoryContext | SourceLinkRecord,
+    recordOrSpec: SourceLinkRecord | SourceLinkUpsertSpec,
+    maybeSpec?: SourceLinkUpsertSpec,
   ): Promise<Result<SourceLinkRecord>> {
+    const context = maybeSpec ? (contextOrRecord as RepositoryContext) : undefined;
+    const record = maybeSpec
+      ? (recordOrSpec as SourceLinkRecord)
+      : (contextOrRecord as SourceLinkRecord);
+    const spec = maybeSpec ?? (recordOrSpec as SourceLinkUpsertSpec);
     const recordResult = validateRecord(record);
     if (recordResult.isErr()) {
       return err(recordResult.error);
     }
 
     try {
+      const executor = context ? resolveRepositoryExecutor(this.db, context) : this.db;
+      const organizationId = context ? resolveRepositoryContextOrganizationId(context) : undefined;
+      if (organizationId) {
+        const project = await executor
+          .selectFrom("projects")
+          .select("id")
+          .where("id", "=", record.projectId)
+          .where("organization_id", "=", organizationId)
+          .executeTakeFirst();
+        if (!project) {
+          return err(domainError.notFound("Project", record.projectId));
+        }
+      }
+
       const mutation = spec.accept(new KyselySourceLinkUpsertVisitor());
-      const persisted = await this.db
+      const persisted = await executor
         .insertInto("source_links")
         .values(mutation.values)
         .onConflict((conflict) =>
@@ -347,7 +383,12 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
     }
   }
 
-  async deleteOne(spec: SourceLinkSelectionSpec): Promise<Result<boolean>> {
+  async deleteOne(
+    contextOrSpec: RepositoryContext | SourceLinkSelectionSpec,
+    maybeSpec?: SourceLinkSelectionSpec,
+  ): Promise<Result<boolean>> {
+    const context = maybeSpec ? (contextOrSpec as RepositoryContext) : undefined;
+    const spec = maybeSpec ?? (contextOrSpec as SourceLinkSelectionSpec);
     const validation = spec.accept(ok(undefined), {
       visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) =>
         validateSourceFingerprint(sourceFingerprintSpec.sourceFingerprint),
@@ -357,10 +398,22 @@ export class PgSourceLinkRepository implements SourceLinkRepository {
     }
 
     try {
-      const deleted = await spec
-        .accept(this.db.deleteFrom("source_links"), new KyselySourceLinkSelectionVisitor())
-        .returning("source_fingerprint")
-        .executeTakeFirst();
+      const executor = context ? resolveRepositoryExecutor(this.db, context) : this.db;
+      let query = spec.accept(
+        executor.deleteFrom("source_links"),
+        new KyselySourceLinkSelectionVisitor(),
+      );
+      const organizationId = context ? resolveRepositoryContextOrganizationId(context) : undefined;
+      if (organizationId) {
+        query = query.where("project_id", "in", (subquery) =>
+          subquery
+            .selectFrom("projects")
+            .select("id")
+            .where("organization_id", "=", organizationId),
+        );
+      }
+
+      const deleted = await query.returning("source_fingerprint").executeTakeFirst();
 
       return ok(Boolean(deleted));
     } catch (error) {
@@ -373,10 +426,17 @@ export class PgSourceLinkReadModel implements SourceLinkReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
   async list(
-    _context: RepositoryContext,
+    context: RepositoryContext,
     input?: { projectId?: string; resourceId?: string; serverId?: string; limit?: number },
   ): Promise<SourceLinkRecord[]> {
-    let query = this.db.selectFrom("source_links").selectAll().orderBy("updated_at", "desc");
+    const executor = resolveRepositoryExecutor(this.db, context);
+    let query = executor.selectFrom("source_links").selectAll().orderBy("updated_at", "desc");
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where("project_id", "in", (subquery) =>
+        subquery.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
 
     if (input?.projectId) {
       query = query.where("project_id", "=", input.projectId);

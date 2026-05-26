@@ -21,6 +21,7 @@ import { type Database } from "../schema";
 import {
   type RepositoryExecutor,
   rehydrateResourceRow,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedResourceAccessProfile,
   type SerializedResourceAutoDeployPolicy,
@@ -338,12 +339,22 @@ export class PgResourceRepository implements ResourceRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("resources").selectAll(),
-            new KyselyResourceSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("resources").selectAll(),
+          new KyselyResourceSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;

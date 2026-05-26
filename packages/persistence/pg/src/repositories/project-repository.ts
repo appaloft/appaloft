@@ -17,7 +17,11 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { rehydrateProject, resolveRepositoryExecutor } from "./shared";
+import {
+  rehydrateProject,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type ProjectSelectionQuery = SelectQueryBuilder<
   Database,
@@ -107,9 +111,15 @@ export class PgProjectRepository implements ProjectRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(executor.selectFrom("projects").selectAll(), new KyselyProjectSelectionVisitor())
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("projects").selectAll(),
+          new KyselyProjectSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+        const row = await query.executeTakeFirst();
 
         return row ? Project.rehydrate(rehydrateProject(row)) : null;
       },

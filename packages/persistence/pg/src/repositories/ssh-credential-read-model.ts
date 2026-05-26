@@ -14,7 +14,11 @@ import {
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type SshCredentialSelectionQuery = SelectQueryBuilder<
   Database,
@@ -78,13 +82,18 @@ export class PgSshCredentialReadModel implements SshCredentialReadModel {
           [appaloftTraceAttributes.readModelName]: "ssh_credential",
         },
       },
-      async () =>
-        executor
+      async () => {
+        let query = executor
           .selectFrom("ssh_credentials")
           .selectAll()
-          .orderBy("created_at", "desc")
-          .execute()
-          .then((rows) => rows.map(toSshCredentialSummary)),
+          .orderBy("created_at", "desc");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        return query.execute().then((rows) => rows.map(toSshCredentialSummary));
+      },
     );
   }
 
@@ -102,12 +111,16 @@ export class PgSshCredentialReadModel implements SshCredentialReadModel {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("ssh_credentials").selectAll(),
-            new KyselySshCredentialReadModelSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("ssh_credentials").selectAll(),
+          new KyselySshCredentialReadModelSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? toSshCredentialSummary(row) : null;
       },
@@ -131,7 +144,7 @@ export class PgSshCredentialUsageReader implements SshCredentialUsageReader {
         },
       },
       async () => {
-        const rows = await executor
+        let query = executor
           .selectFrom("servers")
           .leftJoin("ssh_credentials", "ssh_credentials.id", "servers.credential_id")
           .select([
@@ -145,8 +158,15 @@ export class PgSshCredentialUsageReader implements SshCredentialUsageReader {
           ])
           .where("servers.credential_id", "=", credentialId)
           .where("servers.lifecycle_status", "in", ["active", "inactive"])
-          .orderBy("servers.created_at", "desc")
-          .execute();
+          .orderBy("servers.created_at", "desc");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query
+            .where("servers.organization_id", "=", organizationId)
+            .where("ssh_credentials.organization_id", "=", organizationId);
+        }
+
+        const rows = await query.execute();
 
         return rows.map((row) => {
           const username = row.credentialUsername ?? row.credentialDefaultUsername ?? undefined;

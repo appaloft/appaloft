@@ -82,6 +82,8 @@ import { projectDeleteTombstoneMigration } from "./migrations/073_project_delete
 import { deploymentArchivePruneMigration } from "./migrations/074_deployment_archive_prune";
 import { projectOrganizationOwnershipMigration } from "./migrations/075_project_organization_ownership";
 import { deploymentSupersededForwardReferenceMigration } from "./migrations/076_deployment_superseded_forward_reference";
+import { serverOrganizationOwnershipMigration } from "./migrations/077_server_organization_ownership";
+import { sshCredentialOrganizationOwnershipMigration } from "./migrations/078_ssh_credential_organization_ownership";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -254,6 +256,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "074_deployment_archive_prune": deploymentArchivePruneMigration,
       "075_project_organization_ownership": projectOrganizationOwnershipMigration,
       "076_deployment_superseded_forward_reference": deploymentSupersededForwardReferenceMigration,
+      "077_server_organization_ownership": serverOrganizationOwnershipMigration,
+      "078_ssh_credential_organization_ownership": sshCredentialOrganizationOwnershipMigration,
     };
   }
 }

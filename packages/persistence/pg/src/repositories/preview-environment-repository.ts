@@ -38,7 +38,11 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type PreviewEnvironmentRow = Selectable<Database["preview_environments"]>;
 type PreviewEnvironmentSelectionQuery = SelectQueryBuilder<
@@ -227,14 +231,23 @@ export class PgPreviewEnvironmentReadModel implements PreviewEnvironmentReadMode
   constructor(private readonly db: Kysely<Database>) {}
 
   async list(
-    _context: RepositoryContext,
+    context: RepositoryContext,
     input?: Parameters<PreviewEnvironmentReadModel["list"]>[1],
   ): Promise<{ items: PreviewEnvironmentSummary[]; nextCursor?: string }> {
+    const executor = resolveRepositoryExecutor(this.db, context);
     const limit = input?.limit ?? 50;
-    let query = this.db
+    let query = executor
       .selectFrom("preview_environments")
       .selectAll()
       .limit(limit + 1);
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where(
+        "project_id",
+        "in",
+        executor.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
 
     if (input?.projectId) {
       query = query.where("project_id", "=", input.projectId);
@@ -275,13 +288,22 @@ export class PgPreviewEnvironmentReadModel implements PreviewEnvironmentReadMode
   }
 
   async findOne(
-    _context: RepositoryContext,
+    context: RepositoryContext,
     input: Parameters<PreviewEnvironmentReadModel["findOne"]>[1],
   ): Promise<PreviewEnvironmentSummary | null> {
-    let query = this.db
+    const executor = resolveRepositoryExecutor(this.db, context);
+    let query = executor
       .selectFrom("preview_environments")
       .selectAll()
       .where("id", "=", input.previewEnvironmentId);
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where(
+        "project_id",
+        "in",
+        executor.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
 
     if (input.projectId) {
       query = query.where("project_id", "=", input.projectId);
@@ -388,8 +410,8 @@ function summaryFromRow(row: PreviewEnvironmentRow): PreviewEnvironmentSummary {
       sourceBindingFingerprint: row.source_binding_fingerprint,
     },
     status: row.status as PreviewEnvironmentStatus,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    ...(row.expires_at ? { expiresAt: row.expires_at } : {}),
+    createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+    updatedAt: normalizeTimestamp(row.updated_at) ?? row.updated_at,
+    ...(row.expires_at ? { expiresAt: normalizeTimestamp(row.expires_at) ?? row.expires_at } : {}),
   };
 }

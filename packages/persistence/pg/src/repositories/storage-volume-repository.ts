@@ -34,6 +34,7 @@ import { type Database } from "../schema";
 import {
   normalizeTimestamp,
   type RepositoryExecutor,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   withRepositoryTransaction,
 } from "./shared";
@@ -239,12 +240,22 @@ export class PgStorageVolumeRepository implements StorageVolumeRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("storage_volumes").selectAll(),
-            new KyselyStorageVolumeSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("storage_volumes").selectAll(),
+          new KyselyStorageVolumeSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         return row ? rehydrateStorageVolume(row) : null;
       },
@@ -307,11 +318,22 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("storage_volumes")
           .selectAll()
           .where("lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);
@@ -344,15 +366,25 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
         },
       },
       async () => {
-        const row = await spec
-          .accept(
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor
+            .selectFrom("storage_volumes")
+            .selectAll()
+            .where("lifecycle_status", "!=", "deleted"),
+          new KyselyStorageVolumeSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
             executor
-              .selectFrom("storage_volumes")
-              .selectAll()
-              .where("lifecycle_status", "!=", "deleted"),
-            new KyselyStorageVolumeSelectionVisitor(),
-          )
-          .executeTakeFirst();
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
 
         if (!row) {
           return null;
@@ -366,13 +398,28 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
 
   async countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number> {
     const executor = resolveRepositoryExecutor(this.db, context);
-    const row = await executor
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    let query = executor
       .selectFrom("resource_storage_attachments")
-      .select((expressionBuilder) =>
-        expressionBuilder.fn.count<number>("id").as("attachment_count"),
+      .innerJoin(
+        "storage_volumes",
+        "storage_volumes.id",
+        "resource_storage_attachments.storage_volume_id",
       )
-      .where("storage_volume_id", "=", storageVolumeId)
-      .executeTakeFirst();
+      .select((expressionBuilder) =>
+        expressionBuilder.fn
+          .count<number>("resource_storage_attachments.id")
+          .as("attachment_count"),
+      )
+      .where("resource_storage_attachments.storage_volume_id", "=", storageVolumeId);
+    if (organizationId) {
+      query = query.where(
+        "storage_volumes.project_id",
+        "in",
+        executor.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
+    const row = await query.executeTakeFirst();
 
     return Number(row?.attachment_count ?? 0);
   }

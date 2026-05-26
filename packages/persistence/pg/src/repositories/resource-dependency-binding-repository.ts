@@ -36,7 +36,12 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransaction } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+  withRepositoryTransaction,
+} from "./shared";
 
 type BindingSelectionQuery = SelectQueryBuilder<
   Database,
@@ -248,12 +253,23 @@ export class PgResourceDependencyBindingRepository implements ResourceDependency
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("resource_dependency_bindings").selectAll(),
-            new KyselyResourceBindingSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("resource_dependency_bindings").selectAll(),
+          new KyselyResourceBindingSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
         return row ? rehydrateBinding(row) : null;
       },
     );
@@ -311,7 +327,7 @@ export class PgResourceDependencyBindingReadModel implements ResourceDependencyB
         },
       },
       async () => {
-        const rows = await executor
+        let query = executor
           .selectFrom("resource_dependency_bindings")
           .leftJoin(
             "dependency_resources",
@@ -331,7 +347,20 @@ export class PgResourceDependencyBindingReadModel implements ResourceDependencyB
             "dependency_resources.connection_secret_ref as dependency_connection_secret_ref",
           ])
           .where("resource_dependency_bindings.resource_id", "=", input.resourceId)
-          .where("resource_dependency_bindings.lifecycle_status", "=", "active")
+          .where("resource_dependency_bindings.lifecycle_status", "=", "active");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resource_dependency_bindings.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const rows = await query
           .orderBy("resource_dependency_bindings.created_at", "desc")
           .execute();
         return ok(rows.map((row) => toSummary(row as BindingSummaryRow)));
@@ -352,7 +381,7 @@ export class PgResourceDependencyBindingReadModel implements ResourceDependencyB
         },
       },
       async () => {
-        const row = await executor
+        let query = executor
           .selectFrom("resource_dependency_bindings")
           .leftJoin(
             "dependency_resources",
@@ -373,8 +402,20 @@ export class PgResourceDependencyBindingReadModel implements ResourceDependencyB
           ])
           .where("resource_dependency_bindings.resource_id", "=", input.resourceId)
           .where("resource_dependency_bindings.id", "=", input.bindingId)
-          .where("resource_dependency_bindings.lifecycle_status", "=", "active")
-          .executeTakeFirst();
+          .where("resource_dependency_bindings.lifecycle_status", "=", "active");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "resource_dependency_bindings.project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        const row = await query.executeTakeFirst();
         return ok(row ? toSummary(row as BindingSummaryRow) : null);
       },
     );

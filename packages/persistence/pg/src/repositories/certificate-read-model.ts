@@ -10,6 +10,7 @@ import { type Kysely } from "kysely";
 import { type Database } from "../schema";
 import {
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedCertificateAttempt,
   type SerializedImportedCertificateMetadata,
@@ -37,6 +38,20 @@ export class PgCertificateReadModel implements CertificateReadModel {
 
         if (input?.domainBindingId) {
           query = query.where("domain_binding_id", "=", input.domainBindingId);
+        }
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("domain_binding_id", "in", (subquery) =>
+            subquery
+              .selectFrom("domain_bindings")
+              .select("domain_bindings.id")
+              .where("domain_bindings.project_id", "in", (projects) =>
+                projects
+                  .selectFrom("projects")
+                  .select("projects.id")
+                  .where("projects.organization_id", "=", organizationId),
+              ),
+          );
         }
 
         const rows = await query.execute();

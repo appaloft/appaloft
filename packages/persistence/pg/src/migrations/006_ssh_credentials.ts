@@ -8,12 +8,22 @@ export const sshCredentialsMigration = {
       .createTable("ssh_credentials")
       .ifNotExists()
       .addColumn("id", "text", (column) => column.primaryKey())
+      .addColumn("organization_id", "text", (column) =>
+        column.notNull().defaultTo("org_self_hosted"),
+      )
       .addColumn("name", "text", (column) => column.notNull())
       .addColumn("kind", "text", (column) => column.notNull())
       .addColumn("username", "text")
       .addColumn("public_key", "text")
       .addColumn("private_key", "text", (column) => column.notNull())
       .addColumn("created_at", "timestamptz", (column) => column.notNull())
+      .execute();
+
+    await db.schema
+      .createIndex("ssh_credentials_organization_id_idx")
+      .ifNotExists()
+      .on("ssh_credentials")
+      .column("organization_id")
       .execute();
 
     await sql`

@@ -8,7 +8,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Selectable } from "kysely";
 
 import { type Database } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type DependencyResourceBackupPolicyRow = Selectable<
   Database["dependency_resource_backup_policies"]
@@ -46,11 +46,26 @@ export class PgDependencyResourceBackupPolicyRepository
     const executor = resolveRepositoryExecutor(this.db, context);
 
     try {
-      const row = await executor
+      let query = executor
         .selectFrom("dependency_resource_backup_policies")
         .selectAll()
-        .where("id", "=", policyId)
-        .executeTakeFirst();
+        .where("id", "=", policyId);
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        query = query.where("dependency_resource_id", "in", (subquery) =>
+          subquery
+            .selectFrom("dependency_resources")
+            .select("dependency_resources.id")
+            .where("dependency_resources.project_id", "in", (projects) =>
+              projects
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+        );
+      }
+
+      const row = await query.executeTakeFirst();
 
       return ok(row ? toRecord(row) : null);
     } catch (error) {
@@ -72,6 +87,20 @@ export class PgDependencyResourceBackupPolicyRepository
 
     try {
       let query = executor.selectFrom("dependency_resource_backup_policies").selectAll();
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        query = query.where("dependency_resource_id", "in", (subquery) =>
+          subquery
+            .selectFrom("dependency_resources")
+            .select("dependency_resources.id")
+            .where("dependency_resources.project_id", "in", (projects) =>
+              projects
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+        );
+      }
 
       if (filter.enabledOnly === true) {
         query = query.where("enabled", "=", true);
@@ -105,6 +134,24 @@ export class PgDependencyResourceBackupPolicyRepository
     const executor = resolveRepositoryExecutor(this.db, context);
 
     try {
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        const dependency = await executor
+          .selectFrom("dependency_resources")
+          .select("id")
+          .where("id", "=", record.dependencyResourceId)
+          .where("project_id", "in", (projects) =>
+            projects
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          )
+          .executeTakeFirst();
+        if (!dependency) {
+          return err(domainError.notFound("dependency_resource", record.dependencyResourceId));
+        }
+      }
+
       await executor
         .insertInto("dependency_resource_backup_policies")
         .values({
@@ -160,21 +207,48 @@ export class PgDependencyResourceBackupPolicyRepository
     const executor = resolveRepositoryExecutor(this.db, context);
 
     try {
-      await executor
+      let updateQuery = executor
         .updateTable("dependency_resource_backup_policies")
         .set({
           last_run_at: input.lastRunAt,
           next_run_at: input.nextRunAt,
           updated_at: input.updatedAt,
         })
-        .where("id", "=", input.policyId)
-        .execute();
+        .where("id", "=", input.policyId);
+      const organizationId = resolveRepositoryContextOrganizationId(context);
+      if (organizationId) {
+        updateQuery = updateQuery.where("dependency_resource_id", "in", (subquery) =>
+          subquery
+            .selectFrom("dependency_resources")
+            .select("dependency_resources.id")
+            .where("dependency_resources.project_id", "in", (projects) =>
+              projects
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+        );
+      }
+      await updateQuery.execute();
 
-      const row = await executor
+      let readQuery = executor
         .selectFrom("dependency_resource_backup_policies")
         .selectAll()
-        .where("id", "=", input.policyId)
-        .executeTakeFirst();
+        .where("id", "=", input.policyId);
+      if (organizationId) {
+        readQuery = readQuery.where("dependency_resource_id", "in", (subquery) =>
+          subquery
+            .selectFrom("dependency_resources")
+            .select("dependency_resources.id")
+            .where("dependency_resources.project_id", "in", (projects) =>
+              projects
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+        );
+      }
+      const row = await readQuery.executeTakeFirst();
 
       if (!row) {
         return err(domainError.notFound("dependency_resource_backup_policy", input.policyId));

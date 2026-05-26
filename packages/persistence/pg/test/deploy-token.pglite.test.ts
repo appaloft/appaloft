@@ -36,6 +36,25 @@ function repositoryContext() {
   );
 }
 
+function organizationRepositoryContext(organizationId: string) {
+  return toRepositoryContext(
+    createExecutionContext({
+      requestId: `req_deploy_token_pglite_${organizationId}`,
+      entrypoint: "system",
+      principal: {
+        kind: "user",
+        actorId: `usr_${organizationId}`,
+        userId: `usr_${organizationId}`,
+        activeOrganization: {
+          organizationId,
+          role: "owner",
+          productRole: "owner",
+        },
+      },
+    }),
+  );
+}
+
 function verifier(value = "sha256:1234567890abcdef1234567890abcdef") {
   return DeployTokenVerifierDigest.create(value)._unsafeUnwrap();
 }
@@ -199,6 +218,67 @@ describe("deploy token persistence", () => {
       );
       expect(revokedVerifier).toBeNull();
       expect(byId?.toState().status.value).toBe("revoked");
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[TENANT-REPOSITORY-DEPLOY-TOKEN-001] repository and read model filter by active organization", async () => {
+    const systemContext = repositoryContext();
+    const orgDemoContext = organizationRepositoryContext("org_demo");
+    const orgOtherContext = organizationRepositoryContext("org_other");
+    const { dataDir, database, readModel, repository } = await harness();
+
+    try {
+      const deployToken = token();
+      await repository.upsert(
+        systemContext,
+        deployToken,
+        UpsertDeployTokenSpec.fromDeployToken(deployToken),
+      );
+
+      const visible = await repository.findOne(
+        orgDemoContext,
+        DeployTokenByIdSpec.create(DeployTokenId.rehydrate("dtok_demo")),
+      );
+      const hidden = await repository.findOne(
+        orgOtherContext,
+        DeployTokenByIdSpec.create(DeployTokenId.rehydrate("dtok_demo")),
+      );
+
+      expect(visible?.toState().id.value).toBe("dtok_demo");
+      expect(hidden).toBeNull();
+      expect(
+        await readModel.list(orgOtherContext, {
+          organizationId: "org_demo",
+        }),
+      ).toEqual([]);
+      expect(
+        await readModel.findOne(orgOtherContext, {
+          organizationId: "org_demo",
+          tokenId: "dtok_demo",
+        }),
+      ).toBeNull();
+      expect(
+        await repository.updateOne(
+          orgOtherContext,
+          deployToken,
+          RotateDeployTokenSpec.fromDeployToken(deployToken),
+        ),
+      ).toBe(false);
+
+      let rejected = false;
+      try {
+        await repository.upsert(
+          orgOtherContext,
+          deployToken,
+          UpsertDeployTokenSpec.fromDeployToken(deployToken),
+        );
+      } catch {
+        rejected = true;
+      }
+      expect(rejected).toBe(true);
     } finally {
       await database.close();
       rmSync(dataDir, { recursive: true, force: true });

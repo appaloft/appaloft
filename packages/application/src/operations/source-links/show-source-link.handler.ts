@@ -15,7 +15,7 @@ export class ShowSourceLinkQueryHandler
     private readonly queryService: SourceLinkQueryService,
   ) {}
 
-  handle(_context: ExecutionContext, query: ShowSourceLinkQuery) {
-    return this.queryService.show(query);
+  handle(context: ExecutionContext, query: ShowSourceLinkQuery) {
+    return this.queryService.show(context, query);
   }
 }

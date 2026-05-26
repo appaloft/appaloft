@@ -10,6 +10,7 @@ import { type Kysely } from "kysely";
 import { type Database } from "../schema";
 import {
   normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedDomainDnsObservation,
   type SerializedDomainRouteFailure,
@@ -40,6 +41,17 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
           .selectFrom("domain_bindings")
           .selectAll()
           .orderBy("created_at", "desc");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);

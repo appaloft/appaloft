@@ -18,7 +18,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Selectable } from "kysely";
 
 import { type Database, type ResourceHealthObservationsTable } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { resolveRepositoryContextOrganizationId, resolveRepositoryExecutor } from "./shared";
 
 type ResourceHealthObservationRow = Selectable<ResourceHealthObservationsTable>;
 
@@ -39,15 +39,30 @@ export class PgResourceHealthObservationHistoryReadModel
     const executor = resolveRepositoryExecutor(this.db, toRepositoryContext(context));
 
     try {
-      const rows = await executor
+      let query = executor
         .selectFrom("resource_health_observations")
         .selectAll()
         .where("resource_id", "=", input.resourceId)
         .where("observed_at", ">=", input.window.from)
         .where("observed_at", "<=", input.window.to)
         .orderBy("observed_at", "desc")
-        .limit(input.limit)
-        .execute();
+        .limit(input.limit);
+      const organizationId = resolveRepositoryContextOrganizationId(toRepositoryContext(context));
+      if (organizationId) {
+        query = query.where("resource_id", "in", (subquery) =>
+          subquery
+            .selectFrom("resources")
+            .select("resources.id")
+            .where("resources.project_id", "in", (projects) =>
+              projects
+                .selectFrom("projects")
+                .select("id")
+                .where("organization_id", "=", organizationId),
+            ),
+        );
+      }
+
+      const rows = await query.execute();
 
       const sourceErrors: ResourceHealthSourceError[] =
         rows.length === 0

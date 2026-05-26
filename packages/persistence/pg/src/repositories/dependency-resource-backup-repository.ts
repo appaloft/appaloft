@@ -36,7 +36,12 @@ import {
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { normalizeTimestamp, resolveRepositoryExecutor, withRepositoryTransaction } from "./shared";
+import {
+  normalizeTimestamp,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+  withRepositoryTransaction,
+} from "./shared";
 
 type BackupRow = Selectable<Database["dependency_resource_backups"]>;
 type BackupSelectionQuery = SelectQueryBuilder<Database, "dependency_resource_backups", BackupRow>;
@@ -264,12 +269,22 @@ export class PgDependencyResourceBackupRepository implements DependencyResourceB
         },
       },
       async () => {
-        const row = await spec
-          .accept(
-            executor.selectFrom("dependency_resource_backups").selectAll(),
-            new KyselyBackupSelectionVisitor(),
-          )
-          .executeTakeFirst();
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = spec.accept(
+          executor.selectFrom("dependency_resource_backups").selectAll(),
+          new KyselyBackupSelectionVisitor(),
+        );
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        const row = await query.executeTakeFirst();
         return row ? rehydrateBackup(row) : null;
       },
     );
@@ -280,15 +295,19 @@ export class PgDependencyResourceBackupRepository implements DependencyResourceB
     spec: DependencyResourceBackupSelectionSpec,
   ): Promise<DependencyResourceBackup[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
-    const rows = await spec
-      .accept(
-        executor
-          .selectFrom("dependency_resource_backups")
-          .selectAll()
-          .orderBy("created_at", "desc"),
-        new KyselyBackupSelectionVisitor(),
-      )
-      .execute();
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    let query = spec.accept(
+      executor.selectFrom("dependency_resource_backups").selectAll().orderBy("created_at", "desc"),
+      new KyselyBackupSelectionVisitor(),
+    );
+    if (organizationId) {
+      query = query.where(
+        "project_id",
+        "in",
+        executor.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
+    const rows = await query.execute();
     return rows.map(rehydrateBackup);
   }
 
@@ -350,11 +369,22 @@ export class PgDependencyResourceBackupReadModel implements DependencyResourceBa
         },
       },
       async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("dependency_resource_backups")
           .selectAll()
           .where("dependency_resource_id", "=", input.dependencyResourceId)
           .orderBy("created_at", "desc");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
         if (input.status) {
           query = query.where("status", "=", input.status);
         }
@@ -368,12 +398,19 @@ export class PgDependencyResourceBackupReadModel implements DependencyResourceBa
     spec: DependencyResourceBackupSelectionSpec,
   ): Promise<DependencyResourceBackupSummary | null> {
     const executor = resolveRepositoryExecutor(this.db, context);
-    const row = await spec
-      .accept(
-        executor.selectFrom("dependency_resource_backups").selectAll(),
-        new KyselyBackupSelectionVisitor(),
-      )
-      .executeTakeFirst();
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    let query = spec.accept(
+      executor.selectFrom("dependency_resource_backups").selectAll(),
+      new KyselyBackupSelectionVisitor(),
+    );
+    if (organizationId) {
+      query = query.where(
+        "project_id",
+        "in",
+        executor.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
+    const row = await query.executeTakeFirst();
     return row ? toBackupSummary(row) : null;
   }
 }

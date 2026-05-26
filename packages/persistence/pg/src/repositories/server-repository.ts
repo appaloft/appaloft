@@ -12,12 +12,17 @@ import {
   type DeploymentTargetMutationSpecVisitor,
   type DeploymentTargetSelectionSpec,
   type DeploymentTargetSelectionSpecVisitor,
+  defaultSelfHostedOrganizationId,
   type UpsertDeploymentTargetSpec,
 } from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { rehydrateDeploymentTarget, resolveRepositoryExecutor } from "./shared";
+import {
+  rehydrateDeploymentTarget,
+  resolveRepositoryContextOrganizationId,
+  resolveRepositoryExecutor,
+} from "./shared";
 
 type ServerSelectionQuery = SelectQueryBuilder<
   Database,
@@ -48,10 +53,13 @@ class KyselyServerSelectionVisitor
 class KyselyServerMutationVisitor
   implements DeploymentTargetMutationSpecVisitor<{ values: Insertable<Database["servers"]> }>
 {
+  constructor(private readonly organizationId: string) {}
+
   visitUpsertDeploymentTarget(spec: UpsertDeploymentTargetSpec) {
     return {
       values: {
         id: spec.state.id.value,
+        organization_id: this.organizationId,
         name: spec.state.name.value,
         host: spec.state.host.value,
         port: spec.state.port.value,
@@ -88,7 +96,11 @@ export class PgServerRepository implements ServerRepository {
   ): Promise<void> {
     void server;
     const executor = resolveRepositoryExecutor(this.db, context);
-    const mutation = spec.accept(new KyselyServerMutationVisitor());
+    const mutation = spec.accept(
+      new KyselyServerMutationVisitor(
+        resolveRepositoryContextOrganizationId(context) ?? defaultSelfHostedOrganizationId,
+      ),
+    );
     await context.tracer.startActiveSpan(
       createRepositorySpanName("server", "upsert"),
       {
@@ -103,6 +115,7 @@ export class PgServerRepository implements ServerRepository {
           .values(mutation.values)
           .onConflict((conflict) =>
             conflict.column("id").doUpdateSet({
+              organization_id: mutation.values.organization_id,
               name: mutation.values.name,
               host: mutation.values.host,
               port: mutation.values.port,
@@ -144,9 +157,16 @@ export class PgServerRepository implements ServerRepository {
         },
       },
       async () => {
-        const row = await spec
-          .accept(executor.selectFrom("servers").selectAll(), new KyselyServerSelectionVisitor())
-          .executeTakeFirst();
+        let query = spec.accept(
+          executor.selectFrom("servers").selectAll(),
+          new KyselyServerSelectionVisitor(),
+        );
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
 
         return row ? DeploymentTarget.rehydrate(rehydrateDeploymentTarget(row)) : null;
       },
