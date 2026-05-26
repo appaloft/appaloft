@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
-import { createExecutionContext } from "@appaloft/application";
 import { generateKeyPairSync } from "node:crypto";
+import { createExecutionContext } from "@appaloft/application";
 
 import { createGitHubAppRuntime } from "../src";
 
@@ -60,9 +60,12 @@ describe("GitHubApiAppRuntime", () => {
       async () => new Response("{}", { status: 403 }),
     );
 
-    const result = await runtime.readInstallation(createExecutionContext({ entrypoint: "system" }), {
-      installationId: "987",
-    });
+    const result = await runtime.readInstallation(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        installationId: "987",
+      },
+    );
 
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().message).not.toContain("PRIVATE KEY");

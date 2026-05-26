@@ -3,12 +3,12 @@ import { describe, expect, test } from "bun:test";
 import { ok } from "@appaloft/core";
 import { createExecutionContext } from "../src/execution-context";
 import { ListGitHubRepositoriesQueryService } from "../src/operations/system/list-github-repositories.query-service";
-import type {
-  GitHubAppInstallationRepository,
-  GitHubAppRuntime,
-  GitHubRepositoryBrowser,
-  IntegrationAuthPort,
-  IntegrationRegistry,
+import {
+  type GitHubAppInstallationRepository,
+  type GitHubAppRuntime,
+  type GitHubRepositoryBrowser,
+  type IntegrationAuthPort,
+  type IntegrationRegistry,
 } from "../src/ports";
 
 describe("ListGitHubRepositoriesQueryService", () => {
