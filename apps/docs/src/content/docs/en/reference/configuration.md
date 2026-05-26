@@ -66,6 +66,9 @@ ticking them.
 | `APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE` | `25` | Maximum runtime monitoring targets collected per tick. |
 | `APPALOFT_TERMINAL_SESSION_ACTIVE_TTL_SECONDS` | `3600` | Activity-aware active terminal session age used by `terminal-session expire` when no explicit cutoff is supplied. |
 | `APPALOFT_TERMINAL_SESSION_OUTPUT_RETENTION_BYTES` | `65536` | Bounded in-memory terminal output tail replayed only when an active terminal transport reconnects; `0` disables replay. |
+| `APPALOFT_BETTER_AUTH_COOKIE_DOMAIN` | unset | Optional Better Auth cookie domain; set it when a product session must be shared across same-site subdomains, for example `.example.com`. |
+| `APPALOFT_BETTER_AUTH_COOKIE_PREFIX` | Better Auth default | Optional Better Auth cookie prefix; keep it consistent when multiple Appaloft origins share one product session. |
+| `APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS` | `false` | Allows Better Auth to read proxy headers for external origin reconstruction when running behind a trusted reverse proxy. |
 | `APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS` | `24` | Default retention hours for retained monitoring raw samples. |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_RETENTION_DAYS` | `7` | Recovery window for SSH remote PGlite `state/backups/sync-*` upload backups. |
 | `APPALOFT_REMOTE_PGLITE_SYNC_BACKUP_MAX_COUNT` | `20` | Maximum count for SSH remote PGlite `state/backups/sync-*` upload backups; the newest backups are retained. |
