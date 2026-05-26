@@ -12,6 +12,7 @@ import {
   DoctorQuery,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ExecutionPrincipal,
   enrichResourceAccessFailureDiagnosticWithRouteContext,
   GetAuthBootstrapStatusQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
@@ -23,6 +24,7 @@ import {
   type TerminalSession,
   type TerminalSessionGateway,
   toRepositoryContext,
+  UpsertGitHubAppInstallationCommand,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
 import { apiVersion, type ReadinessResponse } from "@appaloft/contracts";
@@ -667,6 +669,53 @@ export function createHttpApp(input: {
     });
 
     unwrapResult(context, result);
+  }
+
+  async function authorizedMemberContext(
+    request: Request,
+    context: ExecutionContext,
+  ): Promise<ExecutionContext> {
+    if (!input.authRuntime) {
+      return context;
+    }
+
+    const url = new URL(request.url);
+    const result = await input.authRuntime.authorizeProductSession(context, {
+      method: request.method,
+      path: url.pathname,
+      requiredRole: "member",
+      ...(request.headers.get("authorization")
+        ? { authorizationHeader: request.headers.get("authorization") as string }
+        : {}),
+      ...(request.headers.get("cookie")
+        ? { cookieHeader: request.headers.get("cookie") as string }
+        : {}),
+    });
+
+    const authorized = unwrapResult(context, result);
+    const principal: ExecutionPrincipal = {
+      kind: authorized.actor.kind,
+      actorId: authorized.actor.id,
+      userId: authorized.userId,
+      ...(authorized.email ? { email: authorized.email } : {}),
+      activeOrganization: {
+        organizationId: authorized.organizationId,
+        role:
+          authorized.organizationRole ??
+          (authorized.role === "owner" || authorized.role === "admin"
+            ? authorized.role
+            : "developer"),
+        productRole: authorized.role,
+      },
+    };
+
+    return input.executionContextFactory.create({
+      actor: authorized.actor,
+      entrypoint: "http",
+      locale: context.locale,
+      principal,
+      requestId: context.requestId,
+    });
   }
 
   function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
@@ -1385,6 +1434,39 @@ export function createHttpApp(input: {
       serveHttpChallenge(request, params.token),
     )
     .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
+    .get("/api/integrations/github/app/callback", async ({ request, set }) => {
+      const context = createHttpExecutionContext(request);
+      const executionContext = await authorizedMemberContext(request, context);
+      const url = new URL(request.url);
+      const installationId = url.searchParams.get("installation_id")?.trim();
+      const setupAction = url.searchParams.get("setup_action")?.trim();
+      if (!installationId) {
+        set.status = 400;
+        return {
+          error: {
+            code: "github_app_installation_missing",
+            category: "user" as const,
+            message: "GitHub App callback is missing installation_id",
+            retryable: false,
+          },
+        };
+      }
+
+      const command = unwrapResult(
+        executionContext,
+        UpsertGitHubAppInstallationCommand.create({
+          installationId,
+          ...(setupAction === "install" || setupAction === "update" ? { setupAction } : {}),
+        }),
+      );
+      const result = await input.commandBus.execute(executionContext, command);
+      unwrapResult(executionContext, result);
+
+      return Response.redirect(
+        `${input.config.webOrigin.replace(/\/+$/, "")}/console?source=github&githubMode=browser&githubApp=connected`,
+        303,
+      );
+    })
     .get("/.appaloft/resource-access-failure", ({ request }) =>
       resourceAccessFailureDiagnosticResponse(request, {
         enrichEvidence: async (diagnostic, appliedRouteContext) => {
@@ -1567,9 +1649,10 @@ export function createHttpApp(input: {
           productSessionAuthorizationPort: input.authRuntime,
         }
       : {}),
-    ...(input.config.githubWebhookSecret
+    ...(input.config.githubAppWebhookSecret || input.config.githubWebhookSecret
       ? {
-          githubWebhookSecret: input.config.githubWebhookSecret,
+          githubWebhookSecret:
+            input.config.githubAppWebhookSecret ?? input.config.githubWebhookSecret,
         }
       : {}),
     ...(input.requestContextRunner

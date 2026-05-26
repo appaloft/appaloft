@@ -1579,6 +1579,7 @@ export const i18nKeys = {
       githubHostedProviderAppHint: "console:quickDeploy.githubHostedProviderAppHint",
       githubHostedProviderAppSetupPending:
         "console:quickDeploy.githubHostedProviderAppSetupPending",
+      githubInstallApp: "console:quickDeploy.githubInstallApp",
       githubOAuthNotConfigured: "console:quickDeploy.githubOAuthNotConfigured",
       githubOnlyLoginWhenNeeded: "console:quickDeploy.githubOnlyLoginWhenNeeded",
       githubRepository: "console:quickDeploy.githubRepository",

@@ -71,4 +71,49 @@ describe("GitHubApiRepositoryBrowser", () => {
       },
     ]);
   });
+
+  test("lists repositories from a GitHub App installation token", async () => {
+    let requestedUrl = "";
+    const browser = createGitHubRepositoryBrowser(async (url) => {
+      requestedUrl = String(url);
+      return new Response(
+        JSON.stringify({
+          repositories: [
+            {
+              id: 3,
+              name: "app",
+              full_name: "acme/app",
+              description: null,
+              private: true,
+              default_branch: "main",
+              html_url: "https://github.com/acme/app",
+              clone_url: "https://github.com/acme/app.git",
+              updated_at: "2026-04-11T03:00:00.000Z",
+              owner: {
+                login: "acme",
+              },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      );
+    });
+
+    const repositories = await browser.listRepositories(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        accessToken: "installation-token",
+        accessTokenKind: "installation",
+      },
+    );
+
+    expect(requestedUrl).toContain("/installation/repositories");
+    expect(repositories).toHaveLength(1);
+    expect(repositories[0]?.fullName).toBe("acme/app");
+  });
 });

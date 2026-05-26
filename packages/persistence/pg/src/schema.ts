@@ -982,6 +982,20 @@ export interface ResourceHealthObservationsTable {
   created_at: TimestampColumn;
 }
 
+export interface GitHubAppInstallationsTable {
+  tenant_id: string;
+  provider_key: string;
+  installation_id: string;
+  account_id: string | null;
+  account_login: string | null;
+  account_type: string | null;
+  repositories_selection: string | null;
+  repository_count: number | null;
+  suspended_at: string | null;
+  installed_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -1033,6 +1047,7 @@ export interface Database {
   runtime_monitoring_samples: RuntimeMonitoringSamplesTable;
   runtime_monitoring_threshold_policies: RuntimeMonitoringThresholdPoliciesTable;
   resource_health_observations: ResourceHealthObservationsTable;
+  github_app_installations: GitHubAppInstallationsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
   member: BetterAuthMembersTable;

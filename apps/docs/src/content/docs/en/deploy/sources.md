@@ -61,6 +61,8 @@ Common modes include:
 
 `GET /api/integrations` returns these modes and safe configuration status. It describes capabilities, audience, whether provider installation is required, and whether operator secret material is required; it does not return tokens, private keys, webhook secrets, or raw provider payloads.
 
+When the GitHub integration uses `hosted-provider-app` or `operator-managed-app`, the Web console repository picker first asks the user to install the configured GitHub App. After installation, the GitHub setup URL returns to Appaloft, and Appaloft stores only readback data such as installation id, account login, repository selection mode, and update time. Repository browsing uses an installation access token and does not fall back to user OAuth.
+
 <h2 id="deployment-source-validation">Input checks</h2>
 
 Users should see whether the source is readable, whether the ref or path exists, whether the static output is clear, and whether the source conflicts with the resource runtime profile.

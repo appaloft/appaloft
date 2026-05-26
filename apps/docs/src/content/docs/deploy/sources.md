@@ -62,6 +62,8 @@ sidebar:
 
 `GET /api/integrations` 返回这些模式和安全的配置状态。它只描述 capability、audience、是否需要 provider installation，以及是否需要 operator secret material；不返回 token、private key、webhook secret 或 provider 原始 payload。
 
+当 GitHub integration 使用 `hosted-provider-app` 或 `operator-managed-app` 时，Web console 的仓库选择器会先引导用户安装已配置的 GitHub App。安装完成后，GitHub setup URL 会回到 Appaloft，Appaloft 只保存 installation id、账号名、仓库选择方式和更新时间等 readback 信息。仓库列表使用 installation access token 拉取，不会回退到用户 OAuth。
+
 <h2 id="deployment-source-validation">输入检查</h2>
 
 用户应能看到来源是否可读取、ref 或路径是否存在、静态输出目录是否明确，以及来源和资源 runtime profile 是否明显冲突。

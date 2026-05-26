@@ -5829,6 +5829,17 @@ export const integrationDescriptorSchema = z.object({
   capabilities: z.array(z.string()),
   defaultConnectionModeKey: z.string().optional(),
   connectionModes: z.array(integrationConnectionModeSchema).optional(),
+  setup: z
+    .object({
+      providerApp: z
+        .object({
+          installUrl: z.string().optional(),
+          callbackUrl: z.string().optional(),
+          webhookUrl: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
@@ -5909,6 +5920,22 @@ export const listGitHubRepositoriesResponseSchema = z.object({
   items: z.array(githubRepositorySummarySchema),
 });
 
+export const githubAppConnectionResponseSchema = z.object({
+  accountLogin: z.string().optional(),
+  accountType: z.string().optional(),
+  callbackUrl: z.string().optional(),
+  configurationStatus: z.enum(["configured", "not-configured", "partial", "unknown"]),
+  connected: z.boolean(),
+  installUrl: z.string().optional(),
+  installationId: z.string().optional(),
+  repositoryCount: z.number().int().nonnegative().optional(),
+  repositoriesSelection: z.enum(["all", "selected"]).optional(),
+  suspendedAt: z.string().optional(),
+  tenantId: z.string(),
+  updatedAt: z.string().optional(),
+  webhookUrl: z.string().optional(),
+});
+
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 export type VersionResponse = z.infer<typeof versionResponseSchema>;
@@ -5919,6 +5946,7 @@ export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyRe
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
+export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;

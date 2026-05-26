@@ -31,6 +31,7 @@ apps/desktop/*
 !.appaloft/
 !.appaloft/docker-build/
 !.appaloft/docker-build/**
+**/.next
 **/.*.bun-build
 **/.svelte-kit
 **/.turbo
@@ -39,6 +40,7 @@ apps/desktop/*
 **/coverage
 **/dist
 **/node_modules
+**/out
 **/playwright-report
 **/test-results
 

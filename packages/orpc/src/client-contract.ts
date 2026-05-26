@@ -62,6 +62,7 @@ import {
   type ExpireTerminalSessionsCommandInput,
   type GetAuthBootstrapStatusQueryInput,
   type GetCurrentOrganizationContextQueryInput,
+  type GitHubAppConnectionQueryInput,
   type ImportCertificateCommandInput,
   type ImportDependencyResourceCommandInput,
   type ImportResourceVariablesCommandInput,
@@ -251,6 +252,7 @@ import {
   type EnvironmentEffectivePrecedenceResponse,
   type EnvironmentSummary,
   type ExpireTerminalSessionsResponse,
+  type GitHubAppConnectionResponse,
   type ImportCertificateResponse,
   type ImportResourceVariablesResponse,
   type InspectRuntimeUsageResponse,
@@ -1664,6 +1666,14 @@ export type AppaloftOrpcClientContract = {
   integrations: {
     list: Client<AppaloftClientContext, undefined, ListIntegrationsResponse, AppaloftClientError>;
     github: {
+      appConnection: {
+        show: Client<
+          AppaloftClientContext,
+          GitHubAppConnectionQueryInput,
+          GitHubAppConnectionResponse,
+          AppaloftClientError
+        >;
+      };
       repositories: {
         list: Client<
           AppaloftClientContext,
