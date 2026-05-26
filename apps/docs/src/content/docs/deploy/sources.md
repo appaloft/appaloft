@@ -13,6 +13,7 @@ searchAliases:
   - "来源"
 relatedOperations:
   - deployments.create
+  - system.integrations.list
   - source-links.relink
   - resources.configure-auto-deploy
   - source-events.ingest
@@ -46,6 +47,20 @@ sidebar:
 | 静态站点 | 前端静态产物。 | 构建命令和 publish directory。 |
 
 用户不确定时，应先选择最接近当前交付物的来源。后续 runtime profile 会描述如何运行它。
+
+<h2 id="deployment-source-integration-connection-modes">Integration connection modes</h2>
+
+外部 source integration 可以声明连接模式，帮助 Web、CLI 和工具用同一套中性词汇解释“谁来完成 provider 配置”。
+
+常见模式包括：
+
+| Mode | 含义 |
+| --- | --- |
+| `user-oauth` | 最终用户用自己的 provider 账号授权，适合个人或团队的浏览式连接。 |
+| `hosted-provider-app` | 运行方提供 provider app，最终用户只安装或授权该 app。 |
+| `operator-managed-app` | 实例 operator 创建 provider app，并在实例配置里管理 credential reference。 |
+
+`GET /api/integrations` 返回这些模式和安全的配置状态。它只描述 capability、audience、是否需要 provider installation，以及是否需要 operator secret material；不返回 token、private key、webhook secret 或 provider 原始 payload。
 
 <h2 id="deployment-source-validation">输入检查</h2>
 

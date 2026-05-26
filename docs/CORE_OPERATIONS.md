@@ -1679,6 +1679,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | List providers | Query | `system.providers.list` | `ListProvidersQuery` | none | `appaloft providers list` | `GET /api/providers` |
 | List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `appaloft plugins list` | `GET /api/plugins` |
+| List integrations | Query | `system.integrations.list` | `ListIntegrationsQuery` | none | none yet | `GET /api/integrations` |
 | List GitHub repositories | Query | `system.github-repositories.list` | `ListGitHubRepositoriesQuery` | `ListGitHubRepositoriesQueryInput` | none yet | `GET /api/integrations/github/repositories` |
 | Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | `GET /api/system/doctor` |
 | Check instance upgrade | Query | `system.instance-upgrade.check` | `CheckInstanceUpgradeQuery` | `CheckInstanceUpgradeQueryInput` | `appaloft upgrade check` | `GET /api/instance-upgrade/check` |
@@ -1690,6 +1691,8 @@ Current boundary:
 - provider and plugin list operations are read-only diagnostics; they expose stable capability
   flags, optional capability details, and safe configuration diagnostics for operators and future
   tools
+- integration list is a read-only catalog for neutral external provider connection modes; it must not
+  require a particular hosted provider app or expose raw provider app credentials
 - instance upgrade check is read-only and may return an SSH command even when the Web console cannot
   execute the upgrade directly
 - instance upgrade apply requires explicit confirmation and a host-side process with

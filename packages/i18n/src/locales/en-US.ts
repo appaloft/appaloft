@@ -1714,6 +1714,10 @@ export const enUS = {
       dockerfilePath: "Dockerfile path",
       dockerImage: "Docker image",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
+      githubHostedProviderAppHint:
+        "Install or authorize the configured provider app to browse repositories; no GitHub App credentials are entered here.",
+      githubHostedProviderAppSetupPending:
+        "Repository browsing is waiting for the configured provider app setup to be completed by the operator.",
       githubOAuthNotConfigured: "GitHub OAuth is not configured on the backend.",
       githubOnlyLoginWhenNeeded: "Login is triggered only when importing from GitHub.",
       githubRepository: "GitHub repository",
