@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -71,7 +71,7 @@ async function captureProcessOutput<T>(callback: () => Promise<T>): Promise<{
   } finally {
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
-    process.exitCode = originalExitCode;
+    process.exitCode = originalExitCode ?? 0;
   }
 }
 
@@ -164,6 +164,25 @@ function createControlPlaneFetch(
       return jsonResponse({
         id: "prj_remote",
       });
+    }
+
+    if (url.pathname === "/api/static-artifacts/publish-payload") {
+      return jsonResponse(
+        {
+          publicationId: "pub_static_remote",
+          artifactId: "artifact_remote",
+          projectId: "project_docs",
+          resourceId: "res_docs",
+          url: "https://static.example.test/project_docs/res_docs/",
+          manifestDigest: "d".repeat(64),
+          fileCount: 1,
+          totalBytes: 18,
+          publishedAt: "2026-05-17T00:00:00.000Z",
+          provider: "fake-static",
+          promotedAlias: true,
+        },
+        201,
+      );
     }
 
     if (url.pathname === "/api/servers") {
@@ -403,6 +422,63 @@ describe("CLI remote control-plane client", () => {
       ["GET /api/version", "GET /api/organizations/current-context", "GET /api/servers"],
     );
     expect(listed.stdout).toContain("srv_remote");
+  });
+
+  test("[STATIC-ARTIFACT-EXT-018][CONTROL-PLANE-CLI-010] static artifact publish uploads local dist files through the remote payload route", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "appaloft-static-artifact-remote-"));
+    const dist = join(workspace, "dist");
+    await mkdir(join(dist, "assets"), { recursive: true });
+    await writeFile(join(dist, "index.html"), "<main>Remote</main>");
+    await writeFile(join(dist, "assets", "app.js"), "console.log('remote');");
+
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "static-artifacts",
+        "publish",
+        dist,
+        "--project",
+        "project_docs",
+        "--resource",
+        "res_docs",
+        "--promote-alias",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/static-artifacts/publish-payload",
+      ],
+    );
+    expect(await requests[2]?.json()).toMatchObject({
+      projectId: "project_docs",
+      resourceId: "res_docs",
+      promoteAlias: true,
+      files: [
+        {
+          path: "assets/app.js",
+          mimeType: "text/javascript",
+          contentBase64: Buffer.from("console.log('remote');").toString("base64"),
+        },
+        {
+          path: "index.html",
+          mimeType: "text/html",
+          contentBase64: Buffer.from("<main>Remote</main>").toString("base64"),
+        },
+      ],
+    });
+    expect(output.stdout).toContain("https://static.example.test/project_docs/res_docs/");
   });
 
   test("[CONTROL-PLANE-CLI-011] remote dispatch errors do not fall back to local execution", async () => {

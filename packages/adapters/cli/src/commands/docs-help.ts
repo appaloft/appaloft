@@ -179,6 +179,9 @@ export const cliCommandDescriptions = {
     "deployment.source-relink",
   ),
   sourceLinkDelete: withDocs("Delete one source fingerprint link", "deployment.source-relink"),
+  staticArtifact: "Static artifact publishing operations",
+  staticArtifactPublish:
+    "Publish a prebuilt static directory or zip archive through configured artifact adapters",
   sourceEvent: withDocs("Source event diagnostics", "source.auto-deploy-setup"),
   sourceEventList: withDocs(
     "List source event deliveries for a project or resource",

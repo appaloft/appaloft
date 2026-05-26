@@ -87,6 +87,10 @@ import {
   type SshCredential,
   type SshCredentialMutationSpec,
   type SshCredentialSelectionSpec,
+  type StaticArtifactManifest,
+  type StaticArtifactPublication,
+  type StaticArtifactRouteActivation,
+  type StaticArtifactStoredManifest,
   type StorageVolume,
   type StorageVolumeKind,
   type StorageVolumeMutationSpec,
@@ -7042,6 +7046,118 @@ export interface RouteSurfacePort {
     context: ExecutionContext,
     input?: ListRouteSurfaceDecisionsInput,
   ): Promise<readonly RouteSurfaceDecisionRecord[]>;
+}
+
+export interface StoreStaticArtifactManifestInput {
+  projectId: string;
+  resourceId: string;
+  manifest: StaticArtifactManifest;
+  files?: readonly StaticArtifactFilePayload[] | undefined;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface StaticArtifactFilePayload {
+  path: string;
+  sizeBytes: number;
+  mimeType: string;
+  contentDigest: string;
+  readBytes(): Promise<Uint8Array>;
+}
+
+export interface ReadStaticArtifactPayloadInput {
+  artifactId: string;
+  sourcePath: string;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface StaticArtifactPayloadReadResult {
+  manifest: StaticArtifactManifest;
+  files: readonly StaticArtifactFilePayload[];
+}
+
+export interface StaticArtifactPayloadReaderPort {
+  read(
+    context: ExecutionContext,
+    input: ReadStaticArtifactPayloadInput,
+  ): Promise<Result<StaticArtifactPayloadReadResult>>;
+}
+
+export interface ActivateStaticArtifactRouteInput {
+  publication: StaticArtifactPublication;
+  routeKind: "immutable" | "alias";
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface PublishStaticArtifactInput {
+  projectId: string;
+  resourceId: string;
+  manifest: StaticArtifactManifest;
+  files?: readonly StaticArtifactFilePayload[] | undefined;
+  promoteAlias?: boolean | undefined;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface StaticArtifactPublicationSummary {
+  publicationId: string;
+  projectId: string;
+  resourceId: string;
+  artifactId: string;
+  manifestDigest: string;
+  storageRef: string;
+  storeProviderKey: string;
+  routeUrl?: string | undefined;
+  routeProviderKey?: string | undefined;
+  fileCount: number;
+  totalBytes: number;
+  publishedAt?: string | undefined;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface RecordStaticArtifactPublicationInput {
+  publication: StaticArtifactPublication;
+  publishedAt?: string | undefined;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface ListStaticArtifactPublicationsInput {
+  projectId?: string | undefined;
+  resourceId?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface StaticArtifactStorePort {
+  storeManifest(
+    context: ExecutionContext,
+    input: StoreStaticArtifactManifestInput,
+  ): Promise<Result<StaticArtifactStoredManifest>>;
+}
+
+export interface StaticArtifactRouteProviderPort {
+  activateRoute(
+    context: ExecutionContext,
+    input: ActivateStaticArtifactRouteInput,
+  ): Promise<Result<StaticArtifactRouteActivation>>;
+}
+
+export interface StaticArtifactPublisherPort {
+  publish(
+    context: ExecutionContext,
+    input: PublishStaticArtifactInput,
+  ): Promise<Result<StaticArtifactPublication>>;
+}
+
+export interface StaticArtifactPublicationJournalPort {
+  recordPublication(
+    context: ExecutionContext,
+    input: RecordStaticArtifactPublicationInput,
+  ): Promise<Result<StaticArtifactPublicationSummary>>;
+}
+
+export interface StaticArtifactPublicationReadModelPort {
+  listPublications(
+    context: ExecutionContext,
+    input?: ListStaticArtifactPublicationsInput,
+  ): Promise<Result<{ items: StaticArtifactPublicationSummary[] }>>;
 }
 
 export class DefaultRouteSurfacePort implements RouteSurfacePort {

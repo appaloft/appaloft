@@ -6,6 +6,10 @@ import { type SshRemoteStateTarget } from "@appaloft/adapter-cli";
 import {
   FileSystemDeploymentConfigReader,
   FileSystemSourceDetector,
+  FileSystemStaticArtifactPayloadReader,
+  FileSystemStaticArtifactPublicationJournal,
+  FileSystemStaticArtifactRouteProvider,
+  FileSystemStaticArtifactStore,
 } from "@appaloft/adapter-filesystem";
 import {
   createDefaultRuntimeTargetBackendRegistry,
@@ -58,6 +62,7 @@ import {
   type IntegrationAuthPort,
   type MutationCoordinator,
   type OperationGuardPort,
+  PortBackedStaticArtifactPublisher,
   type PreviewFeedbackWriter,
   type PreviewFeedbackWriterInput,
   type PreviewFeedbackWriterResult,
@@ -84,6 +89,8 @@ import {
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
+  type StaticArtifactRouteProviderPort,
+  type StaticArtifactStorePort,
   type StorageRuntimeCleaner,
   type StorageVolumeBackupSafetyReader,
   tokens,
@@ -234,6 +241,12 @@ class NanoIdFirstAdminPasswordIssuer implements FirstAdminPasswordIssuer {
       password: `aplt-admin-${generateIdSuffix()}-${generateIdSuffix()}`,
     });
   }
+}
+
+function localStaticArtifactRouteBaseUrl(config: AppConfig): string {
+  const host =
+    config.httpHost === "0.0.0.0" || config.httpHost === "::" ? "localhost" : config.httpHost;
+  return `http://${host}:${config.httpPort}/static-artifacts`;
 }
 
 class UnavailableCertificateProvider implements CertificateProviderPort {
@@ -1009,6 +1022,55 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.storageVolumeBackupSafetyReader, {
     useFactory: instanceCachingFactory(() => new EmptyStorageVolumeBackupSafetyReader()),
+  });
+  container.register(tokens.staticArtifactPayloadReaderPort, {
+    useFactory: instanceCachingFactory(() => new FileSystemStaticArtifactPayloadReader()),
+  });
+  container.register(tokens.staticArtifactStorePort, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new FileSystemStaticArtifactStore({
+          rootPath: join(input.config.dataDir, "static-artifacts"),
+        }),
+    ),
+  });
+  container.register(tokens.staticArtifactRouteProviderPort, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new FileSystemStaticArtifactRouteProvider({
+          baseUrl: localStaticArtifactRouteBaseUrl(input.config),
+          rootPath: join(input.config.dataDir, "static-artifacts"),
+        }),
+    ),
+  });
+  container.register(tokens.staticArtifactPublicationJournalPort, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new FileSystemStaticArtifactPublicationJournal({
+          rootPath: join(input.config.dataDir, "static-artifacts"),
+        }),
+    ),
+  });
+  container.register(tokens.staticArtifactPublicationReadModelPort, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new FileSystemStaticArtifactPublicationJournal({
+          rootPath: join(input.config.dataDir, "static-artifacts"),
+        }),
+    ),
+  });
+  container.register(tokens.staticArtifactPublisherPort, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PortBackedStaticArtifactPublisher(
+          dependencyContainer.resolve<StaticArtifactStorePort>(tokens.staticArtifactStorePort),
+          dependencyContainer.resolve<StaticArtifactRouteProviderPort>(
+            tokens.staticArtifactRouteProviderPort,
+          ),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.staticArtifactPublicationJournalPort),
+        ),
+    ),
   });
   container.register(tokens.serverEdgeProxyBootstrapper, {
     useFactory: instanceCachingFactory(

@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import {
   type ActionDeployTokenAuthorizationPort,
   type AppLogger,
@@ -150,6 +150,51 @@ function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
     checks: readiness.checks,
     ...(Object.keys(details).length > 0 ? { details } : {}),
   };
+}
+
+function isSafeStaticArtifactSegment(value: string): boolean {
+  return (
+    Boolean(value) &&
+    value !== "." &&
+    value !== ".." &&
+    !value.includes("/") &&
+    !value.includes("\\")
+  );
+}
+
+function readStaticArtifactAlias(
+  aliasPath: string,
+  projectId: string,
+  resourceId: string,
+): { artifactId: string; manifestDigest: string } | null {
+  try {
+    if (!existsSync(aliasPath) || !statSync(aliasPath).isFile()) {
+      return null;
+    }
+    const parsed = JSON.parse(readFileSync(aliasPath, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const record = parsed as Record<string, unknown>;
+    if (
+      record.schemaVersion !== "appaloft-filesystem-static-artifact-alias/v1" ||
+      record.projectId !== projectId ||
+      record.resourceId !== resourceId ||
+      typeof record.artifactId !== "string" ||
+      typeof record.manifestDigest !== "string" ||
+      !isSafeStaticArtifactSegment(record.artifactId) ||
+      !isSafeStaticArtifactSegment(record.manifestDigest)
+    ) {
+      return null;
+    }
+
+    return {
+      artifactId: record.artifactId,
+      manifestDigest: record.manifestDigest,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function readErrorMessage(error: unknown): string {
@@ -726,6 +771,143 @@ export function createHttpApp(input: {
       staticDir: docsStaticDir,
       embeddedAssets: embeddedDocsAssets,
       fallbackToRootIndex: false,
+    });
+  }
+
+  function staticArtifactResponse(pathname: string): Response | null {
+    return staticArtifactImmutableResponse(pathname) ?? staticArtifactAliasResponse(pathname);
+  }
+
+  function staticArtifactImmutableResponse(pathname: string): Response | null {
+    const prefix = "/static-artifacts/artifacts/";
+    if (!pathname.startsWith(prefix)) {
+      return null;
+    }
+
+    const segments = pathname
+      .slice(prefix.length)
+      .split("/")
+      .filter((segment) => segment.length > 0);
+    if (segments.length < 2) {
+      return null;
+    }
+
+    const [encodedArtifactId, encodedManifestDigest, ...assetSegments] = segments;
+    if (!encodedArtifactId || !encodedManifestDigest) {
+      return null;
+    }
+
+    let artifactId: string;
+    let manifestDigest: string;
+    let assetPathname: string;
+    try {
+      artifactId = decodeURIComponent(encodedArtifactId);
+      manifestDigest = decodeURIComponent(encodedManifestDigest);
+      assetPathname =
+        assetSegments.length === 0
+          ? "/"
+          : `/${assetSegments.map((segment) => decodeURIComponent(segment)).join("/")}`;
+    } catch {
+      return null;
+    }
+
+    if (!isSafeStaticArtifactSegment(artifactId) || !isSafeStaticArtifactSegment(manifestDigest)) {
+      return null;
+    }
+
+    const dataRoot = resolve(input.config.dataDir, "static-artifacts");
+    const filesRoot = resolve(dataRoot, artifactId, manifestDigest, "files");
+    const filesRootRelativePath = relative(dataRoot, filesRoot);
+    if (
+      filesRoot === dataRoot ||
+      filesRootRelativePath === "" ||
+      filesRootRelativePath.startsWith("..")
+    ) {
+      return null;
+    }
+
+    return staticAssetResponse(assetPathname, {
+      staticDir: filesRoot,
+      embeddedAssets: {},
+      fallbackToRootIndex: true,
+    });
+  }
+
+  function staticArtifactAliasResponse(pathname: string): Response | null {
+    const prefix = "/static-artifacts/projects/";
+    if (!pathname.startsWith(prefix)) {
+      return null;
+    }
+
+    const segments = pathname
+      .slice(prefix.length)
+      .split("/")
+      .filter((segment) => segment.length > 0);
+    if (segments.length < 4 || segments[1] !== "resources" || segments[3] !== "current") {
+      return null;
+    }
+
+    const [encodedProjectId, , encodedResourceId, , ...assetSegments] = segments;
+    if (!encodedProjectId || !encodedResourceId) {
+      return null;
+    }
+
+    let projectId: string;
+    let resourceId: string;
+    let assetPathname: string;
+    try {
+      projectId = decodeURIComponent(encodedProjectId);
+      resourceId = decodeURIComponent(encodedResourceId);
+      assetPathname =
+        assetSegments.length === 0
+          ? "/"
+          : `/${assetSegments.map((segment) => decodeURIComponent(segment)).join("/")}`;
+    } catch {
+      return null;
+    }
+
+    if (!isSafeStaticArtifactSegment(projectId) || !isSafeStaticArtifactSegment(resourceId)) {
+      return null;
+    }
+
+    const dataRoot = resolve(input.config.dataDir, "static-artifacts");
+    const aliasPath = resolve(
+      dataRoot,
+      "aliases",
+      "projects",
+      encodedProjectId,
+      "resources",
+      encodedResourceId,
+      "current.json",
+    );
+    const aliasPathRelativePath = relative(dataRoot, aliasPath);
+    if (
+      aliasPath === dataRoot ||
+      aliasPathRelativePath === "" ||
+      aliasPathRelativePath.startsWith("..")
+    ) {
+      return null;
+    }
+
+    const alias = readStaticArtifactAlias(aliasPath, projectId, resourceId);
+    if (!alias) {
+      return null;
+    }
+
+    const filesRoot = resolve(dataRoot, alias.artifactId, alias.manifestDigest, "files");
+    const filesRootRelativePath = relative(dataRoot, filesRoot);
+    if (
+      filesRoot === dataRoot ||
+      filesRootRelativePath === "" ||
+      filesRootRelativePath.startsWith("..")
+    ) {
+      return null;
+    }
+
+    return staticAssetResponse(assetPathname, {
+      staticDir: filesRoot,
+      embeddedAssets: {},
+      fallbackToRootIndex: true,
     });
   }
 
@@ -1417,6 +1599,18 @@ export function createHttpApp(input: {
       "/_app/*",
       ({ request }) =>
         webStaticResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
+    )
+    .get(
+      "/static-artifacts/artifacts/*",
+      ({ request }) =>
+        staticArtifactResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
+    )
+    .get(
+      "/static-artifacts/projects/*",
+      ({ request }) =>
+        staticArtifactResponse(new URL(request.url).pathname) ??
         new Response("Not found", { status: 404 }),
     )
     .get("/*", ({ request }) =>

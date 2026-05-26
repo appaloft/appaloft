@@ -27,6 +27,7 @@ import { scheduledTaskCommand } from "./scheduled-task.js";
 import { serverCommand } from "./server.js";
 import { sourceEventCommand } from "./source-event.js";
 import { sourceLinksCommand } from "./source-link.js";
+import { staticArtifactCommand } from "./static-artifact.js";
 import { storageCommand } from "./storage.js";
 import { terminalSessionCommand } from "./terminal-session.js";
 import { upgradeCommand } from "./upgrade.js";
@@ -61,6 +62,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     envCommand,
     sourceEventCommand,
     sourceLinksCommand,
+    staticArtifactCommand,
     auditEventCommand,
     domainEventCommand,
     providerJobLogCommand,

@@ -103,6 +103,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-076: Repository Config Prebuilt Image Source](./ADR-076-repository-config-prebuilt-image-source.md) | Accepted | Defines repository config `source.type = image` as a user-facing prebuilt Docker/OCI image source profile over existing Resource source/runtime operations. |
 | [ADR-077: Repository Config Preview Policy](./ADR-077-repository-config-preview-policy.md) | Accepted | Defines repository config `preview.pullRequest.policy` as a trusted-deploy Resource preview policy declaration reconciled through existing preview policy operations while PR preview deploys skip policy mutation. |
 | [ADR-078: Blueprint Component Relation Boundary](./ADR-078-blueprint-component-relation-boundary.md) | Accepted | Defines neutral component-to-component Blueprint relations, direction, validation, dry-run plan operations, and dependency-resource separation. |
+| [ADR-079: Static Artifact Publishing Extension Point](./ADR-079-static-artifact-publishing-extension-point.md) | Accepted | Defines provider-neutral static artifact manifest, storage, route activation, and publisher ports without hosted default-domain or provider strategy. |
 
 ## Authoring Rules
 

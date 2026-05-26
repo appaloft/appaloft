@@ -205,6 +205,10 @@ import { deleteSourceLinkCommandInputSchema } from "./operations/source-links/de
 import { listSourceLinksQueryInputSchema } from "./operations/source-links/list-source-links.query";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { showSourceLinkQueryInputSchema } from "./operations/source-links/show-source-link.query";
+import { listStaticArtifactPublicationsQueryInputSchema } from "./operations/static-artifacts/list-static-artifact-publications.query";
+import { publishStaticArtifactCommandInputSchema } from "./operations/static-artifacts/publish-static-artifact.command";
+import { publishStaticArtifactArchiveCommandInputSchema } from "./operations/static-artifacts/publish-static-artifact-archive.command";
+import { publishStaticArtifactPayloadCommandInputSchema } from "./operations/static-artifacts/publish-static-artifact-payload.command";
 import { cleanupStorageVolumeRuntimeCommandInputSchema } from "./operations/storage-volumes/cleanup-storage-volume-runtime.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
@@ -253,6 +257,7 @@ type OperationDomain =
   | "certificates"
   | "source-events"
   | "source-links"
+  | "static-artifacts"
   | "system"
   | "terminal-sessions";
 
@@ -2801,6 +2806,60 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft source-links delete <sourceFingerprint>",
       orpc: { method: "DELETE", path: "/api/source-links/{sourceFingerprint}" },
+    },
+  },
+  {
+    key: "static-artifacts.publish",
+    kind: "command",
+    domain: "static-artifacts",
+    messageName: "PublishStaticArtifactCommand",
+    handlerName: "PublishStaticArtifactCommandHandler",
+    serviceName: "StaticArtifactPublisherPort",
+    inputSchema: publishStaticArtifactCommandInputSchema,
+    serviceToken: tokens.staticArtifactPublisherPort,
+    transports: {
+      orpc: { method: "POST", path: "/api/static-artifacts/publish" },
+    },
+  },
+  {
+    key: "static-artifacts.publish-payload",
+    kind: "command",
+    domain: "static-artifacts",
+    messageName: "PublishStaticArtifactPayloadCommand",
+    handlerName: "PublishStaticArtifactPayloadCommandHandler",
+    serviceName: "StaticArtifactPublisherPort",
+    inputSchema: publishStaticArtifactPayloadCommandInputSchema,
+    serviceToken: tokens.staticArtifactPublisherPort,
+    transports: {
+      cli: "appaloft static-artifacts publish <dist-directory>",
+      orpc: { method: "POST", path: "/api/static-artifacts/publish-payload" },
+    },
+  },
+  {
+    key: "static-artifacts.publish-archive",
+    kind: "command",
+    domain: "static-artifacts",
+    messageName: "PublishStaticArtifactArchiveCommand",
+    handlerName: "PublishStaticArtifactArchiveCommandHandler",
+    serviceName: "StaticArtifactPublisherPort",
+    inputSchema: publishStaticArtifactArchiveCommandInputSchema,
+    serviceToken: tokens.staticArtifactPublisherPort,
+    transports: {
+      cli: "appaloft static-artifacts publish <dist.zip>",
+      orpc: { method: "POST", path: "/api/static-artifacts/publish-archive" },
+    },
+  },
+  {
+    key: "static-artifacts.publications.list",
+    kind: "query",
+    domain: "static-artifacts",
+    messageName: "ListStaticArtifactPublicationsQuery",
+    handlerName: "ListStaticArtifactPublicationsQueryHandler",
+    serviceName: "StaticArtifactPublicationReadModelPort",
+    inputSchema: listStaticArtifactPublicationsQueryInputSchema,
+    serviceToken: tokens.staticArtifactPublicationReadModelPort,
+    transports: {
+      orpc: { method: "GET", path: "/api/static-artifacts/publications" },
     },
   },
   {

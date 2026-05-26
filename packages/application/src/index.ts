@@ -62,6 +62,8 @@ export * from "./source-event-handlers";
 export * from "./source-event-messages";
 export * from "./source-link-handlers";
 export * from "./source-link-messages";
+export * from "./static-artifact-handlers";
+export * from "./static-artifact-messages";
 export * from "./storage-volume-handlers";
 export * from "./storage-volume-messages";
 export * from "./system-handlers";
