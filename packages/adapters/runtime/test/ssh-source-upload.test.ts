@@ -1,9 +1,11 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
+import { spawnSync } from "node:child_process";
 import { describe, expect, test } from "bun:test";
 import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
+  buildRemotePreviewArtifactSweepCommand,
 } from "../src/ssh-execution";
 
 describe("SSH source upload", () => {
@@ -44,5 +46,21 @@ describe("SSH source upload", () => {
     expect(command).toContain("else tar -czf -");
     expect(command).toContain("'--exclude' '.turbo'");
     expect(command).toContain("ssh '-p' '22' 'deploy@example.test'");
+  });
+});
+
+describe("SSH preview artifact cleanup", () => {
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-007] renders a POSIX sh-compatible sibling artifact sweep", () => {
+    const command = buildRemotePreviewArtifactSweepCommand({
+      remoteRuntimeRoot: "/var/lib/appaloft/runtime",
+      sourceFingerprint:
+        "source-fingerprint%3Av1:preview%3Apr%3A51:github:provider-repository%3A1240442607:.:appaloft.preview.yaml",
+    });
+
+    const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
+
+    expect(syntaxCheck.status).toBe(0);
+    expect(command).toContain('for marker in "$@"; do if grep -Fq "$fingerprint" "$marker"; then');
+    expect(command).not.toContain("for marker do; if");
   });
 });
