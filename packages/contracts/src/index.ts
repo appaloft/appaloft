@@ -388,6 +388,10 @@ export const createProjectResponseSchema = z.object({
   id: z.string(),
 });
 
+export const countResponseSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
 export const listProjectsResponseSchema = z.object({
   items: z.array(projectSummarySchema),
 });
@@ -5964,6 +5968,7 @@ export type RestoreProjectInput = z.infer<typeof restoreProjectInputSchema>;
 export type CheckProjectDeleteSafetyInput = z.infer<typeof checkProjectDeleteSafetyInputSchema>;
 export type DeleteProjectInput = z.infer<typeof deleteProjectInputSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
+export type CountResponse = z.infer<typeof countResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
 export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;

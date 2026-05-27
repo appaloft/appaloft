@@ -110,6 +110,41 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
     return grouped;
   }
 
+  async count(context: RepositoryContext, input?: { projectId?: string }) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("environment", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "environment",
+        },
+      },
+      async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = executor
+          .selectFrom("environments")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")]);
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(
     context: RepositoryContext,
     input?: {

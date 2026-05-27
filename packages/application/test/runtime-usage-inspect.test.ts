@@ -329,6 +329,7 @@ function queryService(
   const projectReadModel =
     overrides.projectReadModel ??
     ({
+      count: async () => 1,
       list: async () => [],
       findOne: async () => ({
         id: "prj_usage",
@@ -341,6 +342,7 @@ function queryService(
   const environmentReadModel =
     overrides.environmentReadModel ??
     ({
+      count: async () => 1,
       list: async () => [],
       findOne: async () => ({
         id: "env_prod",
@@ -355,6 +357,7 @@ function queryService(
   const resourceReadModel =
     overrides.resourceReadModel ??
     ({
+      count: async () => 1,
       list: async () => [
         {
           id: "res_api",
@@ -383,6 +386,7 @@ function queryService(
   const deploymentReadModel =
     overrides.deploymentReadModel ??
     ({
+      count: async () => 1,
       list: async () => [deployment],
       findOne: async () => deployment,
       findLogs: async () => [],

@@ -31,6 +31,10 @@ import {
 import { ListResourcesQueryService } from "../src/use-cases";
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly resources: ResourceSummary[]) {}
 
   async list(): Promise<ResourceSummary[]> {

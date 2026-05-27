@@ -2,6 +2,8 @@ export * from "./operations/dependency-resources/accept-dependency-resource-prov
 export * from "./operations/dependency-resources/accept-dependency-resource-provisioning-plan.use-case";
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.handler";
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.use-case";
+export * from "./operations/dependency-resources/count-dependency-resources.handler";
+export * from "./operations/dependency-resources/count-dependency-resources.query-service";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.handler";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.use-case";
 export * from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.handler";

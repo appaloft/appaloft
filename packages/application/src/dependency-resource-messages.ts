@@ -1,5 +1,6 @@
 export * from "./operations/dependency-resources/accept-dependency-resource-provisioning-plan.command";
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
+export * from "./operations/dependency-resources/count-dependency-resources.query";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.command";
 export * from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.command";
 export * from "./operations/dependency-resources/delete-dependency-resource.command";

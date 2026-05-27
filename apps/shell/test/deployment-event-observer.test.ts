@@ -12,6 +12,10 @@ import { ShellDeploymentEventObserver } from "../src/deployment-event-observer";
 import { ShellDeploymentProgressReporter } from "../src/deployment-progress-reporter";
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(
     private readonly deployment: DeploymentSummary,
     private readonly logs: Array<{

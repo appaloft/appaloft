@@ -217,6 +217,7 @@ export const tokens = {
   changeOrganizationMemberRoleUseCase: Symbol.for(
     "appaloft.change_organization_member_role_use_case",
   ),
+  countProjectsQueryService: Symbol.for("appaloft.count_projects_query_service"),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   queryCapabilitiesQueryService: Symbol.for("appaloft.query_capabilities_query_service"),
   queryEntitlementsQueryService: Symbol.for("appaloft.query_entitlements_query_service"),
@@ -252,6 +253,7 @@ export const tokens = {
   registerServerUseCase: Symbol.for("appaloft.register_server_use_case"),
   configureServerCredentialUseCase: Symbol.for("appaloft.configure_server_credential_use_case"),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),
+  countServersQueryService: Symbol.for("appaloft.count_servers_query_service"),
   listSshCredentialsQueryService: Symbol.for("appaloft.list_ssh_credentials_query_service"),
   showSshCredentialQueryService: Symbol.for("appaloft.show_ssh_credential_query_service"),
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
@@ -304,6 +306,7 @@ export const tokens = {
   bootstrapServerProxyUseCase: Symbol.for("appaloft.bootstrap_server_proxy_use_case"),
   archiveEnvironmentUseCase: Symbol.for("appaloft.archive_environment_use_case"),
   cloneEnvironmentUseCase: Symbol.for("appaloft.clone_environment_use_case"),
+  countEnvironmentsQueryService: Symbol.for("appaloft.count_environments_query_service"),
   renameEnvironmentUseCase: Symbol.for("appaloft.rename_environment_use_case"),
   lockEnvironmentUseCase: Symbol.for("appaloft.lock_environment_use_case"),
   unlockEnvironmentUseCase: Symbol.for("appaloft.unlock_environment_use_case"),
@@ -366,6 +369,7 @@ export const tokens = {
   showDependencyResourceProvisioningPlanQueryService: Symbol.for(
     "appaloft.show_dependency_resource_provisioning_plan_query_service",
   ),
+  countResourcesQueryService: Symbol.for("appaloft.count_resources_query_service"),
   listResourcesQueryService: Symbol.for("appaloft.list_resources_query_service"),
   showResourceQueryService: Symbol.for("appaloft.show_resource_query_service"),
   listResourceDependencyBindingsQueryService: Symbol.for(
@@ -385,6 +389,9 @@ export const tokens = {
   ),
   restoreDependencyResourceBackupUseCase: Symbol.for(
     "appaloft.restore_dependency_resource_backup_use_case",
+  ),
+  countDependencyResourcesQueryService: Symbol.for(
+    "appaloft.count_dependency_resources_query_service",
   ),
   listDependencyResourcesQueryService: Symbol.for(
     "appaloft.list_dependency_resources_query_service",
@@ -542,6 +549,7 @@ export const tokens = {
   certificateRetryScheduler: Symbol.for("appaloft.certificate_retry_scheduler"),
   listCertificatesQueryService: Symbol.for("appaloft.list_certificates_query_service"),
   showCertificateQueryService: Symbol.for("appaloft.show_certificate_query_service"),
+  countDeploymentsQueryService: Symbol.for("appaloft.count_deployments_query_service"),
   listDeploymentsQueryService: Symbol.for("appaloft.list_deployments_query_service"),
   showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
   deploymentPlanQueryService: Symbol.for("appaloft.deployment_plan_query_service"),

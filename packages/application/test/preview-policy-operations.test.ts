@@ -106,6 +106,10 @@ const previewEnvironmentSummary: PreviewEnvironmentSummary = {
 };
 
 class MemoryPreviewEnvironmentReadModel implements PreviewEnvironmentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   listInput: Parameters<PreviewEnvironmentReadModel["list"]>[1] | undefined;
   findOneInput: Parameters<PreviewEnvironmentReadModel["findOne"]>[1] | undefined;
 

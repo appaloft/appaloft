@@ -540,6 +540,50 @@ export class PgDependencyResourceReadModel implements DependencyResourceReadMode
     ),
   ) {}
 
+  async count(
+    context: RepositoryContext,
+    input?: Parameters<DependencyResourceReadModel["count"]>[1],
+  ): Promise<number> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("dependency-resource", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "dependency-resource",
+        },
+      },
+      async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = executor
+          .selectFrom("dependency_resources")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+          .where("lifecycle_status", "!=", "deleted");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
+        }
+        if (input?.environmentId) {
+          query = query.where("environment_id", "=", input.environmentId);
+        }
+        if (input?.kind) {
+          query = query.where("kind", "=", input.kind);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(
     context: RepositoryContext,
     input?: {

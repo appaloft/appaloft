@@ -26,6 +26,7 @@ export * from "./operations/default-access-domain-policies/configure-default-acc
 export * from "./operations/default-access-domain-policies/list-default-access-domain-policies.schema";
 export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.schema";
 export * from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
+export * from "./operations/dependency-resources/count-dependency-resources.query";
 export * from "./operations/dependency-resources/create-dependency-resource-backup.schema";
 export * from "./operations/dependency-resources/delete-dependency-resource.schema";
 export * from "./operations/dependency-resources/dependency-resource-provisioning.schema";
@@ -63,6 +64,7 @@ export * from "./operations/deployment-overlays/deployment-overlay.schema";
 export * from "./operations/deployments/archive-deployment.schema";
 export * from "./operations/deployments/cancel-deployment.schema";
 export * from "./operations/deployments/cleanup-preview.schema";
+export * from "./operations/deployments/count-deployments.query";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-log-retention.schema";
 export * from "./operations/deployments/deployment-logs.schema";
@@ -93,6 +95,7 @@ export {
 } from "./operations/entitlements/query-entitlements.schema";
 export * from "./operations/environments/archive-environment.schema";
 export * from "./operations/environments/clone-environment.schema";
+export * from "./operations/environments/count-environments.query";
 export * from "./operations/environments/create-environment.schema";
 export * from "./operations/environments/diff-environments.schema";
 export * from "./operations/environments/environment-effective-precedence.schema";
@@ -162,6 +165,7 @@ export {
 } from "./operations/preview-deployments/show-preview-policy.schema";
 export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/check-project-delete-safety.schema";
+export * from "./operations/projects/count-projects.query";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/delete-project.schema";
 export {
@@ -181,6 +185,7 @@ export * from "./operations/resources/configure-resource-health.schema";
 export * from "./operations/resources/configure-resource-network.schema";
 export * from "./operations/resources/configure-resource-runtime.schema";
 export * from "./operations/resources/configure-resource-source.schema";
+export * from "./operations/resources/count-resources.query";
 export * from "./operations/resources/create-resource.schema";
 export * from "./operations/resources/delete-resource.schema";
 export * from "./operations/resources/import-resource-variables.schema";
@@ -215,6 +220,7 @@ export {
 } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/configure-server-edge-proxy.schema";
+export * from "./operations/servers/count-servers.query";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/deactivate-server.schema";
 export * from "./operations/servers/delete-server.schema";

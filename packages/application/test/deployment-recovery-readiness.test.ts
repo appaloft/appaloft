@@ -21,6 +21,10 @@ class FixedClock {
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly deployments: DeploymentSummary[] = []) {}
 
   async list(
@@ -53,6 +57,10 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 }
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly resources: ResourceSummary[] = []) {}
 
   async list(): Promise<ResourceSummary[]> {

@@ -3,6 +3,7 @@ export * from "./operations/deployments/archive-deployment.command";
 export * from "./operations/deployments/cancel-deployment.command";
 export * from "./operations/deployments/cleanup-preview.command";
 export * from "./operations/deployments/confirm-action-preview-route.command";
+export * from "./operations/deployments/count-deployments.query";
 export * from "./operations/deployments/create-deployment.command";
 export * from "./operations/deployments/deployment-logs.query";
 export * from "./operations/deployments/deployment-plan.query";
