@@ -1723,11 +1723,26 @@ export const enUS = {
       dockerfilePath: "Dockerfile path",
       dockerImage: "Docker image",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
+      githubAppConnectedTitle: "GitHub App installed",
+      githubAppLoginRequired:
+        "Sign in or create an Appaloft account first. The GitHub App installation callback binds the selected GitHub account or organization to your current workspace.",
+      githubAppLoginRequiredTitle: "Sign in to connect a workspace",
+      githubAppRepositoryAccessAll: "Repository access: all repositories",
+      githubAppRepositoryAccessSelected: "Repository access: selected repositories",
+      githubAppRepositoryAccessSelectedCount: "Repository access: {{count}} selected repositories",
+      githubAppRepositoryAccessUnknown: "Repository access will be shown after GitHub returns it.",
+      githubChangeRepositoryAccess: "Change repository access",
+      githubConfigureApp: "Configure on GitHub",
       githubHostedProviderAppHint:
-        "Install or authorize the configured provider app to browse repositories; no GitHub App credentials are entered here.",
+        "Install the GitHub App to browse private repositories. GitHub will ask which personal account or organization and which repositories Appaloft can access.",
       githubHostedProviderAppSetupPending:
-        "Repository browsing is waiting for the configured provider app setup to be completed by the operator.",
+        "GitHub App installation is temporarily unavailable. Public repository URLs can still be deployed without the GitHub App.",
       githubInstallApp: "Install GitHub App",
+      githubInstallAppDescription:
+        "You will be redirected to GitHub to choose a personal account or organization, then choose all repositories or selected repositories. Appaloft will return to this Quick Deploy flow afterward.",
+      githubInstallAppTitle: "Connect repositories with the GitHub App",
+      githubNoAppRepositoryResults:
+        "No repositories are visible for this GitHub App installation. Choose the repository in GitHub App repository access, then return here.",
       githubOAuthNotConfigured: "GitHub OAuth is not configured on the backend.",
       githubOnlyLoginWhenNeeded: "Login is triggered only when importing from GitHub.",
       githubRepository: "GitHub repository",
@@ -1738,8 +1753,14 @@ export const enUS = {
       githubRepositoryUrlHint:
         "Paste any GitHub repository URL, or connect GitHub to browse repositories and use private repositories you can access.",
       githubRepositoryUrlPlaceholder: "https://github.com/acme/app.git",
-      githubSourceBrowserMode: "Choose from my GitHub",
-      githubSourceUrlMode: "Enter GitHub URL",
+      githubSourceBrowserMode: "GitHub App",
+      githubSourceBrowserModeHostedHint:
+        "Recommended for private repositories, selected repository access, and future push deploy or PR preview workflows.",
+      githubSourceBrowserModeOAuthHint:
+        "Authorize GitHub when you want Appaloft to list repositories for you.",
+      githubSourceUrlMode: "Public Git URL",
+      githubSourceUrlModeHint:
+        "Use a public GitHub repository URL without installing the GitHub App.",
       healthCheckExistingResource: "Use saved resource config",
       healthCheckExpectedStatusCode: "Expected status",
       healthCheckHost: "Host",

@@ -17,6 +17,7 @@
     Settings2,
     ShieldCheck,
     TerminalSquare,
+    Wrench,
     Waypoints,
   } from "@lucide/svelte";
   import {
@@ -732,11 +733,45 @@
     queryOptions({
       queryKey: ["integrations", "github", "app-connection"],
       queryFn: () => orpcClient.integrations.github.appConnection.show({}),
-      enabled: browser && enabled && sourceKind === "github" && githubUsesHostedProviderApp,
+      enabled:
+        browser &&
+        enabled &&
+        sourceKind === "github" &&
+        githubUsesHostedProviderApp &&
+        Boolean(authSessionQuery.data) &&
+        (!authSession.loginRequired || Boolean(authSession.session)),
     }),
   );
   const githubAppConnection = $derived(githubAppConnectionQuery.data ?? null);
   const githubAppConnected = $derived(Boolean(githubAppConnection?.connected));
+  const githubAppInstallUrl = $derived(
+    githubAppConnection?.installUrl ?? githubIntegration?.setup?.providerApp?.installUrl ?? "",
+  );
+  const githubAppAccountLabel = $derived.by(() => {
+    const login = githubAppConnection?.accountLogin;
+    if (!login) {
+      return null;
+    }
+
+    const accountType = githubAppConnection?.accountType;
+    return accountType ? `${login} · ${accountType}` : login;
+  });
+  const githubAppRepositoryAccessLabel = $derived.by(() => {
+    const selection = githubAppConnection?.repositoriesSelection;
+    if (selection === "all") {
+      return $t(i18nKeys.console.quickDeploy.githubAppRepositoryAccessAll);
+    }
+    if (selection === "selected") {
+      const count = githubAppConnection?.repositoryCount;
+      return count === undefined
+        ? $t(i18nKeys.console.quickDeploy.githubAppRepositoryAccessSelected)
+        : $t(i18nKeys.console.quickDeploy.githubAppRepositoryAccessSelectedCount, {
+            count: String(count),
+          });
+    }
+
+    return $t(i18nKeys.console.quickDeploy.githubAppRepositoryAccessUnknown);
+  });
   const githubRepositoryBrowsingEnabled = $derived.by(() => {
     if (githubUsesHostedProviderApp) {
       return githubHostedProviderAppConfigured && githubAppConnected;
@@ -895,6 +930,7 @@
   );
   const githubConnected = $derived(Boolean(githubProvider?.connected));
   const authIdentity = $derived(readSessionIdentity(authSession.session));
+  const loginRequired = $derived(authSession.loginRequired && !authSession.session);
   const canChooseNativeLocalFolder = $derived(
     browser &&
       typeof (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.selectDirectory === "function",
@@ -1352,6 +1388,9 @@
   const domainBindingSummary = $derived(
     selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
   );
+  const quickDeployGitHubReturnPath =
+    "/deploy?source=github&githubMode=browser&step=source";
+  const quickDeployGitHubReturnPathEncoded = encodeURIComponent(quickDeployGitHubReturnPath);
   const canAdvance = $derived(stepIsComplete(activeStep));
   const quickDeployReady = $derived(
     stepIsComplete("source") && stepIsComplete("project") && stepIsComplete("server"),
@@ -1556,13 +1595,6 @@
 
     if (changed) {
       blueprintDependencyProvisioningDrafts = nextDrafts;
-    }
-  });
-
-  $effect(() => {
-    if (sourceKind === "github" && githubUsesHostedProviderApp && githubSourceMode !== "browser") {
-      githubSourceMode = "browser";
-      githubSourceModeTouched = false;
     }
   });
 
@@ -2267,12 +2299,6 @@
   }
 
   function selectGithubSourceMode(mode: GithubSourceMode): void {
-    if (githubUsesHostedProviderApp && mode === "url") {
-      githubSourceMode = "browser";
-      githubSourceModeTouched = false;
-      return;
-    }
-
     githubSourceMode = mode;
     githubSourceModeTouched = true;
     if (mode === "url") {
@@ -2615,9 +2641,17 @@
   async function connectGitHub(): Promise<void> {
     try {
       if (githubUsesHostedProviderApp) {
-        const installUrl = githubAppConnection?.installUrl ?? githubIntegration?.setup?.providerApp?.installUrl;
-        if (githubHostedProviderAppConfigured && installUrl && browser) {
-          const url = new URL(installUrl);
+        if (loginRequired) {
+          deployFeedback = {
+            kind: "error",
+            title: $t(i18nKeys.console.quickDeploy.githubInstallApp),
+            detail: $t(i18nKeys.console.quickDeploy.githubAppLoginRequired),
+          };
+          return;
+        }
+
+        if (githubHostedProviderAppConfigured && githubAppInstallUrl && browser) {
+          const url = new URL(githubAppInstallUrl);
           const state = buildDeployStateUrl();
           state.searchParams.set("source", "github");
           state.searchParams.set("githubMode", "browser");
@@ -3346,22 +3380,41 @@
             </div>
             {#if sourceKind === "github"}
               <div class="space-y-3">
-                <div class={githubUsesHostedProviderApp ? "grid gap-2" : "grid gap-2 sm:grid-cols-2"}>
-                  {#if !githubUsesHostedProviderApp}
-                    <Button
-                      type="button"
-                      variant={githubSourceMode === "url" ? "selected" : "outline"}
-                      onclick={() => selectGithubSourceMode("url")}
-                    >
-                      {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
-                    </Button>
-                  {/if}
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant={githubSourceMode === "url" ? "selected" : "outline"}
+                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                    data-github-public-url-mode
+                    onclick={() => selectGithubSourceMode("url")}
+                  >
+                    <GitFork class="size-4 shrink-0" />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">
+                        {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
+                      </span>
+                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubSourceUrlModeHint)}
+                      </span>
+                    </span>
+                  </Button>
                   <Button
                     type="button"
                     variant={githubSourceMode === "browser" ? "selected" : "outline"}
+                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
                     onclick={() => selectGithubSourceMode("browser")}
                   >
-                    {$t(i18nKeys.console.quickDeploy.githubSourceBrowserMode)}
+                    <GitHubIcon class="size-4 shrink-0" />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">
+                        {$t(i18nKeys.console.quickDeploy.githubSourceBrowserMode)}
+                      </span>
+                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                        {githubUsesHostedProviderApp
+                          ? $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeHostedHint)
+                          : $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeOAuthHint)}
+                      </span>
+                    </span>
                   </Button>
                 </div>
                 {#if githubSourceMode === "url"}
@@ -3805,10 +3858,10 @@
           {#if sourceKind === "github" && githubSourceMode === "browser"}
             <div class="space-y-3">
               <Separator />
-              <div class="flex items-center justify-between gap-2">
-                <div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
                   <p class="text-sm font-medium">{$t(i18nKeys.console.quickDeploy.githubRepository)}</p>
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs leading-5 text-muted-foreground">
                     {githubUsesHostedProviderApp
                       ? $t(i18nKeys.console.quickDeploy.githubHostedProviderAppHint)
                       : $t(i18nKeys.console.quickDeploy.githubOnlyLoginWhenNeeded)}
@@ -3836,13 +3889,57 @@
               {#if githubUsesHostedProviderApp && !githubHostedProviderAppConfigured}
                 <div class="console-subtle-panel space-y-2 px-3 py-3 text-sm text-muted-foreground">
                   <p>{$t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending)}</p>
-                  {#each githubIntegration?.configuration?.diagnostics ?? [] as diagnostic (diagnostic.code)}
-                    <p>{diagnostic.message}</p>
-                  {/each}
+                </div>
+              {:else if githubUsesHostedProviderApp && loginRequired}
+                <div class="console-subtle-panel space-y-3 px-3 py-3 text-sm">
+                  <div class="flex items-start gap-3">
+                    <ShieldCheck class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div class="min-w-0 space-y-1">
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.quickDeploy.githubAppLoginRequiredTitle)}
+                      </p>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubAppLoginRequired)}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      href={`/login?next=${quickDeployGitHubReturnPathEncoded}`}
+                      class="sm:w-fit"
+                    >
+                      <ShieldCheck class="size-4" />
+                      {$t(i18nKeys.console.authBootstrap.signIn)}
+                    </Button>
+                    <Button
+                      href={`/sign-up?next=${quickDeployGitHubReturnPathEncoded}`}
+                      variant="outline"
+                      class="sm:w-fit"
+                    >
+                      {$t(i18nKeys.console.authSignup.signUpLink)}
+                    </Button>
+                  </div>
                 </div>
               {:else if githubUsesHostedProviderApp && !githubAppConnected}
-                <div class="space-y-2">
-                  <Button variant="outline" class="w-full" onclick={connectGitHub}>
+                <div class="console-subtle-panel space-y-3 px-3 py-3 text-sm" data-github-app-install-panel>
+                  <div class="flex items-start gap-3">
+                    <GitHubIcon class="mt-0.5 size-4 shrink-0" />
+                    <div class="min-w-0 space-y-1">
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.quickDeploy.githubInstallAppTitle)}
+                      </p>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubInstallAppDescription)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    class="w-full sm:w-fit"
+                    disabled={!githubAppInstallUrl}
+                    data-github-app-install-action
+                    onclick={connectGitHub}
+                  >
                     <GitHubIcon class="size-4" />
                     {$t(i18nKeys.console.quickDeploy.githubInstallApp)}
                   </Button>
@@ -3863,6 +3960,33 @@
                 </Button>
               {:else}
                 <div class="space-y-3">
+                  {#if githubUsesHostedProviderApp}
+                    <div class="console-subtle-panel space-y-3 px-3 py-3 text-sm" data-github-app-connected-panel>
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0 space-y-1">
+                          <p class="font-medium">
+                            {githubAppAccountLabel ?? $t(i18nKeys.console.quickDeploy.githubAppConnectedTitle)}
+                          </p>
+                          <p class="text-xs leading-5 text-muted-foreground">
+                            {githubAppRepositoryAccessLabel}
+                          </p>
+                        </div>
+                        {#if githubAppInstallUrl}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            class="sm:shrink-0"
+                            data-github-app-configure-action
+                            onclick={connectGitHub}
+                          >
+                            <Wrench class="size-4" />
+                            {$t(i18nKeys.console.quickDeploy.githubConfigureApp)}
+                          </Button>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
                   <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
                   <div class="console-subtle-panel max-h-64 space-y-2 overflow-auto p-2">
                     {#if githubRepositoriesQuery.isPending}
@@ -3892,7 +4016,25 @@
                         </Button>
                       {/each}
                     {:else}
-                      <p class="px-2 py-3 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noRepositoryResults)}</p>
+                      <div class="space-y-3 px-2 py-3 text-sm text-muted-foreground" data-github-app-empty-repositories>
+                        <p>
+                          {githubUsesHostedProviderApp
+                            ? $t(i18nKeys.console.quickDeploy.githubNoAppRepositoryResults)
+                            : $t(i18nKeys.console.quickDeploy.noRepositoryResults)}
+                        </p>
+                        {#if githubUsesHostedProviderApp && githubAppInstallUrl}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-github-app-configure-empty-action
+                            onclick={connectGitHub}
+                          >
+                            <Wrench class="size-4" />
+                            {$t(i18nKeys.console.quickDeploy.githubChangeRepositoryAccess)}
+                          </Button>
+                        {/if}
+                      </div>
                     {/if}
                   </div>
                 </div>
