@@ -1639,6 +1639,7 @@ export const i18nKeys = {
       noServerOptions: "console:quickDeploy.noServerOptions",
       remoteGitUrl: "console:quickDeploy.remoteGitUrl",
       remoteGitUrlPlaceholder: "console:quickDeploy.remoteGitUrlPlaceholder",
+      repositoryBaseDirectory: "console:quickDeploy.repositoryBaseDirectory",
       reviewBody: "console:quickDeploy.reviewBody",
       reviewDeployment: "console:quickDeploy.reviewDeployment",
       secretStorage: "console:quickDeploy.secretStorage",
