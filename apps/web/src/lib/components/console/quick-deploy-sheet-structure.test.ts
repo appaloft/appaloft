@@ -31,4 +31,40 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain("min-h-16 w-full items-center justify-between");
     expect(quickDeploySheetSource).toContain('class="w-full"');
   });
+
+  test("[QD-GHA-001] shows hosted GitHub App install without requiring GitHub OAuth", () => {
+    expect(quickDeploySheetSource).toContain("data-github-app-install-panel");
+    expect(quickDeploySheetSource).toContain("data-github-app-install-action");
+    expect(quickDeploySheetSource).toContain("githubUsesHostedProviderApp && !githubAppConnected");
+    expect(quickDeploySheetSource).not.toContain(
+      "githubUsesHostedProviderApp && !githubProvider?.connected",
+    );
+  });
+
+  test("[QD-GHA-002] shows installed GitHub App status before the repository picker", () => {
+    expect(quickDeploySheetSource).toContain("data-github-app-connected-panel");
+    expect(quickDeploySheetSource).toContain("githubAppAccountLabel");
+    expect(quickDeploySheetSource).toContain("githubAppRepositoryAccessLabel");
+    expect(quickDeploySheetSource).toContain("githubRepositoriesQuery.isPending");
+  });
+
+  test("[QD-GHA-003] preserves public Git URL mode in hosted GitHub App mode", () => {
+    expect(quickDeploySheetSource).toContain("data-github-public-url-mode");
+    expect(quickDeploySheetSource).toContain("githubSourceUrlModeHint");
+    expect(quickDeploySheetSource).not.toContain(
+      'if (sourceKind === "github" && githubUsesHostedProviderApp && githubSourceMode !== "browser")',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'if (githubUsesHostedProviderApp && mode === "url")',
+    );
+  });
+
+  test("[QD-GHA-004] provides GitHub configuration actions without exposing operator secrets", () => {
+    expect(quickDeploySheetSource).toContain("data-github-app-configure-action");
+    expect(quickDeploySheetSource).toContain("data-github-app-configure-empty-action");
+    expect(quickDeploySheetSource).toContain("githubNoAppRepositoryResults");
+    expect(quickDeploySheetSource).not.toContain("APPALOFT_CLOUD_GITHUB_APP_PRIVATE_KEY");
+    expect(quickDeploySheetSource).not.toContain("webhookSecret");
+    expect(quickDeploySheetSource).not.toContain("clientSecret");
+  });
 });

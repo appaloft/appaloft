@@ -1637,11 +1637,26 @@ export const zhCN = {
       dockerfilePath: "Dockerfile 路径",
       dockerImage: "Docker 镜像",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
+      githubAppConnectedTitle: "GitHub App 已安装",
+      githubAppLoginRequired:
+        "请先登录或注册 Appaloft。GitHub App 安装回调需要把你在 GitHub 选择的个人账号或组织绑定到当前工作区。",
+      githubAppLoginRequiredTitle: "先登录以连接工作区",
+      githubAppRepositoryAccessAll: "仓库访问范围：全部仓库",
+      githubAppRepositoryAccessSelected: "仓库访问范围：已选择仓库",
+      githubAppRepositoryAccessSelectedCount: "仓库访问范围：已选择 {{count}} 个仓库",
+      githubAppRepositoryAccessUnknown: "GitHub 返回安装信息后会显示仓库访问范围。",
+      githubChangeRepositoryAccess: "调整仓库访问范围",
+      githubConfigureApp: "在 GitHub 配置",
       githubHostedProviderAppHint:
-        "安装或授权已配置的 provider app 后再浏览仓库；这里不输入 GitHub App credential。",
+        "安装 GitHub App 后即可浏览私有仓库。GitHub 会让你选择个人账号或组织，并选择 Appaloft 可访问的仓库。",
       githubHostedProviderAppSetupPending:
-        "仓库浏览正在等待 operator 完成已配置 provider app 的外部 setup。",
+        "GitHub App 安装暂时不可用。公开仓库仍可直接填写 URL 部署。",
       githubInstallApp: "安装 GitHub App",
+      githubInstallAppDescription:
+        "将跳转到 GitHub，你可以选择 personal account 或 organization，并选择 all repositories 或 selected repositories；完成后会回到这个快速部署流程。",
+      githubInstallAppTitle: "用 GitHub App 连接仓库",
+      githubNoAppRepositoryResults:
+        "当前 GitHub App 安装没有可见仓库。请在 GitHub App 的 repository access 中选择该仓库，然后回到这里。",
       githubOAuthNotConfigured: "后端尚未配置 GitHub OAuth。",
       githubOnlyLoginWhenNeeded: "只有需要导入 GitHub 时才会触发登录。",
       githubRepository: "GitHub 仓库",
@@ -1651,8 +1666,12 @@ export const zhCN = {
       githubRepositoryUrlHint:
         "可以粘贴任意 GitHub 仓库地址；连接 GitHub 后可以浏览账号仓库，也可以部署你有权限访问的 private 仓库。",
       githubRepositoryUrlPlaceholder: "https://github.com/acme/app.git",
-      githubSourceBrowserMode: "从我的 GitHub 选择",
-      githubSourceUrlMode: "输入 GitHub URL",
+      githubSourceBrowserMode: "GitHub App",
+      githubSourceBrowserModeHostedHint:
+        "推荐用于私有仓库、selected repository access，以及未来的 push deploy / PR preview 能力。",
+      githubSourceBrowserModeOAuthHint: "需要 Appaloft 帮你列出仓库时再授权 GitHub。",
+      githubSourceUrlMode: "Public Git URL",
+      githubSourceUrlModeHint: "公开 GitHub 仓库可直接填写 URL，无需安装 GitHub App。",
       healthCheckExistingResource: "使用资源已保存配置",
       healthCheckExpectedStatusCode: "期望状态码",
       healthCheckHost: "Host",

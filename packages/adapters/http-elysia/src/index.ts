@@ -136,6 +136,7 @@ interface StaticAssetSource {
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
 const loginPath = "/login";
 const signUpPath = "/sign-up";
+const githubAppQuickDeployReturnPath = "/deploy?source=github&githubMode=browser&step=source";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};
@@ -233,6 +234,31 @@ function normalizePluginRouteResult(
 
 function normalizeOrigin(origin: string): string {
   return origin.replace(/\/+$/, "").toLowerCase();
+}
+
+function resolveWebRedirectUrl(input: {
+  fallbackPath: string;
+  state?: string | null;
+  webOrigin: string;
+}): string {
+  const webOrigin = input.webOrigin.replace(/\/+$/, "");
+  const fallback = new URL(input.fallbackPath, `${webOrigin}/`);
+  const state = input.state?.trim();
+
+  if (!state) {
+    return fallback.toString();
+  }
+
+  try {
+    const parsed = new URL(state, `${webOrigin}/`);
+    if (normalizeOrigin(parsed.origin) !== normalizeOrigin(webOrigin)) {
+      return fallback.toString();
+    }
+
+    return parsed.toString();
+  } catch {
+    return fallback.toString();
+  }
 }
 
 function appendVaryHeader(headers: MutableHeaders, value: string): void {
@@ -1440,6 +1466,7 @@ export function createHttpApp(input: {
       const url = new URL(request.url);
       const installationId = url.searchParams.get("installation_id")?.trim();
       const setupAction = url.searchParams.get("setup_action")?.trim();
+      const state = url.searchParams.get("state");
       if (!installationId) {
         set.status = 400;
         return {
@@ -1462,10 +1489,12 @@ export function createHttpApp(input: {
       const result = await input.commandBus.execute(executionContext, command);
       unwrapResult(executionContext, result);
 
-      return Response.redirect(
-        `${input.config.webOrigin.replace(/\/+$/, "")}/console?source=github&githubMode=browser&githubApp=connected`,
-        303,
-      );
+      const redirectUrl = resolveWebRedirectUrl({
+        fallbackPath: githubAppQuickDeployReturnPath,
+        state,
+        webOrigin: input.config.webOrigin,
+      });
+      return Response.redirect(redirectUrl, 303);
     })
     .get("/.appaloft/resource-access-failure", ({ request }) =>
       resourceAccessFailureDiagnosticResponse(request, {
