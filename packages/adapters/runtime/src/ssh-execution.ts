@@ -336,7 +336,7 @@ function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: Deploymen
   ].join(" && ");
 }
 
-function remotePreviewArtifactSweepCommand(input: {
+export function buildRemotePreviewArtifactSweepCommand(input: {
   remoteRuntimeRoot: string;
   sourceFingerprint: string;
 }): string {
@@ -345,8 +345,7 @@ function remotePreviewArtifactSweepCommand(input: {
   const markerSweepScript = [
     "fingerprint=$1",
     "shift",
-    "for marker do",
-    'if grep -Fq "$fingerprint" "$marker"; then',
+    'for marker in "$@"; do if grep -Fq "$fingerprint" "$marker"; then',
     'root=$(dirname "$marker")',
     'rm -rf "$root"',
     'printf "preview-workspace:%s\\n" "$root"',
@@ -3212,7 +3211,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (sourceFingerprint) {
         const siblingArtifactCleanup = await this.runRemoteCommand({
           target,
-          command: remotePreviewArtifactSweepCommand({
+          command: buildRemotePreviewArtifactSweepCommand({
             remoteRuntimeRoot: this.remoteRuntimeRoot,
             sourceFingerprint,
           }),
