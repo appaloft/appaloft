@@ -417,7 +417,7 @@ export const operationCatalog = [
     serviceToken: tokens.listOrganizationMembersQueryService,
     transportAccess: {
       productSession: {
-        minRole: "admin",
+        minRole: "member",
       },
     },
     transports: {
