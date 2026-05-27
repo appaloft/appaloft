@@ -101,6 +101,22 @@ interface ProvisionedDefaultOrganization {
   slug: string;
 }
 
+interface DirectAuthDatabase {
+  selectFrom(table: string): DirectMemberQueryBuilder;
+}
+
+interface DirectMemberQueryBuilder {
+  innerJoin(table: string, leftColumn: string, rightColumn: string): DirectMemberQueryBuilder;
+  select(selection: readonly string[]): DirectMemberQueryBuilder;
+  where(column: string, operator: "=", value: string): DirectMemberQueryBuilder;
+  limit(limit: number): DirectMemberQueryBuilder;
+  execute(): Promise<Record<string, unknown>[]>;
+}
+
+type DirectMemberListReadback =
+  | { result: Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }> }
+  | { reasonCode: string };
+
 function buildProviderStatus(
   key: AuthProviderKey,
   input: {
@@ -683,12 +699,68 @@ export class BetterAuthRuntime implements AuthRuntime {
         items: toArray(resultObject?.members).map(mapMemberSummary),
       });
     } catch {
+      const readback = await this.listMembersFromDatabase(headers, input);
+      if ("result" in readback) {
+        return readback.result;
+      }
+
       return err(
         productAuthForbidden(
           organizationTeamAuthInput("GET", "organization-members", input.organizationId),
-          "member-list-failed",
+          readback.reasonCode,
         ),
       );
+    }
+  }
+
+  private async listMembersFromDatabase(
+    headers: Headers,
+    input: OrganizationMemberListInput,
+  ): Promise<DirectMemberListReadback> {
+    const db = directAuthDatabase(this.config.database);
+    if (!db) {
+      return { reasonCode: "member-list-readback-unavailable" };
+    }
+
+    let activeRole: unknown;
+    try {
+      activeRole = await this.auth.api.getActiveMemberRole({
+        headers,
+        query: { organizationId: input.organizationId },
+      });
+    } catch {
+      return { reasonCode: "member-list-role-readback-failed" };
+    }
+    const role = normalizeProductOrganizationRole(readString(activeRole, "role"));
+    if (!role) {
+      return { reasonCode: "organization-member-missing" };
+    }
+
+    try {
+      const limit = Math.max(1, Math.min(input.limit ?? 100, 100));
+      const rows = await db
+        .selectFrom("member as member")
+        .innerJoin("user as auth_user", "auth_user.id", "member.userId")
+        .select([
+          "member.id as memberId",
+          "member.userId as userId",
+          "member.role as role",
+          "member.createdAt as joinedAt",
+          "auth_user.email as email",
+          "auth_user.name as displayName",
+          "auth_user.image as avatarUrl",
+        ])
+        .where("member.organizationId", "=", input.organizationId)
+        .limit(limit)
+        .execute();
+
+      return {
+        result: ok({
+          items: rows.map(mapDirectMemberSummary),
+        }),
+      };
+    } catch {
+      return { reasonCode: "member-list-readback-failed" };
     }
   }
 
@@ -1120,6 +1192,21 @@ function mapMemberSummary(value: unknown): OrganizationMemberSummary {
   };
 }
 
+function mapDirectMemberSummary(value: Record<string, unknown>): OrganizationMemberSummary {
+  const avatarUrl = readString(value, "avatarUrl");
+  const displayName = readString(value, "displayName");
+  const email = readString(value, "email");
+  return {
+    memberId: readString(value, "memberId") ?? "",
+    userId: readString(value, "userId") ?? "",
+    role: normalizeOrganizationTeamRole(readString(value, "role")) ?? "developer",
+    joinedAt: readDateString(value, "joinedAt") ?? new Date(0).toISOString(),
+    ...(avatarUrl ? { avatarUrl } : {}),
+    ...(displayName ? { displayName } : {}),
+    ...(email ? { email } : {}),
+  };
+}
+
 function normalizeInvitationStatus(status: string | undefined): OrganizationInvitationStatus {
   if (
     status === "accepted" ||
@@ -1223,13 +1310,37 @@ function productAuthForbidden(
   return {
     code: "product_auth_forbidden",
     category: "user",
-    message: "Product session is not authorized for this operation",
+    message: productAuthForbiddenMessage(reasonCode),
     retryable: false,
     details: {
       ...productAuthDetails(input, "product-authorization", reasonCode),
       ...(actualRole ? { actualRole } : {}),
     },
   };
+}
+
+function productAuthForbiddenMessage(reasonCode: string): string {
+  switch (reasonCode) {
+    case "active-organization-missing":
+      return "Choose an organization before running this operation.";
+    case "member-list-failed":
+      return "Organization members could not be read for the current session.";
+    case "member-list-readback-failed":
+      return "Organization members could not be read from the auth database.";
+    case "member-list-readback-unavailable":
+      return "Organization member readback is not available for this auth runtime.";
+    case "member-list-role-readback-failed":
+      return "The current organization role could not be verified before reading members.";
+    case "organization-member-missing":
+      return "The current session is not a member of this organization.";
+    case "organization-switch-failed":
+    case "organization-switch-forbidden":
+      return "The current session cannot switch to this organization.";
+    case "role-insufficient":
+      return "The current organization role is not allowed to run this operation.";
+    default:
+      return "Product session is not authorized for this operation.";
+  }
 }
 
 function productAuthDetails(
@@ -1245,6 +1356,13 @@ function productAuthDetails(
     requiredRole: input.requiredRole,
     ...(input.organizationId ? { organizationId: input.organizationId } : {}),
   };
+}
+
+function directAuthDatabase(
+  database: BetterAuthRuntimeConfig["database"] | undefined,
+): DirectAuthDatabase | null {
+  const db = readObject(database, "db");
+  return db && typeof db.selectFrom === "function" ? (db as unknown as DirectAuthDatabase) : null;
 }
 
 export interface StaticActionDeployTokenScope {
