@@ -60,11 +60,14 @@ function mountOrganizationTeamRoutes(input: {
 
 function productSessionPort(input?: {
   expectedRole?: ProductOrganizationRole;
+  expectedRoles?: ProductOrganizationRole[];
   organizationId?: string;
 }): ProductSessionAuthorizationPort {
+  const expectedRoles = input?.expectedRoles ? [...input.expectedRoles] : null;
   return {
     authorizeProductSession: async (_context, request) => {
-      expect(request.requiredRole).toBe(input?.expectedRole ?? "admin");
+      const expectedRole = expectedRoles?.shift() ?? input?.expectedRole ?? "admin";
+      expect(request.requiredRole).toBe(expectedRole);
       if (input?.organizationId) {
         expect(request.organizationId).toBe(input.organizationId);
       }
@@ -76,7 +79,7 @@ function productSessionPort(input?: {
         },
         email: "admin@example.com",
         organizationId: request.organizationId ?? "org_self_hosted",
-        role: input?.expectedRole ?? "admin",
+        role: expectedRole,
         userId: "usr_admin",
       });
     },
@@ -275,7 +278,7 @@ describe("organization/team HTTP/oRPC routes", () => {
         execute: async () => ok({} as never),
       } as CommandBus,
       productSessionAuthorizationPort: productSessionPort({
-        expectedRole: "admin",
+        expectedRoles: ["member", "admin"],
         organizationId: "org_self_hosted",
       }),
       queryBus: {
