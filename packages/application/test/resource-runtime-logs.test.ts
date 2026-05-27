@@ -25,6 +25,10 @@ import {
 import { ResourceRuntimeLogsQueryService } from "../src/use-cases";
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly resources: ResourceSummary[]) {}
 
   async list(): Promise<ResourceSummary[]> {
@@ -37,6 +41,10 @@ class StaticResourceReadModel implements ResourceReadModel {
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly deployments: DeploymentSummary[]) {}
 
   async list(

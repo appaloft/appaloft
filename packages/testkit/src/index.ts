@@ -653,6 +653,33 @@ export class MemoryProjectRepository implements ProjectRepository {
 export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershipReadModel {
   constructor(private readonly repository: MemoryProjectRepository) {}
 
+  async count(
+    context: RepositoryContext,
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<number> {
+    void context;
+    const organizationIds = input?.organizationIds?.length
+      ? new Set(input.organizationIds)
+      : undefined;
+    const projectIds = input?.projectIds?.length ? new Set(input.projectIds) : undefined;
+
+    return [...this.repository.items.values()]
+      .filter((project) =>
+        input?.organizationId
+          ? project.toState().organizationId?.value === input.organizationId
+          : true,
+      )
+      .filter((project) =>
+        organizationIds ? organizationIds.has(project.toState().organizationId?.value ?? "") : true,
+      )
+      .filter((project) => (projectIds ? projectIds.has(project.toState().id.value) : true))
+      .filter((project) => Boolean(projectSummaryFromState(project))).length;
+  }
+
   async list(
     context: RepositoryContext,
     input?: {
@@ -802,6 +829,13 @@ function memoryServerEdgeProxySummary(
 
 export class MemoryServerReadModel implements ServerReadModel {
   constructor(private readonly repository: MemoryServerRepository) {}
+
+  async count(context: RepositoryContext): Promise<number> {
+    void context;
+    return [...this.repository.items.values()].filter(
+      (server) => !server.toState().lifecycleStatus.isDeleted(),
+    ).length;
+  }
 
   async list(context: RepositoryContext, input?: { limit?: number }) {
     void context;
@@ -966,6 +1000,15 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
     private readonly repository: MemoryEnvironmentRepository,
     private readonly secretMask = "****",
   ) {}
+
+  async count(context: RepositoryContext, input?: { projectId?: string }): Promise<number> {
+    void context;
+    return [...this.repository.items.values()]
+      .map((environment) => environment.toState())
+      .filter((environment) =>
+        input?.projectId ? environment.projectId.value === input.projectId : true,
+      ).length;
+  }
 
   async list(context: RepositoryContext, input?: { projectId?: string; limit?: number }) {
     void context;
@@ -1201,6 +1244,27 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       ...(accessSummary ? { accessSummary } : {}),
       createdAt: resource.createdAt.value,
     };
+  }
+
+  async count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      includePreviewResources?: boolean;
+    },
+  ): Promise<number> {
+    void context;
+    void input?.includePreviewResources;
+    return [...this.repository.items.values()]
+      .map((resource) => resource.toState())
+      .filter((resource) => !resource.lifecycleStatus.isDeleted())
+      .filter((resource) =>
+        input?.projectId ? resource.projectId.value === input.projectId : true,
+      )
+      .filter((resource) =>
+        input?.environmentId ? resource.environmentId.value === input.environmentId : true,
+      ).length;
   }
 
   async list(
@@ -1647,6 +1711,26 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
       createdAt: state.createdAt.value,
       ...(state.deletedAt ? { deletedAt: state.deletedAt.value } : {}),
     };
+  }
+
+  async count(
+    context: RepositoryContext,
+    input?: Parameters<DependencyResourceReadModel["count"]>[1],
+  ): Promise<number> {
+    void context;
+    return [...this.repository.items.values()]
+      .filter((dependencyResource) => dependencyResource.toState().status.value !== "deleted")
+      .filter((dependencyResource) =>
+        input?.projectId ? dependencyResource.toState().projectId?.value === input.projectId : true,
+      )
+      .filter((dependencyResource) =>
+        input?.environmentId
+          ? dependencyResource.toState().environmentId?.value === input.environmentId
+          : true,
+      )
+      .filter((dependencyResource) =>
+        input?.kind ? dependencyResource.toState().kind.value === input.kind : true,
+      ).length;
   }
 
   async list(
@@ -2397,6 +2481,25 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
 
 export class MemoryDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly repository: MemoryDeploymentRepository) {}
+
+  async count(
+    context: RepositoryContext,
+    input?: Parameters<DeploymentReadModel["count"]>[1],
+  ): Promise<number> {
+    void context;
+    const statuses = input?.statuses?.length ? new Set(input.statuses) : undefined;
+    return [...this.repository.items.values()]
+      .map((deployment) => deployment.toState())
+      .filter((deployment) =>
+        input?.projectId ? deployment.projectId.value === input.projectId : true,
+      )
+      .filter((deployment) =>
+        input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
+      )
+      .filter((deployment) => (input?.includeArchived ? true : !deployment.archivedAt))
+      .filter((deployment) => (input?.status ? deployment.status.value === input.status : true))
+      .filter((deployment) => (statuses ? statuses.has(deployment.status.value) : true)).length;
+  }
 
   async list(
     context: RepositoryContext,

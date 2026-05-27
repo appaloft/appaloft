@@ -120,6 +120,10 @@ class StaticDomainBindingReadModel implements DomainBindingReadModel {
 }
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly resources: ResourceSummary[]) {}
 
   async list(

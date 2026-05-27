@@ -28,6 +28,20 @@ function createWebDevPort(mode: string): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 4173;
 }
 
+function createRuntimeExtensionProxyPrefixes(mode: string): string[] {
+  const env = loadEnv(mode, process.cwd(), "");
+  const rawPrefixes = env.APPALOFT_WEB_DEV_EXTENSION_PROXY_PREFIXES ?? "";
+
+  return Array.from(
+    new Set(
+      rawPrefixes
+        .split(",")
+        .map((prefix) => prefix.trim())
+        .filter((prefix) => prefix.startsWith("/") && prefix !== "/" && prefix !== "/api"),
+    ),
+  );
+}
+
 function readRequestPathname(requestUrl: string | undefined): string {
   if (!requestUrl) {
     return "/";
@@ -182,6 +196,15 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = createApiProxyTarget(mode);
   const docsRedirectTarget = createDocsRedirectTarget(mode);
   const webDevPort = createWebDevPort(mode);
+  const runtimeExtensionProxyPrefixes = createRuntimeExtensionProxyPrefixes(mode);
+  const apiProxy = {
+    target: proxyTarget,
+    changeOrigin: true,
+    ws: true,
+  };
+  const runtimeExtensionProxy = Object.fromEntries(
+    runtimeExtensionProxyPrefixes.map((prefix) => [prefix, apiProxy]),
+  );
 
   return {
     plugins: [
@@ -197,20 +220,14 @@ export default defineConfig(({ mode }) => {
         ignored: ["**/build/**", "**/.svelte-kit/output/**"],
       },
       proxy: {
-        "/api": {
-          target: proxyTarget,
-          changeOrigin: true,
-          ws: true,
-        },
+        "/api": apiProxy,
+        ...runtimeExtensionProxy,
       },
     },
     preview: {
       proxy: {
-        "/api": {
-          target: proxyTarget,
-          changeOrigin: true,
-          ws: true,
-        },
+        "/api": apiProxy,
+        ...runtimeExtensionProxy,
       },
     },
     test: {

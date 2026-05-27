@@ -7,6 +7,7 @@ import {
   CheckProjectDeleteSafetyQuery,
   type Command,
   type CommandBus,
+  CountProjectsQuery,
   createExecutionContext,
   DeleteProjectCommand,
   type ExecutionContext,
@@ -42,6 +43,32 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
 }
 
 describe("project lifecycle HTTP routes", () => {
+  test("[READ-MODEL-COUNT-003] dispatches CountProjectsQuery through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({ count: 3 } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(new Request("http://localhost/api/projects/count"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ count: 3 });
+    expect(capturedQuery).toBeInstanceOf(CountProjectsQuery);
+  });
+
   test("[PROJ-LIFE-ENTRY-HTTP-001] dispatches ShowProjectQuery through HTTP", async () => {
     let capturedQuery: Query<unknown> | undefined;
     const commandBus = {

@@ -280,6 +280,66 @@ function toDeploymentSummary(
 export class PgDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+      includeArchived?: boolean;
+      status?: Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"];
+      statuses?: readonly Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"][];
+    },
+  ) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("deployment", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "deployment",
+        },
+      },
+      async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = executor
+          .selectFrom("deployments")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")]);
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
+        }
+
+        if (input?.resourceId) {
+          query = query.where("resource_id", "=", input.resourceId);
+        }
+
+        if (!input?.includeArchived) {
+          query = query.where("archived_at", "is", null);
+        }
+
+        if (input?.status) {
+          query = query.where("status", "=", input.status);
+        }
+
+        if (input?.statuses?.length) {
+          query = query.where("status", "in", [...input.statuses]);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(
     context: RepositoryContext,
     input?: {

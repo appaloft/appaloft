@@ -90,6 +90,12 @@ import {
   ConfirmActionPreviewRouteCommandHandler,
   ConfirmActionPreviewRouteUseCase,
   ConfirmDomainBindingOwnershipUseCase,
+  CountDependencyResourcesQueryService,
+  CountDeploymentsQueryService,
+  CountEnvironmentsQueryService,
+  CountProjectsQueryService,
+  CountResourcesQueryService,
+  CountServersQueryService,
   CreateActionSourceLinkDeploymentCommandHandler,
   CreateActionSourceLinkDeploymentUseCase,
   CreateAuditEventArchiveCommandHandler,
@@ -1792,6 +1798,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.rotateDeployTokenUseCase, RotateDeployTokenUseCase);
   container.registerSingleton(tokens.showDeployTokenQueryService, ShowDeployTokenQueryService);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
+  container.registerSingleton(tokens.countProjectsQueryService, CountProjectsQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);
@@ -1903,6 +1910,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.setResourceVariableUseCase, SetResourceVariableUseCase);
   container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
+  container.registerSingleton(tokens.countResourcesQueryService, CountResourcesQueryService);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
   container.registerSingleton(tokens.createScheduledTaskUseCase, CreateScheduledTaskUseCase);
@@ -1963,6 +1971,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.deleteDependencyResourceUseCase,
     DeleteDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.countDependencyResourcesQueryService,
+    CountDependencyResourcesQueryService,
   );
   container.registerSingleton(
     tokens.listDependencyResourcesQueryService,
@@ -2097,6 +2109,7 @@ export function registerApplicationServices(
     ConfigureServerCredentialUseCase,
   );
   container.registerSingleton(tokens.createSshCredentialUseCase, CreateSshCredentialUseCase);
+  container.registerSingleton(tokens.countServersQueryService, CountServersQueryService);
   container.registerSingleton(
     tokens.listSshCredentialsQueryService,
     ListSshCredentialsQueryService,
@@ -2199,6 +2212,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(tokens.countEnvironmentsQueryService, CountEnvironmentsQueryService);
   container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);
   container.registerSingleton(tokens.unlockEnvironmentUseCase, UnlockEnvironmentUseCase);
@@ -2281,6 +2295,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.certificateRetryScheduler, CertificateRetryScheduler);
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.showCertificateQueryService, ShowCertificateQueryService);
+  container.registerSingleton(tokens.countDeploymentsQueryService, CountDeploymentsQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
   container.registerSingleton(tokens.deploymentPlanQueryService, DeploymentPlanQueryService);

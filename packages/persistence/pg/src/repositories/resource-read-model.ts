@@ -229,6 +229,61 @@ function toResourceSummary(
 export class PgResourceReadModel implements ResourceReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      includePreviewResources?: boolean;
+    },
+  ) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("resource", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "resource",
+        },
+      },
+      async () => {
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        let query = executor
+          .selectFrom("resources")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+          .where("lifecycle_status", "!=", "deleted");
+        if (organizationId) {
+          query = query.where(
+            "project_id",
+            "in",
+            executor
+              .selectFrom("projects")
+              .select("id")
+              .where("organization_id", "=", organizationId),
+          );
+        }
+
+        if (!input?.includePreviewResources) {
+          query = query.where(
+            "environment_id",
+            "not in",
+            executor.selectFrom("environments").select("id").where("kind", "=", "preview"),
+          );
+        }
+
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
+        }
+
+        if (input?.environmentId) {
+          query = query.where("environment_id", "=", input.environmentId);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(
     context: RepositoryContext,
     input?: {

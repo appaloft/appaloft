@@ -1,5 +1,7 @@
 export * from "./operations/environments/archive-environment.handler";
 export * from "./operations/environments/clone-environment.handler";
+export * from "./operations/environments/count-environments.handler";
+export * from "./operations/environments/count-environments.query-service";
 export * from "./operations/environments/create-environment.handler";
 export * from "./operations/environments/diff-environments.handler";
 export * from "./operations/environments/environment-effective-precedence.handler";

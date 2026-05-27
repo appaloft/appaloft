@@ -108,6 +108,10 @@ function createDomainBinding(input: Partial<DomainBindingSummary>): DomainBindin
 }
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly resources: ResourceSummary[]) {}
 
   async list(
@@ -143,6 +147,10 @@ class StaticDomainBindingReadModel implements DomainBindingReadModel {
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly deployments: DeploymentSummary[]) {}
 
   async list(

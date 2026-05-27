@@ -7871,6 +7871,14 @@ export interface PreviewPolicyDecisionReadModel {
 }
 
 export interface ProjectReadModel {
+  count(
+    context: RepositoryContext,
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ): Promise<number>;
   list(
     context: RepositoryContext,
     input?: {
@@ -7898,6 +7906,7 @@ export interface ProjectOwnershipReadModel {
 }
 
 export interface ServerReadModel {
+  count(context: RepositoryContext): Promise<number>;
   list(context: RepositoryContext, input?: { limit?: number }): Promise<ServerSummary[]>;
   findOne(context: RepositoryContext, spec: ServerSelectionSpec): Promise<ServerSummary | null>;
 }
@@ -7918,6 +7927,7 @@ export interface SshCredentialUsageReader {
 }
 
 export interface EnvironmentReadModel {
+  count(context: RepositoryContext, input?: { projectId?: string }): Promise<number>;
   list(
     context: RepositoryContext,
     input?: { projectId?: string; limit?: number },
@@ -7929,6 +7939,14 @@ export interface EnvironmentReadModel {
 }
 
 export interface ResourceReadModel {
+  count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      includePreviewResources?: boolean;
+    },
+  ): Promise<number>;
   list(
     context: RepositoryContext,
     input?: {
@@ -7957,6 +7975,14 @@ export interface StorageVolumeReadModel {
 }
 
 export interface DependencyResourceReadModel {
+  count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      kind?: DependencyResourceKind;
+    },
+  ): Promise<number>;
   list(
     context: RepositoryContext,
     input?: {
@@ -8220,6 +8246,16 @@ export interface ManagedDependencySingleServerTarget {
 }
 
 export interface DeploymentReadModel {
+  count(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+      includeArchived?: boolean;
+      status?: DeploymentStatus;
+      statuses?: readonly DeploymentStatus[];
+    },
+  ): Promise<number>;
   list(
     context: RepositoryContext,
     input?: {

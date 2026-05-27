@@ -54,6 +54,10 @@ class FixedExecutionContextFactory implements ExecutionContextFactory {
 }
 
 class CapturingServerReadModel implements Pick<ServerReadModel, "list"> {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   readonly calls: RepositoryContext[] = [];
 
   constructor(private readonly servers: ServerSummary[]) {}
@@ -65,6 +69,10 @@ class CapturingServerReadModel implements Pick<ServerReadModel, "list"> {
 }
 
 class CapturingProjectReadModel implements Pick<ProjectReadModel, "list"> {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   readonly calls: RepositoryContext[] = [];
 
   constructor(private readonly projects: ProjectSummary[] = []) {}
@@ -76,6 +84,10 @@ class CapturingProjectReadModel implements Pick<ProjectReadModel, "list"> {
 }
 
 class CapturingEnvironmentReadModel implements Pick<EnvironmentReadModel, "list"> {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   readonly calls: Array<{ context: RepositoryContext; projectId?: string }> = [];
 
   constructor(private readonly environments: EnvironmentSummary[] = []) {}
@@ -93,6 +105,10 @@ class CapturingEnvironmentReadModel implements Pick<EnvironmentReadModel, "list"
 }
 
 class CapturingResourceReadModel implements Pick<ResourceReadModel, "list"> {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   readonly calls: Array<{
     context: RepositoryContext;
     input?: Parameters<ResourceReadModel["list"]>[1];

@@ -1,5 +1,6 @@
 export * from "./operations/projects/archive-project.command";
 export * from "./operations/projects/check-project-delete-safety.query";
+export * from "./operations/projects/count-projects.query";
 export * from "./operations/projects/create-project.command";
 export * from "./operations/projects/delete-project.command";
 export * from "./operations/projects/list-projects.query";

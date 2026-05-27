@@ -57,6 +57,47 @@ function toProjectSummary(
 export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async count(
+    context: RepositoryContext,
+    input?: {
+      organizationId?: string;
+      organizationIds?: readonly string[];
+      projectIds?: readonly string[];
+    },
+  ) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("project", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "project",
+        },
+      },
+      async () => {
+        const contextOrganizationId = resolveRepositoryContextOrganizationId(context);
+        let query = executor
+          .selectFrom("projects")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+          .where("lifecycle_status", "!=", "deleted");
+        if (contextOrganizationId) {
+          query = query.where("organization_id", "=", contextOrganizationId);
+        }
+        if (input?.organizationId) {
+          query = query.where("organization_id", "=", input.organizationId);
+        }
+        if (input?.organizationIds?.length) {
+          query = query.where("organization_id", "in", [...input.organizationIds]);
+        }
+        if (input?.projectIds?.length) {
+          query = query.where("id", "in", [...input.projectIds]);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(
     context: RepositoryContext,
     input?: {

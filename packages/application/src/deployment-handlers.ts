@@ -3,6 +3,8 @@ export * from "./operations/deployments/archive-deployment.handler";
 export * from "./operations/deployments/cancel-deployment.handler";
 export * from "./operations/deployments/cleanup-preview.handler";
 export * from "./operations/deployments/confirm-action-preview-route.handler";
+export * from "./operations/deployments/count-deployments.handler";
+export * from "./operations/deployments/count-deployments.query-service";
 export * from "./operations/deployments/create-deployment.handler";
 export * from "./operations/deployments/deployment-logs.handler";
 export * from "./operations/deployments/deployment-plan.handler";
