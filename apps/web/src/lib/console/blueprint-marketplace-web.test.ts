@@ -70,6 +70,7 @@ describe("Blueprint marketplace console surface", () => {
       selectorSource,
       sharedPackageSource,
       quickDeploySource,
+      viteConfigSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
@@ -85,6 +86,7 @@ describe("Blueprint marketplace console surface", () => {
         "utf8",
       ),
       readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../../vite.config.ts", import.meta.url), "utf8"),
     ]);
 
     expect(listPageSource).toContain("ConsoleShell");
@@ -137,5 +139,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("siClickhouse");
     expect(quickDeploySource).toContain("siMinio");
     expect(quickDeploySource).toContain("siOpensearch");
+    expect(viteConfigSource).toContain("APPALOFT_WEB_DEV_EXTENSION_PROXY_PREFIXES");
+    expect(viteConfigSource).toContain("createRuntimeExtensionProxyPrefixes");
   });
 });

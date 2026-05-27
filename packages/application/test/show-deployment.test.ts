@@ -38,6 +38,10 @@ class FixedClock {
 }
 
 class StaticProjectReadModel implements ProjectReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   public listCalls = 0;
   public findOneCalls = 0;
 
@@ -61,6 +65,10 @@ class StaticProjectReadModel implements ProjectReadModel {
 }
 
 class StaticEnvironmentReadModel implements EnvironmentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   public listCalls = 0;
   public findOneCalls = 0;
 
@@ -89,6 +97,10 @@ class StaticEnvironmentReadModel implements EnvironmentReadModel {
 }
 
 class StaticResourceReadModel implements ResourceReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   public listCalls = 0;
   public findOneCalls = 0;
 
@@ -122,6 +134,10 @@ class StaticResourceReadModel implements ResourceReadModel {
 }
 
 class StaticServerReadModel implements ServerReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   public listCalls = 0;
   public findOneCalls = 0;
 
@@ -145,6 +161,10 @@ class StaticServerReadModel implements ServerReadModel {
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   public listCalls = 0;
   public findOneCalls = 0;
   public findLogsCalls = 0;

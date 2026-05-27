@@ -47,6 +47,10 @@ import {
 } from "../src";
 
 class EmptyDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   async list(): Promise<DeploymentSummary[]> {
     return [];
   }

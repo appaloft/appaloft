@@ -439,6 +439,10 @@ class CapturingDeleteScheduledTaskUseCase {
 }
 
 class MemoryDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
   constructor(private readonly items: Awaited<ReturnType<DeploymentReadModel["list"]>> = []) {}
 
   async list(): Promise<Awaited<ReturnType<DeploymentReadModel["list"]>>> {

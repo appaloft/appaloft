@@ -4,6 +4,8 @@ export * from "./operations/servers/check-server-delete-safety.handler";
 export * from "./operations/servers/configure-scheduled-runtime-prune-policy.handler";
 export * from "./operations/servers/configure-server-credential.handler";
 export * from "./operations/servers/configure-server-edge-proxy.handler";
+export * from "./operations/servers/count-servers.handler";
+export * from "./operations/servers/count-servers.query-service";
 export * from "./operations/servers/create-ssh-credential.handler";
 export * from "./operations/servers/deactivate-server.handler";
 export * from "./operations/servers/delete-server.handler";

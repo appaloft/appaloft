@@ -973,90 +973,6 @@
         return ".";
     }
   });
-  const deploymentCommandPreview = $derived.by(() => {
-    const segments = [`appaloft deploy ${sourceLocator || "."}`];
-
-    if (projectMode === "existing" && selectedProjectId) {
-      segments.push(`--project ${selectedProjectId}`);
-    } else if (projectMode === "new" && projectName.trim()) {
-      segments.push(`--project-name ${projectName.trim()}`);
-    }
-
-    if (selectedServerId) {
-      segments.push(`--server ${selectedServerId}`);
-    }
-
-    if (environmentContextEnabled && selectedEnvironmentId) {
-      segments.push(`--environment ${selectedEnvironmentId}`);
-    }
-
-    if (resourceContextEnabled && resourceMode === "existing" && selectedResourceId) {
-      segments.push(`--resource ${selectedResourceId}`);
-    }
-
-    const healthCheckPath = resourceHealthCheckPath.trim();
-    const createsResource = !resourceContextEnabled || resourceMode === "new";
-
-    if (sourceBaseDirectory.trim()) {
-      segments.push(`--source-base-directory ${sourceBaseDirectory.trim()}`);
-    }
-
-    if (createsStaticSiteResource) {
-      if ((staticPublishDirectory.trim() || "/dist") === ".") {
-        segments.push("--as static-site");
-      } else {
-        segments.push("--method static");
-        segments.push(`--publish-dir ${staticPublishDirectory.trim() || "/dist"}`);
-      }
-      if (staticInstallCommand.trim()) {
-        segments.push(`--install ${staticInstallCommand.trim()}`);
-      }
-      if (staticBuildCommand.trim()) {
-        segments.push(`--build ${staticBuildCommand.trim()}`);
-      }
-    }
-    if (!createsStaticSiteResource) {
-      if (resourceInstallCommand.trim()) {
-        segments.push(`--install ${resourceInstallCommand.trim()}`);
-      }
-      if (resourceBuildCommand.trim()) {
-        segments.push(`--build ${resourceBuildCommand.trim()}`);
-      }
-      if (resourceStartCommand.trim()) {
-        segments.push(`--start ${resourceStartCommand.trim()}`);
-      }
-    }
-    if (resourceDockerfilePath.trim()) {
-      segments.push(`--dockerfile-path ${resourceDockerfilePath.trim()}`);
-    }
-    if (resourceDockerComposeFilePath.trim()) {
-      segments.push(`--docker-compose-file-path ${resourceDockerComposeFilePath.trim()}`);
-    }
-    if (resourceBuildTarget.trim()) {
-      segments.push(`--build-target ${resourceBuildTarget.trim()}`);
-    }
-
-    if (!resourceContextEnabled) {
-      segments.push(`--resource-name ${inferredResourceInput.name}`);
-      segments.push(`--port ${effectiveResourceInternalPortText()}`);
-    } else if (resourceMode === "new") {
-      segments.push(`--resource-name ${editedResourceInput.name}`);
-      if (editedResourceInput.kind) {
-        segments.push(`--resource-kind ${editedResourceInput.kind}`);
-      }
-      segments.push(`--port ${effectiveResourceInternalPortText()}`);
-    }
-
-    if (createsResource && resourceRuntimeName.trim()) {
-      segments.push(`--runtime-name ${resourceRuntimeName.trim()}`);
-    }
-
-    if (createsResource && resourceHealthCheckEnabled && healthCheckPath) {
-      segments.push(`--health-path ${healthCheckPath}`);
-    }
-
-    return segments.join(" ");
-  });
   const currentStepIndex = $derived(
     Math.max(
       deploymentSteps.findIndex((step) => step.key === activeStep),
@@ -1405,15 +1321,33 @@
       : $t(i18nKeys.common.status.notConfigured);
   });
   const variableSummary = $derived.by(() => {
-    if (!variableContextEnabled) {
-      return "跳过";
+    const configuredVariables = [
+      ...(sourceKind === "blueprint"
+        ? selectedBlueprintVariables.map((variable) => ({
+            key: variable.key,
+            kind: "plain-config",
+          }))
+        : []),
+      ...(variableContextEnabled && variableKey.trim()
+        ? [
+            {
+              key: variableKey.trim(),
+              kind: variableIsSecret ? "secret" : "plain-config",
+            },
+          ]
+        : []),
+    ];
+
+    if (configuredVariables.length === 0) {
+      return "未配置变量";
     }
 
-    if (!variableKey.trim()) {
-      return "不创建变量";
+    if (configuredVariables.length === 1) {
+      const [variable] = configuredVariables;
+      return `已配置 1 项 · ${variable.key} · ${variable.kind}`;
     }
 
-    return `${variableKey.trim()} · ${variableIsSecret ? "secret" : "plain-config"}`;
+    return `已配置 ${configuredVariables.length} 项`;
   });
   const domainBindingSummary = $derived(
     selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
@@ -3375,7 +3309,7 @@
 
 </script>
 
-<div class="grid min-w-0 gap-5 pb-24 md:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+<div class="grid min-w-0 gap-5 pb-6 md:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
   <div class="min-w-0 space-y-5">
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
@@ -4202,629 +4136,51 @@
           </div>
           </details>
 
-          <div class="space-y-4">
+          <details
+            class="group rounded-md border bg-card px-3 py-3"
+            data-quick-deploy-variables-section
+            open={variableContextEnabled}
+            ontoggle={(event) => {
+              variableContextEnabled = event.currentTarget.open;
+            }}
+          >
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</span>
+                <span class="mt-1 block break-words text-xs text-muted-foreground">{variableSummary}</span>
+              </span>
+              <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
+            </summary>
+            <div class="mt-3 space-y-3">
               <Separator />
-              <div class="space-y-2">
-                <div class="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck class="size-4 text-muted-foreground" />
-                  <span>部署配置</span>
-                </div>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  项目、环境、资源和变量默认使用当前检测结果；需要覆盖时打开对应编辑。
-                </p>
+              <div class="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck class="size-4 text-muted-foreground" />
+                <span>{$t(i18nKeys.common.domain.variables)}</span>
+                <DocsHelpLink
+                  href={webDocsHrefs.environmentVariablePrecedence}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
               </div>
-
               <div class="space-y-3">
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
-                      <p class="break-words text-xs text-muted-foreground">{projectSummary}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="shrink-0"
-                      variant={projectContextEnabled ? "selected" : "outline"}
-                      onclick={() => {
-                        projectContextEnabled = !projectContextEnabled;
-                      }}
-                    >
-                      {projectContextEnabled ? "使用默认值" : "编辑"}
-                    </Button>
-                  </div>
-                  {#if projectContextEnabled}
-                    <div class="mt-3 space-y-3">
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <Button
-                          variant={projectMode === "existing" ? "selected" : "outline"}
-                          onclick={() => {
-                            projectMode = "existing";
-                          }}
-                        >
-                          {$t(i18nKeys.common.modes.useExisting)}
-                        </Button>
-                        <Button
-                          variant={projectMode === "new" ? "selected" : "outline"}
-                          onclick={() => {
-                            projectMode = "new";
-                          }}
-                        >
-                          {$t(i18nKeys.common.modes.newProject)}
-                        </Button>
-                      </div>
-                      {#if projectMode === "existing"}
-                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
-                          {#if projects.length > 0}
-                            {#each projects as project (project.id)}
-                              <Button
-                                class="w-full justify-start"
-                                size="sm"
-                                variant={selectedProjectId === project.id ? "selected" : "ghost"}
-                                onclick={() => {
-                                  selectedProjectId = project.id;
-                                }}
-                              >
-                                {project.name}
-                              </Button>
-                            {/each}
-                          {:else}
-                            <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noProjectOptions)}</p>
-                          {/if}
-                        </div>
-                      {:else}
-                        <div class="grid gap-3 sm:grid-cols-2">
-                          <Input bind:value={projectName} placeholder="platform-control-plane" />
-                          <Input bind:value={projectDescription} placeholder={$t(i18nKeys.common.domain.description)} />
-                        </div>
-                      {/if}
-                    </div>
-                  {/if}
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <Input bind:value={variableKey} placeholder="DATABASE_URL" />
+                  <Input bind:value={variableValue} placeholder="postgres://..." />
                 </div>
-
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
-                        <DocsHelpLink
-                          href={webDocsHrefs.environmentConcept}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                      </div>
-                      <p class="break-words text-xs text-muted-foreground">{environmentSummary}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="shrink-0"
-                      variant={environmentContextEnabled ? "selected" : "outline"}
-                      onclick={() => {
-                        environmentContextEnabled = !environmentContextEnabled;
-                      }}
-                    >
-                      {environmentContextEnabled ? "使用默认值" : "编辑"}
-                    </Button>
-                  </div>
-                  {#if environmentContextEnabled}
-                    <div class="mt-3 space-y-3">
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <Button
-                          variant={environmentMode === "existing" ? "selected" : "outline"}
-                          onclick={() => {
-                            environmentMode = "existing";
-                          }}
-                        >
-                          {$t(i18nKeys.common.modes.useExisting)}
-                        </Button>
-                        <Button
-                          variant={environmentMode === "new" ? "selected" : "outline"}
-                          onclick={() => {
-                            environmentMode = "new";
-                          }}
-                        >
-                          {$t(i18nKeys.common.modes.newEnvironment)}
-                        </Button>
-                      </div>
-                      {#if environmentMode === "existing"}
-                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
-                          {#if filteredEnvironments.length > 0}
-                            {#each filteredEnvironments as environment (environment.id)}
-                              <Button
-                                class="w-full justify-start"
-                                size="sm"
-                                variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}
-                                onclick={() => {
-                                  selectedEnvironmentId = environment.id;
-                                }}
-                              >
-                                {environment.name} · {environment.kind}
-                              </Button>
-                            {/each}
-                          {:else}
-                            <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noEnvironmentOptions)}</p>
-                          {/if}
-                        </div>
-                      {:else}
-                        <div class="space-y-3">
-                          <Input bind:value={environmentName} placeholder="production" />
-                          <div class="grid gap-2 sm:grid-cols-2">
-                            {#each environmentKinds as kind (kind)}
-                              <Button
-                                size="sm"
-                                variant={environmentKind === kind ? "selected" : "outline"}
-                                onclick={() => {
-                                  environmentKind = kind;
-                                }}
-                              >
-                                {kind}
-                              </Button>
-                            {/each}
-                          </div>
-                        </div>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceConcept}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                      </div>
-                      <p class="break-words text-xs text-muted-foreground">{resourceSummary}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="shrink-0"
-                      variant={resourceContextEnabled ? "selected" : "outline"}
-                      onclick={() => {
-                        resourceContextEnabled = !resourceContextEnabled;
-                      }}
-                    >
-                      {resourceContextEnabled ? "使用默认值" : "编辑"}
-                    </Button>
-                  </div>
-                  {#if resourceContextEnabled}
-                    <div class="mt-3 space-y-3">
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <Button
-                          variant={resourceMode === "existing" ? "selected" : "outline"}
-                          onclick={() => {
-                            resourceMode = "existing";
-                          }}
-                        >
-                          {$t(i18nKeys.common.modes.useExisting)}
-                        </Button>
-                        <Button
-                          variant={resourceMode === "new" ? "selected" : "outline"}
-                          onclick={() => {
-                            resourceMode = "new";
-                          }}
-                        >
-                          新建资源
-                        </Button>
-                      </div>
-                      {#if resourceMode === "existing"}
-                        <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
-                          {#if resourcesQuery.isPending}
-                            {#each Array.from({ length: 3 }) as _, index (index)}
-                              <Skeleton class="h-10 w-full" />
-                            {/each}
-                          {:else if resources.length > 0}
-                            {#each resources as resource (resource.id)}
-                              <Button
-                                class="w-full justify-start"
-                                size="sm"
-                                variant={selectedResourceId === resource.id ? "selected" : "ghost"}
-                                onclick={() => {
-                                  selectedResourceId = resource.id;
-                                }}
-                              >
-                                {resource.name} · {resource.kind}
-                                {#if resource.networkProfile?.internalPort}
-                                  · :{resource.networkProfile.internalPort}
-                                {/if}
-                              </Button>
-                            {/each}
-                          {:else}
-                            <p class="px-2 py-2 text-sm text-muted-foreground">暂无资源可选；可以切换为新建资源。</p>
-                          {/if}
-                        </div>
-                      {:else}
-                        <div class="space-y-3">
-                          <div class="grid gap-3 sm:grid-cols-2">
-                            <Input bind:value={resourceName} placeholder={generatedResourceName || inferredSourceName} />
-                            <Input
-                              bind:value={resourceRuntimeName}
-                              placeholder={$t(i18nKeys.console.resources.runtimeNamePlaceholder)}
-                            />
-                          </div>
-                          <div class="grid gap-3 sm:grid-cols-2">
-                            <Input bind:value={resourceDescription} placeholder={$t(i18nKeys.common.domain.description)} />
-                          </div>
-                          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                            {#each resourceKinds as kind (kind)}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={resourceKind === kind ? "selected" : "outline"}
-                                onclick={() => {
-                                  resourceKind = kind;
-                                  if (kind === "static-site" && (!resourceInternalPort.trim() || resourceInternalPort === "3000")) {
-                                    resourceInternalPort = "80";
-                                  }
-                                }}
-                              >
-                                {kind}
-                              </Button>
-                            {/each}
-                          </div>
-                          <p class="text-xs leading-5 text-muted-foreground">
-                            GitHub 仓库默认作为一个 resource；部署时会按项目和环境复用同名资源，找不到则创建。
-                          </p>
-                        </div>
-                      {/if}
-                      {#if resourceMode === "new"}
-                        {#if createsStaticSiteResource}
-                          <div class="grid gap-3 sm:grid-cols-3">
-                            <div class="space-y-2">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-publish-directory">
-                                {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
-                              </label>
-                              <Input
-                                id="resource-static-publish-directory"
-                                class="font-mono text-xs"
-                                bind:value={staticPublishDirectory}
-                                placeholder="/dist"
-                              />
-                            </div>
-                            <div class="space-y-2">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-install-command">
-                                {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
-                              </label>
-                              <Input
-                                id="resource-static-install-command"
-                                class="font-mono text-xs"
-                                bind:value={staticInstallCommand}
-                                placeholder="pnpm install"
-                              />
-                            </div>
-                            <div class="space-y-2">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-build-command">
-                                {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
-                              </label>
-                              <Input
-                                id="resource-static-build-command"
-                                class="font-mono text-xs"
-                                bind:value={staticBuildCommand}
-                                placeholder="pnpm build"
-                              />
-                            </div>
-                            <p class="text-xs text-muted-foreground sm:col-span-3">
-                              {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
-                            </p>
-                          </div>
-                        {/if}
-                        <div class="grid gap-3 sm:grid-cols-2">
-                          <div class="space-y-2">
-                            <div class="flex items-center gap-1.5">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
-                                {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                              </label>
-                              <DocsHelpLink
-                                href={webDocsHrefs.resourceNetworkProfile}
-                                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                                className="size-5"
-                              />
-                            </div>
-                            <Input
-                              id="resource-internal-port"
-                              bind:value={resourceInternalPort}
-                              placeholder={resourceInternalPortDefault}
-                            />
-                            <p class="text-xs text-muted-foreground">
-                              {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
-                            </p>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              class="flex-1"
-                              variant={resourceHealthCheckEnabled ? "selected" : "outline"}
-                              onclick={() => {
-                                resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
-                              }}
-                            >
-                              {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                            </Button>
-                            <DocsHelpLink
-                              href={webDocsHrefs.resourceHealthProfile}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            />
-                          </div>
-                        </div>
-                        {#if resourceHealthCheckEnabled}
-                          <div class="console-subtle-panel grid gap-3 p-3 sm:grid-cols-3">
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-path">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
-                              </label>
-                              <Input id="resource-health-path" bind:value={resourceHealthCheckPath} placeholder="/health" />
-                            </div>
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-status">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
-                              </label>
-                              <Input
-                                id="resource-health-status"
-                                bind:value={resourceHealthCheckExpectedStatusCode}
-                                inputmode="numeric"
-                                placeholder="200"
-                              />
-                            </div>
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-interval">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
-                              </label>
-                              <Input
-                                id="resource-health-interval"
-                                bind:value={resourceHealthCheckIntervalSeconds}
-                                inputmode="numeric"
-                                placeholder="5"
-                              />
-                            </div>
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-timeout">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}
-                              </label>
-                              <Input
-                                id="resource-health-timeout"
-                                bind:value={resourceHealthCheckTimeoutSeconds}
-                                inputmode="numeric"
-                                placeholder="5"
-                              />
-                            </div>
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-retries">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
-                              </label>
-                              <Input
-                                id="resource-health-retries"
-                                bind:value={resourceHealthCheckRetries}
-                                inputmode="numeric"
-                                placeholder="10"
-                              />
-                            </div>
-                            <div class="space-y-1">
-                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-start-period">
-                                {$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}
-                              </label>
-                              <Input
-                                id="resource-health-start-period"
-                                bind:value={resourceHealthCheckStartPeriodSeconds}
-                                inputmode="numeric"
-                                placeholder="5"
-                              />
-                            </div>
-                          </div>
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
-                          </p>
-                        {/if}
-                      {/if}
-                    </div>
-                  {/if}
-                  {#if !resourceContextEnabled}
-                    {#if createsStaticSiteResource}
-                      <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-publish-directory">
-                            {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
-                          </label>
-                          <Input
-                            id="resource-default-static-publish-directory"
-                            class="font-mono text-xs"
-                            bind:value={staticPublishDirectory}
-                            placeholder="/dist"
-                          />
-                        </div>
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-install-command">
-                            {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
-                          </label>
-                          <Input
-                            id="resource-default-static-install-command"
-                            class="font-mono text-xs"
-                            bind:value={staticInstallCommand}
-                            placeholder="pnpm install"
-                          />
-                        </div>
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-build-command">
-                            {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
-                          </label>
-                          <Input
-                            id="resource-default-static-build-command"
-                            class="font-mono text-xs"
-                            bind:value={staticBuildCommand}
-                            placeholder="pnpm build"
-                          />
-                        </div>
-                        <p class="text-xs text-muted-foreground sm:col-span-3">
-                          {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
-                        </p>
-                      </div>
-                    {/if}
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div class="space-y-2">
-                        <div class="flex items-center gap-1.5">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
-                            {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                          </label>
-                          <DocsHelpLink
-                            href={webDocsHrefs.resourceNetworkProfile}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            className="size-5"
-                          />
-                        </div>
-                        <Input
-                          id="resource-default-internal-port"
-                          bind:value={resourceInternalPort}
-                          placeholder={resourceInternalPortDefault}
-                        />
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
-                        </p>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          class="flex-1"
-                          variant={resourceHealthCheckEnabled ? "selected" : "outline"}
-                          onclick={() => {
-                            resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
-                          }}
-                        >
-                          {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                        </Button>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceHealthProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                      </div>
-                    </div>
-                    {#if resourceHealthCheckEnabled}
-                      <div class="console-subtle-panel mt-3 grid gap-3 p-3 sm:grid-cols-3">
-                        <div class="space-y-1">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-path">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
-                          </label>
-                          <Input
-                            id="resource-default-health-path"
-                            bind:value={resourceHealthCheckPath}
-                            placeholder="/health"
-                          />
-                        </div>
-                        <div class="space-y-1">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-status">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
-                          </label>
-                          <Input
-                            id="resource-default-health-status"
-                            bind:value={resourceHealthCheckExpectedStatusCode}
-                            inputmode="numeric"
-                            placeholder="200"
-                          />
-                        </div>
-                        <div class="space-y-1">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-interval">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
-                          </label>
-                          <Input
-                            id="resource-default-health-interval"
-                            bind:value={resourceHealthCheckIntervalSeconds}
-                            inputmode="numeric"
-                            placeholder="5"
-                          />
-                        </div>
-                        <div class="space-y-1">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-timeout">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}
-                          </label>
-                          <Input
-                            id="resource-default-health-timeout"
-                            bind:value={resourceHealthCheckTimeoutSeconds}
-                            inputmode="numeric"
-                            placeholder="5"
-                          />
-                        </div>
-                        <div class="space-y-1">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-retries">
-                            {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
-                          </label>
-                          <Input
-                            id="resource-default-health-retries"
-                            bind:value={resourceHealthCheckRetries}
-                            inputmode="numeric"
-                            placeholder="10"
-                          />
-                        </div>
-                        <div class="space-y-1">
-                          <label
-                            class="text-xs font-medium text-muted-foreground"
-                            for="resource-default-health-start-period"
-                          >
-                            {$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}
-                          </label>
-                          <Input
-                            id="resource-default-health-start-period"
-                            bind:value={resourceHealthCheckStartPeriodSeconds}
-                            inputmode="numeric"
-                            placeholder="5"
-                          />
-                        </div>
-                      </div>
-                      <p class="mt-2 text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
-                      </p>
-                    {/if}
-                  {/if}
-                </div>
-
-                <div class="min-w-0 rounded-md border bg-card px-3 py-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
-                        <DocsHelpLink
-                          href={webDocsHrefs.environmentVariablePrecedence}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                      </div>
-                      <p class="break-words text-xs text-muted-foreground">{variableSummary}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="shrink-0"
-                      variant={variableContextEnabled ? "selected" : "outline"}
-                      onclick={() => {
-                        variableContextEnabled = !variableContextEnabled;
-                      }}
-                    >
-                      {variableContextEnabled ? "跳过" : "编辑"}
-                    </Button>
-                  </div>
-                  {#if variableContextEnabled}
-                    <div class="mt-3 space-y-3">
-                      <div class="grid gap-3 sm:grid-cols-2">
-                        <Input bind:value={variableKey} placeholder="DATABASE_URL" />
-                        <Input bind:value={variableValue} placeholder="postgres://..." />
-                      </div>
-                      <Button
-                        variant={variableIsSecret ? "selected" : "outline"}
-                        size="sm"
-                        onclick={() => {
-                          variableIsSecret = !variableIsSecret;
-                        }}
-                      >
-                        {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
-                      </Button>
-                    </div>
-                  {/if}
-                </div>
+                <Button
+                  variant={variableIsSecret ? "selected" : "outline"}
+                  size="sm"
+                  onclick={() => {
+                    variableIsSecret = !variableIsSecret;
+                  }}
+                >
+                  {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
+                </Button>
               </div>
             </div>
-          </div>
+          </details>
         </div>
       </div>
+    </div>
 
   <aside class="min-w-0 space-y-5 md:sticky md:top-20 md:max-h-[calc(100svh-10rem)] md:self-start md:overflow-y-auto md:pb-3">
       <section class="console-side-panel min-w-0 space-y-4">
@@ -4931,8 +4287,36 @@
               {$t(i18nKeys.common.actions.viewProgress)}
             </Button>
           {/if}
-          <pre class="max-w-full overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
         </div>
+      </section>
+
+      <section
+        class="console-side-panel sticky bottom-3 z-20 space-y-3 bg-background/95 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
+        data-quick-deploy-action-panel
+      >
+        <p class="min-w-0 text-xs text-muted-foreground">
+          {#if quickDeployReady}
+            来源、项目和服务器已就绪。
+          {:else}
+            请先完善来源、项目和服务器。
+          {/if}
+        </p>
+        <Button
+          class="w-full"
+          disabled={deployPending || !quickDeployReady}
+          onclick={handleQuickDeploy}
+        >
+          {#if deployPending}
+            <LoaderCircle class="size-4 animate-spin" />
+            {$t(i18nKeys.console.quickDeploy.submitPending)}
+          {:else if sourceKind === "blueprint"}
+            <Play class="size-4" />
+            查看安装计划
+          {:else}
+            <Play class="size-4" />
+            {$t(i18nKeys.common.actions.createAndDeploy)}
+          {/if}
+        </Button>
       </section>
 
       {#if deployFeedback}
@@ -5012,34 +4396,6 @@
         </section>
       {/if}
   </aside>
-</div>
-
-<div class="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur">
-  <div class="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 md:px-6">
-    <p class="min-w-0 text-xs text-muted-foreground">
-      {#if quickDeployReady}
-        来源、项目和服务器已就绪。
-      {:else}
-        请先完善来源、项目和服务器。
-      {/if}
-    </p>
-    <Button
-      class="min-w-36 shrink-0"
-      disabled={deployPending || !quickDeployReady}
-      onclick={handleQuickDeploy}
-    >
-      {#if deployPending}
-        <LoaderCircle class="size-4 animate-spin" />
-        {$t(i18nKeys.console.quickDeploy.submitPending)}
-      {:else if sourceKind === "blueprint"}
-        <Play class="size-4" />
-        查看安装计划
-      {:else}
-        <Play class="size-4" />
-        {$t(i18nKeys.common.actions.createAndDeploy)}
-      {/if}
-    </Button>
-  </div>
 </div>
 
 <QuickDeployProgressDialog

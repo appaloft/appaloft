@@ -57,6 +57,12 @@ import {
   ConfigureServerEdgeProxyCommand,
   ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
+  CountDependencyResourcesQuery,
+  CountDeploymentsQuery,
+  CountEnvironmentsQuery,
+  CountProjectsQuery,
+  CountResourcesQuery,
+  CountServersQuery,
   CreateActionSourceLinkDeploymentCommand,
   CreateAuditEventArchiveCommand,
   CreateDependencyResourceBackupCommand,
@@ -100,6 +106,12 @@ import {
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  countDependencyResourcesQueryInputSchema,
+  countDeploymentsQueryInputSchema,
+  countEnvironmentsQueryInputSchema,
+  countProjectsQueryInputSchema,
+  countResourcesQueryInputSchema,
+  countServersQueryInputSchema,
   createAuditEventArchiveCommandInputSchema,
   createDependencyResourceBackupCommandInputSchema,
   createDependencyResourceProvisioningPlanInputSchema,
@@ -539,6 +551,7 @@ import {
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
+  countResponseSchema,
   createDeploymentResponseSchema,
   createDeployTokenResponseSchema,
   createDomainBindingResponseSchema,
@@ -2465,6 +2478,16 @@ export const listProjectsProcedure = base
   .output(listProjectsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListProjectsQuery.create(input)));
 
+export const countProjectsProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/count",
+    successStatus: 200,
+  })
+  .input(countProjectsQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, CountProjectsQuery.create(input)));
+
 export const authBootstrapStatusProcedure = base
   .route({
     method: "GET",
@@ -2839,6 +2862,16 @@ export const listServersProcedure = base
   .input(listServersQueryInputSchema)
   .output(listServersResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListServersQuery.create(input)));
+
+export const countServersProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/count",
+    successStatus: 200,
+  })
+  .input(countServersQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, CountServersQuery.create(input)));
 
 export const showServerProcedure = base
   .route({
@@ -3224,6 +3257,18 @@ export const listEnvironmentsProcedure = base
     executeQuery(context, ListEnvironmentsQuery.create(input)),
   );
 
+export const countEnvironmentsProcedure = base
+  .route({
+    method: "GET",
+    path: "/environments/count",
+    successStatus: 200,
+  })
+  .input(countEnvironmentsQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CountEnvironmentsQuery.create(input)),
+  );
+
 export const createEnvironmentProcedure = base
   .route({
     method: "POST",
@@ -3284,6 +3329,16 @@ export const listResourcesProcedure = base
   .input(listResourcesQueryInputSchema)
   .output(listResourcesResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListResourcesQuery.create(input)));
+
+export const countResourcesProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/count",
+    successStatus: 200,
+  })
+  .input(countResourcesQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, CountResourcesQuery.create(input)));
 
 export const showResourceProcedure = base
   .route({
@@ -4015,6 +4070,18 @@ export const listDeploymentsProcedure = base
   .input(listDeploymentsQueryInputSchema)
   .output(listDeploymentsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListDeploymentsQuery.create(input)));
+
+export const countDeploymentsProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployments/count",
+    successStatus: 200,
+  })
+  .input(countDeploymentsQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CountDeploymentsQuery.create(input)),
+  );
 
 export const listOperatorWorkProcedure = base
   .route({
@@ -5133,6 +5200,19 @@ export const listDependencyResourcesProcedure = base
     executeQuery(context, ListDependencyResourcesQuery.create(input)),
   );
 
+export const countDependencyResourcesProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/count",
+    description: apiRouteDescriptions.listDependencyResources,
+    successStatus: 200,
+  })
+  .input(countDependencyResourcesQueryInputSchema)
+  .output(countResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CountDependencyResourcesQuery.create(input)),
+  );
+
 export const showDependencyResourceProcedure = base
   .route({
     method: "GET",
@@ -5495,6 +5575,7 @@ export const appaloftOrpcRouter = {
     removeMember: removeOrganizationMemberProcedure,
   },
   projects: {
+    count: countProjectsProcedure,
     list: listProjectsProcedure,
     create: createProjectProcedure,
     show: showProjectProcedure,
@@ -5506,6 +5587,7 @@ export const appaloftOrpcRouter = {
     delete: deleteProjectProcedure,
   },
   servers: {
+    count: countServersProcedure,
     list: listServersProcedure,
     show: showServerProcedure,
     capacity: {
@@ -5552,6 +5634,7 @@ export const appaloftOrpcRouter = {
     },
   },
   environments: {
+    count: countEnvironmentsProcedure,
     list: listEnvironmentsProcedure,
     create: createEnvironmentProcedure,
     show: showEnvironmentProcedure,
@@ -5572,6 +5655,7 @@ export const appaloftOrpcRouter = {
     show: showDefaultAccessDomainPolicyProcedure,
   },
   resources: {
+    count: countResourcesProcedure,
     list: listResourcesProcedure,
     show: showResourceProcedure,
     create: createResourceProcedure,
@@ -5656,6 +5740,7 @@ export const appaloftOrpcRouter = {
       accept: acceptDependencyResourceProvisioningPlanProcedure,
       status: showDependencyResourceProvisioningPlanProcedure,
     },
+    count: countDependencyResourcesProcedure,
     provision: provisionDependencyResourceProcedure,
     import: importDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
@@ -5697,6 +5782,7 @@ export const appaloftOrpcRouter = {
     delete: deleteCertificateProcedure,
   },
   deployments: {
+    count: countDeploymentsProcedure,
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
     cleanupPreview: cleanupPreviewProcedure,

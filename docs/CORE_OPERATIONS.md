@@ -89,6 +89,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
 | List projects | Product-session member query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
+| Count projects | Product-session member query | `projects.count` | `CountProjectsQuery` | `CountProjectsQueryInput` | `appaloft project count` | `GET /api/projects/count` |
 | Show project | Product-session member query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
 | Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
 | Set project description | Command | `projects.set-description` | `SetProjectDescriptionCommand` | `SetProjectDescriptionCommandInput` | `appaloft project set-description <projectId>` | `POST /api/projects/{projectId}/description` |
@@ -141,6 +142,7 @@ Implemented operations:
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `appaloft server register` | `POST /api/servers` |
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Product-session member query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
+| Count deployment targets | Product-session member query | `servers.count` | `CountServersQuery` | `CountServersQueryInput` | `appaloft server count` | `GET /api/servers/count` |
 | Show deployment target | Product-session member query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Inspect deployment target capacity | Query | `servers.capacity.inspect` | `InspectServerCapacityQuery` | `InspectServerCapacityQueryInput` | `appaloft server capacity inspect <serverId>` | `GET /api/servers/{serverId}/capacity` |
 | Inspect runtime usage attribution | Query | `runtime-usage.inspect` | `InspectRuntimeUsageQuery` | `InspectRuntimeUsageQueryInput` | `appaloft runtime-usage inspect <scope>` | `GET /api/runtime-usage/inspect` |
@@ -296,6 +298,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create environment | Command | `environments.create` | `CreateEnvironmentCommand` | `CreateEnvironmentCommandInput` | `appaloft env create` | `POST /api/environments` |
 | List environments | Product-session member query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `appaloft env list` | `GET /api/environments` |
+| Count environments | Product-session member query | `environments.count` | `CountEnvironmentsQuery` | `CountEnvironmentsQueryInput` | `appaloft env count` | `GET /api/environments/count` |
 | Show environment | Product-session member query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `appaloft env show <environmentId>` | `GET /api/environments/{environmentId}` |
 | Rename environment | Command | `environments.rename` | `RenameEnvironmentCommand` | `RenameEnvironmentCommandInput` | `appaloft env rename <environmentId> --name <name>` | `POST /api/environments/{environmentId}/rename` |
 | Set environment variable | Command | `environments.set-variable` | `SetEnvironmentVariableCommand` | `SetEnvironmentVariableCommandInput` | `appaloft env set <environmentId> <key> <value>` | `POST /api/environments/{environmentId}/variables` |
@@ -357,6 +360,7 @@ Implemented operations:
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Product-session member query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
+| Count resources | Product-session member query | `resources.count` | `CountResourcesQuery` | `CountResourcesQueryInput` | `appaloft resource count` | `GET /api/resources/count` |
 | Show resource profile | Product-session member query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | List resource secret references | Query | `resources.secrets.list` | `ListResourceSecretReferencesQuery` | `ListResourceSecretReferencesQueryInput` | `appaloft resource secrets list <resourceId>` | `GET /api/resources/{resourceId}/secrets` |
@@ -441,6 +445,7 @@ Phase 7 dependency resource operations:
 | Accept dependency resource provisioning plan | Command | `dependency-resources.provisioning.accept` | `AcceptDependencyResourceProvisioningPlanCommand` | `AcceptDependencyResourceProvisioningPlanInput` | `appaloft dependency accept <planId> --acknowledge-mutation` | `POST /api/dependency-resources/provisioning/{planId}/accept` |
 | Show dependency resource provisioning plan | Query | `dependency-resources.provisioning.status` | `ShowDependencyResourceProvisioningPlanQuery` | `ShowDependencyResourceProvisioningPlanInput` | `appaloft dependency status <planId>` | `GET /api/dependency-resources/provisioning/{planId}` |
 | List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
+| Count dependency resources | Query | `dependency-resources.count` | `CountDependencyResourcesQuery` | `CountDependencyResourcesQueryInput` | `appaloft dependency count` | `GET /api/dependency-resources/count` |
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
@@ -878,6 +883,7 @@ Implemented operations:
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | `POST /api/deployments/cleanup-preview` |
 | Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `GET /api/deployments/plan` |
 | List deployments | Product-session member query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
+| Count deployments | Product-session member query | `deployments.count` | `CountDeploymentsQuery` | `CountDeploymentsQueryInput` | `appaloft deployments count` | `GET /api/deployments/count` |
 | Show deployment detail | Product-session member query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |

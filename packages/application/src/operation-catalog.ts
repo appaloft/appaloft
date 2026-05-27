@@ -27,6 +27,7 @@ import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/de
 import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
 import { acceptDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/accept-dependency-resource-provisioning-plan.command";
 import { configureDependencyResourceBackupPolicyCommandInputSchema } from "./operations/dependency-resources/configure-dependency-resource-backup-policy.command";
+import { countDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/count-dependency-resources.query";
 import { createDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/create-dependency-resource-backup.command";
 import { createDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
@@ -49,6 +50,7 @@ import { showDeployTokenQueryInputSchema } from "./operations/deploy-tokens/show
 import { archiveDeploymentCommandInputSchema } from "./operations/deployments/archive-deployment.command";
 import { cancelDeploymentCommandInputSchema } from "./operations/deployments/cancel-deployment.command";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
+import { countDeploymentsQueryInputSchema } from "./operations/deployments/count-deployments.query";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
@@ -73,6 +75,7 @@ import { pruneDomainEventsCommandInputSchema } from "./operations/domain-events/
 import { queryEntitlementsInputSchema } from "./operations/entitlements/query-entitlements.schema";
 import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
+import { countEnvironmentsQueryInputSchema } from "./operations/environments/count-environments.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
@@ -105,6 +108,7 @@ import { showPreviewEnvironmentQueryInputSchema } from "./operations/preview-dep
 import { showPreviewPolicyQueryInputSchema } from "./operations/preview-deployments/show-preview-policy.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { checkProjectDeleteSafetyQueryInputSchema } from "./operations/projects/check-project-delete-safety.query";
+import { countProjectsQueryInputSchema } from "./operations/projects/count-projects.query";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
@@ -122,6 +126,7 @@ import { configureResourceHealthCommandInputSchema } from "./operations/resource
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
+import { countResourcesQueryInputSchema } from "./operations/resources/count-resources.query";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { createResourceSecretReferenceCommandInputSchema } from "./operations/resources/create-resource-secret-reference.command";
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
@@ -180,6 +185,7 @@ import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/ch
 import { configureScheduledRuntimePrunePolicyCommandInputSchema } from "./operations/servers/configure-scheduled-runtime-prune-policy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers/configure-server-edge-proxy.command";
+import { countServersQueryInputSchema } from "./operations/servers/count-servers.query";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
@@ -681,6 +687,25 @@ export const operationCatalog = [
     },
   },
   {
+    key: "projects.count",
+    kind: "query",
+    domain: "projects",
+    messageName: "CountProjectsQuery",
+    handlerName: "CountProjectsQueryHandler",
+    serviceName: "CountProjectsQueryService",
+    inputSchema: countProjectsQueryInputSchema,
+    serviceToken: tokens.countProjectsQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft project count",
+      orpc: { method: "GET", path: "/api/projects/count" },
+    },
+  },
+  {
     key: "projects.show",
     kind: "query",
     domain: "projects",
@@ -903,6 +928,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server list",
       orpc: { method: "GET", path: "/api/servers" },
+    },
+  },
+  {
+    key: "servers.count",
+    kind: "query",
+    domain: "servers",
+    messageName: "CountServersQuery",
+    handlerName: "CountServersQueryHandler",
+    serviceName: "CountServersQueryService",
+    inputSchema: countServersQueryInputSchema,
+    serviceToken: tokens.countServersQueryService,
+    transports: {
+      cli: "appaloft server count",
+      orpc: { method: "GET", path: "/api/servers/count" },
     },
   },
   {
@@ -1182,6 +1221,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource list",
       orpc: { method: "GET", path: "/api/resources" },
+    },
+  },
+  {
+    key: "resources.count",
+    kind: "query",
+    domain: "resources",
+    messageName: "CountResourcesQuery",
+    handlerName: "CountResourcesQueryHandler",
+    serviceName: "CountResourcesQueryService",
+    inputSchema: countResourcesQueryInputSchema,
+    serviceToken: tokens.countResourcesQueryService,
+    transports: {
+      cli: "appaloft resource count",
+      orpc: { method: "GET", path: "/api/resources/count" },
     },
   },
   {
@@ -1791,6 +1844,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "dependency-resources.count",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "CountDependencyResourcesQuery",
+    handlerName: "CountDependencyResourcesQueryHandler",
+    serviceName: "CountDependencyResourcesQueryService",
+    inputSchema: countDependencyResourcesQueryInputSchema,
+    serviceToken: tokens.countDependencyResourcesQueryService,
+    transports: {
+      cli: "appaloft dependency count",
+      orpc: { method: "GET", path: "/api/dependency-resources/count" },
+    },
+  },
+  {
     key: "dependency-resources.show",
     kind: "query",
     domain: "dependency-resources",
@@ -2245,6 +2312,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "environments.count",
+    kind: "query",
+    domain: "environments",
+    messageName: "CountEnvironmentsQuery",
+    handlerName: "CountEnvironmentsQueryHandler",
+    serviceName: "CountEnvironmentsQueryService",
+    inputSchema: countEnvironmentsQueryInputSchema,
+    serviceToken: tokens.countEnvironmentsQueryService,
+    transports: {
+      cli: "appaloft env count",
+      orpc: { method: "GET", path: "/api/environments/count" },
+    },
+  },
+  {
     key: "environments.show",
     kind: "query",
     domain: "environments",
@@ -2568,6 +2649,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments list",
       orpc: { method: "GET", path: "/api/deployments" },
+    },
+  },
+  {
+    key: "deployments.count",
+    kind: "query",
+    domain: "deployments",
+    messageName: "CountDeploymentsQuery",
+    handlerName: "CountDeploymentsQueryHandler",
+    serviceName: "CountDeploymentsQueryService",
+    inputSchema: countDeploymentsQueryInputSchema,
+    serviceToken: tokens.countDeploymentsQueryService,
+    transports: {
+      cli: "appaloft deployments count",
+      orpc: { method: "GET", path: "/api/deployments/count" },
     },
   },
   {

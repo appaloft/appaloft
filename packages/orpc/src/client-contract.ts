@@ -31,6 +31,12 @@ import {
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
+  type CountDependencyResourcesQueryInput,
+  type CountDeploymentsQueryInput,
+  type CountEnvironmentsQueryInput,
+  type CountProjectsQueryInput,
+  type CountResourcesQueryInput,
+  type CountServersQueryInput,
   type CreateDependencyResourceBackupCommandInput,
   type CreateDependencyResourceProvisioningPlanInput,
   type CreateDeploymentCommandInput,
@@ -213,6 +219,7 @@ import {
   type ConfigureScheduledRuntimePrunePolicyResponse,
   type ConfigureServerEdgeProxyResponse,
   type ConfirmDomainBindingOwnershipResponse,
+  type CountResponse,
   type CreateDeploymentResponse,
   type CreateDeployTokenResponse,
   type CreateDomainBindingResponse,
@@ -561,6 +568,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   projects: {
+    count: Client<
+      AppaloftClientContext,
+      CountProjectsQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     list: Client<
       AppaloftClientContext,
       ListProjectsQueryInput,
@@ -617,6 +630,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   servers: {
+    count: Client<
+      AppaloftClientContext,
+      CountServersQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     list: Client<
       AppaloftClientContext,
       ListServersQueryInput,
@@ -779,6 +798,12 @@ export type AppaloftOrpcClientContract = {
     };
   };
   environments: {
+    count: Client<
+      AppaloftClientContext,
+      CountEnvironmentsQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     list: Client<
       AppaloftClientContext,
       ListEnvironmentsQueryInput,
@@ -859,6 +884,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   resources: {
+    count: Client<
+      AppaloftClientContext,
+      CountResourcesQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     list: Client<
       AppaloftClientContext,
       ListResourcesQueryInput,
@@ -1153,6 +1184,12 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientError
       >;
     };
+    count: Client<
+      AppaloftClientContext,
+      CountDependencyResourcesQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     provision: Client<
       AppaloftClientContext,
       ProvisionDependencyResourceCommandInput,
@@ -1417,6 +1454,12 @@ export type AppaloftOrpcClientContract = {
     >;
   };
   deployments: {
+    count: Client<
+      AppaloftClientContext,
+      CountDeploymentsQueryInput,
+      CountResponse,
+      AppaloftClientError
+    >;
     list: Client<
       AppaloftClientContext,
       ListDeploymentsQueryInput,

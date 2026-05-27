@@ -116,6 +116,31 @@ function toServerSummary(
 export class PgServerReadModel implements ServerReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async count(context: RepositoryContext) {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("server", "count"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "server",
+        },
+      },
+      async () => {
+        let query = executor
+          .selectFrom("servers")
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
+          .where("lifecycle_status", "!=", "deleted");
+        const organizationId = resolveRepositoryContextOrganizationId(context);
+        if (organizationId) {
+          query = query.where("organization_id", "=", organizationId);
+        }
+
+        const row = await query.executeTakeFirst();
+        return Number(row?.count ?? 0);
+      },
+    );
+  }
+
   async list(context: RepositoryContext, input?: { limit?: number }) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
