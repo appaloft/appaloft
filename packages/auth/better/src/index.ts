@@ -94,6 +94,13 @@ export interface AuthRuntime
   handle(request: Request): Promise<Response>;
 }
 
+interface ProvisionedDefaultOrganization {
+  organizationId: string;
+  name: string;
+  role: "owner";
+  slug: string;
+}
+
 function buildProviderStatus(
   key: AuthProviderKey,
   input: {
@@ -254,6 +261,45 @@ export class BetterAuthRuntime implements AuthRuntime {
     return role ? { organizationId, role } : null;
   }
 
+  private async provisionDefaultOrganizationForSession(input: {
+    displayName?: string;
+    email?: string;
+    headers: Headers;
+    userId: string;
+  }): Promise<ProvisionedDefaultOrganization | null> {
+    const name = defaultPersonalOrganizationName(input);
+    const slugPrefix = defaultOrganizationSlug(
+      `${input.displayName ?? input.email?.split("@")[0] ?? "appaloft"}-${stableSlugSuffix(input.userId)}`,
+    );
+
+    for (const slug of [slugPrefix, `${slugPrefix}-${randomHex(2)}`]) {
+      try {
+        const organization = await this.auth.api.createOrganization({
+          headers: input.headers,
+          body: {
+            name,
+            slug,
+            userId: input.userId,
+            keepCurrentActiveOrganization: true,
+          },
+        });
+        const organizationId = readString(organization, "id");
+        if (organizationId) {
+          return {
+            organizationId,
+            name: readString(organization, "name") ?? name,
+            role: "owner",
+            slug: readString(organization, "slug") ?? slug,
+          };
+        }
+      } catch {
+        // Retry with the fallback slug; if that also fails, authorization remains fail-closed.
+      }
+    }
+
+    return null;
+  }
+
   async authorizeProductSession(
     _context: ExecutionContext,
     input: ProductSessionAuthorizationInput,
@@ -278,13 +324,25 @@ export class BetterAuthRuntime implements AuthRuntime {
       if (!userId) {
         return err(productAuthInvalid(input, "session-user-missing"));
       }
+      const email = readString(userObject, "email");
+      const displayName = readString(userObject, "name");
 
       const activeOrganizationId =
         input.organizationId ?? readString(sessionObject, "activeOrganizationId");
-      const organizationId =
-        activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
+      let organizationId = activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
       if (!organizationId) {
-        return err(productAuthForbidden(input, "active-organization-missing"));
+        const provisioned = input.organizationId
+          ? null
+          : await this.provisionDefaultOrganizationForSession({
+              ...(displayName ? { displayName } : {}),
+              ...(email ? { email } : {}),
+              headers,
+              userId,
+            });
+        if (!provisioned) {
+          return err(productAuthForbidden(input, "active-organization-missing"));
+        }
+        organizationId = provisioned.organizationId;
       }
 
       const activeRole = await this.auth.api.getActiveMemberRole({
@@ -303,6 +361,18 @@ export class BetterAuthRuntime implements AuthRuntime {
           resolvedOrganizationId = fallback.organizationId;
           role = fallback.role;
           organizationRole = productRoleToOrganizationRole(fallback.role);
+        } else {
+          const provisioned = await this.provisionDefaultOrganizationForSession({
+            ...(displayName ? { displayName } : {}),
+            ...(email ? { email } : {}),
+            headers,
+            userId,
+          });
+          if (provisioned) {
+            resolvedOrganizationId = provisioned.organizationId;
+            role = "owner";
+            organizationRole = "owner";
+          }
         }
       }
       if (!role) {
@@ -312,7 +382,6 @@ export class BetterAuthRuntime implements AuthRuntime {
         return err(productAuthForbidden(input, "role-insufficient", role));
       }
 
-      const email = readString(userObject, "email");
       return ok({
         actor: {
           kind: "user",
@@ -394,11 +463,50 @@ export class BetterAuthRuntime implements AuthRuntime {
 
       const organizations = await this.auth.api.listOrganizations({ headers });
       const organizationSummaries = toArray(organizations).map(mapContextOrganization);
+      const displayName = readString(userObject, "name");
+      const avatarUrl = readString(userObject, "image");
       let activeOrganizationId =
         readString(sessionObject, "activeOrganizationId") ??
         organizationSummaries[0]?.organizationId;
       if (!activeOrganizationId) {
-        return err(productAuthForbidden(authInput, "active-organization-missing"));
+        const provisioned = await this.provisionDefaultOrganizationForSession({
+          ...(displayName ? { displayName } : {}),
+          email,
+          headers,
+          userId,
+        });
+        if (!provisioned) {
+          return err(productAuthForbidden(authInput, "active-organization-missing"));
+        }
+
+        return ok({
+          user: {
+            userId,
+            email,
+            ...(displayName ? { displayName } : {}),
+            ...(avatarUrl ? { avatarUrl } : {}),
+          },
+          currentOrganization: {
+            organizationId: provisioned.organizationId,
+            name: provisioned.name,
+            role: "owner",
+            slug: provisioned.slug,
+          },
+          organizations: [
+            {
+              organizationId: provisioned.organizationId,
+              name: provisioned.name,
+              role: "owner",
+              slug: provisioned.slug,
+            },
+          ],
+          loginMethods: loginMethodsForRuntime({
+            github: this.githubConfigured,
+            google: this.googleConfigured,
+            oidc: this.oidcConfigured,
+          }),
+          permissions: permissionsForRole("owner"),
+        });
       }
 
       const activeRole = await this.auth.api.getActiveMemberRole({
@@ -428,9 +536,6 @@ export class BetterAuthRuntime implements AuthRuntime {
           slug: activeOrganizationId,
           role: currentRole,
         });
-
-      const displayName = readString(userObject, "name");
-      const avatarUrl = readString(userObject, "image");
 
       return ok({
         user: {
@@ -671,6 +776,18 @@ function defaultOrganizationSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "self-hosted-appaloft";
+}
+
+function defaultPersonalOrganizationName(input: { displayName?: string; email?: string }): string {
+  const base = input.displayName?.trim() || input.email?.split("@")[0]?.trim() || "Appaloft";
+  return `${base} Workspace`;
+}
+
+function stableSlugSuffix(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 8);
 }
 
 function firstAdminBootstrapFailed(message: string) {
