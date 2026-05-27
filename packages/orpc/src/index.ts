@@ -1912,6 +1912,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         data: {
           domainCode: error.code,
           locale: context.locale,
+          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
         },
       });
     case "validation_error":
