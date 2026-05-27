@@ -261,6 +261,22 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       throw new Error("Expected Better Auth session cookie after sign-up");
     }
 
+    const listedOrganizations = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/organization/list", {
+        method: "GET",
+        headers: {
+          cookie: sessionCookie,
+        },
+      }),
+    );
+    expect(listedOrganizations.status).toBe(200);
+    const organizations = (await listedOrganizations.json()) as Array<{
+      id?: unknown;
+      slug?: unknown;
+    }>;
+    expect(organizations).toHaveLength(1);
+    expect(typeof organizations[0]?.id).toBe("string");
+
     const authorizationResult = await runtime.authorizeProductSession(context, {
       method: "GET",
       path: "/api/projects",
@@ -274,8 +290,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       role: "owner",
       organizationRole: "owner",
       email: "github-user@example.com",
+      organizationId: organizations[0]?.id,
     });
-    expect(authorized.organizationId).toBeTruthy();
 
     const currentContext = await runtime.getCurrentContext({
       ...context,
