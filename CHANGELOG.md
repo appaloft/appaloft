@@ -1,5 +1,74 @@
 # Changelog
 
+## [1.1.0-rc.14](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.14...v1.1.0-rc.14) (2026-05-27)
+
+
+### Features
+
+* add dependency provisioning and marketplace surfaces ([e8c44f2](https://github.com/appaloft/appaloft/commit/e8c44f2df4dae4a1e6fb1302124eaf7d92ac5569))
+* add dependency resource provisioning workflow ([b3a12cd](https://github.com/appaloft/appaloft/commit/b3a12cd98c4021fe996efca2ef97b8b27ea0c736))
+* add dependency resource provisioning workflow ([7518651](https://github.com/appaloft/appaloft/commit/7518651b65de4957463da148506b1fbfa3a27d75))
+* add GitHub App installation flow ([#349](https://github.com/appaloft/appaloft/issues/349)) ([cf131f4](https://github.com/appaloft/appaloft/commit/cf131f47ba1b65bf9de299990ca63abecfaeefa9))
+* add integration connection catalog ([#348](https://github.com/appaloft/appaloft/issues/348)) ([c861a33](https://github.com/appaloft/appaloft/commit/c861a3326e79da34d51da8dbd8437c979fa648fd))
+* add repository config deployment policies ([#337](https://github.com/appaloft/appaloft/issues/337)) ([3f306b7](https://github.com/appaloft/appaloft/commit/3f306b7610ede0b4a3e339e7412f9ec980834bfd))
+* **auth:** enable GitHub social login ([#347](https://github.com/appaloft/appaloft/issues/347)) ([b5bbdcd](https://github.com/appaloft/appaloft/commit/b5bbdcd8ad37442bca5491ecc313355fd4d131f3))
+* **auth:** export shared better auth options ([#346](https://github.com/appaloft/appaloft/issues/346)) ([5d74df0](https://github.com/appaloft/appaloft/commit/5d74df07a76e04d3d8a2d8549e9f14c53bfc2f26))
+* **blueprints:** add application bundle plan ([#336](https://github.com/appaloft/appaloft/issues/336)) ([2eb7aca](https://github.com/appaloft/appaloft/commit/2eb7aca426da800f4d58ce27ae4b62d21678a23a))
+* **blueprints:** add component relation runtime projection ([#340](https://github.com/appaloft/appaloft/issues/340)) ([2a930ae](https://github.com/appaloft/appaloft/commit/2a930ae2497f9c59c9b7ce1a0f597b16a6aa28ca))
+* **blueprints:** add neutral catalog package ([9f5af7f](https://github.com/appaloft/appaloft/commit/9f5af7ff151cb067ff6045b87315b2b2de9db0cd))
+* **blueprints:** add variants and upgrade planning ([77850b3](https://github.com/appaloft/appaloft/commit/77850b3c192556d6f6a89c1d0a9a861c7872c2ab))
+* **blueprints:** add variants and upgrade planning ([f552d0a](https://github.com/appaloft/appaloft/commit/f552d0a848b68609b8a3ffc1a681d417feb50678))
+* **blueprints:** support mainstream dependency kinds ([5d88419](https://github.com/appaloft/appaloft/commit/5d884192883348956990a0825d7aed7d81bf7c80))
+* **marketplace:** render installed application upgrade plans ([#339](https://github.com/appaloft/appaloft/issues/339)) ([32f43fb](https://github.com/appaloft/appaloft/commit/32f43fbbfb86cf71e185ea3b9f4aeca57915c46f))
+* **web:** add marketplace extension entry points ([5041101](https://github.com/appaloft/appaloft/commit/504110158e8137945394eecd26c833477fdcbf6d))
+* **web:** share blueprint marketplace component ([fbccfda](https://github.com/appaloft/appaloft/commit/fbccfda90af26f6abfa0340f8e068eb36da6d7c6))
+
+
+### Bug Fixes
+
+* add deploy cli source bundle ([412193e](https://github.com/appaloft/appaloft/commit/412193e25e695111add5e55dcdf05e7d5d05c711))
+* add organization member readback fallback ([9ac62ea](https://github.com/appaloft/appaloft/commit/9ac62ea59056afd53d2a8c1fa0c9bd4c1f76e22a))
+* allow acknowledged profile drift deploys ([f4a94fb](https://github.com/appaloft/appaloft/commit/f4a94fb4fc4f7a0483ef70517edf83e71064fd04))
+* allow members to list organization members ([#351](https://github.com/appaloft/appaloft/issues/351)) ([82387d6](https://github.com/appaloft/appaloft/commit/82387d629c482c50c8e7285e4792cd0c782234c3))
+* bootstrap first admin from startup config ([83c1ed7](https://github.com/appaloft/appaloft/commit/83c1ed7f368a97990bc246573416731ced375049))
+* **console:** simplify quick deploy flow ([#344](https://github.com/appaloft/appaloft/issues/344)) ([d525a0a](https://github.com/appaloft/appaloft/commit/d525a0a09b5b569993dc4d231a8adee202c7bbbc))
+* format marketplace web test ([38caffc](https://github.com/appaloft/appaloft/commit/38caffcdd5041db6438f2e62e3150ee66fcb1e50))
+* harden deploy action source installs and failure exits ([0f81c77](https://github.com/appaloft/appaloft/commit/0f81c7790ffa5bc81a91750234b42722eb7f4584))
+* hide closed first admin bootstrap before validation ([ece1539](https://github.com/appaloft/appaloft/commit/ece1539875fd1e4fc81ecc361b491d2a8b643722))
+* hide completed first admin bootstrap ([72827d9](https://github.com/appaloft/appaloft/commit/72827d97635f40ef4baa503a88981d198ee72eee))
+* keep signup public for account onboarding ([016a090](https://github.com/appaloft/appaloft/commit/016a090daefbfa55e4954d3136253aad96249426))
+* keep submodule caches out of ssh source uploads ([afe6b01](https://github.com/appaloft/appaloft/commit/afe6b011a4f58bda9286eaed5783ae7ab617aa3d))
+* **marketplace:** improve blueprint quick deploy dialogs ([82e738a](https://github.com/appaloft/appaloft/commit/82e738a6137565f65a3487ed8d8778a3078ecc03))
+* **marketplace:** improve blueprint quick deploy dialogs ([7725763](https://github.com/appaloft/appaloft/commit/7725763ad71841795c31d0a3a48dc0c5099e4416))
+* **marketplace:** stabilize loading copy ([a7725e7](https://github.com/appaloft/appaloft/commit/a7725e70e5be0360e084e7bab972377b9b414cb6))
+* **marketplace:** use shared skeleton primitive ([1010e44](https://github.com/appaloft/appaloft/commit/1010e44d9dc63ee82582ced3cf6fa4d3ac9d0b1f))
+* **orpc:** require product sessions for catalog queries ([164589b](https://github.com/appaloft/appaloft/commit/164589b02d034a12cb4817565228e8f893aa9a8c))
+* **persistence:** scope project resources by tenant ([#345](https://github.com/appaloft/appaloft/issues/345)) ([e1c91a4](https://github.com/appaloft/appaloft/commit/e1c91a40068d7e03bcf9f929fcd7ac6d04e6ae12))
+* **plugins:** keep wildcard routes active for sha versions ([6b8d8bb](https://github.com/appaloft/appaloft/commit/6b8d8bbf4e24a7353daa738ac77ebd9316bda288))
+* redirect anonymous console navigation before spa ([f31d225](https://github.com/appaloft/appaloft/commit/f31d22526710569aacd71da161de15077981e951))
+* remember active organization for member listing ([#352](https://github.com/appaloft/appaloft/issues/352)) ([87b3baf](https://github.com/appaloft/appaloft/commit/87b3baf54af1639903e9f193b58eb98d22a088c8))
+* render preview artifact sweep shell safely ([#355](https://github.com/appaloft/appaloft/issues/355)) ([d6c0119](https://github.com/appaloft/appaloft/commit/d6c01198070be21af5ea6beff636786a243af736))
+* require login for better-auth console sessions ([840a075](https://github.com/appaloft/appaloft/commit/840a075697d05caa2301e7e50e73fab349eb0004))
+* restart single-server runtime containers ([#342](https://github.com/appaloft/appaloft/issues/342)) ([3ff71f0](https://github.com/appaloft/appaloft/commit/3ff71f00ed3ea6533590c5a34ba10be38c330419))
+* **runtime:** release conflicting route containers ([e90b640](https://github.com/appaloft/appaloft/commit/e90b6408e838227afc59f4d35d1c09efe982c5ca))
+* simplify console chrome quick deploy copy ([bb4488d](https://github.com/appaloft/appaloft/commit/bb4488d9a148255a3d6e79395876f13cf81b0c40))
+* support explicit direct host ports ([32106f5](https://github.com/appaloft/appaloft/commit/32106f59843b724a8b24a48d8f988699ebc4a3de))
+* update existing resource source during quick deploy ([c12e5ba](https://github.com/appaloft/appaloft/commit/c12e5ba5e25ac6419a1bb178d41ac04c522f9c9c))
+* verify direct host port routes ([c96a153](https://github.com/appaloft/appaloft/commit/c96a15360f59b68cc3ab7601e0ae61c67aa257d9))
+* **web:** add console sign out action ([148a2df](https://github.com/appaloft/appaloft/commit/148a2df451e1f5cb83751575ace5f381001d2d3f))
+* **web:** improve favicon contrast ([aaf6a83](https://github.com/appaloft/appaloft/commit/aaf6a83cadd91274197de3d3fe8b9beb11dde537))
+* **web:** keep shell account menu without sign out ([037fad6](https://github.com/appaloft/appaloft/commit/037fad6ecd57dbfa6bc73cb4231756413e69e097))
+* **web:** preserve blueprint selector source ([77ed228](https://github.com/appaloft/appaloft/commit/77ed228dadb59c46498de4115331757289fce11a))
+* **web:** remove shell account footer ([6864d97](https://github.com/appaloft/appaloft/commit/6864d977b2f8897524a12e8eeb5956d721bd9daf))
+* **web:** restore console signout test hook ([5f94167](https://github.com/appaloft/appaloft/commit/5f94167c339d7e7dfcef31225dd6b74d312be1d9))
+* **web:** use appaloft icon for favicon ([f62b882](https://github.com/appaloft/appaloft/commit/f62b882801c7bd58545196f2ffd46bd6e94de2b7))
+* **web:** use vitest in auth bootstrap test ([80f1486](https://github.com/appaloft/appaloft/commit/80f14862eb32d5f2c226ac24b016359957fb278c))
+
+
+### Documentation
+
+* track dockerfile deploy follow-ups ([498c830](https://github.com/appaloft/appaloft/commit/498c830d0df41ccbe4c55a7b79de82cdeb968a8b))
+
 ## [1.0.0-rc.14](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.13...v1.0.0-rc.14) (2026-05-22)
 
 
