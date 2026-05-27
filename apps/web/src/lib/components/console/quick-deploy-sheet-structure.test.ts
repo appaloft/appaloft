@@ -67,4 +67,18 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain("webhookSecret");
     expect(quickDeploySheetSource).not.toContain("clientSecret");
   });
+
+  test("[QD-GHA-005] defers source build settings until a GitHub App repository is selected", () => {
+    expect(quickDeploySheetSource).toContain("const showSourceBuildSettings = $derived.by");
+    expect(quickDeploySheetSource).toContain(
+      'sourceKind === "github" && githubSourceMode === "browser"',
+    );
+    expect(quickDeploySheetSource).toContain("return Boolean(selectedGitHubRepository)");
+    expect(quickDeploySheetSource).toContain("data-source-build-settings");
+    expect(quickDeploySheetSource).toContain("data-github-repository-scoped-settings");
+    expect(quickDeploySheetSource).toContain("repositoryBaseDirectory");
+    expect(quickDeploySheetSource).not.toContain(
+      'sourceKind !== "docker-image" && sourceKind !== "blueprint"',
+    );
+  });
 });

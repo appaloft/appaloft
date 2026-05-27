@@ -779,6 +779,22 @@
 
     return Boolean(githubProvider?.configured) && Boolean(githubProvider?.connected);
   });
+  const showSourceBuildSettings = $derived.by(() => {
+    if (sourceKind === "docker-image" || sourceKind === "blueprint") {
+      return false;
+    }
+
+    if (sourceKind === "github" && githubSourceMode === "browser") {
+      return Boolean(selectedGitHubRepository);
+    }
+
+    return true;
+  });
+  const sourceBaseDirectoryLabel = $derived.by(() =>
+    sourceKind === "github" && githubSourceMode === "browser"
+      ? $t(i18nKeys.console.quickDeploy.repositoryBaseDirectory)
+      : $t(i18nKeys.console.quickDeploy.sourceBaseDirectory),
+  );
   const quickDeploySourceExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "quick-deploy-source")
@@ -3731,10 +3747,14 @@
                 {/if}
               </div>
             {/if}
-            {#if sourceKind !== "docker-image" && sourceKind !== "blueprint"}
-              <div class="space-y-2">
+            {#if showSourceBuildSettings}
+              <div
+                class="space-y-2"
+                data-source-build-settings
+                data-github-repository-scoped-settings={sourceKind === "github" && githubSourceMode === "browser" ? "true" : undefined}
+              >
                 <label class="text-xs font-medium text-muted-foreground" for="source-base-directory">
-                  {$t(i18nKeys.console.quickDeploy.sourceBaseDirectory)}
+                  {sourceBaseDirectoryLabel}
                 </label>
                 <Input
                   id="source-base-directory"
@@ -3783,7 +3803,7 @@
                   {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
                 </p>
               </div>
-            {:else if sourceKind !== "docker-image" && sourceKind !== "blueprint"}
+            {:else if showSourceBuildSettings}
               <div class="grid gap-3 sm:grid-cols-3">
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="runtime-install-command">
