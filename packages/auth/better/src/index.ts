@@ -247,6 +247,20 @@ export class BetterAuthRuntime implements AuthRuntime {
       .find((organizationId) => Boolean(organizationId));
   }
 
+  private async rememberActiveOrganization(
+    headers: Headers,
+    organizationId: string,
+  ): Promise<void> {
+    try {
+      await this.auth.api.setActiveOrganization({
+        headers,
+        body: { organizationId },
+      });
+    } catch {
+      // Downstream authorization remains fail-closed if Better Auth rejects the organization.
+    }
+  }
+
   private async firstAuthorizedOrganizationRole(
     headers: Headers,
   ): Promise<{ organizationId: string; role: ProductOrganizationRole } | null> {
@@ -340,6 +354,16 @@ export class BetterAuthRuntime implements AuthRuntime {
           };
         }
       } catch {
+        const visibleOrganizationId = await this.firstVisibleOrganizationId(input.headers);
+        if (visibleOrganizationId) {
+          await this.rememberActiveOrganization(input.headers, visibleOrganizationId);
+          return {
+            organizationId: visibleOrganizationId,
+            name: visibleOrganizationId,
+            role: "owner",
+            slug: visibleOrganizationId,
+          };
+        }
         // Retry with the fallback slug; if that also fails, authorization remains fail-closed.
       }
     }
@@ -375,7 +399,10 @@ export class BetterAuthRuntime implements AuthRuntime {
 
       const activeOrganizationId =
         input.organizationId ?? readString(sessionObject, "activeOrganizationId");
-      let organizationId = activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
+      const visibleOrganizationId = activeOrganizationId
+        ? undefined
+        : await this.firstVisibleOrganizationId(headers);
+      let organizationId = activeOrganizationId ?? visibleOrganizationId;
       if (!organizationId) {
         const provisioned = input.organizationId
           ? null
@@ -384,6 +411,9 @@ export class BetterAuthRuntime implements AuthRuntime {
           return err(productAuthForbidden(input, "active-organization-missing"));
         }
         organizationId = provisioned.organizationId;
+      }
+      if (!activeOrganizationId && visibleOrganizationId) {
+        await this.rememberActiveOrganization(headers, visibleOrganizationId);
       }
 
       const activeRole = await this.auth.api.getActiveMemberRole({
@@ -504,6 +534,9 @@ export class BetterAuthRuntime implements AuthRuntime {
       let activeOrganizationId =
         readString(sessionObject, "activeOrganizationId") ??
         organizationSummaries[0]?.organizationId;
+      if (!readString(sessionObject, "activeOrganizationId") && activeOrganizationId) {
+        await this.rememberActiveOrganization(headers, activeOrganizationId);
+      }
       if (!activeOrganizationId) {
         const provisioned = await this.ensureDefaultOrganizationForHeaders(headers);
         if (!provisioned) {
@@ -547,6 +580,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       let currentRole = normalizeOrganizationTeamRole(readString(activeRole, "role"));
       if (!currentRole && organizationSummaries[0]?.organizationId) {
         activeOrganizationId = organizationSummaries[0].organizationId;
+        await this.rememberActiveOrganization(headers, activeOrganizationId);
         const fallbackRole = await this.auth.api.getActiveMemberRole({
           headers,
           query: { organizationId: activeOrganizationId },
@@ -636,6 +670,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
 
     try {
+      await this.rememberActiveOrganization(headers, input.organizationId);
       const result = await this.auth.api.listMembers({
         headers,
         query: {
@@ -672,6 +707,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
 
     try {
+      await this.rememberActiveOrganization(headers, input.organizationId);
       const result = await this.auth.api.listInvitations({
         headers,
         query: { organizationId: input.organizationId },

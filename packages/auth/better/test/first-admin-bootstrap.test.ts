@@ -309,6 +309,66 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
   });
 
+  test("[ORG-TEAM-MEMBERS-002] organization owners can list members through the product adapter", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "owner-list@example.com",
+          name: "Owner List",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    const setCookie = signedUp.headers.get("set-cookie") ?? "";
+    const sessionCookie = setCookie.match(/better-auth\.session_token=[^;,]+/)?.[0];
+    expect(signedUp.status).toBe(200);
+    expect(sessionCookie, setCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after sign-up");
+    }
+
+    const contextResult = await runtime.getCurrentContext({
+      ...context,
+      auth: { cookieHeader: sessionCookie },
+      requestId: "req_owner_list_members_context",
+    });
+    expect(contextResult.isOk()).toBe(true);
+    const organizationId = contextResult._unsafeUnwrap().currentOrganization.organizationId;
+
+    const membersResult = await runtime.listMembers(
+      {
+        ...context,
+        auth: { cookieHeader: sessionCookie },
+        requestId: "req_owner_list_members",
+      },
+      {
+        organizationId,
+        limit: 100,
+      },
+    );
+
+    expect(membersResult.isOk()).toBe(true);
+    expect(membersResult._unsafeUnwrap().items).toEqual([
+      expect.objectContaining({
+        email: "owner-list@example.com",
+        role: "owner",
+        userId: expect.any(String),
+      }),
+    ]);
+  });
+
   test("[PRODUCT-AUTH-READ-001] authorizes the first admin through a visible organization when active organization is unset", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
