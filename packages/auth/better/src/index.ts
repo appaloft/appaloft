@@ -94,6 +94,13 @@ export interface AuthRuntime
   handle(request: Request): Promise<Response>;
 }
 
+interface ProvisionedDefaultOrganization {
+  organizationId: string;
+  name: string;
+  role: "owner";
+  slug: string;
+}
+
 function buildProviderStatus(
   key: AuthProviderKey,
   input: {
@@ -221,7 +228,9 @@ export class BetterAuthRuntime implements AuthRuntime {
       );
     }
 
-    return this.auth.handler(request);
+    const response = await this.auth.handler(request);
+    await this.ensureDefaultOrganizationAfterAuthRoute(request, response);
+    return response;
   }
 
   private hasConfiguredOAuthProvider(): boolean {
@@ -254,6 +263,90 @@ export class BetterAuthRuntime implements AuthRuntime {
     return role ? { organizationId, role } : null;
   }
 
+  private async ensureDefaultOrganizationAfterAuthRoute(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    if (response.status >= 400 || !shouldEnsureDefaultOrganizationAfterAuthRoute(request)) {
+      return;
+    }
+
+    const headers = authResponseSessionHeaders(request.headers, response.headers);
+    if (!headers) {
+      return;
+    }
+
+    try {
+      await this.ensureDefaultOrganizationForHeaders(headers);
+    } catch {
+      // Auth succeeds independently; product authorization keeps a fail-closed self-heal path.
+    }
+  }
+
+  private async ensureDefaultOrganizationForHeaders(
+    headers: Headers,
+  ): Promise<ProvisionedDefaultOrganization | null> {
+    const session = await this.auth.api.getSession({ headers });
+    if (!session) {
+      return null;
+    }
+
+    const sessionObject = readObject(session, "session");
+    const userObject = readObject(session, "user");
+    const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+    if (!userId || (await this.firstVisibleOrganizationId(headers))) {
+      return null;
+    }
+
+    const email = readString(userObject, "email");
+    const displayName = readString(userObject, "name");
+    return this.provisionDefaultOrganizationForSession({
+      ...(displayName ? { displayName } : {}),
+      ...(email ? { email } : {}),
+      headers,
+      userId,
+    });
+  }
+
+  private async provisionDefaultOrganizationForSession(input: {
+    displayName?: string;
+    email?: string;
+    headers: Headers;
+    userId: string;
+  }): Promise<ProvisionedDefaultOrganization | null> {
+    const name = defaultPersonalOrganizationName(input);
+    const slugPrefix = defaultOrganizationSlug(
+      `${input.displayName ?? input.email?.split("@")[0] ?? "appaloft"}-${stableSlugSuffix(input.userId)}`,
+    );
+
+    for (const slug of [slugPrefix, `${slugPrefix}-${randomHex(2)}`]) {
+      try {
+        const organization = await this.auth.api.createOrganization({
+          headers: input.headers,
+          body: {
+            name,
+            slug,
+            userId: input.userId,
+            keepCurrentActiveOrganization: true,
+          },
+        });
+        const organizationId = readString(organization, "id");
+        if (organizationId) {
+          return {
+            organizationId,
+            name: readString(organization, "name") ?? name,
+            role: "owner",
+            slug: readString(organization, "slug") ?? slug,
+          };
+        }
+      } catch {
+        // Retry with the fallback slug; if that also fails, authorization remains fail-closed.
+      }
+    }
+
+    return null;
+  }
+
   async authorizeProductSession(
     _context: ExecutionContext,
     input: ProductSessionAuthorizationInput,
@@ -278,13 +371,19 @@ export class BetterAuthRuntime implements AuthRuntime {
       if (!userId) {
         return err(productAuthInvalid(input, "session-user-missing"));
       }
+      const email = readString(userObject, "email");
 
       const activeOrganizationId =
         input.organizationId ?? readString(sessionObject, "activeOrganizationId");
-      const organizationId =
-        activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
+      let organizationId = activeOrganizationId ?? (await this.firstVisibleOrganizationId(headers));
       if (!organizationId) {
-        return err(productAuthForbidden(input, "active-organization-missing"));
+        const provisioned = input.organizationId
+          ? null
+          : await this.ensureDefaultOrganizationForHeaders(headers);
+        if (!provisioned) {
+          return err(productAuthForbidden(input, "active-organization-missing"));
+        }
+        organizationId = provisioned.organizationId;
       }
 
       const activeRole = await this.auth.api.getActiveMemberRole({
@@ -303,6 +402,13 @@ export class BetterAuthRuntime implements AuthRuntime {
           resolvedOrganizationId = fallback.organizationId;
           role = fallback.role;
           organizationRole = productRoleToOrganizationRole(fallback.role);
+        } else {
+          const provisioned = await this.ensureDefaultOrganizationForHeaders(headers);
+          if (provisioned) {
+            resolvedOrganizationId = provisioned.organizationId;
+            role = "owner";
+            organizationRole = "owner";
+          }
         }
       }
       if (!role) {
@@ -312,7 +418,6 @@ export class BetterAuthRuntime implements AuthRuntime {
         return err(productAuthForbidden(input, "role-insufficient", role));
       }
 
-      const email = readString(userObject, "email");
       return ok({
         actor: {
           kind: "user",
@@ -394,11 +499,45 @@ export class BetterAuthRuntime implements AuthRuntime {
 
       const organizations = await this.auth.api.listOrganizations({ headers });
       const organizationSummaries = toArray(organizations).map(mapContextOrganization);
+      const displayName = readString(userObject, "name");
+      const avatarUrl = readString(userObject, "image");
       let activeOrganizationId =
         readString(sessionObject, "activeOrganizationId") ??
         organizationSummaries[0]?.organizationId;
       if (!activeOrganizationId) {
-        return err(productAuthForbidden(authInput, "active-organization-missing"));
+        const provisioned = await this.ensureDefaultOrganizationForHeaders(headers);
+        if (!provisioned) {
+          return err(productAuthForbidden(authInput, "active-organization-missing"));
+        }
+
+        return ok({
+          user: {
+            userId,
+            email,
+            ...(displayName ? { displayName } : {}),
+            ...(avatarUrl ? { avatarUrl } : {}),
+          },
+          currentOrganization: {
+            organizationId: provisioned.organizationId,
+            name: provisioned.name,
+            role: "owner",
+            slug: provisioned.slug,
+          },
+          organizations: [
+            {
+              organizationId: provisioned.organizationId,
+              name: provisioned.name,
+              role: "owner",
+              slug: provisioned.slug,
+            },
+          ],
+          loginMethods: loginMethodsForRuntime({
+            github: this.githubConfigured,
+            google: this.googleConfigured,
+            oidc: this.oidcConfigured,
+          }),
+          permissions: permissionsForRole("owner"),
+        });
       }
 
       const activeRole = await this.auth.api.getActiveMemberRole({
@@ -428,9 +567,6 @@ export class BetterAuthRuntime implements AuthRuntime {
           slug: activeOrganizationId,
           role: currentRole,
         });
-
-      const displayName = readString(userObject, "name");
-      const avatarUrl = readString(userObject, "image");
 
       return ok({
         user: {
@@ -673,6 +809,18 @@ function defaultOrganizationSlug(name: string): string {
   return slug || "self-hosted-appaloft";
 }
 
+function defaultPersonalOrganizationName(input: { displayName?: string; email?: string }): string {
+  const base = input.displayName?.trim() || input.email?.split("@")[0]?.trim() || "Appaloft";
+  return `${base} Workspace`;
+}
+
+function stableSlugSuffix(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 8);
+}
+
 function firstAdminBootstrapFailed(message: string) {
   return {
     code: "first_admin_bootstrap_failed",
@@ -706,6 +854,63 @@ function contextAuthHeaders(context: ExecutionContext): Headers | null {
   }
   return headers.has("cookie") || headers.has("authorization") ? headers : null;
 }
+
+function shouldEnsureDefaultOrganizationAfterAuthRoute(request: Request): boolean {
+  const path = new URL(request.url).pathname;
+  return (
+    path === "/api/auth/sign-up/email" ||
+    path === "/api/auth/sign-in/email" ||
+    path === "/api/auth/callback/github" ||
+    path === "/api/auth/callback/google" ||
+    path === "/api/auth/oauth2/callback/oidc"
+  );
+}
+
+function authResponseSessionHeaders(
+  requestHeaders: Headers,
+  responseHeaders: Headers,
+): Headers | null {
+  const cookieHeader = mergeCookieHeader(requestHeaders.get("cookie"), responseHeaders);
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const headers = new Headers(requestHeaders);
+  headers.set("cookie", cookieHeader);
+  return headers;
+}
+
+function mergeCookieHeader(existingCookieHeader: string | null, responseHeaders: Headers): string {
+  const cookies = new Map<string, string>();
+  for (const cookiePart of (existingCookieHeader ?? "").split(";")) {
+    const [rawName, ...rawValue] = cookiePart.trim().split("=");
+    if (rawName && rawValue.length > 0) {
+      cookies.set(rawName, rawValue.join("="));
+    }
+  }
+
+  const setCookieHeader = responseHeaders.get("set-cookie") ?? "";
+  const cookiePattern = /(?:^|,\s*)([^=;,\s]+)=([^;,\s]*)/g;
+  for (const match of setCookieHeader.matchAll(cookiePattern)) {
+    const name = match[1];
+    const value = match[2];
+    if (name && value && !setCookieAttributeNames.has(name.toLowerCase())) {
+      cookies.set(name, value);
+    }
+  }
+
+  return Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; ");
+}
+
+const setCookieAttributeNames = new Set([
+  "domain",
+  "expires",
+  "httponly",
+  "max-age",
+  "path",
+  "samesite",
+  "secure",
+]);
 
 function organizationTeamAuthInput(
   method: string,
