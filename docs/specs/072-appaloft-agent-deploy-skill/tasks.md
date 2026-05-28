@@ -28,6 +28,8 @@
   catalog.
 - [x] Add checks that the skill references existing operation keys or CLI/API entrypoints only.
 - [x] Add skill source validation through docs registry and operation coverage tests.
+- [x] Add Agent Skills best-practice eval suite and validator for real Appaloft task families,
+  including server save/manage, MCP, and secret/bypass refusal.
 
 ## Code Round
 
@@ -42,3 +44,4 @@
 - [x] Run docs registry tests.
 - [x] Run CLI help tests if CLI help changes.
 - [x] Run skill source and docs registry tests.
+- [x] Run `bun run scripts/validate-appaloft-skill-evals.ts`.

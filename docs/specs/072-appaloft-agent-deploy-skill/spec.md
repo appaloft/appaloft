@@ -44,6 +44,7 @@ tools, CLI commands, HTTP/API calls, or Web actions to use.
 | AGENT-SKILL-006 | Failure recovery is agent-readable | Deployment planning, execution, access, or verification fails | The agent follows structured errors and docs links | It reports stable error code/phase, next action, log/diagnostic command, and whether retry/redeploy/rollback is available. |
 | AGENT-SKILL-007 | MCP remains optional | MCP descriptors exist but the current host may or may not configure them | The agent uses Appaloft | The skill remains useful through CLI/API/Web and can use MCP tools without changing business semantics when available. |
 | AGENT-SKILL-008 | Full Appaloft skill is the AI entrypoint | A user asks an agent to configure, observe, recover, administer, or maintain Appaloft beyond deployment | The agent follows the installed Appaloft skill | The skill maps the request to existing operation-catalog entries and includes every CLI transport command as an AI-readable reference. |
+| AGENT-SKILL-009 | Skill evals cover real Appaloft work | Public docs and the operation catalog define core workflows | The skill eval validator runs | The eval suite covers project, server save/manage, SSH credentials, environments, Resource profile configuration, first deploy, observation, recovery, domain/TLS, dependencies, storage, scheduled tasks, monitoring, runtime controls, terminal sessions, source/preview/static artifacts, audit/retention/operator work, organization/auth/deploy tokens, MCP, and secret/bypass refusal tasks. |
 
 ## Required Skill Content
 
@@ -91,6 +92,8 @@ The deploy subprotocol must include:
 - Repository artifact: standard source `skills/appaloft` with references for entrypoint surfaces,
   CLI operation mapping, and deploy protocol.
 - standard install path: `npx skills add appaloft/appaloft`.
+- eval source: `skills/appaloft/evals/evals.json`, validated by
+  `scripts/validate-appaloft-skill-evals.ts`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft
   CLI.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
@@ -109,6 +112,23 @@ The deploy subprotocol must include:
 - No autonomous background agent runtime.
 - No bypass around BYOS target selection, Resource profile ownership, deployment verification,
   logs, diagnostics, or recovery readiness.
+
+## Skill Best-Practice Loop
+
+Appaloft keeps `SKILL.md` concise and uses progressive disclosure for the long-form material. The
+eval suite is the maintenance loop that prevents this from becoming too shallow. It contains
+realistic prompts and assertions derived from public docs, workflows, testing matrices, and the
+operation catalog. Each eval names expected operation keys and source documents, so future changes
+can verify that the skill remains grounded in Appaloft behavior rather than generic deployment
+advice.
+
+The validator must reject eval drift when:
+
+- a core task family is missing;
+- a referenced operation key is not in `operation-catalog.ts`;
+- a referenced source document no longer exists;
+- an eval lacks concrete assertions;
+- server registration / save-server workflows, MCP, or secret/bypass boundaries lose coverage.
 
 ## Current Implementation Notes And Migration Gaps
 

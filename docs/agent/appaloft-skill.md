@@ -80,10 +80,56 @@ The installable `appaloft` skill must include:
 ## Packaged Artifact
 
 - Full skill source: `skills/appaloft`.
+- Best-practice eval suite: `skills/appaloft/evals/evals.json`.
 - Entrypoint surfaces: `skills/appaloft/references/surfaces.md`.
 - Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
 - Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
 - MCP tool guide: `skills/appaloft/references/mcp-tools.md`.
+
+## Skill Evaluation Loop
+
+The skill follows the Agent Skills progressive-disclosure model: `SKILL.md` stays short, and
+detailed operation maps, deploy protocol, and MCP guidance live in one-level references. Its
+quality gate is the eval suite in `skills/appaloft/evals/evals.json`, which is grounded in public
+Appaloft docs, workflows, testing matrices, and `packages/application/src/operation-catalog.ts`.
+
+The eval suite must cover real Appaloft tasks, including project lifecycle, saving/registering and
+managing servers, server readiness/capacity/proxy maintenance, SSH credentials, environments,
+Resource profile configuration, Resource secrets/effective config, first deploy, deployment
+observation and recovery, domains/TLS, generated default access and route diagnostics, dependency
+resources and backups, storage, scheduled tasks, runtime usage and monitoring, runtime controls,
+terminal sessions, source links, preview cleanup, source-event auto-deploy diagnostics, static
+artifact publishing, audit/retention/operator work, organization/auth/deploy tokens, system
+capabilities/maintenance, MCP usage, and secret/bypass refusal. When a new public operation family
+becomes a core user workflow, add or update an eval instead of expanding `SKILL.md` with exhaustive
+prose.
+
+Run the local validator before changing the skill:
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
+
+For release readiness or a manual nightly check, run the same cases through a real model. This
+requires a provider key, so it is not part of the default PR gate:
+
+```bash
+bun run scripts/run-appaloft-skill-model-evals.ts --model gpt-5-mini
+```
+
+DeepSeek's OpenAI-compatible API can also run the model evals:
+
+```bash
+DEEPSEEK_API_KEY=... bun run scripts/run-appaloft-skill-model-evals.ts \
+  --provider deepseek \
+  --model deepseek-v4-flash
+```
+
+GitHub Actions does not run real-model evals on normal pull requests. Configure
+`DEEPSEEK_API_KEY` or `OPENAI_API_KEY` as a repository secret, then manually dispatch
+`Appaloft Skill Model Evals` for release readiness.
+
+Use `--dry-run` to verify prompt construction without calling a model.
 
 ## MCP Boundary
 
