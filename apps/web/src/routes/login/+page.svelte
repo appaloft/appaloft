@@ -33,6 +33,13 @@
   const githubConfigured = $derived(
     Boolean(authSessionQuery.data?.providers.find((provider) => provider.key === "github")?.configured),
   );
+  const requiresEmailOtpVerification = $derived(
+    Boolean(
+      authSessionQuery.data?.emailVerification.required &&
+        authSessionQuery.data?.emailVerification.otpEnabled &&
+        authSessionQuery.data?.emailVerification.verifyPagePath,
+    ),
+  );
 
   function errorMessageFromResponseBody(body: string): string {
     const trimmed = body.trim();
@@ -87,6 +94,15 @@
         await goto(returnTo);
       }
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : $t(i18nKeys.errors.web.unknownRequestFailure);
+      if (requiresEmailOtpVerification && /email.*verif/i.test(message) && browser) {
+        const verifyPath = authSessionQuery.data?.emailVerification.verifyPagePath ?? "/verify-email";
+        await goto(
+          `${verifyPath}?email=${encodeURIComponent(email)}&next=${encodeURIComponent(returnTo)}`,
+        );
+        return;
+      }
       loginError = error instanceof Error ? error.message : $t(i18nKeys.errors.web.unknownRequestFailure);
     } finally {
       submitting = false;

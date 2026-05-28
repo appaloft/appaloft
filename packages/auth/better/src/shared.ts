@@ -1,6 +1,48 @@
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { bearer, organization } from "better-auth/plugins";
+import { bearer, emailOTP, organization } from "better-auth/plugins";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+
+export type AppaloftBetterAuthEmailOTPType =
+  | "sign-in"
+  | "email-verification"
+  | "forget-password"
+  | "change-email";
+
+export interface AppaloftBetterAuthEmailOTPInput {
+  readonly email: string;
+  readonly otp: string;
+  readonly type: AppaloftBetterAuthEmailOTPType;
+}
+
+type BetterAuthEmailVerificationOptions = NonNullable<BetterAuthOptions["emailVerification"]>;
+
+export interface AppaloftBetterAuthEmailOTPConfig {
+  readonly enabled?: boolean;
+  readonly allowedAttempts?: number;
+  readonly expiresIn?: number;
+  readonly otpLength?: number;
+  readonly rateLimit?: {
+    readonly max: number;
+    readonly window: number;
+  };
+  readonly resendStrategy?: "rotate" | "reuse";
+  readonly storeOTP?: "plain" | "hashed" | "encrypted";
+}
+
+export interface AppaloftBetterAuthEmailVerificationConfig {
+  readonly enabled?: boolean;
+  readonly autoSignInAfterVerification?: boolean;
+  readonly expiresIn?: number;
+  readonly otp?: AppaloftBetterAuthEmailOTPConfig;
+  readonly requireEmailVerification?: boolean;
+  readonly sendOnSignIn?: boolean;
+  readonly sendOnSignUp?: boolean;
+  readonly sendVerificationEmail?: BetterAuthEmailVerificationOptions["sendVerificationEmail"];
+  readonly sendVerificationOTP?: (
+    input: AppaloftBetterAuthEmailOTPInput,
+    request?: Request,
+  ) => Promise<void>;
+}
 
 export interface AppaloftBetterAuthConfig {
   baseURL: string;
@@ -8,6 +50,7 @@ export interface AppaloftBetterAuthConfig {
   cookieDomain?: string;
   cookiePrefix?: string;
   database?: BetterAuthOptions["database"];
+  emailVerification?: AppaloftBetterAuthEmailVerificationConfig;
   minPasswordLength?: number;
   githubClientId?: string;
   githubClientSecret?: string;
@@ -28,6 +71,15 @@ export interface AppaloftBetterAuthProviderConfig {
   github: boolean;
   google: boolean;
   oidc: boolean;
+}
+
+export interface AppaloftBetterAuthEmailVerificationStatus {
+  enabled: boolean;
+  otpEnabled: boolean;
+  required: boolean;
+  sendOtpPath?: string;
+  verifyOtpPath?: string;
+  verifyPagePath?: string;
 }
 
 function joinBaseUrlPath(baseURL: string, path: string): string | undefined {
@@ -84,14 +136,53 @@ export function resolveAppaloftBetterAuthProviderConfig(
   };
 }
 
-export function createAppaloftBetterAuthOptions(
+export function resolveAppaloftBetterAuthEmailVerificationStatus(
   config: AppaloftBetterAuthConfig,
-): BetterAuthOptions {
+): AppaloftBetterAuthEmailVerificationStatus {
+  const enabled = config.emailVerification?.enabled === true;
+  const otpEnabled = enabled && config.emailVerification?.otp?.enabled === true;
+
+  return {
+    enabled,
+    otpEnabled,
+    required: enabled && config.emailVerification?.requireEmailVerification === true,
+    ...(otpEnabled
+      ? {
+          sendOtpPath: "/api/auth/email-otp/send-verification-otp",
+          verifyOtpPath: "/api/auth/email-otp/verify-email",
+          verifyPagePath: "/verify-email",
+        }
+      : {}),
+  };
+}
+
+function createEmailVerificationOptions(
+  config: AppaloftBetterAuthConfig,
+): BetterAuthOptions["emailVerification"] | undefined {
+  const policy = config.emailVerification;
+  if (!policy?.enabled) {
+    return undefined;
+  }
+
+  return {
+    ...(policy.sendVerificationEmail
+      ? { sendVerificationEmail: policy.sendVerificationEmail }
+      : {}),
+    sendOnSignUp: policy.sendOnSignUp ?? policy.requireEmailVerification ?? false,
+    sendOnSignIn: policy.sendOnSignIn ?? policy.requireEmailVerification ?? false,
+    autoSignInAfterVerification: policy.autoSignInAfterVerification ?? true,
+    ...(policy.expiresIn ? { expiresIn: policy.expiresIn } : {}),
+  };
+}
+
+export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig) {
   const providers = resolveAppaloftBetterAuthProviderConfig(config);
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
   const githubRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "github");
   const googleRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "google");
   const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
+  const emailVerification = createEmailVerificationOptions(config);
+  const emailVerificationStatus = resolveAppaloftBetterAuthEmailVerificationStatus(config);
 
   if (providers.github && config.githubClientId && config.githubClientSecret && githubRedirectUri) {
     socialProviders.github = {
@@ -119,8 +210,10 @@ export function createAppaloftBetterAuthOptions(
     },
     emailAndPassword: {
       enabled: true,
+      ...(emailVerificationStatus.required ? { requireEmailVerification: true } : {}),
       ...(config.minPasswordLength ? { minPasswordLength: config.minPasswordLength } : {}),
     },
+    ...(emailVerification ? { emailVerification } : {}),
     advanced: {
       ...(config.cookiePrefix ? { cookiePrefix: config.cookiePrefix } : {}),
       ...(config.trustedProxyHeaders !== undefined
@@ -138,6 +231,36 @@ export function createAppaloftBetterAuthOptions(
     plugins: [
       bearer(),
       organization(),
+      ...(emailVerificationStatus.otpEnabled && config.emailVerification?.sendVerificationOTP
+        ? [
+            emailOTP({
+              ...(config.emailVerification.otp?.allowedAttempts
+                ? { allowedAttempts: config.emailVerification.otp.allowedAttempts }
+                : {}),
+              ...((config.emailVerification.otp?.expiresIn ?? config.emailVerification.expiresIn)
+                ? {
+                    expiresIn:
+                      config.emailVerification.otp?.expiresIn ?? config.emailVerification.expiresIn,
+                  }
+                : {}),
+              ...(config.emailVerification.otp?.otpLength
+                ? { otpLength: config.emailVerification.otp.otpLength }
+                : {}),
+              overrideDefaultEmailVerification: true,
+              ...(config.emailVerification.otp?.rateLimit
+                ? { rateLimit: config.emailVerification.otp.rateLimit }
+                : {}),
+              ...(config.emailVerification.otp?.resendStrategy
+                ? { resendStrategy: config.emailVerification.otp.resendStrategy }
+                : {}),
+              sendVerificationOTP: async (input) =>
+                config.emailVerification?.sendVerificationOTP?.(input),
+              ...(config.emailVerification.otp?.storeOTP
+                ? { storeOTP: config.emailVerification.otp.storeOTP }
+                : {}),
+            }),
+          ]
+        : []),
       ...(providers.oidc &&
       config.oidcClientId &&
       config.oidcClientSecret &&
@@ -167,51 +290,11 @@ export function createAppaloftBetterAuthOptions(
         : []),
     ],
     ...(Object.keys(socialProviders).length > 0 ? { socialProviders } : {}),
-  };
+  } satisfies BetterAuthOptions;
 }
 
 export function createAppaloftBetterAuth(config: AppaloftBetterAuthConfig) {
-  const providers = resolveAppaloftBetterAuthProviderConfig(config);
-  const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
-  if (
-    providers.oidc &&
-    config.oidcClientId &&
-    config.oidcClientSecret &&
-    config.oidcDiscoveryUrl &&
-    oidcRedirectUri
-  ) {
-    return betterAuth({
-      ...createAppaloftBetterAuthOptions(config),
-      plugins: [
-        bearer(),
-        organization(),
-        genericOAuth({
-          config: [
-            {
-              providerId: "oidc",
-              clientId: config.oidcClientId,
-              clientSecret: config.oidcClientSecret,
-              discoveryUrl: config.oidcDiscoveryUrl,
-              redirectURI: oidcRedirectUri,
-              scopes: ["openid", "email", "profile"],
-              pkce: true,
-              ...(config.oidcIssuer
-                ? {
-                    issuer: config.oidcIssuer,
-                    requireIssuerValidation: true,
-                  }
-                : {}),
-            },
-          ],
-        }),
-      ],
-    });
-  }
-
-  return betterAuth({
-    ...createAppaloftBetterAuthOptions(config),
-    plugins: [bearer(), organization()],
-  });
+  return betterAuth(createAppaloftBetterAuthOptions(config));
 }
 
 export type AppaloftBetterAuth = ReturnType<typeof createAppaloftBetterAuth>;

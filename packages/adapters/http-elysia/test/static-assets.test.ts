@@ -245,6 +245,11 @@ describe("HTTP static assets", () => {
     const app = createTestApp({
       authSessionStatus: {
         enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
         provider: "better-auth",
         loginRequired: true,
         deferredAuth: true,
@@ -300,6 +305,15 @@ describe("HTTP static assets", () => {
       expect(signUpPage.status).toBe(200);
       expect(await signUpPage.text()).toBe("web-spa-fallback");
 
+      const verifyEmailPage = await fetch(`${baseUrl}/verify-email`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(verifyEmailPage.status).toBe(200);
+      expect(await verifyEmailPage.text()).toBe("web-spa-fallback");
+
       const asset = await fetch(`${baseUrl}/_app/immutable/app.js`, {
         headers: {
           accept: "text/html",
@@ -339,6 +353,11 @@ describe("HTTP static assets", () => {
     const app = createTestApp({
       authSessionStatus: {
         enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
         provider: "better-auth",
         loginRequired: false,
         deferredAuth: true,
