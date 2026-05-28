@@ -29,6 +29,8 @@
 
 - [x] Add `APPALOFT-MCP-001` through `APPALOFT-MCP-010` tests.
 - [x] Run focused MCP and docs registry tests.
+- [x] Add Appaloft skill eval validation coverage for MCP setup, tool/resource/prompt boundaries,
+  and operation-catalog-backed deploy/recover usage.
 - [ ] Run `git diff --check`.
 
 ## Release Preparation

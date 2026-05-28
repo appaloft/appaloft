@@ -80,10 +80,32 @@ The installable `appaloft` skill must include:
 ## Packaged Artifact
 
 - Full skill source: `skills/appaloft`.
+- Best-practice eval suite: `skills/appaloft/evals/evals.json`.
 - Entrypoint surfaces: `skills/appaloft/references/surfaces.md`.
 - Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
 - Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
 - MCP tool guide: `skills/appaloft/references/mcp-tools.md`.
+
+## Skill Evaluation Loop
+
+The skill follows the Agent Skills progressive-disclosure model: `SKILL.md` stays short, and
+detailed operation maps, deploy protocol, and MCP guidance live in one-level references. Its
+quality gate is the eval suite in `skills/appaloft/evals/evals.json`, which is grounded in public
+Appaloft docs, workflows, testing matrices, and `packages/application/src/operation-catalog.ts`.
+
+The eval suite must cover real Appaloft tasks, including project lifecycle, saving/registering and
+managing servers, SSH credentials, environments, Resource profile configuration, first deploy,
+deployment observation and recovery, domains/TLS, dependency resources and backups, storage,
+scheduled tasks, runtime usage and monitoring, runtime controls, terminal sessions, source links,
+preview cleanup, static artifact publishing, audit/retention/operator work, organization/auth/deploy
+tokens, MCP usage, and secret/bypass refusal. When a new public operation family becomes a core
+user workflow, add or update an eval instead of expanding `SKILL.md` with exhaustive prose.
+
+Run the local validator before changing the skill:
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
 
 ## MCP Boundary
 

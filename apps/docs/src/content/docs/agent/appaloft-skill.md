@@ -59,6 +59,24 @@ npx skills add appaloft/appaloft
 
 完整 CLI 映射随安装包一起发布在 `skills/appaloft/references/cli-entrypoints.md`。
 
+<h2 id="appaloft-skill-evals">最佳实践校验</h2>
+
+Appaloft skill 遵循 Agent Skills 的渐进披露原则：`SKILL.md` 保持短小，长命令表、部署协议和
+MCP 指引放在一层 `references/` 中。为了避免 skill 变成泛泛而谈的部署说明，仓库还维护
+`skills/appaloft/evals/evals.json`。
+
+这组 eval 来自公开文档、workflow、test matrix 和 operation catalog，覆盖真实 Appaloft
+任务族：项目生命周期、保存/注册并管理 server、SSH credential、环境、Resource profile、首次部署、
+部署观测和恢复、domain/TLS、dependency resource、storage、scheduled task、runtime monitoring、
+runtime control、terminal session、source link、preview、static artifact、audit/retention、组织和
+deploy token、MCP，以及拒绝读取 secret 或绕过 Appaloft 的反例。
+
+维护 skill 时先运行：
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
+
 <h2 id="appaloft-skill-mcp">MCP 工具</h2>
 
 MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；

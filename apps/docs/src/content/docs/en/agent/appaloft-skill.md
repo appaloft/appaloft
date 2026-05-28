@@ -66,6 +66,26 @@ The full skill covers every entrypoint in the Appaloft CLI operation catalog, in
 
 The complete CLI map ships with the package at `skills/appaloft/references/cli-entrypoints.md`.
 
+<h2 id="appaloft-skill-evals">Best-practice validation</h2>
+
+The Appaloft skill follows the Agent Skills progressive-disclosure model: keep `SKILL.md` short,
+and put long command maps, deploy protocol, and MCP guidance in one-level `references/` files. To
+keep the skill from becoming generic deployment advice, the repository also maintains
+`skills/appaloft/evals/evals.json`.
+
+The eval suite is derived from public docs, workflows, test matrices, and the operation catalog. It
+covers real Appaloft task families: project lifecycle, saving/registering and managing servers, SSH
+credentials, environments, Resource profile configuration, first deploy, deployment observation and
+recovery, domain/TLS, dependency resources, storage, scheduled tasks, runtime monitoring, runtime
+controls, terminal sessions, source links, previews, static artifacts, audit/retention,
+organization and deploy tokens, MCP, and refusal cases for secrets or bypassing Appaloft.
+
+Before maintaining the skill, run:
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
+
 <h2 id="appaloft-skill-mcp">MCP Tools</h2>
 
 MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP
