@@ -41,25 +41,49 @@
     ),
   );
 
-  function errorMessageFromResponseBody(body: string): string {
+  type AuthErrorDetail = {
+    code: string;
+    message: string;
+  };
+
+  function errorDetailFromResponseBody(body: string): AuthErrorDetail {
     const trimmed = body.trim();
     if (trimmed.length === 0) {
-      return "";
+      return { code: "", message: "" };
     }
 
     try {
       const parsed = JSON.parse(trimmed) as unknown;
       if (parsed && typeof parsed === "object") {
+        const code = (parsed as Record<string, unknown>).code;
         const message = (parsed as Record<string, unknown>).message;
-        if (typeof message === "string" && message.trim().length > 0) {
-          return message.trim();
-        }
+        return {
+          code: typeof code === "string" ? code.trim() : "",
+          message: typeof message === "string" ? message.trim() : "",
+        };
       }
     } catch {
-      return trimmed;
+      return { code: "", message: trimmed };
     }
 
-    return trimmed;
+    return { code: "", message: trimmed };
+  }
+
+  function seedVerifyEmailResendCooldown(): void {
+    if (!browser) {
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      return;
+    }
+
+    const cooldownSeconds = authSessionQuery.data?.emailVerification.cooldownSeconds ?? 60;
+    window.sessionStorage.setItem(
+      `appaloft.email-verification-resend-at:${normalizedEmail}`,
+      String(Date.now() + cooldownSeconds * 1000),
+    );
   }
 
   async function submitLogin(event: SubmitEvent): Promise<void> {
@@ -87,22 +111,22 @@
 
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).trim();
-        throw new Error(errorMessageFromResponseBody(detail) || `${response.status}`);
+        const authError = errorDetailFromResponseBody(detail);
+        if (requiresEmailOtpVerification && authError.code === "EMAIL_NOT_VERIFIED" && browser) {
+          seedVerifyEmailResendCooldown();
+          const verifyPath = authSessionQuery.data?.emailVerification.verifyPagePath ?? "/verify-email";
+          await goto(
+            `${verifyPath}?email=${encodeURIComponent(email)}&next=${encodeURIComponent(returnTo)}`,
+          );
+          return;
+        }
+        throw new Error(authError.message || authError.code || `${response.status}`);
       }
 
       if (browser) {
         await goto(returnTo);
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : $t(i18nKeys.errors.web.unknownRequestFailure);
-      if (requiresEmailOtpVerification && /email.*verif/i.test(message) && browser) {
-        const verifyPath = authSessionQuery.data?.emailVerification.verifyPagePath ?? "/verify-email";
-        await goto(
-          `${verifyPath}?email=${encodeURIComponent(email)}&next=${encodeURIComponent(returnTo)}`,
-        );
-        return;
-      }
       loginError = error instanceof Error ? error.message : $t(i18nKeys.errors.web.unknownRequestFailure);
     } finally {
       submitting = false;
@@ -187,7 +211,12 @@
           </label>
 
           <label class="appaloft-field-stack">
-            <span class="appaloft-field-label">{$t(i18nKeys.console.authBootstrap.loginPasswordLabel)}</span>
+            <span class="flex items-center justify-between gap-3">
+              <span class="appaloft-field-label">{$t(i18nKeys.console.authBootstrap.loginPasswordLabel)}</span>
+              <a class="text-xs font-medium text-primary hover:underline" href={`/forgot-password?email=${encodeURIComponent(email)}&next=${encodeURIComponent(returnTo)}`}>
+                {$t(i18nKeys.console.authAccountRecovery.forgotLink)}
+              </a>
+            </span>
             <Input bind:value={password} type="password" autocomplete="current-password" required />
           </label>
 

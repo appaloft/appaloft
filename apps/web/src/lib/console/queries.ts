@@ -22,6 +22,13 @@ import { orpcClient } from "$lib/orpc";
 export const defaultConsoleListLimit = 100;
 
 export const defaultAuthSession: AuthSessionResponse = {
+  accountSecurity: {
+    enabled: false,
+    passwordState: "unknown",
+  },
+  accountRecovery: {
+    enabled: false,
+  },
   enabled: false,
   emailVerification: {
     enabled: false,

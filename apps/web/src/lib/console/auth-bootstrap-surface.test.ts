@@ -19,27 +19,69 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
       new URL("../../routes/verify-email/+page.svelte", import.meta.url),
       "utf8",
     );
+    const forgotPasswordPageSource = await readFile(
+      new URL("../../routes/forgot-password/+page.svelte", import.meta.url),
+      "utf8",
+    );
+    const resetPasswordPageSource = await readFile(
+      new URL("../../routes/reset-password/+page.svelte", import.meta.url),
+      "utf8",
+    );
+    const accountSecurityPageSource = await readFile(
+      new URL("../../routes/account/security/+page.svelte", import.meta.url),
+      "utf8",
+    );
+    const consoleShellSource = await readFile(
+      new URL("../../lib/components/console/ConsoleShell.svelte", import.meta.url),
+      "utf8",
+    );
 
     expect(loginPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(loginPageSource).not.toContain("createAdmin");
     expect(loginPageSource).toContain("/api/auth/session");
     expect(loginPageSource).toContain("signInWithGithub");
+    expect(loginPageSource).toContain("/forgot-password");
+    expect(loginPageSource).toContain("authAccountRecovery.forgotLink");
     expect(signupPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(signupPageSource).toContain("/api/auth/session");
     expect(signupPageSource).toContain("signUpWithGithub");
     expect(signupPageSource).toContain("/api/auth/sign-up/email");
     expect(signupPageSource).toContain("/api/auth/organization/create");
     expect(signupPageSource).toContain("emailVerification.required");
-    expect(signupPageSource).toContain("appaloft.pending-email-verification");
+    expect(signupPageSource).toContain("appaloftPendingVerificationIntent");
+    expect(signupPageSource).not.toContain("appaloft.pending-email-verification");
     expect(loginPageSource).toContain("emailVerification.required");
+    expect(loginPageSource).toContain("EMAIL_NOT_VERIFIED");
+    expect(loginPageSource).toContain("appaloft.email-verification-resend-at");
+    expect(loginPageSource).not.toContain("/email.*verif/i");
     expect(verifyEmailPageSource).toContain("/api/auth/email-otp/send-verification-otp");
     expect(verifyEmailPageSource).toContain("/api/auth/email-otp/verify-email");
-    expect(verifyEmailPageSource).toContain("/api/auth/organization/create");
+    expect(verifyEmailPageSource).not.toContain("/api/auth/organization/create");
+    expect(verifyEmailPageSource).not.toContain("appaloft.pending-email-verification");
     expect(verifyEmailPageSource).toContain("$lib/components/ui/input-otp");
     expect(verifyEmailPageSource).toContain("InputOTP.Root");
     expect(verifyEmailPageSource).toContain("REGEXP_ONLY_DIGITS");
     expect(verifyEmailPageSource).toContain("cooldownSeconds");
     expect(verifyEmailPageSource).toContain("requestCoolingDown");
+    expect(forgotPasswordPageSource).toContain("/api/auth/session");
+    expect(forgotPasswordPageSource).toContain("accountRecovery");
+    expect(forgotPasswordPageSource).toContain("request-password-reset");
+    expect(forgotPasswordPageSource).toContain("appaloft.account-recovery-request-at");
+    expect(forgotPasswordPageSource).toContain("authAccountRecovery.requestCoolingDown");
+    expect(resetPasswordPageSource).toContain("/api/auth/session");
+    expect(resetPasswordPageSource).toContain("accountRecovery");
+    expect(resetPasswordPageSource).toContain("reset-password");
+    expect(resetPasswordPageSource).toContain("newPassword");
+    expect(accountSecurityPageSource).toContain("/api/auth/change-password");
+    expect(accountSecurityPageSource).toContain("/api/auth/set-password");
+    expect(accountSecurityPageSource).toContain("/api/auth/email-otp/request-email-change");
+    expect(accountSecurityPageSource).toContain("/api/auth/email-otp/change-email");
+    expect(accountSecurityPageSource).toContain("accountSecurity");
+    expect(accountSecurityPageSource).toContain("passwordState");
+    expect(accountSecurityPageSource).toContain("appaloft.email-change-request-at");
+    expect(accountSecurityPageSource).toContain("$lib/components/ui/input-otp");
+    expect(consoleShellSource).toContain("/account/security");
+    expect(consoleShellSource).toContain("nav.accountSecurity");
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
   });

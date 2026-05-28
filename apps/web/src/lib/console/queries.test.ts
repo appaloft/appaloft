@@ -7,6 +7,13 @@ function authSession(
   input: Pick<AuthSessionResponse, "loginRequired" | "session">,
 ): AuthSessionResponse {
   return {
+    accountSecurity: {
+      enabled: true,
+      passwordState: "unknown",
+    },
+    accountRecovery: {
+      enabled: false,
+    },
     enabled: true,
     emailVerification: {
       enabled: false,
