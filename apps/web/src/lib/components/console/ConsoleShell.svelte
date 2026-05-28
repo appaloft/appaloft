@@ -23,6 +23,7 @@
     ShieldCheck,
     Settings2,
     Sun,
+    KeyRound,
     UserRound,
   } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
@@ -578,6 +579,10 @@
           <DropdownMenuItem onclick={() => navigateTo("/organization")}>
             <UserRound class="size-4" />
             {$t(i18nKeys.console.nav.organization)}
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/account/security")}>
+            <KeyRound class="size-4" />
+            {$t(i18nKeys.console.nav.accountSecurity)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/instance")}>
             <Settings2 class="size-4" />

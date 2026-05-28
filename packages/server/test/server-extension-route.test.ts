@@ -237,6 +237,13 @@ function createTestAuthRuntime(): AuthRuntime {
     },
     async getSessionStatus() {
       return {
+        accountSecurity: {
+          enabled: true,
+          passwordState: "unknown",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
         enabled: true,
         emailVerification: {
           enabled: false,

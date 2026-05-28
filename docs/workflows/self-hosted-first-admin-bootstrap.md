@@ -15,7 +15,8 @@ installer/runtime config
   -> generate one-time password when no password was supplied
   -> call application first-admin bootstrap command
   -> auth adapter creates local product user
-  -> auth adapter creates initial organization and owner membership
+  -> auth adapter creates or reuses the stable self-hosted organization tenant
+  -> auth adapter creates owner membership in that organization
   -> return console URL, login method summary, and one-time password only when generated
 ```
 
@@ -28,6 +29,8 @@ installer/runtime config
   the login page, the setup page should send ordinary visitors to `/login`, and the setup endpoint
   must return `404` before dispatching the create command.
 - User/session/provider implementation details stay behind application-owned ports.
+- First-admin owner membership must use the stable `org_self_hosted` organization boundary. This
+  keeps product data created by bootstrap, CLI, installer, and HTTP sessions in the same tenant.
 - OAuth configuration is additive and optional. Missing OAuth never blocks local first-admin login.
 - Existing first-admin state makes bootstrap idempotent and suppresses raw password output.
 - Runtime startup may bootstrap directly from `APPALOFT_FIRST_ADMIN_EMAIL` and

@@ -8957,6 +8957,7 @@ export interface AuthBootstrapStatusReader {
 export interface FirstAdminBootstrapRequest {
   displayName: string;
   email: string;
+  organizationId?: string;
   organizationName: string;
   organizationSlug?: string;
   password: string;

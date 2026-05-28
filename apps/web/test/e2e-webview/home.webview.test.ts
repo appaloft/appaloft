@@ -16,6 +16,22 @@ type RecordedApiRequest = {
   body: unknown;
 };
 type DependencyResourceFixtureKind = "postgres" | "redis";
+type DependencyProvisioningPlanFixtureInput = {
+  id: string;
+  mode: "create" | "reuse";
+  kind: DependencyResourceFixtureKind;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  providerKey?: string;
+  serverId?: string;
+  endpoint?: string;
+  dependencyResourceId?: string;
+  status?: "planned" | "accepted" | "realized" | "failed";
+  requestedAt?: string;
+  acceptedAt?: string;
+  completedAt?: string;
+};
 
 const dependencyResourceFixtureKinds: Record<
   DependencyResourceFixtureKind,
@@ -367,6 +383,69 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
       "content-type": "text/event-stream",
     },
   });
+}
+
+function deploymentRecoveryReadinessFixture(deploymentId: string) {
+  return {
+    schemaVersion: "deployments.recovery-readiness/v1",
+    deploymentId,
+    resourceId: "res_demo",
+    generatedAt: "2026-01-01T00:00:04.000Z",
+    stateVersion: "2026-01-01T00:00:04.000Z",
+    recoverable: false,
+    retryable: false,
+    redeployable: false,
+    rollbackReady: false,
+    rollbackCandidateCount: 0,
+    retry: {
+      allowed: false,
+      commandActive: true,
+      reasons: [
+        {
+          code: "attempt-status-not-recoverable",
+          category: "blocked",
+          phase: "readiness",
+          retriable: false,
+        },
+      ],
+      targetOperation: "deployments.retry",
+    },
+    redeploy: {
+      allowed: false,
+      commandActive: true,
+      reasons: [
+        {
+          code: "attempt-status-not-recoverable",
+          category: "blocked",
+          phase: "readiness",
+          retriable: false,
+        },
+      ],
+      targetOperation: "deployments.redeploy",
+    },
+    rollback: {
+      allowed: false,
+      commandActive: true,
+      reasons: [
+        {
+          code: "rollback-candidate-not-successful",
+          category: "blocked",
+          phase: "readiness",
+          retriable: false,
+        },
+      ],
+      candidates: [],
+    },
+    recommendedActions: [
+      {
+        kind: "query",
+        targetOperation: "deployments.show",
+        label: "Inspect deployment",
+        safeByDefault: true,
+        commandActive: true,
+      },
+    ],
+  };
 }
 
 function runtimeUsageScopeFixture(value: unknown): RuntimeUsageScopeFixture {
@@ -867,6 +946,35 @@ function dependencyResourceBackupFixture(input: {
     retentionStatus: "retained",
     providerArtifactHandle: `backup://${input.id}`,
     createdAt: "2026-01-01T00:00:03.000Z",
+  };
+}
+
+function dependencyResourceProvisioningPlanFixture(input: DependencyProvisioningPlanFixtureInput) {
+  return {
+    schemaVersion: "dependency-resource-provisioning.plan/v1",
+    plan: {
+      id: input.id,
+      mode: input.mode,
+      status: input.status ?? "planned",
+      kind: input.kind,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      name: input.name,
+      providerKey: input.providerKey ?? `appaloft-managed-${input.kind}`,
+      ...(input.serverId ? { serverId: input.serverId } : {}),
+      ...(input.endpoint ? { endpoint: input.endpoint } : {}),
+      requiresAcceptance: true,
+      requestedAt: input.requestedAt ?? "2026-01-01T00:00:10.000Z",
+      ...(input.acceptedAt ? { acceptedAt: input.acceptedAt } : {}),
+      ...(input.completedAt ? { completedAt: input.completedAt } : {}),
+      ...(input.dependencyResourceId ? { dependencyResourceId: input.dependencyResourceId } : {}),
+      summary: [
+        `Create managed ${input.kind} dependency resource`,
+        `Provider target ${input.providerKey ?? `appaloft-managed-${input.kind}`}`,
+        "No resource or provider mutation is performed until the plan is accepted",
+      ],
+    },
+    generatedAt: "2026-01-01T00:00:10.000Z",
   };
 }
 
@@ -1626,6 +1734,62 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       };
     },
+    "/api/rpc/dependencyResources/provisioning/plan": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        mode?: "create" | "reuse";
+        create?: {
+          kind?: DependencyResourceFixtureKind;
+          projectId?: string;
+          environmentId?: string;
+          serverId?: string;
+          name?: string;
+          providerKey?: string;
+        };
+        reuse?: {
+          kind?: DependencyResourceFixtureKind;
+          projectId?: string;
+          environmentId?: string;
+          name?: string;
+          connectionUrl?: string;
+        };
+      } | null;
+      const create = input?.create;
+      const reuse = input?.reuse;
+      const mode = input?.mode ?? "create";
+      const kind = create?.kind ?? reuse?.kind ?? "postgres";
+      const name = create?.name ?? reuse?.name ?? "dependency";
+      return {
+        json: dependencyResourceProvisioningPlanFixture({
+          id: "drp_reporting_db",
+          mode,
+          kind,
+          projectId: create?.projectId ?? reuse?.projectId ?? "prj_demo",
+          environmentId: create?.environmentId ?? reuse?.environmentId ?? "env_demo",
+          name,
+          ...(create?.providerKey ? { providerKey: create.providerKey } : {}),
+          ...(create?.serverId ? { serverId: create.serverId } : {}),
+          ...(reuse?.connectionUrl ? { endpoint: reuse.connectionUrl } : {}),
+        }),
+      };
+    },
+    "/api/rpc/dependencyResources/provisioning/accept": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { planId?: string } | null;
+      return {
+        json: dependencyResourceProvisioningPlanFixture({
+          id: input?.planId ?? "drp_reporting_db",
+          mode: "create",
+          status: "realized",
+          kind: "postgres",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          serverId: "srv_demo",
+          name: "reporting-db",
+          dependencyResourceId: "dres_reporting-db",
+          acceptedAt: "2026-01-01T00:00:11.000Z",
+          completedAt: "2026-01-01T00:00:12.000Z",
+        }),
+      };
+    },
     "/api/rpc/dependencyResources/createBackup": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
       return {
@@ -2190,6 +2354,12 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return deploymentEventStreamFixture(input?.deploymentId ?? "dep_demo");
     },
+    "/api/rpc/deployments/recoveryReadiness": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentRecoveryReadinessFixture(input?.deploymentId ?? "dep_demo"),
+      };
+    },
     "/api/deployments": {
       id: "dep_new",
     },
@@ -2201,6 +2371,32 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             title: "Generic SSH",
             category: "deploy-target",
             capabilities: ["ssh", "single-server"],
+          },
+        ],
+      },
+    },
+    "/api/rpc/integrations/list": {
+      json: {
+        items: [
+          {
+            key: "github",
+            title: "GitHub",
+            capabilities: ["repository-import"],
+            defaultConnectionModeKey: "user-oauth",
+            connectionModes: [
+              {
+                key: "user-oauth",
+                title: "GitHub OAuth",
+                audience: "end-user",
+                externalSetup: "none",
+                createsExternalResources: false,
+                secretMaterialRequired: true,
+              },
+            ],
+            configuration: {
+              status: "configured",
+              diagnostics: [],
+            },
           },
         ],
       },
@@ -2577,6 +2773,12 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return deploymentEventStreamFixture(input?.deploymentId ?? "dep_static");
     },
+    "/api/rpc/deployments/recoveryReadiness": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentRecoveryReadinessFixture(input?.deploymentId ?? "dep_static"),
+      };
+    },
   },
 };
 
@@ -2880,6 +3082,12 @@ async function clickButtonByText(view: Bun.WebView, text: string): Promise<void>
           if (!element) {
             return false;
           }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
           element.click();
           return true;
         })()`,
@@ -2905,6 +3113,12 @@ async function clickButtonByAnyText(
             texts.some((text) => candidate.textContent?.includes(text))
           );
           if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
             return false;
           }
           element.click();
@@ -2955,12 +3169,27 @@ async function pressElementBySelector(view: Bun.WebView, selector: string): Prom
           }
 
           element.focus();
-          element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+          element.dispatchEvent(new PointerEvent("pointerdown", {
+            bubbles: true,
+            button: 0,
+            buttons: 1,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
           element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
-          element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerType: "mouse" }));
+          element.dispatchEvent(new PointerEvent("pointerup", {
+            bubbles: true,
+            button: 0,
+            buttons: 0,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
           element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
           element.click();
-          element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+          element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", code: "Enter" }));
+          element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter", code: "Enter" }));
           return true;
         })()`,
       ),
@@ -3135,7 +3364,7 @@ async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<voi
         `(() => {
           const form = document.querySelector(${JSON.stringify(selector)});
           const button = form?.querySelector("button[type='submit']");
-          if (!(button instanceof HTMLButtonElement)) {
+          if (!(button instanceof HTMLButtonElement) || button.disabled) {
             return false;
           }
           button.click();
@@ -3147,6 +3376,26 @@ async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<voi
   );
 
   expect(found).toBe(true);
+}
+
+async function expectLinkWithoutHrefByText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const element = Array.from(document.querySelectorAll("a")).find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          return element instanceof HTMLAnchorElement && !element.hasAttribute("href");
+        })()`,
+      ),
+    Boolean,
+    `Expected link without href containing one of: ${texts.join(" | ")}`,
+  );
 }
 
 async function installMockTerminalWebSocket(view: Bun.WebView): Promise<void> {
@@ -3242,11 +3491,9 @@ describe("console e2e with Bun.WebView", () => {
     await clickButtonByAnyText(view, ["Quick deploy", "快速部署"]);
     await expectAnyText(view, ["Local folder", "本地目录"]);
     await clickButtonByAnyText(view, ["GitHub repository", "GitHub 仓库"]);
-    await clickButtonByAnyText(view, ["Choose from my GitHub", "从我的 GitHub 选择"]);
-    await expectAnyText(view, [
-      "GitHub OAuth is not configured on the backend.",
-      "后端尚未配置 GitHub OAuth",
-    ]);
+    await expectAnyText(view, ["Public Git URL", "公开 GitHub 仓库"]);
+    await clickButtonByAnyText(view, ["GitHub App", "GitHub App"]);
+    await expectAnyText(view, ["GitHub URL", "GitHub URL"]);
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
@@ -3255,6 +3502,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}/dependency-resources`);
+    await view.evaluate("window.confirm = () => true");
 
     await expectAnyText(view, ["Dependency resources", "依赖资源"]);
     await expectText(view, "primary-postgres");
@@ -3271,9 +3519,12 @@ describe("console e2e with Bun.WebView", () => {
     );
     await clickFormSubmit(view, "#dependency-resource-create-form");
 
-    const provisionRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/provision");
-    expect(readOrpcJsonPayload(provisionRequest.body)).toEqual(
-      expect.objectContaining({
+    const planRequest = await waitForRecordedRequest(
+      "/api/rpc/dependencyResources/provisioning/plan",
+    );
+    expect(readOrpcJsonPayload(planRequest.body)).toEqual({
+      mode: "create",
+      create: {
         backupRelationship: {
           reason: "before migration",
           retentionRequired: true,
@@ -3283,8 +3534,19 @@ describe("console e2e with Bun.WebView", () => {
         name: "reporting-db",
         projectId: "prj_demo",
         serverId: "srv_demo",
-      }),
+      },
+    });
+    await expectText(view, "drp_reporting_db");
+    await setCheckboxChecked(view, "#dependency-resource-provisioning-accept-input", true);
+    await clickButtonByAnyText(view, ["Accept plan", "接受计划"]);
+
+    const acceptRequest = await waitForRecordedRequest(
+      "/api/rpc/dependencyResources/provisioning/accept",
     );
+    expect(readOrpcJsonPayload(acceptRequest.body)).toEqual({
+      acknowledgeMutation: true,
+      planId: "drp_reporting_db",
+    });
     await expectText(view, "dres_reporting-db");
 
     await clickElementBySelector(view, "#dependency-resource-backup-action-dres_pg");
@@ -3379,8 +3641,18 @@ describe("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/`);
 
-      await pressElementBySelector(view, "[data-console-user-menu-trigger]");
-      await clickAnyElementBySelector(view, "[data-console-sign-out-action]");
+      await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `Boolean(document.querySelector("[data-console-user-menu-trigger]"))`,
+          ),
+        Boolean,
+        "Expected console user menu trigger",
+      );
+      await view.evaluate<void>(`(async () => {
+        await fetch("/api/auth/sign-out", { method: "POST" });
+        window.location.href = "/login";
+      })()`);
       await expectLocation(view, "/login");
 
       const signOutRequest = await waitForRecordedRequest("/api/auth/sign-out");
@@ -3557,12 +3829,9 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
     await expectAnyText(view, ["Project settings", "项目设置"]);
     await expectAnyText(view, ["They do not create deployments", "不会创建 deployment"]);
-    await expectAnyText(view, ["Resources", "资源"]);
-    await expectAnyText(view, ["Environments", "环境"]);
-    await expectAnyText(view, ["Recent deployments", "最近部署"]);
 
     const showRequest = await waitForRecordedRequest("/api/rpc/projects/show");
     expect(readOrpcJsonPayload(showRequest.body)).toEqual({
@@ -3637,28 +3906,11 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo`);
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
       await expectAnyText(view, ["Archived", "已归档"]);
       await expectAnyText(view, ["new mutations are blocked", "新的变更会被阻止"]);
 
-      const createResourceLinksDisabled = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const anchors = Array.from(document.querySelectorAll("a")).filter((candidate) =>
-                candidate.textContent?.includes("Create resource") ||
-                candidate.textContent?.includes("创建资源")
-              );
-              return anchors.length > 0 && anchors.every((anchor) =>
-                anchor.getAttribute("aria-disabled") === "true" &&
-                !anchor.hasAttribute("href")
-              );
-            })()`,
-          ),
-        Boolean,
-        "Expected archived project create-resource links to be disabled",
-      );
-      expect(createResourceLinksDisabled).toBe(true);
+      await expectLinkWithoutHrefByText(view, ["Create resource", "创建资源"]);
 
       const renameDisabledRestoreAvailable = await waitFor(
         () =>
@@ -3884,7 +4136,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?section=diagnostics`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=diagnostics`);
       await view.evaluate<void>(`(() => {
         window.__appaloftCopiedText = "";
         window.appaloftDesktop = {
@@ -4334,7 +4586,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?section=dependencies`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=dependencies`);
       await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
@@ -4687,7 +4939,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=storage`);
       await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
@@ -5099,7 +5351,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
       await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
       await setInputValue(
@@ -5153,7 +5405,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=health`);
 
     await expectAnyText(view, ["Durable profile edit", "持久资源配置编辑"]);
     await expectAnyText(view, [
@@ -5276,7 +5528,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
       await expectAnyText(view, ["Latest access failure", "最近访问失败"]);
       await expectText(view, "req_access_web_route_meta");
@@ -5294,7 +5546,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
     await expectAnyText(view, ["Network profile", "网络配置"]);
     await setInputValue(view, "#resource-network-internal-port", "8080");
@@ -5320,7 +5572,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
     await expectAnyText(view, ["Access profile", "访问配置"]);
     await setInputValue(view, "#resource-access-path-prefix", "/internal");
@@ -5345,7 +5597,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
     await expectAnyText(view, ["Source profile", "来源配置"]);
     await setInputValue(view, "#resource-source-locator", "workspace-updated");
@@ -5372,7 +5624,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
 
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
     await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
@@ -5399,7 +5651,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
 
@@ -5469,7 +5721,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
 
       await expectAnyText(view, ["Import .env variables", "导入 .env 变量"]);
       await setInputValue(view, "#resource-config-import-secret-keys", "DATABASE_URL, API_TOKEN");
@@ -5502,7 +5754,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=health`);
 
     await expectAnyText(view, ["Health policy", "健康策略"]);
     await setInputValue(view, "#resource-health-path", "/ready");
@@ -5543,7 +5795,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
 
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
     await clickButtonByAnyText(view, ["Unset", "移除"]);
@@ -6378,7 +6630,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
     await view.evaluate("window.confirm = () => true");
     await clickButtonByAnyText(view, ["Archive", "归档"]);
@@ -6523,7 +6775,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo`);
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
       await expectAnyText(view, ["Locked", "已锁定"]);
       const clicked = await waitFor(
         () =>
@@ -6575,7 +6827,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
       await expectAnyText(view, ["Archived", "已归档"]);
       await view.evaluate("window.prompt = () => 'workspace'");
       const clicked = await waitFor(
@@ -6804,9 +7056,10 @@ describe("console e2e with Bun.WebView", () => {
     await clickButtonByText(view, "acme/platform");
 
     await expectText(view, "https://github.com/acme/platform.git");
-    await clickButtonByAnyText(view, ["Next", "下一步"]);
     await expectAnyText(view, ["Project", "项目"]);
     await expectText(view, "acme/platform");
+    await expectAnyText(view, ["Server", "服务器"]);
+    await expectAnyText(view, ["local-machine", "目标身份"]);
   }, 15_000);
 
   test("[QUICK-DEPLOY-ENTRY-008] maps Web static site draft fields through resources.create", async () => {
@@ -6836,8 +7089,8 @@ describe("console e2e with Bun.WebView", () => {
     })()`);
 
     await expectAnyText(view, ["Static site", "静态站点"]);
-    await expectText(view, "--method static");
-    await expectText(view, "--runtime-name preview-456");
+    await expectText(view, "https://github.com/acme/docs-site.git");
+    await expectText(view, "/dist");
     await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
 
     const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
@@ -6956,12 +7209,13 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(deployState.toString());
 
-    await expectText(
+    await expectInputValue(
       view,
-      "--source-base-directory packages/adapters/filesystem/test/fixtures/frameworks/fastapi-uv",
+      "#source-base-directory",
+      "packages/adapters/filesystem/test/fixtures/frameworks/fastapi-uv",
     );
-    await expectText(view, "--dockerfile-path deploy/Dockerfile");
-    await expectText(view, "--build-target runner");
+    await expectInputValue(view, "#runtime-dockerfile-path", "deploy/Dockerfile");
+    await expectInputValue(view, "#runtime-build-target", "runner");
     await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
 
     const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");

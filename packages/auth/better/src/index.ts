@@ -54,9 +54,13 @@ import {
 } from "@appaloft/core";
 import {
   type AppaloftBetterAuth,
+  type AppaloftBetterAuthAccountRecoveryStatus,
+  type AppaloftBetterAuthAccountSecurityStatus,
   type AppaloftBetterAuthConfig,
   type AppaloftBetterAuthEmailVerificationStatus,
   createAppaloftBetterAuth,
+  resolveAppaloftBetterAuthAccountRecoveryStatus,
+  resolveAppaloftBetterAuthAccountSecurityStatus,
   resolveAppaloftBetterAuthEmailVerificationStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "./shared";
@@ -75,6 +79,8 @@ export interface AuthProviderStatus {
 }
 
 export interface AuthSessionStatus {
+  accountSecurity: AppaloftBetterAuthAccountSecurityStatus;
+  accountRecovery: AppaloftBetterAuthAccountRecoveryStatus;
   enabled: boolean;
   emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   provider: "none" | "better-auth";
@@ -116,6 +122,15 @@ interface DirectMemberQueryBuilder {
   execute(): Promise<Record<string, unknown>[]>;
 }
 
+type ForcedIdCreateAdapter = {
+  create<T extends Record<string, unknown>, R = T>(input: {
+    model: string;
+    data: T & { id: string };
+    select?: string[] | undefined;
+    forceAllowId: true;
+  }): Promise<R>;
+};
+
 type DirectMemberListReadback =
   | { result: Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }> }
   | { reasonCode: string };
@@ -146,6 +161,7 @@ function buildProviderStatus(
 
 export class BetterAuthRuntime implements AuthRuntime {
   private readonly auth: AppaloftBetterAuth;
+  private readonly accountRecovery: AppaloftBetterAuthAccountRecoveryStatus;
   private readonly emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   private readonly githubConfigured: boolean;
   private readonly googleConfigured: boolean;
@@ -153,6 +169,7 @@ export class BetterAuthRuntime implements AuthRuntime {
 
   constructor(private readonly config: BetterAuthRuntimeConfig) {
     const providers = resolveAppaloftBetterAuthProviderConfig(config);
+    this.accountRecovery = resolveAppaloftBetterAuthAccountRecoveryStatus(config);
     this.emailVerification = resolveAppaloftBetterAuthEmailVerificationStatus(config);
     this.githubConfigured = providers.github;
     this.googleConfigured = providers.google;
@@ -163,6 +180,8 @@ export class BetterAuthRuntime implements AuthRuntime {
   async getSessionStatus(request: Request): Promise<AuthSessionStatus> {
     if (!this.config.enabled) {
       return {
+        accountSecurity: disabledAccountSecurityStatus(),
+        accountRecovery: disabledAccountRecoveryStatus(),
         enabled: false,
         emailVerification: disabledEmailVerificationStatus(),
         provider: "none",
@@ -180,12 +199,12 @@ export class BetterAuthRuntime implements AuthRuntime {
     const session = await this.auth.api.getSession({
       headers: request.headers,
     });
-    const accounts =
-      session && this.hasConfiguredOAuthProvider()
-        ? await this.auth.api.listUserAccounts({
-            headers: request.headers,
-          })
-        : [];
+    const accounts = session
+      ? await this.auth.api.listUserAccounts({
+          headers: request.headers,
+        })
+      : [];
+    const passwordState = session ? resolvePasswordState(accounts) : "unknown";
     const connectedProviders = new Set(
       accounts
         .filter((account) => account && typeof account === "object")
@@ -197,6 +216,8 @@ export class BetterAuthRuntime implements AuthRuntime {
     );
 
     return {
+      accountSecurity: resolveAppaloftBetterAuthAccountSecurityStatus({ passwordState }),
+      accountRecovery: this.accountRecovery,
       enabled: true,
       emailVerification: this.emailVerification,
       provider: "better-auth",
@@ -251,13 +272,54 @@ export class BetterAuthRuntime implements AuthRuntime {
       );
     }
 
+    if (isSetPasswordHttpWrapperRequest(request)) {
+      return this.handleSetPasswordHttpWrapper(request);
+    }
+
     const response = await this.auth.handler(request);
+    await this.consumePendingVerificationIntentAfterAuthRoute(request, response);
     await this.ensureDefaultOrganizationAfterAuthRoute(request, response);
     return response;
   }
 
-  private hasConfiguredOAuthProvider(): boolean {
-    return this.githubConfigured || this.googleConfigured || this.oidcConfigured;
+  private async handleSetPasswordHttpWrapper(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      return jsonResponse(
+        {
+          error: {
+            code: "method_not_allowed",
+            message: "Set password requires POST.",
+          },
+        },
+        405,
+      );
+    }
+
+    const body = await readJsonObject(request);
+    const newPassword = readString(body, "newPassword");
+    if (!newPassword) {
+      return jsonResponse(
+        {
+          error: {
+            code: "invalid_request",
+            message: "newPassword is required.",
+          },
+        },
+        400,
+      );
+    }
+
+    try {
+      const result = await this.auth.api.setPassword({
+        headers: request.headers,
+        body: {
+          newPassword,
+        },
+      });
+      return jsonResponse(result, 200);
+    } catch (error) {
+      return betterAuthErrorResponse(error);
+    }
   }
 
   private async firstVisibleOrganizationId(headers: Headers): Promise<string | undefined> {
@@ -318,6 +380,87 @@ export class BetterAuthRuntime implements AuthRuntime {
     } catch {
       // Auth succeeds independently; product authorization keeps a fail-closed self-heal path.
     }
+  }
+
+  private async consumePendingVerificationIntentAfterAuthRoute(
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    if (response.status >= 400 || !shouldConsumePendingVerificationIntentAfterAuthRoute(request)) {
+      return;
+    }
+
+    const headers = authResponseSessionHeaders(request.headers, response.headers);
+    if (!headers) {
+      return;
+    }
+
+    try {
+      await this.consumePendingVerificationIntentForHeaders(headers);
+    } catch {
+      // Verification succeeds independently; product authorization remains fail-closed.
+    }
+  }
+
+  private async consumePendingVerificationIntentForHeaders(headers: Headers): Promise<void> {
+    const session = await this.auth.api.getSession({ headers });
+    if (!session) {
+      return;
+    }
+
+    const sessionObject = readObject(session, "session");
+    const userObject = readObject(session, "user");
+    const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+    if (!userId) {
+      return;
+    }
+
+    const authContext = await this.auth.$context;
+    const rawUser = await authContext.internalAdapter.findUserById(userId);
+    const intentValue = readString(rawUser, "appaloftPendingVerificationIntent");
+    if (!intentValue) {
+      return;
+    }
+
+    const intent = parsePendingVerificationIntent(intentValue);
+    await this.clearPendingVerificationIntent(authContext, userId);
+    if (!intent || (await this.firstVisibleOrganizationId(headers))) {
+      return;
+    }
+
+    for (const slug of [intent.organizationSlug, `${intent.organizationSlug}-${randomHex(2)}`]) {
+      try {
+        const organization = await this.auth.api.createOrganization({
+          headers,
+          body: {
+            keepCurrentActiveOrganization: false,
+            name: intent.organizationName,
+            slug,
+            userId,
+          },
+        });
+        const organizationId = readString(organization, "id");
+        if (organizationId) {
+          await this.rememberActiveOrganization(headers, organizationId);
+          return;
+        }
+      } catch {
+        const visibleOrganizationId = await this.firstVisibleOrganizationId(headers);
+        if (visibleOrganizationId) {
+          await this.rememberActiveOrganization(headers, visibleOrganizationId);
+          return;
+        }
+      }
+    }
+  }
+
+  private async clearPendingVerificationIntent(
+    authContext: Awaited<AppaloftBetterAuth["$context"]>,
+    userId: string,
+  ): Promise<void> {
+    await authContext.internalAdapter.updateUser(userId, {
+      appaloftPendingVerificationIntent: null,
+    });
   }
 
   private async ensureDefaultOrganizationForHeaders(
@@ -509,19 +652,18 @@ export class BetterAuthRuntime implements AuthRuntime {
       const verifiedUser = await authContext.internalAdapter.updateUser(userId, {
         emailVerified: true,
       });
-      const organization = await this.auth.api.createOrganization({
-        body: {
-          name: request.organizationName,
-          slug: request.organizationSlug ?? defaultOrganizationSlug(request.organizationName),
-          userId,
-          keepCurrentActiveOrganization: true,
-        },
+      const organization = await this.ensureFirstAdminOrganizationOwner({
+        organizationId: request.organizationId ?? "org_self_hosted",
+        organizationName: request.organizationName,
+        organizationSlug:
+          request.organizationSlug ?? defaultOrganizationSlug(request.organizationName),
+        userId,
       });
 
       return ok({
         email: verifiedUser.email,
-        organizationId: organization.id,
-        organizationSlug: organization.slug,
+        organizationId: organization.organizationId,
+        organizationSlug: organization.organizationSlug,
         userId,
       });
     } catch (error) {
@@ -531,6 +673,94 @@ export class BetterAuthRuntime implements AuthRuntime {
         ),
       );
     }
+  }
+
+  private async ensureFirstAdminOrganizationOwner(input: {
+    organizationId: string;
+    organizationName: string;
+    organizationSlug: string;
+    userId: string;
+  }): Promise<{ organizationId: string; organizationSlug: string }> {
+    const authContext = await this.auth.$context;
+    const existingOrganization = await authContext.adapter.findOne<{
+      id?: string;
+      slug?: string;
+    }>({
+      model: "organization",
+      where: [
+        {
+          field: "id",
+          value: input.organizationId,
+        },
+      ],
+    });
+    const organization =
+      existingOrganization ??
+      (await (authContext.adapter as ForcedIdCreateAdapter).create<
+        {
+          id: string;
+          name: string;
+          slug: string;
+          logo: null;
+          metadata: null;
+          createdAt: Date;
+        },
+        {
+          id?: string;
+          slug?: string;
+        }
+      >({
+        model: "organization",
+        data: {
+          id: input.organizationId,
+          name: input.organizationName,
+          slug: input.organizationSlug,
+          logo: null,
+          metadata: null,
+          createdAt: new Date(),
+        },
+        forceAllowId: true,
+      }));
+    const organizationId = readString(organization, "id") ?? input.organizationId;
+    const organizationSlug = readString(organization, "slug") ?? input.organizationSlug;
+    const existingMember = await authContext.adapter.findOne<{ id?: string }>({
+      model: "member",
+      where: [
+        {
+          field: "organizationId",
+          value: organizationId,
+        },
+        {
+          field: "userId",
+          value: input.userId,
+        },
+      ],
+    });
+
+    if (existingMember?.id) {
+      await authContext.adapter.update({
+        model: "member",
+        where: [
+          {
+            field: "id",
+            value: existingMember.id,
+          },
+        ],
+        update: { role: "owner" },
+      });
+    } else {
+      await authContext.adapter.create({
+        model: "member",
+        data: {
+          organizationId,
+          userId: input.userId,
+          role: "owner",
+          createdAt: new Date(),
+        },
+      });
+    }
+
+    return { organizationId, organizationSlug };
   }
 
   async getCurrentContext(context: ExecutionContext): Promise<Result<CurrentOrganizationContext>> {
@@ -985,11 +1215,64 @@ function shouldEnsureDefaultOrganizationAfterAuthRoute(request: Request): boolea
   );
 }
 
+function shouldConsumePendingVerificationIntentAfterAuthRoute(request: Request): boolean {
+  return new URL(request.url).pathname === "/api/auth/email-otp/verify-email";
+}
+
+function isSetPasswordHttpWrapperRequest(request: Request): boolean {
+  return new URL(request.url).pathname === "/api/auth/set-password";
+}
+
+async function readJsonObject(request: Request): Promise<Record<string, unknown> | undefined> {
+  try {
+    const value = (await request.json()) as unknown;
+    return readRecord(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
+}
+
+function betterAuthErrorResponse(error: unknown): Response {
+  const statusCode = readNumber(error, "statusCode") ?? 500;
+  const body = readRecord((error as { body?: unknown } | undefined)?.body);
+  return jsonResponse(
+    body ?? {
+      error: {
+        code: readString(error, "code") ?? "auth_error",
+        message: readString(error, "message") ?? "Authentication request failed.",
+      },
+    },
+    statusCode,
+  );
+}
+
 function disabledEmailVerificationStatus(): AppaloftBetterAuthEmailVerificationStatus {
   return {
     enabled: false,
     otpEnabled: false,
     required: false,
+  };
+}
+
+function disabledAccountRecoveryStatus(): AppaloftBetterAuthAccountRecoveryStatus {
+  return {
+    enabled: false,
+  };
+}
+
+function disabledAccountSecurityStatus(): AppaloftBetterAuthAccountSecurityStatus {
+  return {
+    enabled: false,
+    passwordState: "unknown",
   };
 }
 
@@ -1074,6 +1357,14 @@ function readString(value: unknown, key: string): string | undefined {
   return typeof property === "string" && property.trim() ? property : undefined;
 }
 
+function readNumber(value: unknown, key: string): number | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const property = (value as Record<string, unknown>)[key];
+  return typeof property === "number" && Number.isInteger(property) ? property : undefined;
+}
+
 function readDateString(value: unknown, key: string): string | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -1089,6 +1380,39 @@ function toArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(readRecord(item)))
     : [];
+}
+
+function resolvePasswordState(
+  accounts: unknown[],
+): AppaloftBetterAuthAccountSecurityStatus["passwordState"] {
+  return accounts.some(
+    (account) => readRecord(account) && readString(account, "providerId") === "credential",
+  )
+    ? "set"
+    : "not-set";
+}
+
+type PendingVerificationIntent = {
+  readonly organizationName: string;
+  readonly organizationSlug: string;
+};
+
+function parsePendingVerificationIntent(value: string): PendingVerificationIntent | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    const organizationName = readString(parsed, "organizationName");
+    const organizationSlug = readString(parsed, "organizationSlug");
+    if (!organizationName || !organizationSlug) {
+      return null;
+    }
+
+    return {
+      organizationName,
+      organizationSlug: defaultOrganizationSlug(organizationSlug),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function normalizeOrganizationTeamRole(role: string | undefined): OrganizationTeamRole | null {

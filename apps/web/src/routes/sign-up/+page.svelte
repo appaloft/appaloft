@@ -118,28 +118,27 @@
     return response.json().catch(() => null);
   }
 
-  function rememberPendingVerification(): void {
-    if (!browser) {
+  function pendingVerificationIntent(): string {
+    return JSON.stringify({
+      schemaVersion: "appaloft.pending-verification-intent/v1",
+      kind: "sign-up-organization",
+      organizationName,
+      organizationSlug: resolvedOrganizationSlug,
+      next: returnTo,
+    });
+  }
+
+  function seedVerificationResendCooldown(): void {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!browser || !normalizedEmail) {
       return;
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const cooldownSeconds = authSessionQuery.data?.emailVerification.cooldownSeconds ?? 60;
     window.sessionStorage.setItem(
-      "appaloft.pending-email-verification",
-      JSON.stringify({
-        email,
-        organizationName,
-        organizationSlug: resolvedOrganizationSlug,
-        next: returnTo,
-      }),
+      `appaloft.email-verification-resend-at:${normalizedEmail}`,
+      String(Date.now() + cooldownSeconds * 1000),
     );
-    if (normalizedEmail) {
-      const cooldownSeconds = authSessionQuery.data?.emailVerification.cooldownSeconds ?? 60;
-      window.sessionStorage.setItem(
-        `appaloft.email-verification-resend-at:${normalizedEmail}`,
-        String(Date.now() + cooldownSeconds * 1000),
-      );
-    }
   }
 
   async function submitSignup(event: SubmitEvent): Promise<void> {
@@ -160,11 +159,16 @@
             name: displayName,
             password,
             rememberMe: true,
+            ...(requiresEmailOtpVerification
+              ? {
+                  appaloftPendingVerificationIntent: pendingVerificationIntent(),
+                }
+              : {}),
           }),
         );
 
         if (requiresEmailOtpVerification && !readResponseToken(signupBody)) {
-          rememberPendingVerification();
+          seedVerificationResendCooldown();
           if (browser) {
             const verifyPath =
               authSessionQuery.data?.emailVerification.verifyPagePath ?? "/verify-email";

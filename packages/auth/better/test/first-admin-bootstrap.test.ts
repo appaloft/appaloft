@@ -1,12 +1,14 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-
 import { type ExecutionContext } from "@appaloft/application";
+import { makeSignature } from "better-auth/crypto";
 
 import { createBetterAuthRuntime } from "../src";
 import {
   createAppaloftBetterAuthOptions,
+  resolveAppaloftBetterAuthAccountRecoveryStatus,
+  resolveAppaloftBetterAuthAccountSecurityStatus,
   resolveAppaloftBetterAuthEmailVerificationStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "../src/shared";
@@ -22,6 +24,10 @@ const context = {
     },
   },
 } as ExecutionContext;
+
+async function signedBetterAuthCookieValue(token: string): Promise<string> {
+  return `${token}.${await makeSignature(token, "test-secret-at-least-long-enough")}`;
+}
 
 describe("Better Auth first-admin bootstrap adapter", () => {
   test("[AUTH-SHARED-COOKIE-002] builds reusable Better Auth options for shared website sessions", () => {
@@ -103,6 +109,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
     expect(options.emailAndPassword).not.toHaveProperty("requireEmailVerification");
     expect(options.emailVerification).toBeUndefined();
+    expect(options.emailAndPassword).not.toHaveProperty("sendResetPassword");
+    expect(options.rateLimit?.customRules).not.toHaveProperty("/request-password-reset");
     expect(options.plugins?.map((plugin) => plugin.id)).not.toContain("email-otp");
     expect(
       resolveAppaloftBetterAuthEmailVerificationStatus({
@@ -114,9 +122,72 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       otpEnabled: false,
       required: false,
     });
+    expect(
+      resolveAppaloftBetterAuthAccountRecoveryStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+      }),
+    ).toEqual({
+      enabled: false,
+    });
+    expect(resolveAppaloftBetterAuthAccountSecurityStatus()).toEqual({
+      changePasswordPath: "/api/auth/change-password",
+      enabled: true,
+      pagePath: "/account/security",
+      passwordState: "unknown",
+      setPasswordPath: "/api/auth/set-password",
+    });
   });
 
-  test("[CLOUD-AUTH-EMAIL-002] registers neutral email verification and OTP policy when injected", () => {
+  test("[CLOUD-AUTH-ACCOUNT-001][CLOUD-AUTH-ACCOUNT-002] registers neutral account recovery only when injected", () => {
+    const sendResetPassword = async () => undefined;
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+      accountRecovery: {
+        enabled: true,
+        cooldownSeconds: 45,
+        resetPasswordTokenExpiresIn: 600,
+        revokeSessionsOnPasswordReset: true,
+        sendResetPassword,
+      },
+    });
+
+    expect(options.emailAndPassword).toMatchObject({
+      enabled: true,
+      resetPasswordTokenExpiresIn: 600,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword,
+    });
+    expect(options.rateLimit).toMatchObject({
+      enabled: true,
+      customRules: {
+        "/request-password-reset": {
+          max: 1,
+          window: 45,
+        },
+      },
+    });
+    expect(
+      resolveAppaloftBetterAuthAccountRecoveryStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+        accountRecovery: {
+          enabled: true,
+          sendResetPassword,
+        },
+      }),
+    ).toEqual({
+      cooldownSeconds: 60,
+      enabled: true,
+      forgotPasswordPagePath: "/forgot-password",
+      requestPath: "/api/auth/request-password-reset",
+      resetPagePath: "/reset-password",
+      resetPath: "/api/auth/reset-password",
+    });
+  });
+
+  test("[CLOUD-AUTH-EMAIL-002][CLOUD-AUTH-ACCOUNT-010] registers neutral email verification and change-email OTP policy when injected", () => {
     const options = createAppaloftBetterAuthOptions({
       baseURL: "https://appaloft.example.com",
       secret: "test-secret-at-least-long-enough",
@@ -130,12 +201,20 @@ describe("Better Auth first-admin bootstrap adapter", () => {
           expiresIn: 600,
           otpLength: 6,
           storeOTP: "hashed",
+          changeEmail: {
+            enabled: true,
+            verifyCurrentEmail: false,
+          },
         },
       },
     });
     expect(options.rateLimit).toMatchObject({ enabled: true });
     expect(options.rateLimit?.customRules).toMatchObject({
       "/email-otp/send-verification-otp": {
+        max: 1,
+        window: 45,
+      },
+      "/email-otp/request-email-change": {
         max: 1,
         window: 45,
       },
@@ -153,6 +232,11 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       enabled: true,
       requireEmailVerification: true,
     });
+    expect(options.user).toMatchObject({
+      changeEmail: {
+        enabled: true,
+      },
+    });
     expect(options.emailVerification).toMatchObject({
       autoSignInAfterVerification: true,
       sendOnSignIn: true,
@@ -169,10 +253,20 @@ describe("Better Auth first-admin bootstrap adapter", () => {
           sendVerificationOTP: async () => undefined,
           otp: {
             enabled: true,
+            changeEmail: {
+              enabled: true,
+            },
           },
         },
       }),
     ).toEqual({
+      changeEmail: {
+        cooldownSeconds: 60,
+        enabled: true,
+        requestPath: "/api/auth/email-otp/request-email-change",
+        verifyCurrentEmail: false,
+        verifyPath: "/api/auth/email-otp/change-email",
+      },
       cooldownSeconds: 60,
       enabled: true,
       otpLength: 6,
@@ -196,6 +290,13 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     );
 
     expect(status).toMatchObject({
+      accountSecurity: {
+        enabled: true,
+        passwordState: "unknown",
+      },
+      accountRecovery: {
+        enabled: false,
+      },
       enabled: true,
       emailVerification: {
         enabled: false,
@@ -226,11 +327,81 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
       email: "admin@example.com",
+      organizationId: "org_self_hosted",
       organizationSlug: "self-hosted-appaloft",
     });
     expect(result._unsafeUnwrap().userId.length).toBeGreaterThan(0);
-    expect(result._unsafeUnwrap().organizationId.length).toBeGreaterThan(0);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("local-admin-password");
+  });
+
+  test("[FIRST-ADMIN-BOOTSTRAP-004] attaches the first admin to an existing self-hosted organization", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+    const authContext = await runtime["auth"].$context;
+    await authContext.adapter.create({
+      model: "organization",
+      data: {
+        id: "org_self_hosted",
+        name: "Self-hosted Appaloft",
+        slug: "self-hosted-appaloft",
+        logo: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+      forceAllowId: true,
+    });
+
+    const result = await runtime.bootstrapFirstAdmin(context, {
+      email: "admin@example.com",
+      displayName: "Admin User",
+      organizationName: "Self-hosted Appaloft",
+      organizationSlug: "self-hosted-appaloft",
+      password: "local-admin-password",
+    });
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      email: "admin@example.com",
+      organizationId: "org_self_hosted",
+      organizationSlug: "self-hosted-appaloft",
+    });
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "admin@example.com",
+          password: "local-admin-password",
+        }),
+      }),
+    );
+    const sessionCookie = (signedIn.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedIn.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after first-admin sign-in");
+    }
+
+    const authorizationResult = await runtime.authorizeProductSession(context, {
+      method: "POST",
+      path: "/api/domain-bindings",
+      requiredRole: "member",
+      cookieHeader: sessionCookie,
+    });
+    expect(authorizationResult.isOk()).toBe(true);
+    expect(authorizationResult._unsafeUnwrap()).toMatchObject({
+      organizationId: "org_self_hosted",
+      role: "owner",
+      userId: result._unsafeUnwrap().userId,
+    });
   });
 
   test("[FIRST-ADMIN-BOOTSTRAP-008] honors configured local password length for test runtimes", async () => {
@@ -309,6 +480,63 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(setCookie).toContain("better-auth.session_token=");
   });
 
+  test("[CLOUD-AUTH-ACCOUNT-011] unverified local-password sign-in returns a stable error code", async () => {
+    const verificationEmails: unknown[] = [];
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      emailVerification: {
+        enabled: true,
+        requireEmailVerification: true,
+        sendOnSignIn: true,
+        sendOnSignUp: true,
+        sendVerificationEmail: async (input) => {
+          verificationEmails.push(input);
+        },
+      },
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "unverified@example.com",
+          name: "Unverified User",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    expect(signedUp.status).toBe(200);
+    expect(signedUp.headers.get("set-cookie") ?? "").not.toContain("better-auth.session_token=");
+    expect(verificationEmails).toHaveLength(1);
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "unverified@example.com",
+          password: "local-user-password",
+        }),
+      }),
+    );
+    expect(signedIn.status).toBe(403);
+    const errorBody = (await signedIn.json()) as { code?: unknown; message?: unknown };
+    expect(errorBody).toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+    });
+    expect(typeof errorBody.message).toBe("string");
+  });
+
   test("[PRODUCT-AUTH-SIGNUP-001] ordinary signup creates a session and organization", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
@@ -369,6 +597,131 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       organizationId: organization.id,
       role: "owner",
     });
+  });
+
+  test("[CLOUD-AUTH-ACCOUNT-009] reports signed-in password state and supports password lifecycle endpoints", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "password-user@example.com",
+          name: "Password User",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    const sessionCookie = (signedUp.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedUp.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after sign-up");
+    }
+
+    const sessionStatus = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: sessionCookie,
+        },
+      }),
+    );
+    expect(sessionStatus.accountSecurity).toEqual({
+      changePasswordPath: "/api/auth/change-password",
+      enabled: true,
+      pagePath: "/account/security",
+      passwordState: "set",
+      setPasswordPath: "/api/auth/set-password",
+    });
+
+    const changedPassword = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: sessionCookie,
+        },
+        body: JSON.stringify({
+          currentPassword: "local-user-password",
+          newPassword: "local-user-password-updated",
+          revokeOtherSessions: false,
+        }),
+      }),
+    );
+    expect(changedPassword.status).toBe(200);
+
+    const signedInWithUpdatedPassword = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "password-user@example.com",
+          password: "local-user-password-updated",
+        }),
+      }),
+    );
+    expect(signedInWithUpdatedPassword.status).toBe(200);
+
+    const context = await runtime["auth"].$context;
+    const oauthOnlyUser = await context.internalAdapter.createUser({
+      email: "oauth-only@example.com",
+      emailVerified: true,
+      name: "OAuth Only",
+    });
+    await context.internalAdapter.createAccount({
+      accountId: oauthOnlyUser.id,
+      providerId: "github",
+      userId: oauthOnlyUser.id,
+    });
+    const oauthOnlySession = await context.internalAdapter.createSession(oauthOnlyUser.id);
+    const oauthOnlyCookie = `better-auth.session_token=${await signedBetterAuthCookieValue(
+      oauthOnlySession.token,
+    )}`;
+    const oauthOnlyStatus = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: oauthOnlyCookie,
+        },
+      }),
+    );
+    expect(oauthOnlyStatus.accountSecurity.passwordState).toBe("not-set");
+
+    const setPassword = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/set-password", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: oauthOnlyCookie,
+        },
+        body: JSON.stringify({
+          newPassword: "oauth-user-local-password",
+        }),
+      }),
+    );
+    expect(setPassword.status).toBe(200);
+
+    const oauthPasswordStatus = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: oauthOnlyCookie,
+        },
+      }),
+    );
+    expect(oauthPasswordStatus.accountSecurity.passwordState).toBe("set");
   });
 
   test("[PRODUCT-AUTH-SIGNUP-002] signed-in users without an organization receive a default personal organization", async () => {
