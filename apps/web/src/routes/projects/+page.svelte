@@ -1,17 +1,15 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
-  import { createMutation } from "@tanstack/svelte-query";
-  import { AlertCircle, ArrowRight, CheckCircle2, FolderOpen, Plus, ShieldCheck } from "@lucide/svelte";
+  import { ArrowRight, FolderOpen, ShieldCheck } from "@lucide/svelte";
+  import type { CreateProjectResponse } from "@appaloft/contracts";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
-  import { readErrorMessage } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import { Textarea } from "$lib/components/ui/textarea";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     countProjectEnvironments,
@@ -20,8 +18,6 @@
     projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
-  import { queryClient } from "$lib/query-client";
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
@@ -40,52 +36,10 @@
     projects.filter((project) => resources.some((resource) => resource.projectId === project.id))
       .length,
   );
-  let projectName = $state("");
-  let projectDescription = $state("");
-  let createProjectFeedback = $state<{
-    kind: "success" | "error";
-    title: string;
-    detail: string;
-  } | null>(null);
-  const canCreateProject = $derived(projectName.trim().length > 0);
 
-  const createProjectMutation = createMutation(() => ({
-    mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
-    onSuccess: (result) => {
-      createProjectFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.projects.createProjectSucceeded),
-        detail: result.id,
-      };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void goto(projectDetailHref(result.id));
-    },
-    onError: (error) => {
-      createProjectFeedback = {
-        kind: "error",
-        title: $t(i18nKeys.console.projects.createProjectFailed),
-        detail: readErrorMessage(error),
-      };
-    },
-  }));
-
-  function submitProjectCreate(event: SubmitEvent): void {
-    event.preventDefault();
-
-    const name = projectName.trim();
-    const description = projectDescription.trim();
-
-    if (!name || createProjectMutation.isPending) {
-      return;
-    }
-
-    createProjectFeedback = null;
-    createProjectMutation.mutate({
-      name,
-      ...(description ? { description } : {}),
-    });
+  function openCreatedProject(project: CreateProjectResponse): void {
+    void goto(projectDetailHref(project.id));
   }
-
 </script>
 
 <svelte:head>
@@ -128,74 +82,9 @@
         </div>
       </div>
 
-      <form class="console-panel max-w-3xl p-5" onsubmit={submitProjectCreate}>
-        <div class="space-y-1.5">
-          <h2 class="text-base font-semibold">
-            {$t(i18nKeys.console.projects.createProjectTitle)}
-          </h2>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.projects.createProjectDescription)}
-          </p>
-        </div>
-
-        <div class="mt-5 grid gap-4">
-          <label class="console-field-stack" for="project-create-name">
-            <span class="console-field-label">
-              {$t(i18nKeys.console.projects.createProjectNameLabel)}
-            </span>
-            <Input
-              id="project-create-name"
-              autocomplete="off"
-              bind:value={projectName}
-              placeholder={$t(i18nKeys.console.projects.createProjectNamePlaceholder)}
-              disabled={createProjectMutation.isPending}
-            />
-          </label>
-
-          <label class="console-field-stack" for="project-create-description">
-            <span class="console-field-label">
-              {$t(i18nKeys.console.projects.createProjectDescriptionLabel)}
-            </span>
-            <Textarea
-              id="project-create-description"
-              bind:value={projectDescription}
-              placeholder={$t(i18nKeys.console.projects.createProjectDescriptionPlaceholder)}
-              disabled={createProjectMutation.isPending}
-            />
-          </label>
-        </div>
-
-        {#if createProjectFeedback}
-          <div
-            class={`mt-4 flex gap-2 rounded-md border p-3 text-sm ${
-              createProjectFeedback.kind === "success"
-                ? "border-chart-2/30 bg-chart-2/10 text-foreground"
-                : "border-destructive/30 bg-destructive/10 text-foreground"
-            }`}
-          >
-            {#if createProjectFeedback.kind === "success"}
-              <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-chart-2" />
-            {:else}
-              <AlertCircle class="mt-0.5 size-4 shrink-0 text-destructive" />
-            {/if}
-            <div class="min-w-0">
-              <p class="font-medium">{createProjectFeedback.title}</p>
-              <p class="mt-1 break-words text-xs leading-5 text-muted-foreground">
-                {createProjectFeedback.detail}
-              </p>
-            </div>
-          </div>
-        {/if}
-
-        <div class="console-action-row mt-5">
-          <Button type="submit" disabled={!canCreateProject || createProjectMutation.isPending}>
-            <Plus class="size-4" />
-            {createProjectMutation.isPending
-              ? $t(i18nKeys.console.projects.createProjectSubmitting)
-              : $t(i18nKeys.console.projects.createProjectAction)}
-          </Button>
-        </div>
-      </form>
+      <div class="max-w-3xl">
+        <ProjectCreateForm onCreated={openCreatedProject} />
+      </div>
 
       <div class="console-subtle-panel max-w-3xl p-4">
         <div class="grid gap-3 text-sm sm:grid-cols-3">

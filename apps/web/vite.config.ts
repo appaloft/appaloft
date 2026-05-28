@@ -42,6 +42,16 @@ function createRuntimeExtensionProxyPrefixes(mode: string): string[] {
   );
 }
 
+function createFsAllow(mode: string): string[] | undefined {
+  const env = loadEnv(mode, process.cwd(), "");
+  const values = (env.APPALOFT_WEB_DEV_FS_ALLOW ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return values.length > 0 ? values : undefined;
+}
+
 function readRequestPathname(requestUrl: string | undefined): string {
   if (!requestUrl) {
     return "/";
@@ -197,6 +207,7 @@ export default defineConfig(({ mode }) => {
   const docsRedirectTarget = createDocsRedirectTarget(mode);
   const webDevPort = createWebDevPort(mode);
   const runtimeExtensionProxyPrefixes = createRuntimeExtensionProxyPrefixes(mode);
+  const fsAllow = createFsAllow(mode);
   const apiProxy = {
     target: proxyTarget,
     changeOrigin: true,
@@ -216,6 +227,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: webDevPort,
       strictPort: true,
+      ...(fsAllow ? { fs: { allow: fsAllow } } : {}),
       watch: {
         ignored: ["**/build/**", "**/.svelte-kit/output/**"],
       },

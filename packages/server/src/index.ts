@@ -133,6 +133,19 @@ import {
 type MaybePromise<T> = T | Promise<T>;
 
 export type AppaloftHttpApp = ReturnType<typeof createHttpApp>;
+type AppaloftHttpServerHandle = ReturnType<typeof Bun.serve>;
+
+function startAppaloftHttpServer(input: {
+  readonly fetch: (request: Request) => Response | Promise<Response>;
+  readonly hostname: string;
+  readonly port: number;
+}): AppaloftHttpServerHandle {
+  return Bun.serve({
+    hostname: input.hostname,
+    port: input.port,
+    fetch: input.fetch,
+  });
+}
 
 export interface AppaloftServer {
   config: AppConfig;
@@ -920,26 +933,27 @@ export async function createAppaloftServer(
   });
 
   let started = false;
-  let serverHandle: ReturnType<typeof httpApp.listen> | null = null;
+  let serverHandle: AppaloftHttpServerHandle | null = null;
 
   const startServer = async (): Promise<void> => {
     if (started) {
       return;
     }
 
-    serverHandle = httpApp.listen({
+    serverHandle = startAppaloftHttpServer({
       hostname: config.httpHost,
       port: config.httpPort,
+      fetch: (request) => httpApp.handle(request),
     });
     started = true;
     resourceAccessFailureRendererTarget = resourceAccessFailureRendererTargetForStartedServer({
       config,
-      ...(httpApp.server?.port ? { actualPort: httpApp.server.port } : {}),
+      ...(serverHandle.port ? { actualPort: serverHandle.port } : {}),
     });
 
     logger.info("http_server.started", {
       host: config.httpHost,
-      port: config.httpPort,
+      port: serverHandle.port,
       webOrigin: config.webOrigin,
     });
 
