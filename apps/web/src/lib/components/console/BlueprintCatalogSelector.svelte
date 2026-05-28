@@ -72,7 +72,7 @@
 </script>
 
 <div
-  class={surface === "dialog" ? "space-y-4" : "mx-auto w-full max-w-7xl"}
+  class={surface === "dialog" ? "space-y-4" : "w-full"}
   data-blueprint-marketplace-selector
 >
   <BlueprintMarketplacePage

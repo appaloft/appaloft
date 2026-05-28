@@ -1,10 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArchiveRestore,
     BadgeCheck,
-    Database,
     HardDriveDownload,
     Plus,
     Server,
@@ -29,6 +29,8 @@
   import type { TranslationKey } from "@appaloft/i18n";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
@@ -42,6 +44,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -56,6 +59,8 @@
   type ProvisioningPlanInput = Parameters<typeof orpcClient.dependencyResources.provisioning.plan>[0];
   type DependencyKindOption = {
     labelKey: TranslationKey;
+    descriptionKey: TranslationKey;
+    connectionPlaceholderKey: TranslationKey;
     icon: DependencyKindIcon;
   };
   type Feedback = {
@@ -71,26 +76,38 @@
   const dependencyKindOptions: Record<DependencyKind, DependencyKindOption> = {
     postgres: {
       labelKey: i18nKeys.console.dependencyResources.kindPostgres,
+      descriptionKey: i18nKeys.console.dependencyResources.kindPostgresDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderPostgres,
       icon: brandIcon(postgresqlIcon),
     },
     redis: {
       labelKey: i18nKeys.console.dependencyResources.kindRedis,
+      descriptionKey: i18nKeys.console.dependencyResources.kindRedisDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderRedis,
       icon: brandIcon(redisIcon),
     },
     mysql: {
       labelKey: i18nKeys.console.dependencyResources.kindMysql,
+      descriptionKey: i18nKeys.console.dependencyResources.kindMysqlDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderMysql,
       icon: brandIcon(mysqlIcon, "light"),
     },
     clickhouse: {
       labelKey: i18nKeys.console.dependencyResources.kindClickHouse,
+      descriptionKey: i18nKeys.console.dependencyResources.kindClickHouseDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderClickHouse,
       icon: brandIcon(clickhouseIcon),
     },
     "object-storage": {
       labelKey: i18nKeys.console.dependencyResources.kindObjectStorage,
+      descriptionKey: i18nKeys.console.dependencyResources.kindObjectStorageDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderObjectStorage,
       icon: brandIcon(minioIcon),
     },
     opensearch: {
       labelKey: i18nKeys.console.dependencyResources.kindOpenSearch,
+      descriptionKey: i18nKeys.console.dependencyResources.kindOpenSearchDescription,
+      connectionPlaceholderKey: i18nKeys.console.dependencyResources.connectionUrlPlaceholderOpenSearch,
       icon: brandIcon(opensearchIcon),
     },
   };
@@ -103,6 +120,14 @@
     "opensearch",
   ] as const satisfies readonly DependencyKind[];
   const provisioningModes = ["create", "reuse"] as const satisfies readonly ProvisioningMode[];
+  const dependencyKindConnectionProtocols: Record<DependencyKind, readonly string[]> = {
+    postgres: ["postgres:", "postgresql:"],
+    redis: ["redis:", "rediss:"],
+    mysql: ["mysql:"],
+    clickhouse: ["clickhouse:", "clickhouses:", "http:", "https:"],
+    "object-storage": ["s3:", "minio:", "http:", "https:"],
+    opensearch: ["http:", "https:"],
+  };
 
   const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
     resources: false,
@@ -129,8 +154,6 @@
   let createName = $state("");
   let reuseConnectionUrl = $state("");
   let reuseSecretRef = $state("");
-  let backupRetentionRequired = $state(false);
-  let backupRetentionReason = $state("");
   let provisioningPlan = $state<DependencyResourceProvisioningPlan | null>(null);
   let acceptProvisioningPlanAcknowledged = $state(false);
   let selectedDependencyResourceId = $state("");
@@ -229,6 +252,16 @@
       Number.parseInt(backupPolicyRetentionDays, 10) > 0 &&
       Number.parseInt(backupPolicyIntervalHours, 10) > 0,
   );
+  const reuseConnectionUrlValidation = $derived(
+    provisioningMode === "reuse" && reuseConnectionUrl.trim().length > 0
+      ? validateReuseConnectionUrl(createKind, reuseConnectionUrl)
+      : "",
+  );
+  let dependencyResourceCreateDialogOpen = $state(false);
+
+  $effect(() => {
+    dependencyResourceCreateDialogOpen = modalIsOpen(page, "create-dependency-resource");
+  });
 
   const createDependencyResourceMutation = createMutation(() => ({
     mutationFn: (input: ProvisioningPlanInput) =>
@@ -266,10 +299,9 @@
       createName = "";
       reuseConnectionUrl = "";
       reuseSecretRef = "";
-      backupRetentionRequired = false;
-      backupRetentionReason = "";
       acceptProvisioningPlanAcknowledged = false;
       selectedDependencyResourceId = result.plan.dependencyResourceId ?? "";
+      void setModalOpen(page, "create-dependency-resource", false);
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -461,6 +493,15 @@
     serverCreateDialogOpen = true;
   }
 
+  function openDependencyResourceCreateDialog(): void {
+    void setModalOpen(page, "create-dependency-resource", true);
+  }
+
+  function setDependencyResourceCreateDialogOpen(open: boolean): void {
+    dependencyResourceCreateDialogOpen = open;
+    void setModalOpen(page, "create-dependency-resource", open);
+  }
+
   function handleProjectCreated(project: CreateProjectResponse): void {
     selectedProjectId = project.id;
     selectedEnvironmentId = "";
@@ -489,6 +530,34 @@
     return dependencyKindOptions[kind].icon;
   }
 
+  function connectionUrlPlaceholder(kind: DependencyKind): string {
+    return $t(dependencyKindOptions[kind].connectionPlaceholderKey);
+  }
+
+  function validateReuseConnectionUrl(kind: DependencyKind, value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return $t(i18nKeys.console.dependencyResources.connectionUrlInvalid);
+    }
+
+    if (!dependencyKindConnectionProtocols[kind].includes(parsed.protocol)) {
+      return $t(i18nKeys.console.dependencyResources.connectionUrlUnsupportedForKind);
+    }
+
+    if (!parsed.hostname) {
+      return $t(i18nKeys.console.dependencyResources.connectionUrlHostRequired);
+    }
+
+    return "";
+  }
+
   function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
     if (status === "ready" || status === "active") {
       return "default";
@@ -507,14 +576,14 @@
     if (!canCreate || createDependencyResourceMutation.isPending) {
       return;
     }
-    const reason = backupRetentionReason.trim();
-    const backupRelationship =
-      backupRetentionRequired || reason
-        ? {
-            retentionRequired: backupRetentionRequired,
-            ...(reason ? { reason } : {}),
-          }
-        : undefined;
+    if (provisioningMode === "reuse" && reuseConnectionUrlValidation) {
+      feedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.dependencyResources.planFailed),
+        detail: reuseConnectionUrlValidation,
+      };
+      return;
+    }
     provisioningPlan = null;
     acceptProvisioningPlanAcknowledged = false;
 
@@ -528,7 +597,6 @@
               environmentId: selectedEnvironmentId,
               serverId: selectedServerId,
               name: createName.trim(),
-              ...(backupRelationship ? { backupRelationship } : {}),
             },
           }
         : {
@@ -540,7 +608,6 @@
               name: createName.trim(),
               connectionUrl: reuseConnectionUrl.trim(),
               ...(reuseSecretRef.trim() ? { secretRef: reuseSecretRef.trim() } : {}),
-              ...(backupRelationship ? { backupRelationship } : {}),
             },
           },
     );
@@ -663,41 +730,52 @@
       <Skeleton class="h-80 w-full" />
     </div>
   {:else}
-    <div class="space-y-8">
+    <ConsoleResourceCanvas>
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-3xl space-y-2">
-          <Badge class="console-page-kicker" variant="outline">
-            <Database class="size-3.5" />
-            {$t(i18nKeys.console.dependencyResources.dockerBacked)}
-          </Badge>
-          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h1>
+            <DocsHelpLink
+              href={webDocsHrefs.dependencyResourceLifecycle}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.dependencyResources.focusDescription)}
           </p>
         </div>
-        <div class="console-metric-strip grid-cols-3 text-center md:min-w-96">
-          <div>
-            <p class="text-xl font-semibold">{dependencyResources.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {$t(i18nKeys.console.dependencyResources.focusTitle)}
-            </p>
-          </div>
-          <div>
-            <p class="text-xl font-semibold">
-              {dependencyResources.filter((resource) => resource.lifecycleStatus === "ready").length}
-            </p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {$t(i18nKeys.common.status.ready)}
-            </p>
-          </div>
-          <div>
-            <p class="text-xl font-semibold">{activeSingleServerTargets.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {$t(i18nKeys.common.domain.servers)}
-            </p>
-          </div>
-        </div>
       </section>
+
+      {#if dependencyResources.length > 0}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap gap-2">
+            <Select.Root bind:value={selectedProjectId} type="single">
+              <Select.Trigger class="min-w-48">
+                {selectedProjectId ? projectName(selectedProjectId) : $t(i18nKeys.console.dependencyResources.filterAll)}
+              </Select.Trigger>
+              <Select.Content>
+                {#each projects as project (project.id)}
+                  <Select.Item value={project.id}>{project.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            <Select.Root bind:value={selectedEnvironmentId} type="single">
+              <Select.Trigger class="min-w-48">
+                {selectedEnvironmentId ? environmentName(selectedEnvironmentId) : $t(i18nKeys.console.dependencyResources.filterAll)}
+              </Select.Trigger>
+              <Select.Content>
+                {#each projectEnvironments as environment (environment.id)}
+                  <Select.Item value={environment.id}>{environment.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+          <Button type="button" onclick={openDependencyResourceCreateDialog}>
+            <Plus class="size-4" />
+            {provisioningActionLabel()}
+          </Button>
+        </div>
+      {/if}
 
       {#if feedback}
         <section
@@ -713,27 +791,29 @@
         </section>
       {/if}
 
-      <section class="console-panel space-y-5 p-5">
-        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <h2 class="text-lg font-semibold">{provisioningActionLabel()}</h2>
-              <DocsHelpLink
-                href={webDocsHrefs.dependencyResourceLifecycle}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-              />
-            </div>
-            <p class="text-sm text-muted-foreground">
-              {$t(i18nKeys.console.dependencyResources.createDescription)}
-            </p>
-          </div>
-          <Badge variant="outline">
-            {provisioningMode === "create"
-              ? $t(i18nKeys.console.dependencyResources.managedOnlyNotice)
-              : $t(i18nKeys.console.dependencyResources.reuseNotice)}
-          </Badge>
-        </div>
+      {#if dependencyResources.length === 0}
+        <ConsoleEmptyState
+          tone="dependency"
+          title={$t(i18nKeys.console.dependencyResources.emptyTitle)}
+          description={$t(i18nKeys.console.dependencyResources.emptyBody)}
+          actionLabel={provisioningActionLabel()}
+          learnMoreHref={webDocsHrefs.dependencyResourceLifecycle}
+          onAction={openDependencyResourceCreateDialog}
+        />
+      {/if}
 
+      <Dialog.Root
+        bind:open={dependencyResourceCreateDialogOpen}
+        onOpenChange={setDependencyResourceCreateDialogOpen}
+      >
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+          <Dialog.Header>
+            <Dialog.Title>{provisioningActionLabel()}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.dependencyResources.createDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+          <section class="space-y-5 px-5 pb-5">
         <form
           id="dependency-resource-create-form"
           class="space-y-4"
@@ -873,8 +953,12 @@
                 <Input
                   id="dependency-resource-reuse-connection-url-input"
                   bind:value={reuseConnectionUrl}
-                  placeholder="https://search.example.com:9200"
+                  aria-invalid={Boolean(reuseConnectionUrlValidation)}
+                  placeholder={connectionUrlPlaceholder(createKind)}
                 />
+                {#if reuseConnectionUrlValidation}
+                  <p class="text-xs font-medium text-destructive">{reuseConnectionUrlValidation}</p>
+                {/if}
               </label>
               <label class="space-y-1.5 text-sm font-medium">
                 <span class="console-field-label">{$t(i18nKeys.console.dependencyResources.secretRef)}</span>
@@ -895,7 +979,7 @@
                 <button
                   type="button"
                   class={[
-                    "flex min-h-24 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-20 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     createKind === dependencyKind
                       ? "border-primary bg-primary/5 text-foreground shadow-sm"
                       : "border-border bg-background text-foreground hover:bg-muted/50",
@@ -912,8 +996,8 @@
                   </span>
                   <span class="min-w-0">
                     <span class="block text-sm font-semibold">{kindLabel(dependencyKind)}</span>
-                    <span class="mt-1 block truncate text-xs text-muted-foreground">
-                      {icon.title}
+                    <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {$t(dependencyKindOptions[dependencyKind].descriptionKey)}
                     </span>
                   </span>
                 </button>
@@ -921,8 +1005,12 @@
             </div>
           </fieldset>
 
-          <div class="flex justify-end">
-            <Button type="submit" disabled={!canCreate || createDependencyResourceMutation.isPending}>
+          <div class="flex sm:justify-end">
+            <Button
+              type="submit"
+              class="w-full sm:w-auto"
+              disabled={!canCreate || createDependencyResourceMutation.isPending}
+            >
               {#if createDependencyResourceMutation.isPending}
                 {$t(i18nKeys.console.dependencyResources.creatingPlan)}
               {:else}
@@ -932,23 +1020,6 @@
             </Button>
           </div>
         </form>
-
-        <div class="grid gap-4 md:grid-cols-[auto_minmax(0,1fr)]">
-          <label class="flex items-center gap-2 text-sm">
-            <input
-              id="dependency-resource-backup-retention-input"
-              class="size-4 accent-primary"
-              type="checkbox"
-              bind:checked={backupRetentionRequired}
-            />
-            {$t(i18nKeys.console.dependencyResources.backupRetention)}
-          </label>
-          <Input
-            id="dependency-resource-backup-retention-reason-input"
-            bind:value={backupRetentionReason}
-            placeholder={$t(i18nKeys.console.dependencyResources.backupRetentionReasonPlaceholder)}
-          />
-        </div>
 
         {#if provisioningPlan}
           <section class="console-section space-y-3">
@@ -991,52 +1062,33 @@
             </div>
           </section>
         {/if}
-      </section>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>
 
-      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div class="space-y-4">
-          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h2>
-            <div class="flex flex-wrap gap-2">
-              <Select.Root bind:value={selectedProjectId} type="single">
-                <Select.Trigger class="min-w-48">
-                  {selectedProjectId ? projectName(selectedProjectId) : $t(i18nKeys.console.dependencyResources.filterAll)}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each projects as project (project.id)}
-                    <Select.Item value={project.id}>{project.name}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-              <Select.Root bind:value={selectedEnvironmentId} type="single">
-                <Select.Trigger class="min-w-48">
-                  {selectedEnvironmentId ? environmentName(selectedEnvironmentId) : $t(i18nKeys.console.dependencyResources.filterAll)}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each projectEnvironments as environment (environment.id)}
-                    <Select.Item value={environment.id}>{environment.name}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
+      {#if dependencyResources.length > 0}
+        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h2>
             </div>
-          </div>
 
-          {#if filteredDependencyResources.length === 0}
-            <section class="console-panel space-y-2 p-5">
-              <h3 class="font-semibold">{$t(i18nKeys.console.dependencyResources.emptyTitle)}</h3>
-              <p class="text-sm text-muted-foreground">
-                {$t(i18nKeys.console.dependencyResources.emptyBody)}
-              </p>
-            </section>
-          {:else}
-            <div class="console-record-list">
-              {#each filteredDependencyResources as resource (resource.id)}
-                <article
-                  class={[
-                    "console-record-row lg:grid-cols-[minmax(0,1fr)_auto]",
-                    selectedDependencyResourceId === resource.id ? "bg-muted/50" : "",
-                  ]}
-                >
+            {#if filteredDependencyResources.length === 0}
+              <section class="console-panel space-y-2 p-5">
+                <h3 class="font-semibold">{$t(i18nKeys.console.dependencyResources.emptyTitle)}</h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.emptyBody)}
+                </p>
+              </section>
+            {:else}
+              <div class="console-record-list">
+                {#each filteredDependencyResources as resource (resource.id)}
+                  <article
+                    class={[
+                      "console-record-row lg:grid-cols-[minmax(0,1fr)_auto]",
+                      selectedDependencyResourceId === resource.id ? "bg-muted/50" : "",
+                    ]}
+                  >
                   <div class="min-w-0 space-y-3">
                     <div class="flex min-w-0 flex-wrap items-center gap-2">
                       <Badge variant="outline">{kindLabel(resource.kind)}</Badge>
@@ -1090,11 +1142,11 @@
                       {$t(i18nKeys.console.dependencyResources.deleteAction)}
                     </Button>
                   </div>
-                </article>
-              {/each}
-            </div>
-          {/if}
-        </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </div>
 
         <aside class="console-side-panel space-y-5">
           {#if selectedDependencyResource}
@@ -1256,8 +1308,9 @@
             </div>
           {/if}
         </aside>
-      </section>
-    </div>
+        </section>
+      {/if}
+    </ConsoleResourceCanvas>
   {/if}
 
   <Dialog.Root bind:open={projectCreateDialogOpen}>

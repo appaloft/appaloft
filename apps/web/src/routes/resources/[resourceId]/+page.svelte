@@ -5425,7 +5425,7 @@
                       {$t(i18nKeys.console.resources.scheduledTaskRunLogsLoading)}
                     </p>
                   {:else if scheduledTaskRunLogsError}
-                    <p class="text-rose-200">{scheduledTaskRunLogsError}</p>
+                    <p class="text-destructive">{scheduledTaskRunLogsError}</p>
                   {:else if !selectedScheduledTaskRunId}
                     <p class="text-zinc-400">
                       {$t(i18nKeys.console.resources.scheduledTaskRunLogsSelect)}

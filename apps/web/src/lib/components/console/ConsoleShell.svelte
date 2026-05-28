@@ -4,6 +4,8 @@
   import { page } from "$app/state";
   import {
     BookOpen,
+    Check,
+    ChevronDown,
     Database,
     ChevronUp,
     FolderOpen,
@@ -56,16 +58,17 @@
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarProvider,
-    SidebarRail,
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
-  import { createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import {
     consoleSidebarOpenStorageKey,
     defaultConsoleSidebarOpen,
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
+  import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
   import {
     initials,
     projectDetailHref,
@@ -141,9 +144,35 @@
       staleTime: 30_000,
     }),
   );
+  const organizationContextQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["organizations", "current-context"],
+      queryFn: () => orpcClient.organizations.currentContext({}),
+      enabled: browser,
+      retry: 0,
+    }),
+  );
+  const switchCurrentOrganizationMutation = createMutation(() => ({
+    mutationFn: (organizationId: string) =>
+      orpcClient.organizations.switchCurrent({ organizationId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+    },
+  }));
 
   const pathname = $derived(page.url.pathname);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
+  const organizationContext = $derived(organizationContextQuery.data ?? null);
+  const currentOrganization = $derived(organizationContext?.currentOrganization ?? null);
+  const organizations = $derived(organizationContext?.organizations ?? []);
+  const currentOrganizationName = $derived(
+    currentOrganization?.name ?? $t(i18nKeys.common.app.productName),
+  );
+  const currentOrganizationDetail = $derived(
+    currentOrganization
+      ? `${currentOrganization.slug} · ${roleLabel(currentOrganization.role)}`
+      : $t(i18nKeys.common.app.consoleSubtitle),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
@@ -180,6 +209,20 @@
   const activeProjectId = $derived.by(() => {
     const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
     return projectMatch?.[1] ? decodeURIComponent(projectMatch[1]) : "";
+  });
+  const visibleBreadcrumbs = $derived.by<BreadcrumbItem[]>(() => {
+    if (breadcrumbs.length > 0) {
+      return breadcrumbs;
+    }
+
+    if (pathname === "/") {
+      return [{ label: title }];
+    }
+
+    return [
+      { label: $t(i18nKeys.console.nav.home), href: "/" },
+      { label: title },
+    ];
   });
 
   $effect(() => {
@@ -283,6 +326,30 @@
     }
   }
 
+  function roleLabel(role: string): string {
+    if (role === "owner") {
+      return $t(i18nKeys.console.organization.roleOwner);
+    }
+    if (role === "admin") {
+      return $t(i18nKeys.console.organization.roleAdmin);
+    }
+    if (role === "developer") {
+      return $t(i18nKeys.console.organization.roleDeveloper);
+    }
+    if (role === "billing") {
+      return $t(i18nKeys.console.organization.roleBilling);
+    }
+    return $t(i18nKeys.console.organization.roleViewer);
+  }
+
+  function switchOrganization(organizationId: string): void {
+    if (!organizationId || organizationId === currentOrganization?.organizationId) {
+      return;
+    }
+
+    switchCurrentOrganizationMutation.mutate(organizationId);
+  }
+
   function isNavigationActive(href: string): boolean {
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
@@ -300,19 +367,85 @@
 >
   <Sidebar variant="sidebar" collapsible="icon">
     <SidebarHeader class="gap-3">
-      <a class="flex items-center gap-3 px-2 py-2" href="/">
-        <img
-          src={appaloftIcon}
-          alt={$t(i18nKeys.common.app.productName)}
-          class="size-7 shrink-0 object-contain"
-        />
-        <span class="min-w-0 group-data-[collapsible=icon]:hidden">
-          <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
-          <span class="block truncate text-xs text-muted-foreground">
-            {$t(i18nKeys.common.app.consoleSubtitle)}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          data-console-organization-switcher-trigger
+          class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        >
+          <Avatar size="sm" class="shrink-0">
+            <AvatarFallback>{initials(currentOrganizationName)}</AvatarFallback>
+          </Avatar>
+          <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <span class="block truncate text-sm font-medium">{currentOrganizationName}</span>
+            <span class="block truncate text-xs text-muted-foreground">
+              {currentOrganizationDetail}
+            </span>
           </span>
-        </span>
-      </a>
+          <ChevronDown class="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="bottom"
+          sideOffset={6}
+          class="max-h-[min(26rem,calc(100vh-7rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+        >
+          <DropdownMenuLabel>
+            <div class="flex items-center gap-2">
+              <img
+                src={appaloftIcon}
+                alt={$t(i18nKeys.common.app.productName)}
+                class="size-5 shrink-0 object-contain"
+              />
+              <span class="min-w-0 truncate">{$t(i18nKeys.console.organization.switchTitle)}</span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {#if organizations.length > 0}
+            {#each organizations as organization (organization.organizationId)}
+              {@const organizationIsCurrent = organization.organizationId === currentOrganization?.organizationId}
+              <DropdownMenuItem
+                disabled={organizationIsCurrent || switchCurrentOrganizationMutation.isPending}
+                onclick={() => switchOrganization(organization.organizationId)}
+                class="gap-2"
+              >
+                <Avatar size="sm">
+                  <AvatarFallback>{initials(organization.name)}</AvatarFallback>
+                </Avatar>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate">{organization.name}</span>
+                  <span class="block truncate text-xs text-muted-foreground">
+                    {organization.slug} · {roleLabel(organization.role)}
+                  </span>
+                </span>
+                {#if organizationIsCurrent}
+                  <Check class="size-4 text-primary" />
+                {/if}
+              </DropdownMenuItem>
+            {/each}
+          {:else}
+            <DropdownMenuItem disabled>
+              <Avatar size="sm">
+                <AvatarFallback>{initials(currentOrganizationName)}</AvatarFallback>
+              </Avatar>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate">{currentOrganizationName}</span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  {currentOrganizationDetail}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          {/if}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onclick={() => navigateTo("/organization")}>
+            <UserRound class="size-4" />
+            {$t(i18nKeys.console.nav.organization)}
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/instance")}>
+            <Settings2 class="size-4" />
+            {$t(i18nKeys.console.nav.instance)}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <SidebarInput
         bind:value={projectSearch}
         class="group-data-[collapsible=icon]:hidden"
@@ -412,7 +545,7 @@
       <DropdownMenu>
         <DropdownMenuTrigger
           data-console-user-menu-trigger
-          class="flex w-full items-center gap-2 px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+          class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
         >
           <Avatar size="sm">
             <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
@@ -425,7 +558,12 @@
           </span>
           <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" class="w-56">
+        <DropdownMenuContent
+          align="start"
+          side="top"
+          sideOffset={6}
+          class="max-h-[min(28rem,calc(100vh-5rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+        >
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
               <UserRound class="size-4" />
@@ -472,7 +610,6 @@
         </DropdownMenuContent>
       </DropdownMenu>
     </SidebarFooter>
-    <SidebarRail />
   </Sidebar>
 
   <SidebarInset>
@@ -483,12 +620,12 @@
       <div class="flex min-w-0 flex-1 items-center gap-3">
         <SidebarTrigger />
         <div class="min-w-0">
-          {#if breadcrumbs.length > 0}
+          {#if visibleBreadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
               <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
-                {#each breadcrumbs as item, index (`${item.label}-${index}`)}
+                {#each visibleBreadcrumbs as item, index (`${item.label}-${index}`)}
                   <Breadcrumb.Item class="min-w-0">
-                    {#if item.href && index < breadcrumbs.length - 1}
+                    {#if item.href && index < visibleBreadcrumbs.length - 1}
                       <Breadcrumb.Link class="truncate" href={item.href}>
                         {item.label}
                       </Breadcrumb.Link>
@@ -496,14 +633,12 @@
                       <Breadcrumb.Page class="truncate">{item.label}</Breadcrumb.Page>
                     {/if}
                   </Breadcrumb.Item>
-                  {#if index < breadcrumbs.length - 1}
+                  {#if index < visibleBreadcrumbs.length - 1}
                     <Breadcrumb.Separator class="shrink-0" />
                   {/if}
                 {/each}
               </Breadcrumb.List>
             </Breadcrumb.Root>
-          {:else}
-            <p class="truncate text-sm font-medium">{title}</p>
           {/if}
           <p class="truncate text-xs text-muted-foreground">{description}</p>
         </div>

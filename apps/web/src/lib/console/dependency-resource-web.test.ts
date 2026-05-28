@@ -188,7 +188,11 @@ describe("dependency resource Web console surface", () => {
     expect(projectsPageSource).toContain(
       'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
     );
-    expect(projectsPageSource).toContain("<ProjectCreateForm onCreated={openCreatedProject} />");
+    expect(projectsPageSource).toContain('modalIsOpen(page, "create-project")');
+    expect(projectsPageSource).toContain("bind:open={projectCreateDialogOpen}");
+    expect(projectsPageSource).toContain("onOpenChange={setProjectCreateDialogOpen}");
+    expect(projectsPageSource).toContain("ConsoleEmptyState");
+    expect(projectsPageSource).toContain("onCreated={openCreatedProject}");
     expect(serverCreatePageSource).toContain(
       'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
     );
