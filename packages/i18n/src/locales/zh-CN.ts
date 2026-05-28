@@ -1707,6 +1707,7 @@ export const zhCN = {
       noServerOptions: "暂无服务器可选。",
       remoteGitUrl: "Git URL",
       remoteGitUrlPlaceholder: "https://git.example.com/acme/app.git",
+      repositoryBaseDirectory: "仓库内目录",
       reviewBody:
         "提交只需要来源和服务器；项目、环境、资源和变量会使用当前检测结果，只有打开编辑时才会覆盖默认选择。",
       reviewDeployment: "确认部署",

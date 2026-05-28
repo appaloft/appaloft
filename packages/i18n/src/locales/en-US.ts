@@ -1797,6 +1797,7 @@ export const enUS = {
       noServerOptions: "No servers available.",
       remoteGitUrl: "Git URL",
       remoteGitUrlPlaceholder: "https://git.example.com/acme/app.git",
+      repositoryBaseDirectory: "Repository directory",
       reviewBody:
         "Submission only needs a source and server. Project, environment, resource, and variables use the current detected values unless you edit them.",
       reviewDeployment: "Review deployment",
