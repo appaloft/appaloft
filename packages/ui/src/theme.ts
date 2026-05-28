@@ -1,4 +1,4 @@
-import { designPackage } from "@appaloft/design";
+import { appaloftPortableDesignTokens, designPackage } from "@appaloft/design";
 
 export {
   appaloftPortableDesignTokens,
@@ -7,6 +7,59 @@ export {
   type SupportedLocale,
   supportedLocales,
 } from "@appaloft/design";
+
+export const appaloftPortableTailwindTheme = {
+  borderRadius: {
+    sm: appaloftPortableDesignTokens.radius.sm,
+    md: appaloftPortableDesignTokens.radius.md,
+    lg: appaloftPortableDesignTokens.radius.lg,
+  },
+  boxShadow: {
+    sm: appaloftPortableDesignTokens.shadow.sm,
+  },
+  colors: {
+    accent: appaloftPortableDesignTokens.color.accent,
+    "accent-foreground": appaloftPortableDesignTokens.color.accentForeground,
+    background: appaloftPortableDesignTokens.color.background,
+    border: appaloftPortableDesignTokens.color.border,
+    card: appaloftPortableDesignTokens.color.card,
+    foreground: appaloftPortableDesignTokens.color.foreground,
+    muted: appaloftPortableDesignTokens.color.muted,
+    "muted-foreground": appaloftPortableDesignTokens.color.mutedForeground,
+    primary: appaloftPortableDesignTokens.color.primary,
+    "primary-foreground": appaloftPortableDesignTokens.color.primaryForeground,
+    secondary: appaloftPortableDesignTokens.color.secondary,
+    "secondary-foreground": appaloftPortableDesignTokens.color.secondaryForeground,
+  },
+  fontFamily: {
+    mono: appaloftPortableDesignTokens.fontFamily.mono,
+    sans: appaloftPortableDesignTokens.fontFamily.sans,
+  },
+} as const;
+
+export type AppaloftPortableTailwindTheme = typeof appaloftPortableTailwindTheme;
+
+export interface AppaloftPortableTailwindConfigOptions<TPreset = unknown> {
+  readonly presets?: TPreset[];
+}
+
+export interface AppaloftPortableTailwindConfig<TPreset = unknown> {
+  readonly presets?: TPreset[];
+  readonly theme: {
+    readonly extend: AppaloftPortableTailwindTheme;
+  };
+}
+
+export function createAppaloftPortableTailwindConfig<TPreset = unknown>(
+  options: AppaloftPortableTailwindConfigOptions<TPreset> = {},
+): AppaloftPortableTailwindConfig<TPreset> {
+  return {
+    ...(options.presets ? { presets: options.presets } : {}),
+    theme: {
+      extend: appaloftPortableTailwindTheme,
+    },
+  };
+}
 
 export const uiPackage = {
   name: "@appaloft/ui",
