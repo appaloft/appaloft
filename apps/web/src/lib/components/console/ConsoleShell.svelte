@@ -62,6 +62,11 @@
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import {
+    consoleSidebarOpenStorageKey,
+    defaultConsoleSidebarOpen,
+    readBrowserConsoleSidebarOpen,
+  } from "$lib/console/sidebar-state";
+  import {
     initials,
     projectDetailHref,
     readSessionIdentity,
@@ -107,7 +112,9 @@
   let projectSearch = $state("");
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
-  let sidebarOpen = $state(false);
+  let sidebarOpen = $state(
+    browser ? readBrowserConsoleSidebarOpen(window) : defaultConsoleSidebarOpen,
+  );
   let sidebarReady = $state(false);
 
   const {
@@ -180,12 +187,7 @@
       return;
     }
 
-    const storedSidebarState = window.localStorage.getItem("appaloft:console-sidebar-open");
-    if (storedSidebarState === "true" || storedSidebarState === "false") {
-      sidebarOpen = storedSidebarState === "true";
-    } else {
-      sidebarOpen = window.matchMedia("(min-width: 1280px)").matches;
-    }
+    sidebarOpen = readBrowserConsoleSidebarOpen(window);
 
     requestAnimationFrame(() => {
       sidebarReady = true;
@@ -213,7 +215,7 @@
       return;
     }
 
-    window.localStorage.setItem("appaloft:console-sidebar-open", String(sidebarOpen));
+    window.localStorage.setItem(consoleSidebarOpenStorageKey, String(sidebarOpen));
   });
 
   $effect(() => {
