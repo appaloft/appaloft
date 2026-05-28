@@ -30,17 +30,20 @@ a self-hosted Appaloft instance. It is a bootstrap command, not a general user-c
 
 ## Rules
 
-1. The command may create a user and organization only when bootstrap status says no first admin or
-   organization owner exists.
+1. The command may create a user and initial organization ownership only when bootstrap status says
+   no first admin or organization owner exists.
 2. The application layer delegates local user/password/session-provider work to an Appaloft-owned
    first-admin auth port.
-3. Better Auth may implement that port, but command inputs/outputs must not expose Better Auth
+3. The auth adapter must create or reuse the stable self-hosted organization tenant
+   (`org_self_hosted`) so CLI/installer-created product data and HTTP product sessions share the
+   same organization boundary.
+4. Better Auth may implement that port, but command inputs/outputs must not expose Better Auth
    types.
-4. A supplied or generated password is secret material. It is never logged, persisted in Appaloft
+5. A supplied or generated password is secret material. It is never logged, persisted in Appaloft
    read models, or returned after the initial successful bootstrap.
-5. If password is omitted, generated password material is returned only once to trusted bootstrap
+6. If password is omitted, generated password material is returned only once to trusted bootstrap
    output.
-6. Re-running after bootstrap is complete returns a safe conflict/no-op outcome and does not create
+7. Re-running after bootstrap is complete returns a safe conflict/no-op outcome and does not create
    another user, organization, member, or password.
 
 ## Output

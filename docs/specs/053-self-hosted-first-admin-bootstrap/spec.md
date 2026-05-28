@@ -28,7 +28,7 @@ role-aware product mutations.
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | FIRST-ADMIN-SPEC-001 | Bootstrap status before setup | A self-hosted instance has no first admin | Bootstrap status is queried | The result says bootstrap is required, no secret is exposed, and OAuth availability is reported separately. |
-| FIRST-ADMIN-SPEC-002 | Installer-provided first admin | Trusted install config provides email, display name, and password | Bootstrap runs | A local product user is created through the auth adapter, the initial organization is created, the user becomes owner, and no password appears in logs or read models. |
+| FIRST-ADMIN-SPEC-002 | Installer-provided first admin | Trusted install config provides email, display name, and password | Bootstrap runs | A local product user is created through the auth adapter, the stable self-hosted organization tenant is created or reused, the user becomes owner, and no password appears in logs or read models. |
 | FIRST-ADMIN-SPEC-003 | Generated first-admin password | Trusted install config provides email and display name but no password | Bootstrap runs | A strong one-time password is generated behind an application-owned abstraction, returned only to trusted bootstrap output once, and never persisted in raw form by Appaloft code. |
 | FIRST-ADMIN-SPEC-004 | Idempotent after first admin exists | A first admin or organization owner already exists | Bootstrap runs again | The workflow returns safe existing status and does not create another user, organization, member, or raw password output. |
 | FIRST-ADMIN-SPEC-005 | OAuth optional | No OAuth provider is configured | First-admin bootstrap and login are attempted | Local email/password login remains available and OAuth providers are reported disabled with safe setup hints. |
@@ -44,6 +44,8 @@ role-aware product mutations.
 - Bounded context: identity governance.
 - Aggregate owner: organization membership and role semantics belong to the `Organization`
   aggregate. User/session creation is an auth-runtime adapter concern behind application ports.
+- The initial self-hosted organization uses the stable `org_self_hosted` tenant boundary so
+  installer, CLI, and HTTP product-session paths see the same project/server/resource data.
 - Upstream/downstream contexts: installer and HTTP/oRPC may trigger bootstrap/status commands, but
   they must not manipulate auth tables directly.
 

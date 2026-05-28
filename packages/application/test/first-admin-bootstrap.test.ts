@@ -144,6 +144,7 @@ describe("first-admin bootstrap application boundary", () => {
     expect(bootstrapper.requests[0]).toMatchObject({
       password: "supplied-secret",
       email: "admin@example.com",
+      organizationId: "org_self_hosted",
     });
     expect(passwordIssuer.calls).toBe(0);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("supplied-secret");
