@@ -8,7 +8,7 @@ import { Input } from "@appaloft/ui/input";
 import * as Select from "@appaloft/ui/select";
 import * as Tabs from "@appaloft/ui/tabs";
 import { Textarea } from "@appaloft/ui/textarea";
-import { uiPackage } from "@appaloft/ui/theme";
+import { appaloftPortableDesignTokens, uiPackage } from "@appaloft/ui/theme";
 import { cn } from "@appaloft/ui/utils";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
@@ -19,6 +19,7 @@ describe("@appaloft/ui public exports", () => {
     expect(uiPackage.primitiveEntrypoints.dropdownMenu).toBe("@appaloft/ui/dropdown-menu");
     expect(uiPackage.shellEntrypoints.appShell).toBe("@appaloft/ui/app-shell");
     expect(uiPackage.shellEntrypoints.icon).toBe("@appaloft/ui/icon");
+    expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
   });
 
   test("resolves Svelte component exports through package subpaths", () => {

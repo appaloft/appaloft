@@ -1,6 +1,7 @@
 import { designPackage } from "@appaloft/design";
 
 export {
+  appaloftPortableDesignTokens,
   designPackage,
   productIdentity,
   type SupportedLocale,
