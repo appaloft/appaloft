@@ -480,6 +480,63 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(setCookie).toContain("better-auth.session_token=");
   });
 
+  test("[CLOUD-AUTH-ACCOUNT-011] unverified local-password sign-in returns a stable error code", async () => {
+    const verificationEmails: unknown[] = [];
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      emailVerification: {
+        enabled: true,
+        requireEmailVerification: true,
+        sendOnSignIn: true,
+        sendOnSignUp: true,
+        sendVerificationEmail: async (input) => {
+          verificationEmails.push(input);
+        },
+      },
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "unverified@example.com",
+          name: "Unverified User",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    expect(signedUp.status).toBe(200);
+    expect(signedUp.headers.get("set-cookie") ?? "").not.toContain("better-auth.session_token=");
+    expect(verificationEmails).toHaveLength(1);
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "unverified@example.com",
+          password: "local-user-password",
+        }),
+      }),
+    );
+    expect(signedIn.status).toBe(403);
+    const errorBody = (await signedIn.json()) as { code?: unknown; message?: unknown };
+    expect(errorBody).toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+    });
+    expect(typeof errorBody.message).toBe("string");
+  });
+
   test("[PRODUCT-AUTH-SIGNUP-001] ordinary signup creates a session and organization", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
