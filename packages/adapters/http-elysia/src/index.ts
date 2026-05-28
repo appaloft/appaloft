@@ -71,6 +71,14 @@ interface SystemPluginRuntime {
 interface AuthRuntime extends ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<{
     enabled: boolean;
+    emailVerification: {
+      enabled: boolean;
+      otpEnabled: boolean;
+      required: boolean;
+      sendOtpPath?: string;
+      verifyOtpPath?: string;
+      verifyPagePath?: string;
+    };
     provider: "none" | "better-auth";
     loginRequired: boolean;
     deferredAuth: boolean;
@@ -136,6 +144,7 @@ interface StaticAssetSource {
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
 const loginPath = "/login";
 const signUpPath = "/sign-up";
+const verifyEmailPath = "/verify-email";
 const githubAppQuickDeployReturnPath = "/deploy?source=github&githubMode=browser&step=source";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
@@ -379,6 +388,10 @@ function isSignUpPath(pathname: string): boolean {
   return pathname === signUpPath || pathname.startsWith(`${signUpPath}/`);
 }
 
+function isVerifyEmailPath(pathname: string): boolean {
+  return pathname === verifyEmailPath || pathname.startsWith(`${verifyEmailPath}/`);
+}
+
 function hasStaticAssetExtension(pathname: string): boolean {
   return (pathname.split("/").pop() ?? "").includes(".");
 }
@@ -400,6 +413,7 @@ function isConsoleNavigationPath(pathname: string): boolean {
     isFirstAdminBootstrapPath(pathname) ||
     isLoginPath(pathname) ||
     isSignUpPath(pathname) ||
+    isVerifyEmailPath(pathname) ||
     pathname.startsWith("/_app/") ||
     pathname.startsWith("/.well-known/acme-challenge/") ||
     pathname === "/.appaloft/resource-access-failure" ||
@@ -1552,6 +1566,11 @@ export function createHttpApp(input: {
       if (!input.authRuntime) {
         return {
           enabled: false,
+          emailVerification: {
+            enabled: false,
+            otpEnabled: false,
+            required: false,
+          },
           provider: "none" as const,
           loginRequired: false,
           deferredAuth: false,

@@ -8,6 +8,11 @@ function authSession(
 ): AuthSessionResponse {
   return {
     enabled: true,
+    emailVerification: {
+      enabled: false,
+      otpEnabled: false,
+      required: false,
+    },
     provider: "better-auth",
     loginRequired: input.loginRequired,
     deferredAuth: false,

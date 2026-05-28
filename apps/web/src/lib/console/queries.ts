@@ -23,6 +23,11 @@ export const defaultConsoleListLimit = 100;
 
 export const defaultAuthSession: AuthSessionResponse = {
   enabled: false,
+  emailVerification: {
+    enabled: false,
+    otpEnabled: false,
+    required: false,
+  },
   provider: "none",
   loginRequired: false,
   deferredAuth: false,

@@ -89,8 +89,18 @@ export const authProviderStatusSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const authEmailVerificationStatusSchema = z.object({
+  enabled: z.boolean(),
+  otpEnabled: z.boolean(),
+  required: z.boolean(),
+  sendOtpPath: z.string().optional(),
+  verifyOtpPath: z.string().optional(),
+  verifyPagePath: z.string().optional(),
+});
+
 export const authSessionResponseSchema = z.object({
   enabled: z.boolean(),
+  emailVerification: authEmailVerificationStatusSchema,
   provider: z.enum(["none", "better-auth"]),
   loginRequired: z.boolean(),
   deferredAuth: z.boolean(),
