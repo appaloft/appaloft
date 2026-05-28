@@ -68,6 +68,7 @@ describe("home count queries", () => {
     expect(homePageSource).toContain("webDocsHrefs.appaloftMcpServer");
     expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationSkillTitle");
     expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationMcpTitle");
+    expect(homePageSource.match(/rel="external noreferrer"/g)).toHaveLength(2);
     expect(homePageSource).not.toContain("quick_deploy_create");
   });
 

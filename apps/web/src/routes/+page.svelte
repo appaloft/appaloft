@@ -366,7 +366,12 @@
         <p>{$t(i18nKeys.console.home.aiIntegrationDescription)}</p>
       </div>
       <div class="nothing-ai-grid">
-        <a href={webDocsHrefs.appaloftSkill} class="nothing-ai-link">
+        <a
+          href={webDocsHrefs.appaloftSkill}
+          class="nothing-ai-link"
+          target="_blank"
+          rel="external noreferrer"
+        >
           <Bot class="size-4" />
           <span>
             <strong>{$t(i18nKeys.console.home.aiIntegrationSkillTitle)}</strong>
@@ -377,7 +382,12 @@
             <ArrowRight class="size-3.5" />
           </em>
         </a>
-        <a href={webDocsHrefs.appaloftMcpServer} class="nothing-ai-link">
+        <a
+          href={webDocsHrefs.appaloftMcpServer}
+          class="nothing-ai-link"
+          target="_blank"
+          rel="external noreferrer"
+        >
           <Plug class="size-4" />
           <span>
             <strong>{$t(i18nKeys.console.home.aiIntegrationMcpTitle)}</strong>
