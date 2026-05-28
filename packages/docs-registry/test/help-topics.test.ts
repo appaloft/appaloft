@@ -149,12 +149,29 @@ describe("public docs help registry", () => {
         "docs/agent/appaloft-skill.md",
         "docs/agent/appaloft-mcp-server.md",
         "skills/appaloft/SKILL.md",
+        "skills/appaloft/evals/evals.json",
         "skills/appaloft/references/surfaces.md",
         "skills/appaloft/references/cli-entrypoints.md",
         "skills/appaloft/references/deploy-protocol.md",
         "skills/appaloft/references/mcp-tools.md",
       ]),
     );
+
+    const zhPage = readFileSync(
+      resolve(repositoryRoot, "apps/docs/src/content/docs/agent/appaloft-skill.md"),
+      "utf8",
+    );
+    const enPage = readFileSync(
+      resolve(repositoryRoot, "apps/docs/src/content/docs/en/agent/appaloft-skill.md"),
+      "utf8",
+    );
+
+    expect(zhPage).toContain('id="appaloft-skill-evals"');
+    expect(zhPage).toContain("skills/appaloft/evals/evals.json");
+    expect(zhPage).toContain("保存/注册并管理 server");
+    expect(enPage).toContain('id="appaloft-skill-evals"');
+    expect(enPage).toContain("skills/appaloft/evals/evals.json");
+    expect(enPage).toContain("saving/registering and managing servers");
   });
 
   test("[APPALOFT-MCP-009] Appaloft MCP server resolves to public docs and packaged source", () => {

@@ -59,6 +59,47 @@ npx skills add appaloft/appaloft
 
 完整 CLI 映射随安装包一起发布在 `skills/appaloft/references/cli-entrypoints.md`。
 
+<h2 id="appaloft-skill-evals">最佳实践校验</h2>
+
+Appaloft skill 遵循 Agent Skills 的渐进披露原则：`SKILL.md` 保持短小，长命令表、部署协议和
+MCP 指引放在一层 `references/` 中。为了避免 skill 变成泛泛而谈的部署说明，仓库还维护
+`skills/appaloft/evals/evals.json`。
+
+这组 eval 来自公开文档、workflow、test matrix 和 operation catalog，覆盖真实 Appaloft
+任务族：项目生命周期、保存/注册并管理 server、server readiness/capacity/proxy maintenance、SSH
+credential、环境、Resource profile、Resource secrets/effective config、首次部署、部署观测和恢复、
+domain/TLS、generated default access 和 route diagnostics、dependency resource、storage、scheduled
+task、runtime monitoring、runtime control、terminal session、source link、preview、source-event
+auto-deploy diagnostics、static artifact、audit/retention、组织和 deploy token、system capabilities/
+maintenance、MCP，以及拒绝读取 secret 或绕过 Appaloft 的反例。
+
+维护 skill 时先运行：
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
+
+发布准备或 nightly 手动检查时，可以用真实模型跑同一组案例。该检查需要模型 provider key，因此不作为
+默认 PR gate：
+
+```bash
+bun run scripts/run-appaloft-skill-model-evals.ts --model gpt-5-mini
+```
+
+也可以用 DeepSeek 的 OpenAI-compatible API：
+
+```bash
+DEEPSEEK_API_KEY=... bun run scripts/run-appaloft-skill-model-evals.ts \
+  --provider deepseek \
+  --model deepseek-v4-flash
+```
+
+GitHub Actions 不会在普通 PR 自动跑真实模型 eval。需要先把 `DEEPSEEK_API_KEY` 或
+`OPENAI_API_KEY` 配成 repository secret，再手动触发 `Appaloft Skill Model Evals` workflow 作为
+release readiness 检查。
+
+如果只想验证 prompt 构建而不调用模型，可加 `--dry-run`。
+
 <h2 id="appaloft-skill-mcp">MCP 工具</h2>
 
 MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；
