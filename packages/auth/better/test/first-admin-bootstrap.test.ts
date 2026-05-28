@@ -267,6 +267,48 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(signedIn.status).toBe(200);
   });
 
+  test("[FIRST-ADMIN-BOOTSTRAP-009] first admin sign-in bypasses required email verification because bootstrap proves ownership", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      emailVerification: {
+        enabled: true,
+        requireEmailVerification: true,
+        sendOnSignIn: true,
+        sendOnSignUp: true,
+        sendVerificationEmail: async () => undefined,
+      },
+    });
+
+    const result = await runtime.bootstrapFirstAdmin(context, {
+      email: "admin@example.com",
+      displayName: "Admin User",
+      organizationName: "Self-hosted Appaloft",
+      organizationSlug: "self-hosted-appaloft",
+      password: "local-admin-password",
+    });
+
+    expect(result.isOk()).toBe(true);
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "admin@example.com",
+          password: "local-admin-password",
+        }),
+      }),
+    );
+    const setCookie = signedIn.headers.get("set-cookie") ?? "";
+    expect(signedIn.status).toBe(200);
+    expect(setCookie).toContain("better-auth.session_token=");
+  });
+
   test("[PRODUCT-AUTH-SIGNUP-001] ordinary signup creates a session and organization", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
