@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import { createMutation } from "@tanstack/svelte-query";
   import {
     ArrowRight,
@@ -24,10 +25,13 @@
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -40,6 +44,7 @@
     findServer,
     formatTime,
   } from "$lib/console/utils";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -158,6 +163,11 @@
         (routeMode === "serve" || redirectTo),
     ),
   );
+  let domainBindingCreateDialogOpen = $state(false);
+
+  $effect(() => {
+    domainBindingCreateDialogOpen = modalIsOpen(page, "create-domain-binding");
+  });
 
   const createDomainBindingMutation = createMutation(() => ({
     mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
@@ -169,6 +179,7 @@
       };
       domainName = "";
       redirectTo = "";
+      void setModalOpen(page, "create-domain-binding", false);
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
     },
     onError: (error) => {
@@ -512,6 +523,15 @@
       },
     });
   }
+
+  function openDomainBindingCreateDialog(): void {
+    void setModalOpen(page, "create-domain-binding", true);
+  }
+
+  function setDomainBindingCreateDialogOpen(open: boolean): void {
+    domainBindingCreateDialogOpen = open;
+    void setModalOpen(page, "create-domain-binding", open);
+  }
 </script>
 
 <svelte:head>
@@ -528,41 +548,78 @@
       <Skeleton class="h-80 w-full" />
     </div>
   {:else}
-    <div class="space-y-8">
+    <ConsoleResourceCanvas>
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
-            <Badge class="console-page-kicker" variant="outline">
-              {$t(i18nKeys.common.domain.domainBindings)}
-            </Badge>
             <div class="space-y-2">
-              <h1 class="text-2xl font-semibold md:text-3xl">
-                {$t(i18nKeys.console.domainBindings.pageTitle)}
-              </h1>
+              <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-semibold md:text-3xl">
+                  {$t(i18nKeys.console.domainBindings.pageTitle)}
+                </h1>
+                <DocsHelpLink
+                  href={webDocsHrefs.domainCustomDomainBinding}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
               <p class="text-sm leading-6 text-muted-foreground">
                 {$t(i18nKeys.console.domainBindings.pageDescription)}
               </p>
             </div>
           </div>
-          <div class="console-metric-strip grid-cols-2 text-center md:min-w-72">
-            <div>
-              <p class="text-xl font-semibold">{domainBindings.length}</p>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {$t(i18nKeys.common.domain.domainBindings)}
-              </p>
-            </div>
-            <div>
-              <p class="text-xl font-semibold">
-                {domainBindings.filter((binding) => binding.status === "ready").length}
-              </p>
-              <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.status.ready)}</p>
-            </div>
-          </div>
         </div>
       </section>
 
-      <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="console-panel space-y-4 p-4">
+      {#if domainBindings.length > 0}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <Select.Root
+            type="single"
+            value={projectFilterSelectValue}
+            onValueChange={selectProjectFilter}
+          >
+            <Select.Trigger class="min-w-44">
+              {selectedProjectFilter?.name ??
+                $t(i18nKeys.console.domainBindings.filterAllProjects)}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value={allProjectsFilterValue}>
+                {$t(i18nKeys.console.domainBindings.filterAllProjects)}
+              </Select.Item>
+              {#each projects as project (project.id)}
+                <Select.Item value={project.id}>{project.name}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          <Button type="button" onclick={openDomainBindingCreateDialog}>
+            <Plus class="size-4" />
+            {$t(i18nKeys.console.domainBindings.createTitle)}
+          </Button>
+        </div>
+      {/if}
+
+      {#if domainBindings.length === 0}
+        <ConsoleEmptyState
+          tone="domain"
+          title={$t(i18nKeys.console.domainBindings.emptyTitle)}
+          description={$t(i18nKeys.console.domainBindings.emptyBody)}
+          actionLabel={$t(i18nKeys.console.domainBindings.createTitle)}
+          learnMoreHref={webDocsHrefs.domainCustomDomainBinding}
+          onAction={openDomainBindingCreateDialog}
+        />
+      {/if}
+
+      <Dialog.Root
+        bind:open={domainBindingCreateDialogOpen}
+        onOpenChange={setDomainBindingCreateDialogOpen}
+      >
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.domainBindings.createTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.domainBindings.createDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+          <section class="space-y-4 px-5 pb-5">
           <div class="flex items-start gap-3">
             <div class="bg-muted p-2">
               <Plus class="size-4" />
@@ -838,8 +895,11 @@
                 : $t(i18nKeys.console.domainBindings.formSubmit)}
             </Button>
           </form>
-        </section>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>
 
+      {#if domainBindings.length > 0}
         <section class="console-panel space-y-4 p-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -850,24 +910,6 @@
                 {$t(i18nKeys.console.domainBindings.listDescription)}
               </p>
             </div>
-            <Select.Root
-              type="single"
-              value={projectFilterSelectValue}
-              onValueChange={selectProjectFilter}
-            >
-              <Select.Trigger class="min-w-44">
-                {selectedProjectFilter?.name ??
-                  $t(i18nKeys.console.domainBindings.filterAllProjects)}
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Item value={allProjectsFilterValue}>
-                  {$t(i18nKeys.console.domainBindings.filterAllProjects)}
-                </Select.Item>
-                {#each projects as project (project.id)}
-                  <Select.Item value={project.id}>{project.name}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
           </div>
 
           {#if lifecycleFeedback}
@@ -1156,7 +1198,7 @@
             </Button>
           </div>
         </section>
-      </section>
-    </div>
+      {/if}
+    </ConsoleResourceCanvas>
   {/if}
 </ConsoleShell>

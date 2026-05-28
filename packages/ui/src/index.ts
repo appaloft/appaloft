@@ -25,6 +25,7 @@ export * as CardPrimitives from "./card/index.js";
 export * as CollapsiblePrimitives from "./collapsible/index.js";
 export * as DialogPrimitives from "./dialog/index.js";
 export * as DropdownMenuPrimitives from "./dropdown-menu/index.js";
+export * as EmptyPrimitives from "./empty/index.js";
 export { Icon, type IconProps, type IconSize } from "./icon/index.js";
 export { Input } from "./input/index.js";
 export * as InputOTPPrimitives from "./input-otp/index.js";

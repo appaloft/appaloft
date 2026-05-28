@@ -57,6 +57,11 @@
       "types": "./src/dropdown-menu/index.ts",
       "default": "./src/dropdown-menu/index.ts"
     },
+    "./empty": {
+      "svelte": "./src/empty/index.ts",
+      "types": "./src/empty/index.ts",
+      "default": "./src/empty/index.ts"
+    },
     "./icon": {
       "svelte": "./src/icon/index.ts",
       "types": "./src/icon/index.ts",

@@ -4,7 +4,6 @@
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
-  import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
   import { i18nKeys, t } from "$lib/i18n";
@@ -128,7 +127,6 @@
         {/if}
         <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div class="min-w-0 space-y-1">
-            <Badge class="console-page-kicker" variant="outline">{title}</Badge>
             <h1 class="text-2xl font-semibold">{title}</h1>
             <p class="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
           </div>
