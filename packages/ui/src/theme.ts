@@ -75,6 +75,7 @@ export const uiPackage = {
     collapsible: "@appaloft/ui/collapsible",
     dialog: "@appaloft/ui/dialog",
     dropdownMenu: "@appaloft/ui/dropdown-menu",
+    empty: "@appaloft/ui/empty",
     input: "@appaloft/ui/input",
     popover: "@appaloft/ui/popover",
     select: "@appaloft/ui/select",

@@ -278,7 +278,6 @@
 
   [data-slot="sidebar-inner"] {
     background: var(--sidebar);
-    box-shadow: inset -1px 0 0 var(--sidebar-border);
   }
 
   [data-slot="sidebar-header"],
@@ -287,8 +286,8 @@
   }
 
   [data-slot="sidebar-input"] {
-    border-color: color-mix(in oklch, var(--sidebar-border) 84%, var(--sidebar-primary));
-    background: color-mix(in oklch, var(--sidebar-accent) 62%, transparent);
+    border-color: var(--sidebar-border);
+    background: var(--card);
     color: var(--sidebar-foreground);
   }
 
