@@ -126,11 +126,27 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         sendVerificationOTP: async () => undefined,
         otp: {
           enabled: true,
+          cooldownSeconds: 45,
           expiresIn: 600,
           otpLength: 6,
           storeOTP: "hashed",
         },
       },
+    });
+    expect(options.rateLimit).toMatchObject({ enabled: true });
+    expect(options.rateLimit?.customRules).toMatchObject({
+      "/email-otp/send-verification-otp": {
+        max: 1,
+        window: 45,
+      },
+    });
+    const emailOtpPlugin = options.plugins?.find((plugin) => plugin.id === "email-otp");
+    const resendRateLimit = emailOtpPlugin?.rateLimit?.find((rule) =>
+      rule.pathMatcher("/email-otp/send-verification-otp"),
+    );
+    expect(resendRateLimit).toMatchObject({
+      max: 3,
+      window: 60,
     });
 
     expect(options.emailAndPassword).toMatchObject({
@@ -157,7 +173,9 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         },
       }),
     ).toEqual({
+      cooldownSeconds: 60,
       enabled: true,
+      otpLength: 6,
       otpEnabled: true,
       required: true,
       sendOtpPath: "/api/auth/email-otp/send-verification-otp",

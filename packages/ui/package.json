@@ -67,6 +67,11 @@
       "types": "./src/input/index.ts",
       "default": "./src/input/index.ts"
     },
+    "./input-otp": {
+      "svelte": "./src/input-otp/index.ts",
+      "types": "./src/input-otp/index.ts",
+      "default": "./src/input-otp/index.ts"
+    },
     "./popover": {
       "svelte": "./src/popover/index.ts",
       "types": "./src/popover/index.ts",

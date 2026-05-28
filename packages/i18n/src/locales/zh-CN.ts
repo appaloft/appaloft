@@ -280,6 +280,7 @@ export const zhCN = {
       introBody: "先验证你的 email，再进入 Appaloft 控制台。",
       introTitle: "验证你的 email",
       requestCode: "发送验证码",
+      requestCoolingDown: "{{seconds}} 秒后重发",
       requestFailed: "验证码发送失败",
       requestSucceeded: "验证码已发送到 {{email}}。",
       resendCode: "重新发送验证码",

@@ -16,9 +16,13 @@ export interface AppaloftBetterAuthEmailOTPInput {
 
 type BetterAuthEmailVerificationOptions = NonNullable<BetterAuthOptions["emailVerification"]>;
 
+export const defaultAppaloftEmailOtpCooldownSeconds = 60;
+export const defaultAppaloftEmailOtpLength = 6;
+
 export interface AppaloftBetterAuthEmailOTPConfig {
   readonly enabled?: boolean;
   readonly allowedAttempts?: number;
+  readonly cooldownSeconds?: number;
   readonly expiresIn?: number;
   readonly otpLength?: number;
   readonly rateLimit?: {
@@ -51,6 +55,7 @@ export interface AppaloftBetterAuthConfig {
   cookiePrefix?: string;
   database?: BetterAuthOptions["database"];
   emailVerification?: AppaloftBetterAuthEmailVerificationConfig;
+  rateLimit?: BetterAuthOptions["rateLimit"];
   minPasswordLength?: number;
   githubClientId?: string;
   githubClientSecret?: string;
@@ -74,7 +79,9 @@ export interface AppaloftBetterAuthProviderConfig {
 }
 
 export interface AppaloftBetterAuthEmailVerificationStatus {
+  cooldownSeconds?: number;
   enabled: boolean;
+  otpLength?: number;
   otpEnabled: boolean;
   required: boolean;
   sendOtpPath?: string;
@@ -141,6 +148,8 @@ export function resolveAppaloftBetterAuthEmailVerificationStatus(
 ): AppaloftBetterAuthEmailVerificationStatus {
   const enabled = config.emailVerification?.enabled === true;
   const otpEnabled = enabled && config.emailVerification?.otp?.enabled === true;
+  const cooldownSeconds = resolveEmailOtpCooldownSeconds(config);
+  const otpLength = resolveEmailOtpLength(config);
 
   return {
     enabled,
@@ -148,6 +157,8 @@ export function resolveAppaloftBetterAuthEmailVerificationStatus(
     required: enabled && config.emailVerification?.requireEmailVerification === true,
     ...(otpEnabled
       ? {
+          cooldownSeconds,
+          otpLength,
           sendOtpPath: "/api/auth/email-otp/send-verification-otp",
           verifyOtpPath: "/api/auth/email-otp/verify-email",
           verifyPagePath: "/verify-email",
@@ -183,6 +194,14 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
   const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
   const emailVerification = createEmailVerificationOptions(config);
   const emailVerificationStatus = resolveAppaloftBetterAuthEmailVerificationStatus(config);
+  const otpSendRateLimit =
+    config.emailVerification?.otp?.rateLimit ??
+    (emailVerificationStatus.otpEnabled
+      ? {
+          max: 1,
+          window: emailVerificationStatus.cooldownSeconds ?? defaultAppaloftEmailOtpCooldownSeconds,
+        }
+      : undefined);
 
   if (providers.github && config.githubClientId && config.githubClientSecret && githubRedirectUri) {
     socialProviders.github = {
@@ -204,6 +223,22 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     basePath: "/api/auth",
     secret: config.secret,
     ...(config.database ? { database: config.database } : {}),
+    ...(config.rateLimit || emailVerificationStatus.otpEnabled
+      ? {
+          rateLimit: {
+            ...(config.rateLimit ?? {}),
+            ...(emailVerificationStatus.otpEnabled ? { enabled: true } : {}),
+            ...(otpSendRateLimit
+              ? {
+                  customRules: {
+                    ...(config.rateLimit?.customRules ?? {}),
+                    "/email-otp/send-verification-otp": otpSendRateLimit,
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
     ...(config.trustedOrigins?.length ? { trustedOrigins: [...config.trustedOrigins] } : {}),
     account: {
       storeAccountCookie: true,
@@ -247,9 +282,6 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
                 ? { otpLength: config.emailVerification.otp.otpLength }
                 : {}),
               overrideDefaultEmailVerification: true,
-              ...(config.emailVerification.otp?.rateLimit
-                ? { rateLimit: config.emailVerification.otp.rateLimit }
-                : {}),
               ...(config.emailVerification.otp?.resendStrategy
                 ? { resendStrategy: config.emailVerification.otp.resendStrategy }
                 : {}),
@@ -298,3 +330,19 @@ export function createAppaloftBetterAuth(config: AppaloftBetterAuthConfig) {
 }
 
 export type AppaloftBetterAuth = ReturnType<typeof createAppaloftBetterAuth>;
+
+function positiveInteger(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function resolveEmailOtpCooldownSeconds(config: AppaloftBetterAuthConfig): number {
+  return (
+    positiveInteger(config.emailVerification?.otp?.cooldownSeconds) ??
+    positiveInteger(config.emailVerification?.otp?.rateLimit?.window) ??
+    defaultAppaloftEmailOtpCooldownSeconds
+  );
+}
+
+function resolveEmailOtpLength(config: AppaloftBetterAuthConfig): number {
+  return positiveInteger(config.emailVerification?.otp?.otpLength) ?? defaultAppaloftEmailOtpLength;
+}
