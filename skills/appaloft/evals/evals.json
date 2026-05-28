@@ -31,7 +31,7 @@
     {
       "id": "appaloft-skill-project-lifecycle",
       "family": "project-lifecycle",
-      "prompt": "Use Appaloft to show project prj_live_123, update its description for the launch notes, archive the retired staging project, and tell me what you would check before deleting a project.",
+      "prompt": "Use Appaloft to show project prj_live_123, update its description for the launch notes, archive the retired staging project, then run delete safety for prj_retired_123 and delete it only if the safety check passes.",
       "expected_output": "A plan or answer that maps the request to project lifecycle operations, distinguishes read/update/archive/delete-safety/delete, and avoids touching deployments or runtime state directly.",
       "expected_operations": [
         "projects.show",
@@ -55,7 +55,7 @@
     {
       "id": "appaloft-skill-server-save-and-manage",
       "family": "server-registration-and-lifecycle",
-      "prompt": "Save this Docker host as an Appaloft server named prod-sfo-01, reuse it for future deploys, then rename it and explain how to disable or delete it safely later.",
+      "prompt": "Save this Docker host as an Appaloft server named prod-sfo-01, show the saved server detail, configure its edge proxy intent for future deploys, then rename it and explain how to disable or delete it safely later.",
       "expected_output": "A server workflow that treats saving/registering the host as servers.register, then uses show/rename/deactivate/delete-check/delete and edge proxy operations through Appaloft surfaces.",
       "expected_operations": [
         "servers.register",
@@ -82,7 +82,7 @@
     {
       "id": "appaloft-skill-server-readiness-capacity-maintenance",
       "family": "server-readiness-capacity-and-maintenance",
-      "prompt": "Before reusing server srv_prod_sfo_01 for the next deploy, check connectivity, inspect capacity, repair the edge proxy if doctor reports a proxy failure, configure scheduled runtime pruning, and show the policy.",
+      "prompt": "Before reusing server srv_prod_sfo_01 for the next deploy, show the server detail, check connectivity, inspect capacity, run a dry-run capacity prune preview, repair the edge proxy if doctor reports a proxy failure, list existing scheduled runtime prune policies, configure scheduled runtime pruning, and show the policy.",
       "expected_output": "A day-two server maintenance workflow that reads server detail, runs Appaloft connectivity/doctor and capacity operations, repairs proxy state through Appaloft, and configures/list/shows runtime prune policy without touching Docker or proxy files directly.",
       "expected_operations": [
         "servers.show",
