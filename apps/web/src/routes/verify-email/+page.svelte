@@ -15,13 +15,6 @@
   import { REGEXP_ONLY_DIGITS } from "$lib/components/ui/input-otp";
   import { i18nKeys, localeHeaders, t } from "$lib/i18n";
 
-  type PendingEmailVerification = {
-    email?: string;
-    next?: string;
-    organizationName?: string;
-    organizationSlug?: string;
-  };
-
   let email = $state(page.url.searchParams.get("email") ?? "");
   let otp = $state("");
   let requestMessage = $state("");
@@ -62,27 +55,6 @@
         authSessionQuery.data?.emailVerification.otpEnabled,
     ),
   );
-
-  function readPendingVerification(): PendingEmailVerification {
-    if (!browser) {
-      return {};
-    }
-
-    try {
-      const parsed = JSON.parse(
-        window.sessionStorage.getItem("appaloft.pending-email-verification") ?? "{}",
-      ) as unknown;
-      return parsed && typeof parsed === "object" ? (parsed as PendingEmailVerification) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function clearPendingVerification(): void {
-    if (browser) {
-      window.sessionStorage.removeItem("appaloft.pending-email-verification");
-    }
-  }
 
   function resendCooldownStorageKey(emailAddress = normalizedEmail): string {
     return `appaloft.email-verification-resend-at:${emailAddress}`;
@@ -178,21 +150,6 @@
     }
   }
 
-  async function finishPendingOrganization(): Promise<void> {
-    const pending = readPendingVerification();
-    if (!pending.organizationName) {
-      return;
-    }
-
-    await expectOk(
-      await postJson("/api/auth/organization/create", {
-        keepCurrentActiveOrganization: false,
-        name: pending.organizationName,
-        slug: pending.organizationSlug || "organization",
-      }),
-    );
-  }
-
   async function verifyCode(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canVerify) {
@@ -209,8 +166,6 @@
           otp,
         }),
       );
-      await finishPendingOrganization();
-      clearPendingVerification();
 
       if (browser) {
         await goto(returnTo);
@@ -224,10 +179,6 @@
   }
 
   onMount(() => {
-    const pending = readPendingVerification();
-    if (!email && pending.email) {
-      email = pending.email;
-    }
     restoreResendCooldown(email.trim().toLowerCase());
     timer = window.setInterval(() => {
       now = Date.now();

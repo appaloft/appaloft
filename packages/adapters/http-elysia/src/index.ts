@@ -70,6 +70,21 @@ interface SystemPluginRuntime {
 
 interface AuthRuntime extends ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<{
+    accountSecurity: {
+      changePasswordPath?: string;
+      enabled: boolean;
+      pagePath?: string;
+      passwordState: "not-set" | "set" | "unknown";
+      setPasswordPath?: string;
+    };
+    accountRecovery: {
+      cooldownSeconds?: number;
+      enabled: boolean;
+      forgotPasswordPagePath?: string;
+      requestPath?: string;
+      resetPagePath?: string;
+      resetPath?: string;
+    };
     enabled: boolean;
     emailVerification: {
       cooldownSeconds?: number;
@@ -144,7 +159,9 @@ interface StaticAssetSource {
 }
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
+const forgotPasswordPath = "/forgot-password";
 const loginPath = "/login";
+const resetPasswordPath = "/reset-password";
 const signUpPath = "/sign-up";
 const verifyEmailPath = "/verify-email";
 const githubAppQuickDeployReturnPath = "/deploy?source=github&githubMode=browser&step=source";
@@ -386,6 +403,14 @@ function isLoginPath(pathname: string): boolean {
   return pathname === loginPath || pathname.startsWith(`${loginPath}/`);
 }
 
+function isForgotPasswordPath(pathname: string): boolean {
+  return pathname === forgotPasswordPath || pathname.startsWith(`${forgotPasswordPath}/`);
+}
+
+function isResetPasswordPath(pathname: string): boolean {
+  return pathname === resetPasswordPath || pathname.startsWith(`${resetPasswordPath}/`);
+}
+
 function isSignUpPath(pathname: string): boolean {
   return pathname === signUpPath || pathname.startsWith(`${signUpPath}/`);
 }
@@ -414,6 +439,8 @@ function isConsoleNavigationPath(pathname: string): boolean {
     isDocsPath(pathname) ||
     isFirstAdminBootstrapPath(pathname) ||
     isLoginPath(pathname) ||
+    isForgotPasswordPath(pathname) ||
+    isResetPasswordPath(pathname) ||
     isSignUpPath(pathname) ||
     isVerifyEmailPath(pathname) ||
     pathname.startsWith("/_app/") ||
@@ -1567,6 +1594,13 @@ export function createHttpApp(input: {
     .get("/api/auth/session", async ({ request }) => {
       if (!input.authRuntime) {
         return {
+          accountSecurity: {
+            enabled: false,
+            passwordState: "unknown",
+          },
+          accountRecovery: {
+            enabled: false,
+          },
           enabled: false,
           emailVerification: {
             enabled: false,

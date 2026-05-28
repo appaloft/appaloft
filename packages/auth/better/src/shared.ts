@@ -15,13 +15,19 @@ export interface AppaloftBetterAuthEmailOTPInput {
 }
 
 type BetterAuthEmailVerificationOptions = NonNullable<BetterAuthOptions["emailVerification"]>;
+type BetterAuthEmailAndPasswordOptions = NonNullable<BetterAuthOptions["emailAndPassword"]>;
 
+export const defaultAppaloftAccountRecoveryCooldownSeconds = 60;
 export const defaultAppaloftEmailOtpCooldownSeconds = 60;
 export const defaultAppaloftEmailOtpLength = 6;
 
 export interface AppaloftBetterAuthEmailOTPConfig {
   readonly enabled?: boolean;
   readonly allowedAttempts?: number;
+  readonly changeEmail?: {
+    readonly enabled?: boolean;
+    readonly verifyCurrentEmail?: boolean;
+  };
   readonly cooldownSeconds?: number;
   readonly expiresIn?: number;
   readonly otpLength?: number;
@@ -48,9 +54,22 @@ export interface AppaloftBetterAuthEmailVerificationConfig {
   ) => Promise<void>;
 }
 
+export interface AppaloftBetterAuthAccountRecoveryConfig {
+  readonly cooldownSeconds?: number;
+  readonly enabled?: boolean;
+  readonly rateLimit?: {
+    readonly max: number;
+    readonly window: number;
+  };
+  readonly resetPasswordTokenExpiresIn?: number;
+  readonly revokeSessionsOnPasswordReset?: boolean;
+  readonly sendResetPassword?: BetterAuthEmailAndPasswordOptions["sendResetPassword"];
+}
+
 export interface AppaloftBetterAuthConfig {
   baseURL: string;
   secret: string;
+  accountRecovery?: AppaloftBetterAuthAccountRecoveryConfig;
   cookieDomain?: string;
   cookiePrefix?: string;
   database?: BetterAuthOptions["database"];
@@ -79,6 +98,13 @@ export interface AppaloftBetterAuthProviderConfig {
 }
 
 export interface AppaloftBetterAuthEmailVerificationStatus {
+  changeEmail?: {
+    cooldownSeconds?: number;
+    enabled: boolean;
+    requestPath?: string;
+    verifyCurrentEmail?: boolean;
+    verifyPath?: string;
+  };
   cooldownSeconds?: number;
   enabled: boolean;
   otpLength?: number;
@@ -87,6 +113,23 @@ export interface AppaloftBetterAuthEmailVerificationStatus {
   sendOtpPath?: string;
   verifyOtpPath?: string;
   verifyPagePath?: string;
+}
+
+export interface AppaloftBetterAuthAccountRecoveryStatus {
+  cooldownSeconds?: number;
+  enabled: boolean;
+  forgotPasswordPagePath?: string;
+  requestPath?: string;
+  resetPagePath?: string;
+  resetPath?: string;
+}
+
+export interface AppaloftBetterAuthAccountSecurityStatus {
+  changePasswordPath?: string;
+  enabled: boolean;
+  pagePath?: string;
+  passwordState: "not-set" | "set" | "unknown";
+  setPasswordPath?: string;
 }
 
 function joinBaseUrlPath(baseURL: string, path: string): string | undefined {
@@ -153,6 +196,22 @@ export function resolveAppaloftBetterAuthEmailVerificationStatus(
 
   return {
     enabled,
+    ...(otpEnabled
+      ? {
+          changeEmail: {
+            enabled: config.emailVerification?.otp?.changeEmail?.enabled === true,
+            ...(config.emailVerification?.otp?.changeEmail?.enabled === true
+              ? {
+                  cooldownSeconds,
+                  requestPath: "/api/auth/email-otp/request-email-change",
+                  verifyCurrentEmail:
+                    config.emailVerification.otp.changeEmail.verifyCurrentEmail === true,
+                  verifyPath: "/api/auth/email-otp/change-email",
+                }
+              : {}),
+          },
+        }
+      : {}),
     otpEnabled,
     required: enabled && config.emailVerification?.requireEmailVerification === true,
     ...(otpEnabled
@@ -164,6 +223,40 @@ export function resolveAppaloftBetterAuthEmailVerificationStatus(
           verifyPagePath: "/verify-email",
         }
       : {}),
+  };
+}
+
+export function resolveAppaloftBetterAuthAccountRecoveryStatus(
+  config: AppaloftBetterAuthConfig,
+): AppaloftBetterAuthAccountRecoveryStatus {
+  const enabled =
+    config.accountRecovery?.enabled === true &&
+    typeof config.accountRecovery.sendResetPassword === "function";
+  const cooldownSeconds = resolveAccountRecoveryCooldownSeconds(config);
+
+  return {
+    enabled,
+    ...(enabled
+      ? {
+          cooldownSeconds,
+          forgotPasswordPagePath: "/forgot-password",
+          requestPath: "/api/auth/request-password-reset",
+          resetPagePath: "/reset-password",
+          resetPath: "/api/auth/reset-password",
+        }
+      : {}),
+  };
+}
+
+export function resolveAppaloftBetterAuthAccountSecurityStatus(input?: {
+  readonly passwordState?: AppaloftBetterAuthAccountSecurityStatus["passwordState"];
+}): AppaloftBetterAuthAccountSecurityStatus {
+  return {
+    changePasswordPath: "/api/auth/change-password",
+    enabled: true,
+    pagePath: "/account/security",
+    passwordState: input?.passwordState ?? "unknown",
+    setPasswordPath: "/api/auth/set-password",
   };
 }
 
@@ -193,7 +286,17 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
   const googleRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "google");
   const oidcRedirectUri = resolveAppaloftBetterAuthRedirectUri(config, "oidc");
   const emailVerification = createEmailVerificationOptions(config);
+  const accountRecoveryStatus = resolveAppaloftBetterAuthAccountRecoveryStatus(config);
   const emailVerificationStatus = resolveAppaloftBetterAuthEmailVerificationStatus(config);
+  const accountRecoveryRateLimit =
+    config.accountRecovery?.rateLimit ??
+    (accountRecoveryStatus.enabled
+      ? {
+          max: 1,
+          window:
+            accountRecoveryStatus.cooldownSeconds ?? defaultAppaloftAccountRecoveryCooldownSeconds,
+        }
+      : undefined);
   const otpSendRateLimit =
     config.emailVerification?.otp?.rateLimit ??
     (emailVerificationStatus.otpEnabled
@@ -223,16 +326,26 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     basePath: "/api/auth",
     secret: config.secret,
     ...(config.database ? { database: config.database } : {}),
-    ...(config.rateLimit || emailVerificationStatus.otpEnabled
+    ...(config.rateLimit || emailVerificationStatus.otpEnabled || accountRecoveryStatus.enabled
       ? {
           rateLimit: {
             ...(config.rateLimit ?? {}),
-            ...(emailVerificationStatus.otpEnabled ? { enabled: true } : {}),
-            ...(otpSendRateLimit
+            ...(emailVerificationStatus.otpEnabled || accountRecoveryStatus.enabled
+              ? { enabled: true }
+              : {}),
+            ...(otpSendRateLimit || accountRecoveryRateLimit
               ? {
                   customRules: {
                     ...(config.rateLimit?.customRules ?? {}),
-                    "/email-otp/send-verification-otp": otpSendRateLimit,
+                    ...(otpSendRateLimit
+                      ? { "/email-otp/send-verification-otp": otpSendRateLimit }
+                      : {}),
+                    ...(otpSendRateLimit && emailVerificationStatus.changeEmail?.enabled
+                      ? { "/email-otp/request-email-change": otpSendRateLimit }
+                      : {}),
+                    ...(accountRecoveryRateLimit
+                      ? { "/request-password-reset": accountRecoveryRateLimit }
+                      : {}),
                   },
                 }
               : {}),
@@ -247,8 +360,41 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
       enabled: true,
       ...(emailVerificationStatus.required ? { requireEmailVerification: true } : {}),
       ...(config.minPasswordLength ? { minPasswordLength: config.minPasswordLength } : {}),
+      ...(accountRecoveryStatus.enabled && config.accountRecovery?.sendResetPassword
+        ? {
+            sendResetPassword: config.accountRecovery.sendResetPassword,
+            ...(config.accountRecovery.resetPasswordTokenExpiresIn
+              ? {
+                  resetPasswordTokenExpiresIn: config.accountRecovery.resetPasswordTokenExpiresIn,
+                }
+              : {}),
+            ...(config.accountRecovery.revokeSessionsOnPasswordReset !== undefined
+              ? {
+                  revokeSessionsOnPasswordReset:
+                    config.accountRecovery.revokeSessionsOnPasswordReset,
+                }
+              : {}),
+          }
+        : {}),
     },
     ...(emailVerification ? { emailVerification } : {}),
+    user: {
+      ...(config.emailVerification?.otp?.changeEmail?.enabled
+        ? {
+            changeEmail: {
+              enabled: true,
+            },
+          }
+        : {}),
+      additionalFields: {
+        appaloftPendingVerificationIntent: {
+          type: "string",
+          input: true,
+          required: false,
+          returned: false,
+        },
+      },
+    },
     advanced: {
       ...(config.cookiePrefix ? { cookiePrefix: config.cookiePrefix } : {}),
       ...(config.trustedProxyHeaders !== undefined
@@ -289,6 +435,15 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
                 config.emailVerification?.sendVerificationOTP?.(input),
               ...(config.emailVerification.otp?.storeOTP
                 ? { storeOTP: config.emailVerification.otp.storeOTP }
+                : {}),
+              ...(config.emailVerification.otp?.changeEmail
+                ? {
+                    changeEmail: {
+                      enabled: config.emailVerification.otp.changeEmail.enabled === true,
+                      verifyCurrentEmail:
+                        config.emailVerification.otp.changeEmail.verifyCurrentEmail === true,
+                    },
+                  }
                 : {}),
             }),
           ]
@@ -340,6 +495,14 @@ function resolveEmailOtpCooldownSeconds(config: AppaloftBetterAuthConfig): numbe
     positiveInteger(config.emailVerification?.otp?.cooldownSeconds) ??
     positiveInteger(config.emailVerification?.otp?.rateLimit?.window) ??
     defaultAppaloftEmailOtpCooldownSeconds
+  );
+}
+
+function resolveAccountRecoveryCooldownSeconds(config: AppaloftBetterAuthConfig): number {
+  return (
+    positiveInteger(config.accountRecovery?.cooldownSeconds) ??
+    positiveInteger(config.accountRecovery?.rateLimit?.window) ??
+    defaultAppaloftAccountRecoveryCooldownSeconds
   );
 }
 
