@@ -27,6 +27,7 @@ export * as DialogPrimitives from "./dialog/index.js";
 export * as DropdownMenuPrimitives from "./dropdown-menu/index.js";
 export { Icon, type IconProps, type IconSize } from "./icon/index.js";
 export { Input } from "./input/index.js";
+export * as InputOTPPrimitives from "./input-otp/index.js";
 export * as PopoverPrimitives from "./popover/index.js";
 export * as SelectPrimitives from "./select/index.js";
 export { Separator } from "./separator/index.js";

@@ -35,6 +35,11 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(verifyEmailPageSource).toContain("/api/auth/email-otp/send-verification-otp");
     expect(verifyEmailPageSource).toContain("/api/auth/email-otp/verify-email");
     expect(verifyEmailPageSource).toContain("/api/auth/organization/create");
+    expect(verifyEmailPageSource).toContain("$lib/components/ui/input-otp");
+    expect(verifyEmailPageSource).toContain("InputOTP.Root");
+    expect(verifyEmailPageSource).toContain("REGEXP_ONLY_DIGITS");
+    expect(verifyEmailPageSource).toContain("cooldownSeconds");
+    expect(verifyEmailPageSource).toContain("requestCoolingDown");
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
   });

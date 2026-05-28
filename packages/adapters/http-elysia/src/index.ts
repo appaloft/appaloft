@@ -72,7 +72,9 @@ interface AuthRuntime extends ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<{
     enabled: boolean;
     emailVerification: {
+      cooldownSeconds?: number;
       enabled: boolean;
+      otpLength?: number;
       otpEnabled: boolean;
       required: boolean;
       sendOtpPath?: string;
