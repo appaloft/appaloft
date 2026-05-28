@@ -66,6 +66,49 @@ The full skill covers every entrypoint in the Appaloft CLI operation catalog, in
 
 The complete CLI map ships with the package at `skills/appaloft/references/cli-entrypoints.md`.
 
+<h2 id="appaloft-skill-evals">Best-practice validation</h2>
+
+The Appaloft skill follows the Agent Skills progressive-disclosure model: keep `SKILL.md` short,
+and put long command maps, deploy protocol, and MCP guidance in one-level `references/` files. To
+keep the skill from becoming generic deployment advice, the repository also maintains
+`skills/appaloft/evals/evals.json`.
+
+The eval suite is derived from public docs, workflows, test matrices, and the operation catalog. It
+covers real Appaloft task families: project lifecycle, saving/registering and managing servers, SSH
+credentials, server readiness/capacity/proxy maintenance, environments, Resource profile
+configuration, Resource secrets/effective config, first deploy, deployment observation and recovery,
+domain/TLS, generated default access and route diagnostics, dependency resources, storage,
+scheduled tasks, runtime monitoring, runtime controls, terminal sessions, source links, previews,
+source-event auto-deploy diagnostics, static artifacts, audit/retention, organization and deploy
+tokens, system capabilities/maintenance, MCP, and refusal cases for secrets or bypassing Appaloft.
+
+Before maintaining the skill, run:
+
+```bash
+bun run scripts/validate-appaloft-skill-evals.ts
+```
+
+For release readiness or a manual nightly check, run the same cases through a real model. This
+requires a provider key, so it is not part of the default PR gate:
+
+```bash
+bun run scripts/run-appaloft-skill-model-evals.ts --model gpt-5-mini
+```
+
+DeepSeek's OpenAI-compatible API can also run the model evals:
+
+```bash
+DEEPSEEK_API_KEY=... bun run scripts/run-appaloft-skill-model-evals.ts \
+  --provider deepseek \
+  --model deepseek-v4-flash
+```
+
+GitHub Actions does not run real-model evals on normal pull requests. Configure
+`DEEPSEEK_API_KEY` or `OPENAI_API_KEY` as a repository secret, then manually dispatch
+`Appaloft Skill Model Evals` for release readiness.
+
+Add `--dry-run` to verify prompt construction without calling a model.
+
 <h2 id="appaloft-skill-mcp">MCP Tools</h2>
 
 MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP

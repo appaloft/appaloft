@@ -459,6 +459,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
       "docs/agent/appaloft-mcp-server.md",
       "skills/appaloft/SKILL.md",
+      "skills/appaloft/evals/evals.json",
       "skills/appaloft/references/surfaces.md",
       "skills/appaloft/references/cli-entrypoints.md",
       "skills/appaloft/references/deploy-protocol.md",
