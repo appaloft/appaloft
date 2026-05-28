@@ -4,7 +4,7 @@
 >
 > This is the canonical v1 agent-facing deploy subprotocol. It teaches an AI agent how to
 > deploy through Appaloft without bypassing Appaloft operations, leaking secrets, or
-> inventing unsupported MCP/tool behavior before the product exposes it.
+> inventing unsupported MCP/tool behavior outside the operation catalog.
 
 ## Purpose
 
@@ -20,9 +20,9 @@ source lives in this document and the installable full skill references it from
 3. Dispatch existing CLI, HTTP/API, or Web operations through the active Appaloft surface.
 4. Report the deployment outcome by URL, status, logs, diagnostics, and recovery commands.
 
-The skill is more important than MCP for v1 because it can guide any capable coding agent today.
-MCP descriptors should later expose the same operation keys and documentation anchors, not replace
-this protocol.
+The skill remains useful with or without MCP because it guides the workflow. MCP is the active
+callable tool layer when configured; its descriptors expose the same operation keys and
+documentation anchors instead of replacing this protocol.
 
 ## Install
 

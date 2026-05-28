@@ -10,6 +10,8 @@ export const webDocsHrefs = {
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
+  appaloftSkill: resolvePublicDocsHelpHref("agent.appaloft-skill"),
+  appaloftMcpServer: resolvePublicDocsHelpHref("agent.appaloft-mcp-server"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverDockerSwarmTarget: resolvePublicDocsHelpHref("server.docker-swarm-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),

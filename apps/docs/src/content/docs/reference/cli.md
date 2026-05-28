@@ -44,7 +44,7 @@ CLI `--help`、交互式 prompt 和错误恢复提示应该链接到稳定 publi
 
 有 active profile，或显式传入 `--control-plane-mode cloud|self-hosted`、`--control-plane-url <url>`、`APPALOFT_CONTROL_PLANE_MODE`、`APPALOFT_CONTROL_PLANE_URL` 时，普通 CLI 业务命令会先解析执行目标。`controlPlane.mode: none` 和 `--control-plane-mode none` 继续使用本地 CLI/SSH runtime。
 
-远程目标会在业务请求前执行兼容性/auth handshake，然后通过同一套 typed HTTP/API contract dispatch 非 streaming、非 webhook-signature 的 generated SDK operation。CLI 不维护另一份业务 schema；同一个 operation key 和 input schema 也服务于 HTTP/oRPC、Web、SDK 和 future MCP。
+远程目标会在业务请求前执行兼容性/auth handshake，然后通过同一套 typed HTTP/API contract dispatch 非 streaming、非 webhook-signature 的 generated SDK operation。CLI 不维护另一份业务 schema；同一个 operation key 和 input schema 也服务于 HTTP/oRPC、Web、SDK 和 MCP。
 
 没有 profile、URL、token 或其他受信任远程来源时，`auto` 和默认行为会回落到本地模式。这个回落不会联系 public Cloud、不会扫描网络、不会上传或 adopt SSH PGlite state。
 

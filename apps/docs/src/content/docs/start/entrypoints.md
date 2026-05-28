@@ -1,6 +1,6 @@
 ---
 title: "选择入口"
-description: "在 Web console、CLI、HTTP API 和未来 MCP 工具之间选择合适入口。"
+description: "在 Web console、CLI、HTTP API 和 MCP 工具之间选择合适入口。"
 docType: concept
 localeState:
   zh-CN: complete
@@ -38,4 +38,6 @@ Self-hosted Server Action 使用 HTTP API 表面：`control-plane-url` 显式选
 
 <h2 id="entrypoint-mcp-tools">MCP tools</h2>
 
-未来 MCP 工具应复用相同 topic id、输入解释和恢复说明。
+当 agent host 配置 Appaloft MCP 时，使用 `appaloft mcp stdio` 暴露同一 operation catalog。
+MCP tools 应复用相同 topic id、输入解释和恢复说明；查看
+[Appaloft MCP server](/docs/agent/mcp-server/#appaloft-mcp-server)。

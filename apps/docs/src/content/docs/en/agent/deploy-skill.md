@@ -24,7 +24,8 @@ sidebar:
 The Appaloft Deploy Skill is the deploy subprotocol inside the full
 [Appaloft Skill](/docs/en/agent/appaloft-skill/#appaloft-skill). It is not a new deployment
 operation and not a replacement for MCP; it is a user-layer protocol that tells an AI agent how to
-deploy through the existing CLI, HTTP API, or Web Quick Deploy surfaces.
+deploy through the existing CLI, HTTP API, Web Quick Deploy, or
+[MCP tools](/docs/en/agent/mcp-server/#appaloft-mcp-tools) surfaces.
 
 The skill covers the full Appaloft deploy entry surface and keeps the result focused on what the
 user needs next: access URL, deployment status, logs, diagnostics, and recovery. Static output is

@@ -38,6 +38,8 @@ import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 
 export interface AppComposition extends AppaloftServer {
   cliProgram: ReturnType<typeof createCliProgram>;
+  commandBus: CommandBus;
+  queryBus: QueryBus;
 }
 
 export interface ShellRuntimeOptions
@@ -306,5 +308,7 @@ export async function createAppComposition(
   return {
     ...server,
     cliProgram,
+    commandBus,
+    queryBus,
   };
 }

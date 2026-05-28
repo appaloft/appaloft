@@ -3,13 +3,13 @@
 > GOVERNING DOCUMENT
 >
 > This is the canonical full Appaloft AI-facing skill. It makes Appaloft available to agents as a
-> first-class content entrypoint alongside CLI, HTTP/API, Web, and future MCP surfaces.
+> first-class content entrypoint alongside CLI, HTTP/API, Web, and MCP surfaces.
 
 ## Purpose
 
 The Appaloft skill turns user intent such as "deploy this app", "configure this resource", "check
 why access is failing", "rotate this deploy token", "restore this database", or "prune old logs"
-into the same Appaloft operation catalog used by the CLI, HTTP/API, Web console, and future MCP
+into the same Appaloft operation catalog used by the CLI, HTTP/API, Web console, and MCP
 tools.
 
 The skill is not only a static-site or deploy shortcut. Deploy is a high-frequency workflow inside
@@ -36,7 +36,8 @@ Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 - CLI: local shell-capable agent sessions;
 - HTTP/API: agents running beside or integrating with a control plane;
 - Web: human-guided console workflows;
-- MCP/tools: later generated tool descriptors over the same operation catalog;
+- MCP/tools: callable descriptors over the same operation catalog when `appaloft mcp stdio` is
+  configured;
 - repository config: source-controlled deployment intent.
 
 The skill chooses among those surfaces based on the current agent environment. It must not invent
@@ -82,3 +83,14 @@ The installable `appaloft` skill must include:
 - Entrypoint surfaces: `skills/appaloft/references/surfaces.md`.
 - Complete CLI operation reference: `skills/appaloft/references/cli-entrypoints.md`.
 - Deploy subprotocol: `skills/appaloft/references/deploy-protocol.md`.
+- MCP tool guide: `skills/appaloft/references/mcp-tools.md`.
+
+## MCP Boundary
+
+The skill stays lightweight on purpose. It should not enumerate every Appaloft command inline;
+operation coverage belongs in references, public docs, and the MCP operation catalog resource.
+
+When MCP is available, the skill may prefer MCP tool calls for exact input/output. The tools still
+dispatch through `CommandBus` and `QueryBus` with `entrypoint: "mcp"`. The skill remains the
+workflow layer that decides what to inspect, what operation to call next, how to avoid secrets, and
+how to report the outcome.

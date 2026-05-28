@@ -499,6 +499,17 @@ export const zhCN = {
       environmentSnapshotEntry: "已保存变量快照入口",
       environmentCreatedDuringDeployment: "部署时建立第一个环境",
       activeDeploymentsMetric: "进行中",
+      aiIntegrationDescription:
+        "Skill 负责 agent 的流程判断，MCP 负责精确调用同一套 operation catalog。",
+      aiIntegrationMcpBody:
+        "运行 stdio MCP server，让配置好的 MCP client 调用真实的部署、配置、观察和恢复工具。",
+      aiIntegrationMcpCta: "查看 MCP server",
+      aiIntegrationMcpTitle: "MCP 工具层",
+      aiIntegrationSkillBody:
+        "把 /appaloft 这类 agent 调用映射到 CLI、HTTP/API、Web 或 MCP，而不创造 agent-only 操作。",
+      aiIntegrationSkillCta: "查看 Appaloft Skill",
+      aiIntegrationSkillTitle: "完整 Skill",
+      aiIntegrationTitle: "AI 集成",
       dashboardOverviewDescription: "项目、资源、部署和目标状态",
       dashboardOverviewTitle: "平台概览",
       deploymentActivityTitle: "部署活动",
