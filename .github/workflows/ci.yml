@@ -29,7 +29,7 @@ jobs:
     name: Changes
     runs-on: ubuntu-latest
     outputs:
-      docs_only: ${{ steps.classify.outputs.docs_only }}
+      lightweight_only: ${{ steps.classify.outputs.lightweight_only }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "lightweight_only=false" >> "$GITHUB_OUTPUT"
             echo "Workflow dispatch; running full CI."
             exit 0
           fi
@@ -61,29 +61,29 @@ jobs:
           fi
 
           if [[ ! -s changed-files.txt ]]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "lightweight_only=false" >> "$GITHUB_OUTPUT"
             echo "No changed files detected; running full CI."
             exit 0
           fi
 
-          docs_only=true
+          lightweight_only=true
           while IFS= read -r file; do
             case "$file" in
-              docs/*|*.md|*.mdx|LICENSE|LICENSE.*)
+              .github/workflows/*|docs/*|*.md|*.mdx|LICENSE|LICENSE.*)
                 ;;
               *)
-                docs_only=false
+                lightweight_only=false
                 break
                 ;;
             esac
           done < changed-files.txt
 
-          echo "docs_only=${docs_only}" >> "$GITHUB_OUTPUT"
+          echo "lightweight_only=${lightweight_only}" >> "$GITHUB_OUTPUT"
           {
             echo "### Changed files"
             sed 's/^/- `/' changed-files.txt | sed 's/$/`/'
             echo
-            echo "docs_only=${docs_only}"
+            echo "lightweight_only=${lightweight_only}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   biome:
@@ -93,19 +93,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Skip Biome
-        if: ${{ needs.changes.outputs.docs_only == 'true' }}
-        run: echo "Docs-only change; skipping Biome."
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping Biome."
 
       - name: Check out code
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Biome
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run lint:ci
 
   typecheck:
@@ -115,19 +115,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Skip Typecheck
-        if: ${{ needs.changes.outputs.docs_only == 'true' }}
-        run: echo "Docs-only change; skipping Typecheck."
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping Typecheck."
 
       - name: Check out code
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Typecheck
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run typecheck
 
   unit-tests:
@@ -137,19 +137,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Skip Unit Tests
-        if: ${{ needs.changes.outputs.docs_only == 'true' }}
-        run: echo "Docs-only change; skipping unit tests."
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping unit tests."
 
       - name: Check out code
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Unit Tests
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run test:unit
 
   integration-tests:
@@ -159,19 +159,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Skip Integration Tests
-        if: ${{ needs.changes.outputs.docs_only == 'true' }}
-        run: echo "Docs-only change; skipping integration tests."
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping integration tests."
 
       - name: Check out code
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Start Postgres
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -193,11 +193,11 @@ jobs:
           exit 1
 
       - name: Integration Tests
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run test:integration
 
       - name: Stop Postgres
-        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: docker rm --force appaloft-postgres || true
 
   build-smoke:
@@ -207,27 +207,27 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Skip Build And Smoke
-        if: ${{ needs.changes.outputs.docs_only == 'true' }}
-        run: echo "Docs-only change; skipping build and smoke checks."
+        if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
+        run: echo "Lightweight-only change; skipping build and smoke checks."
 
       - name: Check out code
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Bun and caches
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
 
       - name: Build
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run build
 
       - name: Package Release Artifacts
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: bun run package:artifacts
 
       - name: Start Postgres
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -249,7 +249,7 @@ jobs:
           exit 1
 
       - name: Binary Bundle Smoke
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           test ! -d dist/release/appaloft-binary-bundle/web-static
           mkdir -p .tmp-binary-smoke
@@ -263,18 +263,18 @@ jobs:
           curl --fail http://127.0.0.1:3211/ | grep -q "Appaloft"
 
       - name: Stop Binary Bundle Smoke
-        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: |
           if [ -f .tmp-binary-smoke/appaloft-binary.pid ]; then
             kill "$(cat .tmp-binary-smoke/appaloft-binary.pid)" || true
           fi
 
       - name: Stop Postgres
-        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: docker rm --force appaloft-postgres || true
 
       - name: Docker Build Smoke
-        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: docker build -t appaloft-all-in-one:ci .
 
   ci:
