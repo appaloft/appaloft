@@ -53,7 +53,7 @@ jobs:
           fi
 
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > changed-files.txt
+            gh pr diff "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --name-only > changed-files.txt
           elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
             git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > changed-files.txt
           else
