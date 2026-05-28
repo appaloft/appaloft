@@ -1,12 +1,13 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
-  import { ArrowRight, Database, FolderOpen, Server } from "@lucide/svelte";
+  import { ArrowRight, Bot, Database, FolderOpen, Plug, Server } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { findProject, formatTime, projectDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -359,6 +360,47 @@
       </div>
     </section>
 
+    <section class="nothing-section nothing-ai-section">
+      <div class="nothing-section-header">
+        <p class="nothing-label">{$t(i18nKeys.console.home.aiIntegrationTitle)}</p>
+        <p>{$t(i18nKeys.console.home.aiIntegrationDescription)}</p>
+      </div>
+      <div class="nothing-ai-grid">
+        <a
+          href={webDocsHrefs.appaloftSkill}
+          class="nothing-ai-link"
+          target="_blank"
+          rel="external noreferrer"
+        >
+          <Bot class="size-4" />
+          <span>
+            <strong>{$t(i18nKeys.console.home.aiIntegrationSkillTitle)}</strong>
+            <small>{$t(i18nKeys.console.home.aiIntegrationSkillBody)}</small>
+          </span>
+          <em>
+            {$t(i18nKeys.console.home.aiIntegrationSkillCta)}
+            <ArrowRight class="size-3.5" />
+          </em>
+        </a>
+        <a
+          href={webDocsHrefs.appaloftMcpServer}
+          class="nothing-ai-link"
+          target="_blank"
+          rel="external noreferrer"
+        >
+          <Plug class="size-4" />
+          <span>
+            <strong>{$t(i18nKeys.console.home.aiIntegrationMcpTitle)}</strong>
+            <small>{$t(i18nKeys.console.home.aiIntegrationMcpBody)}</small>
+          </span>
+          <em>
+            {$t(i18nKeys.console.home.aiIntegrationMcpCta)}
+            <ArrowRight class="size-3.5" />
+          </em>
+        </a>
+      </div>
+    </section>
+
     <section class="nothing-section">
       <div class="nothing-section-header">
         <p class="nothing-label">{$t(i18nKeys.console.home.projectRelationsTitle)}</p>
@@ -518,7 +560,8 @@
 
   .nothing-metric-cell:focus-visible,
   .nothing-action-row:focus-visible,
-  .nothing-record-row:focus-visible {
+  .nothing-record-row:focus-visible,
+  .nothing-ai-link:focus-visible {
     z-index: 1;
     outline: 2px solid var(--ring);
     outline-offset: -2px;
@@ -694,6 +737,91 @@
     background-color: color-mix(in oklch, var(--primary) 3%, transparent);
   }
 
+  .nothing-ai-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  @media (min-width: 820px) {
+    .nothing-ai-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .nothing-ai-link {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    padding: 16px;
+    text-decoration: none;
+    transition:
+      background-color var(--nothing-motion-duration) var(--nothing-motion-ease),
+      border-color var(--nothing-motion-duration) var(--nothing-motion-ease),
+      color var(--nothing-motion-duration) var(--nothing-motion-ease);
+  }
+
+  .nothing-ai-link:hover,
+  .nothing-ai-link:focus-visible {
+    border-color: color-mix(in oklch, var(--primary) 36%, var(--input));
+    background-color: color-mix(in oklch, var(--primary) 3%, transparent);
+  }
+
+  .nothing-ai-link > :global(svg:first-child) {
+    margin-top: 2px;
+    color: var(--primary);
+  }
+
+  .nothing-ai-link span {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .nothing-ai-link strong {
+    color: var(--text-display);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .nothing-ai-link small {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .nothing-ai-link em {
+    display: inline-flex;
+    grid-column: 2;
+    width: fit-content;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-style: normal;
+    text-transform: uppercase;
+    transition: color var(--nothing-motion-duration) var(--nothing-motion-ease);
+  }
+
+  .nothing-ai-link em :global(svg) {
+    transform: translate3d(0, 0, 0);
+    transition: transform var(--nothing-motion-duration) var(--nothing-motion-ease);
+  }
+
+  .nothing-ai-link:hover em,
+  .nothing-ai-link:focus-visible em {
+    color: var(--primary);
+  }
+
+  .nothing-ai-link:hover em :global(svg),
+  .nothing-ai-link:focus-visible em :global(svg) {
+    transform: translate3d(3px, 0, 0);
+  }
+
   .nothing-record-row {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -731,14 +859,19 @@
     .nothing-metric-cell small,
     .nothing-metric-cell small :global(svg),
     .nothing-action-row,
-    .nothing-action-row :global(svg:last-child) {
+    .nothing-action-row :global(svg:last-child),
+    .nothing-ai-link,
+    .nothing-ai-link em,
+    .nothing-ai-link em :global(svg) {
       transition-duration: 1ms;
     }
 
     .nothing-metric-cell:hover small :global(svg),
     .nothing-metric-cell:focus-visible small :global(svg),
     .nothing-action-row:hover :global(svg:last-child),
-    .nothing-action-row:focus-visible :global(svg:last-child) {
+    .nothing-action-row:focus-visible :global(svg:last-child),
+    .nothing-ai-link:hover em :global(svg),
+    .nothing-ai-link:focus-visible em :global(svg) {
       transform: translate3d(0, 0, 0);
     }
   }

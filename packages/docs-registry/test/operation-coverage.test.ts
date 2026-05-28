@@ -261,6 +261,7 @@ describe("public docs operation coverage", () => {
     const packagedSkill = await Bun.file("skills/appaloft/SKILL.md").text();
     const surfaces = await Bun.file("skills/appaloft/references/surfaces.md").text();
     const cliEntrypoints = await Bun.file("skills/appaloft/references/cli-entrypoints.md").text();
+    const mcpTools = await Bun.file("skills/appaloft/references/mcp-tools.md").text();
     const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
 
     for (const operationKey of [
@@ -283,6 +284,10 @@ describe("public docs operation coverage", () => {
     expect(surfaces).toContain("Web");
     expect(surfaces).toContain("MCP/tools");
     expect(surfaces).toContain("Do not suggest an Appaloft-owned npm");
+    expect(mcpTools).toContain("appaloft mcp stdio");
+    expect(mcpTools).toContain("standalone `appaloft-mcp` package/bin is deferred");
+    expect(mcpTools).toContain("operation catalog");
+    expect(packagedSkill).toContain("references/mcp-tools.md");
     for (const operation of operationCatalog) {
       if (operation.transports.cli) {
         expect(cliEntrypoints).toContain(operation.transports.cli);

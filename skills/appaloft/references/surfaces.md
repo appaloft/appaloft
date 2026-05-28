@@ -38,8 +38,9 @@ installer; that would blur the boundary between installing an agent skill and ru
    apply only during ordinary trusted deploys and are skipped during PR preview deploy mutation.
    Supported secret resolvers are `ci-env:<NAME>` and same-key
    `resource-secret:<KEY>`.
-5. MCP/tools: use only when available. MCP descriptors must mirror existing operations and must not
-   introduce MCP-only mutations.
+5. MCP/tools: use when an MCP host has `appaloft mcp stdio` or an equivalent configured server
+   available. MCP tools mirror existing operations and must not introduce MCP-only mutations. Use
+   [mcp-tools.md](mcp-tools.md) for tool naming, resources, prompts, and setup.
 
 ## GitHub Action Boundary
 
@@ -66,3 +67,15 @@ installer; that would blur the boundary between installing an agent skill and ru
   families first.
 - Do not create `quick-deploy.create`; Quick Deploy remains a workflow over explicit operations.
 - Do not expose unmasked secrets in prompts, logs, diagnostics, docs, PRs, or final responses.
+
+## Skill And MCP Roles
+
+- The skill is the procedural layer: it classifies intent, chooses the active surface, sequences
+  existing operations, and shapes the final answer.
+- MCP is the callable tool layer: one tool maps to one operation catalog key, with input schemas
+  generated from the same command/query schemas used by CLI and HTTP/API.
+- MCP resources and prompts provide context and workflow starters only. They do not own write-side
+  policy, background work, auth, tenant selection, or hidden state.
+- When a user says something like `/appaloft help me deploy this repo`, treat `/appaloft` as the
+  host's skill invocation phrase, load this skill, then use MCP only if the host exposes Appaloft
+  MCP tools in the session.

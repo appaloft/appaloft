@@ -124,6 +124,22 @@ appaloft deploy ./dist --as static-site
 
 如果资源已经绑定过旧来源，使用 [Deployment recovery](/docs/deploy/recovery/#deployment-source-relink) 重新关联。
 
+<h2 id="static-artifact-publishing">静态产物发布</h2>
+
+直接静态产物发布是部署来源的一个扩展点。它适合已经完成构建的 `dist` 目录或 `.zip` 归档，并通过
+`static-artifacts.*` 操作进入同一套 operation catalog：
+
+```bash
+appaloft static-artifacts publish ./dist
+appaloft static-artifacts publish ./dist.zip
+```
+
+API 可以调用 `POST /api/static-artifacts/publish`、
+`POST /api/static-artifacts/publish-payload` 或
+`POST /api/static-artifacts/publish-archive`。发布记录通过
+`GET /api/static-artifacts/publications` 读取。这个入口不会绕过 Resource、Deployment、route 或
+访问控制边界；hosted alias/default-domain routing 仍是单独能力。
+
 <h2 id="source-auto-deploy-setup">自动部署设置</h2>
 
 Source auto-deploy 会把已验证的 source event 转换为普通部署请求，但不会把 branch、webhook 或

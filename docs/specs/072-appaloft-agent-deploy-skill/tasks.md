@@ -3,7 +3,8 @@
 ## Spec Round
 
 - [x] Position agent deploy skill as a v1 entry-experience requirement.
-- [x] Record that skill comes before MCP for v1 usability.
+- [x] Record that skill is the workflow protocol and MCP is the callable tool transport when
+  configured.
 - [x] Position the full Appaloft skill as the AI-facing entrypoint over the operation catalog.
 - [x] Define the safe deploy protocol and outcome packet.
 - [x] Preserve operation catalog, BYOS, Resource profile, and ids-only deployment boundaries.
@@ -33,7 +34,7 @@
 - [x] Add CLI help pointer if the deploy help should reference the skill.
 - [x] Document standard full skill install with `npx skills add appaloft/appaloft`.
 - [x] Remove npm skill installer fallback and keep deploy as an internal full-skill subprotocol.
-- [x] Keep MCP integration optional and separate from the v1 skill path.
+- [x] Keep MCP integration optional at host setup time and separate from skill workflow semantics.
 
 ## Verification
 

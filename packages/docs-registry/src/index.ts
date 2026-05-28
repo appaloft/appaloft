@@ -425,6 +425,7 @@ export const publicDocsHelpTopics = {
       "docs/agent/appaloft-deploy-skill.md",
       "skills/appaloft/references/surfaces.md",
       "skills/appaloft/references/deploy-protocol.md",
+      "skills/appaloft/references/mcp-tools.md",
     ],
     webSurfaces: ["apps/web Quick Deploy source-first entry and completion outcome links"],
   },
@@ -447,6 +448,7 @@ export const publicDocsHelpTopics = {
       "appaloft skill",
       "AI entrypoint",
       "full skill",
+      "/appaloft",
       "npx skills add appaloft/appaloft",
       "GitHub Action deployment modes",
       "完整 skill",
@@ -455,12 +457,50 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/agent/appaloft-skill.md",
       "docs/specs/072-appaloft-agent-deploy-skill/spec.md",
+      "docs/agent/appaloft-mcp-server.md",
       "skills/appaloft/SKILL.md",
       "skills/appaloft/references/surfaces.md",
       "skills/appaloft/references/cli-entrypoints.md",
       "skills/appaloft/references/deploy-protocol.md",
+      "skills/appaloft/references/mcp-tools.md",
     ],
     webSurfaces: ["apps/docs/src/content/docs/agent/appaloft-skill.md"],
+  },
+  "agent.appaloft-mcp-server": {
+    id: "agent.appaloft-mcp-server",
+    title: "Appaloft MCP server",
+    description:
+      "How MCP clients call Appaloft operation-catalog tools, resources, and prompts safely.",
+    page: {
+      "zh-CN": "agent/mcp-server",
+      "en-US": "en/agent/mcp-server",
+    },
+    anchor: "appaloft-mcp-server",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "web", "mcp"],
+    aliases: [
+      "Appaloft MCP",
+      "MCP server",
+      "appaloft mcp stdio",
+      "MCP tools",
+      "tools/list",
+      "resources/list",
+      "prompts/list",
+    ],
+    specReferences: [
+      "docs/agent/appaloft-mcp-server.md",
+      "docs/decisions/ADR-080-appaloft-as-mcp-transport-boundary.md",
+      "docs/specs/090-appaloft-as-mcp-transport/spec.md",
+      "packages/ai/mcp/README.md",
+      "skills/appaloft/references/mcp-tools.md",
+    ],
+    webSurfaces: [
+      "apps/docs/src/content/docs/agent/mcp-server.md",
+      "apps/web Home AI integration section",
+    ],
   },
   "source.auto-deploy-setup": {
     id: "source.auto-deploy-setup",
@@ -2242,7 +2282,7 @@ export const publicDocsHelpTopics = {
       "docs/testing/self-hosted-auth-test-matrix.md",
     ],
     webSurfaces: [
-      "Docker install output, GitHub Action appaloft-token input, self-hosted Action API 401/403 responses, deploy-token CLI lifecycle commands, admin-protected deploy-token HTTP/API lifecycle endpoints, apps/web /organization deploy-token management, and future MCP descriptors",
+      "Docker install output, GitHub Action appaloft-token input, self-hosted Action API 401/403 responses, deploy-token CLI lifecycle commands, admin-protected deploy-token HTTP/API lifecycle endpoints, apps/web /organization deploy-token management, and generated MCP descriptors",
     ],
     aliases: [
       "deploy token",
@@ -2681,6 +2721,7 @@ export type PublicDocsOperationCoverage =
 export const publicDocsOperationCoverage = [
   { operationKey: "projects.create", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
+  { operationKey: "projects.count", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.rename", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.set-description", status: "documented", topicId: "project.lifecycle" },
@@ -2720,6 +2761,7 @@ export const publicDocsOperationCoverage = [
     topicId: "server.ssh-credential",
   },
   { operationKey: "servers.list", status: "documented", topicId: "server.deployment-target" },
+  { operationKey: "servers.count", status: "documented", topicId: "server.deployment-target" },
   { operationKey: "servers.show", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.capacity.inspect",
@@ -2925,6 +2967,7 @@ export const publicDocsOperationCoverage = [
     topicId: "server.proxy-readiness",
   },
   { operationKey: "resources.list", status: "documented", topicId: "resource.concept" },
+  { operationKey: "resources.count", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.show", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.create", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.archive", status: "documented", topicId: "resource.concept" },
@@ -3220,6 +3263,11 @@ export const publicDocsOperationCoverage = [
     topicId: "dependency.resource-lifecycle",
   },
   {
+    operationKey: "dependency-resources.count",
+    status: "documented",
+    topicId: "dependency.resource-lifecycle",
+  },
+  {
     operationKey: "dependency-resources.show",
     status: "documented",
     topicId: "dependency.resource-lifecycle",
@@ -3271,6 +3319,7 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "environments.create", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.list", status: "documented", topicId: "environment.concept" },
+  { operationKey: "environments.count", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.show", status: "documented", topicId: "environment.concept" },
   {
     operationKey: "environments.rename",
@@ -3477,6 +3526,7 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "deployments.create", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
+  { operationKey: "deployments.count", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.plan", status: "documented", topicId: "deployment.plan-preview" },
   {
@@ -3632,6 +3682,31 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "system.github-repositories.list",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
+    operationKey: "system.github-app-connection.show",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
+    operationKey: "static-artifacts.publish",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
+    operationKey: "static-artifacts.publish-payload",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
+    operationKey: "static-artifacts.publish-archive",
+    status: "documented",
+    topicId: "deployment.source",
+  },
+  {
+    operationKey: "static-artifacts.publications.list",
     status: "documented",
     topicId: "deployment.source",
   },

@@ -1,6 +1,6 @@
 ---
 title: "Appaloft skill"
-description: "Let AI agents use the full Appaloft platform like a CLI, HTTP API, or Web entrypoint."
+description: "Let AI agents use the full Appaloft platform like a CLI, HTTP API, Web, or MCP entrypoint."
 docType: task
 localeState:
   zh-CN: complete
@@ -23,12 +23,13 @@ sidebar:
 <h2 id="appaloft-skill">Appaloft AI entrypoint</h2>
 
 The Appaloft Skill is the full product entrypoint for AI agents. It maps to the same Appaloft
-operation catalog as the CLI, HTTP API, Web console, and future MCP tools; the difference is that
+operation catalog as the CLI, HTTP API, Web console, and MCP tools; the difference is that
 its target user is an AI agent.
 
 It is not a new business operation and not an `appaloft deploy` wrapper. It translates user intent
-into existing Appaloft operations and chooses CLI, HTTP/API, Web, or future MCP based on the active
-agent environment.
+into existing Appaloft operations and chooses CLI, HTTP/API, Web, or MCP based on the active agent
+environment. When MCP is configured, the skill can use it as the callable tool layer; without MCP,
+the skill still works through CLI, HTTP/API, or Web.
 
 For GitHub Actions, the skill must keep three modes separate: Pure SSH Action is the default BYOS
 SSH path and does not require an Appaloft console or ids; Self-hosted Server Action calls an
@@ -64,6 +65,16 @@ The full skill covers every entrypoint in the Appaloft CLI operation catalog, in
   maintenance.
 
 The complete CLI map ships with the package at `skills/appaloft/references/cli-entrypoints.md`.
+
+<h2 id="appaloft-skill-mcp">MCP Tools</h2>
+
+MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP
+server. Each tool is generated from an operation key, for example `deployments.create` becomes
+`deployments_create`. Tool input schemas come from the same command/query schemas, and calls still
+enter the Appaloft command/query buses.
+
+See [Appaloft MCP server](/docs/en/agent/mcp-server/#appaloft-mcp-server) for tool naming,
+resources, prompts, and safety boundaries.
 
 <h2 id="appaloft-skill-safety">Safety boundary</h2>
 

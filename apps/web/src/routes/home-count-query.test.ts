@@ -62,6 +62,16 @@ describe("home count queries", () => {
     expect(homePageSource).not.toContain('href="/deploy"');
   });
 
+  test("[HOME-AI-INTEGRATION-001] highlights Skill and MCP docs without adding business actions", () => {
+    expect(homePageSource).toContain("nothing-ai-section");
+    expect(homePageSource).toContain("webDocsHrefs.appaloftSkill");
+    expect(homePageSource).toContain("webDocsHrefs.appaloftMcpServer");
+    expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationSkillTitle");
+    expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationMcpTitle");
+    expect(homePageSource.match(/rel="external noreferrer"/g)).toHaveLength(2);
+    expect(homePageSource).not.toContain("quick_deploy_create");
+  });
+
   test("[HOME-INSTANCE-DIAGNOSTICS-001] keeps instance diagnostics off the home page", () => {
     expect(homePageSource).not.toContain("/api/readiness");
     expect(homePageSource).not.toContain("nothing-system-strip");

@@ -516,6 +516,17 @@ export const enUS = {
       environmentSnapshotEntry: "Saved variable snapshot entry",
       environmentCreatedDuringDeployment: "Create the first environment during deployment",
       activeDeploymentsMetric: "In flight",
+      aiIntegrationDescription:
+        "The skill owns agent workflow judgment; MCP calls the same operation catalog precisely.",
+      aiIntegrationMcpBody:
+        "Run the stdio MCP server so configured clients can call real deploy, configure, observe, and recover tools.",
+      aiIntegrationMcpCta: "View MCP server",
+      aiIntegrationMcpTitle: "MCP tool layer",
+      aiIntegrationSkillBody:
+        "Map /appaloft-style agent requests to CLI, HTTP/API, Web, or MCP without inventing agent-only operations.",
+      aiIntegrationSkillCta: "View Appaloft Skill",
+      aiIntegrationSkillTitle: "Full skill",
+      aiIntegrationTitle: "AI integration",
       dashboardOverviewDescription: "Projects, resources, deployments, and target state",
       dashboardOverviewTitle: "Platform overview",
       deploymentActivityTitle: "Deployment activity",

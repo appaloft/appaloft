@@ -128,6 +128,7 @@ describe("public docs help registry", () => {
         "docs/agent/appaloft-deploy-skill.md",
         "skills/appaloft/references/surfaces.md",
         "skills/appaloft/references/deploy-protocol.md",
+        "skills/appaloft/references/mcp-tools.md",
       ]),
     );
   });
@@ -146,10 +147,32 @@ describe("public docs help registry", () => {
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/agent/appaloft-skill.md",
+        "docs/agent/appaloft-mcp-server.md",
         "skills/appaloft/SKILL.md",
         "skills/appaloft/references/surfaces.md",
         "skills/appaloft/references/cli-entrypoints.md",
         "skills/appaloft/references/deploy-protocol.md",
+        "skills/appaloft/references/mcp-tools.md",
+      ]),
+    );
+  });
+
+  test("[APPALOFT-MCP-009] Appaloft MCP server resolves to public docs and packaged source", () => {
+    const topic = publicDocsHelpTopics["agent.appaloft-mcp-server"];
+
+    expect(resolvePublicDocsHelpHref(topic.id)).toBe("/docs/agent/mcp-server/#appaloft-mcp-server");
+    expect(resolvePublicDocsHelpHref(topic.id, { locale: "en-US" })).toBe(
+      "/docs/en/agent/mcp-server/#appaloft-mcp-server",
+    );
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["cli", "http-api", "web", "mcp"]));
+    expect(topic.aliases).toEqual(expect.arrayContaining(["appaloft mcp stdio", "MCP tools"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/agent/appaloft-mcp-server.md",
+        "docs/decisions/ADR-080-appaloft-as-mcp-transport-boundary.md",
+        "docs/specs/090-appaloft-as-mcp-transport/spec.md",
+        "packages/ai/mcp/README.md",
+        "skills/appaloft/references/mcp-tools.md",
       ]),
     );
   });

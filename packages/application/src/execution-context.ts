@@ -12,7 +12,7 @@ import {
 export type TraceAttributeValue = boolean | number | string;
 export type TraceAttributes = Record<string, TraceAttributeValue | undefined>;
 
-export type AppEntrypoint = "cli" | "http" | "rpc" | "system";
+export type AppEntrypoint = "cli" | "http" | "mcp" | "rpc" | "system";
 
 export interface ExecutionActor {
   kind: "deploy-token" | "system" | "user";

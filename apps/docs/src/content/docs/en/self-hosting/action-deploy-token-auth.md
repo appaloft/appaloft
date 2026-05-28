@@ -85,8 +85,8 @@ HTTP/API entrypoints are:
 - `GET /api/deploy-tokens?organizationId=...` lists safe metadata.
 - `GET /api/deploy-tokens/{tokenId}?organizationId=...` shows one token's safe metadata.
 
-Web token management and future MCP entrypoints remain later Phase 8 work. Do not rely on manual
-database edits to expand or bypass token scopes.
+Web token management and MCP descriptors use the same deploy-token operation contracts. Do not rely
+on manual database edits to expand or bypass token scopes.
 
 <h2 id="self-hosting-action-auth-errors">401 and 403</h2>
 

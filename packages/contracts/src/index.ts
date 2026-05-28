@@ -5772,7 +5772,7 @@ export const resourceDiagnosticLogSectionSchema = z.object({
 });
 
 export const resourceDiagnosticSystemSchema = z.object({
-  entrypoint: z.enum(["cli", "http", "rpc", "system"]),
+  entrypoint: z.enum(["cli", "http", "mcp", "rpc", "system"]),
   requestId: z.string(),
   locale: z.string(),
   readinessStatus: z.enum(["ready", "degraded"]).optional(),

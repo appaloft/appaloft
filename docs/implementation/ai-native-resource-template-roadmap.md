@@ -34,14 +34,14 @@ For traditional deployment, BYOS is about cost, control, and portability. For AI
 
 ## Existing Foundation To Preserve
 
-Future skill, Blueprint, MCP, and AI-native work must fit the existing Appaloft model:
+Skill, Blueprint, MCP, and AI-native work must fit the existing Appaloft model:
 
 - `Resource` is the project/environment-scoped deployable unit. Applications, services, workers, static sites, databases, and Compose stacks already live under this language.
 - `Resource` profile state already owns source, runtime, network, access, health, variables, storage attachment, dependency binding, auto-deploy, runtime control, logs, health, diagnostics, and deployment history surfaces.
 - `Workload`, `SourceSpec`, `BuildSpec`, `RuntimeSpec`, `RuntimePlan`, and `EnvironmentSnapshot` are the planning and snapshot language for deployment.
 - `ResourceInstance` and `ResourceBinding` are the dependency-resource and binding language for managed or imported backing services such as Postgres and Redis.
 - `Provider`, `Strategy`, `Integration`, and `Plugin` are distinct extension concepts and must not be collapsed into one Blueprint mechanism.
-- CLI, HTTP/oRPC, Web, automation, and future MCP entrypoints must dispatch the same application commands and queries from `operation-catalog.ts`.
+- CLI, HTTP/oRPC, Web, automation, and MCP entrypoints must dispatch the same application commands and queries from `operation-catalog.ts`.
 
 ## Blueprint Definition
 
@@ -76,9 +76,9 @@ Deployment
 
 ## Core Principle
 
-For v1 usability, an agent deploy skill comes before MCP.
+For v1 usability, an agent deploy skill stays useful without requiring MCP.
 
-The skill is not a transport and not a new business operation. It is an agent-readable deployment protocol over existing CLI/API/Web behavior: inspect source, exclude secrets, choose or create context, plan, deploy, observe, and return URL plus diagnostics. MCP remains the later formal tool transport generated from the operation catalog.
+The skill is not a transport and not a new business operation. It is an agent-readable deployment protocol over existing CLI/API/Web behavior: inspect source, exclude secrets, choose or create context, plan, deploy, observe, and return URL plus diagnostics. MCP is the formal callable tool transport generated from the operation catalog when configured.
 
 MCP servers are deployable Resources or dependency-backed workloads with AI-tool capabilities, not a separate deployment engine.
 
@@ -97,7 +97,7 @@ Version labels are intentionally tentative. The current product roadmap reserves
 | 2 | Post-1.0 Track 2 | Explicit pre-GA pull-forward only | Blueprint Instantiation And Deployment Planning | Future Spec Round |
 | 3 | Post-1.0 Track 3 | Explicit pre-GA pull-forward only | Blueprint Catalog / Registry | Future Spec Round |
 | 4 | Post-1.0 Track 4 | Explicit pre-GA pull-forward only | AI Tool Server / MCP Capability | Future Spec Round |
-| 5 | Post-1.0 Track 5 | Explicit pre-GA pull-forward only | Appaloft-as-MCP Interface Planning | Future Spec Round |
+| 5 | Pre-1.0 GA readiness | Required before GA for public AI tooling | Appaloft-as-MCP Interface Planning | Active transport slice |
 | 6 | Post-1.0 Track 6 | Explicit pre-GA pull-forward only | Curated AI Tool Server Blueprints | Future Spec Round |
 | 7 | Post-1.0 Track 7 | Explicit pre-GA pull-forward only | MCP Gateway / Tool Gateway | Future Spec Round |
 | 8 | Later AI-native tracks | Post-1.0+ | Observability, AgentOps, cost governance, eval hooks, model gateway, agent runtime | Future discovery |
@@ -108,12 +108,14 @@ Goal: ship a v1-ready full Appaloft skill before requiring MCP, with deploy as t
 
 Planning rules:
 
-- The skill explains how coding agents use existing CLI/API/Web behavior, repository config, and future MCP/tool boundaries across the complete operation catalog.
+- The skill explains how coding agents use existing CLI/API/Web behavior, repository config, and
+  MCP/tool boundaries across the complete operation catalog.
 - It uses the standard skill-manager path `npx skills add appaloft/appaloft` for Codex-compatible skill hosts. Appaloft does not provide a separate npm skill installer; deploy remains a subprotocol inside the full skill.
 - It must point to stable public docs anchors and reuse operation-catalog language without exposing internal DDD/CQRS terminology.
 - It must include every CLI transport entrypoint, operation keys, safe source inspection, secret/cache exclusion, local static output handling, context selection/creation, plan/deploy/observe sequencing, URL-first outcome output, and recovery guidance.
 - It must not add new commands, hidden API endpoints, hosted artifact storage, or MCP-only semantics.
-- It may later link to MCP tools after Appaloft-as-MCP is productized, but MCP is not required for the v1 skill path.
+- It may link to MCP tools when Appaloft-as-MCP is configured, but MCP is not required for the
+  basic skill path.
 
 Source of truth:
 
@@ -321,6 +323,6 @@ Before any Code Round under this roadmap:
 2. Decide whether an ADR is needed for canonical language, command/query boundary, durable state, public tool/MCP contract, gateway/audit/security policy, or registry boundary.
 3. Update local command/query/workflow/error/testing specs for any accepted public operation.
 4. Update [Core Operations](../CORE_OPERATIONS.md) and `operation-catalog.ts` in the same change as any new public command/query.
-5. Preserve CLI, HTTP/oRPC, Web, automation, and future MCP parity over the same operation schema.
+5. Preserve CLI, HTTP/oRPC, Web, automation, and MCP parity over the same operation schema.
 6. Record public docs/help anchors or an explicit not-user-facing reason.
 7. Keep runtime/provider/strategy specifics in adapters, providers, integrations, plugins, or registry/catalog infrastructure, not in `packages/core`.

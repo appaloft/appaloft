@@ -62,6 +62,8 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.productGradePreviews).toBe(
       "/docs/deploy/previews/#product-grade-preview-deployments",
     );
+    expect(webDocsHrefs.appaloftSkill).toBe("/docs/agent/appaloft-skill/#appaloft-skill");
+    expect(webDocsHrefs.appaloftMcpServer).toBe("/docs/agent/mcp-server/#appaloft-mcp-server");
     expect(webDocsHrefs.serverProxyReadiness).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
     );

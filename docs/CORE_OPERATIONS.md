@@ -17,7 +17,7 @@ entry points:
 - CLI
 - HTTP / oRPC
 - Web console
-- future MCP / tool interfaces
+- MCP / tool interfaces
 
 Those interfaces must not invent business actions independently. Every business capability must map
 to an explicit application operation.
@@ -27,7 +27,7 @@ to an explicit application operation.
 1. Every business capability must be represented by an explicit `Command` or `Query`.
 2. Every transport must dispatch through that operation. No transport may call a repository or use
    case directly.
-3. CLI arguments, oRPC input, HTTP input, and future MCP tool input must reuse the operation input
+3. CLI arguments, oRPC input, HTTP input, and MCP tool input must reuse the operation input
    schema. Do not create parallel transport-only business schemas.
 4. Every operation must live in its own vertical slice directory files.
    Required shape:
@@ -823,6 +823,32 @@ Current boundary:
   `resources.delete` source-link blocker checks. HTTP/oRPC relink is exposed for hosted/self-hosted
   control planes, and Web Resource detail exposes a Resource-scoped relink form.
 
+## Static Artifacts
+
+Business meaning:
+- static artifact publishing is a source/artifact extension point for already-built static output
+- it does not create hosted default-domain routing, bypass Resource/Deployment admission, or expose
+  provider-specific artifact storage semantics
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Publish static artifact from source path | Command | `static-artifacts.publish` | `PublishStaticArtifactCommand` | `PublishStaticArtifactCommandInput` | none yet | `POST /api/static-artifacts/publish` |
+| Publish static artifact payload | Command | `static-artifacts.publish-payload` | `PublishStaticArtifactPayloadCommand` | `PublishStaticArtifactPayloadCommandInput` | `appaloft static-artifacts publish <dist-directory>` | `POST /api/static-artifacts/publish-payload` |
+| Publish static artifact archive | Command | `static-artifacts.publish-archive` | `PublishStaticArtifactArchiveCommand` | `PublishStaticArtifactArchiveCommandInput` | `appaloft static-artifacts publish <dist.zip>` | `POST /api/static-artifacts/publish-archive` |
+| List static artifact publications | Query | `static-artifacts.publications.list` | `ListStaticArtifactPublicationsQuery` | `ListStaticArtifactPublicationsQueryInput` | none yet | `GET /api/static-artifacts/publications` |
+
+Current boundary:
+- the CLI packages local dist directories or `.zip` archives into payload/archive commands before
+  dispatch; the business operation still receives an explicit static artifact manifest and safe
+  artifact body reference
+- `static-artifacts.publish` is for trusted server-local source paths over HTTP/API composition
+- publication read models return safe summaries only; they must not expose artifact contents, raw
+  local filesystem internals, provider credentials, or hosted provider payloads
+- route activation remains provider-neutral and scoped by the accepted static artifact route
+  attributes; hosted alias/default-domain routing is a separate follow-up capability
+
 ## Source Events
 
 Business meaning:
@@ -962,7 +988,7 @@ Current boundary:
   reported and preserved.
 - `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
   retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
-  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. Retry, redeploy, rollback, the pre-RC rebuilt
+  Web, CLI, HTTP/oRPC, and MCP/tool surfaces. Retry, redeploy, rollback, the pre-RC rebuilt
   `deployments.cancel` active-attempt command, and terminal history maintenance commands
   `deployments.archive`/`deployments.prune` are active write commands. Cancel and archive require
   exact deployment id confirmation; cancel coordinates on the same resource-runtime scope.
@@ -1198,7 +1224,7 @@ Product-grade preview policy operations:
 - Deployment recovery readiness is active under
   [ADR-034: Deployment Recovery Readiness](./decisions/ADR-034-deployment-recovery-readiness.md).
   The `deployments.recovery-readiness` query is the shared read-only source for retry, redeploy,
-  rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and future MCP/tool
+  rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and MCP/tool
   surfaces.
 - `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
@@ -1262,7 +1288,9 @@ The foundational `Organization` aggregate exists in `packages/core`, Better Auth
 exist in persistence, Web can read auth-session status, and deploy-token create/list/show/rotate/
 revoke now have application message handlers plus CLI and admin-protected HTTP/oRPC
 operation-catalog transports. Web `/organization` now exposes deploy-token list/create/rotate/
-revoke through the same contracts. Future MCP token management remains a Phase 8 gap.
+revoke through the same contracts. MCP token-management descriptors are generated from the active
+operation catalog when the MCP server is configured; hosted gateway policy remains outside this
+document.
 
 Docker self-host installer bootstrap is a narrow optional install-time entrypoint over the existing
 `deploy-tokens.create` application command, not a public deploy-token management surface.
@@ -1310,8 +1338,8 @@ adapter implementations, operation-catalog transports, authorization-gated HTTP/
 CLI commands. Public docs/help coverage is active under
 `self-hosting.organization-team-management`; Web `/organization` exposes current context, safe
 current organization switching, member and invitation reads, invite, role update, removal, and
-deploy-token controls through the same oRPC contracts. Concrete future MCP tool descriptors remain
-Phase 8 follow-up work.
+deploy-token controls through the same oRPC contracts. MCP descriptors are generated from the same
+operation catalog entries.
 
 Current boundary:
 - self-hosted Action deploy-token authentication is an admission gate over existing Action
@@ -1327,8 +1355,8 @@ Current boundary:
   `deployments.create` input
 - raw token values are one-time output only; list/show/readiness/log surfaces expose safe metadata
   and scope summaries only
-- deploy-token lifecycle operations are public through CLI, HTTP/oRPC, and Web `/organization`;
-  concrete future MCP descriptors remain a named Phase 8 gap
+- deploy-token lifecycle operations are public through CLI, HTTP/oRPC, Web `/organization`, and
+  generated MCP descriptors
 
 ## Operator Work
 
@@ -1687,6 +1715,7 @@ Implemented operations:
 | List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `appaloft plugins list` | `GET /api/plugins` |
 | List integrations | Query | `system.integrations.list` | `ListIntegrationsQuery` | none | none yet | `GET /api/integrations` |
 | List GitHub repositories | Query | `system.github-repositories.list` | `ListGitHubRepositoriesQuery` | `ListGitHubRepositoriesQueryInput` | none yet | `GET /api/integrations/github/repositories` |
+| Show GitHub App connection | Query | `system.github-app-connection.show` | `GitHubAppConnectionQuery` | `GitHubAppConnectionQueryInput` | none yet | `GET /api/integrations/github/app-connection` |
 | Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | `GET /api/system/doctor` |
 | Check instance upgrade | Query | `system.instance-upgrade.check` | `CheckInstanceUpgradeQuery` | `CheckInstanceUpgradeQueryInput` | `appaloft upgrade check` | `GET /api/instance-upgrade/check` |
 | Apply instance upgrade | Command | `system.instance-upgrade.apply` | `ApplyInstanceUpgradeCommand` | `ApplyInstanceUpgradeCommandInput` | `appaloft upgrade apply --confirm` | `POST /api/instance-upgrade/apply` |
@@ -1750,14 +1779,14 @@ Web:
 - the web console must call the typed oRPC client or HTTP contract built from these operations
 - it must not hide business rules in components
 
-Future MCP / AI tools:
+MCP / AI tools:
 - the v1 Appaloft skill is a public documentation/skill artifact over the CLI/API/Web operation
   catalog, not a separate business transport and not an operation-catalog entry. The agent deploy
   skill is its deploy subprotocol.
 - `@appaloft/ai-mcp` generates one serializable tool descriptor per operation catalog key
 - generated tool names are operation-key based, for example `projects_create`,
   `environments_create`, `deployments_plan`, and `deployments_create`
-- future MCP server handlers must dispatch through the same command/query messages and input schemas,
+- MCP server handlers must dispatch through the same command/query messages and input schemas,
   not through a separate tool-only operation list
 
 ## Authoring Checklist For New Business Capabilities
