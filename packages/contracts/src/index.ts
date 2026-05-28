@@ -90,7 +90,9 @@ export const authProviderStatusSchema = z.object({
 });
 
 export const authEmailVerificationStatusSchema = z.object({
+  cooldownSeconds: z.number().int().positive().optional(),
   enabled: z.boolean(),
+  otpLength: z.number().int().positive().optional(),
   otpEnabled: z.boolean(),
   required: z.boolean(),
   sendOtpPath: z.string().optional(),
