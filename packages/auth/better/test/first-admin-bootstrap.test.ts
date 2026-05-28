@@ -327,11 +327,81 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
       email: "admin@example.com",
+      organizationId: "org_self_hosted",
       organizationSlug: "self-hosted-appaloft",
     });
     expect(result._unsafeUnwrap().userId.length).toBeGreaterThan(0);
-    expect(result._unsafeUnwrap().organizationId.length).toBeGreaterThan(0);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("local-admin-password");
+  });
+
+  test("[FIRST-ADMIN-BOOTSTRAP-004] attaches the first admin to an existing self-hosted organization", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+    const authContext = await runtime["auth"].$context;
+    await authContext.adapter.create({
+      model: "organization",
+      data: {
+        id: "org_self_hosted",
+        name: "Self-hosted Appaloft",
+        slug: "self-hosted-appaloft",
+        logo: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+      forceAllowId: true,
+    });
+
+    const result = await runtime.bootstrapFirstAdmin(context, {
+      email: "admin@example.com",
+      displayName: "Admin User",
+      organizationName: "Self-hosted Appaloft",
+      organizationSlug: "self-hosted-appaloft",
+      password: "local-admin-password",
+    });
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      email: "admin@example.com",
+      organizationId: "org_self_hosted",
+      organizationSlug: "self-hosted-appaloft",
+    });
+
+    const signedIn = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "admin@example.com",
+          password: "local-admin-password",
+        }),
+      }),
+    );
+    const sessionCookie = (signedIn.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedIn.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after first-admin sign-in");
+    }
+
+    const authorizationResult = await runtime.authorizeProductSession(context, {
+      method: "POST",
+      path: "/api/domain-bindings",
+      requiredRole: "member",
+      cookieHeader: sessionCookie,
+    });
+    expect(authorizationResult.isOk()).toBe(true);
+    expect(authorizationResult._unsafeUnwrap()).toMatchObject({
+      organizationId: "org_self_hosted",
+      role: "owner",
+      userId: result._unsafeUnwrap().userId,
+    });
   });
 
   test("[FIRST-ADMIN-BOOTSTRAP-008] honors configured local password length for test runtimes", async () => {

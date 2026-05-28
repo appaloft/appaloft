@@ -122,6 +122,15 @@ interface DirectMemberQueryBuilder {
   execute(): Promise<Record<string, unknown>[]>;
 }
 
+type ForcedIdCreateAdapter = {
+  create<T extends Record<string, unknown>, R = T>(input: {
+    model: string;
+    data: T & { id: string };
+    select?: string[] | undefined;
+    forceAllowId: true;
+  }): Promise<R>;
+};
+
 type DirectMemberListReadback =
   | { result: Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }> }
   | { reasonCode: string };
@@ -643,19 +652,18 @@ export class BetterAuthRuntime implements AuthRuntime {
       const verifiedUser = await authContext.internalAdapter.updateUser(userId, {
         emailVerified: true,
       });
-      const organization = await this.auth.api.createOrganization({
-        body: {
-          name: request.organizationName,
-          slug: request.organizationSlug ?? defaultOrganizationSlug(request.organizationName),
-          userId,
-          keepCurrentActiveOrganization: true,
-        },
+      const organization = await this.ensureFirstAdminOrganizationOwner({
+        organizationId: request.organizationId ?? "org_self_hosted",
+        organizationName: request.organizationName,
+        organizationSlug:
+          request.organizationSlug ?? defaultOrganizationSlug(request.organizationName),
+        userId,
       });
 
       return ok({
         email: verifiedUser.email,
-        organizationId: organization.id,
-        organizationSlug: organization.slug,
+        organizationId: organization.organizationId,
+        organizationSlug: organization.organizationSlug,
         userId,
       });
     } catch (error) {
@@ -665,6 +673,94 @@ export class BetterAuthRuntime implements AuthRuntime {
         ),
       );
     }
+  }
+
+  private async ensureFirstAdminOrganizationOwner(input: {
+    organizationId: string;
+    organizationName: string;
+    organizationSlug: string;
+    userId: string;
+  }): Promise<{ organizationId: string; organizationSlug: string }> {
+    const authContext = await this.auth.$context;
+    const existingOrganization = await authContext.adapter.findOne<{
+      id?: string;
+      slug?: string;
+    }>({
+      model: "organization",
+      where: [
+        {
+          field: "id",
+          value: input.organizationId,
+        },
+      ],
+    });
+    const organization =
+      existingOrganization ??
+      (await (authContext.adapter as ForcedIdCreateAdapter).create<
+        {
+          id: string;
+          name: string;
+          slug: string;
+          logo: null;
+          metadata: null;
+          createdAt: Date;
+        },
+        {
+          id?: string;
+          slug?: string;
+        }
+      >({
+        model: "organization",
+        data: {
+          id: input.organizationId,
+          name: input.organizationName,
+          slug: input.organizationSlug,
+          logo: null,
+          metadata: null,
+          createdAt: new Date(),
+        },
+        forceAllowId: true,
+      }));
+    const organizationId = readString(organization, "id") ?? input.organizationId;
+    const organizationSlug = readString(organization, "slug") ?? input.organizationSlug;
+    const existingMember = await authContext.adapter.findOne<{ id?: string }>({
+      model: "member",
+      where: [
+        {
+          field: "organizationId",
+          value: organizationId,
+        },
+        {
+          field: "userId",
+          value: input.userId,
+        },
+      ],
+    });
+
+    if (existingMember?.id) {
+      await authContext.adapter.update({
+        model: "member",
+        where: [
+          {
+            field: "id",
+            value: existingMember.id,
+          },
+        ],
+        update: { role: "owner" },
+      });
+    } else {
+      await authContext.adapter.create({
+        model: "member",
+        data: {
+          organizationId,
+          userId: input.userId,
+          role: "owner",
+          createdAt: new Date(),
+        },
+      });
+    }
+
+    return { organizationId, organizationSlug };
   }
 
   async getCurrentContext(context: ExecutionContext): Promise<Result<CurrentOrganizationContext>> {
