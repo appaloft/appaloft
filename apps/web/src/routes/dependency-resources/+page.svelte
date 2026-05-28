@@ -10,30 +10,33 @@
     Server,
     Trash2,
   } from "@lucide/svelte";
-  import {
-    siClickhouse,
-    siMinio,
-    siMysql,
-    siOpensearch,
-    siPostgresql,
-    siRedis,
-  } from "simple-icons";
+  import type { IconModule as BrandIconModule } from "@thesvg/icons";
+  import clickhouseIcon from "@thesvg/icons/clickhouse";
+  import minioIcon from "@thesvg/icons/minio";
+  import mysqlIcon from "@thesvg/icons/mysql";
+  import opensearchIcon from "@thesvg/icons/opensearch";
+  import postgresqlIcon from "@thesvg/icons/postgresql";
+  import redisIcon from "@thesvg/icons/redis";
   import type {
+    CreateEnvironmentResponse,
+    CreateProjectResponse,
     DependencyResourceBackupPolicyRead,
     DependencyResourceBackupSummary,
     DependencyResourceProvisioningPlan,
     DependencyResourceSummary,
-    EnvironmentSummary,
-    ProjectSummary,
-    ServerSummary,
+    RegisterServerResponse,
   } from "@appaloft/contracts";
   import type { TranslationKey } from "@appaloft/i18n";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
+  import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
+  import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte";
+  import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -47,8 +50,7 @@
   type DependencyKind = DependencyResourceSummary["kind"];
   type DependencyKindIcon = {
     title: string;
-    path: string;
-    hex: string;
+    svg: string;
   };
   type ProvisioningMode = "create" | "reuse";
   type ProvisioningPlanInput = Parameters<typeof orpcClient.dependencyResources.provisioning.plan>[0];
@@ -62,30 +64,34 @@
     detail: string;
   };
 
+  function brandIcon(icon: BrandIconModule, variant = "default"): DependencyKindIcon {
+    return { title: icon.title, svg: icon.variants[variant] ?? icon.svg };
+  }
+
   const dependencyKindOptions: Record<DependencyKind, DependencyKindOption> = {
     postgres: {
       labelKey: i18nKeys.console.dependencyResources.kindPostgres,
-      icon: siPostgresql,
+      icon: brandIcon(postgresqlIcon),
     },
     redis: {
       labelKey: i18nKeys.console.dependencyResources.kindRedis,
-      icon: siRedis,
+      icon: brandIcon(redisIcon),
     },
     mysql: {
       labelKey: i18nKeys.console.dependencyResources.kindMysql,
-      icon: siMysql,
+      icon: brandIcon(mysqlIcon, "light"),
     },
     clickhouse: {
       labelKey: i18nKeys.console.dependencyResources.kindClickHouse,
-      icon: siClickhouse,
+      icon: brandIcon(clickhouseIcon),
     },
     "object-storage": {
       labelKey: i18nKeys.console.dependencyResources.kindObjectStorage,
-      icon: siMinio,
+      icon: brandIcon(minioIcon),
     },
     opensearch: {
       labelKey: i18nKeys.console.dependencyResources.kindOpenSearch,
-      icon: siOpensearch,
+      icon: brandIcon(opensearchIcon),
     },
   };
   const dependencyKindOrder = [
@@ -135,6 +141,10 @@
   let backupPolicyIntervalHours = $state("24");
   let backupPolicyEnabled = $state(true);
   let feedback = $state<Feedback | null>(null);
+  let projectCreateDialogOpen = $state(false);
+  let environmentCreateDialogOpen = $state(false);
+  let serverCreateDialogOpen = $state(false);
+  let openEnvironmentAfterProjectCreate = $state(false);
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
@@ -433,16 +443,50 @@
     return servers.find((server) => server.id === serverId)?.name ?? serverId;
   }
 
+  function openProjectCreateDialog(): void {
+    openEnvironmentAfterProjectCreate = false;
+    projectCreateDialogOpen = true;
+  }
+
+  function openEnvironmentCreateDialog(): void {
+    if (!selectedProjectId) {
+      openEnvironmentAfterProjectCreate = true;
+      projectCreateDialogOpen = true;
+      return;
+    }
+    environmentCreateDialogOpen = true;
+  }
+
+  function openServerCreateDialog(): void {
+    serverCreateDialogOpen = true;
+  }
+
+  function handleProjectCreated(project: CreateProjectResponse): void {
+    selectedProjectId = project.id;
+    selectedEnvironmentId = "";
+    projectCreateDialogOpen = false;
+    if (openEnvironmentAfterProjectCreate) {
+      openEnvironmentAfterProjectCreate = false;
+      environmentCreateDialogOpen = true;
+    }
+  }
+
+  function handleEnvironmentCreated(environment: CreateEnvironmentResponse): void {
+    selectedEnvironmentId = environment.id;
+    environmentCreateDialogOpen = false;
+  }
+
+  function handleServerCreated(server: RegisterServerResponse): void {
+    selectedServerId = server.id;
+    serverCreateDialogOpen = false;
+  }
+
   function kindLabel(kind: DependencyKind): string {
     return $t(dependencyKindOptions[kind].labelKey);
   }
 
   function kindIcon(kind: DependencyKind): DependencyKindIcon {
     return dependencyKindOptions[kind].icon;
-  }
-
-  function iconColor(kind: DependencyKind): string {
-    return `#${kindIcon(kind).hex}`;
   }
 
   function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -725,55 +769,101 @@
             </div>
           </fieldset>
 
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label class="block space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">{$t(i18nKeys.common.domain.name)}</span>
+            <Input
+              id="dependency-resource-name-input"
+              bind:value={createName}
+              placeholder={$t(i18nKeys.console.dependencyResources.namePlaceholder)}
+            />
+          </label>
+
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <label class="space-y-1.5 text-sm font-medium">
               <span class="console-field-label">{$t(i18nKeys.common.domain.project)}</span>
-              <Select.Root bind:value={selectedProjectId} type="single">
-                <Select.Trigger class="w-full">{projectName(selectedProjectId)}</Select.Trigger>
-                <Select.Content>
-                  {#each projects as project (project.id)}
-                    <Select.Item value={project.id}>{project.name}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
+              {#if projects.length === 0}
+                <Button
+                  class="h-8 w-full justify-between px-2.5 text-muted-foreground"
+                  variant="outline"
+                  aria-label={$t(i18nKeys.console.dependencyResources.selectProject)}
+                  onclick={openProjectCreateDialog}
+                >
+                  <span class="truncate">{$t(i18nKeys.console.dependencyResources.selectProject)}</span>
+                  <Plus class="size-3.5" />
+                </Button>
+              {:else}
+                <Select.Root bind:value={selectedProjectId} type="single">
+                  <Select.Trigger class="w-full">
+                    {selectedProjectId
+                      ? projectName(selectedProjectId)
+                      : $t(i18nKeys.console.dependencyResources.selectProject)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each projects as project (project.id)}
+                      <Select.Item value={project.id}>{project.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              {/if}
             </label>
 
             <label class="space-y-1.5 text-sm font-medium">
               <span class="console-field-label">{$t(i18nKeys.common.domain.environment)}</span>
-              <Select.Root bind:value={selectedEnvironmentId} type="single">
-                <Select.Trigger class="w-full">{environmentName(selectedEnvironmentId)}</Select.Trigger>
-                <Select.Content>
-                  {#each projectEnvironments as environment (environment.id)}
-                    <Select.Item value={environment.id}>{environment.name}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
+              {#if projectEnvironments.length === 0}
+                <Button
+                  class="h-8 w-full justify-between px-2.5 text-muted-foreground"
+                  variant="outline"
+                  aria-label={$t(i18nKeys.console.dependencyResources.selectEnvironment)}
+                  onclick={openEnvironmentCreateDialog}
+                >
+                  <span class="truncate">{$t(i18nKeys.console.dependencyResources.selectEnvironment)}</span>
+                  <Plus class="size-3.5" />
+                </Button>
+              {:else}
+                <Select.Root bind:value={selectedEnvironmentId} type="single">
+                  <Select.Trigger class="w-full">
+                    {selectedEnvironmentId
+                      ? environmentName(selectedEnvironmentId)
+                      : $t(i18nKeys.console.dependencyResources.selectEnvironment)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each projectEnvironments as environment (environment.id)}
+                      <Select.Item value={environment.id}>{environment.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              {/if}
             </label>
 
             {#if provisioningMode === "create"}
               <label class="space-y-1.5 text-sm font-medium">
                 <span class="console-field-label">{$t(i18nKeys.common.domain.server)}</span>
-                <Select.Root bind:value={selectedServerId} type="single">
-                  <Select.Trigger class="w-full">
-                    {selectedServerId ? serverName(selectedServerId) : $t(i18nKeys.console.dependencyResources.selectServer)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each activeSingleServerTargets as server (server.id)}
-                      <Select.Item value={server.id}>{server.name}</Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
+                {#if activeSingleServerTargets.length === 0}
+                  <Button
+                    class="h-8 w-full justify-between px-2.5 text-muted-foreground"
+                    variant="outline"
+                    aria-label={$t(i18nKeys.console.dependencyResources.selectServer)}
+                    onclick={openServerCreateDialog}
+                  >
+                    <span class="truncate">{$t(i18nKeys.console.dependencyResources.selectServer)}</span>
+                    <Plus class="size-3.5" />
+                  </Button>
+                {:else}
+                  <Select.Root bind:value={selectedServerId} type="single">
+                    <Select.Trigger class="w-full">
+                      {selectedServerId
+                        ? serverName(selectedServerId)
+                        : $t(i18nKeys.console.dependencyResources.selectServer)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each activeSingleServerTargets as server (server.id)}
+                        <Select.Item value={server.id}>{server.name}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                {/if}
               </label>
             {/if}
-
-            <label class="space-y-1.5 text-sm font-medium">
-              <span class="console-field-label">{$t(i18nKeys.common.domain.name)}</span>
-              <Input
-                id="dependency-resource-name-input"
-                bind:value={createName}
-                placeholder={$t(i18nKeys.console.dependencyResources.namePlaceholder)}
-              />
-            </label>
           </div>
 
           {#if provisioningMode === "reuse"}
@@ -815,17 +905,10 @@
                 >
                   <span
                     class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
-                    style={`border-color: ${iconColor(dependencyKind)}33; background-color: ${iconColor(dependencyKind)}12;`}
                   >
-                    <svg
-                      class="size-5"
-                      role="img"
-                      aria-label={icon.title}
-                      viewBox="0 0 24 24"
-                      fill={iconColor(dependencyKind)}
-                    >
-                      <path d={icon.path} />
-                    </svg>
+                    <span class="dependency-kind-logo" role="img" aria-label={icon.title}>
+                      {@html icon.svg}
+                    </span>
                   </span>
                   <span class="min-w-0">
                     <span class="block text-sm font-semibold">{kindLabel(dependencyKind)}</span>
@@ -1176,4 +1259,77 @@
       </section>
     </div>
   {/if}
+
+  <Dialog.Root bind:open={projectCreateDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.projects.createProjectTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.projects.createProjectDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="px-5 pb-5">
+        <ProjectCreateForm
+          panel={false}
+          showIntro={false}
+          idPrefix="dependency-resource-project-create"
+          onCreated={handleProjectCreated}
+        />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={environmentCreateDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.projects.environmentCreateTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.projects.environmentCreateDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="px-5 pb-5">
+        <EnvironmentCreateForm
+          panel={false}
+          showIntro={false}
+          idPrefix="dependency-resource-environment-create"
+          projectId={selectedProjectId}
+          onCreated={handleEnvironmentCreated}
+        />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={serverCreateDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.servers.createFormTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.servers.createFormDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="px-5 pb-5">
+        <ServerCreateForm
+          idPrefix="dependency-resource-server-create"
+          onCreated={handleServerCreated}
+        />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
 </ConsoleShell>
+
+<style>
+  .dependency-kind-logo {
+    display: flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dependency-kind-logo :global(svg) {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>

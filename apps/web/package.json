@@ -38,7 +38,6 @@
     "clsx": "^2.1.1",
     "reflect-metadata": "^0.2.2",
     "shadcn-svelte": "^1.2.7",
-    "simple-icons": "^16.21.0",
     "svelte": "^5.55.5",
     "svelte-check": "^4.4.8",
     "tailwind-merge": "^3.6.0",
@@ -50,6 +49,7 @@
     "vitest": "^4.1.6"
   },
   "dependencies": {
+    "@thesvg/icons": "^3.0.10",
     "@wterm/dom": "^0.3.0"
   }
 }
