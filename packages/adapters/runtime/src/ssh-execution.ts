@@ -345,13 +345,14 @@ export function buildRemotePreviewArtifactSweepCommand(input: {
   const markerSweepScript = [
     "fingerprint=$1",
     "shift",
-    'for marker in "$@"; do if grep -Fq "$fingerprint" "$marker"; then',
+    'for marker in "$@"; do',
+    'if grep -Fq "$fingerprint" "$marker"; then',
     'root=$(dirname "$marker")',
     'rm -rf "$root"',
     'printf "preview-workspace:%s\\n" "$root"',
     "fi",
     "done",
-  ].join("; ");
+  ].join("\n");
 
   return [
     `containers="$(docker ps -aq --filter ${shellQuote(sourceFingerprintLabel)} 2>/dev/null || true)"; if [ -n "$containers" ]; then printf '%s\\n' "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true; printf 'preview-containers\\n'; fi`,
