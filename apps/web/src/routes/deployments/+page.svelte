@@ -8,7 +8,6 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
-  import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -69,9 +68,6 @@
     <ConsoleResourceCanvas>
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
-          <Badge class="console-page-kicker" variant="outline">
-            {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
-          </Badge>
           <div class="flex items-center gap-2">
             <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
             <DocsHelpLink
@@ -101,9 +97,6 @@
     <ConsoleResourceCanvas class="space-y-8">
       <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
-          <Badge class="console-page-kicker" variant="outline">
-            {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
-          </Badge>
           <div class="flex items-center gap-2">
             <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
             <DocsHelpLink

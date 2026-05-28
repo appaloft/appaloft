@@ -458,9 +458,6 @@
     <div class="space-y-8">
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
-          <Badge class="console-page-kicker" variant="outline">
-            {$t(i18nKeys.console.organization.focusLabel)}
-          </Badge>
           <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.organization.focusTitle)}</h1>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.organization.focusDescription)}

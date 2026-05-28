@@ -552,9 +552,6 @@
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
-            <Badge class="console-page-kicker" variant="outline">
-              {$t(i18nKeys.common.domain.domainBindings)}
-            </Badge>
             <div class="space-y-2">
               <div class="flex items-center gap-2">
                 <h1 class="text-2xl font-semibold md:text-3xl">
