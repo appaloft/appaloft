@@ -20,14 +20,13 @@
     Wrench,
     Waypoints,
   } from "@lucide/svelte";
-  import {
-    siClickhouse,
-    siMinio,
-    siMysql,
-    siOpensearch,
-    siPostgresql,
-    siRedis,
-  } from "simple-icons";
+  import type { IconModule as BrandIconModule } from "@thesvg/icons";
+  import clickhouseIcon from "@thesvg/icons/clickhouse";
+  import minioIcon from "@thesvg/icons/minio";
+  import mysqlIcon from "@thesvg/icons/mysql";
+  import opensearchIcon from "@thesvg/icons/opensearch";
+  import postgresqlIcon from "@thesvg/icons/postgresql";
+  import redisIcon from "@thesvg/icons/redis";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     createQuickDeployOutcomePacket,
@@ -91,6 +90,11 @@
     defaultConsoleListLimit,
     type ProviderSummary,
   } from "$lib/console/queries";
+  import {
+    environmentKinds,
+    parseEnvironmentKind,
+    type EnvironmentKind,
+  } from "$lib/console/environment-form";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
     createQuickDeployServerCredential,
@@ -116,13 +120,11 @@
   type SourceOptionIcon = Component<{ class?: string }>;
   type GithubSourceMode = "url" | "browser";
   type DraftMode = "existing" | "new";
-  type EnvironmentKind = EnvironmentSummary["kind"];
   type ResourceKind = ResourceSummary["kind"];
   type DependencyKind = DependencyResourceSummary["kind"];
   type DependencyKindIcon = {
     title: string;
-    path: string;
-    hex: string;
+    svg: string;
   };
   type BlueprintDependencyProvisioningMode = "create" | "reuse";
   type BlueprintDependencyProvisioningDraft = {
@@ -269,15 +271,10 @@
       appaloftDesktop?: AppaloftDesktopBridge;
     };
 
-  const environmentKinds = [
-    "local",
-    "development",
-    "test",
-    "staging",
-    "production",
-    "preview",
-    "custom",
-  ] as const satisfies readonly EnvironmentKind[];
+  function brandIcon(icon: BrandIconModule, variant = "default"): DependencyKindIcon {
+    return { title: icon.title, svg: icon.variants[variant] ?? icon.svg };
+  }
+
   const resourceKinds = [
     "application",
     "service",
@@ -294,27 +291,27 @@
   > = {
     postgres: {
       label: "Postgres",
-      icon: siPostgresql,
+      icon: brandIcon(postgresqlIcon),
     },
     redis: {
       label: "Redis",
-      icon: siRedis,
+      icon: brandIcon(redisIcon),
     },
     mysql: {
       label: "MySQL",
-      icon: siMysql,
+      icon: brandIcon(mysqlIcon, "light"),
     },
     clickhouse: {
       label: "ClickHouse",
-      icon: siClickhouse,
+      icon: brandIcon(clickhouseIcon),
     },
     "object-storage": {
       label: "Object Storage",
-      icon: siMinio,
+      icon: brandIcon(minioIcon),
     },
     opensearch: {
       label: "OpenSearch",
-      icon: siOpensearch,
+      icon: brandIcon(opensearchIcon),
     },
   };
   const dependencyKindOrder = [
@@ -1687,10 +1684,6 @@
     return draftModeKeys.includes(value as DraftMode) ? (value as DraftMode) : "existing";
   }
 
-  function parseEnvironmentKind(value: string | null): EnvironmentKind {
-    return environmentKinds.includes(value as EnvironmentKind) ? (value as EnvironmentKind) : "local";
-  }
-
   function parseResourceKind(value: string | null): ResourceKind {
     return resourceKinds.includes(value as ResourceKind) ? (value as ResourceKind) : "application";
   }
@@ -1705,10 +1698,6 @@
 
   function dependencyKindIcon(kind: DependencyKind): DependencyKindIcon {
     return dependencyKindOptions[kind].icon;
-  }
-
-  function dependencyKindIconColor(kind: DependencyKind): string {
-    return `#${dependencyKindIcon(kind).hex}`;
   }
 
   function effectiveResourceInternalPortText(): string {
@@ -3567,17 +3556,14 @@
                                 <div class="flex min-w-0 items-start gap-3">
                                   <span
                                     class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
-                                    style={`border-color: ${dependencyKindIconColor(requirement.kind)}33; background-color: ${dependencyKindIconColor(requirement.kind)}12;`}
                                   >
-                                    <svg
-                                      class="size-5"
+                                    <span
+                                      class="dependency-kind-logo"
                                       role="img"
                                       aria-label={icon.title}
-                                      viewBox="0 0 24 24"
-                                      fill={dependencyKindIconColor(requirement.kind)}
                                     >
-                                      <path d={icon.path} />
-                                    </svg>
+                                      {@html icon.svg}
+                                    </span>
                                   </span>
                                   <span class="min-w-0">
                                     <span class="block truncate text-sm font-semibold">
@@ -4597,6 +4583,23 @@
     </div>
   </Dialog.Content>
 </Dialog.Root>
+
+<style>
+  .dependency-kind-logo {
+    display: flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dependency-kind-logo :global(svg) {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>
 
 <Dialog.Root bind:open={blueprintDetailDialogOpen}>
   <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">

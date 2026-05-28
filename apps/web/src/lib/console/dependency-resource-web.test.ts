@@ -5,21 +5,36 @@ import { webDocsHrefs } from "./docs-help";
 
 describe("dependency resource Web console surface", () => {
   test("[DEP-RES-WEB-001] exposes dependency resources and bindings through shared oRPC contracts", async () => {
-    const [resourcePageSource, dependencyResourcePageSource, clientContractSource] =
-      await Promise.all([
-        readFile(
-          new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
-          "utf8",
-        ),
-        readFile(
-          new URL("../../routes/dependency-resources/+page.svelte", import.meta.url),
-          "utf8",
-        ),
-        readFile(
-          new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
-          "utf8",
-        ),
-      ]);
+    const [
+      resourcePageSource,
+      dependencyResourcePageSource,
+      clientContractSource,
+      projectCreateFormSource,
+      environmentCreateFormSource,
+      serverCreateFormSource,
+      projectsPageSource,
+      serverCreatePageSource,
+      quickDeploySource,
+    ] = await Promise.all([
+      readFile(
+        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../../routes/dependency-resources/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../components/console/ProjectCreateForm.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../components/console/EnvironmentCreateForm.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../components/console/ServerCreateForm.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/projects/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/servers/new/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+    ]);
 
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.list");
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.provision");
@@ -63,12 +78,16 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain(
       "i18nKeys.console.dependencyResources.kindOpenSearch",
     );
-    expect(dependencyResourcePageSource).toContain("siPostgresql");
-    expect(dependencyResourcePageSource).toContain("siRedis");
-    expect(dependencyResourcePageSource).toContain("siMysql");
-    expect(dependencyResourcePageSource).toContain("siClickhouse");
-    expect(dependencyResourcePageSource).toContain("siMinio");
-    expect(dependencyResourcePageSource).toContain("siOpensearch");
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/postgresql"');
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/redis"');
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/mysql"');
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/clickhouse"');
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/minio"');
+    expect(dependencyResourcePageSource).toContain('from "@thesvg/icons/opensearch"');
+    expect(dependencyResourcePageSource).toContain('brandIcon(mysqlIcon, "light")');
+    expect(dependencyResourcePageSource).toContain("{@html icon.svg}");
+    expect(dependencyResourcePageSource).not.toContain("background-color: ${iconColor");
+    expect(dependencyResourcePageSource).not.toContain("simple-icons");
     expect(dependencyResourcePageSource).toContain("aria-pressed={createKind === dependencyKind}");
     expect(dependencyResourcePageSource).toContain("aria-pressed={provisioningMode === mode}");
     expect(dependencyResourcePageSource).not.toContain("<Select.Item value={dependencyKind}");
@@ -77,6 +96,57 @@ describe("dependency resource Web console surface", () => {
     );
     expect(dependencyResourcePageSource).toContain(
       "orpcClient.dependencyResources.provisioning.accept",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
+    );
+    expect(dependencyResourcePageSource).toContain(
+      'import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte"',
+    );
+    expect(dependencyResourcePageSource).toContain(
+      'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
+    );
+    expect(dependencyResourcePageSource).toContain("projectCreateDialogOpen");
+    expect(dependencyResourcePageSource).toContain("environmentCreateDialogOpen");
+    expect(dependencyResourcePageSource).toContain("serverCreateDialogOpen");
+    expect(dependencyResourcePageSource).toContain("openEnvironmentAfterProjectCreate");
+    expect(dependencyResourcePageSource).toContain("onclick={openProjectCreateDialog}");
+    expect(dependencyResourcePageSource).toContain("onclick={openEnvironmentCreateDialog}");
+    expect(dependencyResourcePageSource).toContain("onclick={openServerCreateDialog}");
+    expect(dependencyResourcePageSource).toContain(
+      "aria-label={$t(i18nKeys.console.dependencyResources.selectProject)}",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "aria-label={$t(i18nKeys.console.dependencyResources.selectEnvironment)}",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "aria-label={$t(i18nKeys.console.dependencyResources.selectServer)}",
+    );
+    expect(
+      dependencyResourcePageSource.indexOf('id="dependency-resource-name-input"'),
+    ).toBeLessThan(
+      dependencyResourcePageSource.indexOf(
+        "aria-label={$t(i18nKeys.console.dependencyResources.selectProject)}",
+      ),
+    );
+    expect(dependencyResourcePageSource).toContain(
+      '<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">',
+    );
+    expect(dependencyResourcePageSource).toContain("showIntro={false}");
+    expect(dependencyResourcePageSource).toContain(
+      "$t(i18nKeys.console.dependencyResources.selectProject)",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "$t(i18nKeys.console.dependencyResources.selectEnvironment)",
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "$t(i18nKeys.console.dependencyResources.selectServer)",
+    );
+    expect(dependencyResourcePageSource).not.toContain(
+      '<Select.Trigger class="w-full">{projectName(selectedProjectId)}</Select.Trigger>',
+    );
+    expect(dependencyResourcePageSource).not.toContain(
+      '<Select.Trigger class="w-full">{environmentName(selectedEnvironmentId)}</Select.Trigger>',
     );
     expect(dependencyResourcePageSource).toContain('mode: "reuse"');
     expect(dependencyResourcePageSource).toContain("reuseConnectionUrl");
@@ -102,6 +172,28 @@ describe("dependency resource Web console surface", () => {
     expect(clientContractSource).toContain("bind: Client");
     expect(clientContractSource).toContain("unbind: Client");
     expect(clientContractSource).toContain("rotateSecret: Client");
+    expect(projectCreateFormSource).toContain("orpcClient.projects.create");
+    expect(projectCreateFormSource).toContain(
+      "onCreated?: (project: CreateProjectResponse) => void",
+    );
+    expect(environmentCreateFormSource).toContain("orpcClient.environments.create");
+    expect(environmentCreateFormSource).toContain(
+      "onCreated?: (environment: CreateEnvironmentResponse) => void",
+    );
+    expect(serverCreateFormSource).toContain("ServerRegistrationForm");
+    expect(serverCreateFormSource).toContain("orpcClient.servers.create");
+    expect(serverCreateFormSource).toContain(
+      "onCreated?: (server: RegisterServerResponse) => void",
+    );
+    expect(projectsPageSource).toContain(
+      'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
+    );
+    expect(projectsPageSource).toContain("<ProjectCreateForm onCreated={openCreatedProject} />");
+    expect(serverCreatePageSource).toContain(
+      'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
+    );
+    expect(serverCreatePageSource).toContain("<ServerCreateForm showSuccessLink />");
+    expect(quickDeploySource).toContain('from "$lib/console/environment-form"');
   });
 
   test("[DEP-RES-WEB-001] points dependency help at public lifecycle anchors", () => {
