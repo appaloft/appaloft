@@ -66,10 +66,12 @@ MCP 指引放在一层 `references/` 中。为了避免 skill 变成泛泛而谈
 `skills/appaloft/evals/evals.json`。
 
 这组 eval 来自公开文档、workflow、test matrix 和 operation catalog，覆盖真实 Appaloft
-任务族：项目生命周期、保存/注册并管理 server、SSH credential、环境、Resource profile、首次部署、
-部署观测和恢复、domain/TLS、dependency resource、storage、scheduled task、runtime monitoring、
-runtime control、terminal session、source link、preview、static artifact、audit/retention、组织和
-deploy token、MCP，以及拒绝读取 secret 或绕过 Appaloft 的反例。
+任务族：项目生命周期、保存/注册并管理 server、server readiness/capacity/proxy maintenance、SSH
+credential、环境、Resource profile、Resource secrets/effective config、首次部署、部署观测和恢复、
+domain/TLS、generated default access 和 route diagnostics、dependency resource、storage、scheduled
+task、runtime monitoring、runtime control、terminal session、source link、preview、source-event
+auto-deploy diagnostics、static artifact、audit/retention、组织和 deploy token、system capabilities/
+maintenance、MCP，以及拒绝读取 secret 或绕过 Appaloft 的反例。
 
 维护 skill 时先运行：
 

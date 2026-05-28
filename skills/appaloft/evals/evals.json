@@ -4,21 +4,26 @@
   "coverage_families": [
     "project-lifecycle",
     "server-registration-and-lifecycle",
+    "server-readiness-capacity-and-maintenance",
     "ssh-credential-management",
     "environment-lifecycle-and-precedence",
     "resource-profile-configuration",
+    "resource-secrets-and-effective-config",
     "first-deploy-and-outcome",
     "deployment-observation-and-recovery",
     "domain-and-tls",
+    "default-access-and-route-diagnostics",
     "dependency-resources-and-backups",
     "storage-volumes",
     "scheduled-tasks",
     "runtime-usage-and-monitoring",
     "runtime-controls-and-terminal-sessions",
     "source-links-and-preview",
+    "source-event-auto-deploy-diagnostics",
     "static-artifact-publishing",
     "audit-retention-and-operator-work",
     "organization-auth-and-deploy-tokens",
+    "system-capabilities-and-maintenance",
     "mcp-transport",
     "negative-secret-and-bypass-boundary"
   ],
@@ -72,6 +77,35 @@
         "Interprets save server/register host as Appaloft server registration, not ad hoc SSH state mutation.",
         "Uses Appaloft server lifecycle operations for rename, deactivate, delete safety, and delete.",
         "Mentions connectivity or proxy readiness checks when server reachability or edge access matters."
+      ]
+    },
+    {
+      "id": "appaloft-skill-server-readiness-capacity-maintenance",
+      "family": "server-readiness-capacity-and-maintenance",
+      "prompt": "Before reusing server srv_prod_sfo_01 for the next deploy, check connectivity, inspect capacity, repair the edge proxy if doctor reports a proxy failure, configure scheduled runtime pruning, and show the policy.",
+      "expected_output": "A day-two server maintenance workflow that reads server detail, runs Appaloft connectivity/doctor and capacity operations, repairs proxy state through Appaloft, and configures/list/shows runtime prune policy without touching Docker or proxy files directly.",
+      "expected_operations": [
+        "servers.show",
+        "servers.test-connectivity",
+        "servers.capacity.inspect",
+        "servers.bootstrap-proxy",
+        "servers.capacity.prune",
+        "scheduled-runtime-prune-policies.configure",
+        "scheduled-runtime-prune-policies.list",
+        "scheduled-runtime-prune-policies.show"
+      ],
+      "source_documents": [
+        "docs/CORE_OPERATIONS.md",
+        "docs/BUSINESS_OPERATION_MAP.md",
+        "docs/workflows/server-bootstrap-and-proxy.md",
+        "docs/testing/server-bootstrap-test-matrix.md",
+        "docs/testing/runtime-target-capacity-test-matrix.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Treats saved server reuse as an Appaloft readiness and capacity workflow, not direct host mutation.",
+        "Uses server doctor/connectivity, capacity inspect, proxy repair, and prune policy operations before claiming the target is healthy.",
+        "Keeps destructive pruning explicit and policy-driven rather than deleting Docker/runtime artifacts directly."
       ]
     },
     {
@@ -152,6 +186,35 @@
         "Uses Resource profile operations for source/runtime/network/health/access/variables/auto-deploy.",
         "Does not add profile fields to deployments.create.",
         "Asks for references or variable names instead of raw secrets."
+      ]
+    },
+    {
+      "id": "appaloft-skill-resource-secrets-effective-config",
+      "family": "resource-secrets-and-effective-config",
+      "prompt": "Set a public build variable, create a runtime secret reference, rotate it, list and show the masked secret metadata, remove an obsolete variable, and confirm the effective config without printing secret values.",
+      "expected_output": "A resource configuration workflow that uses explicit variable and secret-reference operations, reads masked secret metadata and effective config, and never echoes raw secret material.",
+      "expected_operations": [
+        "resources.show",
+        "resources.set-variable",
+        "resources.secrets.create",
+        "resources.secrets.rotate",
+        "resources.secrets.list",
+        "resources.secrets.show",
+        "resources.unset-variable",
+        "resources.effective-config"
+      ],
+      "source_documents": [
+        "docs/CORE_OPERATIONS.md",
+        "docs/BUSINESS_OPERATION_MAP.md",
+        "docs/workflows/resource-profile-lifecycle.md",
+        "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
+        "docs/testing/resource-profile-lifecycle-test-matrix.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Uses Resource-owned variable and secret-reference operations rather than adding env or secret values to deployments.create.",
+        "Reads only masked secret metadata and effective configuration before summarizing state.",
+        "Never prints raw secret values, token material, database URLs, or copied .env content."
       ]
     },
     {
@@ -237,6 +300,33 @@
         "Uses domain binding and certificate operations instead of manual proxy/provider mutation.",
         "Requires ownership/readiness verification before claiming the domain is ready.",
         "Treats certificate revoke/delete as explicit destructive actions."
+      ]
+    },
+    {
+      "id": "appaloft-skill-default-access-route-diagnostics",
+      "family": "default-access-and-route-diagnostics",
+      "prompt": "Enable generated default access for a server, list and show the policy, preview the resource proxy configuration, look up an access failure request id, and explain why this is not the same as binding a custom domain.",
+      "expected_output": "A default-access and route diagnostics workflow that configures/reads default access policy, previews resource proxy/access state, looks up access failure evidence, and keeps generated access separate from managed domain bindings and certificates.",
+      "expected_operations": [
+        "default-access-domain-policies.configure",
+        "default-access-domain-policies.list",
+        "default-access-domain-policies.show",
+        "resources.proxy-configuration.preview",
+        "resources.access-failure-evidence.lookup",
+        "domain-bindings.show"
+      ],
+      "source_documents": [
+        "docs/CORE_OPERATIONS.md",
+        "docs/BUSINESS_OPERATION_MAP.md",
+        "docs/workflows/default-access-domain-and-proxy-routing.md",
+        "docs/specs/020-route-intent-status-and-access-diagnostics/spec.md",
+        "docs/testing/default-access-domain-and-proxy-routing-test-matrix.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Keeps generated default access policy separate from custom domain binding and certificate lifecycle.",
+        "Uses read-only proxy preview and access-failure evidence for diagnostics before suggesting route mutations.",
+        "Does not add generated access, domain, certificate, route, or proxy fields to deployments.create."
       ]
     },
     {
@@ -400,6 +490,34 @@
       ]
     },
     {
+      "id": "appaloft-skill-source-event-auto-deploy-diagnostics",
+      "family": "source-event-auto-deploy-diagnostics",
+      "prompt": "A GitHub push did not auto-deploy. Show recent source events for the resource, inspect the failed delivery, replay it if the current policy still matches, then dry-run prune old retained source-event diagnostics.",
+      "expected_output": "A source-event auto-deploy diagnostic workflow that reads source-event records, uses safe replay through current Resource auto-deploy policy, and prunes retained diagnostic rows explicitly without reading webhook secrets or provider payloads.",
+      "expected_operations": [
+        "resources.configure-auto-deploy",
+        "source-events.list",
+        "source-events.show",
+        "source-events.replay",
+        "source-events.prune",
+        "deployments.show",
+        "operator-work.show"
+      ],
+      "source_documents": [
+        "docs/CORE_OPERATIONS.md",
+        "docs/BUSINESS_OPERATION_MAP.md",
+        "docs/specs/042-source-binding-auto-deploy/spec.md",
+        "docs/testing/source-binding-auto-deploy-test-matrix.md",
+        "docs/errors/source-events.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Uses source-events list/show diagnostics before replaying or pruning retained deliveries.",
+        "Replays through the current Resource-owned auto-deploy policy and existing deployments.create admission, not by reusing raw webhook payloads.",
+        "Does not expose webhook secrets, provider tokens, raw payloads, or unmasked provider errors."
+      ]
+    },
+    {
       "id": "appaloft-skill-static-artifact-publishing",
       "family": "static-artifact-publishing",
       "prompt": "Publish the prebuilt dist directory for my static site, publish a zipped artifact from CI, list the current publications, and return the current URL without assuming Cloud storage.",
@@ -479,6 +597,39 @@
         "Keeps first-admin bootstrap, organization membership, and deploy tokens as distinct operations.",
         "Does not print token values after creation/rotation except through documented one-time safe handling.",
         "Uses organization context readback before switching or acting across organizations."
+      ]
+    },
+    {
+      "id": "appaloft-skill-system-capabilities-maintenance",
+      "family": "system-capabilities-and-maintenance",
+      "prompt": "Check what this Appaloft instance can do, list providers/plugins/integrations, inspect GitHub App connection and repositories for source selection, run doctor, check whether an upgrade is available, and prepare a confirmed database migration only after status is safe.",
+      "expected_output": "A system maintenance workflow that uses read-only capabilities/provider/plugin/integration/GitHub/doctor/upgrade/db status queries before any confirmed upgrade or database migration command.",
+      "expected_operations": [
+        "capabilities.query",
+        "entitlements.query",
+        "system.providers.list",
+        "system.plugins.list",
+        "system.integrations.list",
+        "system.github-app-connection.show",
+        "system.github-repositories.list",
+        "system.doctor",
+        "system.instance-upgrade.check",
+        "system.instance-upgrade.apply",
+        "system.db-status",
+        "system.db-migrate"
+      ],
+      "source_documents": [
+        "docs/CORE_OPERATIONS.md",
+        "docs/BUSINESS_OPERATION_MAP.md",
+        "docs/testing/system-diagnostics-test-matrix.md",
+        "apps/docs/src/content/docs/self-hosting/upgrades.md",
+        "apps/docs/src/content/docs/deploy/sources.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Runs read-only capability, entitlement, provider, plugin, integration, doctor, upgrade-check, and database-status queries before proposing maintenance mutations.",
+        "Treats upgrade apply and database migrate as explicit confirmed system operations.",
+        "Does not expose provider secrets, plugin internals, GitHub tokens, database URLs, or raw diagnostic payloads."
       ]
     },
     {

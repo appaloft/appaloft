@@ -16,7 +16,7 @@ describe("Appaloft skill eval suite", () => {
 
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Validated 19 Appaloft skill evals");
+    expect(result.stdout).toContain("Validated 24 Appaloft skill evals");
   });
 
   test("[APPALOFT-SKILL-EVAL-002] eval suite is grounded in current operation catalog keys", async () => {
@@ -37,7 +37,7 @@ describe("Appaloft skill eval suite", () => {
   test("[APPALOFT-SKILL-EVAL-003] model eval runner supports no-network dry runs", () => {
     const result = spawnSync(
       "bun",
-      ["run", "scripts/run-appaloft-skill-model-evals.ts", "--dry-run", "--limit", "2"],
+      ["run", "scripts/run-appaloft-skill-model-evals.ts", "--dry-run", "--limit", "3"],
       {
         cwd: repositoryRoot,
         encoding: "utf8",
@@ -46,7 +46,8 @@ describe("Appaloft skill eval suite", () => {
 
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Dry run prepared 2 Appaloft skill model eval prompts");
+    expect(result.stdout).toContain("Dry run prepared 3 Appaloft skill model eval prompts");
     expect(result.stdout).toContain("appaloft-skill-server-save-and-manage");
+    expect(result.stdout).toContain("appaloft-skill-server-readiness-capacity-maintenance");
   });
 });

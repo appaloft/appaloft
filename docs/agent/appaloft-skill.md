@@ -94,12 +94,15 @@ quality gate is the eval suite in `skills/appaloft/evals/evals.json`, which is g
 Appaloft docs, workflows, testing matrices, and `packages/application/src/operation-catalog.ts`.
 
 The eval suite must cover real Appaloft tasks, including project lifecycle, saving/registering and
-managing servers, SSH credentials, environments, Resource profile configuration, first deploy,
-deployment observation and recovery, domains/TLS, dependency resources and backups, storage,
-scheduled tasks, runtime usage and monitoring, runtime controls, terminal sessions, source links,
-preview cleanup, static artifact publishing, audit/retention/operator work, organization/auth/deploy
-tokens, MCP usage, and secret/bypass refusal. When a new public operation family becomes a core
-user workflow, add or update an eval instead of expanding `SKILL.md` with exhaustive prose.
+managing servers, server readiness/capacity/proxy maintenance, SSH credentials, environments,
+Resource profile configuration, Resource secrets/effective config, first deploy, deployment
+observation and recovery, domains/TLS, generated default access and route diagnostics, dependency
+resources and backups, storage, scheduled tasks, runtime usage and monitoring, runtime controls,
+terminal sessions, source links, preview cleanup, source-event auto-deploy diagnostics, static
+artifact publishing, audit/retention/operator work, organization/auth/deploy tokens, system
+capabilities/maintenance, MCP usage, and secret/bypass refusal. When a new public operation family
+becomes a core user workflow, add or update an eval instead of expanding `SKILL.md` with exhaustive
+prose.
 
 Run the local validator before changing the skill:
 

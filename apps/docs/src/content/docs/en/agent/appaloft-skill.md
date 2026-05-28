@@ -75,10 +75,12 @@ keep the skill from becoming generic deployment advice, the repository also main
 
 The eval suite is derived from public docs, workflows, test matrices, and the operation catalog. It
 covers real Appaloft task families: project lifecycle, saving/registering and managing servers, SSH
-credentials, environments, Resource profile configuration, first deploy, deployment observation and
-recovery, domain/TLS, dependency resources, storage, scheduled tasks, runtime monitoring, runtime
-controls, terminal sessions, source links, previews, static artifacts, audit/retention,
-organization and deploy tokens, MCP, and refusal cases for secrets or bypassing Appaloft.
+credentials, server readiness/capacity/proxy maintenance, environments, Resource profile
+configuration, Resource secrets/effective config, first deploy, deployment observation and recovery,
+domain/TLS, generated default access and route diagnostics, dependency resources, storage,
+scheduled tasks, runtime monitoring, runtime controls, terminal sessions, source links, previews,
+source-event auto-deploy diagnostics, static artifacts, audit/retention, organization and deploy
+tokens, system capabilities/maintenance, MCP, and refusal cases for secrets or bypassing Appaloft.
 
 Before maintaining the skill, run:
 
