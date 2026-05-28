@@ -1,13 +1,17 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { FolderOpen } from "@lucide/svelte";
+  import { Play } from "@lucide/svelte";
 
+  import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { findProject } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -31,17 +35,6 @@
       ? deployments.filter((deployment) => deployment.projectId === selectedProject.id)
       : deployments,
   );
-  const runningDeployments = $derived(
-    visibleDeployments.filter((deployment) =>
-      ["created", "planning", "planned", "running"].includes(deployment.status),
-    ).length,
-  );
-  const failedDeployments = $derived(
-    visibleDeployments.filter((deployment) =>
-      ["failed", "canceled", "rolled-back"].includes(deployment.status),
-    ).length,
-  );
-
 </script>
 
 <svelte:head>
@@ -61,7 +54,7 @@
   ]}
 >
   {#if pageLoading}
-    <div class="space-y-5">
+    <ConsoleResourceCanvas class="space-y-5">
       <section class="space-y-3">
         <Skeleton class="h-5 w-36" />
         <Skeleton class="h-4 w-72" />
@@ -71,33 +64,53 @@
           <Skeleton class="h-12 w-full" />
         {/each}
       </div>
-    </div>
+    </ConsoleResourceCanvas>
   {:else if deployments.length === 0}
-    <section class="space-y-5 py-2">
-      <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.deployments.noFilteredDeployments)}</Badge>
-      <div class="max-w-2xl space-y-3">
-        <h1 class="text-2xl font-semibold md:text-3xl">
-          {$t(i18nKeys.console.deployments.emptyTitle)}
-        </h1>
-        <p class="text-sm leading-6 text-muted-foreground">
-          {$t(i18nKeys.console.deployments.emptyBody)}
-        </p>
-      </div>
-      <div class="mt-6 flex flex-wrap gap-2">
-        <Button href="/projects" size="lg" variant="outline">
-          <FolderOpen class="size-4" />
-          {$t(i18nKeys.common.actions.viewProjects)}
+    <ConsoleResourceCanvas>
+      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div class="max-w-2xl space-y-2">
+          <Badge class="console-page-kicker" variant="outline">
+            {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
+          </Badge>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+            <DocsHelpLink
+              href={webDocsHrefs.deploymentLifecycle}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.deployments.focusDescription)}
+          </p>
+        </div>
+      </section>
+
+      <ConsoleEmptyState
+        tone="deployment"
+        title={$t(i18nKeys.console.deployments.emptyTitle)}
+        description={$t(i18nKeys.console.deployments.emptyBody)}
+        learnMoreHref={webDocsHrefs.deploymentLifecycle}
+      >
+        <Button href="/deploy">
+          <Play class="size-4" />
+          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
-      </div>
-    </section>
+      </ConsoleEmptyState>
+    </ConsoleResourceCanvas>
   {:else}
-    <div class="space-y-8">
+    <ConsoleResourceCanvas class="space-y-8">
       <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
           <Badge class="console-page-kicker" variant="outline">
             {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
           </Badge>
-          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+            <DocsHelpLink
+              href={webDocsHrefs.deploymentLifecycle}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.deployments.focusDescription)}
           </p>
@@ -106,27 +119,10 @@
           {#if selectedProject}
             <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
           {/if}
-        </div>
-      </section>
-
-      <section class="console-metric-strip sm:grid-cols-3">
-        <div>
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.common.domain.currentList)}
-          </p>
-          <p class="mt-1 text-2xl font-semibold">{visibleDeployments.length}</p>
-        </div>
-        <div>
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.console.deployments.inFlight)}
-          </p>
-          <p class="mt-1 text-2xl font-semibold">{runningDeployments}</p>
-        </div>
-        <div>
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.console.deployments.needsAttention)}
-          </p>
-          <p class="mt-1 text-2xl font-semibold">{failedDeployments}</p>
+          <Button href="/deploy">
+            <Play class="size-4" />
+            {$t(i18nKeys.common.actions.quickDeploy)}
+          </Button>
         </div>
       </section>
 
@@ -146,6 +142,6 @@
           </div>
         {/if}
       </section>
-    </div>
+    </ConsoleResourceCanvas>
   {/if}
 </ConsoleShell>

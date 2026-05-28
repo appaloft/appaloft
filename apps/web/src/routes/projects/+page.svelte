@@ -1,16 +1,23 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
-  import { ArrowRight, FolderOpen, ShieldCheck } from "@lucide/svelte";
+  import { page } from "$app/state";
+  import { ArrowRight, FolderOpen, Plus, ShieldCheck } from "@lucide/svelte";
   import type { CreateProjectResponse } from "@appaloft/contracts";
 
+  import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import {
     countProjectEnvironments,
     formatTime,
@@ -32,10 +39,20 @@
       resourcesQuery.isPending ||
       deploymentsQuery.isPending,
   );
-  const activeProjects = $derived(
-    projects.filter((project) => resources.some((resource) => resource.projectId === project.id))
-      .length,
-  );
+  let projectCreateDialogOpen = $state(false);
+
+  $effect(() => {
+    projectCreateDialogOpen = modalIsOpen(page, "create-project");
+  });
+
+  function openProjectCreateDialog(): void {
+    void setModalOpen(page, "create-project", true);
+  }
+
+  function setProjectCreateDialogOpen(open: boolean): void {
+    projectCreateDialogOpen = open;
+    void setModalOpen(page, "create-project", open);
+  }
 
   function openCreatedProject(project: CreateProjectResponse): void {
     void goto(projectDetailHref(project.id));
@@ -66,143 +83,128 @@
         {/each}
       </div>
     </div>
-  {:else if projects.length === 0}
-    <section class="max-w-4xl space-y-6 py-2">
-      <div class="space-y-5">
-        <Badge class="console-page-kicker" variant="outline">
-          {$t(i18nKeys.console.shell.noProjects)}
-        </Badge>
-        <div class="max-w-2xl space-y-3">
-          <h1 class="text-2xl font-semibold tracking-tight md:text-3xl">
-            {$t(i18nKeys.console.projects.emptyTitle)}
-          </h1>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.projects.emptyBody)}
-          </p>
-        </div>
-      </div>
-
-      <div class="max-w-3xl">
-        <ProjectCreateForm onCreated={openCreatedProject} />
-      </div>
-
-      <div class="console-subtle-panel max-w-3xl p-4">
-        <div class="grid gap-3 text-sm sm:grid-cols-3">
-          <div>
-            <p class="font-medium">{$t(i18nKeys.common.domain.environments)}</p>
-            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              {$t(i18nKeys.console.projects.createProjectEnvironmentHint)}
-            </p>
-          </div>
-          <div>
-            <p class="font-medium">{$t(i18nKeys.common.domain.resources)}</p>
-            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              {$t(i18nKeys.console.projects.createProjectResourceHint)}
-            </p>
-          </div>
-          <div>
-            <p class="font-medium">{$t(i18nKeys.common.domain.deployments)}</p>
-            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              {$t(i18nKeys.console.projects.createProjectDeploymentHint)}
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
   {:else}
-    <div class="space-y-8">
+    <ConsoleResourceCanvas>
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
           <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.console.projects.focusLabel)}</Badge>
-          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.projects.focusTitle)}</h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.projects.focusTitle)}</h1>
+            <DocsHelpLink
+              href={webDocsHrefs.projectLifecycle}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.projects.focusDescription)}
           </p>
         </div>
-        <div class="console-metric-strip grid-cols-3 text-center md:min-w-80">
-          <div>
-            <p class="text-xl font-semibold">{projects.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.projects)}</p>
-          </div>
-          <div>
-            <p class="text-xl font-semibold">{activeProjects}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {$t(i18nKeys.console.projects.projectsWithResources)}
-            </p>
-          </div>
-          <div>
-            <p class="text-xl font-semibold">{resources.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</p>
-          </div>
-        </div>
       </section>
 
       <section class="space-y-3">
-        <div>
+        {#if projects.length > 0}
+          <div class="flex justify-end">
+            <Button type="button" onclick={openProjectCreateDialog}>
+              <Plus class="size-4" />
+              {$t(i18nKeys.console.projects.createProjectAction)}
+            </Button>
+          </div>
+
           <div>
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.projectListTitle)}</h2>
             <p class="mt-1 text-sm text-muted-foreground">
               {$t(i18nKeys.console.projects.projectListDescription)}
             </p>
           </div>
-        </div>
 
-        <div class="console-record-list">
-          {#each projects as project (project.id)}
-            {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
-            {@const latestDeployment = latestProjectDeployment(project, deployments)}
-            {@const latestResource =
-              projectResources.find((resource) => resource.lastDeploymentId === latestDeployment?.id) ??
-              projectResources[0]}
-            <a
-              href={projectDetailHref(project.id)}
-              class="console-record-row group lg:grid-cols-[minmax(0,1fr)_36rem_auto] lg:items-center"
-            >
-              <div class="min-w-0 space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="truncate text-base font-semibold">{project.name}</h3>
-                  <Badge variant="outline">{project.slug}</Badge>
-                </div>
-                <p class="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                  {project.description ?? $t(i18nKeys.console.projects.noDescription)}
-                </p>
-              </div>
-
-              <div class="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3">
-                <span class="inline-flex items-center gap-2">
-                  <ShieldCheck class="size-3.5" />
-                  {countProjectEnvironments(project, environments)}
-                  {$t(i18nKeys.common.domain.environments)}
-                </span>
-                <span class="inline-flex items-center gap-2">
-                  <FolderOpen class="size-3.5" />
-                  {projectResources.length} {$t(i18nKeys.common.domain.resources)}
-                </span>
-                <span class="flex min-w-0 items-center gap-2">
-                  {#if latestResource}
-                    <ResourceHealthDot resourceId={latestResource.id} class="shrink-0" />
-                    <span class="truncate">
-                      {latestResource.name}
-                      {#if latestDeployment}
-                        · {formatTime(latestDeployment.createdAt)}
-                      {/if}
-                    </span>
-                  {:else}
-                    {$t(i18nKeys.console.projects.noResourcesShort)}
-                  {/if}
-                </span>
-              </div>
-
-              <span
-                class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+          <div class="console-record-list">
+            {#each projects as project (project.id)}
+              {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
+              {@const latestDeployment = latestProjectDeployment(project, deployments)}
+              {@const latestResource =
+                projectResources.find((resource) => resource.lastDeploymentId === latestDeployment?.id) ??
+                projectResources[0]}
+              <a
+                href={projectDetailHref(project.id)}
+                class="console-record-row group lg:grid-cols-[minmax(0,1fr)_36rem_auto] lg:items-center"
               >
-                {$t(i18nKeys.common.actions.viewDetails)}
-                <ArrowRight class="size-4" />
-              </span>
-            </a>
-          {/each}
-        </div>
+                <div class="min-w-0 space-y-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="truncate text-base font-semibold">{project.name}</h3>
+                    <Badge variant="outline">{project.slug}</Badge>
+                  </div>
+                  <p class="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    {project.description ?? $t(i18nKeys.console.projects.noDescription)}
+                  </p>
+                </div>
+
+                <div class="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3">
+                  <span class="inline-flex items-center gap-2">
+                    <ShieldCheck class="size-3.5" />
+                    {countProjectEnvironments(project, environments)}
+                    {$t(i18nKeys.common.domain.environments)}
+                  </span>
+                  <span class="inline-flex items-center gap-2">
+                    <FolderOpen class="size-3.5" />
+                    {projectResources.length} {$t(i18nKeys.common.domain.resources)}
+                  </span>
+                  <span class="flex min-w-0 items-center gap-2">
+                    {#if latestResource}
+                      <ResourceHealthDot resourceId={latestResource.id} class="shrink-0" />
+                      <span class="truncate">
+                        {latestResource.name}
+                        {#if latestDeployment}
+                          · {formatTime(latestDeployment.createdAt)}
+                        {/if}
+                      </span>
+                    {:else}
+                      {$t(i18nKeys.console.projects.noResourcesShort)}
+                    {/if}
+                  </span>
+                </div>
+
+                <span
+                  class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+                >
+                  {$t(i18nKeys.common.actions.viewDetails)}
+                  <ArrowRight class="size-4" />
+                </span>
+              </a>
+            {/each}
+          </div>
+        {:else}
+          <ConsoleEmptyState
+            tone="project"
+            title={$t(i18nKeys.console.projects.emptyTitle)}
+            description={$t(i18nKeys.console.projects.emptyBody)}
+            actionLabel={$t(i18nKeys.console.projects.createProjectAction)}
+            learnMoreHref={webDocsHrefs.projectLifecycle}
+            onAction={openProjectCreateDialog}
+          />
+        {/if}
       </section>
-    </div>
+    </ConsoleResourceCanvas>
   {/if}
+
+  <Dialog.Root
+    bind:open={projectCreateDialogOpen}
+    onOpenChange={setProjectCreateDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.projects.createProjectTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.projects.createProjectDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="px-5 pb-5">
+        <ProjectCreateForm
+          panel={false}
+          showIntro={false}
+          idPrefix="projects-page-create"
+          onCreated={openCreatedProject}
+        />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
 </ConsoleShell>

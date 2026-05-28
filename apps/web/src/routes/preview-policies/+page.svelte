@@ -5,6 +5,8 @@
   import type { PreviewPolicyScope, PreviewPolicySettings } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -210,30 +212,44 @@
   ]}
 >
   {#if pageLoading}
-    <div class="space-y-5">
+    <ConsoleResourceCanvas class="space-y-5">
       <Skeleton class="h-5 w-48" />
       <Skeleton class="h-40 w-full" />
       <Skeleton class="h-64 w-full" />
-    </div>
+    </ConsoleResourceCanvas>
   {:else if projects.length === 0}
-    <section class="space-y-5 py-2">
-      <Badge class="w-fit" variant="outline">
-        {$t(i18nKeys.console.previewPolicies.projectScope)}
-      </Badge>
-      <div class="max-w-2xl space-y-3">
-        <h1 class="text-2xl font-semibold md:text-3xl">
-          {$t(i18nKeys.console.previewPolicies.emptyProjectsTitle)}
-        </h1>
-        <p class="text-sm leading-6 text-muted-foreground">
-          {$t(i18nKeys.console.previewPolicies.emptyProjectsBody)}
-        </p>
-      </div>
-      <Button href="/projects" size="lg" variant="outline">
-        {$t(i18nKeys.common.actions.viewProjects)}
-      </Button>
-    </section>
+    <ConsoleResourceCanvas>
+      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div class="max-w-2xl space-y-2">
+          <Badge class="console-page-kicker" variant="outline">
+            {$t(i18nKeys.console.previewPolicies.projectScope)}
+          </Badge>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.previewPolicies.scopeTitle)}</h1>
+            <DocsHelpLink
+              href={webDocsHrefs.productGradePreviews}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.previewPolicies.scopeDescription)}
+          </p>
+        </div>
+      </section>
+
+      <ConsoleEmptyState
+        tone="preview-policy"
+        title={$t(i18nKeys.console.previewPolicies.emptyProjectsTitle)}
+        description={$t(i18nKeys.console.previewPolicies.emptyProjectsBody)}
+        learnMoreHref={webDocsHrefs.productGradePreviews}
+      >
+        <Button href="/projects" variant="outline">
+          {$t(i18nKeys.common.actions.viewProjects)}
+        </Button>
+      </ConsoleEmptyState>
+    </ConsoleResourceCanvas>
   {:else}
-    <div class="space-y-8">
+    <ConsoleResourceCanvas class="space-y-8">
       <section class="console-panel space-y-4 p-5">
         <div class="max-w-3xl space-y-1">
           <div class="flex items-center gap-2">
@@ -448,6 +464,6 @@
           {/if}
         </section>
       </section>
-    </div>
+    </ConsoleResourceCanvas>
   {/if}
 </ConsoleShell>
