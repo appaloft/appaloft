@@ -77,6 +77,27 @@ deploy token、MCP，以及拒绝读取 secret 或绕过 Appaloft 的反例。
 bun run scripts/validate-appaloft-skill-evals.ts
 ```
 
+发布准备或 nightly 手动检查时，可以用真实模型跑同一组案例。该检查需要模型 provider key，因此不作为
+默认 PR gate：
+
+```bash
+bun run scripts/run-appaloft-skill-model-evals.ts --model gpt-5-mini
+```
+
+也可以用 DeepSeek 的 OpenAI-compatible API：
+
+```bash
+DEEPSEEK_API_KEY=... bun run scripts/run-appaloft-skill-model-evals.ts \
+  --provider deepseek \
+  --model deepseek-v4-flash
+```
+
+GitHub Actions 不会在普通 PR 自动跑真实模型 eval。需要先把 `DEEPSEEK_API_KEY` 或
+`OPENAI_API_KEY` 配成 repository secret，再手动触发 `Appaloft Skill Model Evals` workflow 作为
+release readiness 检查。
+
+如果只想验证 prompt 构建而不调用模型，可加 `--dry-run`。
+
 <h2 id="appaloft-skill-mcp">MCP 工具</h2>
 
 MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；

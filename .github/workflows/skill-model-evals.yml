@@ -1,0 +1,87 @@
+name: Appaloft Skill Model Evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Model provider"
+        required: true
+        default: "deepseek"
+        type: choice
+        options:
+          - deepseek
+          - openai
+      model:
+        description: "Model name"
+        required: true
+        default: "deepseek-v4-flash"
+        type: string
+      eval_id:
+        description: "Optional eval id"
+        required: false
+        type: string
+      limit:
+        description: "Optional positive eval limit"
+        required: false
+        type: string
+      no_judge:
+        description: "Skip model-as-judge assertion grading"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-model-evals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  appaloft-skill-model-evals:
+    name: Skill Model Evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        uses: ./.github/actions/setup-bun-turbo
+
+      - name: Validate static eval suite
+        run: bun run scripts/validate-appaloft-skill-evals.ts
+
+      - name: Run model evals
+        shell: bash
+        env:
+          PROVIDER: ${{ inputs.provider }}
+          MODEL: ${{ inputs.model }}
+          EVAL_ID: ${{ inputs.eval_id }}
+          LIMIT: ${{ inputs.limit }}
+          NO_JUDGE: ${{ inputs.no_judge }}
+        run: |
+          set -euo pipefail
+
+          args=(
+            "scripts/run-appaloft-skill-model-evals.ts"
+            "--provider" "${PROVIDER}"
+            "--model" "${MODEL}"
+          )
+
+          if [[ -n "${EVAL_ID}" ]]; then
+            args+=("--eval-id" "${EVAL_ID}")
+          fi
+
+          if [[ -n "${LIMIT}" ]]; then
+            args+=("--limit" "${LIMIT}")
+          fi
+
+          if [[ "${NO_JUDGE}" == "true" ]]; then
+            args+=("--no-judge")
+          fi
+
+          bun run "${args[@]}"

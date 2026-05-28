@@ -86,6 +86,27 @@ Before maintaining the skill, run:
 bun run scripts/validate-appaloft-skill-evals.ts
 ```
 
+For release readiness or a manual nightly check, run the same cases through a real model. This
+requires a provider key, so it is not part of the default PR gate:
+
+```bash
+bun run scripts/run-appaloft-skill-model-evals.ts --model gpt-5-mini
+```
+
+DeepSeek's OpenAI-compatible API can also run the model evals:
+
+```bash
+DEEPSEEK_API_KEY=... bun run scripts/run-appaloft-skill-model-evals.ts \
+  --provider deepseek \
+  --model deepseek-v4-flash
+```
+
+GitHub Actions does not run real-model evals on normal pull requests. Configure
+`DEEPSEEK_API_KEY` or `OPENAI_API_KEY` as a repository secret, then manually dispatch
+`Appaloft Skill Model Evals` for release readiness.
+
+Add `--dry-run` to verify prompt construction without calling a model.
+
 <h2 id="appaloft-skill-mcp">MCP Tools</h2>
 
 MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP

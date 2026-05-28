@@ -33,4 +33,20 @@ describe("Appaloft skill eval suite", () => {
       expect(catalogKeys.has(operationKey), operationKey).toBe(true);
     }
   });
+
+  test("[APPALOFT-SKILL-EVAL-003] model eval runner supports no-network dry runs", () => {
+    const result = spawnSync(
+      "bun",
+      ["run", "scripts/run-appaloft-skill-model-evals.ts", "--dry-run", "--limit", "2"],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Dry run prepared 2 Appaloft skill model eval prompts");
+    expect(result.stdout).toContain("appaloft-skill-server-save-and-manage");
+  });
 });
