@@ -17,7 +17,12 @@ Consumers:
 ## Package Entrypoints
 
 - `@appaloft/design`: typed product identity and package metadata.
+- `@appaloft/design`: also exports `appaloftPortableDesignTokens` for non-CSS renderers such as
+  email templates that need Appaloft color, radius, shadow, and font tokens as plain values.
 - `@appaloft/ui`: Community Svelte design primitives and shell primitives built on these tokens.
+- `@appaloft/ui/theme`: also exports `appaloftPortableTailwindTheme` and
+  `createAppaloftPortableTailwindConfig` so non-DOM renderers can reuse the canonical Appaloft token
+  mapping while supplying their own renderer preset.
 - `@appaloft/design/styles/web.css`: Web console fonts, tokens, Tailwind v4 theme mapping, and
   base layer.
 - `@appaloft/design/styles/docs.css`: documentation theme derived from Web tokens.

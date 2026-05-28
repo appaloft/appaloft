@@ -7,6 +7,7 @@ import { type ExecutionContext } from "@appaloft/application";
 import { createBetterAuthRuntime } from "../src";
 import {
   createAppaloftBetterAuthOptions,
+  resolveAppaloftBetterAuthEmailVerificationStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "../src/shared";
 
@@ -91,6 +92,80 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     ).toBe(true);
   });
 
+  test("[CLOUD-AUTH-EMAIL-001] leaves email verification disabled by default", () => {
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    expect(options.emailAndPassword).toMatchObject({
+      enabled: true,
+    });
+    expect(options.emailAndPassword).not.toHaveProperty("requireEmailVerification");
+    expect(options.emailVerification).toBeUndefined();
+    expect(options.plugins?.map((plugin) => plugin.id)).not.toContain("email-otp");
+    expect(
+      resolveAppaloftBetterAuthEmailVerificationStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+      }),
+    ).toEqual({
+      enabled: false,
+      otpEnabled: false,
+      required: false,
+    });
+  });
+
+  test("[CLOUD-AUTH-EMAIL-002] registers neutral email verification and OTP policy when injected", () => {
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+      emailVerification: {
+        enabled: true,
+        requireEmailVerification: true,
+        sendVerificationOTP: async () => undefined,
+        otp: {
+          enabled: true,
+          expiresIn: 600,
+          otpLength: 6,
+          storeOTP: "hashed",
+        },
+      },
+    });
+
+    expect(options.emailAndPassword).toMatchObject({
+      enabled: true,
+      requireEmailVerification: true,
+    });
+    expect(options.emailVerification).toMatchObject({
+      autoSignInAfterVerification: true,
+      sendOnSignIn: true,
+      sendOnSignUp: true,
+    });
+    expect(options.plugins?.map((plugin) => plugin.id)).toContain("email-otp");
+    expect(
+      resolveAppaloftBetterAuthEmailVerificationStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+        emailVerification: {
+          enabled: true,
+          requireEmailVerification: true,
+          sendVerificationOTP: async () => undefined,
+          otp: {
+            enabled: true,
+          },
+        },
+      }),
+    ).toEqual({
+      enabled: true,
+      otpEnabled: true,
+      required: true,
+      sendOtpPath: "/api/auth/email-otp/send-verification-otp",
+      verifyOtpPath: "/api/auth/email-otp/verify-email",
+      verifyPagePath: "/verify-email",
+    });
+  });
+
   test("[AUTH-SESSION-001] requires a login when better-auth is enabled and no session exists", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
@@ -104,6 +179,11 @@ describe("Better Auth first-admin bootstrap adapter", () => {
 
     expect(status).toMatchObject({
       enabled: true,
+      emailVerification: {
+        enabled: false,
+        otpEnabled: false,
+        required: false,
+      },
       provider: "better-auth",
       loginRequired: true,
       session: null,

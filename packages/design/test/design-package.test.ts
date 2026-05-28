@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 
-import { designPackage, productIdentity } from "../src/index";
+import { appaloftPortableDesignTokens, designPackage, productIdentity } from "../src/index";
 
 describe("design package", () => {
   test("exports the product identity from the canonical design package", () => {
@@ -20,6 +20,13 @@ describe("design package", () => {
       expect(tokensCss).toContain(token);
       expect(tailwindCss).toContain(token);
     }
+  });
+
+  test("exports portable design tokens for non-CSS renderers", () => {
+    expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
+    expect(appaloftPortableDesignTokens.color.background).toBe("#ffffff");
+    expect(appaloftPortableDesignTokens.radius.lg).toBe("8px");
+    expect(appaloftPortableDesignTokens.fontFamily.sans).toContain("IBM Plex Sans");
   });
 
   test("keeps brand assets available to product surfaces", async () => {

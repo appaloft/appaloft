@@ -1,3 +1,5 @@
+export { appaloftPortableDesignTokens } from "./portable-tokens";
+
 export const productIdentity = {
   name: "Appaloft",
   nameZhCn: "Appaloft",
