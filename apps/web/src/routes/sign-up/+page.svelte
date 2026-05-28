@@ -37,6 +37,13 @@
   const githubConfigured = $derived(
     Boolean(authSessionQuery.data?.providers.find((provider) => provider.key === "github")?.configured),
   );
+  const requiresEmailOtpVerification = $derived(
+    Boolean(
+      authSessionQuery.data?.emailVerification.required &&
+        authSessionQuery.data?.emailVerification.otpEnabled &&
+        authSessionQuery.data?.emailVerification.verifyPagePath,
+    ),
+  );
   const resolvedOrganizationSlug = $derived(
     organizationSlug.trim() || slugify(organizationName) || "organization",
   );
@@ -97,6 +104,36 @@
     throw new Error(errorMessageFromResponseBody(detail) || `${response.status}`);
   }
 
+  function readResponseToken(body: unknown): string | null {
+    if (!body || typeof body !== "object") {
+      return null;
+    }
+
+    const token = (body as Record<string, unknown>).token;
+    return typeof token === "string" && token.length > 0 ? token : null;
+  }
+
+  async function expectOkWithBody(response: Response): Promise<unknown> {
+    await expectOk(response);
+    return response.json().catch(() => null);
+  }
+
+  function rememberPendingVerification(): void {
+    if (!browser) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      "appaloft.pending-email-verification",
+      JSON.stringify({
+        email,
+        organizationName,
+        organizationSlug: resolvedOrganizationSlug,
+        next: returnTo,
+      }),
+    );
+  }
+
   async function submitSignup(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canSubmit) {
@@ -108,7 +145,7 @@
 
     try {
       if (!authIdentity) {
-        await expectOk(
+        const signupBody = await expectOkWithBody(
           await postJson("/api/auth/sign-up/email", {
             callbackURL: returnTo,
             email,
@@ -117,6 +154,18 @@
             rememberMe: true,
           }),
         );
+
+        if (requiresEmailOtpVerification && !readResponseToken(signupBody)) {
+          rememberPendingVerification();
+          if (browser) {
+            const verifyPath =
+              authSessionQuery.data?.emailVerification.verifyPagePath ?? "/verify-email";
+            await goto(
+              `${verifyPath}?email=${encodeURIComponent(email)}&next=${encodeURIComponent(returnTo)}`,
+            );
+          }
+          return;
+        }
       }
 
       await expectOk(

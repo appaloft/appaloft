@@ -55,7 +55,9 @@ import {
 import {
   type AppaloftBetterAuth,
   type AppaloftBetterAuthConfig,
+  type AppaloftBetterAuthEmailVerificationStatus,
   createAppaloftBetterAuth,
+  resolveAppaloftBetterAuthEmailVerificationStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "./shared";
 
@@ -74,6 +76,7 @@ export interface AuthProviderStatus {
 
 export interface AuthSessionStatus {
   enabled: boolean;
+  emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   provider: "none" | "better-auth";
   loginRequired: boolean;
   deferredAuth: boolean;
@@ -143,12 +146,14 @@ function buildProviderStatus(
 
 export class BetterAuthRuntime implements AuthRuntime {
   private readonly auth: AppaloftBetterAuth;
+  private readonly emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   private readonly githubConfigured: boolean;
   private readonly googleConfigured: boolean;
   private readonly oidcConfigured: boolean;
 
   constructor(private readonly config: BetterAuthRuntimeConfig) {
     const providers = resolveAppaloftBetterAuthProviderConfig(config);
+    this.emailVerification = resolveAppaloftBetterAuthEmailVerificationStatus(config);
     this.githubConfigured = providers.github;
     this.googleConfigured = providers.google;
     this.oidcConfigured = providers.oidc;
@@ -159,6 +164,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     if (!this.config.enabled) {
       return {
         enabled: false,
+        emailVerification: disabledEmailVerificationStatus(),
         provider: "none",
         loginRequired: false,
         deferredAuth: false,
@@ -192,6 +198,7 @@ export class BetterAuthRuntime implements AuthRuntime {
 
     return {
       enabled: true,
+      emailVerification: this.emailVerification,
       provider: "better-auth",
       loginRequired: !session,
       deferredAuth: true,
@@ -972,6 +979,14 @@ function shouldEnsureDefaultOrganizationAfterAuthRoute(request: Request): boolea
     path === "/api/auth/callback/google" ||
     path === "/api/auth/oauth2/callback/oidc"
   );
+}
+
+function disabledEmailVerificationStatus(): AppaloftBetterAuthEmailVerificationStatus {
+  return {
+    enabled: false,
+    otpEnabled: false,
+    required: false,
+  };
 }
 
 function authResponseSessionHeaders(

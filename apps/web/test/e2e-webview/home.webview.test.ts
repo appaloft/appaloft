@@ -908,6 +908,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     },
     "/api/auth/session": () => ({
       enabled: true,
+      emailVerification: {
+        enabled: false,
+        otpEnabled: false,
+        required: false,
+      },
       provider: "better-auth",
       loginRequired: false,
       deferredAuth: true,
@@ -2231,6 +2236,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     },
     "/api/auth/session": {
       enabled: true,
+      emailVerification: {
+        enabled: false,
+        otpEnabled: false,
+        required: false,
+      },
       provider: "better-auth",
       loginRequired: false,
       deferredAuth: true,
@@ -2348,6 +2358,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     },
     "/api/auth/session": {
       enabled: true,
+      emailVerification: {
+        enabled: false,
+        otpEnabled: false,
+        required: false,
+      },
       provider: "better-auth",
       loginRequired: false,
       deferredAuth: true,

@@ -238,6 +238,11 @@ function createTestAuthRuntime(): AuthRuntime {
     async getSessionStatus() {
       return {
         enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
         provider: "better-auth",
         loginRequired: true,
         deferredAuth: false,
