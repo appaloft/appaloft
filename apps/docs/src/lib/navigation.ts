@@ -100,6 +100,7 @@ const zhTree: NavFolder[] = [
     children: [
       page("Appaloft skill", "agent/appaloft-skill"),
       page("Deploy skill", "agent/deploy-skill"),
+      page("MCP server", "agent/mcp-server"),
     ],
   },
   {

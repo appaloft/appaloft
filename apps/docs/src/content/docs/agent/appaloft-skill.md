@@ -1,6 +1,6 @@
 ---
 title: "Appaloft skill"
-description: "让 AI agent 像使用 CLI、HTTP API 或 Web 一样使用完整 Appaloft 能力。"
+description: "让 AI agent 像使用 CLI、HTTP API、Web 或 MCP 一样使用完整 Appaloft 能力。"
 docType: task
 localeState:
   zh-CN: complete
@@ -23,10 +23,10 @@ sidebar:
 
 <h2 id="appaloft-skill">Appaloft AI 入口</h2>
 
-Appaloft Skill 是面向 AI agent 的完整产品入口。它和 CLI、HTTP API、Web console、未来 MCP
+Appaloft Skill 是面向 AI agent 的完整产品入口。它和 CLI、HTTP API、Web console、MCP
 工具一样，都映射到同一套 Appaloft operation catalog；区别只是它的使用者是 AI。
 
-它不是新的业务操作，也不是 `appaloft deploy` 包装器。它把用户意图翻译成既有 Appaloft 操作，并根据当前环境选择 CLI、HTTP/API、Web 或未来 MCP 表面。
+它不是新的业务操作，也不是 `appaloft deploy` 包装器。它把用户意图翻译成既有 Appaloft 操作，并根据当前环境选择 CLI、HTTP/API、Web 或 MCP 表面。MCP 配置好时，skill 可以把它作为 callable tool layer；未配置 MCP 时，skill 仍可通过 CLI、HTTP/API 或 Web 工作。
 
 GitHub Action 场景中，skill 必须区分三种模式：Pure SSH Action 是默认 BYOS SSH 路径，不需要
 Appaloft console 或 ids；Self-hosted Server Action 通过 `control-plane-url` 和 `appaloft-token`
@@ -58,6 +58,15 @@ npx skills add appaloft/appaloft
 - organization、auth bootstrap、deploy tokens、providers、plugins、upgrade、database maintenance。
 
 完整 CLI 映射随安装包一起发布在 `skills/appaloft/references/cli-entrypoints.md`。
+
+<h2 id="appaloft-skill-mcp">MCP 工具</h2>
+
+MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；
+每个 tool 都由 operation key 生成，例如 `deployments.create` 对应 `deployments_create`。
+Tool 输入 schema 来自同一套 command/query schema，调用仍进入 Appaloft command/query bus。
+
+查看 [Appaloft MCP server](/docs/agent/mcp-server/#appaloft-mcp-server) 了解工具命名、resources、prompts
+和安全边界。
 
 <h2 id="appaloft-skill-safety">安全边界</h2>
 

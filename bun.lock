@@ -184,8 +184,14 @@
     },
     "packages/ai/mcp": {
       "name": "@appaloft/ai-mcp",
+      "version": "0.1.0",
+      "bin": {
+        "appaloft-mcp": "./src/stdio.ts",
+      },
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/observability": "workspace:*",
+        "reflect-metadata": "^0.2.2",
         "zod": "^4.4.3",
       },
     },

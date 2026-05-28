@@ -127,6 +127,24 @@ Recovery examples:
 
 If the resource already points at an old source, use [Deployment recovery](/docs/en/deploy/recovery/#deployment-source-relink).
 
+<h2 id="static-artifact-publishing">Static artifact publishing</h2>
+
+Direct static artifact publishing is a deployment source extension point. Use it for an already
+built `dist` directory or `.zip` archive; it enters the same operation catalog through
+`static-artifacts.*` operations:
+
+```bash
+appaloft static-artifacts publish ./dist
+appaloft static-artifacts publish ./dist.zip
+```
+
+API callers can use `POST /api/static-artifacts/publish`,
+`POST /api/static-artifacts/publish-payload`, or
+`POST /api/static-artifacts/publish-archive`. Read publication records through
+`GET /api/static-artifacts/publications`. This entrypoint does not bypass Resource, Deployment,
+route, or access-control boundaries; hosted alias/default-domain routing remains a separate
+capability.
+
 <h2 id="source-auto-deploy-setup">Auto-deploy setup</h2>
 
 Source auto-deploy turns a verified source event into an ordinary deployment request, without adding

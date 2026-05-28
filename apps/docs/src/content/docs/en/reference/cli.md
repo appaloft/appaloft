@@ -43,7 +43,7 @@ Current Cloud support requires an explicit `--url` plus trusted local token or s
 
 With an active profile, or with explicit `--control-plane-mode cloud|self-hosted`, `--control-plane-url <url>`, `APPALOFT_CONTROL_PLANE_MODE`, or `APPALOFT_CONTROL_PLANE_URL`, ordinary CLI business commands resolve an execution target first. `controlPlane.mode: none` and `--control-plane-mode none` continue to use the local CLI/SSH runtime.
 
-A remote target performs compatibility/auth handshake before the business request, then dispatches non-streaming, non-webhook-signature generated SDK operations through the shared typed HTTP/API contract. The CLI does not maintain a separate business schema; the same operation key and input schema are shared with HTTP/oRPC, Web, SDK, and future MCP.
+A remote target performs compatibility/auth handshake before the business request, then dispatches non-streaming, non-webhook-signature generated SDK operations through the shared typed HTTP/API contract. The CLI does not maintain a separate business schema; the same operation key and input schema are shared with HTTP/oRPC, Web, SDK, and MCP.
 
 Without a profile, URL, token, or other trusted remote source, `auto` and default behavior fall back to local mode. That fallback does not contact public Cloud, scan networks, upload SSH PGlite state, or adopt an SSH server.
 

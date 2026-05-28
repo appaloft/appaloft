@@ -1,9 +1,12 @@
-import "../../../application/node_modules/reflect-metadata/Reflect.js";
+import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
   ConfigureRuntimeMonitoringThresholdsCommand,
+  CreateProjectCommand,
   createExecutionContext,
+  DeploymentPlanQuery,
+  DoctorQuery,
   InspectRuntimeUsageQuery,
   ListRuntimeMonitoringSamplesQuery,
   operationCatalog,
@@ -12,14 +15,35 @@ import {
 } from "@appaloft/application";
 
 import {
+  createAppaloftMcpPrompts,
+  createAppaloftMcpResources,
+  createAppaloftMcpServer,
+  createOperationToolHandlers,
   createRuntimeMonitoringMcpToolServer,
   createRuntimeMonitoringToolHandlers,
   createRuntimeUsageMcpToolServer,
   createRuntimeUsageToolHandlers,
+  handleAppaloftMcpJsonRpcRequest,
+  operationMessageFactoryNames,
   toolContractSchema,
   toolContracts,
   toolContractsByOperationKey,
+  toolDescriptorsByName,
 } from "../src";
+
+function isResultError(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "isErr" in value &&
+    typeof value.isErr === "function" &&
+    value.isErr()
+  );
+}
+
+function mcpText(result: { content: { type: "text"; text: string }[] }): string {
+  return result.content.map((part) => part.text).join("\n");
+}
 
 describe("MCP tool descriptors", () => {
   test("[MCP-TOOL-DESC-001] every operation catalog entry has one generated tool descriptor", () => {
@@ -164,6 +188,52 @@ describe("MCP tool descriptors", () => {
     });
   });
 
+  test("[APPALOFT-MCP-010] MCP tools expose host annotations for read-only, idempotent, and destructive operations", () => {
+    const server = createAppaloftMcpServer({
+      commandBus: {
+        execute: async () => ({ ok: true }),
+      },
+      queryBus: {
+        execute: async () => ({ ok: true }),
+      },
+    });
+    const toolsByName = new Map(server.listTools().map((tool) => [tool.name, tool]));
+
+    expect(toolsByName.get("runtime_usage_inspect")).toMatchObject({
+      title: "Runtime Usage Inspect",
+      annotations: {
+        title: "Runtime Usage Inspect",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    });
+    expect(toolsByName.get("projects_create")).toMatchObject({
+      title: "Projects Create",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    });
+    expect(toolsByName.get("projects_delete")).toMatchObject({
+      title: "Projects Delete",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    });
+    expect(toolsByName.get("deployments_prune")).toMatchObject({
+      annotations: {
+        destructiveHint: true,
+      },
+    });
+  });
+
   test("[SCHED-TASK-SECRET-001] scheduled task descriptors do not contain secret examples", () => {
     for (const operationKey of [
       "scheduled-tasks.create",
@@ -182,6 +252,113 @@ describe("MCP tool descriptors", () => {
         ].join("\n"),
       ).not.toMatch(/(?:password|secret|token)\s*[:=]/i);
     }
+  });
+
+  test("[APPALOFT-MCP-001] every descriptor has a message factory and generated operation handler", () => {
+    const handlers = createOperationToolHandlers({
+      commandBus: {
+        execute: async () => ({ ok: true }),
+      },
+      queryBus: {
+        execute: async () => ({ ok: true }),
+      },
+    });
+
+    expect(Object.keys(handlers)).toHaveLength(operationCatalog.length);
+
+    for (const entry of operationCatalog) {
+      const descriptor = toolContractsByOperationKey.get(entry.key);
+
+      expect(descriptor, entry.key).toBeDefined();
+      expect(toolDescriptorsByName.get(descriptor?.name ?? ""), entry.key).toBe(descriptor);
+      expect(operationMessageFactoryNames.has(entry.messageName), entry.messageName).toBe(true);
+      expect(handlers[descriptor?.name ?? ""], entry.key).toBeFunction();
+    }
+  });
+
+  test("[APPALOFT-MCP-002] generated operation handlers dispatch representative command, query, and no-input query messages", async () => {
+    const dispatched: unknown[] = [];
+    const commandBus = {
+      execute: async (context: unknown, command: unknown) => {
+        dispatched.push({ context, message: command });
+        return { ok: true, commandName: command?.constructor?.name };
+      },
+    };
+    const queryBus = {
+      execute: async (context: unknown, query: unknown) => {
+        dispatched.push({ context, message: query });
+        return { ok: true, queryName: query?.constructor?.name };
+      },
+    };
+    const handlers = createOperationToolHandlers({ commandBus, queryBus });
+    const context = createExecutionContext({
+      requestId: "req_appaloft_mcp_dispatch_test",
+      entrypoint: "mcp",
+    });
+
+    const createdProject = await handlers.projects_create({
+      context,
+      input: {
+        name: "Agent demo",
+        description: "Created through MCP",
+      },
+    });
+    const deploymentPlan = await handlers.deployments_plan({
+      context,
+      input: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+      },
+    });
+    const doctor = await handlers.system_doctor({
+      context,
+      input: {},
+    });
+
+    expect(createdProject).toEqual({ ok: true, commandName: "CreateProjectCommand" });
+    expect(deploymentPlan).toEqual({ ok: true, queryName: "DeploymentPlanQuery" });
+    expect(doctor).toEqual({ ok: true, queryName: "DoctorQuery" });
+    expect(dispatched.map((item) => item.message)).toEqual([
+      expect.any(CreateProjectCommand),
+      expect.any(DeploymentPlanQuery),
+      expect.any(DoctorQuery),
+    ]);
+    for (const item of dispatched) {
+      expect(item.context.entrypoint).toBe("mcp");
+    }
+  });
+
+  test("[APPALOFT-MCP-003] generated handlers return schema errors before dispatch", async () => {
+    const dispatched: unknown[] = [];
+    const handlers = createOperationToolHandlers({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => {
+          dispatched.push(command);
+          return { ok: true };
+        },
+      },
+      queryBus: {
+        execute: async (_context: unknown, query: unknown) => {
+          dispatched.push(query);
+          return { ok: true };
+        },
+      },
+    });
+
+    const result = await handlers.projects_create({
+      context: createExecutionContext({
+        requestId: "req_appaloft_mcp_invalid_test",
+        entrypoint: "mcp",
+      }),
+      input: {
+        description: "missing name",
+      },
+    });
+
+    expect(isResultError(result)).toBe(true);
+    expect(dispatched).toHaveLength(0);
   });
 
   test("[RT-MON-002][RT-MON-003] runtime monitoring MCP handlers dispatch shared query messages", async () => {
@@ -311,13 +488,7 @@ describe("MCP tool descriptors", () => {
     });
 
     expect(dispatched).toHaveLength(0);
-    expect(
-      typeof result === "object" &&
-        result !== null &&
-        "isErr" in result &&
-        typeof result.isErr === "function" &&
-        result.isErr(),
-    ).toBe(true);
+    expect(isResultError(result)).toBe(true);
   });
 
   test("[RT-MON-002][RT-MON-003] runtime monitoring MCP server registers tools and dispatches calls by name", async () => {
@@ -406,12 +577,24 @@ describe("MCP tool descriptors", () => {
         kind: "query",
         domain: "runtime-usage",
         description:
-          "Read runtime-usage.inspect through the Appaloft application operation catalog.",
+          "Read runtime-usage.inspect through the Appaloft application operation catalog. Shared with CLI and HTTP/API.",
         cliCommand: "appaloft runtime-usage inspect <scope>",
         httpRoute: "GET /api/runtime-usage/inspect",
         inputSchemaAvailable: true,
       },
     ]);
+    expect(server.listMcpTools()[0]).toMatchObject({
+      name: "runtime_usage_inspect",
+      title: "Runtime Usage Inspect",
+      annotations: {
+        title: "Runtime Usage Inspect",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: expect.objectContaining({}),
+    });
 
     const okResult = await server.callTool({
       name: "runtime_usage_inspect",
@@ -432,13 +615,263 @@ describe("MCP tool descriptors", () => {
     expect(okResult).toEqual({ ok: true, queryName: "InspectRuntimeUsageQuery" });
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0]).toBeInstanceOf(InspectRuntimeUsageQuery);
-    expect(
-      typeof invalidResult === "object" &&
-        invalidResult !== null &&
-        "isErr" in invalidResult &&
-        typeof invalidResult.isErr === "function" &&
-        invalidResult.isErr(),
-    ).toBe(true);
+    expect(isResultError(invalidResult)).toBe(true);
     expect(dispatched).toHaveLength(1);
+  });
+
+  test("[APPALOFT-MCP-005][APPALOFT-MCP-006] resources and prompts expose read-only workflow context", () => {
+    const resources = createAppaloftMcpResources();
+    const prompts = createAppaloftMcpPrompts();
+
+    expect(resources.map((resource) => resource.uri)).toEqual([
+      "appaloft://operation-catalog",
+      "appaloft://tools/high-value",
+      "appaloft://skill/appaloft",
+      "appaloft://skill/deploy-protocol",
+      "appaloft://tools/mcp-guide",
+      "appaloft://docs/agent",
+    ]);
+    expect(
+      resources.find((resource) => resource.uri === "appaloft://operation-catalog")?.text,
+    ).toContain('"operationKey": "deployments.create"');
+    expect(resources.map((resource) => resource.text).join("\n")).not.toMatch(
+      /(?:password|secret|token)\s*[:=]/i,
+    );
+
+    expect(prompts.map((prompt) => prompt.name)).toEqual([
+      "appaloft-first-deploy",
+      "appaloft-recover-deployment",
+      "appaloft-configure-resource",
+      "appaloft-observe-runtime",
+      "appaloft-publish-static-artifact",
+    ]);
+    expect(
+      prompts[0]?.getMessages({ source: "repo", goal: "demo app" })[0]?.content.text,
+    ).toContain("deployments_create");
+    expect(prompts[1]?.getMessages({ deploymentId: "dep_demo" })[0]?.content.text).toContain(
+      "recovery readiness",
+    );
+  });
+
+  test("[APPALOFT-MCP-002][APPALOFT-MCP-007] full MCP server lists tools and returns MCP-shaped tool results", async () => {
+    const commandBus = {
+      execute: async (context: unknown, command: unknown) => ({
+        entrypoint: context.entrypoint,
+        commandName: command?.constructor?.name,
+      }),
+    };
+    const queryBus = {
+      execute: async (context: unknown, query: unknown) => ({
+        entrypoint: context.entrypoint,
+        queryName: query?.constructor?.name,
+      }),
+    };
+    const server = createAppaloftMcpServer({ commandBus, queryBus });
+
+    expect(server.listTools()).toHaveLength(operationCatalog.length);
+    expect(server.listTools().find((tool) => tool.name === "projects_create")).toMatchObject({
+      inputSchema: expect.objectContaining({
+        type: "object",
+      }),
+      operationKey: "projects.create",
+    });
+
+    const commandResult = await server.callTool({
+      name: "projects_create",
+      arguments: { name: "MCP project" },
+    });
+    const queryResult = await server.callTool({
+      name: "system_doctor",
+      arguments: {},
+    });
+    const missingResult = await server.callTool({
+      name: "missing_tool",
+      arguments: {},
+    });
+
+    expect(JSON.parse(mcpText(commandResult))).toEqual({
+      entrypoint: "mcp",
+      commandName: "CreateProjectCommand",
+    });
+    expect(commandResult.structuredContent).toEqual({
+      entrypoint: "mcp",
+      commandName: "CreateProjectCommand",
+    });
+    expect(JSON.parse(mcpText(queryResult))).toEqual({
+      entrypoint: "mcp",
+      queryName: "DoctorQuery",
+    });
+    expect(queryResult.structuredContent).toEqual({
+      entrypoint: "mcp",
+      queryName: "DoctorQuery",
+    });
+    expect(missingResult.isError).toBe(true);
+    expect(mcpText(missingResult)).toContain("mcp_tool_not_registered");
+  });
+
+  test("[APPALOFT-MCP-007] JSON-RPC adapter supports initialize, tools, resources, prompts, and errors", async () => {
+    const server = createAppaloftMcpServer({
+      commandBus: {
+        execute: async (_context: unknown, command: unknown) => ({
+          commandName: command?.constructor?.name,
+        }),
+      },
+      queryBus: {
+        execute: async (_context: unknown, query: unknown) => ({
+          queryName: query?.constructor?.name,
+        }),
+      },
+    });
+
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    ).resolves.toBeNull();
+
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        protocolVersion: "2025-06-18",
+        capabilities: {
+          tools: {},
+          resources: {},
+          prompts: {},
+        },
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/list",
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        tools: expect.arrayContaining([expect.objectContaining({ name: "deployments_create" })]),
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "projects_create",
+          arguments: { name: "RPC project" },
+        },
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        content: [
+          {
+            type: "text",
+            text: expect.stringContaining("CreateProjectCommand"),
+          },
+        ],
+        structuredContent: {
+          commandName: "CreateProjectCommand",
+        },
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: "missing-tool",
+        method: "tools/call",
+        params: {
+          name: "missing_tool",
+          arguments: {},
+        },
+      }),
+    ).resolves.toMatchObject({
+      error: {
+        code: -32602,
+        data: {
+          toolName: "missing_tool",
+        },
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "resources/list",
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        resources: expect.arrayContaining([
+          expect.objectContaining({ uri: "appaloft://operation-catalog" }),
+        ]),
+      },
+    });
+    const resourceRead = await handleAppaloftMcpJsonRpcRequest(server, {
+      jsonrpc: "2.0",
+      id: 5,
+      method: "resources/read",
+      params: { uri: "appaloft://tools/mcp-guide" },
+    });
+    expect(resourceRead).toMatchObject({
+      result: {
+        contents: [
+          {
+            mimeType: "text/markdown",
+            uri: "appaloft://tools/mcp-guide",
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(resourceRead)).toContain("operation-catalog.ts");
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 6,
+        method: "prompts/list",
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        prompts: expect.arrayContaining([
+          expect.objectContaining({ name: "appaloft-first-deploy" }),
+        ]),
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 7,
+        method: "prompts/get",
+        params: {
+          name: "appaloft-first-deploy",
+          arguments: { source: "repo" },
+        },
+      }),
+    ).resolves.toMatchObject({
+      result: {
+        messages: [
+          expect.objectContaining({
+            content: expect.objectContaining({
+              text: expect.stringContaining("repo"),
+            }),
+          }),
+        ],
+      },
+    });
+    await expect(
+      handleAppaloftMcpJsonRpcRequest(server, {
+        jsonrpc: "2.0",
+        id: 8,
+        method: "no/such-method",
+      }),
+    ).resolves.toMatchObject({
+      error: {
+        code: -32601,
+      },
+    });
   });
 });

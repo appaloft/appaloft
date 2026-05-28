@@ -6,6 +6,7 @@ import {
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
 } from "@appaloft/adapter-cli";
+import { createAppaloftMcpServer, runAppaloftMcpStdioServer } from "@appaloft/ai-mcp";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
@@ -226,9 +227,31 @@ function readExitCode(): number {
   return typeof value === "number" ? value : Number(value) || 0;
 }
 
+function commandArgs(argv: readonly string[]): readonly string[] {
+  const args = argv.slice(2);
+  return args[0] === "appaloft" ? args.slice(1) : args;
+}
+
+function isMcpCommand(argv: readonly string[]): boolean {
+  const args = commandArgs(argv);
+  return args[0] === "mcp" && (args.length === 1 || args[1] === "stdio");
+}
+
+async function runShellMcpStdio(app: AppComposition): Promise<void> {
+  const server = createAppaloftMcpServer({
+    commandBus: app.commandBus,
+    queryBus: app.queryBus,
+    executionContextFactory: app.executionContextFactory,
+  });
+
+  await runAppaloftMcpStdioServer({ server });
+}
+
 export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
+  const argv = process.argv;
+  const mcpCommand = isMcpCommand(argv);
   const controlPlaneCli = await runStandaloneControlPlaneCli({
-    argv: process.argv,
+    argv,
     env: process.env,
   });
   if (controlPlaneCli.handled) {
@@ -239,7 +262,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
   }
 
   const executionTarget = await resolveCliExecutionTarget({
-    argv: process.argv,
+    argv,
     env: process.env,
   });
   if (executionTarget.isErr()) {
@@ -310,7 +333,11 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
       }
     }
 
-    await app.cliProgram.parseAsync(cliArgv);
+    if (mcpCommand) {
+      await runShellMcpStdio(app);
+    } else {
+      await app.cliProgram.parseAsync(cliArgv);
+    }
     process.exitCode = 0;
   } catch {
     const currentExitCode = readExitCode();

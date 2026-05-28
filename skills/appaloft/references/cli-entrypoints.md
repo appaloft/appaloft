@@ -1,7 +1,7 @@
 # CLI Entrypoints
 
 This reference mirrors every Appaloft CLI transport in `packages/application/src/operation-catalog.ts`.
-Use it to map AI intent to the same operations exposed through CLI, HTTP/API, Web, and future MCP
+Use it to map AI intent to the same operations exposed through CLI, HTTP/API, Web, and MCP
 surfaces. If a command is absent here, treat it as unsupported until the operation catalog adds it.
 
 ## Deploy Mode Notes
@@ -38,6 +38,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft preview environment delete` - `preview-environments.delete`
 - `appaloft project create` - `projects.create`
 - `appaloft project list` - `projects.list`
+- `appaloft project count` - `projects.count`
 - `appaloft project show <projectId>` - `projects.show`
 - `appaloft project rename <projectId> --name <name>` - `projects.rename`
 - `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
@@ -53,6 +54,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server credential-delete <credentialId> --confirm <credentialId>` - `credentials.delete-ssh`
 - `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>` - `credentials.rotate-ssh`
 - `appaloft server list` - `servers.list`
+- `appaloft server count` - `servers.count`
 - `appaloft server show <serverId>` - `servers.show`
 - `appaloft server capacity inspect <serverId>` - `servers.capacity.inspect`
 - `appaloft runtime-usage inspect <scope>` - `runtime-usage.inspect`
@@ -72,6 +74,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server test <serverId>; appaloft server doctor <serverId>` - `servers.test-connectivity`
 - `appaloft server proxy repair <serverId>` - `servers.bootstrap-proxy`
 - `appaloft resource list` - `resources.list`
+- `appaloft resource count` - `resources.count`
 - `appaloft resource show <resourceId>` - `resources.show`
 - `appaloft resource create` - `resources.create`
 - `appaloft resource archive <resourceId>` - `resources.archive`
@@ -115,6 +118,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft dependency accept <planId> --acknowledge-mutation` - `dependency-resources.provisioning.accept`
 - `appaloft dependency status <planId>` - `dependency-resources.provisioning.status`
 - `appaloft dependency list` - `dependency-resources.list`
+- `appaloft dependency count` - `dependency-resources.count`
 - `appaloft dependency show <dependencyResourceId>` - `dependency-resources.show`
 - `appaloft dependency rename <dependencyResourceId>` - `dependency-resources.rename`
 - `appaloft dependency delete <dependencyResourceId>` - `dependency-resources.delete`
@@ -147,6 +151,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso> [--dry-run false]` - `storage-volumes.cleanup-runtime`
 - `appaloft env create` - `environments.create`
 - `appaloft env list` - `environments.list`
+- `appaloft env count` - `environments.count`
 - `appaloft env show <environmentId>` - `environments.show`
 - `appaloft env rename <environmentId> --name <name>` - `environments.rename`
 - `appaloft env lock <environmentId>` - `environments.lock`
@@ -170,6 +175,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource runtime start <resourceId>` - `resources.runtime.start`
 - `appaloft resource runtime restart <resourceId>` - `resources.runtime.restart`
 - `appaloft deployments list` - `deployments.list`
+- `appaloft deployments count` - `deployments.count`
 - `appaloft deployments show <deploymentId>` - `deployments.show`
 - `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.plan`
 - `appaloft deployments recovery-readiness <deploymentId>` - `deployments.recovery-readiness`
@@ -187,6 +193,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft source-links show <sourceFingerprint>` - `source-links.show`
 - `appaloft source-links relink` - `source-links.relink`
 - `appaloft source-links delete <sourceFingerprint>` - `source-links.delete`
+- `appaloft static-artifacts publish <dist-directory>` - `static-artifacts.publish-payload`
+- `appaloft static-artifacts publish <dist.zip>` - `static-artifacts.publish-archive`
 - `appaloft audit-event list --aggregate <aggregateId>` - `audit-events.list`
 - `appaloft audit-event show <auditEventId> --aggregate <aggregateId>` - `audit-events.show`
 - `appaloft audit-event prune --before <iso>` - `audit-events.prune`

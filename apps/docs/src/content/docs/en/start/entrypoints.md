@@ -1,6 +1,6 @@
 ---
 title: "Choose an entrypoint"
-description: "Choose between the Web console, CLI, HTTP API, and future MCP tools."
+description: "Choose between the Web console, CLI, HTTP API, and MCP tools."
 docType: concept
 localeState:
   zh-CN: complete
@@ -38,4 +38,6 @@ run the CLI, open SSH, or scan target machines to discover a control plane.
 
 <h2 id="entrypoint-mcp-tools">MCP tools</h2>
 
-Future MCP tools should reuse the same topic ids, input explanations, and recovery guidance.
+When an agent host configures Appaloft MCP, use `appaloft mcp stdio` to expose the same operation
+catalog. MCP tools reuse the same topic ids, input explanations, and recovery guidance. See
+[Appaloft MCP server](/docs/en/agent/mcp-server/#appaloft-mcp-server).

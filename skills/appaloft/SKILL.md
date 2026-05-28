@@ -1,12 +1,12 @@
 ---
 name: appaloft
-description: Use Appaloft as a complete AI-facing deployment platform entrypoint. Trigger when an AI agent is asked to deploy, inspect, configure, operate, observe, recover, administer, or document Appaloft projects, servers, environments, resources, deployments, domains, certificates, dependencies, storage, scheduled tasks, runtime monitoring, audit events, organizations, deploy tokens, or system maintenance through the same operation catalog exposed by CLI, HTTP/API, Web, and future MCP surfaces.
+description: Use Appaloft as a complete AI-facing deployment platform entrypoint. Trigger when an AI agent is asked to deploy, inspect, configure, operate, observe, recover, administer, or document Appaloft projects, servers, environments, resources, deployments, domains, certificates, dependencies, storage, scheduled tasks, runtime monitoring, audit events, organizations, deploy tokens, MCP tools, or system maintenance through the same operation catalog exposed by CLI, HTTP/API, Web, and MCP surfaces.
 ---
 
 # Appaloft
 
 This skill is the AI-facing Appaloft entrypoint. It is peer to the CLI, HTTP/API, Web console, and
-future MCP tools, but its target user is an AI agent. It does not create agent-only business
+MCP tools, but its target user is an AI agent. It does not create agent-only business
 operations. It maps user intent to the same Appaloft operation catalog and chooses the active
 surface available in the session.
 
@@ -17,7 +17,7 @@ surface available in the session.
    observation, recovery, audit/retention, organization/auth, or system maintenance.
 2. Choose the active surface and state owner: CLI/pure SSH for local shell-capable agents and
    BYOS Action deploys, HTTP/API for selected control planes, Web when guiding a human through the
-   console, and MCP only when available.
+   console, and MCP when tools are configured.
 3. Use existing Appaloft operations only. Do not invent hidden agent commands, bypass adapters, call
    provider SDKs directly, mutate Docker/SSH/database state directly, or inspect repositories/use
    cases/persistence internals for product behavior.
@@ -31,9 +31,11 @@ surface available in the session.
 - Read [references/cli-entrypoints.md](references/cli-entrypoints.md) when the task needs exact CLI
   forms or operation keys. It mirrors every CLI transport in the Appaloft operation catalog.
 - Read [references/surfaces.md](references/surfaces.md) when choosing between CLI, HTTP/API, Web,
-  repository config, and future MCP/tool entrypoints.
+  repository config, and MCP/tool entrypoints.
 - Read [references/deploy-protocol.md](references/deploy-protocol.md) for deploy, preview cleanup,
   GitHub Action mode selection, preview cleanup, plan, observe, retry, redeploy, and rollback tasks.
+- Read [references/mcp-tools.md](references/mcp-tools.md) when MCP tools are available or the user
+  asks for Appaloft MCP setup, tool names, resources, prompts, or stdio usage.
 
 ## Common Workflows
 
@@ -53,6 +55,9 @@ surface available in the session.
   dependency binding operations; do not inject raw connection strings into chat output.
 - Observe and administer: use runtime usage, monitoring, operator work, audit events, retention,
   deploy tokens, organization, auth bootstrap, provider/plugin, upgrade, and database commands.
+- MCP-enabled session: prefer MCP tool calls for precise operation input/output, use MCP resources
+  for operation catalog and workflow context, and keep this skill as the procedural protocol that
+  decides which tools to call.
 
 ## Installation Boundary
 

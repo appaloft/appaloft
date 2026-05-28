@@ -12,17 +12,18 @@
 
 ## Relationship To MCP
 
-The v1 ordering is skill first, MCP later:
+The v1 relationship is skill as workflow protocol, MCP as callable tool transport:
 
 1. Appaloft Skill: complete AI-facing entrypoint over existing CLI/API/Web behavior and all CLI
    operation catalog entries.
 2. Agent Deploy Skill: deploy subprotocol inside the full skill for first-deploy and URL-first
    outcomes.
 3. Generated MCP/tool descriptors: formal transport metadata from the operation catalog.
-4. Appaloft-as-MCP server: future packaged server and handler coverage.
+4. Appaloft-as-MCP server: active stdio transport over the same command/query buses when configured.
 5. AI tool server templates/gateway: later AI-native product tracks.
 
-The skill may mention future MCP tools, but it must not depend on them for v1.
+The skill may use MCP tools when a host has them configured, but it must not depend on MCP for
+basic usefulness.
 
 ## Documentation Impact
 
@@ -40,7 +41,7 @@ The Code/Docs Round has chosen the v1 distribution location:
   subprotocol;
 - `skills/appaloft` is the standard discoverable full skill folder;
 - `skills/appaloft/references/surfaces.md` records the CLI, HTTP/API, Web, repository config, and
-  future MCP/tool entrypoint boundaries;
+  MCP/tool entrypoint boundaries;
 - deploy is an internal subprotocol in `skills/appaloft/references/deploy-protocol.md`;
 - the standard install path is `npx skills add appaloft/appaloft`;
 - Appaloft does not expose an npm skill installer because that would blur the boundary with the
@@ -55,8 +56,9 @@ Other generated exports remain optional follow-ups derived from the canonical so
 - No new operation catalog entry.
 - CLI remains the preferred v1 automation path for local coding agents.
 - HTTP/API remains the preferred integration path for agents running beside a control plane.
-- Web remains human-facing but should point users to the skill when they ask an agent to deploy.
-- MCP remains optional and generated from existing operation catalog entries.
+- Web remains human-facing but should point users to the skill and MCP when they ask an agent to
+  deploy or operate Appaloft.
+- MCP remains optional at host setup time and generated from existing operation catalog entries.
 
 ## Test Strategy
 
@@ -72,7 +74,7 @@ Other generated exports remain optional follow-ups derived from the canonical so
 2. Docs registry/topic link and public docs traceability row.
 3. CLI help pointer to the skill docs if appropriate.
 4. Optional `.well-known`/`llms.txt` exports after the canonical skill source stabilizes.
-5. Optional MCP/tool descriptor cross-links after the MCP surface is productized.
+5. MCP/tool descriptor cross-links and external install docs after release packaging is productized.
 
 ## Open Questions
 

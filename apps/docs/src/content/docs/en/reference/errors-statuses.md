@@ -34,7 +34,7 @@ Appaloft errors should not collapse to a message string. Public entrypoints shou
 - `links`: human public docs, agent-readable guides, related specs, runbooks, or source symbols.
 - `remedies`: recovery actions that are safe to show or suggest.
 
-Web, CLI, HTTP/API, and future MCP tools should render errors from those fields instead of branching on message text.
+Web, CLI, HTTP/API, and MCP tools should render errors from those fields instead of branching on message text.
 
 <h2 id="agent-readable-errors">Agent-readable errors</h2>
 
