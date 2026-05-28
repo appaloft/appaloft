@@ -90,6 +90,15 @@ export const authProviderStatusSchema = z.object({
 });
 
 export const authEmailVerificationStatusSchema = z.object({
+  changeEmail: z
+    .object({
+      cooldownSeconds: z.number().int().positive().optional(),
+      enabled: z.boolean(),
+      requestPath: z.string().optional(),
+      verifyCurrentEmail: z.boolean().optional(),
+      verifyPath: z.string().optional(),
+    })
+    .optional(),
   cooldownSeconds: z.number().int().positive().optional(),
   enabled: z.boolean(),
   otpLength: z.number().int().positive().optional(),
@@ -100,7 +109,26 @@ export const authEmailVerificationStatusSchema = z.object({
   verifyPagePath: z.string().optional(),
 });
 
+export const authAccountRecoveryStatusSchema = z.object({
+  cooldownSeconds: z.number().int().positive().optional(),
+  enabled: z.boolean(),
+  forgotPasswordPagePath: z.string().optional(),
+  requestPath: z.string().optional(),
+  resetPagePath: z.string().optional(),
+  resetPath: z.string().optional(),
+});
+
+export const authAccountSecurityStatusSchema = z.object({
+  changePasswordPath: z.string().optional(),
+  enabled: z.boolean(),
+  pagePath: z.string().optional(),
+  passwordState: z.enum(["not-set", "set", "unknown"]),
+  setPasswordPath: z.string().optional(),
+});
+
 export const authSessionResponseSchema = z.object({
+  accountSecurity: authAccountSecurityStatusSchema,
+  accountRecovery: authAccountRecoveryStatusSchema,
   enabled: z.boolean(),
   emailVerification: authEmailVerificationStatusSchema,
   provider: z.enum(["none", "better-auth"]),
@@ -5960,6 +5988,7 @@ export type InstanceUpgradeCheckResponse = z.infer<typeof instanceUpgradeCheckRe
 export type ApplyInstanceUpgradeInput = z.infer<typeof applyInstanceUpgradeInputSchema>;
 export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyResponseSchema>;
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
+export type AuthAccountRecoveryStatus = z.infer<typeof authAccountRecoveryStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;

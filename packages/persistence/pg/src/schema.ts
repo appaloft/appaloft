@@ -821,6 +821,7 @@ export interface DeployTokensTable {
 }
 
 export interface BetterAuthUsersTable {
+  appaloftPendingVerificationIntent: string | null;
   id: string;
   name: string;
   email: string;

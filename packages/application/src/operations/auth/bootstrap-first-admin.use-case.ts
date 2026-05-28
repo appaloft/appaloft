@@ -72,6 +72,7 @@ export class BootstrapFirstAdminUseCase {
       const record = yield* await firstAdminBootstrapper.bootstrapFirstAdmin(context, {
         email: input.email,
         displayName: input.displayName,
+        organizationId: status.organizationId ?? "org_self_hosted",
         password,
         organizationName: input.organizationName?.trim() || "Self-hosted Appaloft",
         ...(input.organizationSlug?.trim()

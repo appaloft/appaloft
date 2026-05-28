@@ -244,6 +244,13 @@ describe("HTTP static assets", () => {
     const authChecks: string[] = [];
     const app = createTestApp({
       authSessionStatus: {
+        accountSecurity: {
+          enabled: true,
+          passwordState: "unknown",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
         enabled: true,
         emailVerification: {
           enabled: false,
@@ -314,6 +321,24 @@ describe("HTTP static assets", () => {
       expect(verifyEmailPage.status).toBe(200);
       expect(await verifyEmailPage.text()).toBe("web-spa-fallback");
 
+      const forgotPasswordPage = await fetch(`${baseUrl}/forgot-password`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(forgotPasswordPage.status).toBe(200);
+      expect(await forgotPasswordPage.text()).toBe("web-spa-fallback");
+
+      const resetPasswordPage = await fetch(`${baseUrl}/reset-password?token=tok_test`, {
+        headers: {
+          accept: "text/html",
+        },
+        redirect: "manual",
+      });
+      expect(resetPasswordPage.status).toBe(200);
+      expect(await resetPasswordPage.text()).toBe("web-spa-fallback");
+
       const asset = await fetch(`${baseUrl}/_app/immutable/app.js`, {
         headers: {
           accept: "text/html",
@@ -352,6 +377,13 @@ describe("HTTP static assets", () => {
   test("[PRODUCT-AUTH-NAV-001] serves console navigation when a product session exists", async () => {
     const app = createTestApp({
       authSessionStatus: {
+        accountSecurity: {
+          enabled: true,
+          passwordState: "set",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
         enabled: true,
         emailVerification: {
           enabled: false,
