@@ -505,6 +505,10 @@ export class BetterAuthRuntime implements AuthRuntime {
         },
       });
       const userId = signup.user.id;
+      const authContext = await this.auth.$context;
+      const verifiedUser = await authContext.internalAdapter.updateUser(userId, {
+        emailVerified: true,
+      });
       const organization = await this.auth.api.createOrganization({
         body: {
           name: request.organizationName,
@@ -515,7 +519,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       });
 
       return ok({
-        email: signup.user.email,
+        email: verifiedUser.email,
         organizationId: organization.id,
         organizationSlug: organization.slug,
         userId,
