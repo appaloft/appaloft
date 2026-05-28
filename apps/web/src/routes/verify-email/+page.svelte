@@ -6,11 +6,13 @@
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { AuthSessionResponse } from "@appaloft/contracts";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   import { buildApiUrl, request } from "$lib/api/client";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import * as InputOTP from "$lib/components/ui/input-otp";
+  import { REGEXP_ONLY_DIGITS } from "$lib/components/ui/input-otp";
   import { i18nKeys, localeHeaders, t } from "$lib/i18n";
 
   type PendingEmailVerification = {
@@ -27,10 +29,11 @@
   let verifyError = $state("");
   let sending = $state(false);
   let verifying = $state(false);
+  let now = $state(Date.now());
+  let resendAvailableAt = $state(0);
+  let timer: number | undefined;
 
   const returnTo = $derived(page.url.searchParams.get("next") || "/");
-  const canSend = $derived(email.trim().length > 0 && !sending);
-  const canVerify = $derived(email.trim().length > 0 && otp.trim().length > 0 && !verifying);
   const authSessionQuery = createQuery(() =>
     queryOptions({
       queryKey: ["system", "auth-session", "verify-email"],
@@ -38,6 +41,20 @@
       enabled: browser,
       retry: 0,
     }),
+  );
+  const normalizedEmail = $derived(email.trim().toLowerCase());
+  const cooldownSeconds = $derived(
+    authSessionQuery.data?.emailVerification.cooldownSeconds ?? 60,
+  );
+  const otpLength = $derived(authSessionQuery.data?.emailVerification.otpLength ?? 6);
+  const resendRemainingSeconds = $derived(
+    Math.max(0, Math.ceil((resendAvailableAt - now) / 1000)),
+  );
+  const canSend = $derived(
+    normalizedEmail.length > 0 && !sending && resendRemainingSeconds === 0,
+  );
+  const canVerify = $derived(
+    normalizedEmail.length > 0 && otp.trim().length === otpLength && !verifying,
   );
   const emailVerificationEnabled = $derived(
     Boolean(
@@ -64,6 +81,32 @@
   function clearPendingVerification(): void {
     if (browser) {
       window.sessionStorage.removeItem("appaloft.pending-email-verification");
+    }
+  }
+
+  function resendCooldownStorageKey(emailAddress = normalizedEmail): string {
+    return `appaloft.email-verification-resend-at:${emailAddress}`;
+  }
+
+  function restoreResendCooldown(emailAddress = normalizedEmail): void {
+    if (!browser || !emailAddress) {
+      resendAvailableAt = 0;
+      return;
+    }
+
+    const storedValue = window.sessionStorage.getItem(resendCooldownStorageKey(emailAddress));
+    const storedTimestamp = storedValue ? Number.parseInt(storedValue, 10) : 0;
+    resendAvailableAt =
+      Number.isFinite(storedTimestamp) && storedTimestamp > Date.now() ? storedTimestamp : 0;
+  }
+
+  function startResendCooldown(): void {
+    resendAvailableAt = Date.now() + cooldownSeconds * 1000;
+    if (browser && normalizedEmail) {
+      window.sessionStorage.setItem(
+        resendCooldownStorageKey(normalizedEmail),
+        String(resendAvailableAt),
+      );
     }
   }
 
@@ -125,6 +168,7 @@
           type: "email-verification",
         }),
       );
+      startResendCooldown();
       requestMessage = $t(i18nKeys.console.authEmailVerification.requestSucceeded, { email });
     } catch (error) {
       requestError =
@@ -183,6 +227,16 @@
     const pending = readPendingVerification();
     if (!email && pending.email) {
       email = pending.email;
+    }
+    restoreResendCooldown(email.trim().toLowerCase());
+    timer = window.setInterval(() => {
+      now = Date.now();
+    }, 1000);
+  });
+
+  onDestroy(() => {
+    if (timer) {
+      window.clearInterval(timer);
     }
   });
 </script>
@@ -254,14 +308,26 @@
           <form class="grid gap-5" onsubmit={sendCode}>
             <label class="appaloft-field-stack">
               <span class="appaloft-field-label">{$t(i18nKeys.console.authEmailVerification.emailLabel)}</span>
-              <Input bind:value={email} type="email" autocomplete="email" required />
+              <Input
+                bind:value={email}
+                type="email"
+                autocomplete="email"
+                required
+                oninput={() => restoreResendCooldown()}
+              />
             </label>
 
             <div class="flex flex-wrap items-center gap-3">
               <Button type="submit" variant="outline" disabled={!canSend}>
-                {sending
-                  ? $t(i18nKeys.console.authEmailVerification.sendingCode)
-                  : $t(i18nKeys.console.authEmailVerification.requestCode)}
+                {#if sending}
+                  {$t(i18nKeys.console.authEmailVerification.sendingCode)}
+                {:else if resendRemainingSeconds > 0}
+                  {$t(i18nKeys.console.authEmailVerification.requestCoolingDown, {
+                    seconds: resendRemainingSeconds,
+                  })}
+                {:else}
+                  {$t(i18nKeys.console.authEmailVerification.requestCode)}
+                {/if}
               </Button>
               <a class="text-sm font-medium text-primary hover:underline" href={`/sign-up?next=${encodeURIComponent(returnTo)}`}>
                 {$t(i18nKeys.console.authEmailVerification.changeEmail)}
@@ -272,13 +338,24 @@
           <form class="grid gap-5 border-t pt-5" onsubmit={verifyCode}>
             <label class="appaloft-field-stack">
               <span class="appaloft-field-label">{$t(i18nKeys.console.authEmailVerification.codeLabel)}</span>
-              <Input
+              <InputOTP.Root
                 bind:value={otp}
+                maxlength={otpLength}
+                pattern={REGEXP_ONLY_DIGITS}
                 inputmode="numeric"
                 autocomplete="one-time-code"
-                placeholder={$t(i18nKeys.console.authEmailVerification.codePlaceholder)}
+                pasteTransformer={(text) => text.replace(/\D/g, "").slice(0, otpLength)}
+                aria-label={$t(i18nKeys.console.authEmailVerification.codeLabel)}
                 required
-              />
+              >
+                {#snippet children({ cells })}
+                  <InputOTP.Group>
+                    {#each cells as cell}
+                      <InputOTP.Slot {cell} />
+                    {/each}
+                  </InputOTP.Group>
+                {/snippet}
+              </InputOTP.Root>
               <span class="text-xs text-muted-foreground">
                 {$t(i18nKeys.console.authEmailVerification.codeHelp)}
               </span>

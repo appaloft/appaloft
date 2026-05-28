@@ -277,6 +277,7 @@ export const enUS = {
       introBody: "Verify your email before opening the Appaloft console.",
       introTitle: "Verify your email",
       requestCode: "Send code",
+      requestCoolingDown: "Send again in {{seconds}}s",
       requestFailed: "Code delivery failed",
       requestSucceeded: "We sent a verification code to {{email}}.",
       resendCode: "Resend code",

@@ -123,6 +123,7 @@
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     window.sessionStorage.setItem(
       "appaloft.pending-email-verification",
       JSON.stringify({
@@ -132,6 +133,13 @@
         next: returnTo,
       }),
     );
+    if (normalizedEmail) {
+      const cooldownSeconds = authSessionQuery.data?.emailVerification.cooldownSeconds ?? 60;
+      window.sessionStorage.setItem(
+        `appaloft.email-verification-resend-at:${normalizedEmail}`,
+        String(Date.now() + cooldownSeconds * 1000),
+      );
+    }
   }
 
   async function submitSignup(event: SubmitEvent): Promise<void> {

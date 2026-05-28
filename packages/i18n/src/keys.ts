@@ -272,6 +272,7 @@ export const i18nKeys = {
       introBody: "console:authEmailVerification.introBody",
       introTitle: "console:authEmailVerification.introTitle",
       requestCode: "console:authEmailVerification.requestCode",
+      requestCoolingDown: "console:authEmailVerification.requestCoolingDown",
       requestFailed: "console:authEmailVerification.requestFailed",
       requestSucceeded: "console:authEmailVerification.requestSucceeded",
       resendCode: "console:authEmailVerification.resendCode",
