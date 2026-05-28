@@ -58,9 +58,12 @@ describe("SSH preview artifact cleanup", () => {
     });
 
     const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
+    const dashSyntaxCheck = spawnSync("dash", ["-n", "-c", command], { encoding: "utf8" });
 
     expect(syntaxCheck.status).toBe(0);
-    expect(command).toContain('for marker in "$@"; do if grep -Fq "$fingerprint" "$marker"; then');
+    expect(dashSyntaxCheck.status).toBe(0);
+    expect(command).toContain('for marker in "$@"; do\nif grep -Fq "$fingerprint" "$marker"; then');
+    expect(command).not.toContain("then;");
     expect(command).not.toContain("for marker do; if");
   });
 });
