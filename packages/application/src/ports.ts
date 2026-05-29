@@ -9064,6 +9064,7 @@ export type InstanceUpgradeCheckStatus = "available" | "current" | "unknown";
 export interface InstanceUpgradeCheckResult {
   schemaVersion: "system.instance-upgrade.check/v1";
   currentVersion: string;
+  currentCommitSha?: string;
   targetVersion: string;
   latestVersion: string | null;
   updateAvailable: boolean;

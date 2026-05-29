@@ -1005,6 +1005,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/instance-upgrade/check": {
       schemaVersion: "system.instance-upgrade.check/v1",
       currentVersion: "0.1.0-test",
+      currentCommitSha: "57ea0764b8f0a491fd1d30bedc5cbe281744b36c",
       targetVersion: "0.1.0-test",
       latestVersion: "0.1.0-test",
       updateAvailable: false,

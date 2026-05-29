@@ -388,7 +388,7 @@
           align="start"
           side="bottom"
           sideOffset={6}
-          class="max-h-[min(26rem,calc(100vh-7rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+          class="max-h-[min(26rem,calc(100vh-7rem))] w-(--bits-dropdown-menu-anchor-width) min-w-64"
         >
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
@@ -563,7 +563,7 @@
           align="start"
           side="top"
           sideOffset={6}
-          class="max-h-[min(28rem,calc(100vh-5rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+          class="max-h-[min(28rem,calc(100vh-5rem))] w-(--bits-dropdown-menu-anchor-width) min-w-64"
         >
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
