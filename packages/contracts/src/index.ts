@@ -51,6 +51,7 @@ export const instanceUpgradeCheckStatusSchema = z.enum(["available", "current", 
 export const instanceUpgradeCheckResponseSchema = z.object({
   schemaVersion: z.literal("system.instance-upgrade.check/v1"),
   currentVersion: z.string(),
+  currentCommitSha: z.string().optional(),
   targetVersion: z.string(),
   latestVersion: z.string().nullable(),
   updateAvailable: z.boolean(),
