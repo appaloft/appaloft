@@ -643,6 +643,10 @@ export const enUS = {
       applyingUpgrade: "Updating",
       checkForUpdates: "Check updates",
       checkingForUpdates: "Checking",
+      commitShaLabel: "Git commit SHA",
+      guidanceBody:
+        "Install, console-domain changes, and GitHub Actions connection details live here so they do not compete with day-to-day instance status.",
+      guidanceTitle: "Install and connection guidance",
       currentOriginLabel: "Current console origin",
       currentVersionLabel: "Current version",
       directInstallBody:
@@ -657,7 +661,10 @@ export const enUS = {
       maintenanceWorkersBody:
         "Read the configured scheduled worker state from system doctor. This panel does not start workers, tick schedulers, run prune, collect samples, execute tasks, or clean up previews.",
       maintenanceWorkersTitle: "Scheduled maintenance workers",
-      pageDescription: "Bootstrap proxy, domain, and Action connection guidance for this instance",
+      noCommitSha: "Not provided",
+      overviewTitle: "Instance basics",
+      pageDescription:
+        "Review this instance version, provenance, proxy, and maintenance entrypoints",
       pageTitle: "Instance",
       proxyTitle: "Managed proxy",
       proxyBody:

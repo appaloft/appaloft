@@ -63,10 +63,9 @@ describe("organization auth management console surface", () => {
     );
   });
 
-  test("[ORG-TEAM-WEB-004] keeps organization and instance management outside the product sidebar", async () => {
-    const [organizationPageSource, instancePageSource, managementShellSource] = await Promise.all([
+  test("[ORG-TEAM-WEB-004] keeps organization management outside the product sidebar", async () => {
+    const [organizationPageSource, managementShellSource] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
       readFile(
         new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
         "utf8",
@@ -74,13 +73,7 @@ describe("organization auth management console surface", () => {
     ]);
 
     expect(organizationPageSource).toContain("ManagementShell");
-    expect(instancePageSource).toContain("ManagementShell");
-    expect(instancePageSource).toContain("orpcClient.system.doctor");
-    expect(instancePageSource).toContain("maintenanceWorkers");
-    expect(instancePageSource).toContain("workerSafetyLabelKey");
-    expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
     expect(organizationPageSource).not.toContain("ConsoleShell");
-    expect(instancePageSource).not.toContain("ConsoleShell");
     expect(organizationPageSource).toContain("activeSection");
     expect(organizationPageSource).toContain("sectionOptions");
     expect(organizationPageSource).toContain('href: "/organization/members"');
@@ -92,5 +85,37 @@ describe("organization auth management console surface", () => {
     expect(managementShellSource).not.toContain("i18nKeys.console.nav.management");
     expect(managementShellSource).not.toContain("projectSearch");
     expect(managementShellSource).not.toContain("filteredProjects");
+  });
+
+  test("[ORG-TEAM-WEB-005] presents instance operations as focused ConsoleShell subpages", async () => {
+    const [instancePageSource, contractsSource, zhLocaleSource] = await Promise.all([
+      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+    expect(instancePageSource).toContain("ConsoleShell");
+    expect(instancePageSource).toContain("ConsoleResourceCanvas");
+    expect(instancePageSource).toContain("parseInstanceSection");
+    expect(instancePageSource).toContain("instanceSectionHref");
+    expect(instancePageSource).toContain("selectInstanceSection");
+    expect(instancePageSource).toContain('page.url.searchParams.get("section")');
+    expect(instancePageSource).toContain('activeSection === "overview"');
+    expect(instancePageSource).toContain('activeSection === "maintenance"');
+    expect(instancePageSource).toContain('activeSection === "sessions"');
+    expect(instancePageSource).toContain('activeSection === "guidance"');
+    expect(instancePageSource).toContain("i18nKeys.console.instance.overviewTitle");
+    expect(instancePageSource).toContain("i18nKeys.console.instance.commitShaLabel");
+    expect(instancePageSource).toContain("currentCommitSha");
+    expect(instancePageSource).toContain("orpcClient.system.doctor");
+    expect(instancePageSource).toContain("maintenanceWorkers");
+    expect(instancePageSource).toContain("workerSafetyLabelKey");
+    expect(instancePageSource).not.toContain("ManagementShell");
+    expect(contractsSource).toContain("currentCommitSha: z.string().optional()");
+    expect(zhLocaleSource).toContain('pageTitle: "实例"');
+    expect(zhLocaleSource).toContain('instance: "实例"');
   });
 });

@@ -80,8 +80,15 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(accountSecurityPageSource).toContain("passwordState");
     expect(accountSecurityPageSource).toContain("appaloft.email-change-request-at");
     expect(accountSecurityPageSource).toContain("$lib/components/ui/input-otp");
+    expect(accountSecurityPageSource).toContain("ConsoleShell");
+    expect(accountSecurityPageSource).toContain("ConsoleResourceCanvas");
+    expect(accountSecurityPageSource).toContain('page.url.searchParams.get("section")');
+    expect(accountSecurityPageSource).toContain("selectAccountSecuritySection");
+    expect(accountSecurityPageSource).not.toContain("ManagementShell");
     expect(consoleShellSource).toContain("/account/security");
     expect(consoleShellSource).toContain("nav.accountSecurity");
+    expect(consoleShellSource).toContain("min-w-64");
+    expect(consoleShellSource).not.toContain("w-(--bits-dropdown-menu-anchor-width) min-w-0");
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
   });
