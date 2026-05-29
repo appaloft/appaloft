@@ -623,6 +623,10 @@ export const zhCN = {
       applyingUpgrade: "正在更新",
       checkForUpdates: "检查更新",
       checkingForUpdates: "正在检查",
+      commitShaLabel: "Git commit SHA",
+      guidanceBody:
+        "安装、重新绑定 console 域名和 GitHub Actions 连接信息集中在这里，避免干扰 instance 日常状态判断。",
+      guidanceTitle: "安装与连接指引",
       currentOriginLabel: "当前 console origin",
       currentVersionLabel: "当前版本",
       directInstallBody: "没有域名时，Appaloft 会通过服务器 IP 和直连 console 端口访问。",
@@ -636,8 +640,10 @@ export const zhCN = {
       maintenanceWorkersBody:
         "从 system doctor 读取 scheduled worker 的配置状态。这个面板不会启动 worker、tick scheduler、运行 prune、采集 sample、执行 task 或清理 preview。",
       maintenanceWorkersTitle: "定时维护 workers",
-      pageDescription: "这个 instance 的 bootstrap proxy、域名和 Action 连接指引",
-      pageTitle: "Instance",
+      noCommitSha: "未提供",
+      overviewTitle: "实例基本信息",
+      pageDescription: "查看这个实例的版本、来源、proxy 与维护入口",
+      pageTitle: "实例",
       proxyTitle: "托管代理",
       proxyBody: "安装器创建常驻 Traefik edge，console bootstrap route 和后续项目 route 共用它。",
       rerunBody:
@@ -685,7 +691,7 @@ export const zhCN = {
       deployments: "部署",
       extensions: "扩展",
       home: "首页",
-      instance: "Instance",
+      instance: "实例",
       organization: "Organization",
       previewEnvironments: "预览环境",
       previewPolicies: "预览策略",
