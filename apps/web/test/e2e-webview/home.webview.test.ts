@@ -3470,12 +3470,14 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/`);
 
-    await expectAnyText(view, ["Latest deployment", "LATEST DEPLOYMENT", "最近部署"]);
+    await expectAnyText(view, ["Projects", "项目"]);
     await expectAnyText(view, ["Quick deploy", "快速部署"]);
-    await expectAnyText(view, ["View projects", "VIEW PROJECTS", "查看项目"]);
-    await expectAnyText(view, ["View deployments", "VIEW DEPLOYMENTS", "查看部署"]);
+    await expectAnyText(view, ["Workspace", "工作区"]);
     await expectText(view, "Demo");
+    await expectText(view, "workspace");
+    await expectAnyText(view, ["Access", "访问地址"]);
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
+    await expectAnyText(view, ["Recent deployments", "最近部署"]);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
@@ -3511,13 +3513,8 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "appaloft-postgres-dres_pg");
     await expectText(view, "postgresql://appaloft:****@primary-postgres:5432/appaloft");
 
+    await clickButtonByAnyText(view, ["Create dependency resource", "创建依赖资源"]);
     await setInputValue(view, "#dependency-resource-name-input", "reporting-db");
-    await setCheckboxChecked(view, "#dependency-resource-backup-retention-input", true);
-    await setInputValue(
-      view,
-      "#dependency-resource-backup-retention-reason-input",
-      "before migration",
-    );
     await clickFormSubmit(view, "#dependency-resource-create-form");
 
     const planRequest = await waitForRecordedRequest(
@@ -3526,10 +3523,6 @@ describe("console e2e with Bun.WebView", () => {
     expect(readOrpcJsonPayload(planRequest.body)).toEqual({
       mode: "create",
       create: {
-        backupRelationship: {
-          reason: "before migration",
-          retentionRequired: true,
-        },
         environmentId: "env_demo",
         kind: "postgres",
         name: "reporting-db",
@@ -3670,7 +3663,7 @@ describe("console e2e with Bun.WebView", () => {
     resetSelfHostedAuthE2eState();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/instance`);
+    await view.navigate(`${previewUrl}/instance?section=maintenance`);
 
     await expectAnyText(view, ["Scheduled maintenance workers", "定时维护 workers"]);
     await expectAnyText(view, ["This panel does not start workers", "这个面板不会启动 worker"]);
@@ -3775,7 +3768,7 @@ describe("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/instance`);
+      await view.navigate(`${previewUrl}/instance?section=sessions`);
       await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Active terminal sessions", "活跃终端会话"]);
