@@ -33,6 +33,7 @@ export type StandaloneControlPlaneCliResult =
     };
 
 interface ParsedOptions {
+  readonly booleans: Readonly<Record<string, boolean>>;
   readonly values: Readonly<Record<string, string>>;
   readonly positional: readonly string[];
 }
@@ -45,10 +46,13 @@ function commandArgs(argv: readonly string[]): readonly string[] {
 function parseOptions(
   args: readonly string[],
   optionNames: readonly string[],
+  booleanOptionNames: readonly string[] = [],
 ): Result<ParsedOptions> {
+  const booleans: Record<string, boolean> = {};
   const values: Record<string, string> = {};
   const positional: string[] = [];
   const allowed = new Set(optionNames);
+  const booleanAllowed = new Set(booleanOptionNames);
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -61,6 +65,11 @@ function parseOptions(
     }
 
     const key = arg.slice(2);
+    if (booleanAllowed.has(key)) {
+      booleans[key] = true;
+      continue;
+    }
+
     if (!allowed.has(key)) {
       return err({
         code: "validation_error",
@@ -90,6 +99,7 @@ function parseOptions(
   }
 
   return ok({
+    booleans,
     values,
     positional,
   });
@@ -161,7 +171,7 @@ async function handleLogin(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
 ): Promise<StandaloneControlPlaneCliResult> {
-  const parsed = parseOptions(args, ["url", "mode", "profile"]);
+  const parsed = parseOptions(args, ["url", "mode", "profile"], ["no-browser"]);
   if (parsed.isErr()) {
     return finish(parsed, input);
   }
@@ -170,15 +180,13 @@ async function handleLogin(
     return finish(mode, input);
   }
   const url = parsed.value.values.url;
-  if (!url) {
-    return finish(parseError("Login requires --url"), input);
-  }
 
   return finish(
     loginControlPlane(
       {
-        url,
+        ...(url ? { url } : {}),
         ...(mode.value ? { mode: mode.value } : {}),
+        ...(parsed.value.booleans["no-browser"] ? { openBrowser: false } : {}),
         ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
       },
       deps(input),

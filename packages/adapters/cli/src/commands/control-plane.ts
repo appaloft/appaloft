@@ -13,9 +13,10 @@ import { cliCommandDescriptions } from "./docs-help.js";
 
 const controlPlaneModes = ["cloud", "self-hosted"] as const;
 
-const urlOption = Options.text("url");
+const urlOption = Options.text("url").pipe(Options.optional);
 const profileOption = Options.text("profile").pipe(Options.optional);
 const modeOption = Options.choice("mode", controlPlaneModes).pipe(Options.optional);
+const noBrowserOption = Options.boolean("no-browser").pipe(Options.withDefault(false));
 const profileArg = Args.text({ name: "profile" });
 
 function runControlPlaneTask<T>(task: Promise<Result<T>>) {
@@ -27,21 +28,24 @@ function runControlPlaneTask<T>(task: Promise<Result<T>>) {
 }
 
 function loginTask(input: {
-  readonly url: string;
+  readonly url?: string;
   readonly mode?: CliControlPlaneMode;
+  readonly openBrowser?: boolean;
   readonly profile?: string;
 }) {
   return runControlPlaneTask(loginControlPlane(input));
 }
 
 function loginInput(
-  url: string,
+  url: string | undefined,
   mode: CliControlPlaneMode | undefined,
+  noBrowser: boolean,
   profile: string | undefined,
 ) {
   return {
-    url,
+    ...(url ? { url } : {}),
     ...(mode ? { mode } : {}),
+    ...(noBrowser ? { openBrowser: false } : {}),
     ...(profile ? { profile } : {}),
   };
 }
@@ -51,10 +55,13 @@ const authLoginCommand = EffectCommand.make(
   {
     url: urlOption,
     mode: modeOption,
+    noBrowser: noBrowserOption,
     profile: profileOption,
   },
-  ({ mode, profile, url }) =>
-    loginTask(loginInput(url, optionalValue(mode), optionalValue(profile))),
+  ({ mode, noBrowser, profile, url }) =>
+    loginTask(
+      loginInput(optionalValue(url), optionalValue(mode), noBrowser, optionalValue(profile)),
+    ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogin));
 
 const authStatusCommand = EffectCommand.make(
@@ -84,10 +91,13 @@ export const loginCommand = EffectCommand.make(
   {
     url: urlOption,
     mode: modeOption,
+    noBrowser: noBrowserOption,
     profile: profileOption,
   },
-  ({ mode, profile, url }) =>
-    loginTask(loginInput(url, optionalValue(mode), optionalValue(profile))),
+  ({ mode, noBrowser, profile, url }) =>
+    loginTask(
+      loginInput(optionalValue(url), optionalValue(mode), noBrowser, optionalValue(profile)),
+    ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogin));
 
 export const logoutCommand = EffectCommand.make(
