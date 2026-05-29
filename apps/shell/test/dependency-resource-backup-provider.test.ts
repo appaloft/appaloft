@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createExecutionContext, type DependencyResourceSecretStore } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
+import { DockerBackedManagedDependencyProvider } from "../src/managed-dependency-providers";
 import {
   BunDependencyResourceNativeCommandRunner,
   ShellDependencyResourceBackupProvider,
@@ -54,6 +55,21 @@ class RecordingNativeCommandRunner implements ShellDependencyResourceNativeComma
 }
 
 describe("Shell managed dependency resource providers", () => {
+  test("[CLOUD-DEP-PROV-CAPABILITY-052] Docker-backed dependency provider rejects required unsupported capabilities", () => {
+    const provider = new DockerBackedManagedDependencyProvider({} as never);
+
+    expect(
+      provider.supports("appaloft-managed-postgres", "postgres", [
+        { type: "postgres-extension", name: "vector", required: true },
+      ]),
+    ).toBe(false);
+    expect(
+      provider.supports("appaloft-managed-redis", "redis", [
+        { type: "redis-module", name: "search", required: false },
+      ]),
+    ).toBe(true);
+  });
+
   test("[DEP-RES-GENERIC-001] Docker-backed dependency provider uses one generic realization path", async () => {
     const [genericProviderSource, dockerEntrySource] = await Promise.all([
       readFile(new URL("../src/managed-dependency-providers/generic.ts", import.meta.url), "utf8"),

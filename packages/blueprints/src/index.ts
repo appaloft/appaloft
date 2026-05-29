@@ -13,10 +13,12 @@ export const blueprintComponentRuntimePlanMetadataKey =
   "appaloft.blueprint.component-runtime-plan.v1" as const;
 
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
+const dependencyCapabilityNamePattern = /^[a-z](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const envKeyPattern = /^[A-Z][A-Z0-9_]{0,127}$/;
 
 const nonEmptyString = z.string().trim().min(1);
 const slugSchema = z.string().trim().regex(slugPattern);
+const dependencyCapabilityNameSchema = z.string().trim().regex(dependencyCapabilityNamePattern);
 const envKeySchema = z.string().trim().regex(envKeyPattern);
 
 const blueprintParameterSchema = z
@@ -104,6 +106,29 @@ const blueprintVariableSchema = z
     description: nonEmptyString.optional(),
   })
   .strict();
+
+const blueprintPostgresExtensionCapabilitySchema = z
+  .object({
+    type: z.literal("postgres-extension"),
+    name: dependencyCapabilityNameSchema,
+    required: z.boolean().default(true),
+    description: nonEmptyString.optional(),
+  })
+  .strict();
+
+const blueprintRedisModuleCapabilitySchema = z
+  .object({
+    type: z.literal("redis-module"),
+    name: dependencyCapabilityNameSchema,
+    required: z.boolean().default(true),
+    description: nonEmptyString.optional(),
+  })
+  .strict();
+
+const blueprintDependencyCapabilitySchema = z.discriminatedUnion("type", [
+  blueprintPostgresExtensionCapabilitySchema,
+  blueprintRedisModuleCapabilitySchema,
+]);
 
 const blueprintComponentRelationInjectEnvEffectSchema = z
   .object({
@@ -199,8 +224,27 @@ const blueprintResourceRequirementSchema = z
     ]),
     label: nonEmptyString,
     optional: z.boolean().default(false),
+    capabilities: z.array(blueprintDependencyCapabilitySchema).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((resource, context) => {
+    for (const [index, capability] of resource.capabilities.entries()) {
+      if (capability.type === "postgres-extension" && resource.kind !== "postgres") {
+        context.addIssue({
+          code: "custom",
+          message: "postgres-extension capability requires a postgres dependency resource",
+          path: ["capabilities", index, "type"],
+        });
+      }
+      if (capability.type === "redis-module" && resource.kind !== "redis") {
+        context.addIssue({
+          code: "custom",
+          message: "redis-module capability requires a redis dependency resource",
+          path: ["capabilities", index, "type"],
+        });
+      }
+    }
+  });
 
 const blueprintEnvironmentProfileSchema = z
   .object({
@@ -597,6 +641,7 @@ export type BlueprintEnvironmentProfile = NonNullable<BlueprintManifest["profile
 export type BlueprintParameter = BlueprintManifest["parameters"][number];
 export type BlueprintSecretPlaceholder = BlueprintManifest["secrets"][number];
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
+export type BlueprintDependencyCapability = BlueprintResourceRequirement["capabilities"][number];
 export type BlueprintComponentRelation = BlueprintManifest["componentRelations"][number];
 export type BlueprintComponentRelationType = BlueprintComponentRelation["type"];
 export type BlueprintComponentRelationEffect = BlueprintComponentRelation["effects"][number];
@@ -885,6 +930,7 @@ export type BlueprintInstallOperation =
       readonly componentId: string;
       readonly requirementId: string;
       readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly capabilities: readonly BlueprintDependencyCapability[];
     }
   | {
       readonly kind: "configure-component-link";
@@ -957,6 +1003,7 @@ export interface BlueprintApplicationBundleComponentPlan {
   readonly dependencyBindings: readonly {
     readonly requirementId: string;
     readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly capabilities: readonly BlueprintDependencyCapability[];
   }[];
   readonly deploymentReason?: "blueprint-install";
 }
@@ -964,6 +1011,7 @@ export interface BlueprintApplicationBundleComponentPlan {
 export interface BlueprintApplicationBundleDependencyPlan {
   readonly requirementId: string;
   readonly kind: BlueprintResourceRequirement["kind"];
+  readonly capabilities: readonly BlueprintDependencyCapability[];
   readonly scope: "dependency-resource";
   readonly bindingMode: "bind-existing-or-provisioned";
 }
@@ -983,6 +1031,7 @@ export type BlueprintApplicationBundleRelationship =
       readonly componentId: string;
       readonly requirementId: string;
       readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly capabilities: readonly BlueprintDependencyCapability[];
     }
   | {
       readonly kind: "component-links-component";
@@ -1148,10 +1197,16 @@ export type BlueprintUpgradeOperation =
       readonly classification: BlueprintUpgradeClassification;
     }
   | {
-      readonly kind: "add-dependency" | "remove-dependency" | "change-dependency-kind";
+      readonly kind:
+        | "add-dependency"
+        | "remove-dependency"
+        | "change-dependency-kind"
+        | "change-dependency-capabilities";
       readonly requirementId: string;
       readonly fromKind?: BlueprintResourceRequirement["kind"];
       readonly toKind?: BlueprintResourceRequirement["kind"];
+      readonly fromCapabilities?: readonly BlueprintDependencyCapability[];
+      readonly toCapabilities?: readonly BlueprintDependencyCapability[];
       readonly classification: BlueprintUpgradeClassification;
     }
   | {
@@ -1544,6 +1599,7 @@ function appendComponentSetupOperations(
         componentId: component.id,
         requirementId: requirement.id,
         requirementKind: requirement.kind,
+        capabilities: requirement.capabilities,
       });
     }
   }
@@ -1566,6 +1622,7 @@ type MutableBlueprintApplicationBundleComponentPlan = {
   dependencyBindings: {
     readonly requirementId: string;
     readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly capabilities: readonly BlueprintDependencyCapability[];
   }[];
   deploymentReason?: "blueprint-install";
 };
@@ -1650,18 +1707,21 @@ export function createBlueprintApplicationBundlePlan(
         dependencies.set(operation.requirementId, {
           requirementId: operation.requirementId,
           kind: operation.requirementKind,
+          capabilities: operation.capabilities,
           scope: "dependency-resource",
           bindingMode: "bind-existing-or-provisioned",
         });
         component.value.dependencyBindings.push({
           requirementId: operation.requirementId,
           requirementKind: operation.requirementKind,
+          capabilities: operation.capabilities,
         });
         relationships.push({
           kind: "component-binds-dependency",
           componentId: operation.componentId,
           requirementId: operation.requirementId,
           requirementKind: operation.requirementKind,
+          capabilities: operation.capabilities,
         });
         break;
       }
@@ -2375,6 +2435,16 @@ function diffResources(
         fromKind: current.kind,
         toKind: resource.kind,
         classification: "breaking",
+      });
+      continue;
+    }
+    if (fingerprint(current.capabilities) !== fingerprint(resource.capabilities)) {
+      operations.push({
+        kind: "change-dependency-capabilities",
+        requirementId: resource.id,
+        fromCapabilities: current.capabilities,
+        toCapabilities: resource.capabilities,
+        classification: "potentially-breaking",
       });
     }
   }
