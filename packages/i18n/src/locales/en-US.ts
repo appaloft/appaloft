@@ -351,7 +351,7 @@ export const enUS = {
       avatarUrlLabel: "Avatar URL",
       avatarUrlPlaceholder: "https://example.com/avatar.png",
       clientCli: "CLI",
-      clientUnknown: "Unknown client",
+      clientUnknown: "Unrecorded client",
       clientWeb: "Web",
       currentSession: "Current session",
       dangerConfirmLabel: "Type your account ID to confirm",

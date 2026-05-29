@@ -353,7 +353,7 @@ export const zhCN = {
       avatarUrlLabel: "头像 URL",
       avatarUrlPlaceholder: "https://example.com/avatar.png",
       clientCli: "CLI",
-      clientUnknown: "未知客户端",
+      clientUnknown: "未记录客户端",
       clientWeb: "Web",
       currentSession: "当前会话",
       dangerConfirmLabel: "输入你的账号 ID 以确认",

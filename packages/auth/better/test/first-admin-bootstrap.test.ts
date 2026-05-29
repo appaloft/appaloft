@@ -378,7 +378,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
+          "user-agent":
+            "Mozilla/5.0 Appaloft Settings Test AppleWebKit/537.36 Chrome/148.0.7778.97 Safari/537.36",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -433,7 +434,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
+          "user-agent":
+            "Mozilla/5.0 Appaloft Settings Test AppleWebKit/537.36 Chrome/148.0.7778.97 Safari/537.36",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -743,7 +745,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
+          "user-agent":
+            "Mozilla/5.0 Appaloft Settings Test AppleWebKit/537.36 Chrome/148.0.7778.97 Safari/537.36",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -814,6 +817,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         expect.objectContaining({
           clientKind: "web",
           current: true,
+          displayName: "Chrome",
           userId: shown._unsafeUnwrap().userId,
         }),
         expect.objectContaining({
