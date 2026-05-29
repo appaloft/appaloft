@@ -27,6 +27,11 @@ export interface StaticArtifactZipArchiveInput {
   readonly archiveBase64: string;
 }
 
+export interface StaticArtifactPayloadStructureEstimate {
+  readonly fileCount: number;
+  readonly pathNestingDepth: number;
+}
+
 export function createStaticArtifactPayloadReadResultFromInlineFiles(
   artifactId: string,
   files: readonly StaticArtifactInlineFileInput[],
@@ -109,6 +114,32 @@ export function createStaticArtifactPayloadReadResultFromZipArchive(
   }
 
   return createStaticArtifactPayloadReadResult(artifactId, payloads);
+}
+
+export function estimateStaticArtifactZipArchiveStructure(
+  input: StaticArtifactZipArchiveInput,
+): StaticArtifactPayloadStructureEstimate | undefined {
+  const archiveBytes = decodeBase64Content(input.archiveBase64, "archive.zip");
+  if (archiveBytes.isErr()) {
+    return undefined;
+  }
+
+  const entries = readZipCentralDirectory(archiveBytes.value);
+  if (entries.isErr()) {
+    return undefined;
+  }
+
+  const filePaths = entries.value
+    .filter((entry) => !entry.path.endsWith("/"))
+    .map((entry) => entry.path);
+
+  return {
+    fileCount: filePaths.length || 1,
+    pathNestingDepth: filePaths.reduce(
+      (depth, path) => Math.max(depth, path.split(/[\\/]+/).filter(Boolean).length),
+      1,
+    ),
+  };
 }
 
 function createStaticArtifactPayloadReadResult(

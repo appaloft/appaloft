@@ -24,14 +24,19 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type DependencyResourceReadModel,
   type DependencyResourceRepository,
   type DependencyResourceSecretStore,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -40,6 +45,10 @@ import { maskDependencyConnectionUrl } from "./dependency-connection-masking";
 import { type ImportDependencyResourceCommandInput } from "./import-dependency-resource.command";
 
 const importDependencyResourceOperation = "dependency-resources.import";
+const importDependencyResourceOperationEntry = findOperationCatalogEntryByKey(
+  importDependencyResourceOperation,
+);
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class ImportDependencyResourceUseCase {
@@ -60,6 +69,10 @@ export class ImportDependencyResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.dependencyResourceReadModel, { isOptional: true })
+    private readonly dependencyResourceReadModel?: DependencyResourceReadModel,
   ) {}
 
   async execute(
@@ -69,12 +82,14 @@ export class ImportDependencyResourceUseCase {
     const repositoryContext = toRepositoryContext(context);
     const {
       clock,
+      dependencyResourceReadModel,
       dependencyResourceRepository,
       dependencyResourceSecretStore,
       environmentRepository,
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
       projectRepository,
     } = this;
 
@@ -97,6 +112,49 @@ export class ImportDependencyResourceUseCase {
       );
       if (!project) {
         return err(domainError.notFound("project", projectId.value));
+      }
+      const projectState = project.toState();
+
+      if (importDependencyResourceOperationEntry) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: importDependencyResourceOperationEntry,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(projectState.organizationId
+            ? { organizationId: projectState.organizationId.value }
+            : {}),
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+          },
+          contextAttributes: {
+            estimatedFieldCount: input.backupRelationship ? 6 : 4,
+            estimatedInputBytes: input.connectionUrl.length + (input.connectionSecret?.length ?? 0),
+            estimatedItemCount: 1,
+            estimatedNestingDepth: input.backupRelationship ? 2 : 1,
+            estimatedSecretCount: input.secretRef ? 0 : 1,
+            estimatedWriteUnits: 2,
+            ...(dependencyResourceReadModel
+              ? {
+                  currentEnvironmentDependencyResourceCount:
+                    await dependencyResourceReadModel.count(repositoryContext, {
+                      environmentId: environmentId.value,
+                      projectId: projectId.value,
+                    }),
+                  currentProjectDependencyResourceCount: await dependencyResourceReadModel.count(
+                    repositoryContext,
+                    {
+                      projectId: projectId.value,
+                    },
+                  ),
+                }
+              : {}),
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
       yield* project.ensureCanAcceptMutation(importDependencyResourceOperation);
 

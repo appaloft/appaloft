@@ -147,6 +147,68 @@ describe("operation guard extension boundary", () => {
     });
   });
 
+  test("[OP-GUARD-004] request shape carries neutral idempotency key context", () => {
+    const entry = findOperationCatalogEntryByKey("deployments.create");
+    expect(entry).toBeDefined();
+    const context = createExecutionContext({
+      entrypoint: "rpc",
+      requestId: "req_operation_guard_idempotency",
+    });
+
+    const request = createOperationCheckRequest({
+      context,
+      entry: entry as NonNullable<typeof entry>,
+      message: {
+        projectId: "prj_demo",
+        resourceId: "res_demo",
+        idempotencyKey: "deploy:req-123",
+      },
+    });
+
+    expect(request.contextAttributes).toMatchObject({
+      entrypoint: "rpc",
+      idempotencyKey: "deploy:req-123",
+      requestId: "req_operation_guard_idempotency",
+    });
+  });
+
+  test("[OP-GUARD-005] request shape carries neutral request security context", () => {
+    const entry = findOperationCatalogEntryByKey("projects.create");
+    expect(entry).toBeDefined();
+    const context = createExecutionContext({
+      entrypoint: "http",
+      requestId: "req_operation_guard_request_security",
+      requestSecurity: {
+        edgeAction: "managed_challenge",
+        edgeProvider: "edge-fixture",
+        edgeRayId: "ray_fixture",
+        edgeRuleId: "rule_fixture",
+        botScore: 7,
+        fraudRiskScore: 95,
+      },
+    });
+
+    const request = createOperationCheckRequest({
+      context,
+      entry: entry as NonNullable<typeof entry>,
+      message: {
+        name: "Edge Guarded Project",
+        organizationId: "org_security",
+      },
+    });
+
+    expect(request.contextAttributes).toMatchObject({
+      botScore: 7,
+      edgeAction: "managed_challenge",
+      edgeProvider: "edge-fixture",
+      edgeRayId: "ray_fixture",
+      edgeRuleId: "rule_fixture",
+      entrypoint: "http",
+      fraudRiskScore: 95,
+      requestId: "req_operation_guard_request_security",
+    });
+  });
+
   test("[OP-SCOPE-001] community default returns unrestricted query visibility", async () => {
     const entry = findOperationCatalogEntryByKey("projects.list");
     expect(entry).toBeDefined();

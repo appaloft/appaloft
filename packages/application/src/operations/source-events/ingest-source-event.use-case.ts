@@ -2,10 +2,14 @@ import { err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type Clock,
   type IdGenerator,
   type IngestSourceEventResult,
+  type OperationGuardPort,
   type ProcessAttemptNextAction,
   type ProcessAttemptRecorder,
   type SourceEventDeploymentDispatcher,
@@ -27,6 +31,9 @@ import {
   ingestSourceEventCommandInputSchema,
 } from "./ingest-source-event.schema";
 
+const ingestSourceEventOperation = findOperationCatalogEntryByKey("source-events.ingest");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
+
 @injectable()
 export class IngestSourceEventUseCase {
   constructor(
@@ -42,6 +49,8 @@ export class IngestSourceEventUseCase {
     private readonly sourceEventDeploymentDispatcher?: SourceEventDeploymentDispatcher,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -62,6 +71,24 @@ export class IngestSourceEventUseCase {
   ): Promise<Result<IngestSourceEventResult>> {
     const repositoryContext = toRepositoryContext(context);
     const dedupeKey = sourceEventDedupeKey(input);
+    if (ingestSourceEventOperation) {
+      const checked = await checkOperationGuards({
+        context,
+        entry: ingestSourceEventOperation,
+        message: input,
+        operationGuardPort: this.operationGuardPort ?? defaultOperationGuardPort,
+        ...(input.scopeResourceId ? { resourceRefs: { resourceId: input.scopeResourceId } } : {}),
+        contextAttributes: {
+          sourceKind: input.sourceKind,
+          eventKind: input.eventKind,
+          estimatedExternalProviderCalls: 1,
+        },
+      });
+      if (checked.isErr()) {
+        return err(checked.error);
+      }
+    }
+
     const existing = await this.sourceEventRecorder.findByDedupeKey(repositoryContext, dedupeKey);
     const sourceIdentity = sourceIdentityFromInput(input.sourceIdentity);
 

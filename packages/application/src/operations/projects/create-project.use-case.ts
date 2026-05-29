@@ -25,6 +25,7 @@ import {
   type EventBus,
   type IdGenerator,
   type OperationGuardPort,
+  type ProjectReadModel,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -49,13 +50,23 @@ export class CreateProjectUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.projectReadModel, { isOptional: true })
+    private readonly projectReadModel?: ProjectReadModel,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: CreateProjectCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, eventBus, idGenerator, logger, operationGuardPort, projectRepository } = this;
+    const {
+      clock,
+      eventBus,
+      idGenerator,
+      logger,
+      operationGuardPort,
+      projectReadModel,
+      projectRepository,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -76,6 +87,15 @@ export class CreateProjectUseCase {
           message: { ...input, organizationId },
           operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
           organizationId,
+          contextAttributes: {
+            ...(projectReadModel
+              ? {
+                  currentOrganizationProjectCount: await projectReadModel.count(repositoryContext, {
+                    organizationId,
+                  }),
+                }
+              : {}),
+          },
         });
         if (checked.isErr()) {
           return err(checked.error);

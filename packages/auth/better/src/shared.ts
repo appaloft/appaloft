@@ -396,6 +396,9 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
       },
     },
     advanced: {
+      disableCSRFCheck: false,
+      disableOriginCheck: false,
+      ...(isHttpsUrl(config.baseURL) ? { useSecureCookies: true } : {}),
       ...(config.cookiePrefix ? { cookiePrefix: config.cookiePrefix } : {}),
       ...(config.trustedProxyHeaders !== undefined
         ? { trustedProxyHeaders: config.trustedProxyHeaders }
@@ -488,6 +491,14 @@ export type AppaloftBetterAuth = ReturnType<typeof createAppaloftBetterAuth>;
 
 function positiveInteger(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function resolveEmailOtpCooldownSeconds(config: AppaloftBetterAuthConfig): number {

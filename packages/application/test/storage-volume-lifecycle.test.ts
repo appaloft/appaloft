@@ -34,7 +34,14 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
+  toRepositoryContext,
+} from "../src";
 import { ListStorageVolumesQuery, ShowStorageVolumeQuery } from "../src/messages";
 import {
   AttachResourceStorageUseCase,
@@ -46,6 +53,33 @@ import {
   ShowStorageVolumeQueryService,
 } from "../src/use-cases";
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 function createContext(): ExecutionContext {
   return createExecutionContext({
     requestId: "req_storage_volume_lifecycle_test",
@@ -53,7 +87,7 @@ function createContext(): ExecutionContext {
   });
 }
 
-async function createHarness() {
+async function createHarness(input?: { guard?: OperationGuardPort }) {
   const context = createContext();
   const repositoryContext = toRepositoryContext(context);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -113,6 +147,8 @@ async function createHarness() {
       idGenerator,
       eventBus,
       logger,
+      input?.guard,
+      storageReadModel,
     ),
     deleteStorage: new DeleteStorageVolumeUseCase(
       storageVolumes,
@@ -181,6 +217,51 @@ describe("Storage volume lifecycle use cases", () => {
         field: "sourcePath",
       },
     });
+  });
+
+  test("[STOR-CREATE-GUARD-001] create volume can be denied by the generic operation guard", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const { context, createStorage, eventBus, repositoryContext, storageVolumes } =
+      await createHarness({ guard });
+
+    const result = await createStorage.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "App Data",
+      kind: "named-volume",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "storage-volumes.create",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "storage-volumes.create",
+      contextAttributes: {
+        currentEnvironmentStorageVolumeCount: 0,
+        currentProjectStorageVolumeCount: 0,
+      },
+      resourceRefs: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+      },
+    });
+    expect(
+      await storageVolumes.findOne(
+        repositoryContext,
+        StorageVolumeByIdSpec.create(StorageVolumeId.rehydrate("stv_0001")),
+      ),
+    ).toBeNull();
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("[STOR-VOL-RENAME-001] renames active volumes without mutating attachments", async () => {

@@ -45,6 +45,9 @@ function createTestApp(input?: {
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
   onAuthSessionStatus?: (request: Request) => void;
+  onExecutionContextCreate?: Parameters<
+    typeof createHttpApp
+  >[0]["executionContextFactory"]["create"];
   onQuery?: (query: Query<unknown>) => void;
   webStaticDir?: string;
 }) {
@@ -77,6 +80,7 @@ function createTestApp(input?: {
     logger: new SilentLogger(),
     executionContextFactory: {
       create(contextInput) {
+        input?.onExecutionContextCreate?.(contextInput);
         return createExecutionContext(contextInput);
       },
     },
@@ -238,6 +242,53 @@ describe("HTTP static assets", () => {
       expect(queries).toHaveLength(1);
       expect(queries[0]).toBeInstanceOf(GetAuthBootstrapStatusQuery);
     });
+  });
+
+  test("[OP-GUARD-005] carries neutral request security headers into HTTP execution context", async () => {
+    const contexts: Parameters<typeof createExecutionContext>[0][] = [];
+    const app = createTestApp({
+      embeddedWebAssets: {
+        "/200.html": new Blob(["web-spa-fallback"]),
+      },
+      onExecutionContextCreate: (contextInput) => {
+        contexts.push(contextInput);
+        return createExecutionContext(contextInput);
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/projects/prj_request_security`, {
+        headers: {
+          accept: "text/html",
+          "x-appaloft-edge-action": "managed_challenge",
+          "x-appaloft-edge-provider": "edge-fixture",
+          "x-appaloft-edge-ray-id": "ray_fixture",
+          "x-appaloft-edge-rule-id": "rule_fixture",
+          "x-appaloft-bot-score": "7",
+          "x-appaloft-fraud-risk-score": "95",
+          "x-request-id": "req_http_request_security",
+        },
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    expect(contexts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entrypoint: "http",
+          requestId: "req_http_request_security",
+          requestSecurity: {
+            botScore: 7,
+            edgeAction: "managed_challenge",
+            edgeProvider: "edge-fixture",
+            edgeRayId: "ray_fixture",
+            edgeRuleId: "rule_fixture",
+            fraudRiskScore: 95,
+          },
+        }),
+      ]),
+    );
   });
 
   test("[PRODUCT-AUTH-NAV-001] redirects anonymous console navigation to login before serving SPA", async () => {

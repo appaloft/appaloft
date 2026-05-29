@@ -22,9 +22,13 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type Clock,
   type IdGenerator,
+  type OperationGuardPort,
   type ResourceRepository,
   type ScheduledTaskCommandResult,
   type ScheduledTaskDefinitionRepository,
@@ -32,6 +36,9 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CreateScheduledTaskCommandInput } from "./create-scheduled-task.command";
+
+const createScheduledTaskOperation = findOperationCatalogEntryByKey("scheduled-tasks.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function taskSummaryFromDefinition(task: ScheduledTaskDefinition): ScheduledTaskDefinitionSummary {
   const state = task.toState();
@@ -60,13 +67,21 @@ export class CreateScheduledTaskUseCase {
     private readonly idGenerator: IdGenerator,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: CreateScheduledTaskCommandInput,
   ): Promise<Result<ScheduledTaskCommandResult>> {
-    const { clock, idGenerator, resourceRepository, scheduledTaskDefinitionRepository } = this;
+    const {
+      clock,
+      idGenerator,
+      operationGuardPort,
+      resourceRepository,
+      scheduledTaskDefinitionRepository,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -89,6 +104,27 @@ export class CreateScheduledTaskUseCase {
             lifecycleStatus: resourceState.lifecycleStatus.value,
           }),
         );
+      }
+
+      if (createScheduledTaskOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createScheduledTaskOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: {
+            projectId: resourceState.projectId.value,
+            environmentId: resourceState.environmentId.value,
+            resourceId: resourceId.value,
+          },
+          contextAttributes: {
+            estimatedTimeoutSeconds: input.timeoutSeconds,
+            estimatedWriteUnits: 2,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       const schedule = yield* ScheduledTaskScheduleExpression.create(input.schedule);

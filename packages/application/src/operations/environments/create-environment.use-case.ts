@@ -16,17 +16,25 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type EnvironmentReadModel,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProjectRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateEnvironmentCommandInput } from "./create-environment.command";
+
+const createEnvironmentOperation = findOperationCatalogEntryByKey("environments.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class CreateEnvironmentUseCase {
@@ -43,19 +51,57 @@ export class CreateEnvironmentUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.environmentReadModel, { isOptional: true })
+    private readonly environmentReadModel?: EnvironmentReadModel,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: CreateEnvironmentCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, environmentRepository, eventBus, idGenerator, logger, projectRepository } = this;
+    const {
+      clock,
+      environmentReadModel,
+      environmentRepository,
+      eventBus,
+      idGenerator,
+      logger,
+      operationGuardPort,
+      projectRepository,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
       const projectId = yield* ProjectId.create(input.projectId);
       const environmentName = yield* EnvironmentName.create(input.name);
       const environmentKind = yield* EnvironmentKindValue.create(input.kind);
+
+      if (createEnvironmentOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createEnvironmentOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: { projectId: projectId.value },
+          contextAttributes: {
+            ...(environmentReadModel
+              ? {
+                  currentProjectEnvironmentCount: await environmentReadModel.count(
+                    repositoryContext,
+                    {
+                      projectId: projectId.value,
+                    },
+                  ),
+                }
+              : {}),
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
 
       const project = await projectRepository.findOne(
         repositoryContext,

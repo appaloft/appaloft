@@ -40,6 +40,9 @@ import {
   ListDeployTokensQuery,
   ListDeployTokensQueryHandler,
   ListDeployTokensQueryService,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   operationCatalog,
   type RepositoryContext,
   RevokeDeployTokenCommand,
@@ -192,6 +195,33 @@ class CapturingEventBus implements EventBus {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 const noopLogger: AppLogger = {
   debug() {},
   info() {},
@@ -307,6 +337,55 @@ describe("CreateDeployTokenUseCase", () => {
     expect(savedState?.secretSuffix.value).toBe("00000000");
     expect(JSON.stringify(savedState)).not.toContain(materialIssuer.token);
     expect(eventBus.published.map((event) => event.type)).toContain("deploy_token.created");
+  });
+
+  test("[SELF-AUTH-TOKEN-GUARD-001] create deploy token can be denied before material issue or persistence", async () => {
+    const repository = new MemoryDeployTokenRepository();
+    const materialIssuer = new FixedDeployTokenMaterialIssuer();
+    const eventBus = new CapturingEventBus();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new CreateDeployTokenUseCase(
+      repository,
+      materialIssuer,
+      new FixedClock("2026-05-10T08:00:00.000Z"),
+      new SequentialIdGenerator(),
+      eventBus,
+      noopLogger,
+      guard,
+    );
+
+    const result = await useCase.execute(createTestContext(), {
+      organizationId: "org_self_hosted",
+      displayName: "GitHub Action deploy token",
+      scope: {
+        projectIds: ["prj_demo"],
+        repositoryFullNames: ["appaloft/demo"],
+        workflowCommands: ["server-config-deploy"],
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "deploy-tokens.create",
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "deploy-tokens.create",
+      organizationId: "org_self_hosted",
+      resourceRefs: {
+        projectId: "prj_demo",
+      },
+    });
+    expect(repository.saved).toBeUndefined();
+    expect(eventBus.published).toHaveLength(0);
   });
 });
 

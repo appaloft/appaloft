@@ -2,21 +2,45 @@ import { domainError, err } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type InviteOrganizationMemberInput,
+  type OperationGuardPort,
   type OrganizationTeamManagementPort,
 } from "../../ports";
 import { tokens } from "../../tokens";
+
+const inviteOrganizationMemberOperation = findOperationCatalogEntryByKey(
+  "organizations.invite-member",
+);
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class InviteOrganizationMemberUseCase {
   constructor(
     @inject(tokens.organizationTeamManagementPort)
     private readonly organizationTeamManagement: OrganizationTeamManagementPort,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(context: ExecutionContext, input: InviteOrganizationMemberInput) {
     const targetEmail = normalizeEmail(input.email);
+    if (inviteOrganizationMemberOperation) {
+      const checked = await checkOperationGuards({
+        context,
+        entry: inviteOrganizationMemberOperation,
+        message: input,
+        operationGuardPort: this.operationGuardPort ?? defaultOperationGuardPort,
+        organizationId: input.organizationId,
+      });
+      if (checked.isErr()) {
+        return err(checked.error);
+      }
+    }
+
     const members = await this.organizationTeamManagement.listMembers(context, {
       organizationId: input.organizationId,
     });
