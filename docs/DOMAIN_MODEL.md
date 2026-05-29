@@ -1121,6 +1121,8 @@ Meaning:
 
 Rules:
 - at least one owner must exist at creation time
+- owner role changes use the dedicated ownership transfer operation; generic role update and
+  remove-member operations must not change or remove owners
 - plan changes cannot invalidate the current member count
 - membership identity is owned by `OrganizationMember`; seat capacity is owned by
   `OrganizationPlan`; `Organization` coordinates those rules across its owned members and plan

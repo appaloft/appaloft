@@ -139,6 +139,42 @@ export const authSessionResponseSchema = z.object({
   providers: z.array(authProviderStatusSchema),
 });
 
+export const accountProfileResponseSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  emailVerified: z.boolean().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export const accountSessionSummarySchema = z.object({
+  sessionId: z.string(),
+  userId: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+  current: z.boolean().optional(),
+  lastActiveAt: z.string().optional(),
+});
+
+export const listAccountSessionsResponseSchema = z.object({
+  items: z.array(accountSessionSummarySchema),
+  nextCursor: z.string().optional(),
+});
+
+export const revokeAccountSessionResponseSchema = z.object({
+  sessionId: z.string(),
+  revokedAt: z.string(),
+});
+
+export const deleteAccountResponseSchema = z.object({
+  userId: z.string(),
+  deletedAt: z.string(),
+});
+
 export const deployTokenScopeSummarySchema = z.object({
   deploymentTargetIds: z.array(z.string()),
   environmentIds: z.array(z.string()),
@@ -227,6 +263,7 @@ export const organizationContextPermissionsSchema = z.object({
   canListMembers: z.boolean(),
   canManageDeployTokens: z.boolean(),
   canRemoveMembers: z.boolean(),
+  canTransferOwnership: z.boolean().optional(),
   canUpdateMemberRoles: z.boolean(),
 });
 
@@ -243,6 +280,17 @@ export const currentOrganizationContextResponseSchema = z.object({
   organizations: z.array(organizationContextOrganizationSummarySchema),
   loginMethods: z.array(productLoginMethodStatusSchema),
   permissions: organizationContextPermissionsSchema.optional(),
+});
+
+export const organizationProfileResponseSchema = z.object({
+  organizationId: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  role: organizationTeamRoleSchema,
+  permissions: organizationContextPermissionsSchema.optional(),
+  logoUrl: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export const organizationMemberSummarySchema = z.object({
@@ -290,6 +338,17 @@ export const removeOrganizationMemberResponseSchema = z.object({
   memberId: z.string(),
   organizationId: z.string(),
   removedAt: z.string(),
+});
+
+export const transferOrganizationOwnerResponseSchema = z.object({
+  fromMember: organizationMemberSummarySchema,
+  toMember: organizationMemberSummarySchema,
+  transferredAt: z.string(),
+});
+
+export const deleteOrganizationResponseSchema = z.object({
+  organizationId: z.string(),
+  deletedAt: z.string(),
 });
 
 export const systemCapabilityDetailSchema = z.object({
@@ -5991,6 +6050,11 @@ export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyRe
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthAccountRecoveryStatus = z.infer<typeof authAccountRecoveryStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
+export type AccountProfileResponse = z.infer<typeof accountProfileResponseSchema>;
+export type AccountSessionSummary = z.infer<typeof accountSessionSummarySchema>;
+export type ListAccountSessionsResponse = z.infer<typeof listAccountSessionsResponseSchema>;
+export type RevokeAccountSessionResponse = z.infer<typeof revokeAccountSessionResponseSchema>;
+export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
@@ -6404,6 +6468,7 @@ export type OrganizationContextPermissions = z.infer<typeof organizationContextP
 export type CurrentOrganizationContextResponse = z.infer<
   typeof currentOrganizationContextResponseSchema
 >;
+export type OrganizationProfileResponse = z.infer<typeof organizationProfileResponseSchema>;
 export type OrganizationMemberSummary = z.infer<typeof organizationMemberSummarySchema>;
 export type OrganizationInvitationSummary = z.infer<typeof organizationInvitationSummarySchema>;
 export type ListOrganizationMembersResponse = z.infer<typeof listOrganizationMembersResponseSchema>;
@@ -6419,6 +6484,10 @@ export type ChangeOrganizationMemberRoleResponse = z.infer<
 export type RemoveOrganizationMemberResponse = z.infer<
   typeof removeOrganizationMemberResponseSchema
 >;
+export type TransferOrganizationOwnerResponse = z.infer<
+  typeof transferOrganizationOwnerResponseSchema
+>;
+export type DeleteOrganizationResponse = z.infer<typeof deleteOrganizationResponseSchema>;
 export type ConfigureDomainBindingRouteInput = z.infer<
   typeof configureDomainBindingRouteInputSchema
 >;

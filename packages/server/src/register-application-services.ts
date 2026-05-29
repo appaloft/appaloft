@@ -33,8 +33,12 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  ChangeAccountProfileCommandHandler,
+  ChangeAccountProfileUseCase,
   ChangeOrganizationMemberRoleCommandHandler,
   ChangeOrganizationMemberRoleUseCase,
+  ChangeOrganizationProfileCommandHandler,
+  ChangeOrganizationProfileUseCase,
   CheckDomainBindingDeleteSafetyQueryHandler,
   CheckDomainBindingDeleteSafetyQueryService,
   CheckInstanceUpgradeQueryHandler,
@@ -121,12 +125,16 @@ import {
   DefaultRouteSurfacePort,
   DefaultTenantContextResolver,
   DefaultUsageIntentPort,
+  DeleteAccountCommandHandler,
+  DeleteAccountUseCase,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
   DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
+  DeleteOrganizationCommandHandler,
+  DeleteOrganizationUseCase,
   DeletePreviewEnvironmentCommandHandler,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
@@ -197,6 +205,8 @@ import {
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
+  ListAccountSessionsQueryHandler,
+  ListAccountSessionsQueryService,
   ListAuditEventArchivesQueryHandler,
   ListAuditEventArchivesQueryService,
   ListAuditEventLegalHoldsQueryHandler,
@@ -369,6 +379,8 @@ import {
   RetryDomainBindingVerificationUseCase,
   RetryOperatorWorkCommandHandler,
   RetryOperatorWorkUseCase,
+  RevokeAccountSessionCommandHandler,
+  RevokeAccountSessionUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
   RevokeDeployTokenCommandHandler,
@@ -402,6 +414,8 @@ import {
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
+  ShowAccountProfileQueryHandler,
+  ShowAccountProfileQueryService,
   ShowAuditEventArchiveQueryHandler,
   ShowAuditEventArchiveQueryService,
   ShowAuditEventLegalHoldQueryHandler,
@@ -426,6 +440,8 @@ import {
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
+  ShowOrganizationProfileQueryHandler,
+  ShowOrganizationProfileQueryService,
   ShowPreviewEnvironmentQueryHandler,
   ShowPreviewEnvironmentQueryService,
   ShowPreviewPolicyQueryHandler,
@@ -464,6 +480,8 @@ import {
   SwitchCurrentOrganizationUseCase,
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
+  TransferOrganizationOwnerCommandHandler,
+  TransferOrganizationOwnerUseCase,
   tokens,
   toRepositoryContext,
   UnbindResourceDependencyCommandHandler,
@@ -2349,12 +2367,21 @@ export function registerApplicationServices(
   container.registerSingleton(ShowStorageVolumeQueryHandler);
   container.registerSingleton(BootstrapFirstAdminCommandHandler);
   container.registerSingleton(GetAuthBootstrapStatusQueryHandler);
+  container.registerSingleton(ShowAccountProfileQueryHandler);
+  container.registerSingleton(ChangeAccountProfileCommandHandler);
+  container.registerSingleton(ListAccountSessionsQueryHandler);
+  container.registerSingleton(RevokeAccountSessionCommandHandler);
+  container.registerSingleton(DeleteAccountCommandHandler);
   container.registerSingleton(GetCurrentOrganizationContextQueryHandler);
+  container.registerSingleton(ShowOrganizationProfileQueryHandler);
+  container.registerSingleton(ChangeOrganizationProfileCommandHandler);
+  container.registerSingleton(DeleteOrganizationCommandHandler);
   container.registerSingleton(ListOrganizationMembersQueryHandler);
   container.registerSingleton(ListOrganizationInvitationsQueryHandler);
   container.registerSingleton(InviteOrganizationMemberCommandHandler);
   container.registerSingleton(SwitchCurrentOrganizationCommandHandler);
   container.registerSingleton(ChangeOrganizationMemberRoleCommandHandler);
+  container.registerSingleton(TransferOrganizationOwnerCommandHandler);
   container.registerSingleton(RemoveOrganizationMemberCommandHandler);
   container.registerSingleton(CreateDeployTokenCommandHandler);
   container.registerSingleton(RotateDeployTokenCommandHandler);
@@ -2396,9 +2423,29 @@ export function registerApplicationServices(
     GetAuthBootstrapStatusQueryService,
   );
   container.registerSingleton(
+    tokens.showAccountProfileQueryService,
+    ShowAccountProfileQueryService,
+  );
+  container.registerSingleton(tokens.changeAccountProfileUseCase, ChangeAccountProfileUseCase);
+  container.registerSingleton(
+    tokens.listAccountSessionsQueryService,
+    ListAccountSessionsQueryService,
+  );
+  container.registerSingleton(tokens.revokeAccountSessionUseCase, RevokeAccountSessionUseCase);
+  container.registerSingleton(tokens.deleteAccountUseCase, DeleteAccountUseCase);
+  container.registerSingleton(
     tokens.getCurrentOrganizationContextQueryService,
     GetCurrentOrganizationContextQueryService,
   );
+  container.registerSingleton(
+    tokens.showOrganizationProfileQueryService,
+    ShowOrganizationProfileQueryService,
+  );
+  container.registerSingleton(
+    tokens.changeOrganizationProfileUseCase,
+    ChangeOrganizationProfileUseCase,
+  );
+  container.registerSingleton(tokens.deleteOrganizationUseCase, DeleteOrganizationUseCase);
   container.registerSingleton(
     tokens.listOrganizationMembersQueryService,
     ListOrganizationMembersQueryService,
@@ -2418,6 +2465,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.changeOrganizationMemberRoleUseCase,
     ChangeOrganizationMemberRoleUseCase,
+  );
+  container.registerSingleton(
+    tokens.transferOrganizationOwnerUseCase,
+    TransferOrganizationOwnerUseCase,
   );
   container.registerSingleton(
     tokens.removeOrganizationMemberUseCase,

@@ -1987,22 +1987,24 @@ Current verification notes:
 - 2026-05-11 Phase 8 organization/team operations Spec Round added ADR-045 and
   [docs/specs/054-self-hosted-organization-team-operations](./specs/054-self-hosted-organization-team-operations/spec.md)
   to define current user/current organization context, member list, invitation list, member invite,
-  role update, member removal, at-least-one-owner policy, and the Better Auth adapter boundary. The
+  non-owner role update, ownership transfer, non-owner member removal, owner protection, and the
+  Better Auth adapter boundary. The
   first Code Round slice added `Organization` aggregate role/removal rules plus application-owned
   organization/team ports, command/query messages, handlers, use cases/query services, and
   operation-catalog entries without public transports. A follow-up adapter slice implemented those
   organization/team ports in `@appaloft/auth-better`; Better Auth remains behind Appaloft-owned
   application abstractions, with Better Auth `member` currently adapted back to Appaloft
   `developer` until richer custom-role persistence is added. A follow-up HTTP/oRPC slice exposed
-  current context, member list, invitation list, invite, role update, and removal routes behind the
+  current context, member list, invitation list, invite, non-owner role update, ownership transfer, and removal routes behind the
   product-session authorization gate while preserving CommandBus/QueryBus dispatch. A follow-up CLI
-  slice added `appaloft organization context`, member/invitation list, invite, role update, and
-  removal commands over those same application messages. A follow-up Docs Round added the
-  `self-hosting.organization-team-management` public help anchor for current context, member list,
-  invitations, invite, role update, removal, session input, and safe output rules. A follow-up Web
-  slice added `/organization` current context, safe member/invitation reads, invite, role update,
-  remove, deploy-token list/create/rotate/revoke, shared public help, and i18n-backed UI over the
-  existing oRPC contracts. A follow-up switch-current slice activated `organizations.switch-current`
+  slice added `appaloft organization context`, member/invitation list, invite, role update, owner
+  transfer, and removal commands over those same application messages. A follow-up Docs Round added
+  the `self-hosting.organization-team-management` public help anchor for current context, member
+  list, invitations, invite, non-owner role update, ownership transfer, non-owner removal, session
+  input, and safe output rules. A follow-up Web slice added `/organization` current context, safe
+  member/invitation reads, invite, non-owner role update, ownership transfer, non-owner remove,
+  deploy-token list/create/rotate/revoke, shared public help, and i18n-backed UI over the existing
+  oRPC contracts. A follow-up switch-current slice activated `organizations.switch-current`
   through application, HTTP/oRPC, CLI, Web `/organization`, public docs, and
   `ORG-TEAM-SWITCH-001` automation. A follow-up optional OAuth config slice added GitHub, Google, and
   generic OIDC runtime config/status behind the Better Auth adapter boundary; provider login is
@@ -2061,7 +2063,7 @@ Required:
   configured login methods, and safe next steps for adding OAuth later without requiring users to
   understand Better Auth internals.
 - [x] Add organization/team operations and read models for first organization creation, member list,
-  invitation, role update, remove member, and current-user/current-organization context.
+  invitation, non-owner role update, ownership transfer, remove member, and current-user/current-organization context.
 - [x] Add authorization policy gates for console and HTTP/oRPC mutation endpoints: unauthenticated
   users get 401, authenticated users outside the organization or without the required role get 403,
   and public health/version/readiness endpoints remain explicitly public.

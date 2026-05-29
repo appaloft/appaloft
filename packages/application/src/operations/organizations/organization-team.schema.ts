@@ -21,3 +21,6 @@ export const optionalCursorSchema = nonEmptyTrimmedString("cursor").optional();
 export const optionalLimitSchema = z.coerce.number().int().positive().max(250).optional();
 export const organizationIdSchema = nonEmptyTrimmedString("organizationId");
 export const organizationMemberIdSchema = nonEmptyTrimmedString("memberId");
+export const optionalOrganizationLogoUrlSchema = z
+  .union([z.string().trim().url(), z.literal("").transform(() => undefined), z.null()])
+  .optional();

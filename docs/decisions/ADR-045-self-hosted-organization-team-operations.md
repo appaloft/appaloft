@@ -22,7 +22,8 @@ Self-hosted organization/team management is expressed through Appaloft-owned com
 messages and application ports.
 
 - The `Organization` aggregate remains the owner of membership and role invariants in
-  `packages/core`.
+  `packages/core`. Owner changes are a dedicated ownership transfer operation; generic role update
+  and remove-member commands cannot change or remove owner members.
 - The application layer defines stable ports for member/invitation commands and organization
   context reads. A Better Auth adapter may implement those ports with Better Auth organization,
   member, invitation, and session APIs.
@@ -47,8 +48,8 @@ messages and application ports.
 - Replacing Better Auth requires a new adapter for the organization/team application ports, not
   changes to core entities, application use cases, or transport contracts.
 - Web, CLI, HTTP/oRPC, and future MCP surfaces can share the same operation catalog entries for
-  current organization selection, member list, invitation, role update, member removal, and current
-  context reads.
+  current organization selection, member list, invitation, non-owner role update, ownership
+  transfer, non-owner member removal, and current context reads.
 - Role-aware access can be broadened from mutation gates to read/context surfaces without making
   Svelte components or transport adapters own membership policy.
 - Public docs can explain team invitations and role recovery without exposing Better Auth internals.

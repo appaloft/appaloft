@@ -1223,6 +1223,7 @@ export function registerRuntimeDependencies(
     ),
   });
   container.registerInstance(tokens.firstAdminBootstrapper, input.authRuntime);
+  container.registerInstance(tokens.accountSettingsPort, input.authRuntime);
   container.registerInstance(tokens.organizationTeamManagementPort, input.authRuntime);
   container.register(tokens.firstAdminPasswordIssuer, {
     useFactory: instanceCachingFactory(() => new NanoIdFirstAdminPasswordIssuer()),

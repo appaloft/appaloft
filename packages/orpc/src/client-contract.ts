@@ -8,7 +8,9 @@ import {
   type BootstrapFirstAdminCommandInput,
   type BootstrapServerProxyCommandInput,
   type CancelDeploymentCommandInput,
+  type ChangeAccountProfileCommandInput,
   type ChangeOrganizationMemberRoleCommandInput,
+  type ChangeOrganizationProfileCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckProjectDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
@@ -49,9 +51,11 @@ import {
   type CreateScheduledTaskCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
+  type DeleteAccountCommandInput,
   type DeleteCertificateCommandInput,
   type DeleteDependencyResourceCommandInput,
   type DeleteDomainBindingCommandInput,
+  type DeleteOrganizationCommandInput,
   type DeletePreviewEnvironmentCommandInput,
   type DeleteProjectCommandInput,
   type DeleteResourceCommandInput,
@@ -76,6 +80,7 @@ import {
   type InspectServerCapacityQueryInput,
   type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
+  type ListAccountSessionsQueryInput,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDependencyResourceBackupPoliciesQueryInput,
@@ -137,6 +142,7 @@ import {
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
+  type RevokeAccountSessionCommandInput,
   type RevokeCertificateCommandInput,
   type RevokeDeployTokenCommandInput,
   type RollbackDeploymentCommandInput,
@@ -150,6 +156,7 @@ import {
   type SetEnvironmentVariableCommandInput,
   type SetProjectDescriptionCommandInput,
   type SetResourceVariableCommandInput,
+  type ShowAccountProfileQueryInput,
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDependencyResourceBackupPolicyQueryInput,
@@ -161,6 +168,7 @@ import {
   type ShowDomainBindingQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowOperatorWorkQueryInput,
+  type ShowOrganizationProfileQueryInput,
   type ShowPreviewEnvironmentQueryInput,
   type ShowPreviewPolicyQueryInput,
   type ShowProjectQueryInput,
@@ -181,12 +189,14 @@ import {
   type SwitchCurrentOrganizationCommandInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
+  type TransferOrganizationOwnerCommandInput,
   type UnbindResourceDependencyCommandInput,
   type UnlockEnvironmentCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type AccountProfileResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
@@ -232,8 +242,10 @@ import {
   type CreateStorageVolumeResponse,
   type CurrentOrganizationContextResponse,
   type DeactivateServerResponse,
+  type DeleteAccountResponse,
   type DeleteCertificateResponse,
   type DeleteDomainBindingResponse,
+  type DeleteOrganizationResponse,
   type DeletePreviewEnvironmentResponse,
   type DeleteProjectResponse,
   type DeleteResourceResponse,
@@ -266,6 +278,7 @@ import {
   type InspectServerCapacityResponse,
   type InviteOrganizationMemberResponse,
   type IssueOrRenewCertificateResponse,
+  type ListAccountSessionsResponse,
   type ListCertificatesResponse,
   type ListDefaultAccessDomainPoliciesResponse,
   type ListDependencyResourceBackupPoliciesResponse,
@@ -297,6 +310,7 @@ import {
   type ListStorageVolumesResponse,
   type ListTerminalSessionsResponse,
   type LockEnvironmentResponse,
+  type OrganizationProfileResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type PruneDeploymentLogsResponse,
@@ -327,6 +341,7 @@ import {
   type RetryCertificateResponse,
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
+  type RevokeAccountSessionResponse,
   type RevokeCertificateResponse,
   type RevokeDeployTokenResponse,
   type RollbackDeploymentResponse,
@@ -369,6 +384,7 @@ import {
   type StopResourceRuntimeResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
+  type TransferOrganizationOwnerResponse,
   type UnbindResourceDependencyResponse,
   type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
@@ -491,6 +507,38 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientError
     >;
   };
+  account: {
+    showProfile: Client<
+      AppaloftClientContext,
+      ShowAccountProfileQueryInput,
+      AccountProfileResponse,
+      AppaloftClientError
+    >;
+    changeProfile: Client<
+      AppaloftClientContext,
+      ChangeAccountProfileCommandInput,
+      AccountProfileResponse,
+      AppaloftClientError
+    >;
+    listSessions: Client<
+      AppaloftClientContext,
+      ListAccountSessionsQueryInput,
+      ListAccountSessionsResponse,
+      AppaloftClientError
+    >;
+    revokeSession: Client<
+      AppaloftClientContext,
+      RevokeAccountSessionCommandInput,
+      RevokeAccountSessionResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteAccountCommandInput,
+      DeleteAccountResponse,
+      AppaloftClientError
+    >;
+  };
   deployTokens: {
     create: Client<
       AppaloftClientContext,
@@ -530,6 +578,24 @@ export type AppaloftOrpcClientContract = {
       CurrentOrganizationContextResponse,
       AppaloftClientError
     >;
+    showProfile: Client<
+      AppaloftClientContext,
+      ShowOrganizationProfileQueryInput,
+      OrganizationProfileResponse,
+      AppaloftClientError
+    >;
+    changeProfile: Client<
+      AppaloftClientContext,
+      ChangeOrganizationProfileCommandInput,
+      OrganizationProfileResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteOrganizationCommandInput,
+      DeleteOrganizationResponse,
+      AppaloftClientError
+    >;
     switchCurrent: Client<
       AppaloftClientContext,
       SwitchCurrentOrganizationCommandInput,
@@ -564,6 +630,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RemoveOrganizationMemberCommandInput,
       RemoveOrganizationMemberResponse,
+      AppaloftClientError
+    >;
+    transferOwner: Client<
+      AppaloftClientContext,
+      TransferOrganizationOwnerCommandInput,
+      TransferOrganizationOwnerResponse,
       AppaloftClientError
     >;
   };

@@ -28,7 +28,9 @@ import {
   bootstrapServerProxyCommandInputSchema,
   CancelDeploymentCommand,
   CancelOperatorWorkCommand,
+  ChangeAccountProfileCommand,
   ChangeOrganizationMemberRoleCommand,
+  ChangeOrganizationProfileCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckProjectDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
@@ -80,7 +82,9 @@ import {
   CreateStorageVolumeCommand,
   cancelDeploymentCommandInputSchema,
   cancelOperatorWorkCommandInputSchema,
+  changeAccountProfileCommandInputSchema,
   changeOrganizationMemberRoleCommandInputSchema,
+  changeOrganizationProfileCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkProjectDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
@@ -127,9 +131,11 @@ import {
   createStorageVolumeCommandInputSchema,
   DeactivateServerCommand,
   DeadLetterOperatorWorkCommand,
+  DeleteAccountCommand,
   DeleteCertificateCommand,
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
+  DeleteOrganizationCommand,
   DeletePreviewEnvironmentCommand,
   DeleteProjectCommand,
   DeleteResourceCommand,
@@ -150,9 +156,11 @@ import {
   DoctorQuery,
   deactivateServerCommandInputSchema,
   deadLetterOperatorWorkCommandInputSchema,
+  deleteAccountCommandInputSchema,
   deleteCertificateCommandInputSchema,
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
+  deleteOrganizationCommandInputSchema,
   deletePreviewEnvironmentCommandInputSchema,
   deleteProjectCommandInputSchema,
   deleteResourceCommandInputSchema,
@@ -211,6 +219,7 @@ import {
   inspectServerCapacityQueryInputSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
+  ListAccountSessionsQuery,
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
@@ -252,6 +261,7 @@ import {
   ListTerminalSessionsQuery,
   ListUsageIntentRecordsQuery,
   LockEnvironmentCommand,
+  listAccountSessionsQueryInputSchema,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
@@ -371,6 +381,7 @@ import {
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
   RetryOperatorWorkCommand,
+  RevokeAccountSessionCommand,
   RevokeCertificateCommand,
   RevokeDeployTokenCommand,
   RollbackDeploymentCommand,
@@ -408,6 +419,7 @@ import {
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
   retryOperatorWorkCommandInputSchema,
+  revokeAccountSessionCommandInputSchema,
   revokeCertificateCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
@@ -421,6 +433,7 @@ import {
   SetEnvironmentVariableCommand,
   SetProjectDescriptionCommand,
   SetResourceVariableCommand,
+  ShowAccountProfileQuery,
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
   ShowAuditEventQuery,
@@ -435,6 +448,7 @@ import {
   ShowDomainBindingQuery,
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
+  ShowOrganizationProfileQuery,
   ShowPreviewEnvironmentQuery,
   ShowPreviewPolicyQuery,
   ShowProjectQuery,
@@ -465,6 +479,7 @@ import {
   setEnvironmentVariableCommandInputSchema,
   setProjectDescriptionCommandInputSchema,
   setResourceVariableCommandInputSchema,
+  showAccountProfileQueryInputSchema,
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
   showAuditEventQueryInputSchema,
@@ -479,6 +494,7 @@ import {
   showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
+  showOrganizationProfileQueryInputSchema,
   showPreviewEnvironmentQueryInputSchema,
   showPreviewPolicyQueryInputSchema,
   showProjectQueryInputSchema,
@@ -502,9 +518,11 @@ import {
   streamDeploymentEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   TestServerConnectivityCommand,
+  TransferOrganizationOwnerCommand,
   tenantContextForPrincipal,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
+  transferOrganizationOwnerCommandInputSchema,
   UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
@@ -516,6 +534,7 @@ import {
   withExecutionAuthProviderAccessTokens,
 } from "@appaloft/application";
 import {
+  accountProfileResponseSchema,
   archiveDeploymentResponseSchema,
   archiveEnvironmentResponseSchema,
   archiveProjectResponseSchema,
@@ -564,8 +583,10 @@ import {
   currentOrganizationContextResponseSchema,
   deactivateServerResponseSchema,
   deadLetterOperatorWorkResponseSchema,
+  deleteAccountResponseSchema,
   deleteCertificateResponseSchema,
   deleteDomainBindingResponseSchema,
+  deleteOrganizationResponseSchema,
   deletePreviewEnvironmentResponseSchema,
   deleteProjectResponseSchema,
   deleteResourceResponseSchema,
@@ -598,6 +619,7 @@ import {
   inspectServerCapacityResponseSchema,
   inviteOrganizationMemberResponseSchema,
   issueOrRenewCertificateResponseSchema,
+  listAccountSessionsResponseSchema,
   listAuditEventArchivesResponseSchema,
   listAuditEventLegalHoldsResponseSchema,
   listAuditEventsResponseSchema,
@@ -635,6 +657,7 @@ import {
   listTerminalSessionsResponseSchema,
   lockEnvironmentResponseSchema,
   markOperatorWorkRecoveredResponseSchema,
+  organizationProfileResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   pruneAuditEventArchivesResponseSchema,
@@ -672,6 +695,7 @@ import {
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
   retryOperatorWorkResponseSchema,
+  revokeAccountSessionResponseSchema,
   revokeCertificateResponseSchema,
   revokeDeployTokenResponseSchema,
   rollbackDeploymentResponseSchema,
@@ -718,6 +742,7 @@ import {
   stopResourceRuntimeResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
+  transferOrganizationOwnerResponseSchema,
   unbindResourceDependencyResponseSchema,
   unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
@@ -2668,6 +2693,62 @@ export const revokeDeployTokenProcedure = base
     executeCommand(context, RevokeDeployTokenCommand.create(input)),
   );
 
+export const showAccountProfileProcedure = base
+  .route({
+    method: "GET",
+    path: "/account/profile",
+    successStatus: 200,
+  })
+  .input(showAccountProfileQueryInputSchema)
+  .output(accountProfileResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ShowAccountProfileQuery.create({})));
+
+export const changeAccountProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/account/profile",
+    successStatus: 200,
+  })
+  .input(changeAccountProfileCommandInputSchema)
+  .output(accountProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ChangeAccountProfileCommand.create(input)),
+  );
+
+export const listAccountSessionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/account/sessions",
+    successStatus: 200,
+  })
+  .input(listAccountSessionsQueryInputSchema)
+  .output(listAccountSessionsResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListAccountSessionsQuery.create({})));
+
+export const revokeAccountSessionProcedure = base
+  .route({
+    method: "POST",
+    path: "/account/sessions/{sessionId}/revoke",
+    successStatus: 200,
+  })
+  .input(revokeAccountSessionCommandInputSchema)
+  .output(revokeAccountSessionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeAccountSessionCommand.create(input)),
+  );
+
+export const deleteAccountProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/account",
+    successStatus: 200,
+  })
+  .input(deleteAccountCommandInputSchema)
+  .output(deleteAccountResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteAccountCommand.create(input)),
+  );
+
 export const currentOrganizationContextProcedure = base
   .route({
     method: "GET",
@@ -2678,6 +2759,42 @@ export const currentOrganizationContextProcedure = base
   .output(currentOrganizationContextResponseSchema)
   .handler(async ({ context }) =>
     executeQuery(context, GetCurrentOrganizationContextQuery.create({})),
+  );
+
+export const showOrganizationProfileProcedure = base
+  .route({
+    method: "GET",
+    path: "/organizations/{organizationId}/profile",
+    successStatus: 200,
+  })
+  .input(showOrganizationProfileQueryInputSchema)
+  .output(organizationProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowOrganizationProfileQuery.create(input)),
+  );
+
+export const changeOrganizationProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/{organizationId}/profile",
+    successStatus: 200,
+  })
+  .input(changeOrganizationProfileCommandInputSchema)
+  .output(organizationProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ChangeOrganizationProfileCommand.create(input)),
+  );
+
+export const deleteOrganizationProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/organizations/{organizationId}",
+    successStatus: 200,
+  })
+  .input(deleteOrganizationCommandInputSchema)
+  .output(deleteOrganizationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteOrganizationCommand.create(input)),
   );
 
 export const switchCurrentOrganizationProcedure = base
@@ -2750,6 +2867,18 @@ export const removeOrganizationMemberProcedure = base
   .output(removeOrganizationMemberResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, RemoveOrganizationMemberCommand.create(input)),
+  );
+
+export const transferOrganizationOwnerProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/{organizationId}/owner-transfer",
+    successStatus: 200,
+  })
+  .input(transferOrganizationOwnerCommandInputSchema)
+  .output(transferOrganizationOwnerResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TransferOrganizationOwnerCommand.create(input)),
   );
 
 export const createProjectProcedure = base
@@ -5565,14 +5694,25 @@ export const appaloftOrpcRouter = {
     rotate: rotateDeployTokenProcedure,
     revoke: revokeDeployTokenProcedure,
   },
+  account: {
+    showProfile: showAccountProfileProcedure,
+    changeProfile: changeAccountProfileProcedure,
+    listSessions: listAccountSessionsProcedure,
+    revokeSession: revokeAccountSessionProcedure,
+    delete: deleteAccountProcedure,
+  },
   organizations: {
     currentContext: currentOrganizationContextProcedure,
+    showProfile: showOrganizationProfileProcedure,
+    changeProfile: changeOrganizationProfileProcedure,
+    delete: deleteOrganizationProcedure,
     switchCurrent: switchCurrentOrganizationProcedure,
     listMembers: listOrganizationMembersProcedure,
     listInvitations: listOrganizationInvitationsProcedure,
     inviteMember: inviteOrganizationMemberProcedure,
     updateMemberRole: changeOrganizationMemberRoleProcedure,
     removeMember: removeOrganizationMemberProcedure,
+    transferOwner: transferOrganizationOwnerProcedure,
   },
   projects: {
     count: countProjectsProcedure,
@@ -8023,12 +8163,19 @@ export function mountAppaloftOrpcRoutes(
     "/api/deploy-tokens/:tokenId",
     "/api/deploy-tokens/:tokenId/rotate",
     "/api/deploy-tokens/:tokenId/revoke",
+    "/api/account/profile",
+    "/api/account/sessions",
+    "/api/account/sessions/:sessionId/revoke",
+    "/api/account",
     "/api/organizations/current-context",
     "/api/organizations/current-context/switch",
+    "/api/organizations/:organizationId/profile",
+    "/api/organizations/:organizationId",
     "/api/organizations/:organizationId/members",
     "/api/organizations/:organizationId/invitations",
     "/api/organizations/:organizationId/members/:memberId/role",
     "/api/organizations/:organizationId/members/:memberId",
+    "/api/organizations/:organizationId/owner-transfer",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
