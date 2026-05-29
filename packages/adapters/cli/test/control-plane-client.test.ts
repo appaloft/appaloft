@@ -909,6 +909,7 @@ describe("CLI remote control-plane client", () => {
         "GET /api/projects/prj_remote",
       ],
     );
+    expect(requests.at(-1)?.headers.get("user-agent")).toBe("appaloft-cli");
     expect(listed.stdout).toContain("prj_remote");
     expect(shown.stdout).toContain("Remote Project");
   });

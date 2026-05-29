@@ -139,7 +139,8 @@ Do not manually edit database user, member, or organization rows to bypass first
 
 The first admin becomes the owner of the initial organization. After login, use
 [Organization team management](/docs/en/self-hosting/organization-team-management/) to read the
-current organization context, invite members, update roles, remove members, and recover from
+current organization context, invite members, update non-owner roles, transfer ownership, remove
+non-owner members, and recover from
 `401 product_auth_missing` or `403 product_auth_forbidden`.
 
 <h2 id="self-hosting-first-admin-recovery">Recovery and troubleshooting</h2>

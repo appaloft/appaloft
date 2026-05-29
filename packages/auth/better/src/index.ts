@@ -1,14 +1,21 @@
 import "reflect-metadata";
 
 import {
+  type AccountProfileSummary,
+  type AccountSessionSummary,
+  type AccountSettingsPort,
   type ActionDeployTokenAuthorizationInput,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenAuthorizationResult,
   type ActionDeployTokenRequestedScope,
   type ActionDeployTokenResolvedScope,
+  type ChangeAccountProfileInput,
   type ChangeOrganizationMemberRoleInput,
+  type ChangeOrganizationProfileInput,
   type Clock,
   type CurrentOrganizationContext,
+  type DeleteAccountInput,
+  type DeleteOrganizationInput,
   type DeployTokenMaterial,
   type DeployTokenMaterialIssuer,
   type DeployTokenRepository,
@@ -22,6 +29,7 @@ import {
   type OrganizationInvitationSummary,
   type OrganizationMemberListInput,
   type OrganizationMemberSummary,
+  type OrganizationProfileSummary,
   type OrganizationTeamManagementPort,
   type OrganizationTeamRole,
   type ProductOrganizationRole,
@@ -29,7 +37,9 @@ import {
   type ProductSessionAuthorizationPort,
   type ProductSessionAuthorizationResult,
   type RemoveOrganizationMemberInput,
+  type RevokeAccountSessionInput,
   type SwitchCurrentOrganizationInput,
+  type TransferOrganizationOwnerInput,
   toRepositoryContext,
 } from "@appaloft/application";
 import {
@@ -52,6 +62,7 @@ import {
   type Result,
   SourceRepositoryFullName,
 } from "@appaloft/core";
+import { makeSignature } from "better-auth/crypto";
 import {
   type AppaloftBetterAuth,
   type AppaloftBetterAuthAccountRecoveryStatus,
@@ -96,10 +107,12 @@ export interface BetterAuthRuntimeConfig extends AppaloftBetterAuthConfig {
 
 export interface AuthRuntime
   extends FirstAdminBootstrapper,
+    AccountSettingsPort,
     OrganizationTeamManagementPort,
     ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<AuthSessionStatus>;
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
+  issueCliProductSessionCookie(request: Request): Promise<string | null>;
   handle(request: Request): Promise<Response>;
 }
 
@@ -252,6 +265,35 @@ export class BetterAuthRuntime implements AuthRuntime {
     } catch {
       return null;
     }
+  }
+
+  async issueCliProductSessionCookie(request: Request): Promise<string | null> {
+    if (!this.config.enabled) {
+      return null;
+    }
+
+    const session = await this.auth.api.getSession({
+      headers: request.headers,
+    });
+    if (!session) {
+      return null;
+    }
+
+    const sessionObject = readObject(session, "session");
+    const userObject = readObject(session, "user");
+    const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+    if (!userId) {
+      return null;
+    }
+
+    const authContext = await this.auth.$context;
+    const ipAddress = trustedRequestIp(request.headers);
+    const cliSession = await authContext.internalAdapter.createSession(userId, false, {
+      ...(ipAddress ? { ipAddress } : {}),
+      userAgent: "appaloft-cli browser-auth-exchange",
+    });
+    const signedToken = `${cliSession.token}.${await makeSignature(cliSession.token, this.config.secret)}`;
+    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
   }
 
   async handle(request: Request): Promise<Response> {
@@ -763,6 +805,353 @@ export class BetterAuthRuntime implements AuthRuntime {
     return { organizationId, organizationSlug };
   }
 
+  async showAccountProfile(context: ExecutionContext): Promise<Result<AccountProfileSummary>> {
+    const authInput = accountSettingsAuthInput("GET", "/api/account/profile");
+    const sessionRead = await this.readSessionForAccountSettings(context, authInput);
+    if (sessionRead.isErr()) {
+      return err(sessionRead.error);
+    }
+
+    return ok(mapAccountProfileSummary(sessionRead.value.user));
+  }
+
+  async changeAccountProfile(
+    context: ExecutionContext,
+    input: ChangeAccountProfileInput,
+  ): Promise<Result<AccountProfileSummary>> {
+    const authInput = accountSettingsAuthInput("POST", "/api/account/profile");
+    const sessionRead = await this.readSessionForAccountSettings(context, authInput);
+    if (sessionRead.isErr()) {
+      return err(sessionRead.error);
+    }
+
+    const update: { image?: string | null; name?: string } = {};
+    if (input.displayName !== undefined) {
+      update.name = input.displayName;
+    }
+    if (input.avatarUrl !== undefined) {
+      update.image = input.avatarUrl;
+    }
+
+    try {
+      const authContext = await this.auth.$context;
+      const updatedUser = await authContext.internalAdapter.updateUser(
+        sessionRead.value.userId,
+        update,
+      );
+      return ok(mapAccountProfileSummary(updatedUser));
+    } catch {
+      return err(productAuthInvalid(authInput, "account-profile-update-failed"));
+    }
+  }
+
+  async listAccountSessions(
+    context: ExecutionContext,
+  ): Promise<Result<{ items: AccountSessionSummary[]; nextCursor?: string }>> {
+    const authInput = accountSettingsAuthInput("GET", "/api/account/sessions");
+    const sessionRead = await this.readSessionForAccountSettings(context, authInput);
+    if (sessionRead.isErr()) {
+      return err(sessionRead.error);
+    }
+
+    try {
+      const authContext = await this.auth.$context;
+      const sessions = await authContext.internalAdapter.listSessions(sessionRead.value.userId, {
+        onlyActiveSessions: true,
+      });
+      return ok({
+        items: sessions.map((session) =>
+          mapAccountSessionSummary(session, sessionRead.value.currentSessionToken),
+        ),
+      });
+    } catch {
+      return err(productAuthInvalid(authInput, "account-session-list-failed"));
+    }
+  }
+
+  async revokeAccountSession(
+    context: ExecutionContext,
+    input: RevokeAccountSessionInput,
+  ): Promise<Result<{ sessionId: string; revokedAt: string }>> {
+    const authInput = accountSettingsAuthInput("POST", "/api/account/sessions/revoke");
+    const sessionRead = await this.readSessionForAccountSettings(context, authInput);
+    if (sessionRead.isErr()) {
+      return err(sessionRead.error);
+    }
+
+    try {
+      const authContext = await this.auth.$context;
+      const targetSession = await this.findAccountSessionForUser(
+        sessionRead.value.userId,
+        input.sessionId,
+      );
+      if (!targetSession) {
+        return err(productAuthForbidden(authInput, "account-session-missing"));
+      }
+
+      const token = readString(targetSession, "token") ?? input.sessionId;
+      await authContext.internalAdapter.deleteSession(token);
+      return ok({
+        sessionId: readString(targetSession, "id") ?? input.sessionId,
+        revokedAt: new Date().toISOString(),
+      });
+    } catch {
+      return err(productAuthInvalid(authInput, "account-session-revoke-failed"));
+    }
+  }
+
+  async deleteAccount(
+    context: ExecutionContext,
+    input: DeleteAccountInput,
+  ): Promise<Result<{ userId: string; deletedAt: string }>> {
+    const authInput = accountSettingsAuthInput("DELETE", "/api/account");
+    const sessionRead = await this.readSessionForAccountSettings(context, authInput);
+    if (sessionRead.isErr()) {
+      return err(sessionRead.error);
+    }
+    if (input.confirmation.userId !== sessionRead.value.userId) {
+      return err(productAuthForbidden(authInput, "account-confirmation-mismatch"));
+    }
+
+    try {
+      const authContext = await this.auth.$context;
+      await authContext.internalAdapter.deleteUser(sessionRead.value.userId);
+      return ok({
+        deletedAt: new Date().toISOString(),
+        userId: sessionRead.value.userId,
+      });
+    } catch {
+      return err(productAuthInvalid(authInput, "account-delete-failed"));
+    }
+  }
+
+  private async readSessionForAccountSettings(
+    context: ExecutionContext,
+    authInput: ProductSessionAuthorizationInput,
+  ): Promise<
+    Result<{
+      currentSessionToken?: string;
+      user: Record<string, unknown>;
+      userId: string;
+    }>
+  > {
+    const headers = contextAuthHeaders(context);
+    if (!headers) {
+      return err(productAuthMissing(authInput, "session-missing"));
+    }
+
+    try {
+      const session = await this.auth.api.getSession({ headers });
+      if (!session) {
+        return err(productAuthMissing(authInput, "session-missing"));
+      }
+
+      const sessionObject = readObject(session, "session");
+      const userObject = readObject(session, "user");
+      const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+      if (!userId || !userObject) {
+        return err(productAuthInvalid(authInput, "session-user-missing"));
+      }
+
+      const currentSessionToken = readString(sessionObject, "token");
+      return ok({
+        ...(currentSessionToken ? { currentSessionToken } : {}),
+        user: userObject,
+        userId,
+      });
+    } catch {
+      return err(productAuthInvalid(authInput, "session-verification-failed"));
+    }
+  }
+
+  private async findAccountSessionForUser(
+    userId: string,
+    sessionId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const authContext = await this.auth.$context;
+    const directMatch = await authContext.internalAdapter.findSession(sessionId);
+    if (directMatch?.session.userId === userId) {
+      return directMatch.session;
+    }
+
+    const sessions = await authContext.internalAdapter.listSessions(userId);
+    return (
+      sessions.find(
+        (session) =>
+          readString(session, "id") === sessionId || readString(session, "token") === sessionId,
+      ) ?? null
+    );
+  }
+
+  async showOrganizationProfile(
+    context: ExecutionContext,
+    input: { organizationId: string },
+  ): Promise<Result<OrganizationProfileSummary>> {
+    const authInput = organizationTeamAuthInput(
+      "GET",
+      "/api/organizations/profile",
+      input.organizationId,
+    );
+    const membership = await this.readOrganizationMembership(
+      context,
+      authInput,
+      input.organizationId,
+    );
+    if (membership.isErr()) {
+      return err(membership.error);
+    }
+
+    return ok(mapOrganizationProfileSummary(membership.value.organization, membership.value.role));
+  }
+
+  async changeOrganizationProfile(
+    context: ExecutionContext,
+    input: ChangeOrganizationProfileInput,
+  ): Promise<Result<OrganizationProfileSummary>> {
+    const authInput = organizationTeamAuthInput(
+      "POST",
+      "/api/organizations/profile",
+      input.organizationId,
+    );
+    const membership = await this.readOrganizationMembership(
+      context,
+      authInput,
+      input.organizationId,
+    );
+    if (membership.isErr()) {
+      return err(membership.error);
+    }
+    if (!organizationRoleAllows(membership.value.role, "admin")) {
+      return err(
+        productAuthForbidden(
+          authInput,
+          "role-insufficient",
+          organizationRoleToProductRole(membership.value.role),
+        ),
+      );
+    }
+
+    const data: { logo?: string | null; name?: string; slug?: string } = {};
+    if (input.name !== undefined) {
+      data.name = input.name;
+    }
+    if (input.slug !== undefined) {
+      data.slug = input.slug;
+    }
+    if (input.logoUrl !== undefined) {
+      data.logo = input.logoUrl;
+    }
+
+    try {
+      const authContext = await this.auth.$context;
+      const organization =
+        (await authContext.adapter.update<Record<string, unknown>>({
+          model: "organization",
+          where: [
+            {
+              field: "id",
+              value: input.organizationId,
+            },
+          ],
+          update: data,
+        })) ?? membership.value.organization;
+      return ok(mapOrganizationProfileSummary(organization, membership.value.role));
+    } catch {
+      return err(productAuthForbidden(authInput, "organization-profile-update-failed"));
+    }
+  }
+
+  async deleteOrganization(
+    context: ExecutionContext,
+    input: DeleteOrganizationInput,
+  ): Promise<Result<{ organizationId: string; deletedAt: string }>> {
+    const authInput = organizationTeamAuthInput(
+      "DELETE",
+      "/api/organizations",
+      input.organizationId,
+    );
+    const membership = await this.readOrganizationMembership(
+      context,
+      authInput,
+      input.organizationId,
+    );
+    if (membership.isErr()) {
+      return err(membership.error);
+    }
+    if (membership.value.role !== "owner") {
+      return err(
+        productAuthForbidden(
+          authInput,
+          "role-insufficient",
+          organizationRoleToProductRole(membership.value.role),
+        ),
+      );
+    }
+
+    try {
+      await this.auth.api.deleteOrganization({
+        headers: membership.value.headers,
+        body: {
+          organizationId: input.organizationId,
+        },
+      });
+      return ok({
+        deletedAt: new Date().toISOString(),
+        organizationId: input.organizationId,
+      });
+    } catch {
+      return err(productAuthForbidden(authInput, "organization-delete-failed"));
+    }
+  }
+
+  private async readOrganizationMembership(
+    context: ExecutionContext,
+    authInput: ProductSessionAuthorizationInput,
+    organizationId: string,
+  ): Promise<
+    Result<{
+      headers: Headers;
+      organization: Record<string, unknown>;
+      role: OrganizationTeamRole;
+    }>
+  > {
+    const headers = contextAuthHeaders(context);
+    if (!headers) {
+      return err(productAuthMissing(authInput, "session-missing"));
+    }
+
+    try {
+      await this.rememberActiveOrganization(headers, organizationId);
+      const activeRole = await this.auth.api.getActiveMemberRole({
+        headers,
+        query: { organizationId },
+      });
+      const role = normalizeOrganizationTeamRole(readString(activeRole, "role"));
+      if (!role) {
+        return err(productAuthForbidden(authInput, "organization-member-missing"));
+      }
+
+      const authContext = await this.auth.$context;
+      const organization = (await authContext.adapter.findOne<Record<string, unknown>>({
+        model: "organization",
+        where: [
+          {
+            field: "id",
+            value: organizationId,
+          },
+        ],
+      })) ?? {
+        id: organizationId,
+        name: organizationId,
+        slug: organizationId,
+      };
+
+      return ok({ headers, organization, role });
+    } catch {
+      return err(productAuthInvalid(authInput, "organization-profile-read-failed"));
+    }
+  }
+
   async getCurrentContext(context: ExecutionContext): Promise<Result<CurrentOrganizationContext>> {
     const authInput = organizationTeamAuthInput("GET", "/api/organizations/current-context");
     const headers = contextAuthHeaders(context);
@@ -1144,6 +1533,59 @@ export class BetterAuthRuntime implements AuthRuntime {
       );
     }
   }
+
+  async transferOwner(
+    context: ExecutionContext,
+    input: TransferOrganizationOwnerInput,
+  ): Promise<
+    Result<{
+      fromMember: OrganizationMemberSummary;
+      toMember: OrganizationMemberSummary;
+      transferredAt: string;
+    }>
+  > {
+    const headers = contextAuthHeaders(context);
+    if (!headers) {
+      return err(
+        productAuthMissing(
+          organizationTeamAuthInput("POST", "organization-owner-transfer"),
+          "session-missing",
+        ),
+      );
+    }
+
+    try {
+      const promotedResult = await this.auth.api.updateMemberRole({
+        headers,
+        body: {
+          organizationId: input.organizationId,
+          memberId: input.toMemberId,
+          role: "owner",
+        },
+      });
+      const demotedResult = await this.auth.api.updateMemberRole({
+        headers,
+        body: {
+          organizationId: input.organizationId,
+          memberId: input.fromMemberId,
+          role: "admin",
+        },
+      });
+
+      return ok({
+        fromMember: mapMemberSummary(readObject(demotedResult, "member") ?? demotedResult),
+        toMember: mapMemberSummary(readObject(promotedResult, "member") ?? promotedResult),
+        transferredAt: new Date().toISOString(),
+      });
+    } catch {
+      return err(
+        productAuthForbidden(
+          organizationTeamAuthInput("POST", "organization-owner-transfer", input.organizationId),
+          "transfer-owner-failed",
+        ),
+      );
+    }
+  }
 }
 
 export function createBetterAuthRuntime(config: BetterAuthRuntimeConfig): AuthRuntime {
@@ -1335,6 +1777,14 @@ function organizationTeamAuthInput(
   };
 }
 
+function accountSettingsAuthInput(method: string, path: string): ProductSessionAuthorizationInput {
+  return {
+    method,
+    path,
+    requiredRole: "member",
+  };
+}
+
 function readRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }
@@ -1365,6 +1815,14 @@ function readNumber(value: unknown, key: string): number | undefined {
   return typeof property === "number" && Number.isInteger(property) ? property : undefined;
 }
 
+function readBoolean(value: unknown, key: string): boolean | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const property = (value as Record<string, unknown>)[key];
+  return typeof property === "boolean" ? property : undefined;
+}
+
 function readDateString(value: unknown, key: string): string | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -1374,6 +1832,21 @@ function readDateString(value: unknown, key: string): string | undefined {
     return property.toISOString();
   }
   return typeof property === "string" && property.trim() ? property : undefined;
+}
+
+function trustedRequestIp(headers: Headers): string | undefined {
+  return (
+    firstHeaderListValue(headers.get("x-forwarded-for")) ??
+    firstHeaderListValue(headers.get("x-real-ip")) ??
+    firstHeaderListValue(headers.get("cf-connecting-ip"))
+  );
+}
+
+function firstHeaderListValue(value: string | null): string | undefined {
+  return value
+    ?.split(",")
+    .map((item) => item.trim())
+    .find((item) => item.length > 0);
 }
 
 function toArray(value: unknown): Record<string, unknown>[] {
@@ -1501,7 +1974,127 @@ function permissionsForRole(role: OrganizationTeamRole) {
     canListMembers: true,
     canManageDeployTokens: manages,
     canRemoveMembers: owns,
+    canTransferOwnership: owns,
     canUpdateMemberRoles: owns,
+  };
+}
+
+function organizationRoleToProductRole(role: OrganizationTeamRole): ProductOrganizationRole {
+  if (role === "owner" || role === "admin") {
+    return role;
+  }
+  return "member";
+}
+
+function organizationRoleAllows(
+  role: OrganizationTeamRole,
+  requiredRole: ProductOrganizationRole,
+): boolean {
+  return productRoleAllows(organizationRoleToProductRole(role), requiredRole);
+}
+
+function mapAccountProfileSummary(value: Record<string, unknown>): AccountProfileSummary {
+  const avatarUrl = readString(value, "image");
+  const createdAt = readDateString(value, "createdAt");
+  const displayName = readString(value, "name");
+  const updatedAt = readDateString(value, "updatedAt");
+  return {
+    userId: readString(value, "id") ?? "",
+    email: readString(value, "email") ?? "",
+    emailVerified:
+      readBoolean(value, "emailVerified") ?? readDateString(value, "emailVerified") !== undefined,
+    ...(displayName ? { displayName } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
+    ...(createdAt ? { createdAt } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+  };
+}
+
+function mapAccountSessionSummary(
+  value: Record<string, unknown>,
+  currentSessionToken?: string,
+): AccountSessionSummary {
+  const token = readString(value, "token");
+  const ipAddress = readString(value, "ipAddress");
+  const lastActiveAt = readDateString(value, "updatedAt");
+  const userAgent = readString(value, "userAgent");
+  const clientKind = classifyAccountSessionClient(userAgent);
+  const displayName = accountSessionDisplayName(clientKind, userAgent);
+  return {
+    sessionId: readString(value, "id") ?? token ?? "",
+    userId: readString(value, "userId") ?? "",
+    clientKind,
+    ...(displayName ? { displayName } : {}),
+    createdAt: readDateString(value, "createdAt") ?? new Date(0).toISOString(),
+    expiresAt: readDateString(value, "expiresAt") ?? new Date(0).toISOString(),
+    ...(ipAddress ? { ipAddress } : {}),
+    ...(userAgent ? { userAgent } : {}),
+    current: Boolean(token && currentSessionToken && token === currentSessionToken),
+    ...(lastActiveAt ? { lastActiveAt } : {}),
+  };
+}
+
+function classifyAccountSessionClient(userAgent: string | undefined): "web" | "cli" | "unknown" {
+  if (!userAgent) {
+    return "unknown";
+  }
+  if (/\b(appaloft-cli|appaloft cli)\b/i.test(userAgent)) {
+    return "cli";
+  }
+  return "web";
+}
+
+function accountSessionDisplayName(
+  clientKind: "web" | "cli" | "unknown",
+  userAgent: string | undefined,
+): string | undefined {
+  if (clientKind === "cli") {
+    return "Appaloft CLI";
+  }
+  if (userAgent) {
+    return accountSessionBrowserDisplayName(userAgent);
+  }
+  return undefined;
+}
+
+function accountSessionBrowserDisplayName(userAgent: string): string {
+  if (/\bCodex\//i.test(userAgent)) {
+    return "Codex Browser";
+  }
+  if (/\bElectron\//i.test(userAgent)) {
+    return "Electron app";
+  }
+  if (/\bEdg\//i.test(userAgent)) {
+    return "Microsoft Edge";
+  }
+  if (/\bChrome\//i.test(userAgent) || /\bChromium\//i.test(userAgent)) {
+    return "Chrome";
+  }
+  if (/\bFirefox\//i.test(userAgent)) {
+    return "Firefox";
+  }
+  if (/\bSafari\//i.test(userAgent)) {
+    return "Safari";
+  }
+  return userAgent;
+}
+
+function mapOrganizationProfileSummary(
+  value: Record<string, unknown>,
+  role: OrganizationTeamRole,
+): OrganizationProfileSummary {
+  const createdAt = readDateString(value, "createdAt");
+  const logoUrl = readString(value, "logo");
+  const updatedAt = readDateString(value, "updatedAt");
+  return {
+    organizationId: readString(value, "id") ?? readString(value, "organizationId") ?? "",
+    name: readString(value, "name") ?? "",
+    slug: readString(value, "slug") ?? "",
+    role,
+    permissions: permissionsForRole(role),
+    ...(logoUrl ? { logoUrl } : {}),
+    ...(createdAt ? { createdAt } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
   };
 }
 

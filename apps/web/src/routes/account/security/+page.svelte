@@ -8,13 +8,13 @@
   import { onDestroy, onMount } from "svelte";
 
   import { buildApiUrl, request } from "$lib/api/client";
-  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
-  import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import * as InputOTP from "$lib/components/ui/input-otp";
   import { REGEXP_ONLY_DIGITS } from "$lib/components/ui/input-otp";
+  import { accountSettingsItems } from "$lib/console/settings-nav";
   import { i18nKeys, localeHeaders, t } from "$lib/i18n";
   import { queryClient } from "$lib/query-client";
 
@@ -289,220 +289,222 @@
   <title>{$t(i18nKeys.console.authAccountSecurity.introTitle)} · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell
+<SettingsShell
   title={$t(i18nKeys.console.authAccountSecurity.introTitle)}
   description={$t(i18nKeys.console.authAccountSecurity.introBody)}
+  groupLabel={$t(i18nKeys.console.accountSettings.introTitle)}
+  activePath="/account/security"
+  items={accountSettingsItems()}
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.workspace), href: "/" },
+    { label: $t(i18nKeys.console.accountSettings.introTitle), href: "/account/profile" },
     { label: $t(i18nKeys.console.authAccountSecurity.introTitle) },
   ]}
 >
-  <ConsoleResourceCanvas>
-    <div class="grid gap-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-start">
-      <aside class="console-subnav md:sticky md:top-20">
-        <p class="console-subnav-kicker">
-          {$t(i18nKeys.console.authAccountSecurity.introTitle)}
-        </p>
-        <nav class="console-subnav-list" aria-label={$t(i18nKeys.console.authAccountSecurity.introTitle)}>
-          <a
-            href={accountSecuritySectionHref("password")}
-            onclick={(event) => selectAccountSecuritySection("password", event)}
-            aria-current={activeSection === "password" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <KeyRound class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {passwordState === "not-set"
-                ? $t(i18nKeys.console.authAccountSecurity.setPasswordTitle)
-                : $t(i18nKeys.console.authAccountSecurity.changePasswordTitle)}
-            </span>
-          </a>
+  <div class="console-subnav-layout">
+    <aside class="console-subnav">
+      <p class="console-subnav-kicker">
+        {$t(i18nKeys.console.authAccountSecurity.introTitle)}
+      </p>
+      <nav class="console-subnav-list" aria-label={$t(i18nKeys.console.authAccountSecurity.introTitle)}>
+        <a
+          href={accountSecuritySectionHref("password")}
+          onclick={(event) => selectAccountSecuritySection("password", event)}
+          aria-current={activeSection === "password" ? "page" : undefined}
+          class="console-subnav-item"
+        >
+          <KeyRound class="console-subnav-item-icon" />
+          <span class="console-subnav-item-title">
+            {passwordState === "not-set"
+              ? $t(i18nKeys.console.authAccountSecurity.setPasswordTitle)
+              : $t(i18nKeys.console.authAccountSecurity.changePasswordTitle)}
+          </span>
+        </a>
 
-          <a
-            href={accountSecuritySectionHref("email")}
-            onclick={(event) => selectAccountSecuritySection("email", event)}
-            aria-current={activeSection === "email" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <MailCheck class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {$t(i18nKeys.console.authAccountSecurity.changeEmailTitle)}
-            </span>
-          </a>
-        </nav>
-      </aside>
+        <a
+          href={accountSecuritySectionHref("email")}
+          onclick={(event) => selectAccountSecuritySection("email", event)}
+          aria-current={activeSection === "email" ? "page" : undefined}
+          class="console-subnav-item"
+        >
+          <MailCheck class="console-subnav-item-icon" />
+          <span class="console-subnav-item-title">
+            {$t(i18nKeys.console.authAccountSecurity.changeEmailTitle)}
+          </span>
+        </a>
+      </nav>
+    </aside>
 
-      <div class="min-w-0 space-y-4">
-        {#if feedback}
-          <div class="rounded-[calc(var(--radius-lg)-2px)] border border-primary/30 bg-primary/5 p-4 text-sm">
-            {feedback}
-          </div>
-        {/if}
+    <div class="console-subnav-content">
+      {#if feedback}
+        <div class="rounded-[calc(var(--radius-lg)-2px)] border border-primary/30 bg-primary/5 p-4 text-sm">
+          {feedback}
+        </div>
+      {/if}
 
-        {#if operationError}
-          <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
-            <p class="font-medium">{$t(i18nKeys.console.authAccountSecurity.operationFailed)}</p>
-            <p class="mt-1.5 break-words text-muted-foreground">{operationError}</p>
-          </div>
-        {/if}
+      {#if operationError}
+        <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p class="font-medium">{$t(i18nKeys.console.authAccountSecurity.operationFailed)}</p>
+          <p class="mt-1.5 break-words text-muted-foreground">{operationError}</p>
+        </div>
+      {/if}
 
-        {#if activeSection === "password"}
-          <section class="console-panel p-5">
-            <div class="flex items-start gap-3">
-              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
-                <KeyRound class="size-5 text-primary" />
-              </div>
-              <div class="min-w-0 space-y-1">
-                <h2 class="text-base font-semibold">
-                  {passwordState === "not-set"
-                    ? $t(i18nKeys.console.authAccountSecurity.setPasswordTitle)
-                    : $t(i18nKeys.console.authAccountSecurity.changePasswordTitle)}
-                </h2>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {passwordState === "not-set"
-                    ? $t(i18nKeys.console.authAccountSecurity.passwordNotSetBody)
-                    : $t(i18nKeys.console.authAccountSecurity.changePasswordBody)}
-                </p>
-              </div>
+      {#if activeSection === "password"}
+        <section class="console-panel p-5">
+          <div class="flex items-start gap-3">
+            <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
+              <KeyRound class="size-5 text-primary" />
             </div>
+            <div class="min-w-0 space-y-1">
+              <h2 class="text-base font-semibold">
+                {passwordState === "not-set"
+                  ? $t(i18nKeys.console.authAccountSecurity.setPasswordTitle)
+                  : $t(i18nKeys.console.authAccountSecurity.changePasswordTitle)}
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {passwordState === "not-set"
+                  ? $t(i18nKeys.console.authAccountSecurity.passwordNotSetBody)
+                  : $t(i18nKeys.console.authAccountSecurity.changePasswordBody)}
+              </p>
+            </div>
+          </div>
 
-            <div class="mt-5 grid max-w-2xl gap-4">
-              {#if authSessionQuery.isLoading}
-                <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.authAccountSecurity.checking)}
-                </div>
-              {:else if !accountSecurityEnabled}
-                <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.authAccountSecurity.securityDisabled)}
-                </div>
-              {:else}
-                <form class="grid gap-4" onsubmit={submitPassword}>
-                  {#if passwordState !== "not-set"}
-                    <label class="appaloft-field-stack">
-                      <span class="appaloft-field-label">
-                        {$t(i18nKeys.console.authAccountSecurity.currentPasswordLabel)}
-                      </span>
-                      <Input bind:value={currentPassword} type="password" autocomplete="current-password" required />
-                    </label>
+          <div class="mt-5 grid max-w-2xl gap-4">
+            {#if authSessionQuery.isLoading}
+              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.authAccountSecurity.checking)}
+              </div>
+            {:else if !accountSecurityEnabled}
+              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.authAccountSecurity.securityDisabled)}
+              </div>
+            {:else}
+              <form class="grid gap-4" onsubmit={submitPassword}>
+                {#if passwordState !== "not-set"}
+                  <label class="appaloft-field-stack">
+                    <span class="appaloft-field-label">
+                      {$t(i18nKeys.console.authAccountSecurity.currentPasswordLabel)}
+                    </span>
+                    <Input bind:value={currentPassword} type="password" autocomplete="current-password" required />
+                  </label>
+                {/if}
+
+                <label class="appaloft-field-stack">
+                  <span class="appaloft-field-label">
+                    {$t(i18nKeys.console.authAccountSecurity.newPasswordLabel)}
+                  </span>
+                  <Input bind:value={newPassword} type="password" autocomplete="new-password" required />
+                </label>
+
+                <Button type="submit" class="w-fit" disabled={!canSubmitPassword}>
+                  <ShieldCheck class="size-4" />
+                  {#if passwordSubmitting}
+                    {$t(i18nKeys.console.authAccountSecurity.updatingPassword)}
+                  {:else if passwordState === "not-set"}
+                    {$t(i18nKeys.console.authAccountSecurity.setPassword)}
+                  {:else}
+                    {$t(i18nKeys.console.authAccountSecurity.updatePassword)}
                   {/if}
-
-                  <label class="appaloft-field-stack">
-                    <span class="appaloft-field-label">
-                      {$t(i18nKeys.console.authAccountSecurity.newPasswordLabel)}
-                    </span>
-                    <Input bind:value={newPassword} type="password" autocomplete="new-password" required />
-                  </label>
-
-                  <Button type="submit" class="w-fit" disabled={!canSubmitPassword}>
-                    <ShieldCheck class="size-4" />
-                    {#if passwordSubmitting}
-                      {$t(i18nKeys.console.authAccountSecurity.updatingPassword)}
-                    {:else if passwordState === "not-set"}
-                      {$t(i18nKeys.console.authAccountSecurity.setPassword)}
-                    {:else}
-                      {$t(i18nKeys.console.authAccountSecurity.updatePassword)}
-                    {/if}
-                  </Button>
-                </form>
-              {/if}
+                </Button>
+              </form>
+            {/if}
+          </div>
+        </section>
+      {:else}
+        <section class="console-panel p-5">
+          <div class="flex items-start gap-3">
+            <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
+              <MailCheck class="size-5 text-primary" />
             </div>
-          </section>
-        {:else}
-          <section class="console-panel p-5">
-            <div class="flex items-start gap-3">
-              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
-                <MailCheck class="size-5 text-primary" />
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold">
+                  {$t(i18nKeys.console.authAccountSecurity.changeEmailTitle)}
+                </h2>
+                <Badge variant="outline">
+                  {changeEmailEnabled
+                    ? $t(i18nKeys.common.status.configured)
+                    : $t(i18nKeys.common.status.notConfigured)}
+                </Badge>
               </div>
-              <div class="min-w-0 space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h2 class="text-base font-semibold">
-                    {$t(i18nKeys.console.authAccountSecurity.changeEmailTitle)}
-                  </h2>
-                  <Badge variant="outline">
-                    {changeEmailEnabled
-                      ? $t(i18nKeys.common.status.configured)
-                      : $t(i18nKeys.common.status.notConfigured)}
-                  </Badge>
-                </div>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.authAccountSecurity.changeEmailBody)}
-                </p>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.authAccountSecurity.changeEmailBody)}
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-5 grid max-w-2xl gap-4">
+            {#if authSessionQuery.isLoading}
+              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.authAccountSecurity.checking)}
               </div>
-            </div>
+            {:else if !changeEmailEnabled}
+              <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.authAccountSecurity.changeEmailDisabled)}
+              </div>
+            {:else}
+              <form class="grid gap-4" onsubmit={requestEmailChange}>
+                <label class="appaloft-field-stack">
+                  <span class="appaloft-field-label">
+                    {$t(i18nKeys.console.authAccountSecurity.newEmailLabel)}
+                  </span>
+                  <Input
+                    bind:value={newEmail}
+                    type="email"
+                    autocomplete="email"
+                    required
+                    oninput={() => restoreEmailChangeCooldown()}
+                  />
+                </label>
 
-            <div class="mt-5 grid max-w-2xl gap-4">
-              {#if authSessionQuery.isLoading}
-                <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.authAccountSecurity.checking)}
-                </div>
-              {:else if !changeEmailEnabled}
-                <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.authAccountSecurity.changeEmailDisabled)}
-                </div>
-              {:else}
-                <form class="grid gap-4" onsubmit={requestEmailChange}>
-                  <label class="appaloft-field-stack">
-                    <span class="appaloft-field-label">
-                      {$t(i18nKeys.console.authAccountSecurity.newEmailLabel)}
-                    </span>
-                    <Input
-                      bind:value={newEmail}
-                      type="email"
-                      autocomplete="email"
-                      required
-                      oninput={() => restoreEmailChangeCooldown()}
-                    />
-                  </label>
+                <Button type="submit" variant="outline" class="w-fit" disabled={!canRequestEmailChange}>
+                  {#if requestEmailSubmitting}
+                    {$t(i18nKeys.console.authAccountSecurity.requestingCode)}
+                  {:else if emailRequestRemainingSeconds > 0}
+                    {$t(i18nKeys.console.authAccountSecurity.requestCoolingDown, {
+                      seconds: emailRequestRemainingSeconds,
+                    })}
+                  {:else}
+                    {$t(i18nKeys.console.authAccountSecurity.requestCode)}
+                  {/if}
+                </Button>
+              </form>
 
-                  <Button type="submit" variant="outline" class="w-fit" disabled={!canRequestEmailChange}>
-                    {#if requestEmailSubmitting}
-                      {$t(i18nKeys.console.authAccountSecurity.requestingCode)}
-                    {:else if emailRequestRemainingSeconds > 0}
-                      {$t(i18nKeys.console.authAccountSecurity.requestCoolingDown, {
-                        seconds: emailRequestRemainingSeconds,
-                      })}
-                    {:else}
-                      {$t(i18nKeys.console.authAccountSecurity.requestCode)}
-                    {/if}
-                  </Button>
-                </form>
+              <form class="grid gap-4 border-t pt-4" onsubmit={verifyEmailChange}>
+                <label class="appaloft-field-stack">
+                  <span class="appaloft-field-label">
+                    {$t(i18nKeys.console.authAccountSecurity.codeLabel)}
+                  </span>
+                  <InputOTP.Root
+                    bind:value={emailOtp}
+                    maxlength={otpLength}
+                    pattern={REGEXP_ONLY_DIGITS}
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    pasteTransformer={(text) => text.replace(/\D/g, "").slice(0, otpLength)}
+                    aria-label={$t(i18nKeys.console.authAccountSecurity.codeLabel)}
+                    required
+                  >
+                    {#snippet children({ cells })}
+                      <InputOTP.Group>
+                        {#each cells as cell}
+                          <InputOTP.Slot {cell} />
+                        {/each}
+                      </InputOTP.Group>
+                    {/snippet}
+                  </InputOTP.Root>
+                </label>
 
-                <form class="grid gap-4 border-t pt-4" onsubmit={verifyEmailChange}>
-                  <label class="appaloft-field-stack">
-                    <span class="appaloft-field-label">
-                      {$t(i18nKeys.console.authAccountSecurity.codeLabel)}
-                    </span>
-                    <InputOTP.Root
-                      bind:value={emailOtp}
-                      maxlength={otpLength}
-                      pattern={REGEXP_ONLY_DIGITS}
-                      inputmode="numeric"
-                      autocomplete="one-time-code"
-                      pasteTransformer={(text) => text.replace(/\D/g, "").slice(0, otpLength)}
-                      aria-label={$t(i18nKeys.console.authAccountSecurity.codeLabel)}
-                      required
-                    >
-                      {#snippet children({ cells })}
-                        <InputOTP.Group>
-                          {#each cells as cell}
-                            <InputOTP.Slot {cell} />
-                          {/each}
-                        </InputOTP.Group>
-                      {/snippet}
-                    </InputOTP.Root>
-                  </label>
-
-                  <Button type="submit" class="w-fit" disabled={!canVerifyEmailChange}>
-                    {verifyEmailSubmitting
-                      ? $t(i18nKeys.console.authAccountSecurity.verifyingEmailChange)
-                      : $t(i18nKeys.console.authAccountSecurity.verifyEmailChange)}
-                  </Button>
-                </form>
-              {/if}
-            </div>
-          </section>
-        {/if}
-      </div>
+                <Button type="submit" class="w-fit" disabled={!canVerifyEmailChange}>
+                  {verifyEmailSubmitting
+                    ? $t(i18nKeys.console.authAccountSecurity.verifyingEmailChange)
+                    : $t(i18nKeys.console.authAccountSecurity.verifyEmailChange)}
+                </Button>
+              </form>
+            {/if}
+          </div>
+        </section>
+      {/if}
     </div>
-  </ConsoleResourceCanvas>
-</ConsoleShell>
+  </div>
+</SettingsShell>

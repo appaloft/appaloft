@@ -13,16 +13,19 @@
 ## Code Round Shape
 
 - Core:
-  - extend `Organization` with intention methods for role updates and member removal while keeping
-    duplicate membership, seat policy, and at-least-one-owner rules inside the aggregate;
+  - extend `Organization` with intention methods for non-owner role updates, ownership transfer,
+    and non-owner member removal while keeping duplicate membership, seat policy, and owner
+    protection rules inside the aggregate;
   - add value-object/state-machine behavior only where needed for role transition questions.
 - Application:
   - add Appaloft-owned organization/team ports for current-context reads, current organization
-    switching, member list reads, invitation creation, role update, and member removal;
+    switching, member list reads, invitation creation, non-owner role update, ownership transfer,
+    and member removal;
   - add command/query messages, handlers, and use cases/query services for
     `organizations.current-context`, `organizations.switch-current`,
     `organizations.list-members`, `organizations.list-invitations`, `organizations.invite-member`,
-    `organizations.change-member-role`, and `organizations.remove-member`;
+    `organizations.change-member-role`, `organizations.transfer-owner`, and
+    `organizations.remove-member`;
   - keep Better Auth out of application types and only depend on stable ports/tokens.
 - Auth adapter:
   - implement the application ports in `@appaloft/auth-better` with Better Auth organization,
@@ -38,22 +41,22 @@
   - add Web current organization switch/member management surfaces with i18n keys;
   - reserve future MCP descriptors for the same schemas.
 - Public docs:
-  - add task-oriented self-hosting docs for inviting operators, managing roles, removing members,
-    and recovering from `401`/`403`.
+  - add task-oriented self-hosting docs for inviting operators, managing non-owner roles,
+    transferring ownership, removing non-owner members, and recovering from `401`/`403`.
 
 ## Test Strategy
 
 - Core unit tests:
-  - extend `IDENTITY-DOMAIN-001` or add `IDENTITY-DOMAIN-002` for role update, member removal, and
-    at-least-one-owner protection.
+  - extend `IDENTITY-DOMAIN-001` or add `IDENTITY-DOMAIN-002`/`IDENTITY-DOMAIN-003` for non-owner
+    role update, ownership transfer, non-owner member removal, and owner protection.
 - Application tests:
   - prove commands/queries call Appaloft-owned ports and return safe DTOs;
-  - prove duplicate active membership and last-owner removal are rejected.
+  - prove duplicate active membership is rejected and owner role/removal changes require transfer.
 - Auth adapter tests:
   - prove Better Auth implements the ports without leaking Better Auth types into application.
 - HTTP/oRPC and CLI contract tests:
   - prove missing session returns `401`, insufficient role returns `403`, and authorized owners can
-    list/invite/update/remove through command/query dispatch.
+    list/invite/update/transfer/remove through command/query dispatch.
 - Web tests:
   - prove current organization switch/member management surfaces use i18n copy and shared client
     contracts.

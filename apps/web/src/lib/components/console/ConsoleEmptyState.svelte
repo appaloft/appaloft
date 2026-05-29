@@ -6,7 +6,15 @@
   import * as Empty from "$lib/components/ui/empty";
   import { i18nKeys, t } from "$lib/i18n";
 
-  type EmptyTone = "project" | "server" | "dependency" | "domain" | "deployment" | "preview-policy";
+  type EmptyTone =
+    | "project"
+    | "server"
+    | "dependency"
+    | "domain"
+    | "deployment"
+    | "credential"
+    | "invitation"
+    | "preview-policy";
 
   let {
     tone,
@@ -85,6 +93,27 @@
         <path d="M63 96H50l-12 17 22-5M97 96h13l12 17-22-5" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".68" />
         <path d="M72 115c0 7 8 14 8 14s8-7 8-14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".58" />
         <path d="M80 72v30" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".5" />
+      {:else if tone === "credential"}
+        <circle cx="61" cy="70" r="21" stroke="currentColor" stroke-width="4" />
+        <path d="M76 85l12 12h14l8 8h14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="55" cy="64" r="5" fill="currentColor" opacity=".58" />
+        <rect x="40" y="26" width="80" height="28" rx="8" stroke="currentColor" stroke-width="4" opacity=".68" />
+        <path d="M55 40h16M86 40h19" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".42" />
+        <path d="M44 106h58" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".32" />
+      {:else if tone === "invitation"}
+        <rect x="36" y="40" width="88" height="58" rx="12" stroke="currentColor" stroke-width="4" />
+        <path
+          d="M40 50l40 30 40-30"
+          stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          opacity=".58"
+        />
+        <path d="M58 100v12M102 100v12M66 112h28" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".42" />
+        <circle cx="115" cy="34" r="17" stroke="currentColor" stroke-width="4" />
+        <path d="M115 25v18M106 34h18" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+        <path d="M46 31h34M91 31h12" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".32" />
       {:else}
         <rect x="38" y="25" width="84" height="64" rx="12" stroke="currentColor" stroke-width="4" />
         <path d="M56 56l17 16 32-34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />

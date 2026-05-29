@@ -101,10 +101,28 @@
     box-shadow: none;
   }
 
+  .console-subnav-layout {
+    display: grid;
+    margin: -1rem;
+    min-height: calc(100svh - 3.5rem);
+  }
+
+  .console-subnav-content {
+    min-width: 0;
+    padding: 1rem;
+  }
+
   .console-subnav {
     min-width: 0;
     border-bottom: 1px solid var(--input);
     padding-bottom: 1rem;
+  }
+
+  .console-subnav-layout > .console-subnav {
+    border-bottom-color: var(--sidebar-border);
+    background: var(--sidebar);
+    padding: 0.5rem;
+    color: var(--sidebar-foreground);
   }
 
   .console-subnav-kicker {
@@ -188,6 +206,21 @@
       border-bottom: 0;
       padding-right: 1rem;
       padding-bottom: 0;
+    }
+
+    .console-subnav-layout > .console-subnav {
+      min-height: calc(100svh - 3.5rem);
+      border-right-color: var(--sidebar-border);
+      padding: 0.5rem;
+    }
+
+    .console-subnav-layout {
+      grid-template-columns: 16rem minmax(0, 1fr);
+      margin: -1.5rem;
+    }
+
+    .console-subnav-content {
+      padding: 1.5rem;
     }
   }
 

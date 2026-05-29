@@ -8,8 +8,15 @@ import {
   ChangeOrganizationMemberRoleCommandHandler,
   type ChangeOrganizationMemberRoleInput,
   ChangeOrganizationMemberRoleUseCase,
+  ChangeOrganizationProfileCommand,
+  ChangeOrganizationProfileCommandHandler,
+  type ChangeOrganizationProfileInput,
+  ChangeOrganizationProfileUseCase,
   type CurrentOrganizationContext,
   createExecutionContext,
+  DeleteOrganizationCommand,
+  DeleteOrganizationCommandHandler,
+  DeleteOrganizationUseCase,
   type ExecutionContext,
   GetCurrentOrganizationContextQuery,
   GetCurrentOrganizationContextQueryHandler,
@@ -28,6 +35,7 @@ import {
   type OrganizationInvitationSummary,
   type OrganizationMemberListInput,
   type OrganizationMemberSummary,
+  type OrganizationProfileSummary,
   type OrganizationTeamManagementPort,
   type OrganizationTeamRole,
   operationCatalog,
@@ -35,10 +43,17 @@ import {
   RemoveOrganizationMemberCommandHandler,
   type RemoveOrganizationMemberInput,
   RemoveOrganizationMemberUseCase,
+  ShowOrganizationProfileQuery,
+  ShowOrganizationProfileQueryHandler,
+  ShowOrganizationProfileQueryService,
   SwitchCurrentOrganizationCommand,
   SwitchCurrentOrganizationCommandHandler,
   type SwitchCurrentOrganizationInput,
   SwitchCurrentOrganizationUseCase,
+  TransferOrganizationOwnerCommand,
+  TransferOrganizationOwnerCommandHandler,
+  type TransferOrganizationOwnerInput,
+  TransferOrganizationOwnerUseCase,
 } from "../src";
 
 const context = createExecutionContext({ entrypoint: "http" });
@@ -69,6 +84,7 @@ const currentContext: CurrentOrganizationContext = {
     canListMembers: true,
     canManageDeployTokens: true,
     canRemoveMembers: true,
+    canTransferOwnership: true,
     canUpdateMemberRoles: true,
   },
 };
@@ -82,6 +98,15 @@ const member: OrganizationMemberSummary = {
   joinedAt: "2026-01-01T00:00:00.000Z",
 };
 
+const operatorMember: OrganizationMemberSummary = {
+  memberId: "om_operator",
+  userId: "usr_operator",
+  email: "existing-operator@example.com",
+  displayName: "Operator User",
+  role: "developer",
+  joinedAt: "2026-01-01T00:02:00.000Z",
+};
+
 const invitation: OrganizationInvitationSummary = {
   invitationId: "inv_operator",
   organizationId: "org_self_hosted",
@@ -89,6 +114,22 @@ const invitation: OrganizationInvitationSummary = {
   role: "developer",
   status: "pending",
   createdAt: "2026-01-01T00:01:00.000Z",
+};
+
+const profile: OrganizationProfileSummary = {
+  organizationId: "org_self_hosted",
+  name: "Self-hosted Appaloft",
+  slug: "self-hosted-appaloft",
+  role: "owner",
+  logoUrl: "https://example.com/logo.png",
+  permissions: {
+    canInviteMembers: true,
+    canListMembers: true,
+    canManageDeployTokens: true,
+    canRemoveMembers: true,
+    canTransferOwnership: true,
+    canUpdateMemberRoles: true,
+  },
 };
 
 class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagementPort {
@@ -100,13 +141,50 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
     return ok(currentContext);
   }
 
+  async showOrganizationProfile(
+    _context: ExecutionContext,
+    input: { organizationId: string },
+  ): Promise<Result<OrganizationProfileSummary>> {
+    this.calls.push("showOrganizationProfile");
+    this.inputs.push(input);
+    return ok({ ...profile, organizationId: input.organizationId });
+  }
+
+  async changeOrganizationProfile(
+    _context: ExecutionContext,
+    input: ChangeOrganizationProfileInput,
+  ): Promise<Result<OrganizationProfileSummary>> {
+    this.calls.push("changeOrganizationProfile");
+    this.inputs.push(input);
+    const { logoUrl: _logoUrl, ...profileWithoutLogo } = profile;
+    return ok({
+      ...profileWithoutLogo,
+      organizationId: input.organizationId,
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.slug ? { slug: input.slug } : {}),
+      ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}),
+    });
+  }
+
+  async deleteOrganization(
+    _context: ExecutionContext,
+    input: { organizationId: string; confirmation: { organizationId: string } },
+  ): Promise<Result<{ organizationId: string; deletedAt: string }>> {
+    this.calls.push("deleteOrganization");
+    this.inputs.push(input);
+    return ok({
+      organizationId: input.organizationId,
+      deletedAt: "2026-01-01T00:03:00.000Z",
+    });
+  }
+
   async listMembers(
     _context: ExecutionContext,
     input: OrganizationMemberListInput,
   ): Promise<Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }>> {
     this.calls.push("listMembers");
     this.inputs.push(input);
-    return ok({ items: [member], nextCursor: "next-members" });
+    return ok({ items: [member, operatorMember], nextCursor: "next-members" });
   }
 
   async switchCurrentOrganization(
@@ -151,6 +229,25 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
     this.calls.push("updateMemberRole");
     this.inputs.push(input);
     return ok({ ...member, memberId: input.memberId, role: input.role });
+  }
+
+  async transferOwner(
+    _context: ExecutionContext,
+    input: TransferOrganizationOwnerInput,
+  ): Promise<
+    Result<{
+      fromMember: OrganizationMemberSummary;
+      toMember: OrganizationMemberSummary;
+      transferredAt: string;
+    }>
+  > {
+    this.calls.push("transferOwner");
+    this.inputs.push(input);
+    return ok({
+      fromMember: { ...member, memberId: input.fromMemberId, role: "admin" },
+      toMember: { ...operatorMember, memberId: input.toMemberId, role: "owner" },
+      transferredAt: "2026-01-01T00:04:00.000Z",
+    });
   }
 
   async removeMember(
@@ -206,7 +303,10 @@ describe("organization/team application boundary", () => {
       })._unsafeUnwrap(),
     );
 
-    expect(members._unsafeUnwrap()).toEqual({ items: [member], nextCursor: "next-members" });
+    expect(members._unsafeUnwrap()).toEqual({
+      items: [member, operatorMember],
+      nextCursor: "next-members",
+    });
     expect(invitations._unsafeUnwrap()).toEqual({
       items: [invitation],
       nextCursor: "next-invitations",
@@ -235,6 +335,75 @@ describe("organization/team application boundary", () => {
     });
     expect(port.calls).toEqual(["switchCurrentOrganization"]);
     expect(port.inputs).toEqual([{ organizationId: "org_second" }]);
+  });
+
+  test("[ORG-SETTINGS-PROFILE-001] organization profile read/change use Appaloft-owned settings methods", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const show = await new ShowOrganizationProfileQueryHandler(
+      new ShowOrganizationProfileQueryService(port),
+    ).handle(
+      context,
+      ShowOrganizationProfileQuery.create({
+        organizationId: "org_self_hosted",
+      })._unsafeUnwrap(),
+    );
+    const update = await new ChangeOrganizationProfileCommandHandler(
+      new ChangeOrganizationProfileUseCase(port),
+    ).handle(
+      context,
+      ChangeOrganizationProfileCommand.create({
+        organizationId: "org_self_hosted",
+        name: "Renamed Organization",
+        slug: "renamed-organization",
+        logoUrl: null,
+      })._unsafeUnwrap(),
+    );
+
+    expect(show._unsafeUnwrap()).toEqual(profile);
+    expect(update._unsafeUnwrap()).toMatchObject({
+      organizationId: "org_self_hosted",
+      name: "Renamed Organization",
+      slug: "renamed-organization",
+    });
+    expect(update._unsafeUnwrap().logoUrl).toBeUndefined();
+    expect(port.calls).toEqual(["showOrganizationProfile", "changeOrganizationProfile"]);
+  });
+
+  test("[ORG-SETTINGS-DANGER-001] exact organization-id confirmation is required before delete dispatch", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const handler = new DeleteOrganizationCommandHandler(new DeleteOrganizationUseCase(port));
+
+    const rejected = await handler.handle(
+      context,
+      DeleteOrganizationCommand.create({
+        organizationId: "org_self_hosted",
+        confirmation: {
+          organizationId: "org_other",
+        },
+      })._unsafeUnwrap(),
+    );
+    const deleted = await handler.handle(
+      context,
+      DeleteOrganizationCommand.create({
+        organizationId: "org_self_hosted",
+        confirmation: {
+          organizationId: "org_self_hosted",
+        },
+      })._unsafeUnwrap(),
+    );
+
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "organization-danger-zone",
+      },
+    });
+    expect(deleted._unsafeUnwrap()).toEqual({
+      organizationId: "org_self_hosted",
+      deletedAt: "2026-01-01T00:03:00.000Z",
+    });
+    expect(port.calls).toEqual(["deleteOrganization"]);
   });
 
   test("[ORG-TEAM-INVITE-001] rejects duplicate active membership before creating an invitation", async () => {
@@ -331,13 +500,101 @@ describe("organization/team application boundary", () => {
       "listMembers",
       "listInvitations",
       "inviteMember",
+      "listMembers",
       "updateMemberRole",
+      "listMembers",
       "removeMember",
     ]);
   });
 
-  test("[ORG-TEAM-ROLE-002] preserves full organization team roles at the application boundary", async () => {
-    const roles: OrganizationTeamRole[] = ["owner", "admin", "billing", "developer", "viewer"];
+  test("[ORG-TEAM-ROLE-001] rejects owner role changes through the generic role command", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const handler = new ChangeOrganizationMemberRoleCommandHandler(
+      new ChangeOrganizationMemberRoleUseCase(port),
+    );
+
+    const ownerTarget = await handler.handle(
+      context,
+      ChangeOrganizationMemberRoleCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_admin",
+        role: "admin",
+      })._unsafeUnwrap(),
+    );
+    const ownerRole = await handler.handle(
+      context,
+      ChangeOrganizationMemberRoleCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_operator",
+        role: "owner",
+      })._unsafeUnwrap(),
+    );
+
+    expect(ownerTarget.isErr()).toBe(true);
+    expect(ownerTarget._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        memberId: "om_admin",
+        phase: "organization-change-member-role",
+      },
+    });
+    expect(ownerRole.isErr()).toBe(true);
+    expect(ownerRole._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        memberId: "om_operator",
+        phase: "organization-change-member-role",
+      },
+    });
+    expect(port.calls).toEqual(["listMembers"]);
+  });
+
+  test("[ORG-TEAM-REMOVE-001] rejects owner removal through the generic remove command", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const result = await new RemoveOrganizationMemberCommandHandler(
+      new RemoveOrganizationMemberUseCase(port),
+    ).handle(
+      context,
+      RemoveOrganizationMemberCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_admin",
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        memberId: "om_admin",
+        phase: "organization-remove-member",
+      },
+    });
+    expect(port.calls).toEqual(["listMembers"]);
+  });
+
+  test("[ORG-TEAM-OWNER-TRANSFER-001] transfers ownership through the dedicated command", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const result = await new TransferOrganizationOwnerCommandHandler(
+      new TransferOrganizationOwnerUseCase(port),
+    ).handle(
+      context,
+      TransferOrganizationOwnerCommand.create({
+        organizationId: "org_self_hosted",
+        fromMemberId: "om_admin",
+        toMemberId: "om_operator",
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      fromMember: { memberId: "om_admin", role: "admin" },
+      toMember: { memberId: "om_operator", role: "owner" },
+    });
+    expect(port.calls).toEqual(["listMembers", "transferOwner"]);
+  });
+
+  test("[ORG-TEAM-ROLE-002] preserves non-owner organization team roles at the application boundary", async () => {
+    const roles: OrganizationTeamRole[] = ["admin", "billing", "developer", "viewer"];
     const port = new CapturingOrganizationTeamManagementPort();
     const handler = new ChangeOrganizationMemberRoleCommandHandler(
       new ChangeOrganizationMemberRoleUseCase(port),
@@ -348,14 +605,14 @@ describe("organization/team application boundary", () => {
         context,
         ChangeOrganizationMemberRoleCommand.create({
           organizationId: "org_self_hosted",
-          memberId: `om_${role}`,
+          memberId: "om_operator",
           role,
         })._unsafeUnwrap(),
       );
 
       expect(result.isOk()).toBe(true);
       expect(result._unsafeUnwrap()).toMatchObject({
-        memberId: `om_${role}`,
+        memberId: "om_operator",
         role,
       });
     }
@@ -375,30 +632,51 @@ describe("organization/team application boundary", () => {
 
     expect(entries.map((entry) => entry.key)).toEqual([
       "organizations.current-context",
+      "organizations.profile.show",
+      "organizations.profile.change",
+      "organizations.delete",
       "organizations.switch-current",
       "organizations.list-members",
       "organizations.list-invitations",
       "organizations.invite-member",
       "organizations.change-member-role",
       "organizations.remove-member",
+      "organizations.transfer-owner",
     ]);
     expect(entries.map((entry) => entry.transports.orpc?.path)).toEqual([
       "/api/organizations/current-context",
+      "/api/organizations/{organizationId}/profile",
+      "/api/organizations/{organizationId}/profile",
+      "/api/organizations/{organizationId}",
       "/api/organizations/current-context/switch",
       "/api/organizations/{organizationId}/members",
       "/api/organizations/{organizationId}/invitations",
       "/api/organizations/{organizationId}/invitations",
       "/api/organizations/{organizationId}/members/{memberId}/role",
       "/api/organizations/{organizationId}/members/{memberId}",
+      "/api/organizations/{organizationId}/owner-transfer",
     ]);
-    expect(entries.map((entry) => entry.transports.cli)).toEqual([
+    expect(
+      entries.map((entry) => ("cli" in entry.transports ? entry.transports.cli : undefined)),
+    ).toEqual([
       "appaloft organization context",
+      undefined,
+      undefined,
+      undefined,
       "appaloft organization switch <organizationId>",
       "appaloft organization members list",
       "appaloft organization invitations list",
       "appaloft organization member invite",
       "appaloft organization member role <memberId>",
       "appaloft organization member remove <memberId>",
+      "appaloft organization owner transfer <fromMemberId> <toMemberId>",
     ]);
+    expect(entries.find((entry) => entry.key === "organizations.transfer-owner")).toMatchObject({
+      transportAccess: {
+        productSession: {
+          minRole: "owner",
+        },
+      },
+    });
   });
 });
