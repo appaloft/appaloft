@@ -12,12 +12,7 @@ import {
   type ResourceInstanceKindValue,
   ResourceInstanceStatusValue,
 } from "../shared/state-machine";
-import {
-  type CreatedAt,
-  type DeletedAt,
-  type OccurredAt,
-  type UpdatedAt,
-} from "../shared/temporal";
+import { type CreatedAt, type DeletedAt, OccurredAt, type UpdatedAt } from "../shared/temporal";
 import {
   DescriptionText,
   type EndpointText,
@@ -35,6 +30,8 @@ export type DependencyResourceProviderRealizationStatus =
   | "failed"
   | "delete-pending"
   | "deleted";
+export type DependencyResourceCapabilityType = "postgres-extension" | "redis-module";
+export type DependencyResourceCapabilityReadbackStatus = "satisfied" | "unsupported" | "failed";
 
 function slugify(value: string): string {
   return value
@@ -402,6 +399,40 @@ export interface DependencyResourceBindingReadinessState {
   reason?: DescriptionText;
 }
 
+export interface DependencyResourceCapabilityRequirementInput {
+  type: DependencyResourceCapabilityType;
+  name: string;
+  required?: boolean;
+  description?: string;
+}
+
+export interface DependencyResourceCapabilityRequirementState {
+  type: DependencyResourceCapabilityType;
+  name: string;
+  required: boolean;
+  description?: DescriptionText;
+}
+
+export interface DependencyResourceCapabilityReadbackInput {
+  type: DependencyResourceCapabilityType;
+  name: string;
+  required?: boolean;
+  status: DependencyResourceCapabilityReadbackStatus;
+  evidence: readonly string[];
+  version?: string;
+  checkedAt?: string;
+}
+
+export interface DependencyResourceCapabilityReadbackState {
+  type: DependencyResourceCapabilityType;
+  name: string;
+  required: boolean;
+  status: DependencyResourceCapabilityReadbackStatus;
+  evidence: readonly string[];
+  version?: string;
+  checkedAt?: OccurredAt;
+}
+
 export interface DependencyResourceProviderRealizationState {
   status: DependencyResourceProviderRealizationStatusValue;
   attemptId: DependencyResourceProviderRealizationAttemptId;
@@ -450,6 +481,8 @@ export interface ResourceInstanceState {
   redisEndpoint?: DependencyResourceEndpointState;
   connectionSecretRef?: DependencyResourceSecretRef;
   providerRealization?: DependencyResourceProviderRealizationState;
+  desiredCapabilities?: readonly DependencyResourceCapabilityRequirementState[];
+  capabilityReadbacks?: readonly DependencyResourceCapabilityReadbackState[];
   backupRelationship?: DependencyResourceBackupRelationshipState;
   bindingReadiness?: DependencyResourceBindingReadinessState;
   status: ResourceInstanceStatusValue;
@@ -496,6 +529,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     endpoint?: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
     providerRealization?: DependencyResourceProviderRealizationState;
+    desiredCapabilities?: readonly DependencyResourceCapabilityRequirementInput[];
     description?: DescriptionText;
     backupRelationship?: DependencyResourceBackupRelationshipState;
     createdAt: CreatedAt;
@@ -521,6 +555,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     if (endpoint.isErr()) {
       return err(endpoint.error);
     }
+    const desiredCapabilities = createCapabilityRequirementStates(
+      dependencyKind,
+      input.desiredCapabilities,
+    );
+    if (desiredCapabilities.isErr()) {
+      return err(desiredCapabilities.error);
+    }
 
     const instance = new ResourceInstance({
       id: input.id,
@@ -538,6 +579,9 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
       ...(input.providerRealization
         ? { providerRealization: cloneProviderRealization(input.providerRealization) }
+        : {}),
+      ...(desiredCapabilities.value.length > 0
+        ? { desiredCapabilities: desiredCapabilities.value }
         : {}),
       ...(endpoint.value
         ? dependencyKind === "redis"
@@ -593,6 +637,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     endpoint?: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
     providerRealization?: DependencyResourceProviderRealizationState;
+    desiredCapabilities?: readonly DependencyResourceCapabilityRequirementInput[];
     description?: DescriptionText;
     backupRelationship?: DependencyResourceBackupRelationshipState;
     createdAt: CreatedAt;
@@ -616,6 +661,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     if (endpoint.isErr()) {
       return err(endpoint.error);
     }
+    const desiredCapabilities = createCapabilityRequirementStates(
+      input.kind.value,
+      input.desiredCapabilities,
+    );
+    if (desiredCapabilities.isErr()) {
+      return err(desiredCapabilities.error);
+    }
 
     const instance = new ResourceInstance({
       id: input.id,
@@ -633,6 +685,9 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
       ...(input.providerRealization
         ? { providerRealization: cloneProviderRealization(input.providerRealization) }
+        : {}),
+      ...(desiredCapabilities.value.length > 0
+        ? { desiredCapabilities: desiredCapabilities.value }
         : {}),
       ...(endpoint.value ? { postgresEndpoint: endpoint.value } : {}),
       ...(input.backupRelationship
@@ -684,6 +739,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     endpoint?: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
     providerRealization?: DependencyResourceProviderRealizationState;
+    desiredCapabilities?: readonly DependencyResourceCapabilityRequirementInput[];
     description?: DescriptionText;
     backupRelationship?: DependencyResourceBackupRelationshipState;
     createdAt: CreatedAt;
@@ -707,6 +763,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     if (endpoint.isErr()) {
       return err(endpoint.error);
     }
+    const desiredCapabilities = createCapabilityRequirementStates(
+      input.kind.value,
+      input.desiredCapabilities,
+    );
+    if (desiredCapabilities.isErr()) {
+      return err(desiredCapabilities.error);
+    }
 
     const instance = new ResourceInstance({
       id: input.id,
@@ -724,6 +787,9 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       ...(input.connectionSecretRef ? { connectionSecretRef: input.connectionSecretRef } : {}),
       ...(input.providerRealization
         ? { providerRealization: cloneProviderRealization(input.providerRealization) }
+        : {}),
+      ...(desiredCapabilities.value.length > 0
+        ? { desiredCapabilities: desiredCapabilities.value }
         : {}),
       ...(endpoint.value ? { redisEndpoint: endpoint.value } : {}),
       ...(input.backupRelationship
@@ -807,6 +873,7 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     endpoint: DependencyResourceEndpointInput;
     connectionSecretRef?: DependencyResourceSecretRef;
     bindingReadiness?: DependencyResourceBindingReadinessState;
+    capabilityReadbacks?: readonly DependencyResourceCapabilityReadbackInput[];
     realizedAt: OccurredAt;
   }): Result<void> {
     if (!this.state.providerManaged || this.state.sourceMode?.value !== "appaloft-managed") {
@@ -819,6 +886,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     const endpoint = createEndpointState(input.endpoint);
     if (endpoint.isErr()) {
       return err(endpoint.error);
+    }
+    const capabilityReadbacks = createCapabilityReadbackStates(
+      this.state.kind.value,
+      input.capabilityReadbacks,
+    );
+    if (capabilityReadbacks.isErr()) {
+      return err(capabilityReadbacks.error);
     }
 
     this.state.providerRealization = {
@@ -839,6 +913,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     this.state.bindingReadiness = input.bindingReadiness
       ? cloneBindingReadiness(input.bindingReadiness)
       : { status: "ready" };
+    if (capabilityReadbacks.value.length > 0) {
+      this.state.capabilityReadbacks = capabilityReadbacks.value;
+      const blocked = capabilityBlockedBindingReadiness(capabilityReadbacks.value);
+      if (blocked) {
+        this.state.bindingReadiness = blocked;
+      }
+    }
     this.state.status = this.state.status.markReady();
     this.recordDomainEvent("dependency-resource-realized", input.realizedAt, {
       dependencyResourceId: this.state.id.value,
@@ -1043,6 +1124,12 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
       ...(this.state.providerRealization
         ? { providerRealization: cloneProviderRealization(this.state.providerRealization) }
         : {}),
+      ...(this.state.desiredCapabilities
+        ? { desiredCapabilities: cloneCapabilityRequirements(this.state.desiredCapabilities) }
+        : {}),
+      ...(this.state.capabilityReadbacks
+        ? { capabilityReadbacks: cloneCapabilityReadbacks(this.state.capabilityReadbacks) }
+        : {}),
       ...(this.state.backupRelationship
         ? { backupRelationship: cloneBackupRelationship(this.state.backupRelationship) }
         : {}),
@@ -1109,6 +1196,114 @@ function cloneEndpoint(endpoint: DependencyResourceEndpointState): DependencyRes
   };
 }
 
+function createCapabilityRequirementStates(
+  dependencyKind: string,
+  capabilities: readonly DependencyResourceCapabilityRequirementInput[] | undefined,
+): Result<readonly DependencyResourceCapabilityRequirementState[]> {
+  const states: DependencyResourceCapabilityRequirementState[] = [];
+  for (const capability of capabilities ?? []) {
+    const normalized = normalizeCapabilityName(capability.name);
+    const compatibility = validateCapabilityKind(dependencyKind, capability.type);
+    if (compatibility.isErr()) {
+      return err(compatibility.error);
+    }
+    if (!isDependencyCapabilityName(normalized)) {
+      return err(
+        dependencyResourceValidationError("Dependency capability name is unsupported", {
+          field: "capabilities.name",
+        }),
+      );
+    }
+    states.push({
+      type: capability.type,
+      name: normalized,
+      required: capability.required ?? true,
+      ...(capability.description
+        ? { description: DescriptionText.rehydrate(capability.description) }
+        : {}),
+    });
+  }
+  return ok(states);
+}
+
+function createCapabilityReadbackStates(
+  dependencyKind: string,
+  capabilities: readonly DependencyResourceCapabilityReadbackInput[] | undefined,
+): Result<readonly DependencyResourceCapabilityReadbackState[]> {
+  const states: DependencyResourceCapabilityReadbackState[] = [];
+  for (const capability of capabilities ?? []) {
+    const normalized = normalizeCapabilityName(capability.name);
+    const compatibility = validateCapabilityKind(dependencyKind, capability.type);
+    if (compatibility.isErr()) {
+      return err(compatibility.error);
+    }
+    if (!isDependencyCapabilityName(normalized)) {
+      return err(
+        dependencyResourceValidationError("Dependency capability readback name is unsupported", {
+          field: "capabilityReadbacks.name",
+        }),
+      );
+    }
+    states.push({
+      type: capability.type,
+      name: normalized,
+      required: capability.required ?? true,
+      status: capability.status,
+      evidence: [...new Set(capability.evidence.map((entry) => entry.trim()).filter(Boolean))],
+      ...(capability.version ? { version: capability.version } : {}),
+      ...(capability.checkedAt ? { checkedAt: OccurredAt.rehydrate(capability.checkedAt) } : {}),
+    });
+  }
+  return ok(states);
+}
+
+function validateCapabilityKind(
+  dependencyKind: string,
+  capabilityType: DependencyResourceCapabilityType,
+): Result<void> {
+  if (capabilityType === "postgres-extension" && dependencyKind !== "postgres") {
+    return err(
+      dependencyResourceValidationError("Postgres extension capabilities require postgres", {
+        field: "capabilities.type",
+        kind: dependencyKind,
+      }),
+    );
+  }
+  if (capabilityType === "redis-module" && dependencyKind !== "redis") {
+    return err(
+      dependencyResourceValidationError("Redis module capabilities require redis", {
+        field: "capabilities.type",
+        kind: dependencyKind,
+      }),
+    );
+  }
+  return ok(undefined);
+}
+
+function normalizeCapabilityName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function isDependencyCapabilityName(value: string): boolean {
+  return /^[a-z](?:[a-z0-9_-]{0,62}[a-z0-9])?$/.test(value);
+}
+
+function capabilityBlockedBindingReadiness(
+  readbacks: readonly DependencyResourceCapabilityReadbackState[],
+): DependencyResourceBindingReadinessState | undefined {
+  const failed = readbacks.find(
+    (capability) => capability.required && capability.status !== "satisfied",
+  );
+  return failed
+    ? {
+        status: "blocked",
+        reason: DescriptionText.rehydrate(
+          `required capability ${failed.type}:${failed.name} is ${failed.status}`,
+        ),
+      }
+    : undefined;
+}
+
 function cloneBackupRelationship(
   backupRelationship: DependencyResourceBackupRelationshipState,
 ): DependencyResourceBackupRelationshipState {
@@ -1135,6 +1330,31 @@ function cloneProviderRealization(
       ? { failureMessage: providerRealization.failureMessage }
       : {}),
   };
+}
+
+function cloneCapabilityRequirements(
+  capabilities: readonly DependencyResourceCapabilityRequirementState[],
+): readonly DependencyResourceCapabilityRequirementState[] {
+  return capabilities.map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    ...(capability.description ? { description: capability.description } : {}),
+  }));
+}
+
+function cloneCapabilityReadbacks(
+  capabilities: readonly DependencyResourceCapabilityReadbackState[],
+): readonly DependencyResourceCapabilityReadbackState[] {
+  return capabilities.map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    status: capability.status,
+    evidence: [...capability.evidence],
+    ...(capability.version ? { version: capability.version } : {}),
+    ...(capability.checkedAt ? { checkedAt: capability.checkedAt } : {}),
+  }));
 }
 
 function cloneBindingReadiness(

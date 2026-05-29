@@ -20,6 +20,7 @@ export class ImportDependencyResourceCommand extends Command<{ id: string }> {
     public readonly secretRef?: string,
     public readonly connectionSecret?: string,
     public readonly description?: string,
+    public readonly capabilities?: ImportDependencyResourceCommandInput["capabilities"],
     public readonly backupRelationship?: ImportDependencyResourceCommandInput["backupRelationship"],
   ) {
     super();
@@ -39,6 +40,7 @@ export class ImportDependencyResourceCommand extends Command<{ id: string }> {
           parsed.secretRef,
           parsed.connectionSecret,
           parsed.description,
+          parsed.capabilities,
           parsed.backupRelationship,
         ),
     );

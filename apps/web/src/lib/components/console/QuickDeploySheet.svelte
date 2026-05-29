@@ -49,6 +49,7 @@
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     DeploymentProgressEvent,
+    DependencyResourceCapabilityRequirement,
     DependencyResourceSummary,
     CreateResourceInput,
     EnvironmentSummary,
@@ -138,6 +139,7 @@
     id: string;
     kind: DependencyKind;
     label: string;
+    capabilities: readonly DependencyResourceCapabilityRequirement[];
     optional?: boolean;
   };
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
@@ -229,7 +231,13 @@
       description?: string;
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
       secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
-      resources: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+      resources: readonly {
+        id: string;
+        kind: string;
+        label: string;
+        capabilities?: readonly DependencyResourceCapabilityRequirement[];
+        optional?: boolean;
+      }[];
       components: readonly BlueprintManifestComponent[];
       defaultVariant?: string;
       variants?: Record<string, {
@@ -239,7 +247,13 @@
         defaultProfile?: string;
         parameters?: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
         secrets?: readonly { key: string; label: string; required?: boolean; description?: string }[];
-        resources?: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+        resources?: readonly {
+          id: string;
+          kind: string;
+          label: string;
+          capabilities?: readonly DependencyResourceCapabilityRequirement[];
+          optional?: boolean;
+        }[];
         components?: readonly BlueprintManifestComponent[];
         upgrade?: BlueprintUpgradePolicy;
       }>;
@@ -874,6 +888,7 @@
                 id: resource.id,
                 kind: resource.kind,
                 label: resource.label,
+                capabilities: resource.capabilities ?? [],
                 ...(resource.optional ? { optional: resource.optional } : {}),
               },
             ]
@@ -1772,6 +1787,7 @@
         requirementId: requirement.id,
         kind: requirement.kind,
         label: requirement.label,
+        capabilities: requirement.capabilities,
         mode: draft.mode,
         providerKey,
         ...(draft.mode === "create"
@@ -1818,6 +1834,7 @@
           requirementId: requirement.id,
           kind: requirement.kind,
           name: blueprintDependencyResourceName(requirement),
+          capabilities: [...requirement.capabilities],
           binding,
         };
       }
@@ -1829,6 +1846,7 @@
         name: blueprintDependencyResourceName(requirement),
         connectionUrl: draft.reuseConnectionUrl.trim(),
         secretRef: draft.reuseSecretRef.trim(),
+        capabilities: [...requirement.capabilities],
         binding,
       };
     });
@@ -2895,6 +2913,9 @@
                   projectId: input.projectId,
                   environmentId: input.environmentId,
                   name: item.name,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.serverId ? { serverId: item.serverId } : {}),
                   ...(item.providerKey ? { providerKey: item.providerKey } : {}),
                   ...(item.description ? { description: item.description } : {}),
@@ -2908,6 +2929,9 @@
                   environmentId: input.environmentId,
                   name: item.name,
                   connectionUrl: item.connectionUrl,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.secretRef ? { secretRef: item.secretRef } : {}),
                   ...(item.connectionSecret ? { connectionSecret: item.connectionSecret } : {}),
                   ...(item.description ? { description: item.description } : {}),

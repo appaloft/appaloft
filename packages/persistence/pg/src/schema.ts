@@ -192,6 +192,16 @@ export interface DependencyResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  desired_capabilities: ColumnType<
+    Record<string, unknown>[] | null,
+    Record<string, unknown>[] | null,
+    Record<string, unknown>[] | null
+  >;
+  capability_readbacks: ColumnType<
+    Record<string, unknown>[] | null,
+    Record<string, unknown>[] | null,
+    Record<string, unknown>[] | null
+  >;
   backup_relationship: ColumnType<
     Record<string, unknown> | null,
     Record<string, unknown> | null,

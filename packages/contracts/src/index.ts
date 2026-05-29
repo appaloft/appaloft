@@ -2211,6 +2211,39 @@ export const dependencyResourceDeleteBlockerSchema = z.object({
   count: z.number().optional(),
 });
 
+export const dependencyResourceCapabilityRequirementSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("postgres-extension"),
+    name: z.string(),
+    required: z.boolean(),
+    description: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("redis-module"),
+    name: z.string(),
+    required: z.boolean(),
+    description: z.string().optional(),
+  }),
+]);
+
+export const dependencyResourceCapabilityReadbackSchema = z.object({
+  type: z.enum(["postgres-extension", "redis-module"]),
+  name: z.string(),
+  required: z.boolean(),
+  status: z.enum(["satisfied", "unsupported", "failed"]),
+  evidence: z.array(z.string()),
+  version: z.string().optional(),
+  checkedAt: z.string().optional(),
+});
+
+export type DependencyResourceCapabilityRequirement = z.output<
+  typeof dependencyResourceCapabilityRequirementSchema
+>;
+
+export type DependencyResourceCapabilityReadback = z.output<
+  typeof dependencyResourceCapabilityReadbackSchema
+>;
+
 export const dependencyResourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -2225,6 +2258,8 @@ export const dependencyResourceSummarySchema = z.object({
   lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
   connection: dependencyResourceConnectionSummarySchema.optional(),
   providerRealization: dependencyResourceProviderRealizationSummarySchema.optional(),
+  desiredCapabilities: z.array(dependencyResourceCapabilityRequirementSchema),
+  capabilityReadbacks: z.array(dependencyResourceCapabilityReadbackSchema),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   backupRelationship: dependencyResourceBackupRelationshipSchema.optional(),
   deleteSafety: z
@@ -3664,6 +3699,7 @@ export const dependencyResourceProvisioningPlanSchema = z.object({
   providerKey: z.string().optional(),
   serverId: z.string().optional(),
   endpoint: z.string().optional(),
+  capabilities: z.array(dependencyResourceCapabilityRequirementSchema),
   requiresAcceptance: z.boolean(),
   requestedAt: z.string(),
   acceptedAt: z.string().optional(),

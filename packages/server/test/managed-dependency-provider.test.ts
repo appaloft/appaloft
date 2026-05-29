@@ -19,6 +19,31 @@ async function createTempRoot(): Promise<string> {
 }
 
 describe("ShellManagedDependencyProvider", () => {
+  test("[CLOUD-DEP-PROV-CAPABILITY-052] rejects required capabilities before shell provider realization", () => {
+    const provider = new ShellManagedDependencyProvider();
+
+    expect(
+      provider.supports("appaloft-managed-postgres", "postgres", [
+        { type: "postgres-extension", name: "vector", required: true },
+      ]),
+    ).toBe(false);
+    expect(
+      provider.supports("appaloft-managed-redis", "redis", [
+        { type: "redis-module", name: "search", required: true },
+      ]),
+    ).toBe(false);
+  });
+
+  test("[CLOUD-DEP-PROV-CAPABILITY-052] allows optional unsupported capabilities for readback evidence", () => {
+    const provider = new ShellManagedDependencyProvider();
+
+    expect(
+      provider.supports("appaloft-managed-redis", "redis", [
+        { type: "redis-module", name: "search", required: false },
+      ]),
+    ).toBe(true);
+  });
+
   test("[DEP-BIND-SECRET-RESOLVE-005] realizes targeted Postgres as Docker-backed runtime secret", async () => {
     const root = await createTempRoot();
     const binDir = join(root, "bin");
