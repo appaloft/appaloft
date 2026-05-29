@@ -2024,7 +2024,7 @@ function mapAccountSessionSummary(
     sessionId: readString(value, "id") ?? token ?? "",
     userId: readString(value, "userId") ?? "",
     clientKind,
-    displayName,
+    ...(displayName ? { displayName } : {}),
     createdAt: readDateString(value, "createdAt") ?? new Date(0).toISOString(),
     expiresAt: readDateString(value, "expiresAt") ?? new Date(0).toISOString(),
     ...(ipAddress ? { ipAddress } : {}),
@@ -2047,14 +2047,36 @@ function classifyAccountSessionClient(userAgent: string | undefined): "web" | "c
 function accountSessionDisplayName(
   clientKind: "web" | "cli" | "unknown",
   userAgent: string | undefined,
-): string {
+): string | undefined {
   if (clientKind === "cli") {
     return "Appaloft CLI";
   }
-  if (clientKind === "web") {
-    return userAgent ?? "Web browser";
+  if (userAgent) {
+    return accountSessionBrowserDisplayName(userAgent);
   }
-  return userAgent ?? "Unknown client";
+  return undefined;
+}
+
+function accountSessionBrowserDisplayName(userAgent: string): string {
+  if (/\bCodex\//i.test(userAgent)) {
+    return "Codex Browser";
+  }
+  if (/\bElectron\//i.test(userAgent)) {
+    return "Electron app";
+  }
+  if (/\bEdg\//i.test(userAgent)) {
+    return "Microsoft Edge";
+  }
+  if (/\bChrome\//i.test(userAgent) || /\bChromium\//i.test(userAgent)) {
+    return "Chrome";
+  }
+  if (/\bFirefox\//i.test(userAgent)) {
+    return "Firefox";
+  }
+  if (/\bSafari\//i.test(userAgent)) {
+    return "Safari";
+  }
+  return userAgent;
 }
 
 function mapOrganizationProfileSummary(

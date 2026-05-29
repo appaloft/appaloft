@@ -46,7 +46,72 @@
     }
   }
 
-  function clientLabel(clientKind: "web" | "cli" | "unknown" | undefined): string {
+  type AccountSessionClientKind = "web" | "cli" | "unknown";
+
+  function sessionClientKind(session: {
+    clientKind?: AccountSessionClientKind;
+    current?: boolean;
+    displayName?: string;
+    userAgent?: string;
+  }): AccountSessionClientKind {
+    if (session.clientKind && session.clientKind !== "unknown") {
+      return session.clientKind;
+    }
+    const clientText = `${session.displayName ?? ""} ${session.userAgent ?? ""}`;
+    if (/\b(appaloft-cli|appaloft cli)\b/i.test(clientText)) {
+      return "cli";
+    }
+    if (session.userAgent) {
+      return "web";
+    }
+    if (session.current) {
+      return "web";
+    }
+    return "unknown";
+  }
+
+  function sessionDisplayName(session: {
+    clientKind?: AccountSessionClientKind;
+    current?: boolean;
+    displayName?: string;
+    userAgent?: string;
+    sessionId: string;
+  }): string {
+    if (session.displayName) {
+      return session.displayName;
+    }
+    if (session.userAgent) {
+      return browserDisplayName(session.userAgent);
+    }
+    if (session.current) {
+      return $t(i18nKeys.console.accountSettings.clientWeb);
+    }
+    return session.sessionId;
+  }
+
+  function browserDisplayName(userAgent: string): string {
+    if (/\bCodex\//i.test(userAgent)) {
+      return "Codex Browser";
+    }
+    if (/\bElectron\//i.test(userAgent)) {
+      return "Electron app";
+    }
+    if (/\bEdg\//i.test(userAgent)) {
+      return "Microsoft Edge";
+    }
+    if (/\bChrome\//i.test(userAgent) || /\bChromium\//i.test(userAgent)) {
+      return "Chrome";
+    }
+    if (/\bFirefox\//i.test(userAgent)) {
+      return "Firefox";
+    }
+    if (/\bSafari\//i.test(userAgent)) {
+      return "Safari";
+    }
+    return userAgent;
+  }
+
+  function clientLabel(clientKind: AccountSessionClientKind): string {
     if (clientKind === "cli") {
       return $t(i18nKeys.console.accountSettings.clientCli);
     }
@@ -111,19 +176,20 @@
           </div>
         {:else}
           {#each sessions as session (session.sessionId)}
+            {@const clientKind = sessionClientKind(session)}
             <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_18rem_auto] lg:items-center">
               <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 class="truncate text-base font-semibold">
-                    {session.displayName ?? session.userAgent ?? session.sessionId}
+                    {sessionDisplayName(session)}
                   </h2>
                   <Badge variant="secondary">
-                    {#if session.clientKind === "cli"}
+                    {#if clientKind === "cli"}
                       <SquareTerminal class="size-3.5" />
                     {:else}
                       <Monitor class="size-3.5" />
                     {/if}
-                    {clientLabel(session.clientKind)}
+                    {clientLabel(clientKind)}
                   </Badge>
                   {#if session.current}
                     <Badge variant="outline">
