@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { ShieldCheck, Trash2 } from "@lucide/svelte";
+  import { Monitor, ShieldCheck, SquareTerminal, Trash2 } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
@@ -44,6 +44,16 @@
     if (!revokeSessionMutation.isPending) {
       revokeSessionMutation.mutate(sessionId);
     }
+  }
+
+  function clientLabel(clientKind: "web" | "cli" | "unknown" | undefined): string {
+    if (clientKind === "cli") {
+      return $t(i18nKeys.console.accountSettings.clientCli);
+    }
+    if (clientKind === "web") {
+      return $t(i18nKeys.console.accountSettings.clientWeb);
+    }
+    return $t(i18nKeys.console.accountSettings.clientUnknown);
   }
 </script>
 
@@ -105,8 +115,16 @@
               <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 class="truncate text-base font-semibold">
-                    {session.userAgent ?? session.sessionId}
+                    {session.displayName ?? session.userAgent ?? session.sessionId}
                   </h2>
+                  <Badge variant="secondary">
+                    {#if session.clientKind === "cli"}
+                      <SquareTerminal class="size-3.5" />
+                    {:else}
+                      <Monitor class="size-3.5" />
+                    {/if}
+                    {clientLabel(session.clientKind)}
+                  </Badge>
                   {#if session.current}
                     <Badge variant="outline">
                       <ShieldCheck class="size-3.5" />

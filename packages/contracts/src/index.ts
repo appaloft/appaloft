@@ -152,6 +152,8 @@ export const accountProfileResponseSchema = z.object({
 export const accountSessionSummarySchema = z.object({
   sessionId: z.string(),
   userId: z.string(),
+  clientKind: z.enum(["web", "cli", "unknown"]).optional(),
+  displayName: z.string().optional(),
   createdAt: z.string(),
   expiresAt: z.string(),
   ipAddress: z.string().optional(),

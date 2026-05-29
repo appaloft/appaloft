@@ -19,6 +19,7 @@ console-style sidebar.
 | --- | --- | --- | --- |
 | Account profile | Safe display metadata for the signed-in product user. | Identity governance | user profile |
 | Account session | A safe read model for one signed-in user's auth session. | Identity governance / auth adapter | device session |
+| Account session client | The safe client category inferred or issued for an account session: Web, CLI, or unknown. | Identity governance / auth adapter | device type |
 | Account danger zone | Explicit destructive account action area requiring confirmation. | Web/API settings | delete account |
 | Organization profile | Safe name, slug, and logo metadata for an Appaloft organization. | Identity governance | team profile |
 | Organization settings | Sidebar-driven organization configuration, including profile, members, invitations, deploy tokens, and danger zone. | Web/API settings | team settings |
@@ -31,7 +32,7 @@ console-style sidebar.
 | --- | --- | --- | --- | --- |
 | ACCOUNT-SETTINGS-SPEC-001 | Read account profile | A signed-in product user opens account settings | Account profile is queried | Safe user id, email, display name, avatar URL, email verification status, and creation/update timestamps are returned without session tokens or provider payloads. |
 | ACCOUNT-SETTINGS-SPEC-002 | Change account profile | A signed-in product user edits display name or avatar URL | Account profile change command runs | The auth adapter changes only display name and avatar URL, returns the safe profile read model, and leaves email/password/security policy unchanged. |
-| ACCOUNT-SETTINGS-SPEC-003 | List account sessions | A signed-in product user opens sessions | Account sessions are queried | Safe bounded session metadata is returned, marks the current session when detectable, and never exposes session token material. |
+| ACCOUNT-SETTINGS-SPEC-003 | List account sessions | A signed-in product user opens sessions | Account sessions are queried | Safe bounded session metadata is returned, marks the current session when detectable, distinguishes Web, CLI, and unknown account session clients when known, and never exposes session token material. |
 | ACCOUNT-SETTINGS-SPEC-004 | Revoke account session | A signed-in product user revokes one non-current or current session | Session revoke command runs | The target session is revoked through the auth adapter and a safe revoked-at response is returned. |
 | ACCOUNT-SETTINGS-SPEC-005 | Delete account | A signed-in product user enters exact user-id confirmation | Account deletion command runs | The signed-in account is deleted through the auth adapter, session state becomes unusable, and organization/resource/deployment/deploy-token/audit data is not cascaded. |
 | ORG-SETTINGS-SPEC-001 | Read organization profile | A signed-in organization member opens organization profile settings | Organization profile is queried | Safe organization id, name, slug, logo URL, role, permissions, and timestamps are returned. |
@@ -52,8 +53,9 @@ console-style sidebar.
 ## Public Surfaces
 
 - API/oRPC: product-session protected account and organization settings operations.
-- CLI: deferred for account settings; existing organization/team/deploy-token CLI commands remain
-  active.
+- CLI: account settings commands are deferred; CLI browser login sessions may appear in the account
+  sessions read model as CLI clients when the selected auth adapter issues distinct CLI sessions.
+  Existing organization/team/deploy-token CLI commands remain active.
 - Web/UI: account profile, security, sessions, and danger-zone pages; organization profile,
   members, invitations, deploy tokens, and danger-zone pages.
 - Config: not applicable.

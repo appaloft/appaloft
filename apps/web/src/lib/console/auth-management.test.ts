@@ -221,6 +221,10 @@ describe("organization auth management console surface", () => {
     expect(layoutCssSource).toContain("border-right-color: var(--sidebar-border)");
     expect(accountSessionsSource).toContain("orpcClient.account.listSessions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
+    expect(accountSessionsSource).toContain("clientKind");
+    expect(accountSessionsSource).toContain("displayName");
+    expect(accountSessionsSource).toContain("SquareTerminal");
+    expect(accountSessionsSource).toContain("clientCli");
     expect(accountDangerSource).toContain("orpcClient.account.delete");
     expect(accountDangerSource).toContain("confirmation: { userId");
 
