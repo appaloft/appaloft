@@ -877,7 +877,14 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
     private readonly serverRepository?: ServerRepository,
   ) {}
 
-  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyResourceKind,
+    capabilities?: ManagedDependencyRealizationInput["capabilities"],
+  ): boolean {
+    if (capabilities?.some((capability) => capability.required)) {
+      return false;
+    }
     return (
       shellManagedDependencyKinds.includes(kind) && providerKey === shellManagedProviderKey(kind)
     );
@@ -913,6 +920,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
         }),
         endpoint: spec.endpoint,
         connectionSecretValue: spec.connectionSecretValue,
+        ...(input.capabilities && input.capabilities.length > 0
+          ? { capabilityReadbacks: unsupportedCapabilityReadbacks(input) }
+          : {}),
         realizedAt: input.requestedAt,
       });
     }
@@ -922,6 +932,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
       providerResourceHandle: `${input.kind}/${input.dependencyResourceId}`,
       endpoint,
       secretRef: `secret://dependency/${input.kind}/${input.dependencyResourceId}`,
+      ...(input.capabilities && input.capabilities.length > 0
+        ? { capabilityReadbacks: unsupportedCapabilityReadbacks(input) }
+        : {}),
       realizedAt: input.requestedAt,
     };
     const artifact: ShellManagedDependencyResourceArtifact = {
@@ -1269,6 +1282,19 @@ function dockerManagedPostgresRealizationSpec(
       ].join("\n"),
     ].join("\n"),
   };
+}
+
+function unsupportedCapabilityReadbacks(
+  input: ManagedDependencyRealizationInput,
+): NonNullable<ManagedDependencyRealizationResult["capabilityReadbacks"]> {
+  return (input.capabilities ?? []).map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    status: "unsupported",
+    evidence: [`provider-capability-unsupported:${capability.type}:${capability.name}`],
+    checkedAt: input.requestedAt,
+  }));
 }
 
 function managedDependencyDockerCommandFailure(input: {

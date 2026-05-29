@@ -126,6 +126,7 @@ describe("dependency resource persistence", () => {
           attemptId: DependencyResourceProviderRealizationAttemptId.rehydrate("dpr_1"),
           attemptedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
         },
+        desiredCapabilities: [{ type: "postgres-extension", name: "vector", required: true }],
         createdAt,
       })._unsafeUnwrap();
       managedResource
@@ -142,6 +143,17 @@ describe("dependency resource persistence", () => {
           connectionSecretRef: DependencyResourceSecretRef.rehydrate(
             "secret://dependency/postgres/rsi_managed_pg",
           ),
+          capabilityReadbacks: [
+            {
+              type: "postgres-extension",
+              name: "vector",
+              required: true,
+              status: "satisfied",
+              evidence: ["postgres-extension-installed:vector"],
+              version: "0.7.4",
+              checkedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
           realizedAt: OccurredAt.rehydrate("2026-01-01T00:00:00.000Z"),
         })
         ._unsafeUnwrap();
@@ -252,6 +264,24 @@ describe("dependency resource persistence", () => {
         id: "rsi_managed_pg",
         lifecycleStatus: "ready",
         bindingReadiness: { status: "ready" },
+        desiredCapabilities: [
+          {
+            type: "postgres-extension",
+            name: "vector",
+            required: true,
+          },
+        ],
+        capabilityReadbacks: [
+          {
+            type: "postgres-extension",
+            name: "vector",
+            required: true,
+            status: "satisfied",
+            evidence: ["postgres-extension-installed:vector"],
+            version: "0.7.4",
+            checkedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
         providerRealization: {
           status: "ready",
           providerResourceHandle: "pg/rsi_managed_pg",

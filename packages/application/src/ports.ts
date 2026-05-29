@@ -3290,6 +3290,30 @@ export interface DependencyResourceBindingReadinessSummary {
   reason?: string;
 }
 
+export type DependencyResourceCapabilityRequirement =
+  | {
+      type: "postgres-extension";
+      name: string;
+      required: boolean;
+      description?: string;
+    }
+  | {
+      type: "redis-module";
+      name: string;
+      required: boolean;
+      description?: string;
+    };
+
+export interface DependencyResourceCapabilityReadback {
+  type: DependencyResourceCapabilityRequirement["type"];
+  name: string;
+  required: boolean;
+  status: "satisfied" | "unsupported" | "failed";
+  evidence: string[];
+  version?: string;
+  checkedAt?: string;
+}
+
 export interface DependencyResourceSummary {
   id: string;
   projectId: string;
@@ -3304,6 +3328,8 @@ export interface DependencyResourceSummary {
   lifecycleStatus: DependencyResourceLifecycleStatus;
   connection?: DependencyResourceConnectionSummary;
   providerRealization?: DependencyResourceProviderRealizationSummary;
+  desiredCapabilities: DependencyResourceCapabilityRequirement[];
+  capabilityReadbacks: DependencyResourceCapabilityReadback[];
   bindingReadiness: DependencyResourceBindingReadinessSummary;
   backupRelationship?: {
     retentionRequired: boolean;
@@ -8255,6 +8281,7 @@ export interface ManagedDependencyRealizationInput {
   slug: string;
   attemptId: string;
   requestedAt: string;
+  capabilities?: readonly DependencyResourceCapabilityRequirement[];
   target?: ManagedDependencySingleServerTarget;
 }
 
@@ -8268,6 +8295,7 @@ export interface ManagedDependencyRealizationResult {
   };
   secretRef?: string;
   connectionSecretValue?: string;
+  capabilityReadbacks?: readonly DependencyResourceCapabilityReadback[];
   realizedAt: string;
 }
 
@@ -8286,7 +8314,11 @@ export interface ManagedDependencyDeleteResult {
 }
 
 export interface ManagedDependencyProviderPort {
-  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean;
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyResourceKind,
+    capabilities?: readonly DependencyResourceCapabilityRequirement[],
+  ): boolean;
   realize(
     context: ExecutionContext,
     input: ManagedDependencyRealizationInput,
