@@ -12,7 +12,10 @@ import {
   type CliControlPlaneProfileStore,
   type CliControlPlaneProfileView,
   defaultCliControlPlaneProfileStore,
+  defaultPublicCloudBrowserLoginUrl,
+  defaultPublicCloudControlPlaneUrl,
   deriveProfileName,
+  isDefaultPublicCloudControlPlaneUrl,
   normalizeControlPlaneUrl,
   profileView,
   readControlPlaneAuthFromEnvironment,
@@ -26,8 +29,9 @@ export interface CliControlPlaneDependencies {
 }
 
 export interface CliControlPlaneLoginInput {
-  readonly url: string;
+  readonly url?: string;
   readonly mode?: CliControlPlaneMode;
+  readonly openBrowser?: boolean;
   readonly profile?: string;
 }
 
@@ -60,6 +64,66 @@ function dependencies(input?: CliControlPlaneDependencies): Required<CliControlP
     now: input?.now ?? (() => new Date().toISOString()),
     store: input?.store ?? defaultCliControlPlaneProfileStore(env),
   };
+}
+
+function openBrowser(url: string, env: CliControlPlaneEnvironment): Result<boolean> {
+  if (env.APPALOFT_CLI_OPEN_BROWSER === "false" || env.CI === "true") {
+    return ok(false);
+  }
+
+  const command =
+    process.platform === "darwin"
+      ? ["open", url]
+      : process.platform === "win32"
+        ? ["cmd", "/c", "start", "", url]
+        : ["xdg-open", url];
+
+  try {
+    const subprocess = Bun.spawn(command, {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    subprocess.unref();
+    return ok(true);
+  } catch (error) {
+    return err(
+      controlPlaneError(
+        "control_plane_browser_open_failed",
+        "infra",
+        "Could not open the browser for Appaloft login",
+        true,
+        {
+          phase: "control-plane-auth",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ),
+    );
+  }
+}
+
+function loginAuthMissingError(input: {
+  readonly browserLoginUrl: string;
+  readonly defaultCloud: boolean;
+  readonly openedBrowser: boolean;
+}): DomainError {
+  const credentialMessage = input.defaultCloud
+    ? "Open the browser login URL, then provide a CLI product-session cookie through APPALOFT_AUTH_COOKIE after the Cloud CLI authorization exchange is available. For noninteractive automation, provide APPALOFT_TOKEN explicitly."
+    : "Provide a trusted local product-session cookie through APPALOFT_AUTH_COOKIE or a bearer token through APPALOFT_TOKEN before logging in to this control plane.";
+
+  return controlPlaneError(
+    "control_plane_auth_missing",
+    "user",
+    input.defaultCloud
+      ? `${input.openedBrowser ? "Appaloft Cloud login opened in the browser" : "Open Appaloft Cloud login in a browser"} at ${input.browserLoginUrl}, but the CLI does not yet have a local credential to verify`
+      : "Control-plane login requires a local credential to verify",
+    false,
+    {
+      phase: "control-plane-auth",
+      browserLoginUrl: input.browserLoginUrl,
+      credential: credentialMessage,
+    },
+  );
 }
 
 function validateProfileName(value: string): Result<string> {
@@ -124,16 +188,64 @@ export async function loginControlPlane(
   deps?: CliControlPlaneDependencies,
 ): Promise<Result<CliControlPlaneProfileView>> {
   const resolved = dependencies(deps);
-  const mode = input.mode ?? "self-hosted";
+  if (input.mode === "self-hosted" && !input.url) {
+    return err(
+      controlPlaneError(
+        "validation_error",
+        "user",
+        "Self-hosted control-plane login requires --url",
+        false,
+        {
+          phase: "control-plane-profile-write",
+        },
+      ),
+    );
+  }
 
-  const normalizedUrl = normalizeControlPlaneUrl(input.url);
+  const rawUrl = input.url ?? defaultPublicCloudControlPlaneUrl;
+
+  const normalizedUrl = normalizeControlPlaneUrl(rawUrl);
   if (normalizedUrl.isErr()) {
     return err(normalizedUrl.error);
+  }
+  if (input.mode === "self-hosted" && isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value)) {
+    return err(
+      controlPlaneError(
+        "validation_error",
+        "user",
+        "The default Appaloft Cloud endpoint requires cloud mode",
+        false,
+        {
+          phase: "control-plane-profile-write",
+        },
+      ),
+    );
+  }
+  const mode =
+    input.mode ??
+    (isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value) ? "cloud" : "self-hosted");
+  const shouldOpenBrowser = input.openBrowser ?? (!input.url || mode === "cloud");
+  const browserLoginUrl = defaultPublicCloudBrowserLoginUrl(normalizedUrl.value);
+  const defaultCloud = mode === "cloud" && isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value);
+
+  let openedBrowser = false;
+  if (shouldOpenBrowser) {
+    const opened = openBrowser(browserLoginUrl, resolved.env);
+    if (opened.isErr()) {
+      return err(opened.error);
+    }
+    openedBrowser = opened.value;
   }
 
   const auth = readControlPlaneAuthFromEnvironment(resolved.env);
   if (auth.isErr()) {
-    return err(auth.error);
+    return err(
+      loginAuthMissingError({
+        browserLoginUrl,
+        defaultCloud,
+        openedBrowser,
+      }),
+    );
   }
 
   const profileName = validateProfileName(

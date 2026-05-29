@@ -37,6 +37,8 @@
 | CONTROL-PLANE-CLI-009 | Profile store never writes tokens, database URLs, SSH keys, credential ids, tenant/org secret identity, or raw secrets to committed config/log output. | `packages/adapters/cli/test/control-plane-client.test.ts` | `bun test packages/adapters/cli/test/control-plane-client.test.ts -t CONTROL-PLANE-CLI-009` |
 | CONTROL-PLANE-CLI-010 | Remote dispatch reuses `@appaloft/sdk` or `@appaloft/orpc/client` contract metadata and does not define parallel schemas. | `packages/adapters/cli/test/control-plane-client.test.ts` | `bun test packages/adapters/cli/test/control-plane-client.test.ts -t CONTROL-PLANE-CLI-010` |
 | CONTROL-PLANE-CLI-011 | Remote profile auth errors and handshake failures preserve structured server/client error phases. | `packages/adapters/cli/test/control-plane-client.test.ts` | `bun test packages/adapters/cli/test/control-plane-client.test.ts -t CONTROL-PLANE-CLI-011` |
+| CONTROL-PLANE-CLI-012 | Login without `--url` defaults to Appaloft Cloud and gives browser login guidance without writing a profile when no local credential is available. | `packages/adapters/cli/test/control-plane-client.test.ts` | `bun test packages/adapters/cli/test/control-plane-client.test.ts -t CONTROL-PLANE-CLI-012` |
+| CONTROL-PLANE-CLI-013 | Default Appaloft Cloud endpoint can create a `cloud` profile or explicit ephemeral Cloud target once trusted local credential input exists. | `packages/adapters/cli/test/control-plane-client.test.ts` | `bun test packages/adapters/cli/test/control-plane-client.test.ts -t CONTROL-PLANE-CLI-013` |
 
 ## Code Round
 
@@ -55,6 +57,8 @@ Implemented bridge:
 - [x] Use `@appaloft/sdk` generated operation descriptors or extend `@appaloft/orpc/client` with
   auth/header support for remote operation dispatch.
 - [x] Add login/logout/status/context CLI commands and top-level aliases when feasible.
+- [x] Add default Appaloft Cloud endpoint selection and browser-open guidance for login without
+  claiming automatic browser-to-CLI credential exchange.
 - [x] Remoteize `appaloft project list` and `appaloft project show <projectId>`.
 - [x] Remoteize generated SDK non-streaming operations, with automated proof for `project rename`
   and `server list`.
@@ -73,6 +77,8 @@ Implemented bridge:
 - [x] Update CLI help descriptions to point to the public anchors.
 - [x] Ensure docs explain that login is not adoption, state upload, or `deployments.create`
   enrichment.
+- [x] Ensure docs explain that `appaloft login` defaults to `https://app.appaloft.com`, while
+  automatic browser/device/OIDC credential exchange remains a follow-up.
 - [ ] Update release-note input when the Code Round ships.
 
 Docs Round outcome for this Code Round: public docs coverage is active under

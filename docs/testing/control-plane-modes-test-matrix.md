@@ -97,6 +97,8 @@ These rows are governed by
 | CONTROL-PLANE-CLI-009 | unit/import-boundary | Profile store secret boundary | Profile commands run inside a repository with `appaloft.yml` | No token, database URL, SSH key, credential id, tenant/org secret identity, provider account id, or raw secret is written to committed config, logs, diagnostics, or JSON output | `control_plane_profile_store_unavailable`, phase `control-plane-profile-read` or `control-plane-profile-write` only when local secure storage fails | Profile store read/write -> redacted diagnostics |
 | CONTROL-PLANE-CLI-010 | import-boundary/contract | Remote dispatch reuses typed client contracts | A CLI command is marked remote-capable | The remote dispatcher uses `@appaloft/sdk` generated operation descriptors or authenticated `@appaloft/orpc/client` contract metadata and does not define parallel CLI schemas | Boundary violation test failure | Operation key/input -> typed client descriptor -> remote request |
 | CONTROL-PLANE-CLI-011 | contract | Remote auth and handshake errors remain structured | Stored profile auth is missing/invalid or endpoint versions/features are incompatible | The CLI returns structured server/client error code, category, phase, retriable flag, and sanitized details without falling back to local dispatch | `product_auth_missing`, `product_auth_invalid`, `control_plane_handshake_failed`, or `control_plane_unsupported` | Target resolution -> handshake/auth -> structured error -> no local mutation |
+| CONTROL-PLANE-CLI-012 | CLI/unit | Login defaults to Appaloft Cloud | No `--url` is supplied | `appaloft login` or `appaloft auth login` selects `https://app.appaloft.com`, derives the `cloud` profile name, opens or prints the browser login URL, and writes no profile until trusted local credential input verifies against current organization context | `control_plane_auth_missing`, phase `control-plane-auth`, when no local credential is available | Default Cloud endpoint -> optional browser login URL -> trusted credential check -> no profile write or profile store write |
+| CONTROL-PLANE-CLI-013 | CLI/unit | Explicit Cloud mode can use the default endpoint | No profile or explicit URL exists, but a trusted local Cloud credential is provided | Login without `--url` stores an active `cloud` profile after handshake, or a remote-capable command with `--control-plane-mode cloud` builds an ephemeral target for `https://app.appaloft.com` without writing a profile | Auth/handshake errors are structured and do not fall back to local mutation | Default Cloud endpoint -> handshake/current-context -> profile store write or ephemeral remote dispatch |
 
 ## Self-Hosted Install Matrix
 
@@ -190,8 +192,8 @@ client bridge:
 
 - `CONTROL-PLANE-CLI-001`, `CONTROL-PLANE-CLI-002`, `CONTROL-PLANE-CLI-003`,
   `CONTROL-PLANE-CLI-004`, `CONTROL-PLANE-CLI-005`, `CONTROL-PLANE-CLI-007`,
-  `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`, and
-  `CONTROL-PLANE-CLI-011`;
+  `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`,
+  `CONTROL-PLANE-CLI-011`, `CONTROL-PLANE-CLI-012`, and `CONTROL-PLANE-CLI-013`;
 - the adapter-level `CONTROL-PLANE-CLI-006` binding for typed SDK `projects.list/show`,
   `projects.rename`, and `servers.list` remote dispatch;
 - mode/profile mismatch and explicit local-only terminal/deploy unsupported checks under
@@ -204,9 +206,9 @@ login/logout/status commands, context command, self-hosted and explicit-URL Clou
 handshake, full flags/env/profile/config target resolution, dispatch-time handshake, and ordinary
 CLI remote dispatcher for generated SDK non-streaming operations.
 
-Default Cloud browser/device/OIDC login, OS keychain credential storage, source-package quick
-deploy, remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption
-remain governed follow-ups.
+Automatic Cloud browser/device/OIDC credential exchange, OS keychain credential storage,
+source-package quick deploy, remote streaming/watch, terminal attach gateway, MCP exposure, and
+SSH PGlite adoption remain governed follow-ups.
 
 `remote-pglite-state-sync.test.ts` now also covers SSH `ssh-pglite` final upload refresh/merge
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under

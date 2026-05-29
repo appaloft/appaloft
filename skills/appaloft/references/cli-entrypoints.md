@@ -6,6 +6,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 
 ## Deploy Mode Notes
 
+- `appaloft login` and `appaloft auth login` are local profile/context commands, not operation
+  catalog entries. Without `--url`, they default to the public Appaloft Cloud control plane at
+  `https://app.appaloft.com`, open or print the Cloud browser login URL, then write a local `cloud`
+  profile only after a trusted local credential verifies against the current organization context.
+- `appaloft auth status`, `appaloft context show`, `appaloft context list`,
+  `appaloft context use <profile>`, and `appaloft logout` only manage local CLI profile/context
+  state. They must not create projects, resources, deployments, source links, or domain bindings.
 - `appaloft deploy` is the CLI entrypoint used by Pure SSH Action. SSH targets default to
   server-owned `ssh-pglite` state when no control plane is selected.
 - Self-hosted Server Action does not call the CLI for deployment. It calls self-hosted Action API

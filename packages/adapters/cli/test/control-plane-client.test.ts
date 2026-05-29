@@ -8,6 +8,8 @@ import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
   type CliControlPlaneProfile,
   createRemoteCliProgram,
+  defaultPublicCloudBrowserLoginUrl,
+  defaultPublicCloudControlPlaneUrl,
   loginControlPlane,
   MemoryCliControlPlaneProfileStore,
   resolveCliExecutionTarget,
@@ -212,6 +214,136 @@ function createControlPlaneFetch(
 }
 
 describe("CLI remote control-plane client", () => {
+  test("[CONTROL-PLANE-CLI-012][CONTROL-PLANE-CLI-013] login without --url defaults to the Appaloft Cloud profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--no-browser"],
+      env: {
+        APPALOFT_TOKEN: "tok_cloud_secret_1234",
+      },
+      fetch: createControlPlaneFetch(requests, {
+        "/api/version": jsonResponse({
+          name: "Appaloft Cloud",
+          version: "0.12.5-test",
+          apiVersion: "v1",
+          mode: "cloud",
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("cloud");
+    expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
+      mode: "cloud",
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+    });
+    expect(requests.map((request) => new URL(request.url).origin)).toEqual([
+      defaultPublicCloudControlPlaneUrl,
+      defaultPublicCloudControlPlaneUrl,
+    ]);
+    expect(rendered.stdout).toContain(defaultPublicCloudControlPlaneUrl);
+    expect(rendered.stdout).toContain("***1234");
+    expect(rendered.stdout).not.toContain("tok_cloud_secret_1234");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] browser login guidance does not write a Cloud profile without a local credential", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "login", "--no-browser"],
+      env: {},
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(requests).toEqual([]);
+    expect(rendered.stderr).toContain("control_plane_auth_missing");
+    expect(rendered.stderr).toContain(defaultPublicCloudBrowserLoginUrl());
+    expect(rendered.stdout).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-001][CONTROL-PLANE-CLI-012] explicit self-hosted login still requires a URL", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--mode", "self-hosted", "--no-browser"],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      fetch: createControlPlaneFetch([]),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(rendered.stderr).toContain("Self-hosted control-plane login requires --url");
+    expect(rendered.stderr).toContain("validation_error");
+    expect(rendered.stdout).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud URL cannot be logged in as self-hosted", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "login",
+        "--mode",
+        "self-hosted",
+        "--url",
+        defaultPublicCloudControlPlaneUrl,
+        "--no-browser",
+      ],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      fetch: createControlPlaneFetch([]),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(rendered.stderr).toContain("The default Appaloft Cloud endpoint requires cloud mode");
+    expect(rendered.stderr).toContain("validation_error");
+    expect(rendered.stdout).toBe("");
+  });
+
   test("[CONTROL-PLANE-CLI-001][CONTROL-PLANE-CLI-004][CONTROL-PLANE-CLI-009] auth login writes an active redacted self-hosted profile after handshake", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
@@ -577,6 +709,67 @@ describe("CLI remote control-plane client", () => {
       diagnostics: {
         source: "env",
         requestedMode: "self-hosted",
+      },
+    });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud URL cannot be dispatched as self-hosted", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: [
+        "node",
+        "appaloft",
+        "--control-plane-mode",
+        "self-hosted",
+        "--control-plane-url",
+        defaultPublicCloudControlPlaneUrl,
+        "server",
+        "list",
+      ],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      store: new MemoryCliControlPlaneProfileStore(),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "control-plane-resolution",
+        requestedMode: "self-hosted",
+      },
+      message: "The default Appaloft Cloud endpoint requires cloud mode",
+    });
+  });
+
+  test("[CONTROL-PLANE-MODE-010][CONTROL-PLANE-CLI-013] explicit cloud mode uses the default Appaloft Cloud endpoint when no profile exists", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "--control-plane-mode", "cloud", "server", "list"],
+      env: {
+        APPALOFT_AUTH_COOKIE: "better-auth.session_token=cloud-session",
+      },
+      store,
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    const stored = await store.read();
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      profile: {
+        name: "cloud",
+        mode: "cloud",
+        baseUrl: defaultPublicCloudControlPlaneUrl,
+        auth: {
+          kind: "product-session",
+          cookie: "better-auth.session_token=cloud-session",
+        },
+      },
+      diagnostics: {
+        source: "cli",
+        requestedMode: "cloud",
+        effectiveMode: "cloud",
       },
     });
     expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });

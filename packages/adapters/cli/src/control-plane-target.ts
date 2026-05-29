@@ -12,7 +12,9 @@ import {
   type CliControlPlaneProfile,
   type CliControlPlaneProfileStore,
   defaultCliControlPlaneProfileStore,
+  defaultPublicCloudControlPlaneUrl,
   deriveProfileName,
+  isDefaultPublicCloudControlPlaneUrl,
   normalizeControlPlaneUrl,
   readControlPlaneAuthFromEnvironment,
 } from "./control-plane-profile.js";
@@ -574,7 +576,6 @@ export async function resolveCliExecutionTarget(
   }
 
   if (url) {
-    const mode = requestedMode === "cloud" ? "cloud" : "self-hosted";
     if (requestedMode === "auto") {
       return err(
         controlPlaneResolutionError(
@@ -591,6 +592,21 @@ export async function resolveCliExecutionTarget(
     if (normalized.isErr()) {
       return err(normalized.error);
     }
+    if (requestedMode === "self-hosted" && isDefaultPublicCloudControlPlaneUrl(normalized.value)) {
+      return err(
+        controlPlaneResolutionError(
+          "validation_error",
+          "The default Appaloft Cloud endpoint requires cloud mode",
+          {
+            requestedMode,
+          },
+        ),
+      );
+    }
+    const mode =
+      requestedMode === "cloud" || isDefaultPublicCloudControlPlaneUrl(normalized.value)
+        ? "cloud"
+        : "self-hosted";
 
     const storedProfile = await profileFromStore({
       store,
@@ -654,6 +670,35 @@ export async function resolveCliExecutionTarget(
       return err(profile.error);
     }
     if (!profile.value) {
+      if (requestedMode === "cloud") {
+        const auth = readControlPlaneAuthFromEnvironment(env);
+        if (auth.isErr()) {
+          return err(auth.error);
+        }
+        const defaultCloudProfile = profileFromExplicitUrl({
+          auth: auth.value,
+          mode: "cloud",
+          now: input.now?.() ?? new Date().toISOString(),
+          url: defaultPublicCloudControlPlaneUrl,
+          ...(profileName ? { profileName } : {}),
+        });
+        if (defaultCloudProfile.isErr()) {
+          return err(defaultCloudProfile.error);
+        }
+
+        return ok(
+          remoteTarget({
+            argv,
+            command,
+            source,
+            requestedMode,
+            profile: defaultCloudProfile.value,
+            reason: "Explicit Cloud mode selects the default Appaloft Cloud control plane.",
+            configPath: config.value.path,
+          }),
+        );
+      }
+
       return err(
         controlPlaneResolutionError(
           "control_plane_profile_not_found",
