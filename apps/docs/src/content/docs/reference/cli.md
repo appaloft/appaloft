@@ -38,7 +38,9 @@ CLI `--help`、交互式 prompt 和错误恢复提示应该链接到稳定 publi
 
 登录不是部署接管，也不是 SSH PGlite state adoption。它不会创建 project、resource、deployment、source link、domain binding，不会把 `controlPlane` 塞进 `deployments.create`，也不会把 token、cookie、database URL、SSH key、credential id、tenant/org secret identity 写进 committed `appaloft.yml`。
 
-交互式 Cloud 登录会打开或提示浏览器登录 URL。当前 CLI 仍需要一个受信任的本机 credential 才能完成 profile 写入：`APPALOFT_AUTH_COOKIE` 用于 product session，`APPALOFT_TOKEN` 用于明确的 bearer token 自动化输入。浏览器/device/OIDC 自动把 session/token 交换回 CLI 属于后续能力；在该能力落地前，浏览器登录只是引导，不会让 CLI 读取浏览器 cookie。
+交互式登录使用浏览器 auth-session exchange。CLI 会创建短期登录 session，打印 `verificationUriComplete` 和 user code，打开浏览器（或在 `--no-browser`/CI 下只打印 URL），轮询授权状态；浏览器确认后，CLI 只在一次性交换成功并通过当前组织上下文校验后写入 profile。被拒绝、过期、超时、中断、交换失败或上下文校验失败都不会写入部分 profile。
+
+`APPALOFT_AUTH_COOKIE` 和 `APPALOFT_TOKEN` 仍是本机自动化/非交互场景的受信任 credential path。它们不是默认 human flow，也不应要求用户把 product-session cookie、bearer token、deploy token 或浏览器 cookie 粘贴到聊天或 committed config。
 
 <h2 id="cli-remote-control-plane-dispatch">远程控制面 dispatch</h2>
 

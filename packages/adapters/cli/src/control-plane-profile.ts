@@ -55,6 +55,18 @@ export interface CliControlPlaneProfileView {
   readonly currentOrganization?: CliControlPlaneOrganizationContext;
 }
 
+export interface CliControlPlaneLoginSessionView {
+  readonly schemaVersion: "appaloft-cli-auth-session/v1";
+  readonly verificationUriComplete: string;
+  readonly userCode: string;
+  readonly openedBrowser: boolean;
+  readonly openBrowserFailed: boolean;
+}
+
+export interface CliControlPlaneLoginProfileView extends CliControlPlaneProfileView {
+  readonly login?: CliControlPlaneLoginSessionView;
+}
+
 export interface CliControlPlaneProfileStoreData {
   readonly activeProfile?: string;
   readonly profiles: Readonly<Record<string, CliControlPlaneProfile>>;
@@ -386,8 +398,7 @@ export function isDefaultPublicCloudControlPlaneUrl(url: string): boolean {
 export function defaultPublicCloudBrowserLoginUrl(
   baseUrl = defaultPublicCloudControlPlaneUrl,
 ): string {
-  const loginUrl = new URL("/login", baseUrl);
-  loginUrl.searchParams.set("intent", "cli");
+  const loginUrl = new URL("/cli-auth/authorize", baseUrl);
   return loginUrl.toString();
 }
 

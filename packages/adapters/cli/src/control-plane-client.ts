@@ -28,6 +28,26 @@ export interface CliControlPlaneHandshakeResult {
   readonly currentOrganization?: CliControlPlaneOrganizationContext;
 }
 
+export type CliAuthSessionStatus = "pending" | "authorized" | "denied" | "expired";
+
+export interface CliAuthSession {
+  readonly deviceCode: string;
+  readonly userCode: string;
+  readonly verificationUri: string;
+  readonly verificationUriComplete: string;
+  readonly expiresIn: number;
+  readonly interval: number;
+}
+
+export interface CliAuthSessionPollResult {
+  readonly status: CliAuthSessionStatus;
+  readonly interval?: number;
+}
+
+export interface CliAuthSessionExchangeResult {
+  readonly auth: CliControlPlaneAuth;
+}
+
 function cliControlPlaneError(
   code: string,
   category: DomainError["category"],
@@ -162,6 +182,74 @@ function readOrganizationContext(value: unknown): CliControlPlaneOrganizationCon
   };
 }
 
+function authContractError(phase: string, field?: string): DomainError {
+  return cliControlPlaneError(
+    "control_plane_auth_exchange_failed",
+    "infra",
+    "CLI auth exchange response did not match the expected contract",
+    true,
+    {
+      phase,
+      ...(field ? { field } : {}),
+    },
+  );
+}
+
+function readRequiredString(
+  record: Record<string, unknown>,
+  key: string,
+  phase: string,
+): Result<string> {
+  const value = readOptionalString(record, key);
+  if (value) {
+    return ok(value);
+  }
+
+  return err(authContractError(phase, key));
+}
+
+function readRequiredNumber(
+  record: Record<string, unknown>,
+  key: string,
+  phase: string,
+): Result<number> {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return ok(value);
+  }
+
+  return err(authContractError(phase, key));
+}
+
+function readAuth(value: unknown, phase: string): Result<CliControlPlaneAuth> {
+  const record = readJsonObject(value);
+  const kind = readOptionalString(record ?? {}, "kind");
+  if (kind === "bearer") {
+    const token = readOptionalString(record ?? {}, "token");
+    if (token) {
+      return ok({ kind, token });
+    }
+  }
+  if (kind === "product-session") {
+    const cookie = readOptionalString(record ?? {}, "cookie");
+    if (cookie) {
+      return ok({ kind, cookie });
+    }
+  }
+
+  return err(
+    cliControlPlaneError(
+      "control_plane_auth_exchange_failed",
+      "infra",
+      "CLI auth exchange response did not include supported credential material",
+      true,
+      {
+        phase,
+      },
+    ),
+  );
+}
+
 async function readResponseJson(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {
@@ -173,6 +261,66 @@ async function readResponseJson(response: Response): Promise<unknown> {
   } catch {
     return text;
   }
+}
+
+function safeAuthErrorDetails(value: unknown, phase: string, status: number): DomainErrorDetails {
+  const details: DomainErrorDetails = {
+    phase,
+    status,
+  };
+  const record = readJsonObject(value);
+  const rawDetails = readJsonObject(record?.details);
+  for (const [key, detail] of Object.entries(rawDetails ?? {})) {
+    if (/token|cookie|secret|credential|authorization|auth|raw/i.test(key)) {
+      continue;
+    }
+    const safeValue = detailValue(detail);
+    if (safeValue !== undefined) {
+      details[key] = safeValue;
+    }
+  }
+  return details;
+}
+
+function errorFromAuthResponse(response: Response, value: unknown, phase: string): DomainError {
+  const record = readJsonObject(value);
+  const code = readOptionalString(record ?? {}, "code");
+  const category = readOptionalString(record ?? {}, "category");
+  const message = readOptionalString(record ?? {}, "message");
+  const retryable = readJsonObject(value)?.retryable;
+
+  if (
+    response.status === 404 ||
+    response.status === 405 ||
+    response.status === 501 ||
+    code === "not_found" ||
+    code === "method_not_allowed"
+  ) {
+    return cliControlPlaneError(
+      "control_plane_auth_unsupported",
+      "user",
+      "Selected control plane does not support CLI browser auth exchange",
+      false,
+      safeAuthErrorDetails(value, phase, response.status),
+    );
+  }
+
+  const safeCategory =
+    category === "user" ||
+    category === "infra" ||
+    category === "provider" ||
+    category === "retryable" ||
+    category === "timeout"
+      ? category
+      : "infra";
+
+  return cliControlPlaneError(
+    code ?? "control_plane_auth_exchange_failed",
+    safeCategory,
+    message ?? "CLI browser auth exchange failed",
+    typeof retryable === "boolean" ? retryable : true,
+    safeAuthErrorDetails(value, phase, response.status),
+  );
 }
 
 function handshakeFromVersion(
@@ -275,6 +423,183 @@ export async function performControlPlaneHandshake(input: {
     handshake: handshake.value,
     ...(currentOrganization ? { currentOrganization } : {}),
   });
+}
+
+export async function createCliAuthSession(input: {
+  readonly baseUrl: string;
+  readonly fetch?: AppaloftSdkFetch;
+}): Promise<Result<CliAuthSession>> {
+  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  let response: Response;
+
+  try {
+    response = await fetchImplementation(
+      new Request(`${input.baseUrl}/api/cli-auth/sessions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          client: "appaloft-cli",
+        }),
+      }),
+    );
+  } catch (error) {
+    return err(errorFromUnknown(error, "control-plane-auth"));
+  }
+
+  const json = await readResponseJson(response);
+  if (!response.ok) {
+    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+  }
+
+  const record = readJsonObject(json);
+  if (!record) {
+    return err(authContractError("control-plane-auth"));
+  }
+
+  const deviceCode = readRequiredString(record, "deviceCode", "control-plane-auth");
+  if (deviceCode.isErr()) {
+    return err(deviceCode.error);
+  }
+  const userCode = readRequiredString(record, "userCode", "control-plane-auth");
+  if (userCode.isErr()) {
+    return err(userCode.error);
+  }
+  const verificationUri = readRequiredString(record, "verificationUri", "control-plane-auth");
+  if (verificationUri.isErr()) {
+    return err(verificationUri.error);
+  }
+  const verificationUriComplete = readRequiredString(
+    record,
+    "verificationUriComplete",
+    "control-plane-auth",
+  );
+  if (verificationUriComplete.isErr()) {
+    return err(verificationUriComplete.error);
+  }
+  const expiresIn = readRequiredNumber(record, "expiresIn", "control-plane-auth");
+  if (expiresIn.isErr()) {
+    return err(expiresIn.error);
+  }
+  const interval = readRequiredNumber(record, "interval", "control-plane-auth");
+  if (interval.isErr()) {
+    return err(interval.error);
+  }
+
+  return ok({
+    deviceCode: deviceCode.value,
+    userCode: userCode.value,
+    verificationUri: verificationUri.value,
+    verificationUriComplete: verificationUriComplete.value,
+    expiresIn: expiresIn.value,
+    interval: interval.value,
+  });
+}
+
+export async function pollCliAuthSession(input: {
+  readonly baseUrl: string;
+  readonly deviceCode: string;
+  readonly fetch?: AppaloftSdkFetch;
+}): Promise<Result<CliAuthSessionPollResult>> {
+  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  let response: Response;
+
+  try {
+    response = await fetchImplementation(
+      new Request(`${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}`),
+    );
+  } catch (error) {
+    return err(errorFromUnknown(error, "control-plane-auth"));
+  }
+
+  const json = await readResponseJson(response);
+  if (!response.ok) {
+    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+  }
+
+  const record = readJsonObject(json);
+  const status = readOptionalString(record ?? {}, "status");
+  if (
+    status !== "pending" &&
+    status !== "authorized" &&
+    status !== "denied" &&
+    status !== "expired"
+  ) {
+    return err(
+      cliControlPlaneError(
+        "control_plane_auth_exchange_failed",
+        "infra",
+        "CLI auth session status did not match the expected contract",
+        true,
+        {
+          phase: "control-plane-auth",
+        },
+      ),
+    );
+  }
+
+  const interval = record && typeof record.interval === "number" ? record.interval : undefined;
+  return ok({
+    status,
+    ...(interval !== undefined ? { interval } : {}),
+  });
+}
+
+export async function exchangeCliAuthSession(input: {
+  readonly baseUrl: string;
+  readonly deviceCode: string;
+  readonly fetch?: AppaloftSdkFetch;
+}): Promise<Result<CliAuthSessionExchangeResult>> {
+  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  let response: Response;
+
+  try {
+    response = await fetchImplementation(
+      new Request(
+        `${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}/exchange`,
+        {
+          method: "POST",
+        },
+      ),
+    );
+  } catch (error) {
+    return err(errorFromUnknown(error, "control-plane-auth"));
+  }
+
+  const json = await readResponseJson(response);
+  if (!response.ok) {
+    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+  }
+
+  const record = readJsonObject(json);
+  const auth = readAuth(record?.auth, "control-plane-auth");
+  if (auth.isErr()) {
+    return err(auth.error);
+  }
+
+  return ok({ auth: auth.value });
+}
+
+export async function cancelCliAuthSession(input: {
+  readonly baseUrl: string;
+  readonly deviceCode: string;
+  readonly fetch?: AppaloftSdkFetch;
+}): Promise<Result<void>> {
+  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  try {
+    await fetchImplementation(
+      new Request(
+        `${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}/cancel`,
+        {
+          method: "POST",
+        },
+      ),
+    );
+    return ok(undefined);
+  } catch (error) {
+    return err(errorFromUnknown(error, "control-plane-auth"));
+  }
 }
 
 export async function requestControlPlaneOperation(input: {
