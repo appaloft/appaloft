@@ -7,76 +7,67 @@ const homePageSource = readFileSync(
   "utf8",
 );
 
-describe("home count queries", () => {
-  test("[HOME-COUNT-QUERY-001] uses count queries for dashboard totals", () => {
-    expect(homePageSource).toContain("orpcClient.projects.count({})");
-    expect(homePageSource).toContain("orpcClient.servers.count({})");
-    expect(homePageSource).toContain("orpcClient.environments.count({})");
-    expect(homePageSource).toContain("orpcClient.resources.count({})");
-    expect(homePageSource).toContain("orpcClient.dependencyResources.count({})");
-    expect(homePageSource).toContain("orpcClient.deployments.count({})");
-    expect(homePageSource).toContain(
-      "orpcClient.deployments.count({ statuses: [...activeDeploymentStatuses] })",
-    );
-    expect(homePageSource).toContain('orpcClient.deployments.count({ status: "failed" })');
-  });
-
-  test("[HOME-COUNT-QUERY-002] keeps list queries only for rendered list previews", () => {
+describe("project-first home", () => {
+  test("[HOME-PROJECT-FIRST-001] uses list queries for the project entry view", () => {
+    expect(homePageSource).toContain("const homeProjectListLimit = 8");
     expect(homePageSource).toContain("orpcClient.projects.list({ limit: homeProjectListLimit })");
+    expect(homePageSource).toContain("orpcClient.resources.list({ limit: homeResourceListLimit })");
+    expect(homePageSource).toContain(
+      "orpcClient.environments.list({ limit: homeEnvironmentListLimit })",
+    );
     expect(homePageSource).toContain(
       "orpcClient.deployments.list({ limit: homeDeploymentListLimit })",
     );
-    expect(homePageSource).not.toContain("orpcClient.servers.list");
-    expect(homePageSource).not.toContain("orpcClient.environments.list");
-    expect(homePageSource).not.toContain("orpcClient.resources.list");
-    expect(homePageSource).not.toContain("orpcClient.dependencyResources.list");
   });
 
-  test("[HOME-METRIC-NAV-001] renders every metric cell as an interactive navigation cue", () => {
-    expect(homePageSource.match(/<a href="[^"]+" class="nothing-metric-cell">/g)).toHaveLength(6);
-    expect(homePageSource).not.toContain('<div class="nothing-metric-cell">');
-    expect(homePageSource).toContain(".nothing-metric-cell:hover");
-    expect(homePageSource).toContain(".nothing-metric-cell:focus-visible");
-    expect(homePageSource).toContain('<ArrowRight class="size-3.5" />');
-  });
-
-  test("[HOME-METRIC-MOTION-001] keeps metric hover motion smooth and accessible", () => {
-    expect(homePageSource).toContain("--nothing-motion-ease: cubic-bezier(0.2, 0, 0, 1);");
-    expect(homePageSource).toContain(
-      "background-color var(--nothing-motion-duration) var(--nothing-motion-ease)",
+  test("[HOME-PROJECT-FIRST-002] demotes raw metrics and avoids dashboard count grids", () => {
+    expect(homePageSource).not.toContain("nothing-metric-grid");
+    expect(homePageSource).not.toContain("nothing-metric-cell");
+    expect(homePageSource).not.toContain("orpcClient.projects.count({})");
+    expect(homePageSource).not.toContain("orpcClient.resources.count({})");
+    expect(homePageSource).not.toContain("orpcClient.environments.count({})");
+    expect(homePageSource).not.toContain("orpcClient.dependencyResources.count({})");
+    expect(homePageSource).not.toContain(
+      "orpcClient.deployments.count({ statuses: [...activeDeploymentStatuses] })",
     );
-    expect(homePageSource).toContain("transform: translate3d(3px, 0, 0);");
-    expect(homePageSource).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(homePageSource).not.toContain('orpcClient.deployments.count({ status: "failed" })');
   });
 
-  test("[HOME-PAAS-DASHBOARD-001] keeps dependency resources as a compact metric and action", () => {
-    expect(homePageSource).toContain("nothing-overview-head");
-    expect(homePageSource).toContain("nothing-dashboard-grid");
-    expect(homePageSource).not.toContain("nothing-feature-strip");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.dependencyResourcesTitle");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.dependencyResourcesDescription");
+  test("[HOME-PROJECT-FIRST-003] renders projects as the primary interactive surface", () => {
+    expect(homePageSource).toContain("data-home-project-list");
+    expect(homePageSource).toContain("data-home-project-row");
+    expect(homePageSource).toContain("projectDetailHref(project.id)");
+    expect(homePageSource).toContain("visibleProjectResources(project)");
+    expect(homePageSource).toContain("resourceDetailHref(resource)");
+    expect(homePageSource).toContain("selectCurrentResourceAccessRoute(resource.accessSummary)");
   });
 
-  test("[HOME-PAAS-DASHBOARD-002] does not duplicate the global quick deploy action", () => {
-    expect(homePageSource).not.toContain("i18nKeys.common.actions.quickDeploy");
-    expect(homePageSource).not.toContain('href="/deploy"');
+  test("[HOME-PROJECT-FIRST-004] keeps app/resource detail in project and resource routes", () => {
+    expect(homePageSource).toContain("i18nKeys.console.home.resourcePreviewLabel");
+    expect(homePageSource).toContain("i18nKeys.console.home.accessRouteTitle");
+    expect(homePageSource).toContain("i18nKeys.console.home.noResourcesInProject");
+    expect(homePageSource).toContain("i18nKeys.common.actions.viewDetails");
+    expect(homePageSource).not.toContain("i18nKeys.console.home.projectRelationsTitle");
+    expect(homePageSource).not.toContain("i18nKeys.console.home.dashboardOverviewTitle");
   });
 
-  test("[HOME-AI-INTEGRATION-001] highlights Skill and MCP docs without adding business actions", () => {
-    expect(homePageSource).toContain("nothing-ai-section");
-    expect(homePageSource).toContain("webDocsHrefs.appaloftSkill");
-    expect(homePageSource).toContain("webDocsHrefs.appaloftMcpServer");
-    expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationSkillTitle");
-    expect(homePageSource).toContain("i18nKeys.console.home.aiIntegrationMcpTitle");
-    expect(homePageSource.match(/rel="external noreferrer"/g)).toHaveLength(2);
-    expect(homePageSource).not.toContain("quick_deploy_create");
+  test("[HOME-EMPTY-STATE-001] guides the first deployment only when there is no work", () => {
+    expect(homePageSource).toContain("!hasWork");
+    expect(homePageSource).toContain("<ConsoleEmptyState");
+    expect(homePageSource).toContain('tone="deployment"');
+    expect(homePageSource).toContain('href="/deploy"');
+    expect(homePageSource).toContain("i18nKeys.console.home.emptyStateTitle");
+    expect(homePageSource).toContain("i18nKeys.common.actions.quickDeploy");
   });
 
-  test("[HOME-INSTANCE-DIAGNOSTICS-001] keeps instance diagnostics off the home page", () => {
-    expect(homePageSource).not.toContain("/api/readiness");
-    expect(homePageSource).not.toContain("nothing-system-strip");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.readinessCard");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.databaseCard");
+  test("[HOME-OPERATION-CONTEXT-001] keeps only compact operational context on home", () => {
+    expect(homePageSource).toContain("nothing-side-stack");
+    expect(homePageSource).toContain("i18nKeys.console.home.operationContextTitle");
+    expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsTitle");
+    expect(homePageSource).toContain("orpcClient.servers.count({})");
+    expect(homePageSource).toContain("orpcClient.deployments.count({})");
+    expect(homePageSource).not.toContain("nothing-dashboard-grid");
+    expect(homePageSource).not.toContain("nothing-ai-section");
   });
 
   test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {

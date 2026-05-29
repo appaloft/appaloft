@@ -3470,12 +3470,14 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/`);
 
-    await expectAnyText(view, ["Latest deployment", "LATEST DEPLOYMENT", "最近部署"]);
+    await expectAnyText(view, ["Projects", "项目"]);
     await expectAnyText(view, ["Quick deploy", "快速部署"]);
-    await expectAnyText(view, ["View projects", "VIEW PROJECTS", "查看项目"]);
-    await expectAnyText(view, ["View deployments", "VIEW DEPLOYMENTS", "查看部署"]);
+    await expectAnyText(view, ["Workspace", "工作区"]);
     await expectText(view, "Demo");
+    await expectText(view, "workspace");
+    await expectAnyText(view, ["Access", "访问地址"]);
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
+    await expectAnyText(view, ["Recent deployments", "最近部署"]);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);

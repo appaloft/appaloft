@@ -3348,7 +3348,7 @@
 
 </script>
 
-<div class="grid min-w-0 gap-5 pb-6 md:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+<div class="grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(22rem,1fr)_20rem] xl:grid-cols-[minmax(24rem,1fr)_22rem]">
   <div class="min-w-0 space-y-5">
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
@@ -3367,7 +3367,7 @@
               />
             </div>
             <div
-              class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+              class="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-3"
               role="radiogroup"
               aria-label={$t(i18nKeys.common.domain.source)}
             >
@@ -4330,7 +4330,7 @@
       </div>
     </div>
 
-  <aside class="min-w-0 space-y-5 md:sticky md:top-20 md:max-h-[calc(100svh-10rem)] md:self-start md:overflow-y-auto md:pb-3">
+  <aside class="min-w-0 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100svh-10rem)] lg:self-start lg:overflow-y-auto lg:pb-3">
       <section class="console-side-panel min-w-0 space-y-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
