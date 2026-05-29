@@ -2340,7 +2340,7 @@ export const publicDocsHelpTopics = {
     id: "self-hosting.organization-team-management",
     title: "Self-hosted organization team management",
     description:
-      "How self-hosted operators inspect organization context, list members and invitations, invite operators, update roles, remove members safely, and manage deploy tokens from the organization surface.",
+      "How self-hosted operators inspect organization context, list members and invitations, invite operators, update non-owner roles, transfer ownership, remove non-owner members safely, and manage deploy tokens from the organization surface.",
     page: {
       "zh-CN": "self-hosting/organization-team-management",
       "en-US": "en/self-hosting/organization-team-management",
@@ -2359,7 +2359,7 @@ export const publicDocsHelpTopics = {
       "docs/testing/self-hosted-product-auth-test-matrix.md",
     ],
     webSurfaces: [
-      "Organization/team HTTP/API routes, organization CLI commands, apps/web /organization member and deploy-token management, and product session 401/403 recovery",
+      "Organization/team HTTP/API routes, organization CLI commands, apps/web /organization member ownership transfer and deploy-token management, and product session 401/403 recovery",
     ],
     aliases: [
       "organization context",
@@ -2368,11 +2368,13 @@ export const publicDocsHelpTopics = {
       "invite member",
       "member role",
       "remove member",
+      "transfer owner",
       "APPALOFT_AUTH_COOKIE",
       "APPALOFT_AUTHORIZATION",
       "组织成员",
       "邀请成员",
       "成员角色",
+      "移交所有者",
     ],
   },
   "advanced.provider-boundary": {
@@ -3471,6 +3473,56 @@ export const publicDocsOperationCoverage = [
     topicId: "self-hosting.organization-team-management",
   },
   {
+    operationKey: "account.profile.show",
+    status: "migration-gap",
+    reason:
+      "Account settings APIs are active, but public user-account documentation is deferred until the docs IA selects a durable account settings page.",
+    targetPage: "account settings docs",
+  },
+  {
+    operationKey: "account.profile.change",
+    status: "migration-gap",
+    reason:
+      "Account settings APIs are active, but public user-account documentation is deferred until the docs IA selects a durable account settings page.",
+    targetPage: "account settings docs",
+  },
+  {
+    operationKey: "account.sessions.list",
+    status: "migration-gap",
+    reason:
+      "Account session settings APIs are active, but public user-account documentation is deferred until the docs IA selects a durable account settings page.",
+    targetPage: "account settings docs",
+  },
+  {
+    operationKey: "account.sessions.revoke",
+    status: "migration-gap",
+    reason:
+      "Account session settings APIs are active, but public user-account documentation is deferred until the docs IA selects a durable account settings page.",
+    targetPage: "account settings docs",
+  },
+  {
+    operationKey: "account.delete",
+    status: "migration-gap",
+    reason:
+      "Account danger-zone APIs are active, but public user-account documentation is deferred until the docs IA selects a durable account settings page.",
+    targetPage: "account settings docs",
+  },
+  {
+    operationKey: "organizations.profile.show",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+  },
+  {
+    operationKey: "organizations.profile.change",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+  },
+  {
+    operationKey: "organizations.delete",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+  },
+  {
     operationKey: "organizations.switch-current",
     status: "documented",
     topicId: "self-hosting.organization-team-management",
@@ -3497,6 +3549,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "organizations.remove-member",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+  },
+  {
+    operationKey: "organizations.transfer-owner",
     status: "documented",
     topicId: "self-hosting.organization-team-management",
   },

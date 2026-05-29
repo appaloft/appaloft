@@ -379,6 +379,9 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     },
     ...(emailVerification ? { emailVerification } : {}),
     user: {
+      deleteUser: {
+        enabled: true,
+      },
       ...(config.emailVerification?.otp?.changeEmail?.enabled
         ? {
             changeEmail: {
