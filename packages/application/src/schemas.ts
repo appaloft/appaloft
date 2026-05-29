@@ -1,3 +1,23 @@
+export {
+  type ChangeAccountProfileCommandInput,
+  changeAccountProfileCommandInputSchema,
+} from "./operations/account-settings/change-account-profile.command";
+export {
+  type DeleteAccountCommandInput,
+  deleteAccountCommandInputSchema,
+} from "./operations/account-settings/delete-account.command";
+export {
+  type ListAccountSessionsQueryInput,
+  listAccountSessionsQueryInputSchema,
+} from "./operations/account-settings/list-account-sessions.query";
+export {
+  type RevokeAccountSessionCommandInput,
+  revokeAccountSessionCommandInputSchema,
+} from "./operations/account-settings/revoke-account-session.command";
+export {
+  type ShowAccountProfileQueryInput,
+  showAccountProfileQueryInputSchema,
+} from "./operations/account-settings/show-account-profile.query";
 export * from "./operations/audit-events/audit-events.schema";
 export {
   type BootstrapFirstAdminCommandInput,
@@ -116,6 +136,14 @@ export {
   changeOrganizationMemberRoleCommandInputSchema,
 } from "./operations/organizations/change-organization-member-role.command";
 export {
+  type ChangeOrganizationProfileCommandInput,
+  changeOrganizationProfileCommandInputSchema,
+} from "./operations/organizations/change-organization-profile.command";
+export {
+  type DeleteOrganizationCommandInput,
+  deleteOrganizationCommandInputSchema,
+} from "./operations/organizations/delete-organization.command";
+export {
   type GetCurrentOrganizationContextQueryInput,
   getCurrentOrganizationContextQueryInputSchema,
 } from "./operations/organizations/get-current-organization-context.query";
@@ -136,9 +164,17 @@ export {
   removeOrganizationMemberCommandInputSchema,
 } from "./operations/organizations/remove-organization-member.command";
 export {
+  type ShowOrganizationProfileQueryInput,
+  showOrganizationProfileQueryInputSchema,
+} from "./operations/organizations/show-organization-profile.query";
+export {
   type SwitchCurrentOrganizationCommandInput,
   switchCurrentOrganizationCommandInputSchema,
 } from "./operations/organizations/switch-current-organization.command";
+export {
+  type TransferOrganizationOwnerCommandInput,
+  transferOrganizationOwnerCommandInputSchema,
+} from "./operations/organizations/transfer-organization-owner.command";
 export {
   type ConfigurePreviewPolicyCommandInput,
   configurePreviewPolicyCommandInputSchema,

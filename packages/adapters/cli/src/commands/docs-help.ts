@@ -629,6 +629,14 @@ export const cliCommandDescriptions = {
     "Remove an organization member",
     "self-hosting.organization-team-management",
   ),
+  organizationOwner: withDocs(
+    "Organization owner operations",
+    "self-hosting.organization-team-management",
+  ),
+  organizationOwnerTransfer: withDocs(
+    "Transfer organization ownership to another member",
+    "self-hosting.organization-team-management",
+  ),
   dependency: withDocs("Dependency resource operations", "dependency.resource-lifecycle"),
   dependencyPlan: withDocs(
     "Prepare a dependency resource create or reuse plan without mutating providers",
@@ -646,8 +654,16 @@ export const cliCommandDescriptions = {
     "Create an Appaloft-managed dependency resource by kind; pass --server for Docker-backed single-server realization",
     "dependency.resource-lifecycle",
   ),
+  dependencyPostgresProvision: withDocs(
+    "Create an Appaloft-managed Postgres dependency resource",
+    "dependency.resource-lifecycle",
+  ),
   dependencyImport: withDocs(
     "Import an external dependency resource by kind",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyRedisImport: withDocs(
+    "Import an external Redis dependency resource",
     "dependency.resource-lifecycle",
   ),
   dependencyList: withDocs("List dependency resources", "dependency.resource-lifecycle"),

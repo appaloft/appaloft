@@ -1270,6 +1270,8 @@ Core next operations expected here:
 Business meaning:
 - identity governance owns organizations, membership, and machine credentials for self-hosted and
   future hosted control-plane operation
+- account settings own signed-in user profile metadata, safe session readback, and explicit
+  account deletion through Appaloft-owned ports implemented by the auth adapter
 - deploy tokens are machine credentials for automation, not Better Auth user sessions
 - Action mutation endpoints must be authenticated and authorized before they can reach source-link,
   config bootstrap, preview cleanup, route, resource, or deployment commands
@@ -1283,6 +1285,11 @@ Implemented operations:
 | Show deploy token | Admin/operator-protected lifecycle query | `deploy-tokens.show` | `ShowDeployTokenQuery` | `ShowDeployTokenQueryInput` | `appaloft deploy-token show <tokenId>` | `GET /api/deploy-tokens/{tokenId}` |
 | Rotate deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.rotate` | `RotateDeployTokenCommand` | `RotateDeployTokenCommandInput` | `appaloft deploy-token rotate <tokenId> --confirm <tokenId>` | `POST /api/deploy-tokens/{tokenId}/rotate` |
 | Revoke deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.revoke` | `RevokeDeployTokenCommand` | `RevokeDeployTokenCommandInput` | `appaloft deploy-token revoke <tokenId> --confirm <tokenId>` | `POST /api/deploy-tokens/{tokenId}/revoke` |
+| Read account profile | Product-session protected query | `account.profile.show` | `ShowAccountProfileQuery` | `ShowAccountProfileQueryInput` | - | `GET /api/account/profile` |
+| Change account profile | Product-session protected command | `account.profile.change` | `ChangeAccountProfileCommand` | `ChangeAccountProfileCommandInput` | - | `POST /api/account/profile` |
+| List account sessions | Product-session protected query | `account.sessions.list` | `ListAccountSessionsQuery` | `ListAccountSessionsQueryInput` | - | `GET /api/account/sessions` |
+| Revoke account session | Product-session protected command | `account.sessions.revoke` | `RevokeAccountSessionCommand` | `RevokeAccountSessionCommandInput` | - | `POST /api/account/sessions/{sessionId}/revoke` |
+| Delete account | Product-session protected command | `account.delete` | `DeleteAccountCommand` | `DeleteAccountCommandInput` | - | `DELETE /api/account` |
 
 The foundational `Organization` aggregate exists in `packages/core`, Better Auth-compatible tables
 exist in persistence, Web can read auth-session status, and deploy-token create/list/show/rotate/
@@ -1321,25 +1328,36 @@ types into core or application.
 Organization/team operations are governed by
 [ADR-045: Self-Hosted Organization Team Operations](./decisions/ADR-045-self-hosted-organization-team-operations.md)
 and
-[Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md):
+[Self-Hosted Organization Team Operations](./specs/054-self-hosted-organization-team-operations/spec.md).
+Account and organization settings operations are governed by
+[ADR-081: Account And Organization Settings Boundary](./decisions/ADR-081-account-and-organization-settings-boundary.md)
+and
+[Account And Organization Settings](./specs/091-account-and-organization-settings/spec.md):
 
 | Operation | Status | Operation key | Message | Input model | CLI | HTTP/oRPC |
 | --- | --- | --- | --- | --- | --- | --- |
 | Read current organization context | Product-session protected query | `organizations.current-context` | `GetCurrentOrganizationContextQuery` | `GetCurrentOrganizationContextQueryInput` | `appaloft organization context` | `GET /api/organizations/current-context` |
+| Read organization profile | Product-session protected query | `organizations.profile.show` | `ShowOrganizationProfileQuery` | `ShowOrganizationProfileQueryInput` | - | `GET /api/organizations/{organizationId}/profile` |
+| Change organization profile | Admin/operator-protected command | `organizations.profile.change` | `ChangeOrganizationProfileCommand` | `ChangeOrganizationProfileCommandInput` | - | `POST /api/organizations/{organizationId}/profile` |
+| Delete organization | Owner-protected command | `organizations.delete` | `DeleteOrganizationCommand` | `DeleteOrganizationCommandInput` | - | `DELETE /api/organizations/{organizationId}` |
 | Switch current organization | Product-session protected command | `organizations.switch-current` | `SwitchCurrentOrganizationCommand` | `SwitchCurrentOrganizationCommandInput` | `appaloft organization switch <organizationId>` | `POST /api/organizations/current-context/switch` |
 | List organization members | Admin/operator-protected query | `organizations.list-members` | `ListOrganizationMembersQuery` | `ListOrganizationMembersQueryInput` | `appaloft organization members list` | `GET /api/organizations/{organizationId}/members` |
 | List organization invitations | Admin/operator-protected query | `organizations.list-invitations` | `ListOrganizationInvitationsQuery` | `ListOrganizationInvitationsQueryInput` | `appaloft organization invitations list` | `GET /api/organizations/{organizationId}/invitations` |
 | Invite organization member | Admin/operator-protected command | `organizations.invite-member` | `InviteOrganizationMemberCommand` | `InviteOrganizationMemberCommandInput` | `appaloft organization member invite` | `POST /api/organizations/{organizationId}/invitations` |
 | Change organization member role | Admin/operator-protected command | `organizations.change-member-role` | `ChangeOrganizationMemberRoleCommand` | `ChangeOrganizationMemberRoleCommandInput` | `appaloft organization member role <memberId>` | `POST /api/organizations/{organizationId}/members/{memberId}/role` |
 | Remove organization member | Admin/operator-protected command | `organizations.remove-member` | `RemoveOrganizationMemberCommand` | `RemoveOrganizationMemberCommandInput` | `appaloft organization member remove <memberId>` | `DELETE /api/organizations/{organizationId}/members/{memberId}` |
+| Transfer organization owner | Owner-protected command | `organizations.transfer-owner` | `TransferOrganizationOwnerCommand` | `TransferOrganizationOwnerCommandInput` | `appaloft organization owner transfer <fromMemberId> <toMemberId>` | `POST /api/organizations/{organizationId}/owner-transfer` |
 
 These operations now have application message/handler/service boundaries, `@appaloft/auth-better`
-adapter implementations, operation-catalog transports, authorization-gated HTTP/oRPC routes, and
-CLI commands. Public docs/help coverage is active under
+adapter implementations behind Appaloft-owned ports, operation-catalog transports,
+authorization-gated HTTP/oRPC routes, Web account/organization settings surfaces, and CLI commands
+where listed. Public docs/help coverage is active under
 `self-hosting.organization-team-management`; Web `/organization` exposes current context, safe
-current organization switching, member and invitation reads, invite, role update, removal, and
-deploy-token controls through the same oRPC contracts. MCP descriptors are generated from the same
-operation catalog entries.
+current organization switching, member and invitation reads, invite, non-owner role update,
+ownership transfer, non-owner removal, and deploy-token controls through the same oRPC contracts.
+Web `/account/*` exposes profile, security, session, and danger-zone settings through account
+operations and existing auth-runtime security endpoints. MCP descriptors are generated from the
+same operation catalog entries.
 
 Current boundary:
 - self-hosted Action deploy-token authentication is an admission gate over existing Action
@@ -1357,6 +1375,13 @@ Current boundary:
   and scope summaries only
 - deploy-token lifecycle operations are public through CLI, HTTP/oRPC, Web `/organization`, and
   generated MCP descriptors
+- account profile updates are intentionally narrow: display name and avatar URL only; email and
+  password remain account-security behavior through configured auth-runtime endpoints
+- account/session queries return safe read models only and never expose cookies, session tokens,
+  provider account tokens, invite secrets, or Better Auth table shapes
+- account deletion and organization deletion are danger-zone commands that require exact id
+  confirmation and must not cascade Appaloft project, resource, deployment, deploy-token, runtime,
+  audit, or retained history state
 
 ## Operator Work
 

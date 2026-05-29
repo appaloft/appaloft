@@ -33,6 +33,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft organization member invite` - `organizations.invite-member`
 - `appaloft organization member role <memberId>` - `organizations.change-member-role`
 - `appaloft organization member remove <memberId>` - `organizations.remove-member`
+- `appaloft organization owner transfer <fromMemberId> <toMemberId>` - `organizations.transfer-owner`
 - `appaloft deploy-token create` - `deploy-tokens.create`
 - `appaloft deploy-token list` - `deploy-tokens.list`
 - `appaloft deploy-token show <tokenId>` - `deploy-tokens.show`

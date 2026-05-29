@@ -1,6 +1,6 @@
 ---
 title: "Organization team management"
-description: "Invite members, inspect members and invitations, update roles, remove members, and handle 401/403 safely."
+description: "Invite members, inspect members and invitations, update non-owner roles, transfer ownership, remove non-owner members, and handle 401/403 safely."
 docType: task
 localeState:
   zh-CN: complete
@@ -22,6 +22,7 @@ relatedOperations:
   - "organizations.list-invitations"
   - "organizations.invite-member"
   - "organizations.change-member-role"
+  - "organizations.transfer-owner"
   - "organizations.remove-member"
 sidebar:
   label: "Team"
@@ -62,11 +63,12 @@ appaloft organization invitations list --organization-id org_self_hosted --statu
 Member lists return member ids, safe user metadata, roles, joined timestamps, and similar safe
 fields. Invitation lists return safe invitation metadata without raw invitation tokens.
 
-<h2 id="self-hosting-organization-member-management">Invite, update roles, and remove members</h2>
+<h2 id="self-hosting-organization-member-management">Invite, transfer ownership, update roles, and remove members</h2>
 
 ```sh
 appaloft organization member invite --organization-id org_self_hosted --email operator@example.com --role developer
 appaloft organization member role mem_operator --organization-id org_self_hosted --role admin
+appaloft organization owner transfer mem_admin mem_operator --organization-id org_self_hosted
 appaloft organization member remove mem_operator --organization-id org_self_hosted
 ```
 
@@ -74,8 +76,10 @@ Available roles are `owner`, `admin`, `developer`, `billing`, and `viewer`. Owne
 manage members. Early self-hosted builds adapt the auth runtime's default `member` role back to
 Appaloft `developer` until richer custom role persistence is available.
 
-Role updates and member removal keep at least one owner in the organization. If an operation would
-leave no owner, Appaloft rejects it instead of leaving the organization unrecoverable.
+Generic role updates can only change non-owner members to non-owner roles, and generic member
+removal can only remove non-owner members. Owners cannot be demoted, created, or removed through
+those generic operations; use `appaloft organization owner transfer <fromMemberId> <toMemberId>`.
+After transfer, the target member becomes owner and the previous owner becomes admin.
 
 <h2 id="self-hosting-organization-http-api">HTTP/API routes</h2>
 
@@ -88,6 +92,7 @@ GET /api/organizations/{organizationId}/members
 GET /api/organizations/{organizationId}/invitations
 POST /api/organizations/{organizationId}/invitations
 POST /api/organizations/{organizationId}/members/{memberId}/role
+POST /api/organizations/{organizationId}/owner-transfer
 DELETE /api/organizations/{organizationId}/members/{memberId}
 ```
 
@@ -98,15 +103,16 @@ tables, or provider payloads.
 <h2 id="self-hosting-organization-web-status">Web console status</h2>
 
 The Web console `/organization` page can read the current organization context, switch to another
-visible organization, inspect members and invitations, invite members, update roles, remove members,
-and manage deploy-token create, rotate, and revoke actions. Browser-driven self-hosted auth e2e
-coverage remains later Phase 8 work.
+visible organization, inspect members and invitations, invite members, update non-owner roles,
+transfer ownership, remove non-owner members, and manage deploy-token create, rotate, and revoke
+actions. Browser-driven self-hosted auth e2e coverage remains later Phase 8 work.
 
 <h2 id="self-hosting-organization-recovery">Recovery and troubleshooting</h2>
 
 - For `401 product_auth_missing`, log in again or provide a trusted session handoff to the CLI.
 - For `403 product_auth_forbidden`, confirm that the current user belongs to the target
   organization. Member management and deploy-token management also require an owner or admin role.
-- If a member cannot be removed or demoted, check whether that member is the last owner.
+- If a member cannot be removed or demoted, check whether that member is an owner. Owners must be
+  transferred to another member first.
 - Do not edit auth database tables directly to bypass member, role, or invitation state; use
   CLI/HTTP/API or restore from a trusted backup.

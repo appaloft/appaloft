@@ -88,6 +88,7 @@ export const tokens = {
   authBootstrapStatusReader: Symbol.for("appaloft.auth_bootstrap_status_reader"),
   firstAdminBootstrapper: Symbol.for("appaloft.first_admin_bootstrapper"),
   firstAdminPasswordIssuer: Symbol.for("appaloft.first_admin_password_issuer"),
+  accountSettingsPort: Symbol.for("appaloft.account_settings_port"),
   organizationTeamManagementPort: Symbol.for("appaloft.organization_team_management_port"),
   dependencyResourceDeleteSafetyReader: Symbol.for(
     "appaloft.dependency_resource_delete_safety_reader",
@@ -189,6 +190,16 @@ export const tokens = {
   getCurrentOrganizationContextQueryService: Symbol.for(
     "appaloft.get_current_organization_context_query_service",
   ),
+  deleteAccountUseCase: Symbol.for("appaloft.delete_account_use_case"),
+  listAccountSessionsQueryService: Symbol.for("appaloft.list_account_sessions_query_service"),
+  revokeAccountSessionUseCase: Symbol.for("appaloft.revoke_account_session_use_case"),
+  showAccountProfileQueryService: Symbol.for("appaloft.show_account_profile_query_service"),
+  changeAccountProfileUseCase: Symbol.for("appaloft.change_account_profile_use_case"),
+  deleteOrganizationUseCase: Symbol.for("appaloft.delete_organization_use_case"),
+  showOrganizationProfileQueryService: Symbol.for(
+    "appaloft.show_organization_profile_query_service",
+  ),
+  changeOrganizationProfileUseCase: Symbol.for("appaloft.change_organization_profile_use_case"),
   inviteOrganizationMemberUseCase: Symbol.for("appaloft.invite_organization_member_use_case"),
   switchCurrentOrganizationUseCase: Symbol.for("appaloft.switch_current_organization_use_case"),
   listDeployTokensQueryService: Symbol.for("appaloft.list_deploy_tokens_query_service"),
@@ -217,6 +228,7 @@ export const tokens = {
   changeOrganizationMemberRoleUseCase: Symbol.for(
     "appaloft.change_organization_member_role_use_case",
   ),
+  transferOrganizationOwnerUseCase: Symbol.for("appaloft.transfer_organization_owner_use_case"),
   countProjectsQueryService: Symbol.for("appaloft.count_projects_query_service"),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
   queryCapabilitiesQueryService: Symbol.for("appaloft.query_capabilities_query_service"),

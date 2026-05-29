@@ -110,6 +110,11 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(options.emailAndPassword).not.toHaveProperty("requireEmailVerification");
     expect(options.emailVerification).toBeUndefined();
     expect(options.emailAndPassword).not.toHaveProperty("sendResetPassword");
+    expect(options.user).toMatchObject({
+      deleteUser: {
+        enabled: true,
+      },
+    });
     expect(options.rateLimit?.customRules).not.toHaveProperty("/request-password-reset");
     expect(options.plugins?.map((plugin) => plugin.id)).not.toContain("email-otp");
     expect(
@@ -722,6 +727,200 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       }),
     );
     expect(oauthPasswordStatus.accountSecurity.passwordState).toBe("set");
+  });
+
+  test("[ACCOUNT-SETTINGS-PROFILE-001] [ACCOUNT-SETTINGS-SESSION-001] exposes safe account settings through Appaloft port", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "settings-user@example.com",
+          name: "Settings User",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    const sessionCookie = (signedUp.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedUp.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after sign-up");
+    }
+
+    const portContext = {
+      ...context,
+      auth: { cookieHeader: sessionCookie },
+      requestId: "req_account_settings",
+    };
+    const shown = await runtime.showAccountProfile(portContext);
+    const updated = await runtime.changeAccountProfile(portContext, {
+      displayName: "Renamed Settings User",
+      avatarUrl: "https://example.com/avatar.png",
+    });
+    const sessions = await runtime.listAccountSessions(portContext);
+    const sessionId = sessions.isOk() ? sessions.value.items[0]?.sessionId : undefined;
+
+    expect(shown.isOk()).toBe(true);
+    expect(shown._unsafeUnwrap()).toMatchObject({
+      email: "settings-user@example.com",
+      displayName: "Settings User",
+      emailVerified: false,
+    });
+    expect(updated.isOk()).toBe(true);
+    expect(updated._unsafeUnwrap()).toMatchObject({
+      displayName: "Renamed Settings User",
+      avatarUrl: "https://example.com/avatar.png",
+    });
+    expect(sessions.isOk()).toBe(true);
+    expect(sessions._unsafeUnwrap().items).toEqual([
+      expect.objectContaining({
+        current: true,
+        userId: shown._unsafeUnwrap().userId,
+      }),
+    ]);
+    expect(JSON.stringify(sessions._unsafeUnwrap())).not.toContain("local-user-password");
+    expect(JSON.stringify(sessions._unsafeUnwrap())).not.toContain("token");
+
+    if (!sessionId) {
+      throw new Error("Expected a session id before revocation");
+    }
+    const revoked = await runtime.revokeAccountSession(portContext, { sessionId });
+    expect(revoked.isOk()).toBe(true);
+    expect(revoked._unsafeUnwrap()).toMatchObject({ sessionId });
+  });
+
+  test("[ACCOUNT-SETTINGS-DANGER-001] deletes the signed-in account through Appaloft port", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "delete-user@example.com",
+          name: "Delete User",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    const sessionCookie = (signedUp.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedUp.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after sign-up");
+    }
+
+    const portContext = {
+      ...context,
+      auth: { cookieHeader: sessionCookie },
+      requestId: "req_account_delete",
+    };
+    const profile = await runtime.showAccountProfile(portContext);
+    expect(profile.isOk()).toBe(true);
+    const deleted = await runtime.deleteAccount(portContext, {
+      confirmation: {
+        userId: profile._unsafeUnwrap().userId,
+      },
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(deleted._unsafeUnwrap()).toMatchObject({
+      userId: profile._unsafeUnwrap().userId,
+    });
+    const afterDelete = await runtime.showAccountProfile(portContext);
+    expect(afterDelete.isErr()).toBe(true);
+  });
+
+  test("[ORG-SETTINGS-PROFILE-001] [ORG-SETTINGS-DANGER-001] updates and deletes organization settings through Appaloft-owned methods", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "org-settings@example.com",
+          name: "Org Settings",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    const sessionCookie = (signedUp.headers.get("set-cookie") ?? "").match(
+      /better-auth\.session_token=[^;,]+/,
+    )?.[0];
+    expect(signedUp.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error("Expected Better Auth session cookie after sign-up");
+    }
+
+    const portContext = {
+      ...context,
+      auth: { cookieHeader: sessionCookie },
+      requestId: "req_organization_settings",
+    };
+    const current = await runtime.getCurrentContext(portContext);
+    expect(current.isOk()).toBe(true);
+    const organizationId = current._unsafeUnwrap().currentOrganization.organizationId;
+    const shown = await runtime.showOrganizationProfile(portContext, { organizationId });
+    const updated = await runtime.changeOrganizationProfile(portContext, {
+      organizationId,
+      name: "Renamed Org Settings",
+      slug: "renamed-org-settings",
+      logoUrl: "https://example.com/logo.png",
+    });
+    const deleted = await runtime.deleteOrganization(portContext, {
+      organizationId,
+      confirmation: { organizationId },
+    });
+
+    expect(shown.isOk()).toBe(true);
+    expect(shown._unsafeUnwrap()).toMatchObject({
+      organizationId,
+      role: "owner",
+    });
+    expect(updated.isOk()).toBe(true);
+    expect(updated._unsafeUnwrap()).toMatchObject({
+      organizationId,
+      name: "Renamed Org Settings",
+      slug: "renamed-org-settings",
+      logoUrl: "https://example.com/logo.png",
+    });
+    expect(deleted.isOk()).toBe(true);
+    expect(deleted._unsafeUnwrap()).toMatchObject({ organizationId });
+    const afterDelete = await runtime.showOrganizationProfile(portContext, { organizationId });
+    expect(afterDelete.isErr()).toBe(true);
   });
 
   test("[PRODUCT-AUTH-SIGNUP-002] signed-in users without an organization receive a default personal organization", async () => {
