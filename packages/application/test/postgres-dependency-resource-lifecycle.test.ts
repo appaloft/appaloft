@@ -44,6 +44,9 @@ import {
 import {
   createExecutionContext,
   type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
@@ -75,6 +78,33 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   ): Promise<Result<ProcessAttemptRecord>> {
     this.records.push(attempt);
     return ok(attempt);
+  }
+}
+
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
   }
 }
 
@@ -143,6 +173,7 @@ async function createHarness() {
     idGenerator,
     eventBus,
     logger,
+    undefined,
   );
   const provisionDependency = new ProvisionDependencyResourceUseCase(
     projects,
@@ -173,8 +204,12 @@ async function createHarness() {
     deleteSafetyReader,
     dependencyResources,
     dependencyResourceSecretStore,
+    environments,
     eventBus,
+    idGenerator,
+    logger,
     managedDependencyProvider,
+    projects,
     servers,
     importDependencyResource: importDependency,
     listDependencyResources: new ListDependencyResourcesQueryService(readModel, clock),
@@ -293,6 +328,154 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         },
       },
     ]);
+  });
+
+  test("[DEP-RES-IMPORT-AUTHZ-001] import can be denied before secret storage and persistence", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      environments,
+      eventBus,
+      idGenerator,
+      logger,
+      projects,
+    } = await createHarness();
+    const guard = new DenyingOperationGuardPort();
+    const readModel = new MemoryDependencyResourceReadModel(dependencyResources);
+    const useCase = new ImportDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      new FixedClock("2026-01-01T00:00:00.000Z"),
+      idGenerator,
+      eventBus,
+      logger,
+      guard,
+      readModel,
+    );
+
+    const result = await useCase.execute(context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Imported DB",
+      connectionUrl: "postgres://app:super-secret@db.example.test:5432/main",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "dependency-resources.import",
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toEqual([
+      expect.objectContaining({
+        operationKey: "dependency-resources.import",
+        organizationId: "org_self_hosted",
+        resourceRefs: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+        },
+        contextAttributes: expect.objectContaining({
+          estimatedFieldCount: 4,
+          estimatedInputBytes: expect.any(Number),
+          estimatedItemCount: 1,
+          estimatedNestingDepth: 1,
+          estimatedSecretCount: 1,
+          estimatedWriteUnits: 2,
+          currentEnvironmentDependencyResourceCount: 0,
+          currentProjectDependencyResourceCount: 0,
+        }),
+      }),
+    ]);
+    expect(dependencyResourceSecretStore.stored).toHaveLength(0);
+    expect(eventBus.events).toHaveLength(0);
+    expect(dependencyResources.items).toHaveLength(0);
+  });
+
+  test("[DEP-RES-PROVISION-AUTHZ-002] provision estimates provider cost before persistence/provider calls", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      dependencyResources,
+      environments,
+      eventBus,
+      idGenerator,
+      logger,
+      managedDependencyProvider,
+      processAttemptRecorder,
+      projects,
+      servers,
+    } = await createHarness();
+    const guard = new DenyingOperationGuardPort();
+    const readModel = new MemoryDependencyResourceReadModel(dependencyResources);
+    const useCase = new ProvisionDependencyResourceUseCase(
+      projects,
+      environments,
+      servers,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      new FixedClock("2026-01-01T00:00:00.000Z"),
+      idGenerator,
+      eventBus,
+      logger,
+      managedDependencyProvider,
+      processAttemptRecorder,
+      guard,
+      readModel,
+    );
+
+    const result = await useCase.execute(context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "dependency-resources.provision",
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toEqual([
+      expect.objectContaining({
+        operationKey: "dependency-resources.provision",
+        organizationId: "org_self_hosted",
+        resourceRefs: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+        },
+        contextAttributes: expect.objectContaining({
+          estimatedExternalProviderCalls: 1,
+          estimatedSecretCount: 1,
+          estimatedWriteUnits: 3,
+          currentEnvironmentDependencyResourceCount: 0,
+          currentProjectDependencyResourceCount: 0,
+        }),
+      }),
+    ]);
+    expect(managedDependencyProvider.realized).toHaveLength(0);
+    expect(dependencyResourceSecretStore.stored).toHaveLength(0);
+    expect(processAttemptRecorder.records).toHaveLength(0);
+    expect(eventBus.events).toHaveLength(0);
+    expect(dependencyResources.items).toHaveLength(0);
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-003] keeps managed Postgres binding ready for resolvable Appaloft-owned refs", async () => {

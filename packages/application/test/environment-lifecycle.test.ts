@@ -53,6 +53,7 @@ import {
   MemoryEnvironmentReadModel,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
+  MemoryResourceReadModel,
   MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
@@ -871,6 +872,8 @@ describe("environment archive operations", () => {
       new SequenceIdGenerator(),
       eventBus,
       logger,
+      undefined,
+      new MemoryResourceReadModel(resources),
     );
 
     const result = await useCase.execute(context, {
@@ -1004,6 +1007,8 @@ describe("environment archive operations", () => {
       new SequenceIdGenerator(),
       eventBus,
       logger,
+      undefined,
+      new MemoryResourceReadModel(resources),
     );
 
     const result = await useCase.execute(context, {

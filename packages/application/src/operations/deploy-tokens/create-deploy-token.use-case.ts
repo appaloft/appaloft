@@ -8,6 +8,7 @@ import {
   DisplayNameText,
   EnvironmentId,
   ExpiresAt,
+  err,
   OrganizationId,
   ok,
   ProjectId,
@@ -20,18 +21,26 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
   type ActionDeployTokenWorkflow,
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type DeployTokenMaterialIssuer,
   type DeployTokenRepository,
   type EventBus,
   type IdGenerator,
+  type OperationCheckResourceRefs,
+  type OperationGuardPort,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeployTokenScopeResult, mapDeployTokenScope } from "./deploy-token-result-mapper";
+
+const createDeployTokenOperation = findOperationCatalogEntryByKey("deploy-tokens.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 export interface CreateDeployTokenScopeInput {
   deploymentTargetIds?: readonly string[];
@@ -75,6 +84,8 @@ export class CreateDeployTokenUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -88,10 +99,35 @@ export class CreateDeployTokenUseCase {
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (createDeployTokenOperation) {
+        const resourceRefs: OperationCheckResourceRefs = {
+          ...(input.scope.projectIds?.[0] ? { projectId: input.scope.projectIds[0] } : {}),
+          ...(input.scope.environmentIds?.[0]
+            ? { environmentId: input.scope.environmentIds[0] }
+            : {}),
+          ...(input.scope.resourceIds?.[0] ? { resourceId: input.scope.resourceIds[0] } : {}),
+          ...(input.scope.deploymentTargetIds?.[0]
+            ? { serverId: input.scope.deploymentTargetIds[0] }
+            : {}),
+        };
+        const checked = await checkOperationGuards({
+          context,
+          entry: createDeployTokenOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          organizationId: input.organizationId,
+          ...(Object.keys(resourceRefs).length > 0 ? { resourceRefs } : {}),
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
+
       const material = yield* await deployTokenMaterialIssuer.issue(context);
       const createdAt = yield* CreatedAt.create(clock.now());
       const deployToken = yield* DeployToken.create({

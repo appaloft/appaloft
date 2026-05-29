@@ -60,9 +60,13 @@ import {
   createExecutionContext,
   type DomainOwnershipVerificationResult,
   type DomainOwnershipVerifier,
+  type ExecutionContext,
   ImportCertificateUseCase,
   ListCertificatesQueryService,
   MarkDomainReadyOnCertificateImportedHandler,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
@@ -126,6 +130,33 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   ): Promise<Result<ProcessAttemptRecord>> {
     this.records.push(attempt);
     return ok(attempt);
+  }
+}
+
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
   }
 }
 
@@ -403,6 +434,71 @@ describe("ImportCertificateUseCase", () => {
     expect(repeated.isOk()).toBe(true);
     expect(repeated._unsafeUnwrap()).toEqual(first._unsafeUnwrap());
     expect(eventsByType(seed.eventBus.events, "certificate-imported")).toHaveLength(1);
+  });
+
+  test("[CERT-IMPORT-AUTHZ-001] import can be denied before validator, secret storage, and persistence", async () => {
+    const seed = await seedImportContext();
+    const validator = new FakeCertificateMaterialValidator(ok(createValidationResult()));
+    const secretStore = new FakeCertificateSecretStore();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new ImportCertificateUseCase(
+      seed.domainBindings,
+      seed.certificates,
+      validator,
+      secretStore,
+      seed.clock,
+      seed.idGenerator,
+      seed.eventBus,
+      seed.logger,
+      undefined,
+      guard,
+    );
+
+    const result = await useCase.execute(seed.context, {
+      domainBindingId: seed.domainBindingId,
+      certificateChain: "leaf-chain",
+      privateKey: "leaf-key",
+      passphrase: "leaf-passphrase",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "certificates.import",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toEqual([
+      expect.objectContaining({
+        operationKey: "certificates.import",
+        resourceRefs: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+          domainBindingId: seed.domainBindingId,
+        },
+        contextAttributes: expect.objectContaining({
+          estimatedFieldCount: 3,
+          estimatedInputBytes: expect.any(Number),
+          estimatedItemCount: 1,
+          estimatedNestingDepth: 1,
+          estimatedSecretCount: 3,
+          estimatedWriteUnits: 3,
+        }),
+      }),
+    ]);
+    expect(validator.inputs).toHaveLength(0);
+    expect(secretStore.importedStored).toHaveLength(0);
+    expect(seed.certificates.items).toHaveLength(0);
+    expect(eventsByType(seed.eventBus.events, "certificate-imported")).toHaveLength(0);
   });
 
   test("[CERT-IMPORT-CMD-012] rejects conflicting idempotency reuse for different material", async () => {

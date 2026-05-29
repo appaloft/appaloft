@@ -32,9 +32,13 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type DependencyResourceReadModel,
   type DependencyResourceRepository,
   type DependencyResourceSecretStore,
   type EnvironmentRepository,
@@ -43,6 +47,7 @@ import {
   type ManagedDependencyProviderPort,
   type ManagedDependencyResourceKind,
   type ManagedDependencySingleServerTarget,
+  type OperationGuardPort,
   type ProcessAttemptRecorder,
   type ProjectRepository,
   type ServerRepository,
@@ -54,6 +59,10 @@ import { type ProvisionDependencyResourceCommandInput } from "./provision-depend
 
 const appaloftOwnedDependencySecretRefPrefix = "appaloft://dependency-resources/";
 const provisionDependencyResourceOperation = "dependency-resources.provision";
+const provisionDependencyResourceOperationEntry = findOperationCatalogEntryByKey(
+  provisionDependencyResourceOperation,
+);
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function blockedBindingReadiness(reason: string): DependencyResourceBindingReadinessState {
   return {
@@ -125,6 +134,10 @@ export class ProvisionDependencyResourceUseCase {
     private readonly managedDependencyProvider: ManagedDependencyProviderPort,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.dependencyResourceReadModel, { isOptional: true })
+    private readonly dependencyResourceReadModel?: DependencyResourceReadModel,
   ) {}
 
   async execute(
@@ -134,6 +147,7 @@ export class ProvisionDependencyResourceUseCase {
     const repositoryContext = toRepositoryContext(context);
     const {
       clock,
+      dependencyResourceReadModel,
       dependencyResourceRepository,
       dependencyResourceSecretStore,
       environmentRepository,
@@ -141,6 +155,7 @@ export class ProvisionDependencyResourceUseCase {
       idGenerator,
       logger,
       managedDependencyProvider,
+      operationGuardPort,
       processAttemptRecorder,
       projectRepository,
       serverRepository,
@@ -178,6 +193,46 @@ export class ProvisionDependencyResourceUseCase {
       );
       if (!project) {
         return err(domainError.notFound("project", projectId.value));
+      }
+      const projectState = project.toState();
+      if (provisionDependencyResourceOperationEntry) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: provisionDependencyResourceOperationEntry,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(projectState.organizationId
+            ? { organizationId: projectState.organizationId.value }
+            : {}),
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            ...(input.serverId ? { serverId: input.serverId } : {}),
+          },
+          contextAttributes: {
+            estimatedExternalProviderCalls: 1,
+            estimatedSecretCount: 1,
+            estimatedWriteUnits: 3,
+            ...(dependencyResourceReadModel
+              ? {
+                  currentEnvironmentDependencyResourceCount:
+                    await dependencyResourceReadModel.count(repositoryContext, {
+                      environmentId: environmentId.value,
+                      projectId: projectId.value,
+                    }),
+                  currentProjectDependencyResourceCount: await dependencyResourceReadModel.count(
+                    repositoryContext,
+                    {
+                      projectId: projectId.value,
+                    },
+                  ),
+                }
+              : {}),
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
       yield* project.ensureCanAcceptMutation(provisionDependencyResourceOperation);
 

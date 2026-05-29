@@ -28,14 +28,19 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type DestinationRepository,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProjectRepository,
+  type ResourceReadModel,
   type ResourceRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -44,6 +49,9 @@ import { type CreateResourceCommandInput } from "./create-resource.command";
 import { resourceNetworkProfileFromInput } from "./resource-network-profile.mapper";
 import { resourceRuntimeProfileFromInput } from "./resource-runtime-profile.mapper";
 import { resourceSourceBindingFromInput } from "./resource-source-binding.mapper";
+
+const createResourceOperation = findOperationCatalogEntryByKey("resources.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class CreateResourceUseCase {
@@ -64,6 +72,10 @@ export class CreateResourceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.resourceReadModel, { isOptional: true })
+    private readonly resourceReadModel?: ResourceReadModel,
   ) {}
 
   async execute(
@@ -77,7 +89,9 @@ export class CreateResourceUseCase {
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
       projectRepository,
+      resourceReadModel,
       resourceRepository,
     } = this;
     const repositoryContext = toRepositoryContext(context);
@@ -96,6 +110,43 @@ export class CreateResourceUseCase {
 
       if (!project) {
         return err(domainError.notFound("project", input.projectId));
+      }
+      const projectState = project.toState();
+
+      if (createResourceOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createResourceOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(projectState.organizationId
+            ? { organizationId: projectState.organizationId.value }
+            : {}),
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+          },
+          contextAttributes: {
+            ...(resourceReadModel
+              ? {
+                  currentEnvironmentResourceCount: await resourceReadModel.count(
+                    repositoryContext,
+                    {
+                      environmentId: environmentId.value,
+                      projectId: projectId.value,
+                    },
+                  ),
+                  currentProjectResourceCount: await resourceReadModel.count(repositoryContext, {
+                    projectId: projectId.value,
+                  }),
+                }
+              : {}),
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       yield* project.ensureCanAcceptMutation("resources.create");

@@ -24,6 +24,9 @@ import {
   ListOrganizationMembersQuery,
   ListOrganizationMembersQueryHandler,
   ListOrganizationMembersQueryService,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type OrganizationInvitationListInput,
   type OrganizationInvitationSummary,
   type OrganizationMemberListInput,
@@ -167,6 +170,33 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 describe("organization/team application boundary", () => {
   test("[ORG-TEAM-CONTEXT-001] current context query uses the Appaloft-owned port", async () => {
     const port = new CapturingOrganizationTeamManagementPort();
@@ -180,6 +210,36 @@ describe("organization/team application boundary", () => {
     expect(result._unsafeUnwrap()).toEqual(currentContext);
     expect(port.calls).toEqual(["getCurrentContext"]);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("providerToken");
+  });
+
+  test("[ORG-TEAM-INVITE-GUARD-001] invite member can be denied before team port side effects", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new InviteOrganizationMemberUseCase(port, guard);
+
+    const result = await useCase.execute(context, {
+      organizationId: "org_self_hosted",
+      email: "operator@example.com",
+      role: "developer",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "organizations.invite-member",
+        organizationId: "org_self_hosted",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "organizations.invite-member",
+      organizationId: "org_self_hosted",
+    });
+    expect(port.calls).toEqual([]);
   });
 
   test("[ORG-TEAM-MEMBERS-001] member and invitation queries reuse organization/team port inputs", async () => {

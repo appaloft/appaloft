@@ -29,6 +29,46 @@ async function signedBetterAuthCookieValue(token: string): Promise<string> {
   return `${token}.${await makeSignature(token, "test-secret-at-least-long-enough")}`;
 }
 
+async function signUpWithSessionCookie(
+  runtime: ReturnType<typeof createBetterAuthRuntime>,
+  input: { email: string; name: string },
+): Promise<{ sessionCookie: string }> {
+  const signedUp = await runtime.handle(
+    new Request("http://localhost:3721/api/auth/sign-up/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        callbackURL: "/",
+        email: input.email,
+        name: input.name,
+        password: "local-user-password",
+        rememberMe: true,
+      }),
+    }),
+  );
+  const setCookie = signedUp.headers.get("set-cookie") ?? "";
+  const sessionCookie = setCookie.match(/better-auth\.session_token=[^;,]+/)?.[0];
+  expect(signedUp.status).toBe(200);
+  expect(sessionCookie, setCookie).toBeTruthy();
+  if (!sessionCookie) {
+    throw new Error("Expected Better Auth session cookie after sign-up");
+  }
+
+  return { sessionCookie };
+}
+
+function requireSessionCookie(response: Response): string {
+  const setCookie = response.headers.get("set-cookie") ?? "";
+  const sessionCookie = setCookie.match(/better-auth\.session_token=[^;,]+/)?.[0];
+  expect(sessionCookie, setCookie).toBeTruthy();
+  if (!sessionCookie) {
+    throw new Error("Expected Better Auth session cookie");
+  }
+  return sessionCookie;
+}
+
 describe("Better Auth first-admin bootstrap adapter", () => {
   test("[AUTH-SHARED-COOKIE-002] builds reusable Better Auth options for shared website sessions", () => {
     const options = createAppaloftBetterAuthOptions({
@@ -44,13 +84,20 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
 
     expect(options.basePath).toBe("/api/auth");
+    expect(options.trustedOrigins).toEqual([
+      "https://www.appaloft.com",
+      "https://app.appaloft.com",
+    ]);
     expect(options.advanced).toMatchObject({
       cookiePrefix: "better-auth",
       crossSubDomainCookies: {
         enabled: true,
         domain: ".appaloft.com",
       },
+      disableCSRFCheck: false,
+      disableOriginCheck: false,
       trustedProxyHeaders: true,
+      useSecureCookies: true,
     });
     expect(options.socialProviders).toMatchObject({
       github: {
@@ -69,6 +116,21 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         trustedOrigins: ["https://www.appaloft.com"],
       }).github,
     ).toBe(true);
+  });
+
+  test("[AUTH-SESSION-COOKIE-003] keeps local development cookies non-forced while preserving CSRF and origin checks", () => {
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      trustedOrigins: ["http://localhost:3721"],
+    });
+
+    expect(options.trustedOrigins).toEqual(["http://localhost:3721"]);
+    expect(options.advanced).toMatchObject({
+      disableCSRFCheck: false,
+      disableOriginCheck: false,
+    });
+    expect(options.advanced).not.toHaveProperty("useSecureCookies");
   });
 
   test("[AUTH-GITHUB-OAUTH-001] derives GitHub callback URL from the Better Auth base URL", () => {
@@ -340,7 +402,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       baseURL: "http://localhost:3721",
       secret: "test-secret-at-least-long-enough",
     });
-    const authContext = await runtime["auth"].$context;
+    const authContext = await runtime.auth.$context;
     await authContext.adapter.create({
       model: "organization",
       data: {
@@ -573,6 +635,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         headers: {
           "content-type": "application/json",
           cookie: sessionCookie,
+          origin: "http://localhost:3721",
         },
         body: JSON.stringify({
           name: "Acme",
@@ -651,6 +714,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         headers: {
           "content-type": "application/json",
           cookie: sessionCookie,
+          origin: "http://localhost:3721",
         },
         body: JSON.stringify({
           currentPassword: "local-user-password",
@@ -676,7 +740,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     );
     expect(signedInWithUpdatedPassword.status).toBe(200);
 
-    const context = await runtime["auth"].$context;
+    const context = await runtime.auth.$context;
     const oauthOnlyUser = await context.internalAdapter.createUser({
       email: "oauth-only@example.com",
       emailVerified: true,
@@ -706,6 +770,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         headers: {
           "content-type": "application/json",
           cookie: oauthOnlyCookie,
+          origin: "http://localhost:3721",
         },
         body: JSON.stringify({
           newPassword: "oauth-user-local-password",
@@ -802,6 +867,81 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
   });
 
+  test("[AUTH-BETTER-ORG-ADMISSION-001] exposes neutral current organization counts for admission hooks and session status", async () => {
+    const organizationAdmissionRequests: unknown[] = [];
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      organizationAdmission: {
+        async admitOrganizationCreate(request) {
+          organizationAdmissionRequests.push(request);
+          return { allowed: true, reason: "test-admission-allowed" };
+        },
+      },
+    });
+
+    const signedUp = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: "/",
+          email: "neutral-org-count@example.com",
+          name: "Neutral Org Count",
+          password: "local-user-password",
+          rememberMe: true,
+        }),
+      }),
+    );
+    expect(signedUp.status).toBe(200);
+    const sessionCookie = requireSessionCookie(signedUp);
+
+    expect(organizationAdmissionRequests).toEqual([
+      expect.objectContaining({
+        currentUserOrganizationCount: 0,
+        email: "neutral-org-count@example.com",
+        reason: "default-organization",
+      }),
+    ]);
+
+    const sessionStatus = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: sessionCookie,
+        },
+      }),
+    );
+    expect(sessionStatus.currentUserOrganizationCount).toBe(1);
+
+    const createdOrganization = await runtime.handle(
+      new Request("http://localhost:3721/api/auth/organization/create", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: sessionCookie,
+          origin: "http://localhost:3721",
+        },
+        body: JSON.stringify({
+          name: "Second Neutral Org",
+          slug: "second-neutral-org",
+        }),
+      }),
+    );
+    expect(createdOrganization.status).toBe(200);
+
+    const updatedSessionStatus = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: sessionCookie,
+        },
+      }),
+    );
+    expect(updatedSessionStatus.currentUserOrganizationCount).toBe(2);
+  });
+
   test("[ORG-TEAM-MEMBERS-002] organization owners can list members through the product adapter", async () => {
     const runtime = createBetterAuthRuntime({
       enabled: true,
@@ -858,6 +998,156 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         email: "owner-list@example.com",
         role: "owner",
         userId: expect.any(String),
+      }),
+    ]);
+  });
+
+  test("[ORG-TEAM-SWITCH-003] organization switching fails closed for non-member organizations", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const ownerA = await signUpWithSessionCookie(runtime, {
+      email: "switch-owner-a@example.com",
+      name: "Switch Owner A",
+    });
+    const ownerB = await signUpWithSessionCookie(runtime, {
+      email: "switch-owner-b@example.com",
+      name: "Switch Owner B",
+    });
+    const ownerBContext = await runtime.getCurrentContext({
+      ...context,
+      auth: { cookieHeader: ownerB.sessionCookie },
+      requestId: "req_switch_owner_b_context",
+    });
+    expect(ownerBContext.isOk()).toBe(true);
+    const ownerBOrganizationId = ownerBContext._unsafeUnwrap().currentOrganization.organizationId;
+
+    const switchResult = await runtime.switchCurrentOrganization(
+      {
+        ...context,
+        auth: { cookieHeader: ownerA.sessionCookie },
+        requestId: "req_switch_owner_a_to_b",
+      },
+      {
+        organizationId: ownerBOrganizationId,
+      },
+    );
+
+    expect(switchResult.isErr()).toBe(true);
+    expect(switchResult._unsafeUnwrapErr()).toMatchObject({
+      code: "product_auth_forbidden",
+      details: {
+        organizationId: ownerBOrganizationId,
+        phase: "product-authorization",
+      },
+    });
+  });
+
+  test("[ORG-TEAM-INVITE-003] invitations require membership and preserve pending-invitation lifecycle", async () => {
+    const runtime = createBetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+
+    const owner = await signUpWithSessionCookie(runtime, {
+      email: "invite-owner@example.com",
+      name: "Invite Owner",
+    });
+    const outsider = await signUpWithSessionCookie(runtime, {
+      email: "invite-outsider@example.com",
+      name: "Invite Outsider",
+    });
+    const ownerContext = await runtime.getCurrentContext({
+      ...context,
+      auth: { cookieHeader: owner.sessionCookie },
+      requestId: "req_invite_owner_context",
+    });
+    expect(ownerContext.isOk()).toBe(true);
+    const organizationId = ownerContext._unsafeUnwrap().currentOrganization.organizationId;
+
+    const createdInvitation = await runtime.inviteMember(
+      {
+        ...context,
+        auth: { cookieHeader: owner.sessionCookie },
+        requestId: "req_invite_owner_create",
+      },
+      {
+        organizationId,
+        email: "pending-member@example.com",
+        role: "developer",
+      },
+    );
+    expect(createdInvitation.isOk()).toBe(true);
+    expect(createdInvitation._unsafeUnwrap()).toMatchObject({
+      email: "pending-member@example.com",
+      organizationId,
+      role: "developer",
+      status: "pending",
+    });
+
+    const duplicateInvitation = await runtime.inviteMember(
+      {
+        ...context,
+        auth: { cookieHeader: owner.sessionCookie },
+        requestId: "req_invite_owner_duplicate",
+      },
+      {
+        organizationId,
+        email: "pending-member@example.com",
+        role: "developer",
+      },
+    );
+    expect(duplicateInvitation.isErr()).toBe(true);
+    expect(duplicateInvitation._unsafeUnwrapErr()).toMatchObject({
+      code: "product_auth_forbidden",
+      details: {
+        organizationId,
+        reasonCode: "invite-member-failed",
+      },
+    });
+
+    const outsiderInvitation = await runtime.inviteMember(
+      {
+        ...context,
+        auth: { cookieHeader: outsider.sessionCookie },
+        requestId: "req_invite_outsider_create",
+      },
+      {
+        organizationId,
+        email: "outsider-invite@example.com",
+        role: "developer",
+      },
+    );
+    expect(outsiderInvitation.isErr()).toBe(true);
+    expect(outsiderInvitation._unsafeUnwrapErr()).toMatchObject({
+      code: "product_auth_forbidden",
+      details: {
+        organizationId,
+        reasonCode: "invite-member-failed",
+      },
+    });
+
+    const invitations = await runtime.listInvitations(
+      {
+        ...context,
+        auth: { cookieHeader: owner.sessionCookie },
+        requestId: "req_invite_owner_list",
+      },
+      {
+        organizationId,
+        status: "pending",
+      },
+    );
+    expect(invitations.isOk()).toBe(true);
+    expect(invitations._unsafeUnwrap().items).toEqual([
+      expect.objectContaining({
+        email: "pending-member@example.com",
+        organizationId,
+        status: "pending",
       }),
     ]);
   });

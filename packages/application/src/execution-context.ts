@@ -58,6 +58,15 @@ export interface ExecutionAuthContext {
   providerAccessTokens?: ExecutionProviderAccessTokens;
 }
 
+export interface ExecutionRequestSecurityContext {
+  edgeAction?: string;
+  edgeProvider?: string;
+  edgeRayId?: string;
+  edgeRuleId?: string;
+  botScore?: number;
+  fraudRiskScore?: number;
+}
+
 export interface AppSpan {
   addEvent(name: string, attributes?: TraceAttributes): void;
   recordError(error: Error | { message: string; name?: string; stack?: string }): void;
@@ -82,6 +91,7 @@ export interface ExecutionContext {
   entrypoint: AppEntrypoint;
   locale: AppaloftLocale;
   principal?: ExecutionPrincipal;
+  requestSecurity?: ExecutionRequestSecurityContext;
   requestId: string;
   tenant?: ExecutionTenantContext;
   t: AppaloftTranslate;
@@ -106,6 +116,7 @@ export interface ExecutionContextFactory {
     entrypoint: AppEntrypoint;
     locale?: string;
     principal?: ExecutionPrincipal;
+    requestSecurity?: ExecutionRequestSecurityContext;
     requestId?: string;
     tenant?: ExecutionTenantContext;
   }): ExecutionContext;
@@ -158,6 +169,7 @@ export function createExecutionContext(input: {
   entrypoint: AppEntrypoint;
   locale?: string;
   principal?: ExecutionPrincipal;
+  requestSecurity?: ExecutionRequestSecurityContext;
   requestId?: string;
   tenant?: ExecutionTenantContext;
   tracer?: AppTracer;
@@ -181,6 +193,7 @@ export function createExecutionContext(input: {
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.auth ? { auth: input.auth } : {}),
     ...(input.principal ? { principal: input.principal } : {}),
+    ...(input.requestSecurity ? { requestSecurity: input.requestSecurity } : {}),
   };
 }
 

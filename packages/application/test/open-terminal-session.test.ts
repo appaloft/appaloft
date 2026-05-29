@@ -21,10 +21,14 @@ import {
   ShowTerminalSessionQuery,
 } from "../src/messages";
 import {
+  AllowAllOperationGuardPort,
   type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
   type IdGenerator,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ResourceReadModel,
   type ResourceSummary,
   type ServerReadModel,
@@ -227,6 +231,29 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  constructor(private readonly decisionDetails: Record<string, string> = {}) {}
+
+  async checkOperation(
+    _context: Parameters<OperationGuardPort["checkOperation"]>[0],
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [],
+      deniedBy: {
+        checkKey: "test.guard",
+        kind: "quota",
+      },
+      details: this.decisionDetails,
+      reason: "test-denied",
+    };
+  }
+}
+
 function serverSummary(overrides: Partial<ServerSummary> = {}): ServerSummary {
   return {
     id: "srv_demo",
@@ -312,6 +339,7 @@ function createUseCase(input?: {
   servers?: ServerSummary[];
   resources?: ResourceSummary[];
   deployments?: DeploymentSummary[];
+  operationGuardPort?: OperationGuardPort;
 }) {
   const gateway = new RecordingTerminalSessionGateway();
   const useCase = new OpenTerminalSessionUseCase(
@@ -320,6 +348,7 @@ function createUseCase(input?: {
     new StaticResourceReadModel(input?.resources ?? [resourceSummary()]),
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
     gateway,
+    input?.operationGuardPort ?? new AllowAllOperationGuardPort(),
   );
 
   return {
@@ -329,6 +358,41 @@ function createUseCase(input?: {
 }
 
 describe("OpenTerminalSessionUseCase", () => {
+  test("[TERMINAL-SESSION-AUTHZ-001] checks operation guard before opening terminal gateway sessions", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const operationGuardPort = new DenyingOperationGuardPort({ resourceId: "res_web" });
+    const { gateway, useCase } = createUseCase({
+      operationGuardPort,
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+        deploymentId: "dep_new",
+      },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.guard",
+        operationKey: "terminal-sessions.open",
+        resourceId: "res_web",
+      },
+    });
+    expect(gateway.calls).toHaveLength(0);
+    expect(operationGuardPort.requests[0]).toMatchObject({
+      operationKey: "terminal-sessions.open",
+      resourceRefs: {
+        resourceId: "res_web",
+        deploymentId: "dep_new",
+      },
+    });
+  });
+
   test("opens a resource session in the deployment workspace resolved from runtime metadata", async () => {
     const context = createExecutionContext({ entrypoint: "http" });
     const olderDeployment = deploymentSummary({

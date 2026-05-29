@@ -175,6 +175,7 @@ import {
   type ExecutionContextFactory,
   type ExecutionPrincipal,
   type ExecutionProviderAccessTokens,
+  type ExecutionRequestSecurityContext,
   ExpireTerminalSessionsCommand,
   ExportAuditEventsQuery,
   ExportGlobalAuditEventsQuery,
@@ -1995,6 +1996,52 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
 
 const productMutationRequiredRole: ProductOrganizationRole = "admin";
 
+const requestSecurityHeaderMap = {
+  edgeAction: "x-appaloft-edge-action",
+  edgeProvider: "x-appaloft-edge-provider",
+  edgeRayId: "x-appaloft-edge-ray-id",
+  edgeRuleId: "x-appaloft-edge-rule-id",
+  botScore: "x-appaloft-bot-score",
+  fraudRiskScore: "x-appaloft-fraud-risk-score",
+} as const;
+
+function optionalHeaderString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalBoundedInteger(value: string | null): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 100 ? parsed : undefined;
+}
+
+function requestSecurityContextFromHeaders(
+  headers: Headers,
+): ExecutionRequestSecurityContext | undefined {
+  const edgeAction = optionalHeaderString(headers.get(requestSecurityHeaderMap.edgeAction));
+  const edgeProvider = optionalHeaderString(headers.get(requestSecurityHeaderMap.edgeProvider));
+  const edgeRayId = optionalHeaderString(headers.get(requestSecurityHeaderMap.edgeRayId));
+  const edgeRuleId = optionalHeaderString(headers.get(requestSecurityHeaderMap.edgeRuleId));
+  const botScore = optionalBoundedInteger(headers.get(requestSecurityHeaderMap.botScore));
+  const fraudRiskScore = optionalBoundedInteger(
+    headers.get(requestSecurityHeaderMap.fraudRiskScore),
+  );
+  const requestSecurity = {
+    ...(edgeAction ? { edgeAction } : {}),
+    ...(edgeProvider ? { edgeProvider } : {}),
+    ...(edgeRayId ? { edgeRayId } : {}),
+    ...(edgeRuleId ? { edgeRuleId } : {}),
+    ...(botScore !== undefined ? { botScore } : {}),
+    ...(fraudRiskScore !== undefined ? { fraudRiskScore } : {}),
+  };
+
+  return Object.keys(requestSecurity).length > 0 ? requestSecurity : undefined;
+}
+
 function readOrganizationIdFromMessage(message: unknown): string | undefined {
   if (!message || typeof message !== "object" || !("organizationId" in message)) {
     return undefined;
@@ -2449,6 +2496,7 @@ function createRequestExecutionContext(
   const requestId = request.headers.get("x-request-id");
   const authorizationHeader = request.headers.get("authorization");
   const cookieHeader = request.headers.get("cookie");
+  const requestSecurity = requestSecurityContextFromHeaders(request.headers);
 
   return executionContextFactory.create({
     ...(actor ? { actor } : {}),
@@ -2464,6 +2512,7 @@ function createRequestExecutionContext(
       : {}),
     entrypoint,
     locale: resolveAppaloftLocaleFromHeaders(request.headers),
+    ...(requestSecurity ? { requestSecurity } : {}),
     ...(requestId ? { requestId } : {}),
   });
 }

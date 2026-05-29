@@ -42,7 +42,14 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
+  toRepositoryContext,
+} from "../src";
 import { CreateResourceCommand } from "../src/messages";
 import { type DefaultAccessDomainProvider } from "../src/ports";
 import { CreateResourceUseCase, ListResourcesQueryService } from "../src/use-cases";
@@ -69,6 +76,33 @@ class StaticDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
     requestId: "req_resource_create_test",
@@ -92,7 +126,10 @@ function resourceCreatedEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
-async function seedResourceContext(input?: { environmentProjectId?: string }) {
+async function seedResourceContext(input?: {
+  environmentProjectId?: string;
+  operationGuardPort?: OperationGuardPort;
+}) {
   const context = createTestContext();
   const repositoryContext = toRepositoryContext(context);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -144,6 +181,8 @@ async function seedResourceContext(input?: { environmentProjectId?: string }) {
     new SequenceIdGenerator(),
     eventBus,
     logger,
+    input?.operationGuardPort,
+    new MemoryResourceReadModel(resources),
   );
 
   return {
@@ -423,6 +462,49 @@ describe("CreateResourceUseCase", () => {
       runtimePlanStrategy: "static",
       publishDirectory: "../dist",
     });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-CREATE-AUTHZ-038] passes neutral resource counts to the operation guard before persistence", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const { context, eventBus, resources, useCase } = await seedResourceContext({
+      operationGuardPort: guard,
+    });
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "Worker",
+      kind: "worker",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "resources.create",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "resources.create",
+      resourceRefs: {
+        destinationId: "dst_demo",
+        environmentId: "env_demo",
+        projectId: "prj_demo",
+      },
+      contextAttributes: {
+        currentEnvironmentResourceCount: 0,
+        currentProjectResourceCount: 0,
+      },
+    });
+    expect(resources.items.has("res_0001")).toBe(false);
     expect(eventBus.events).toHaveLength(0);
   });
 

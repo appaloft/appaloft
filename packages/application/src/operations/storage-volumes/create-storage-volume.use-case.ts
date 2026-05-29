@@ -22,18 +22,26 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProjectRepository,
+  type StorageVolumeReadModel,
   type StorageVolumeRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateStorageVolumeCommandInput } from "./create-storage-volume.command";
+
+const createStorageVolumeOperation = findOperationCatalogEntryByKey("storage-volumes.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class CreateStorageVolumeUseCase {
@@ -52,6 +60,10 @@ export class CreateStorageVolumeUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.storageVolumeReadModel, { isOptional: true })
+    private readonly storageVolumeReadModel?: StorageVolumeReadModel,
   ) {}
 
   async execute(
@@ -65,7 +77,9 @@ export class CreateStorageVolumeUseCase {
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
       projectRepository,
+      storageVolumeReadModel,
       storageVolumeRepository,
     } = this;
 
@@ -80,6 +94,39 @@ export class CreateStorageVolumeUseCase {
         : undefined;
       const description = DescriptionText.fromOptional(input.description);
       const createdAt = yield* CreatedAt.create(clock.now());
+
+      if (createStorageVolumeOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createStorageVolumeOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+          },
+          contextAttributes: {
+            ...(storageVolumeReadModel
+              ? {
+                  currentEnvironmentStorageVolumeCount: (
+                    await storageVolumeReadModel.list(repositoryContext, {
+                      environmentId: environmentId.value,
+                      projectId: projectId.value,
+                    })
+                  ).length,
+                  currentProjectStorageVolumeCount: (
+                    await storageVolumeReadModel.list(repositoryContext, {
+                      projectId: projectId.value,
+                    })
+                  ).length,
+                }
+              : {}),
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
 
       const project = await projectRepository.findOne(
         repositoryContext,
