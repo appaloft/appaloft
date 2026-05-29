@@ -19,6 +19,7 @@ import {
   type DependencyResourceBackupReadModel,
   type DependencyResourceBackupRepository,
   type DependencyResourceBackupSummary,
+  type DependencyResourceCapabilityRequirement,
   type DependencyResourceDeleteBlocker,
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceReadModel,
@@ -364,7 +365,12 @@ export class FakeManagedDependencyProvider implements ManagedDependencyProviderP
     this.deleteResult = result;
   }
 
-  supports(providerKey: string, kind: ManagedDependencyRealizationInput["kind"]): boolean {
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyRealizationInput["kind"],
+    capabilities?: readonly DependencyResourceCapabilityRequirement[],
+  ): boolean {
+    void capabilities;
     return this.supportedProviderKeys.has(`${providerKey}:${kind}`);
   }
 
@@ -1654,6 +1660,21 @@ export class MemoryDependencyResourceReadModel implements DependencyResourceRead
       providerManaged: state.providerManaged ?? false,
       ...(state.description ? { description: state.description.value } : {}),
       lifecycleStatus: state.status.value,
+      desiredCapabilities: (state.desiredCapabilities ?? []).map((capability) => ({
+        type: capability.type,
+        name: capability.name,
+        required: capability.required,
+        ...(capability.description ? { description: capability.description.value } : {}),
+      })),
+      capabilityReadbacks: (state.capabilityReadbacks ?? []).map((capability) => ({
+        type: capability.type,
+        name: capability.name,
+        required: capability.required,
+        status: capability.status,
+        evidence: [...capability.evidence],
+        ...(capability.version ? { version: capability.version } : {}),
+        ...(capability.checkedAt ? { checkedAt: capability.checkedAt.value } : {}),
+      })),
       ...(endpoint
         ? {
             connection: {

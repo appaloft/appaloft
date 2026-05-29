@@ -18,6 +18,7 @@ import {
   type CreateResourceResponse,
   type CreateSshCredentialInput,
   type CreateSshCredentialResponse,
+  type DependencyResourceCapabilityRequirement,
   type DependencyResourceSummary,
   type RegisterServerInput,
   type RegisterServerResponse,
@@ -75,6 +76,7 @@ export type QuickDeployDependencyProvisioningInput =
       name: string;
       providerKey?: string;
       serverId?: string;
+      capabilities?: DependencyResourceCapabilityRequirement[];
       description?: string;
       binding?: QuickDeployDependencyBindingInput;
     }
@@ -86,6 +88,7 @@ export type QuickDeployDependencyProvisioningInput =
       connectionUrl: string;
       secretRef?: string;
       connectionSecret?: string;
+      capabilities?: DependencyResourceCapabilityRequirement[];
       description?: string;
       binding?: QuickDeployDependencyBindingInput;
     };

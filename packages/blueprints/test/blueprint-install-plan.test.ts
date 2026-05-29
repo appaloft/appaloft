@@ -158,6 +158,90 @@ describe("Blueprint install plan", () => {
     }
   });
 
+  test("[CLOUD-BLUEPRINT-PUBLIC-DEPENDENCY-KINDS-022] carries dependency capabilities into plans and bundles", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "capability-service",
+      name: "Capability Service",
+      version: "1.0.0",
+      summary: "A deployable service with dependency capabilities.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          capabilities: [{ type: "postgres-extension", name: "vector" }],
+        },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/appaloft/api:latest",
+          },
+          usesResources: ["postgres"],
+        },
+      ],
+      profiles: {
+        production: {
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) {
+      throw new Error("Expected manifest to validate");
+    }
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Capability Project",
+        environmentName: "production",
+      },
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) {
+      throw new Error("Expected install plan to compile");
+    }
+
+    const bindDependency = plan.value.operations.find(
+      (operation) => operation.kind === "bind-dependency",
+    );
+    expect(bindDependency).toMatchObject({
+      kind: "bind-dependency",
+      requirementId: "postgres",
+      requirementKind: "postgres",
+      capabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+    });
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: plan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) {
+      throw new Error("Expected bundle plan to compile");
+    }
+    expect(bundle.value.dependencies).toEqual([
+      expect.objectContaining({
+        requirementId: "postgres",
+        kind: "postgres",
+        capabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+      }),
+    ]);
+    expect(bundle.value.components[0]?.dependencyBindings).toEqual([
+      {
+        requirementId: "postgres",
+        requirementKind: "postgres",
+        capabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+      },
+    ]);
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-VARIANT-033] compiles the selected variant into the install plan", () => {
     const manifest = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
@@ -345,6 +429,7 @@ describe("Blueprint install plan", () => {
           componentId: "worker",
           requirementId: "redis",
           requirementKind: "redis",
+          capabilities: [],
         },
       ]),
     );

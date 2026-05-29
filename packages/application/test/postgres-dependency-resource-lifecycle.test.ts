@@ -20,6 +20,8 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  ResourceInstanceByIdSpec,
+  ResourceInstanceId,
   type Result,
   TargetKindValue,
   UpsertDeploymentTargetSpec,
@@ -399,6 +401,92 @@ describe("Postgres dependency resource lifecycle use cases", () => {
         secretRef,
         maskedConnection: expect.stringContaining("********"),
       },
+    });
+  });
+
+  test("[CLOUD-DEP-PROV-CAPABILITY-052] provisions managed Postgres with dependency capabilities on the resource state", async () => {
+    const {
+      context,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      repositoryContext,
+      dependencyResources,
+      showDependencyResource,
+    } = await createHarness();
+    managedDependencyProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "pg/rsi_0001",
+        endpoint: {
+          host: "main-db.postgres.internal",
+          port: 5432,
+          databaseName: "main_db",
+          maskedConnection: "postgres://app:********@main-db.postgres.internal:5432/main_db",
+        },
+        secretRef: "secret://dependency/postgres/rsi_0001",
+        capabilityReadbacks: [
+          {
+            type: "postgres-extension",
+            name: "vector",
+            required: true,
+            status: "satisfied",
+            evidence: ["postgres-extension-installed:vector"],
+            version: "0.7.4",
+            checkedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Vector DB",
+      capabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+    });
+
+    expect(result.isOk()).toBe(true);
+    const id = result._unsafeUnwrap().id;
+    expect(managedDependencyProvider.realized[0]?.capabilities).toEqual([
+      { type: "postgres-extension", name: "vector", required: true },
+    ]);
+    const persisted = await dependencyResources.findOne(
+      repositoryContext,
+      ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate(id)),
+    );
+    expect(persisted?.toState().desiredCapabilities).toMatchObject([
+      { type: "postgres-extension", name: "vector", required: true },
+    ]);
+    expect(persisted?.toState().capabilityReadbacks).toMatchObject([
+      {
+        type: "postgres-extension",
+        name: "vector",
+        required: true,
+        status: "satisfied",
+        evidence: ["postgres-extension-installed:vector"],
+        version: "0.7.4",
+      },
+    ]);
+
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: id })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().dependencyResource).toMatchObject({
+      desiredCapabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+      capabilityReadbacks: [
+        {
+          type: "postgres-extension",
+          name: "vector",
+          required: true,
+          status: "satisfied",
+          evidence: ["postgres-extension-installed:vector"],
+          version: "0.7.4",
+          checkedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      bindingReadiness: { status: "ready" },
     });
   });
 
