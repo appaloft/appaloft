@@ -32,6 +32,15 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain('class="w-full"');
   });
 
+  test("[QUICK-DEPLOY-UX-003] keeps the deploy entry readable at constrained console widths", () => {
+    expect(quickDeploySheetSource).toContain("lg:grid-cols-[minmax(22rem,1fr)_20rem]");
+    expect(quickDeploySheetSource).not.toContain("md:grid-cols-[minmax(0,1fr)_20rem]");
+    expect(quickDeploySheetSource).toContain("grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]");
+    expect(quickDeploySheetSource).not.toContain("sm:grid-cols-2 xl:grid-cols-5");
+    expect(quickDeploySheetSource).toContain("lg:sticky");
+    expect(quickDeploySheetSource).not.toContain("md:sticky");
+  });
+
   test("[QD-GHA-001] shows hosted GitHub App install without requiring GitHub OAuth", () => {
     expect(quickDeploySheetSource).toContain("data-github-app-install-panel");
     expect(quickDeploySheetSource).toContain("data-github-app-install-action");
