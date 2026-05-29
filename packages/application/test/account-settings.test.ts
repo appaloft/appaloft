@@ -45,6 +45,8 @@ const profile: AccountProfileSummary = {
 const session: AccountSessionSummary = {
   sessionId: "sess_current",
   userId: "usr_admin",
+  clientKind: "cli",
+  displayName: "Appaloft CLI",
   createdAt: "2026-01-01T00:00:00.000Z",
   expiresAt: "2026-02-01T00:00:00.000Z",
   current: true,

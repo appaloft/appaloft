@@ -1287,7 +1287,7 @@ Implemented operations:
 | Revoke deploy token | Admin/operator-protected lifecycle command | `deploy-tokens.revoke` | `RevokeDeployTokenCommand` | `RevokeDeployTokenCommandInput` | `appaloft deploy-token revoke <tokenId> --confirm <tokenId>` | `POST /api/deploy-tokens/{tokenId}/revoke` |
 | Read account profile | Product-session protected query | `account.profile.show` | `ShowAccountProfileQuery` | `ShowAccountProfileQueryInput` | - | `GET /api/account/profile` |
 | Change account profile | Product-session protected command | `account.profile.change` | `ChangeAccountProfileCommand` | `ChangeAccountProfileCommandInput` | - | `POST /api/account/profile` |
-| List account sessions | Product-session protected query | `account.sessions.list` | `ListAccountSessionsQuery` | `ListAccountSessionsQueryInput` | - | `GET /api/account/sessions` |
+| List account sessions | Product-session protected query returning safe Web/CLI/unknown client metadata when known | `account.sessions.list` | `ListAccountSessionsQuery` | `ListAccountSessionsQueryInput` | - | `GET /api/account/sessions` |
 | Revoke account session | Product-session protected command | `account.sessions.revoke` | `RevokeAccountSessionCommand` | `RevokeAccountSessionCommandInput` | - | `POST /api/account/sessions/{sessionId}/revoke` |
 | Delete account | Product-session protected command | `account.delete` | `DeleteAccountCommand` | `DeleteAccountCommandInput` | - | `DELETE /api/account` |
 

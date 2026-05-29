@@ -6355,6 +6355,8 @@ export interface ChangeAccountProfileInput {
 export interface AccountSessionSummary {
   sessionId: string;
   userId: string;
+  clientKind?: "web" | "cli" | "unknown";
+  displayName?: string;
   createdAt: string;
   expiresAt: string;
   ipAddress?: string;

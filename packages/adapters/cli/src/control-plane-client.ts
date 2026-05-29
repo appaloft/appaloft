@@ -21,6 +21,8 @@ import {
   type CliControlPlaneProfile,
 } from "./control-plane-profile.js";
 
+const cliUserAgent = "appaloft-cli";
+
 export type CliRemoteProjectOperationKey = "projects.list" | "projects.show";
 
 export interface CliControlPlaneHandshakeResult {
@@ -615,6 +617,7 @@ export async function requestControlPlaneOperation(input: {
     baseUrl: `${input.profile.baseUrl}/api`,
     auth: authForProfile(input.profile.auth),
     ...(input.fetch ? { fetch: input.fetch } : {}),
+    userAgent: cliUserAgent,
   });
 
   const request: AppaloftSdkOperationRequest = {

@@ -62,6 +62,7 @@ import {
   type Result,
   SourceRepositoryFullName,
 } from "@appaloft/core";
+import { makeSignature } from "better-auth/crypto";
 import {
   type AppaloftBetterAuth,
   type AppaloftBetterAuthAccountRecoveryStatus,
@@ -111,6 +112,7 @@ export interface AuthRuntime
     ProductSessionAuthorizationPort {
   getSessionStatus(request: Request): Promise<AuthSessionStatus>;
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
+  issueCliProductSessionCookie(request: Request): Promise<string | null>;
   handle(request: Request): Promise<Response>;
 }
 
@@ -263,6 +265,35 @@ export class BetterAuthRuntime implements AuthRuntime {
     } catch {
       return null;
     }
+  }
+
+  async issueCliProductSessionCookie(request: Request): Promise<string | null> {
+    if (!this.config.enabled) {
+      return null;
+    }
+
+    const session = await this.auth.api.getSession({
+      headers: request.headers,
+    });
+    if (!session) {
+      return null;
+    }
+
+    const sessionObject = readObject(session, "session");
+    const userObject = readObject(session, "user");
+    const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+    if (!userId) {
+      return null;
+    }
+
+    const authContext = await this.auth.$context;
+    const ipAddress = trustedRequestIp(request.headers);
+    const cliSession = await authContext.internalAdapter.createSession(userId, false, {
+      ...(ipAddress ? { ipAddress } : {}),
+      userAgent: "appaloft-cli browser-auth-exchange",
+    });
+    const signedToken = `${cliSession.token}.${await makeSignature(cliSession.token, this.config.secret)}`;
+    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
   }
 
   async handle(request: Request): Promise<Response> {
@@ -1803,6 +1834,21 @@ function readDateString(value: unknown, key: string): string | undefined {
   return typeof property === "string" && property.trim() ? property : undefined;
 }
 
+function trustedRequestIp(headers: Headers): string | undefined {
+  return (
+    firstHeaderListValue(headers.get("x-forwarded-for")) ??
+    firstHeaderListValue(headers.get("x-real-ip")) ??
+    firstHeaderListValue(headers.get("cf-connecting-ip"))
+  );
+}
+
+function firstHeaderListValue(value: string | null): string | undefined {
+  return value
+    ?.split(",")
+    .map((item) => item.trim())
+    .find((item) => item.length > 0);
+}
+
 function toArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(readRecord(item)))
@@ -1972,9 +2018,13 @@ function mapAccountSessionSummary(
   const ipAddress = readString(value, "ipAddress");
   const lastActiveAt = readDateString(value, "updatedAt");
   const userAgent = readString(value, "userAgent");
+  const clientKind = classifyAccountSessionClient(userAgent);
+  const displayName = accountSessionDisplayName(clientKind, userAgent);
   return {
     sessionId: readString(value, "id") ?? token ?? "",
     userId: readString(value, "userId") ?? "",
+    clientKind,
+    displayName,
     createdAt: readDateString(value, "createdAt") ?? new Date(0).toISOString(),
     expiresAt: readDateString(value, "expiresAt") ?? new Date(0).toISOString(),
     ...(ipAddress ? { ipAddress } : {}),
@@ -1982,6 +2032,29 @@ function mapAccountSessionSummary(
     current: Boolean(token && currentSessionToken && token === currentSessionToken),
     ...(lastActiveAt ? { lastActiveAt } : {}),
   };
+}
+
+function classifyAccountSessionClient(userAgent: string | undefined): "web" | "cli" | "unknown" {
+  if (!userAgent) {
+    return "unknown";
+  }
+  if (/\b(appaloft-cli|appaloft cli)\b/i.test(userAgent)) {
+    return "cli";
+  }
+  return "web";
+}
+
+function accountSessionDisplayName(
+  clientKind: "web" | "cli" | "unknown",
+  userAgent: string | undefined,
+): string {
+  if (clientKind === "cli") {
+    return "Appaloft CLI";
+  }
+  if (clientKind === "web") {
+    return userAgent ?? "Web browser";
+  }
+  return userAgent ?? "Unknown client";
 }
 
 function mapOrganizationProfileSummary(

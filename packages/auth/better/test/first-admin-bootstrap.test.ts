@@ -378,6 +378,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -432,6 +433,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -741,6 +743,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "user-agent": "Mozilla/5.0 Appaloft Settings Test",
         },
         body: JSON.stringify({
           callbackURL: "/",
@@ -765,6 +768,27 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       auth: { cookieHeader: sessionCookie },
       requestId: "req_account_settings",
     };
+    const cliSessionCookie = await runtime.issueCliProductSessionCookie(
+      new Request("http://localhost:3721/cli-auth/authorize", {
+        headers: {
+          cookie: sessionCookie,
+          "x-forwarded-for": "203.0.113.9",
+        },
+      }),
+    );
+    expect(cliSessionCookie).toContain("better-auth.session_token=");
+    expect(cliSessionCookie).not.toBe(sessionCookie);
+    if (!cliSessionCookie) {
+      throw new Error("Expected CLI product session cookie after browser authorization");
+    }
+    const cliAuthorizationResult = await runtime.authorizeProductSession(context, {
+      method: "GET",
+      path: "/api/organizations/current-context",
+      requiredRole: "member",
+      cookieHeader: cliSessionCookie,
+    });
+    expect(cliAuthorizationResult.isOk()).toBe(true);
+
     const shown = await runtime.showAccountProfile(portContext);
     const updated = await runtime.changeAccountProfile(portContext, {
       displayName: "Renamed Settings User",
@@ -785,12 +809,20 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       avatarUrl: "https://example.com/avatar.png",
     });
     expect(sessions.isOk()).toBe(true);
-    expect(sessions._unsafeUnwrap().items).toEqual([
-      expect.objectContaining({
-        current: true,
-        userId: shown._unsafeUnwrap().userId,
-      }),
-    ]);
+    expect(sessions._unsafeUnwrap().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          clientKind: "web",
+          current: true,
+          userId: shown._unsafeUnwrap().userId,
+        }),
+        expect.objectContaining({
+          clientKind: "cli",
+          displayName: "Appaloft CLI",
+          userId: shown._unsafeUnwrap().userId,
+        }),
+      ]),
+    );
     expect(JSON.stringify(sessions._unsafeUnwrap())).not.toContain("local-user-password");
     expect(JSON.stringify(sessions._unsafeUnwrap())).not.toContain("token");
 
