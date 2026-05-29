@@ -32,13 +32,13 @@ CLI `--help`、交互式 prompt 和错误恢复提示应该链接到稳定 publi
 
 <h2 id="cli-remote-control-plane-login">远程控制面登录</h2>
 
-`appaloft login --url <url>` 和 `appaloft auth login --url <url>` 会把 Appaloft Cloud 或自托管控制面的 endpoint、profile 名称、认证引用和握手摘要保存到本机 CLI profile。这个 profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home，不属于仓库配置。
+`appaloft login` 和 `appaloft auth login` 默认连接 Appaloft Cloud：`https://app.appaloft.com`。如果要连接自托管控制面或其他受信任 endpoint，显式传入 `--url <url>`。登录成功后，CLI 会把 endpoint、profile 名称、认证引用和握手摘要保存到本机 CLI profile。这个 profile 位于 `APPALOFT_HOME` 或用户本机 Appaloft home，不属于仓库配置。
 
 登录需要先通过 `/api/version` 兼容性发现和当前组织上下文校验。`appaloft auth status`、`appaloft logout`、`appaloft auth logout`、`appaloft context list`、`appaloft context show`、`appaloft context use <profile>` 只管理本机 profile/context。
 
 登录不是部署接管，也不是 SSH PGlite state adoption。它不会创建 project、resource、deployment、source link、domain binding，不会把 `controlPlane` 塞进 `deployments.create`，也不会把 token、cookie、database URL、SSH key、credential id、tenant/org secret identity 写进 committed `appaloft.yml`。
 
-当前 Cloud 支持需要显式 `--url` 和受信任的本机 token 或 session 输入；默认 Cloud URL、浏览器/device/OIDC 登录仍属于后续能力。
+交互式 Cloud 登录会打开或提示浏览器登录 URL。当前 CLI 仍需要一个受信任的本机 credential 才能完成 profile 写入：`APPALOFT_AUTH_COOKIE` 用于 product session，`APPALOFT_TOKEN` 用于明确的 bearer token 自动化输入。浏览器/device/OIDC 自动把 session/token 交换回 CLI 属于后续能力；在该能力落地前，浏览器登录只是引导，不会让 CLI 读取浏览器 cookie。
 
 <h2 id="cli-remote-control-plane-dispatch">远程控制面 dispatch</h2>
 

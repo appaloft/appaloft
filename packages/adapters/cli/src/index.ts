@@ -40,6 +40,8 @@ export {
   type CliControlPlaneProfile,
   type CliControlPlaneProfileStore,
   defaultCliControlPlaneProfileStore,
+  defaultPublicCloudBrowserLoginUrl,
+  defaultPublicCloudControlPlaneUrl,
   FileSystemCliControlPlaneProfileStore,
   MemoryCliControlPlaneProfileStore,
   profileView,

@@ -67,6 +67,8 @@ export interface CliControlPlaneProfileStore {
 
 export type CliControlPlaneEnvironment = Readonly<Record<string, string | undefined>>;
 
+export const defaultPublicCloudControlPlaneUrl = "https://app.appaloft.com";
+
 const emptyStoreData: CliControlPlaneProfileStoreData = {
   profiles: {},
 };
@@ -376,6 +378,19 @@ export function normalizeControlPlaneUrl(url: string): Result<string> {
   }
 }
 
+export function isDefaultPublicCloudControlPlaneUrl(url: string): boolean {
+  const normalized = normalizeControlPlaneUrl(url);
+  return normalized.isOk() && normalized.value === defaultPublicCloudControlPlaneUrl;
+}
+
+export function defaultPublicCloudBrowserLoginUrl(
+  baseUrl = defaultPublicCloudControlPlaneUrl,
+): string {
+  const loginUrl = new URL("/login", baseUrl);
+  loginUrl.searchParams.set("intent", "cli");
+  return loginUrl.toString();
+}
+
 export function deriveProfileName(url: string, mode: CliControlPlaneMode): string {
   if (mode === "cloud") {
     return "cloud";
@@ -405,7 +420,7 @@ export function readControlPlaneAuthFromEnvironment(
   return err(
     controlPlaneProfileError(
       "control_plane_auth_missing",
-      "Set APPALOFT_AUTH_COOKIE or APPALOFT_TOKEN before logging in to a self-hosted control plane",
+      "Set APPALOFT_AUTH_COOKIE or APPALOFT_TOKEN before logging in to a control plane",
       {
         phase: "control-plane-auth",
       },

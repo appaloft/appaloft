@@ -4,9 +4,10 @@
 
 - Round: Code Round with Post-Implementation Sync for the ordinary CLI remote client bridge.
 - Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
-  handshake, and generic generated SDK non-streaming operation dispatch are implemented and
-  synchronized. Default Cloud auth, OS keychain storage, SSH PGlite adoption, source-package
-  quick deploy, streaming/watch, and future MCP exposure remain deferred.
+  handshake, default public Cloud endpoint selection, browser-open login guidance, and generic
+  generated SDK non-streaming operation dispatch are implemented and synchronized. Automatic
+  Cloud browser-to-CLI credential exchange, OS keychain storage, SSH PGlite adoption,
+  source-package quick deploy, streaming/watch, and future MCP exposure remain deferred.
 - Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
   resolution, and ordinary generated SDK remote operation dispatch concrete without completing
   Cloud-assisted Action, self-hosted adoption, or control-plane-owned source-package execution.
@@ -56,13 +57,15 @@ remote state on an SSH target, or rewrite committed repository config.
 
 ### Login
 
-`appaloft login --url <cloud-or-self-hosted-url>` creates or updates a local CLI profile only after
-the endpoint is trusted, reachable, and compatible enough for the selected authentication flow.
+`appaloft login` defaults to Appaloft Cloud at `https://app.appaloft.com`. `appaloft login --url
+<cloud-or-self-hosted-url>` creates or updates a local CLI profile for an explicit endpoint only
+after the endpoint is trusted, reachable, and compatible enough for the selected authentication
+flow.
 
 Initial accepted command shapes:
 
-- `appaloft login --url <url> [--profile <name>]`
-- `appaloft auth login --url <url> [--profile <name>]` as a namespaced alias when useful for CLI
+- `appaloft login [--url <url>] [--profile <name>] [--no-browser]`
+- `appaloft auth login [--url <url>] [--profile <name>] [--no-browser]` as a namespaced alias when useful for CLI
   organization
 - `appaloft auth status [--profile <name>]`
 - `appaloft logout [--profile <name>]`
@@ -79,6 +82,8 @@ Login must:
 - make the new profile active only after profile write succeeds;
 - print sanitized profile, URL origin, API version, selected mode, and current organization/user
   summary when available.
+- open the browser to the selected Cloud login URL for interactive Cloud login unless `--no-browser`,
+  `APPALOFT_CLI_OPEN_BROWSER=false`, or CI disables browser opening.
 
 Login must not:
 
@@ -89,8 +94,9 @@ Login must not:
 - store raw token material in command history, committed config, logs, diagnostics, or JSON output.
 
 The implemented auth acquisition mechanism accepts trusted local product-session cookie or bearer
-token input from environment variables. Browser/device/OIDC login and a default public Cloud URL
-remain deferred until the Cloud auth mechanism is accepted.
+token input from environment variables. Browser-open Cloud login guidance and the default public
+Cloud URL are active; automatic browser/device/OIDC credential exchange into the CLI remains
+deferred until the Cloud auth mechanism is accepted.
 
 ### Logout
 
@@ -197,10 +203,12 @@ Spec/Test-First/Code Round remoteizes the missing transport/custody behavior:
 
 ### Cloud Boundary
 
-Cloud is partially supported as an explicit endpoint mode: `--mode cloud --url <url>` or
-`--control-plane-mode cloud --control-plane-url <url>` may use trusted local token/session input and
-the same handshake/profile/dispatch path. A default public Cloud endpoint, browser/device/OIDC
-login, and Cloud-specific token custody remain deferred.
+Cloud is supported as the default login endpoint and as an explicit endpoint mode:
+`appaloft login`, `appaloft auth login`, `--mode cloud --url <url>`,
+`--control-plane-mode cloud`, or `--control-plane-mode cloud --control-plane-url <url>` may use
+trusted local token/session input and the same handshake/profile/dispatch path. When Cloud mode is
+selected without a URL, the public CLI uses `https://app.appaloft.com` as the default endpoint.
+Browser opening is guidance only until a governed Cloud browser-to-CLI credential exchange exists.
 
 ### Self-Hosted Boundary
 
@@ -286,6 +294,8 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-007 | Remote errors do not silently fall back | Remote mode/profile is selected and the operation is unsupported or handshake fails | The operator runs a non-remoteized command | The CLI fails before local mutation and reports the remote failure phase. |
 | CLI-RCPC-SPEC-008 | `auto` does not adopt | An active profile exists or no trusted source exists | The operator runs with `auto` | With a profile, remote dispatch may be selected after handshake; without a trusted source, local mode is selected. In neither case does the CLI upload or adopt SSH PGlite state. |
 | CLI-RCPC-SPEC-009 | Profile store secrets stay local | A command is run from a repository with `appaloft.yml` | The CLI reads/writes profile data | No token, database URL, SSH key, credential id, tenant/org secret identity, or raw secret value is written to committed config or diagnostics. |
+| CLI-RCPC-SPEC-010 | Cloud login has a default endpoint | No explicit `--url` is supplied | The operator runs `appaloft login` or `appaloft auth login` | The CLI selects `https://app.appaloft.com`, derives the `cloud` profile, opens or prints the Cloud browser login URL, verifies any trusted local credential, and writes no profile when the local credential is absent. |
+| CLI-RCPC-SPEC-011 | Explicit Cloud dispatch can use the default endpoint | No profile exists but trusted local Cloud credential input exists | The operator runs a remote-capable command with `--control-plane-mode cloud` and no URL | The CLI builds an ephemeral `cloud` target for `https://app.appaloft.com`, does not write a profile, and fails before local mutation if auth or handshake fails. |
 
 ## Public Surfaces
 
@@ -320,10 +330,8 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 
 ## Open Questions
 
-- Which browser/device/OIDC login flow should replace or complement trusted local token/session
-  input?
-- Should public Cloud use an implicit default URL, or should `--url` be required until Cloud auth is
-  accepted?
+- Which browser/device/OIDC or one-time code exchange should replace or complement trusted local
+  token/session input for automatic Cloud CLI login?
 - Should profile credential storage require OS keychain support for release readiness, or is a
   file-backed owner-only fallback acceptable for the current bridge?
 - Should context eventually include project/environment/resource defaults, and what command should
@@ -337,12 +345,13 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   store with an owner-only file-backed fallback under `APPALOFT_HOME` or the user's Appaloft home.
   It is intentionally outside `core` and `application`.
 - `packages/adapters/cli/src/control-plane-service.ts` implements `auth login/status`, `logout`,
-  `context list/use/show`, and active profile resolution for self-hosted and explicit-URL Cloud
-  profiles.
+  `context list/use/show`, default Appaloft Cloud login endpoint selection, browser-open guidance,
+  and active profile resolution for self-hosted and Cloud profiles.
 - `packages/adapters/cli/src/control-plane-client.ts` reuses `@appaloft/sdk` generated operation
   descriptors for handshake and remote operation dispatch; it does not define parallel CLI schemas.
 - `packages/adapters/cli/src/control-plane-target.ts` implements flags/env/profile/config target
-  resolution and strips global control-plane options before normal CLI parsing.
+  resolution, default Appaloft Cloud endpoint selection for explicit Cloud mode, and strips global
+  control-plane options before normal CLI parsing.
 - `packages/adapters/cli/src/remote-cli-program.ts` implements the remote CLI runtime over the
   generated SDK operation descriptors, including dispatch-time handshake, path/query/body mapping,
   streaming/follow rejection, and webhook-signature rejection.
@@ -351,6 +360,6 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   profile/context commands therefore avoid local runtime setup.
 - `packages/adapters/cli/src/runtime.ts` still executes non-remoteized CLI commands and queries
   through local `CommandBus` and `QueryBus` using the shell composition.
-- Default Cloud URL/browser/device/OIDC login, OS keychain storage, source-package quick deploy,
-  remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption remain
-  deferred governed work.
+- Automatic browser/device/OIDC credential exchange, OS keychain storage, source-package quick
+  deploy, remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption
+  remain deferred governed work.
