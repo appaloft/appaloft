@@ -2,17 +2,23 @@ import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
   type CliRemoteProjectOperationKey,
+  cancelCliAuthSession,
+  createCliAuthSession,
+  exchangeCliAuthSession,
   performControlPlaneHandshake,
+  pollCliAuthSession,
   requestRemoteProjectOperation,
 } from "./control-plane-client.js";
 import {
+  type CliControlPlaneAuth,
   type CliControlPlaneEnvironment,
+  type CliControlPlaneLoginProfileView,
+  type CliControlPlaneLoginSessionView,
   type CliControlPlaneMode,
   type CliControlPlaneProfile,
   type CliControlPlaneProfileStore,
   type CliControlPlaneProfileView,
   defaultCliControlPlaneProfileStore,
-  defaultPublicCloudBrowserLoginUrl,
   defaultPublicCloudControlPlaneUrl,
   deriveProfileName,
   isDefaultPublicCloudControlPlaneUrl,
@@ -24,7 +30,10 @@ import {
 export interface CliControlPlaneDependencies {
   readonly env?: CliControlPlaneEnvironment;
   readonly fetch?: AppaloftSdkFetch;
+  readonly monotonicNow?: () => number;
   readonly now?: () => string;
+  readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
+  readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly store?: CliControlPlaneProfileStore;
 }
 
@@ -32,13 +41,20 @@ export interface CliControlPlaneLoginInput {
   readonly url?: string;
   readonly mode?: CliControlPlaneMode;
   readonly openBrowser?: boolean;
+  readonly pollTimeoutMs?: number;
   readonly profile?: string;
+  readonly signal?: AbortSignal;
 }
 
 export interface CliControlPlaneStatus {
   readonly activeProfile?: string;
   readonly profiles: readonly CliControlPlaneProfileView[];
 }
+
+type AcquiredControlPlaneAuth = {
+  readonly auth: CliControlPlaneAuth;
+  readonly output?: CliControlPlaneLoginSessionView;
+};
 
 function controlPlaneError(
   code: string,
@@ -61,14 +77,17 @@ function dependencies(input?: CliControlPlaneDependencies): Required<CliControlP
   return {
     env,
     fetch: input?.fetch ?? ((request: Request) => fetch(request)),
+    monotonicNow: input?.monotonicNow ?? (() => Date.now()),
     now: input?.now ?? (() => new Date().toISOString()),
+    openBrowser: input?.openBrowser ?? ((url: string) => openBrowser(url, env)),
+    sleep: input?.sleep ?? ((milliseconds: number) => Bun.sleep(milliseconds)),
     store: input?.store ?? defaultCliControlPlaneProfileStore(env),
   };
 }
 
-function openBrowser(url: string, env: CliControlPlaneEnvironment): Result<boolean> {
+function openBrowser(url: string, env: CliControlPlaneEnvironment): boolean {
   if (env.APPALOFT_CLI_OPEN_BROWSER === "false" || env.CI === "true") {
-    return ok(false);
+    return false;
   }
 
   const command =
@@ -85,45 +104,10 @@ function openBrowser(url: string, env: CliControlPlaneEnvironment): Result<boole
       stderr: "ignore",
     });
     subprocess.unref();
-    return ok(true);
+    return true;
   } catch (error) {
-    return err(
-      controlPlaneError(
-        "control_plane_browser_open_failed",
-        "infra",
-        "Could not open the browser for Appaloft login",
-        true,
-        {
-          phase: "control-plane-auth",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      ),
-    );
+    throw error;
   }
-}
-
-function loginAuthMissingError(input: {
-  readonly browserLoginUrl: string;
-  readonly defaultCloud: boolean;
-  readonly openedBrowser: boolean;
-}): DomainError {
-  const credentialMessage = input.defaultCloud
-    ? "Open the browser login URL, then provide a CLI product-session cookie through APPALOFT_AUTH_COOKIE after the Cloud CLI authorization exchange is available. For noninteractive automation, provide APPALOFT_TOKEN explicitly."
-    : "Provide a trusted local product-session cookie through APPALOFT_AUTH_COOKIE or a bearer token through APPALOFT_TOKEN before logging in to this control plane.";
-
-  return controlPlaneError(
-    "control_plane_auth_missing",
-    "user",
-    input.defaultCloud
-      ? `${input.openedBrowser ? "Appaloft Cloud login opened in the browser" : "Open Appaloft Cloud login in a browser"} at ${input.browserLoginUrl}, but the CLI does not yet have a local credential to verify`
-      : "Control-plane login requires a local credential to verify",
-    false,
-    {
-      phase: "control-plane-auth",
-      browserLoginUrl: input.browserLoginUrl,
-      credential: credentialMessage,
-    },
-  );
 }
 
 function validateProfileName(value: string): Result<string> {
@@ -183,10 +167,201 @@ function sortedProfiles(
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function interruptedAuthError(): DomainError {
+  return controlPlaneError(
+    "control_plane_auth_interrupted",
+    "user",
+    "CLI browser auth polling was interrupted",
+    true,
+    {
+      phase: "control-plane-auth",
+    },
+  );
+}
+
+function authStatusError(status: "denied" | "expired"): DomainError {
+  return controlPlaneError(
+    status === "denied" ? "control_plane_auth_denied" : "control_plane_auth_expired",
+    "user",
+    status === "denied" ? "CLI browser login was canceled" : "CLI browser login link expired",
+    false,
+    {
+      phase: "control-plane-auth",
+    },
+  );
+}
+
+function authTimeoutError(): DomainError {
+  return controlPlaneError(
+    "control_plane_auth_timeout",
+    "timeout",
+    "CLI browser auth polling timed out",
+    true,
+    {
+      phase: "control-plane-auth",
+    },
+  );
+}
+
+function authSessionOutput(input: {
+  readonly openedBrowser: boolean;
+  readonly openBrowserFailed: boolean;
+  readonly userCode: string;
+  readonly verificationUriComplete: string;
+}): CliControlPlaneLoginSessionView {
+  return {
+    schemaVersion: "appaloft-cli-auth-session/v1" as const,
+    verificationUriComplete: input.verificationUriComplete,
+    userCode: input.userCode,
+    openedBrowser: input.openedBrowser,
+    openBrowserFailed: input.openBrowserFailed,
+  };
+}
+
+async function tryCancelAuthSession(input: {
+  readonly baseUrl: string;
+  readonly deviceCode: string;
+  readonly fetch: AppaloftSdkFetch;
+}): Promise<void> {
+  await cancelCliAuthSession(input).catch(() => undefined);
+}
+
+async function sleepUntilNextPoll(input: {
+  readonly milliseconds: number;
+  readonly signal?: AbortSignal;
+  readonly sleep: (milliseconds: number) => Promise<void>;
+}): Promise<"ready" | "interrupted"> {
+  if (!input.signal) {
+    await input.sleep(input.milliseconds);
+    return "ready";
+  }
+  if (input.signal.aborted) {
+    return "interrupted";
+  }
+
+  return new Promise((resolve, reject) => {
+    const abort = () => resolve("interrupted");
+    input.signal?.addEventListener("abort", abort, { once: true });
+    input
+      .sleep(input.milliseconds)
+      .then(() => resolve("ready"), reject)
+      .finally(() => {
+        input.signal?.removeEventListener("abort", abort);
+      });
+  });
+}
+
+async function acquireBrowserAuth(input: {
+  readonly baseUrl: string;
+  readonly fetch: AppaloftSdkFetch;
+  readonly openBrowser: (url: string) => Promise<boolean> | boolean;
+  readonly monotonicNow: () => number;
+  readonly shouldOpenBrowser: boolean;
+  readonly signal?: AbortSignal;
+  readonly sleep: (milliseconds: number) => Promise<void>;
+  readonly timeoutMs: number;
+}): Promise<
+  Result<{ readonly auth: CliControlPlaneAuth; readonly output: CliControlPlaneLoginSessionView }>
+> {
+  const session = await createCliAuthSession({
+    baseUrl: input.baseUrl,
+    fetch: input.fetch,
+  });
+  if (session.isErr()) {
+    return err(session.error);
+  }
+
+  if (input.signal?.aborted) {
+    await tryCancelAuthSession({
+      baseUrl: input.baseUrl,
+      deviceCode: session.value.deviceCode,
+      fetch: input.fetch,
+    });
+    return err(interruptedAuthError());
+  }
+
+  let openedBrowser = false;
+  let openBrowserFailed = false;
+  if (input.shouldOpenBrowser) {
+    try {
+      openedBrowser = await input.openBrowser(session.value.verificationUriComplete);
+    } catch {
+      openBrowserFailed = true;
+    }
+  }
+
+  const output = authSessionOutput({
+    openedBrowser,
+    openBrowserFailed,
+    userCode: session.value.userCode,
+    verificationUriComplete: session.value.verificationUriComplete,
+  });
+  const startedAt = input.monotonicNow();
+  let intervalMs = Math.max(0, session.value.interval) * 1000;
+
+  while (true) {
+    if (input.signal?.aborted) {
+      await tryCancelAuthSession({
+        baseUrl: input.baseUrl,
+        deviceCode: session.value.deviceCode,
+        fetch: input.fetch,
+      });
+      return err(interruptedAuthError());
+    }
+
+    if (input.monotonicNow() - startedAt > input.timeoutMs) {
+      return err(authTimeoutError());
+    }
+
+    const polled = await pollCliAuthSession({
+      baseUrl: input.baseUrl,
+      deviceCode: session.value.deviceCode,
+      fetch: input.fetch,
+    });
+    if (polled.isErr()) {
+      return err(polled.error);
+    }
+
+    if (polled.value.status === "authorized") {
+      const exchanged = await exchangeCliAuthSession({
+        baseUrl: input.baseUrl,
+        deviceCode: session.value.deviceCode,
+        fetch: input.fetch,
+      });
+      if (exchanged.isErr()) {
+        return err(exchanged.error);
+      }
+      return ok({
+        auth: exchanged.value.auth,
+        output,
+      });
+    }
+
+    if (polled.value.status === "denied" || polled.value.status === "expired") {
+      return err(authStatusError(polled.value.status));
+    }
+
+    intervalMs = Math.max(0, polled.value.interval ?? session.value.interval) * 1000;
+    const waitResult = await sleepUntilNextPoll({
+      milliseconds: intervalMs,
+      ...(input.signal ? { signal: input.signal } : {}),
+      sleep: input.sleep,
+    });
+    if (waitResult === "interrupted") {
+      await tryCancelAuthSession({
+        baseUrl: input.baseUrl,
+        deviceCode: session.value.deviceCode,
+        fetch: input.fetch,
+      });
+      return err(interruptedAuthError());
+    }
+  }
+}
+
 export async function loginControlPlane(
   input: CliControlPlaneLoginInput,
   deps?: CliControlPlaneDependencies,
-): Promise<Result<CliControlPlaneProfileView>> {
+): Promise<Result<CliControlPlaneLoginProfileView>> {
   const resolved = dependencies(deps);
   if (input.mode === "self-hosted" && !input.url) {
     return err(
@@ -225,27 +400,23 @@ export async function loginControlPlane(
     input.mode ??
     (isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value) ? "cloud" : "self-hosted");
   const shouldOpenBrowser = input.openBrowser ?? (!input.url || mode === "cloud");
-  const browserLoginUrl = defaultPublicCloudBrowserLoginUrl(normalizedUrl.value);
-  const defaultCloud = mode === "cloud" && isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value);
-
-  let openedBrowser = false;
-  if (shouldOpenBrowser) {
-    const opened = openBrowser(browserLoginUrl, resolved.env);
-    if (opened.isErr()) {
-      return err(opened.error);
-    }
-    openedBrowser = opened.value;
-  }
-
-  const auth = readControlPlaneAuthFromEnvironment(resolved.env);
-  if (auth.isErr()) {
-    return err(
-      loginAuthMissingError({
-        browserLoginUrl,
-        defaultCloud,
-        openedBrowser,
-      }),
-    );
+  const environmentAuth = readControlPlaneAuthFromEnvironment(resolved.env);
+  const acquiredAuth: Result<AcquiredControlPlaneAuth> = environmentAuth.isOk()
+    ? ok({
+        auth: environmentAuth.value,
+      })
+    : await acquireBrowserAuth({
+        baseUrl: normalizedUrl.value,
+        fetch: resolved.fetch,
+        monotonicNow: resolved.monotonicNow,
+        openBrowser: resolved.openBrowser,
+        shouldOpenBrowser,
+        ...(input.signal ? { signal: input.signal } : {}),
+        sleep: resolved.sleep,
+        timeoutMs: input.pollTimeoutMs ?? 10 * 60 * 1000,
+      });
+  if (acquiredAuth.isErr()) {
+    return err(acquiredAuth.error);
   }
 
   const profileName = validateProfileName(
@@ -258,7 +429,7 @@ export async function loginControlPlane(
   const checkedAt = resolved.now();
   const handshake = await performControlPlaneHandshake({
     baseUrl: normalizedUrl.value,
-    auth: auth.value,
+    auth: acquiredAuth.value.auth,
     checkedAt,
     fetch: resolved.fetch,
   });
@@ -276,7 +447,7 @@ export async function loginControlPlane(
     name: profileName.value,
     mode,
     baseUrl: normalizedUrl.value,
-    auth: auth.value,
+    auth: acquiredAuth.value.auth,
     createdAt: existing?.createdAt ?? checkedAt,
     updatedAt: checkedAt,
     lastHandshake: handshake.value.handshake,
@@ -296,7 +467,15 @@ export async function loginControlPlane(
     return err(written.error);
   }
 
-  return ok(profileView(profile, nextData.activeProfile));
+  const view = profileView(profile, nextData.activeProfile);
+  return ok(
+    acquiredAuth.value.output
+      ? {
+          ...view,
+          login: acquiredAuth.value.output,
+        }
+      : view,
+  );
 }
 
 export async function logoutControlPlane(

@@ -4,9 +4,9 @@
 
 - Round: Code Round with Post-Implementation Sync for the ordinary CLI remote client bridge.
 - Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
-  handshake, default public Cloud endpoint selection, browser-open login guidance, and generic
-  generated SDK non-streaming operation dispatch are implemented and synchronized. Automatic
-  Cloud browser-to-CLI credential exchange, OS keychain storage, SSH PGlite adoption,
+  handshake, default public Cloud endpoint selection, neutral browser auth-session exchange, and
+  generic generated SDK non-streaming operation dispatch are implemented and synchronized. OS
+  keychain storage, SSH PGlite adoption,
   source-package quick deploy, streaming/watch, and future MCP exposure remain deferred.
 - Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
   resolution, and ordinary generated SDK remote operation dispatch concrete without completing
@@ -93,10 +93,17 @@ Login must not:
 - adopt, import, upload, or reconcile SSH PGlite state;
 - store raw token material in command history, committed config, logs, diagnostics, or JSON output.
 
-The implemented auth acquisition mechanism accepts trusted local product-session cookie or bearer
-token input from environment variables. Browser-open Cloud login guidance and the default public
-Cloud URL are active; automatic browser/device/OIDC credential exchange into the CLI remains
-deferred until the Cloud auth mechanism is accepted.
+The implemented auth acquisition mechanisms are:
+
+- trusted local product-session cookie or bearer token input from environment variables for
+  noninteractive automation;
+- neutral CLI browser auth-session exchange against the selected control plane for human login.
+
+Browser auth-session exchange creates a short-lived session, prints `verificationUriComplete` and
+the user code, opens the browser when allowed, polls until the session is authorized, exchanges the
+authorized session for control-plane credential material, verifies current organization context,
+and writes the profile only after that verification succeeds. If the selected control plane does
+not support the exchange contract, login fails with structured `control_plane_auth_unsupported`.
 
 ### Logout
 
@@ -208,16 +215,20 @@ Cloud is supported as the default login endpoint and as an explicit endpoint mod
 `--control-plane-mode cloud`, or `--control-plane-mode cloud --control-plane-url <url>` may use
 trusted local token/session input and the same handshake/profile/dispatch path. When Cloud mode is
 selected without a URL, the public CLI uses `https://app.appaloft.com` as the default endpoint.
-Browser opening is guidance only until a governed Cloud browser-to-CLI credential exchange exists.
+Browser opening is part of the governed auth-session exchange. The CLI must not claim complete
+browser login until session authorization, one-time exchange, and current-context verification all
+succeed.
 
 ### Self-Hosted Boundary
 
 Self-hosted is the first practical target for the CLI remote client because `/api/version`,
 product-session auth routes, current organization context, and generated operation routes already
 exist. The implemented slice accepts `APPALOFT_AUTH_COOKIE` or `APPALOFT_TOKEN` as trusted local
-credential input, performs `/api/version` plus current organization context verification, then
-stores or uses a local profile. Self-hosted remote dispatch must require HTTPS before release
-readiness unless an explicit local-development allowance is used for localhost or loopback.
+automation credential input, and otherwise uses the same neutral auth-session contract when the
+selected endpoint supports it. Login performs `/api/version` plus current organization context
+verification before storing or using a local profile. Self-hosted remote dispatch must require HTTPS
+before release readiness unless an explicit local-development allowance is used for localhost or
+loopback.
 
 Self-hosted login does not install a control plane and does not adopt SSH state.
 
@@ -276,6 +287,11 @@ it lacks a field needed for a remote operation, the operation must fail with
 | `product_auth_invalid` | `control-plane-auth` | No | Stored or supplied token/session is rejected by the control plane. |
 | `control_plane_unsupported` | `control-plane-resolution` | No | Explicit remote mode was selected for a command that remains local-only before dispatch. |
 | `control_plane_unsupported` | `remote-operation-dispatch` | No | Remote mode was selected for an operation that is not remote-capable in this slice. |
+| `control_plane_auth_unsupported` | `control-plane-auth` | No | The selected endpoint does not support CLI browser auth-session creation. |
+| `control_plane_auth_denied` | `control-plane-auth` | No | The browser authorization session was denied by the user. |
+| `control_plane_auth_expired` | `control-plane-auth` | No | The browser authorization session expired before exchange. |
+| `control_plane_auth_timeout` | `control-plane-auth` | Yes | The CLI stopped polling before the browser authorization session completed. |
+| `control_plane_auth_interrupted` | `control-plane-auth` | Yes | The user interrupted polling; the CLI attempted to cancel the auth session and did not write a profile. |
 
 All errors must include sanitized details such as profile name, URL origin, selected mode, client
 version, API version, feature flag, and operation key when safe. They must not include raw tokens,
@@ -294,12 +310,17 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-007 | Remote errors do not silently fall back | Remote mode/profile is selected and the operation is unsupported or handshake fails | The operator runs a non-remoteized command | The CLI fails before local mutation and reports the remote failure phase. |
 | CLI-RCPC-SPEC-008 | `auto` does not adopt | An active profile exists or no trusted source exists | The operator runs with `auto` | With a profile, remote dispatch may be selected after handshake; without a trusted source, local mode is selected. In neither case does the CLI upload or adopt SSH PGlite state. |
 | CLI-RCPC-SPEC-009 | Profile store secrets stay local | A command is run from a repository with `appaloft.yml` | The CLI reads/writes profile data | No token, database URL, SSH key, credential id, tenant/org secret identity, or raw secret value is written to committed config or diagnostics. |
-| CLI-RCPC-SPEC-010 | Cloud login has a default endpoint | No explicit `--url` is supplied | The operator runs `appaloft login` or `appaloft auth login` | The CLI selects `https://app.appaloft.com`, derives the `cloud` profile, opens or prints the Cloud browser login URL, verifies any trusted local credential, and writes no profile when the local credential is absent. |
+| CLI-RCPC-SPEC-010 | Cloud login has a default endpoint | No explicit `--url` is supplied | The operator runs `appaloft login` or `appaloft auth login` | The CLI selects `https://app.appaloft.com`, derives the `cloud` profile name, and uses either trusted env credentials for noninteractive automation or the neutral browser auth-session exchange for human login. |
 | CLI-RCPC-SPEC-011 | Explicit Cloud dispatch can use the default endpoint | No profile exists but trusted local Cloud credential input exists | The operator runs a remote-capable command with `--control-plane-mode cloud` and no URL | The CLI builds an ephemeral `cloud` target for `https://app.appaloft.com`, does not write a profile, and fails before local mutation if auth or handshake fails. |
+| CLI-RCPC-SPEC-012 | Browser auth session completes login | No local credential is present and the selected control plane supports CLI auth exchange | The operator runs `appaloft login` | The CLI creates an auth session, prints `verificationUriComplete` and the user code, opens the browser unless disabled, polls pending states, exchanges only after authorization, verifies current context, writes the active profile, and never prints raw credential material. |
+| CLI-RCPC-SPEC-013 | Browser auth session failure writes no profile | The auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current context verification fails | The operator runs login | The CLI returns a structured auth error, attempts cancellation on interruption, and does not create, update, or activate a profile. |
+| CLI-RCPC-SPEC-014 | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local credential is present | The operator runs `appaloft login --url <self-hosted-url>` | The CLI uses the same neutral auth-session contract against that endpoint, or returns `control_plane_auth_unsupported` when the endpoint does not support it. |
 
 ## Public Surfaces
 
-- API/oRPC: no new business operation; remote dispatch uses existing authenticated operation
+- API/oRPC: CLI auth-session creation, polling, exchange, and cancellation are neutral
+  infrastructure/auth routes, not product business operations. Remote dispatch uses existing
+  authenticated operation
   contracts such as `GET /api/projects`, `GET /api/projects/{projectId}`,
   `POST /api/projects/{projectId}/rename`, and `GET /api/servers`.
 - CLI: new login/logout/status/context affordances plus remote dispatch selection for declared
@@ -330,8 +351,6 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 
 ## Open Questions
 
-- Which browser/device/OIDC or one-time code exchange should replace or complement trusted local
-  token/session input for automatic Cloud CLI login?
 - Should profile credential storage require OS keychain support for release readiness, or is a
   file-backed owner-only fallback acceptable for the current bridge?
 - Should context eventually include project/environment/resource defaults, and what command should
@@ -360,6 +379,5 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   profile/context commands therefore avoid local runtime setup.
 - `packages/adapters/cli/src/runtime.ts` still executes non-remoteized CLI commands and queries
   through local `CommandBus` and `QueryBus` using the shell composition.
-- Automatic browser/device/OIDC credential exchange, OS keychain storage, source-package quick
-  deploy, remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption
-  remain deferred governed work.
+- OS keychain storage, source-package quick deploy, remote streaming/watch, terminal attach
+  gateway, MCP exposure, and SSH PGlite adoption remain deferred governed work.

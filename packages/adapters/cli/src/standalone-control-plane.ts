@@ -17,8 +17,11 @@ export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];
   readonly env?: CliControlPlaneEnvironment;
   readonly fetch?: AppaloftSdkFetch;
+  readonly monotonicNow?: () => number;
   readonly store?: CliControlPlaneProfileStore;
   readonly now?: () => string;
+  readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
+  readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly stdout?: Pick<NodeJS.WriteStream, "write">;
   readonly stderr?: Pick<NodeJS.WriteStream, "write">;
 }
@@ -134,8 +137,11 @@ function deps(input: StandaloneControlPlaneCliInput): CliControlPlaneDependencie
   return {
     ...(input.env ? { env: input.env } : {}),
     ...(input.fetch ? { fetch: input.fetch } : {}),
+    ...(input.monotonicNow ? { monotonicNow: input.monotonicNow } : {}),
     ...(input.store ? { store: input.store } : {}),
     ...(input.now ? { now: input.now } : {}),
+    ...(input.openBrowser ? { openBrowser: input.openBrowser } : {}),
+    ...(input.sleep ? { sleep: input.sleep } : {}),
   };
 }
 
@@ -180,19 +186,27 @@ async function handleLogin(
     return finish(mode, input);
   }
   const url = parsed.value.values.url;
+  const abortController = new AbortController();
+  const abort = () => abortController.abort();
+  process.once("SIGINT", abort);
 
-  return finish(
-    loginControlPlane(
-      {
-        ...(url ? { url } : {}),
-        ...(mode.value ? { mode: mode.value } : {}),
-        ...(parsed.value.booleans["no-browser"] ? { openBrowser: false } : {}),
-        ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
-      },
-      deps(input),
-    ),
-    input,
-  );
+  try {
+    return await finish(
+      loginControlPlane(
+        {
+          ...(url ? { url } : {}),
+          ...(mode.value ? { mode: mode.value } : {}),
+          ...(parsed.value.booleans["no-browser"] ? { openBrowser: false } : {}),
+          ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
+          signal: abortController.signal,
+        },
+        deps(input),
+      ),
+      input,
+    );
+  } finally {
+    process.off("SIGINT", abort);
+  }
 }
 
 function handleStatus(
