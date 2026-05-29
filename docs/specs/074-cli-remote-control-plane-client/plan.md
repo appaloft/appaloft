@@ -42,7 +42,6 @@ ADR-025 already decides the durable cross-cutting rules needed here:
 ADR-025 should be updated, or a new ADR should be proposed, before a later Code Round if any of
 these become part of the behavior:
 
-- automatic Cloud browser-to-CLI credential exchange or Cloud credential custody is selected;
 - CLI login performs server-side credential issuance or revocation with durable custody rules;
 - OS keychain versus file-backed credential storage becomes a required product-security guarantee;
 - profile context starts carrying project/environment/resource defaults that affect business
@@ -206,8 +205,8 @@ Code Round implemented:
 
 1. Added a CLI-adapter-local profile store and active profile resolver.
 2. Added `appaloft auth login/status/logout` plus top-level `appaloft login/logout` aliases.
-3. Added default Appaloft Cloud login endpoint selection for `https://app.appaloft.com`, browser
-   login URL guidance, and `--no-browser` for CI/noninteractive contexts.
+3. Added default Appaloft Cloud login endpoint selection for `https://app.appaloft.com`, neutral
+   browser auth-session exchange, and `--no-browser` for CI/noninteractive contexts.
 4. Added `appaloft context list/use/show`.
 5. Added `/api/version` and current organization context verification before profile write.
 6. Added dispatch-time handshake before remote business operations.
@@ -227,12 +226,35 @@ domain mapping, or control-plane-owned source-package execution.
 The broader `CliExecutionTargetResolver` and generalized remote dispatcher are now implemented in
 the CLI adapter as `control-plane-target.ts` and `remote-cli-program.ts`.
 
+## Browser Auth Exchange Contract
+
+The CLI auth exchange is a transport/auth contract, not a new product business operation:
+
+1. `POST /api/cli-auth/sessions` creates a short-lived authorization session and returns
+   `verificationUri`, `verificationUriComplete`, `userCode`, `deviceCode`, `expiresIn`, and
+   `interval`.
+2. The CLI prints `verificationUriComplete` and the user code, then opens the browser unless
+   disabled by `--no-browser`, `APPALOFT_CLI_OPEN_BROWSER=false`, or CI.
+3. `GET /api/cli-auth/sessions/{deviceCode}` returns `pending`, `authorized`, `denied`, or
+   `expired`. The CLI continues polling while pending.
+4. `POST /api/cli-auth/sessions/{deviceCode}/exchange` is called only after `authorized` and
+   returns one-time credential material suitable for the existing profile auth shape.
+5. The CLI performs `/api/version` and current organization context verification with the exchanged
+   credential before writing the profile.
+6. `POST /api/cli-auth/sessions/{deviceCode}/cancel` is best-effort on Ctrl-C or equivalent
+   cancellation.
+
+Endpoints that do not implement session creation return `control_plane_auth_unsupported`, letting
+self-hosted instances remain explicit and structured instead of falling back to token paste.
+Environment credentials remain trusted noninteractive paths and do not become the default human
+flow.
+
 ## Risks And Migration Gaps
 
 - `packages/orpc/src/client.ts` does not currently accept auth headers, so `@appaloft/sdk` remains
   the practical remote dispatch client unless oRPC client auth support is added.
-- Browser/device/OIDC credential exchange is not selected. The current CLI can open or print the
-  Cloud login URL, but automatic session/token import requires a future governed auth exchange.
+- Browser auth exchange now uses a neutral one-time session contract. The private hosted
+  implementation owns actual identity provider login UX and credential issuance policy.
 - Long-running remote mutations need progress, streaming, and async acceptance alignment before
   remoteization.
 - Project/environment/resource context defaults are intentionally deferred because they can change

@@ -33,7 +33,22 @@ function loginTask(input: {
   readonly openBrowser?: boolean;
   readonly profile?: string;
 }) {
-  return runControlPlaneTask(loginControlPlane(input));
+  return Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const abortController = new AbortController();
+      const abort = () => abortController.abort();
+      process.once("SIGINT", abort);
+      return { abort, abortController };
+    }),
+    ({ abortController }) =>
+      runControlPlaneTask(
+        loginControlPlane({
+          ...input,
+          signal: abortController.signal,
+        }),
+      ),
+    ({ abort }) => Effect.sync(() => process.off("SIGINT", abort)),
+  );
 }
 
 function loginInput(
