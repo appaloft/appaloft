@@ -185,6 +185,12 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.organizationMemberRemove).toContain(
       cliDocsHrefs.selfHostedOrganizationTeam,
     );
+    expect(cliCommandDescriptions.organizationOwner).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
+    expect(cliCommandDescriptions.organizationOwnerTransfer).toContain(
+      cliDocsHrefs.selfHostedOrganizationTeam,
+    );
     expect(cliCommandDescriptions.auth).toContain(cliDocsHrefs.selfHostedFirstAdmin);
     expect(cliCommandDescriptions.authBootstrapStatus).toContain(cliDocsHrefs.selfHostedFirstAdmin);
     expect(cliCommandDescriptions.authBootstrapFirstAdmin).toContain(

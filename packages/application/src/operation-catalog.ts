@@ -1,4 +1,9 @@
 import { type ZodTypeAny } from "zod";
+import { changeAccountProfileCommandInputSchema } from "./operations/account-settings/change-account-profile.command";
+import { deleteAccountCommandInputSchema } from "./operations/account-settings/delete-account.command";
+import { listAccountSessionsQueryInputSchema } from "./operations/account-settings/list-account-sessions.query";
+import { revokeAccountSessionCommandInputSchema } from "./operations/account-settings/revoke-account-session.command";
+import { showAccountProfileQueryInputSchema } from "./operations/account-settings/show-account-profile.query";
 import { configureAuditEventLegalHoldCommandInputSchema } from "./operations/audit-events/configure-audit-event-legal-hold.command";
 import { createAuditEventArchiveCommandInputSchema } from "./operations/audit-events/create-audit-event-archive.command";
 import { exportAuditEventsQueryInputSchema } from "./operations/audit-events/export-audit-events.query";
@@ -95,12 +100,16 @@ import { pruneOperatorWorkCommandInputSchema } from "./operations/operator-work/
 import { retryOperatorWorkCommandInputSchema } from "./operations/operator-work/retry-operator-work.command";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
 import { changeOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/change-organization-member-role.command";
+import { changeOrganizationProfileCommandInputSchema } from "./operations/organizations/change-organization-profile.command";
+import { deleteOrganizationCommandInputSchema } from "./operations/organizations/delete-organization.command";
 import { getCurrentOrganizationContextQueryInputSchema } from "./operations/organizations/get-current-organization-context.query";
 import { inviteOrganizationMemberCommandInputSchema } from "./operations/organizations/invite-organization-member.command";
 import { listOrganizationInvitationsQueryInputSchema } from "./operations/organizations/list-organization-invitations.query";
 import { listOrganizationMembersQueryInputSchema } from "./operations/organizations/list-organization-members.query";
 import { removeOrganizationMemberCommandInputSchema } from "./operations/organizations/remove-organization-member.command";
+import { showOrganizationProfileQueryInputSchema } from "./operations/organizations/show-organization-profile.query";
 import { switchCurrentOrganizationCommandInputSchema } from "./operations/organizations/switch-current-organization.command";
+import { transferOrganizationOwnerCommandInputSchema } from "./operations/organizations/transfer-organization-owner.command";
 import { configurePreviewPolicyCommandInputSchema } from "./operations/preview-deployments/configure-preview-policy.command";
 import { deletePreviewEnvironmentCommandInputSchema } from "./operations/preview-deployments/delete-preview-environment.command";
 import { listPreviewEnvironmentsQueryInputSchema } from "./operations/preview-deployments/list-preview-environments.query";
@@ -235,6 +244,7 @@ import { tokens } from "./tokens";
 
 type OperationKind = "command" | "query";
 type OperationDomain =
+  | "account"
   | "projects"
   | "servers"
   | "credentials"
@@ -375,6 +385,96 @@ export const operationCatalog = [
     },
   },
   {
+    key: "account.profile.show",
+    kind: "query",
+    domain: "account",
+    messageName: "ShowAccountProfileQuery",
+    handlerName: "ShowAccountProfileQueryHandler",
+    serviceName: "ShowAccountProfileQueryService",
+    inputSchema: showAccountProfileQueryInputSchema,
+    serviceToken: tokens.showAccountProfileQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "GET", path: "/api/account/profile" },
+    },
+  },
+  {
+    key: "account.profile.change",
+    kind: "command",
+    domain: "account",
+    messageName: "ChangeAccountProfileCommand",
+    handlerName: "ChangeAccountProfileCommandHandler",
+    serviceName: "ChangeAccountProfileUseCase",
+    inputSchema: changeAccountProfileCommandInputSchema,
+    serviceToken: tokens.changeAccountProfileUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "POST", path: "/api/account/profile" },
+    },
+  },
+  {
+    key: "account.sessions.list",
+    kind: "query",
+    domain: "account",
+    messageName: "ListAccountSessionsQuery",
+    handlerName: "ListAccountSessionsQueryHandler",
+    serviceName: "ListAccountSessionsQueryService",
+    inputSchema: listAccountSessionsQueryInputSchema,
+    serviceToken: tokens.listAccountSessionsQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "GET", path: "/api/account/sessions" },
+    },
+  },
+  {
+    key: "account.sessions.revoke",
+    kind: "command",
+    domain: "account",
+    messageName: "RevokeAccountSessionCommand",
+    handlerName: "RevokeAccountSessionCommandHandler",
+    serviceName: "RevokeAccountSessionUseCase",
+    inputSchema: revokeAccountSessionCommandInputSchema,
+    serviceToken: tokens.revokeAccountSessionUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "POST", path: "/api/account/sessions/{sessionId}/revoke" },
+    },
+  },
+  {
+    key: "account.delete",
+    kind: "command",
+    domain: "account",
+    messageName: "DeleteAccountCommand",
+    handlerName: "DeleteAccountCommandHandler",
+    serviceName: "DeleteAccountUseCase",
+    inputSchema: deleteAccountCommandInputSchema,
+    serviceToken: tokens.deleteAccountUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "DELETE", path: "/api/account" },
+    },
+  },
+  {
     key: "organizations.current-context",
     kind: "query",
     domain: "organizations",
@@ -391,6 +491,60 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft organization context",
       orpc: { method: "GET", path: "/api/organizations/current-context" },
+    },
+  },
+  {
+    key: "organizations.profile.show",
+    kind: "query",
+    domain: "organizations",
+    messageName: "ShowOrganizationProfileQuery",
+    handlerName: "ShowOrganizationProfileQueryHandler",
+    serviceName: "ShowOrganizationProfileQueryService",
+    inputSchema: showOrganizationProfileQueryInputSchema,
+    serviceToken: tokens.showOrganizationProfileQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      orpc: { method: "GET", path: "/api/organizations/{organizationId}/profile" },
+    },
+  },
+  {
+    key: "organizations.profile.change",
+    kind: "command",
+    domain: "organizations",
+    messageName: "ChangeOrganizationProfileCommand",
+    handlerName: "ChangeOrganizationProfileCommandHandler",
+    serviceName: "ChangeOrganizationProfileUseCase",
+    inputSchema: changeOrganizationProfileCommandInputSchema,
+    serviceToken: tokens.changeOrganizationProfileUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
+    transports: {
+      orpc: { method: "POST", path: "/api/organizations/{organizationId}/profile" },
+    },
+  },
+  {
+    key: "organizations.delete",
+    kind: "command",
+    domain: "organizations",
+    messageName: "DeleteOrganizationCommand",
+    handlerName: "DeleteOrganizationCommandHandler",
+    serviceName: "DeleteOrganizationUseCase",
+    inputSchema: deleteOrganizationCommandInputSchema,
+    serviceToken: tokens.deleteOrganizationUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "owner",
+      },
+    },
+    transports: {
+      orpc: { method: "DELETE", path: "/api/organizations/{organizationId}" },
     },
   },
   {
@@ -493,6 +647,28 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft organization member remove <memberId>",
       orpc: { method: "DELETE", path: "/api/organizations/{organizationId}/members/{memberId}" },
+    },
+  },
+  {
+    key: "organizations.transfer-owner",
+    kind: "command",
+    domain: "organizations",
+    messageName: "TransferOrganizationOwnerCommand",
+    handlerName: "TransferOrganizationOwnerCommandHandler",
+    serviceName: "TransferOrganizationOwnerUseCase",
+    inputSchema: transferOrganizationOwnerCommandInputSchema,
+    serviceToken: tokens.transferOrganizationOwnerUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "owner",
+      },
+    },
+    transports: {
+      cli: "appaloft organization owner transfer <fromMemberId> <toMemberId>",
+      orpc: {
+        method: "POST",
+        path: "/api/organizations/{organizationId}/owner-transfer",
+      },
     },
   },
   {

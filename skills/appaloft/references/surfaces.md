@@ -17,8 +17,12 @@ installer; that would blur the boundary between installing an agent skill and ru
 
 ## Surface Selection
 
-1. CLI: use when the agent has a trusted local shell and the user expects direct project or server
-   work. Pure SSH GitHub Actions also enter through the CLI wrapper by default with
+1. CLI: use when the agent has a trusted local shell and the user expects direct project, server,
+   or hosted Appaloft Cloud work. For product/control-plane tasks, check `appaloft auth status` or
+   `appaloft context show` first. If there is no active profile and the user did not select another
+   endpoint, run `appaloft login`; the CLI defaults to `https://app.appaloft.com`, opens or prints
+   the Cloud browser login URL, and writes a local `cloud` profile only after a trusted local
+   credential verifies. Pure SSH GitHub Actions still enter through the CLI wrapper by default with
    `control-plane-mode: none` and SSH-server `ssh-pglite` state. Use
    `references/cli-entrypoints.md` for exact commands and operation keys.
 2. HTTP/API: use when the agent is integrated beside an Appaloft control plane or when shell access
@@ -57,6 +61,9 @@ installer; that would blur the boundary between installing an agent skill and ru
 
 - The skill is an AI-facing content entrypoint, not a runtime adapter, provider, plugin, or new
   business surface.
+- Do not ask the user to paste product-session cookies, bearer tokens, deploy tokens, or browser
+  cookies into chat. Let the CLI read local env/profile state, or ask the user to run login in their
+  trusted shell.
 - Do not inspect Appaloft internals such as repositories, use cases, database state, Docker, SSH,
   provider SDKs, or proxy config directly when an Appaloft operation exists.
 - Do not add source, runtime, network, health, or access fields to `deployments.create`; configure

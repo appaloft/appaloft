@@ -49,6 +49,7 @@ describe("Appaloft SDK auth and structured errors", () => {
         kind: "product-session",
         cookie: "better-auth.session_token=test-session",
       },
+      userAgent: "appaloft-cli/test",
       fetch: async (request) => {
         capturedRequest = request;
         return Response.json({ ok: true });
@@ -76,6 +77,7 @@ describe("Appaloft SDK auth and structured errors", () => {
       "https://appaloft.example/api/organizations/org_self_hosted/members?cursor=cursor_1",
     );
     expect(capturedRequest?.headers.get("cookie")).toBe("better-auth.session_token=test-session");
+    expect(capturedRequest?.headers.get("user-agent")).toBe("appaloft-cli/test");
     expect(capturedRequest?.headers.has("authorization")).toBe(false);
   });
 

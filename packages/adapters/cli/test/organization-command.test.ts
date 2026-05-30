@@ -56,6 +56,23 @@ async function createCommandCaptureHarness(requestId: string) {
           joinedAt: "2026-01-01T00:00:00.000Z",
         } as T);
       }
+      if (command.constructor.name === "TransferOrganizationOwnerCommand") {
+        return ok({
+          fromMember: {
+            memberId: "mem_admin",
+            userId: "usr_admin",
+            role: "admin",
+            joinedAt: "2026-01-01T00:00:00.000Z",
+          },
+          toMember: {
+            memberId: "mem_operator",
+            userId: "usr_operator",
+            role: "owner",
+            joinedAt: "2026-01-01T00:00:00.000Z",
+          },
+          transferredAt: "2026-01-01T00:45:00.000Z",
+        } as T);
+      }
       if (command.constructor.name === "SwitchCurrentOrganizationCommand") {
         return ok({
           user: {
@@ -264,11 +281,12 @@ describe("CLI organization commands", () => {
     });
   });
 
-  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] member mutation commands dispatch organization commands", async () => {
+  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [ORG-TEAM-OWNER-TRANSFER-001] member mutation commands dispatch organization commands", async () => {
     const {
       InviteOrganizationMemberCommand,
       RemoveOrganizationMemberCommand,
       ChangeOrganizationMemberRoleCommand,
+      TransferOrganizationOwnerCommand,
     } = await import("@appaloft/application");
     const { commands, program } = await createCommandCaptureHarness(
       "req_cli_organization_member_mutation_test",
@@ -309,8 +327,21 @@ describe("CLI organization commands", () => {
       "--organization-id",
       "org_self_hosted",
     ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "organization",
+      "owner",
+      "transfer",
+      "mem_admin",
+      "mem_operator",
+      "--organization-id",
+      "org_self_hosted",
+      "--idempotency-key",
+      "idem_owner_transfer",
+    ]);
 
-    expect(commands).toHaveLength(3);
+    expect(commands).toHaveLength(4);
     expect(commands[0]).toBeInstanceOf(InviteOrganizationMemberCommand);
     expect(commands[0]).toMatchObject({
       organizationId: "org_self_hosted",
@@ -327,6 +358,13 @@ describe("CLI organization commands", () => {
     expect(commands[2]).toMatchObject({
       organizationId: "org_self_hosted",
       memberId: "mem_operator",
+    });
+    expect(commands[3]).toBeInstanceOf(TransferOrganizationOwnerCommand);
+    expect(commands[3]).toMatchObject({
+      organizationId: "org_self_hosted",
+      fromMemberId: "mem_admin",
+      toMemberId: "mem_operator",
+      idempotencyKey: "idem_owner_transfer",
     });
   });
 });

@@ -1,5 +1,6 @@
 import {
   CreatedAt,
+  type DependencyResourceCapabilityRequirementInput,
   DependencyResourceSecretRef,
   DependencyResourceSourceModeValue,
   DescriptionText,
@@ -49,6 +50,17 @@ const importDependencyResourceOperationEntry = findOperationCatalogEntryByKey(
   importDependencyResourceOperation,
 );
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
+
+function normalizeDependencyResourceCapabilities(
+  capabilities: ImportDependencyResourceCommandInput["capabilities"],
+): DependencyResourceCapabilityRequirementInput[] {
+  return (capabilities ?? []).map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    ...(capability.description ? { description: capability.description } : {}),
+  }));
+}
 
 @injectable()
 export class ImportDependencyResourceUseCase {
@@ -103,6 +115,7 @@ export class ImportDependencyResourceUseCase {
         kind: input.kind,
         connectionUrl: input.connectionUrl,
       });
+      const capabilities = normalizeDependencyResourceCapabilities(input.capabilities);
       const createdAt = yield* CreatedAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
       const dependencyResourceId = ResourceInstanceId.rehydrate(idGenerator.next("rsi"));
@@ -217,6 +230,7 @@ export class ImportDependencyResourceUseCase {
         providerManaged: false,
         endpoint,
         connectionSecretRef: secretRef,
+        desiredCapabilities: capabilities,
         ...(description ? { description } : {}),
         ...(input.backupRelationship
           ? {

@@ -1,6 +1,7 @@
 import {
   CreatedAt,
   type DependencyResourceBindingReadinessState,
+  type DependencyResourceCapabilityReadbackInput,
   DependencyResourceProviderFailureCode,
   DependencyResourceProviderRealizationAttemptId,
   DependencyResourceProviderRealizationStatusValue,
@@ -38,6 +39,7 @@ import {
   AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type DependencyResourceCapabilityRequirement,
   type DependencyResourceReadModel,
   type DependencyResourceRepository,
   type DependencyResourceSecretStore,
@@ -81,6 +83,17 @@ function isProviderOwnedDependencySecretRef(secretRef: string): boolean {
 
 function defaultManagedProviderKey(kind: ManagedDependencyResourceKind): string {
   return `appaloft-managed-${kind}`;
+}
+
+function normalizeDependencyResourceCapabilities(
+  capabilities: ProvisionDependencyResourceCommandInput["capabilities"],
+): DependencyResourceCapabilityRequirement[] {
+  return (capabilities ?? []).map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    ...(capability.description ? { description: capability.description } : {}),
+  }));
 }
 
 async function resolveManagedDependencyBindingReadiness(input: {
@@ -173,7 +186,8 @@ export class ProvisionDependencyResourceUseCase {
       const createdAt = yield* CreatedAt.create(clock.now());
       const attemptedAt = yield* OccurredAt.create(clock.now());
       const description = DescriptionText.fromOptional(input.description);
-      if (!managedDependencyProvider.supports(providerKey.value, input.kind)) {
+      const capabilities = normalizeDependencyResourceCapabilities(input.capabilities);
+      if (!managedDependencyProvider.supports(providerKey.value, input.kind, capabilities)) {
         return err(
           domainError.providerCapabilityUnsupported(
             "Provider does not support managed dependency realization",
@@ -296,6 +310,7 @@ export class ProvisionDependencyResourceUseCase {
           attemptId: realizationAttemptId,
           attemptedAt,
         },
+        desiredCapabilities: capabilities,
         ...(description ? { description } : {}),
         ...(input.backupRelationship
           ? {
@@ -333,6 +348,7 @@ export class ProvisionDependencyResourceUseCase {
         slug: slug.value,
         attemptId: realizationAttemptId.value,
         requestedAt: attemptedAt.value,
+        capabilities,
         ...(realizationTarget ? { target: realizationTarget } : {}),
       });
       if (realization.isOk()) {
@@ -386,6 +402,22 @@ export class ProvisionDependencyResourceUseCase {
               ? { connectionSecretRef: connectionSecretRef.value }
               : {}),
             bindingReadiness,
+            ...(realization.value.capabilityReadbacks
+              ? {
+                  capabilityReadbacks: realization.value.capabilityReadbacks.map(
+                    (capability) =>
+                      ({
+                        type: capability.type,
+                        name: capability.name,
+                        required: capability.required,
+                        status: capability.status,
+                        evidence: capability.evidence,
+                        ...(capability.version ? { version: capability.version } : {}),
+                        ...(capability.checkedAt ? { checkedAt: capability.checkedAt } : {}),
+                      }) satisfies DependencyResourceCapabilityReadbackInput,
+                  ),
+                }
+              : {}),
             realizedAt,
           });
         }

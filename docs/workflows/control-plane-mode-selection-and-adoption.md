@@ -440,11 +440,12 @@ Current implementation has an active self-hosted control-plane baseline:
 Governed follow-ups remain:
 
 - no adoption marker exists;
-- Cloud-assisted Action API mode and OIDC/token exchange remain governed control-plane follow-ups;
+- Cloud-assisted Action API mode and broader OIDC/token exchange flows remain governed control-plane
+  follow-ups;
 - Additional config-aware backend workflow APIs beyond the active `server-config-deploy` route are
   governed follow-ups;
-- default Cloud browser/device/OIDC login, remote streaming/watch, source-package quick deploy,
-  terminal attach gateway, OS keychain storage, and future MCP exposure remain governed follow-ups;
+- remote streaming/watch, source-package quick deploy, terminal attach gateway, OS keychain storage,
+  broader OIDC provider flows, and future MCP exposure remain governed follow-ups;
 - no Web selection surface exists.
 
 ## Open Questions

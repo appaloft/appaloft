@@ -1,6 +1,6 @@
 ---
 title: "Organization team management"
-description: "邀请成员、查看成员和邀请、更新角色、移除成员，并安全处理 401/403。"
+description: "邀请成员、查看成员和邀请、更新非 owner 角色、移交 owner、移除非 owner 成员，并安全处理 401/403。"
 docType: task
 localeState:
   zh-CN: complete
@@ -26,6 +26,7 @@ relatedOperations:
   - "organizations.list-invitations"
   - "organizations.invite-member"
   - "organizations.change-member-role"
+  - "organizations.transfer-owner"
   - "organizations.remove-member"
 sidebar:
   label: "Team"
@@ -62,11 +63,12 @@ appaloft organization invitations list --organization-id org_self_hosted --statu
 成员列表只返回 member id、用户安全元数据、role、加入时间等字段。邀请列表只返回安全邀请元数据，
 不会返回原始邀请 token。
 
-<h2 id="self-hosting-organization-member-management">邀请、更新 role、移除成员</h2>
+<h2 id="self-hosting-organization-member-management">邀请、移交 owner、更新 role、移除成员</h2>
 
 ```sh
 appaloft organization member invite --organization-id org_self_hosted --email operator@example.com --role developer
 appaloft organization member role mem_operator --organization-id org_self_hosted --role admin
+appaloft organization owner transfer mem_admin mem_operator --organization-id org_self_hosted
 appaloft organization member remove mem_operator --organization-id org_self_hosted
 ```
 
@@ -74,8 +76,10 @@ appaloft organization member remove mem_operator --organization-id org_self_host
 早期自托管构建会在 auth runtime 边界把默认 `member` role 映射回 Appaloft 的 `developer`，直到更完整
 的自定义 role 持久化完成。
 
-Role update 和 remove member 会保留至少一个 owner。如果操作会让 organization 没有 owner，Appaloft
-会拒绝操作，而不是留下不可恢复的 organization。
+通用 role update 只能把非 owner 成员改成非 owner role，通用 remove member 只能移除非 owner 成员。
+Owner 不能通过这两个操作被降级、升级出来或移除；需要改 owner 时使用
+`appaloft organization owner transfer <fromMemberId> <toMemberId>`。移交成功后目标成员成为 owner，
+原 owner 成为 admin。
 
 <h2 id="self-hosting-organization-http-api">HTTP/API routes</h2>
 
@@ -88,6 +92,7 @@ GET /api/organizations/{organizationId}/members
 GET /api/organizations/{organizationId}/invitations
 POST /api/organizations/{organizationId}/invitations
 POST /api/organizations/{organizationId}/members/{memberId}/role
+POST /api/organizations/{organizationId}/owner-transfer
 DELETE /api/organizations/{organizationId}/members/{memberId}
 ```
 
@@ -97,7 +102,8 @@ HTTP/API routes 和 CLI 都执行同一组 Appaloft 操作。Auth runtime 是实
 <h2 id="self-hosting-organization-web-status">Web console status</h2>
 
 Web console 的 `/organization` 页面可以读取当前 organization context、切换到另一个可见
-organization、查看成员和邀请、邀请成员、更新 role、移除成员，并管理 deploy token 的创建、轮换和撤销。
+organization、查看成员和邀请、邀请成员、更新非 owner role、移交 owner、移除非 owner 成员，并管理
+deploy token 的创建、轮换和撤销。
 浏览器端 self-hosted auth e2e 覆盖仍是后续 Phase 8 工作。
 
 <h2 id="self-hosting-organization-recovery">恢复和排查</h2>
@@ -105,5 +111,5 @@ organization、查看成员和邀请、邀请成员、更新 role、移除成员
 - 看到 `401 product_auth_missing` 时，重新登录，或为 CLI 提供受信任的 session handoff。
 - 看到 `403 product_auth_forbidden` 时，确认当前用户属于目标 organization。成员管理和 deploy token
   管理还需要 owner 或 admin role。
-- 如果无法移除或降级成员，检查该成员是否是最后一个 owner。
+- 如果无法移除或降级成员，检查该成员是否是 owner。Owner 只能先移交给另一个成员。
 - 不要直接编辑 auth 数据库表来绕过成员、role 或邀请状态；优先使用 CLI/HTTP/API 或从受信任备份恢复。

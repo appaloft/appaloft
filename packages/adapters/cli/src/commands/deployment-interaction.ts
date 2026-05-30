@@ -1641,6 +1641,9 @@ function provisionDependencyResources(input: QuickDeployProvisionDependencyResou
                   projectId: input.projectId,
                   environmentId: input.environmentId,
                   name: item.name,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.serverId ? { serverId: item.serverId } : {}),
                   ...(item.providerKey ? { providerKey: item.providerKey } : {}),
                   ...(item.description ? { description: item.description } : {}),
@@ -1654,6 +1657,9 @@ function provisionDependencyResources(input: QuickDeployProvisionDependencyResou
                   environmentId: input.environmentId,
                   name: item.name,
                   connectionUrl: item.connectionUrl,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.secretRef ? { secretRef: item.secretRef } : {}),
                   ...(item.connectionSecret ? { connectionSecret: item.connectionSecret } : {}),
                   ...(item.description ? { description: item.description } : {}),
@@ -2314,6 +2320,8 @@ function ensureRepositoryConfigDependencies(input: {
           providerKey: "",
           providerManaged: true,
           lifecycleStatus: "provisioning",
+          desiredCapabilities: [],
+          capabilityReadbacks: [],
           bindingReadiness: { status: "blocked", reason: "provisioning" },
           createdAt: new Date().toISOString(),
         } satisfies DependencyResourceSummary;

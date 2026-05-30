@@ -51,6 +51,7 @@ export const instanceUpgradeCheckStatusSchema = z.enum(["available", "current", 
 export const instanceUpgradeCheckResponseSchema = z.object({
   schemaVersion: z.literal("system.instance-upgrade.check/v1"),
   currentVersion: z.string(),
+  currentCommitSha: z.string().optional(),
   targetVersion: z.string(),
   latestVersion: z.string().nullable(),
   updateAvailable: z.boolean(),
@@ -136,6 +137,44 @@ export const authSessionResponseSchema = z.object({
   deferredAuth: z.boolean(),
   session: z.unknown().nullable(),
   providers: z.array(authProviderStatusSchema),
+});
+
+export const accountProfileResponseSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  emailVerified: z.boolean().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export const accountSessionSummarySchema = z.object({
+  sessionId: z.string(),
+  userId: z.string(),
+  clientKind: z.enum(["web", "cli", "unknown"]).optional(),
+  displayName: z.string().optional(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+  current: z.boolean().optional(),
+  lastActiveAt: z.string().optional(),
+});
+
+export const listAccountSessionsResponseSchema = z.object({
+  items: z.array(accountSessionSummarySchema),
+  nextCursor: z.string().optional(),
+});
+
+export const revokeAccountSessionResponseSchema = z.object({
+  sessionId: z.string(),
+  revokedAt: z.string(),
+});
+
+export const deleteAccountResponseSchema = z.object({
+  userId: z.string(),
+  deletedAt: z.string(),
 });
 
 export const deployTokenScopeSummarySchema = z.object({
@@ -226,6 +265,7 @@ export const organizationContextPermissionsSchema = z.object({
   canListMembers: z.boolean(),
   canManageDeployTokens: z.boolean(),
   canRemoveMembers: z.boolean(),
+  canTransferOwnership: z.boolean().optional(),
   canUpdateMemberRoles: z.boolean(),
 });
 
@@ -242,6 +282,17 @@ export const currentOrganizationContextResponseSchema = z.object({
   organizations: z.array(organizationContextOrganizationSummarySchema),
   loginMethods: z.array(productLoginMethodStatusSchema),
   permissions: organizationContextPermissionsSchema.optional(),
+});
+
+export const organizationProfileResponseSchema = z.object({
+  organizationId: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  role: organizationTeamRoleSchema,
+  permissions: organizationContextPermissionsSchema.optional(),
+  logoUrl: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export const organizationMemberSummarySchema = z.object({
@@ -289,6 +340,17 @@ export const removeOrganizationMemberResponseSchema = z.object({
   memberId: z.string(),
   organizationId: z.string(),
   removedAt: z.string(),
+});
+
+export const transferOrganizationOwnerResponseSchema = z.object({
+  fromMember: organizationMemberSummarySchema,
+  toMember: organizationMemberSummarySchema,
+  transferredAt: z.string(),
+});
+
+export const deleteOrganizationResponseSchema = z.object({
+  organizationId: z.string(),
+  deletedAt: z.string(),
 });
 
 export const systemCapabilityDetailSchema = z.object({
@@ -2149,6 +2211,39 @@ export const dependencyResourceDeleteBlockerSchema = z.object({
   count: z.number().optional(),
 });
 
+export const dependencyResourceCapabilityRequirementSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("postgres-extension"),
+    name: z.string(),
+    required: z.boolean(),
+    description: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("redis-module"),
+    name: z.string(),
+    required: z.boolean(),
+    description: z.string().optional(),
+  }),
+]);
+
+export const dependencyResourceCapabilityReadbackSchema = z.object({
+  type: z.enum(["postgres-extension", "redis-module"]),
+  name: z.string(),
+  required: z.boolean(),
+  status: z.enum(["satisfied", "unsupported", "failed"]),
+  evidence: z.array(z.string()),
+  version: z.string().optional(),
+  checkedAt: z.string().optional(),
+});
+
+export type DependencyResourceCapabilityRequirement = z.output<
+  typeof dependencyResourceCapabilityRequirementSchema
+>;
+
+export type DependencyResourceCapabilityReadback = z.output<
+  typeof dependencyResourceCapabilityReadbackSchema
+>;
+
 export const dependencyResourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -2163,6 +2258,8 @@ export const dependencyResourceSummarySchema = z.object({
   lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
   connection: dependencyResourceConnectionSummarySchema.optional(),
   providerRealization: dependencyResourceProviderRealizationSummarySchema.optional(),
+  desiredCapabilities: z.array(dependencyResourceCapabilityRequirementSchema),
+  capabilityReadbacks: z.array(dependencyResourceCapabilityReadbackSchema),
   bindingReadiness: dependencyResourceBindingReadinessSummarySchema,
   backupRelationship: dependencyResourceBackupRelationshipSchema.optional(),
   deleteSafety: z
@@ -3602,6 +3699,7 @@ export const dependencyResourceProvisioningPlanSchema = z.object({
   providerKey: z.string().optional(),
   serverId: z.string().optional(),
   endpoint: z.string().optional(),
+  capabilities: z.array(dependencyResourceCapabilityRequirementSchema),
   requiresAcceptance: z.boolean(),
   requestedAt: z.string(),
   acceptedAt: z.string().optional(),
@@ -5990,6 +6088,11 @@ export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyRe
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
 export type AuthAccountRecoveryStatus = z.infer<typeof authAccountRecoveryStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
+export type AccountProfileResponse = z.infer<typeof accountProfileResponseSchema>;
+export type AccountSessionSummary = z.infer<typeof accountSessionSummarySchema>;
+export type ListAccountSessionsResponse = z.infer<typeof listAccountSessionsResponseSchema>;
+export type RevokeAccountSessionResponse = z.infer<typeof revokeAccountSessionResponseSchema>;
+export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
@@ -6403,6 +6506,7 @@ export type OrganizationContextPermissions = z.infer<typeof organizationContextP
 export type CurrentOrganizationContextResponse = z.infer<
   typeof currentOrganizationContextResponseSchema
 >;
+export type OrganizationProfileResponse = z.infer<typeof organizationProfileResponseSchema>;
 export type OrganizationMemberSummary = z.infer<typeof organizationMemberSummarySchema>;
 export type OrganizationInvitationSummary = z.infer<typeof organizationInvitationSummarySchema>;
 export type ListOrganizationMembersResponse = z.infer<typeof listOrganizationMembersResponseSchema>;
@@ -6418,6 +6522,10 @@ export type ChangeOrganizationMemberRoleResponse = z.infer<
 export type RemoveOrganizationMemberResponse = z.infer<
   typeof removeOrganizationMemberResponseSchema
 >;
+export type TransferOrganizationOwnerResponse = z.infer<
+  typeof transferOrganizationOwnerResponseSchema
+>;
+export type DeleteOrganizationResponse = z.infer<typeof deleteOrganizationResponseSchema>;
 export type ConfigureDomainBindingRouteInput = z.infer<
   typeof configureDomainBindingRouteInputSchema
 >;

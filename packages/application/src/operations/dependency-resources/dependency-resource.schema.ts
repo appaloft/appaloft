@@ -9,6 +9,25 @@ export const dependencyResourceBackupRelationshipInputSchema = z
   })
   .optional();
 
+export const dependencyResourceCapabilityRequirementInputSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("postgres-extension"),
+    name: nonEmptyTrimmedString("Postgres extension name"),
+    required: z.boolean().default(true),
+    description: nonEmptyTrimmedString("Capability description").optional(),
+  }),
+  z.object({
+    type: z.literal("redis-module"),
+    name: nonEmptyTrimmedString("Redis module name"),
+    required: z.boolean().default(true),
+    description: nonEmptyTrimmedString("Capability description").optional(),
+  }),
+]);
+
+export const dependencyResourceCapabilityRequirementsInputSchema = z
+  .array(dependencyResourceCapabilityRequirementInputSchema)
+  .optional();
+
 export const dependencyResourceResponseSchema = z.object({
   id: z.string(),
 });

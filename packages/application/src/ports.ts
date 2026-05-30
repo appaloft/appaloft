@@ -3290,6 +3290,30 @@ export interface DependencyResourceBindingReadinessSummary {
   reason?: string;
 }
 
+export type DependencyResourceCapabilityRequirement =
+  | {
+      type: "postgres-extension";
+      name: string;
+      required: boolean;
+      description?: string;
+    }
+  | {
+      type: "redis-module";
+      name: string;
+      required: boolean;
+      description?: string;
+    };
+
+export interface DependencyResourceCapabilityReadback {
+  type: DependencyResourceCapabilityRequirement["type"];
+  name: string;
+  required: boolean;
+  status: "satisfied" | "unsupported" | "failed";
+  evidence: string[];
+  version?: string;
+  checkedAt?: string;
+}
+
 export interface DependencyResourceSummary {
   id: string;
   projectId: string;
@@ -3304,6 +3328,8 @@ export interface DependencyResourceSummary {
   lifecycleStatus: DependencyResourceLifecycleStatus;
   connection?: DependencyResourceConnectionSummary;
   providerRealization?: DependencyResourceProviderRealizationSummary;
+  desiredCapabilities: DependencyResourceCapabilityRequirement[];
+  capabilityReadbacks: DependencyResourceCapabilityReadback[];
   bindingReadiness: DependencyResourceBindingReadinessSummary;
   backupRelationship?: {
     retentionRequired: boolean;
@@ -6336,6 +6362,66 @@ export interface ProductSessionAuthorizationPort {
   ): Promise<Result<ProductSessionAuthorizationResult>>;
 }
 
+export interface AccountProfileSummary {
+  userId: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+  emailVerified?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ChangeAccountProfileInput {
+  displayName?: string;
+  avatarUrl?: string | null;
+  idempotencyKey?: string;
+}
+
+export interface AccountSessionSummary {
+  sessionId: string;
+  userId: string;
+  clientKind?: "web" | "cli" | "unknown";
+  displayName?: string;
+  createdAt: string;
+  expiresAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  current?: boolean;
+  lastActiveAt?: string;
+}
+
+export interface RevokeAccountSessionInput {
+  sessionId: string;
+  idempotencyKey?: string;
+}
+
+export interface DeleteAccountInput {
+  confirmation: {
+    userId: string;
+  };
+  idempotencyKey?: string;
+}
+
+export interface AccountSettingsPort {
+  showAccountProfile(context: ExecutionContext): Promise<Result<AccountProfileSummary>>;
+  changeAccountProfile(
+    context: ExecutionContext,
+    input: ChangeAccountProfileInput,
+  ): Promise<Result<AccountProfileSummary>>;
+  listAccountSessions(
+    context: ExecutionContext,
+  ): Promise<Result<{ items: AccountSessionSummary[]; nextCursor?: string }>>;
+  revokeAccountSession(
+    context: ExecutionContext,
+    input: RevokeAccountSessionInput,
+  ): Promise<Result<{ sessionId: string; revokedAt: string }>>;
+  deleteAccount(
+    context: ExecutionContext,
+    input: DeleteAccountInput,
+  ): Promise<Result<{ userId: string; deletedAt: string }>>;
+}
+
 export interface OrganizationCurrentUserSummary {
   userId: string;
   email: string;
@@ -6355,6 +6441,7 @@ export interface OrganizationContextPermissions {
   canListMembers: boolean;
   canManageDeployTokens: boolean;
   canRemoveMembers: boolean;
+  canTransferOwnership?: boolean;
   canUpdateMemberRoles: boolean;
 }
 
@@ -6427,13 +6514,59 @@ export interface RemoveOrganizationMemberInput {
   idempotencyKey?: string;
 }
 
+export interface TransferOrganizationOwnerInput {
+  organizationId: string;
+  fromMemberId: string;
+  toMemberId: string;
+  idempotencyKey?: string;
+}
+
 export interface SwitchCurrentOrganizationInput {
   organizationId: string;
   idempotencyKey?: string;
 }
 
+export interface OrganizationProfileSummary {
+  organizationId: string;
+  name: string;
+  slug: string;
+  role: OrganizationTeamRole;
+  permissions?: OrganizationContextPermissions;
+  logoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ChangeOrganizationProfileInput {
+  organizationId: string;
+  name?: string;
+  slug?: string;
+  logoUrl?: string | null;
+  idempotencyKey?: string;
+}
+
+export interface DeleteOrganizationInput {
+  organizationId: string;
+  confirmation: {
+    organizationId: string;
+  };
+  idempotencyKey?: string;
+}
+
 export interface OrganizationTeamManagementPort {
   getCurrentContext(context: ExecutionContext): Promise<Result<CurrentOrganizationContext>>;
+  showOrganizationProfile(
+    context: ExecutionContext,
+    input: { organizationId: string },
+  ): Promise<Result<OrganizationProfileSummary>>;
+  changeOrganizationProfile(
+    context: ExecutionContext,
+    input: ChangeOrganizationProfileInput,
+  ): Promise<Result<OrganizationProfileSummary>>;
+  deleteOrganization(
+    context: ExecutionContext,
+    input: DeleteOrganizationInput,
+  ): Promise<Result<{ organizationId: string; deletedAt: string }>>;
   switchCurrentOrganization(
     context: ExecutionContext,
     input: SwitchCurrentOrganizationInput,
@@ -6454,6 +6587,16 @@ export interface OrganizationTeamManagementPort {
     context: ExecutionContext,
     input: ChangeOrganizationMemberRoleInput,
   ): Promise<Result<OrganizationMemberSummary>>;
+  transferOwner(
+    context: ExecutionContext,
+    input: TransferOrganizationOwnerInput,
+  ): Promise<
+    Result<{
+      fromMember: OrganizationMemberSummary;
+      toMember: OrganizationMemberSummary;
+      transferredAt: string;
+    }>
+  >;
   removeMember(
     context: ExecutionContext,
     input: RemoveOrganizationMemberInput,
@@ -8138,6 +8281,7 @@ export interface ManagedDependencyRealizationInput {
   slug: string;
   attemptId: string;
   requestedAt: string;
+  capabilities?: readonly DependencyResourceCapabilityRequirement[];
   target?: ManagedDependencySingleServerTarget;
 }
 
@@ -8151,6 +8295,7 @@ export interface ManagedDependencyRealizationResult {
   };
   secretRef?: string;
   connectionSecretValue?: string;
+  capabilityReadbacks?: readonly DependencyResourceCapabilityReadback[];
   realizedAt: string;
 }
 
@@ -8169,7 +8314,11 @@ export interface ManagedDependencyDeleteResult {
 }
 
 export interface ManagedDependencyProviderPort {
-  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean;
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyResourceKind,
+    capabilities?: readonly DependencyResourceCapabilityRequirement[],
+  ): boolean;
   realize(
     context: ExecutionContext,
     input: ManagedDependencyRealizationInput,
@@ -9064,6 +9213,7 @@ export type InstanceUpgradeCheckStatus = "available" | "current" | "unknown";
 export interface InstanceUpgradeCheckResult {
   schemaVersion: "system.instance-upgrade.check/v1";
   currentVersion: string;
+  currentCommitSha?: string;
   targetVersion: string;
   latestVersion: string | null;
   updateAvailable: boolean;

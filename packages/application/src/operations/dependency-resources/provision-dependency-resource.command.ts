@@ -22,6 +22,7 @@ export class ProvisionDependencyResourceCommand extends Command<{ id: string }> 
     public readonly name: string,
     public readonly providerKey?: string,
     public readonly description?: string,
+    public readonly capabilities?: ProvisionDependencyResourceCommandInput["capabilities"],
     public readonly backupRelationship?: ProvisionDependencyResourceCommandInput["backupRelationship"],
   ) {
     super();
@@ -40,6 +41,7 @@ export class ProvisionDependencyResourceCommand extends Command<{ id: string }> 
           parsed.name,
           parsed.providerKey,
           parsed.description,
+          parsed.capabilities,
           parsed.backupRelationship,
         ),
     );

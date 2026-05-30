@@ -55,6 +55,7 @@ export interface AppaloftSdkClientOptions {
   readonly auth?: AppaloftSdkAuth | (() => AppaloftSdkAuth | undefined);
   readonly fetch?: AppaloftSdkFetch;
   readonly headers?: HeadersInit | (() => HeadersInit);
+  readonly userAgent?: string;
 }
 
 export interface AppaloftSdkOperationRequest {
@@ -115,6 +116,7 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
         buildRequest(url, input, {
           auth: resolveAuth(options.auth),
           configuredHeaders: options.headers,
+          userAgent: options.userAgent,
         }),
       );
 
@@ -156,6 +158,7 @@ async function* streamOperation<TEnvelope>(
     buildRequest(url, input, {
       auth: resolveAuth(options.auth),
       configuredHeaders: options.headers,
+      userAgent: options.userAgent,
     }),
   );
 
@@ -182,6 +185,7 @@ function buildRequest(
   options: {
     readonly auth: AppaloftSdkAuth | undefined;
     readonly configuredHeaders: HeadersInit | (() => HeadersInit) | undefined;
+    readonly userAgent: string | undefined;
   },
 ): Request {
   const requestInit: RequestInit = {
@@ -190,6 +194,7 @@ function buildRequest(
       auth: options.auth,
       body: input.body,
       configuredHeaders: options.configuredHeaders,
+      userAgent: options.userAgent,
     }),
     ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
     ...(input.signal ? { signal: input.signal } : {}),
@@ -232,6 +237,7 @@ function buildHeaders(input: {
   auth: AppaloftSdkAuth | undefined;
   body: unknown;
   configuredHeaders: HeadersInit | (() => HeadersInit) | undefined;
+  userAgent: string | undefined;
 }): Headers {
   const headers = new Headers(
     typeof input.configuredHeaders === "function"
@@ -240,6 +246,10 @@ function buildHeaders(input: {
   );
 
   applyAuthHeaders(headers, input.auth);
+
+  if (input.userAgent && !headers.has("user-agent")) {
+    headers.set("user-agent", input.userAgent);
+  }
 
   if (input.body !== undefined && !headers.has("content-type")) {
     headers.set("content-type", "application/json");

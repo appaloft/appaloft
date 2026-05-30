@@ -75,10 +75,12 @@ function buildPlan(
       name: create.name,
       providerKey,
       ...(create.serverId ? { serverId: create.serverId } : {}),
+      capabilities: create.capabilities ?? [],
       requiresAcceptance: true,
       requestedAt,
       summary: [
         `Create managed ${create.kind} dependency resource`,
+        ...capabilitySummaryLines(create.capabilities ?? []),
         `Provider target ${providerKey}`,
         "No resource or provider mutation is performed until the plan is accepted",
       ],
@@ -104,10 +106,12 @@ function buildPlan(
     name: reuse.name,
     providerKey: `external-${reuse.kind}`,
     endpoint: endpoint.value.maskedConnection,
+    capabilities: reuse.capabilities ?? [],
     requiresAcceptance: true,
     requestedAt,
     summary: [
       `Reuse external ${reuse.kind} dependency resource`,
+      ...capabilitySummaryLines(reuse.capabilities ?? []),
       "Connection material is stored only when the plan is accepted",
       "No provider resource is created for reuse mode",
     ],
@@ -116,6 +120,19 @@ function buildPlan(
 
 export function missingDependencyResourceProvisioningPlan(planId: string) {
   return domainError.notFound("dependency_resource_provisioning_plan", planId);
+}
+
+function capabilitySummaryLines(
+  capabilities: readonly { type: string; name: string; required: boolean }[],
+): string[] {
+  return capabilities.length > 0
+    ? [
+        `Requires dependency capabilities ${capabilities
+          .map((capability) => `${capability.type}:${capability.name}`)
+          .join(", ")}`,
+        "Capability readback is required before binding readiness is trusted",
+      ]
+    : [];
 }
 
 export { response as dependencyResourceProvisioningPlanResponse };

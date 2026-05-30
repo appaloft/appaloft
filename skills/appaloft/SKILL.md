@@ -18,6 +18,10 @@ surface available in the session.
 2. Choose the active surface and state owner: CLI/pure SSH for local shell-capable agents and
    BYOS Action deploys, HTTP/API for selected control planes, Web when guiding a human through the
    console, and MCP when tools are configured.
+   In shell-capable sessions, first run `appaloft auth status` or `appaloft context show` when a
+   Cloud/control-plane task needs product context. If no active profile exists and the user has not
+   selected another endpoint, run `appaloft login`; the public CLI defaults to
+   `https://app.appaloft.com` and stores the verified `cloud` profile locally.
 3. Use existing Appaloft operations only. Do not invent hidden agent commands, bypass adapters, call
    provider SDKs directly, mutate Docker/SSH/database state directly, or inspect repositories/use
    cases/persistence internals for product behavior.

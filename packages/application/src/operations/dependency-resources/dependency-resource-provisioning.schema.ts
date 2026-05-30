@@ -45,6 +45,22 @@ export const dependencyResourceProvisioningPlanSchema = z.object({
   providerKey: z.string().optional(),
   serverId: z.string().optional(),
   endpoint: z.string().optional(),
+  capabilities: z.array(
+    z.discriminatedUnion("type", [
+      z.object({
+        type: z.literal("postgres-extension"),
+        name: z.string(),
+        required: z.boolean(),
+        description: z.string().optional(),
+      }),
+      z.object({
+        type: z.literal("redis-module"),
+        name: z.string(),
+        required: z.boolean(),
+        description: z.string().optional(),
+      }),
+    ]),
+  ),
   requiresAcceptance: z.boolean(),
   requestedAt: z.string(),
   acceptedAt: z.string().optional(),

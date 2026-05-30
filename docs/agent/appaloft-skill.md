@@ -41,7 +41,10 @@ Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 - repository config: source-controlled deployment intent.
 
 The skill chooses among those surfaces based on the current agent environment. It must not invent
-agent-only operations.
+agent-only operations. In shell-capable sessions that need hosted product context, the skill should
+check `appaloft auth status` or `appaloft context show` first, then run `appaloft login` when no
+active profile exists. Without `--url`, login defaults to `https://app.appaloft.com`; credential
+material stays in local CLI environment/profile handling, not in chat.
 
 For GitHub Actions, the skill must keep three deployment shapes distinct:
 
@@ -62,6 +65,7 @@ The installable `appaloft` skill must include:
 - operation keys beside CLI forms so an agent can map CLI/API/Web/MCP surfaces back to the same
   business operation;
 - safety rules for secrets, credentials, local files, logs, and diagnostics;
+- local CLI profile/context guidance for default Appaloft Cloud login and remote control-plane use;
 - deploy, observe, recover, configure, administer, and maintenance workflows;
 - a deploy subprotocol equivalent to `appaloft-deploy` for first-deploy and URL-first outcomes.
 
@@ -69,6 +73,8 @@ The installable `appaloft` skill must include:
 
 - Do not read `.env`, private keys, token files, cloud credential files, deploy tokens, SSH
   material, cookies, or unmasked secrets.
+- Do not ask users to paste product-session cookies, bearer tokens, deploy tokens, browser cookies,
+  or raw secret material into chat for CLI login.
 - Do not call provider SDKs or mutate Docker, SSH, database, proxy, or cloud state directly when an
   Appaloft operation exists.
 - Do not add source/runtime/network fields to `deployments.create`; configure Resource profile
@@ -100,9 +106,9 @@ observation and recovery, domains/TLS, generated default access and route diagno
 resources and backups, storage, scheduled tasks, runtime usage and monitoring, runtime controls,
 terminal sessions, source links, preview cleanup, source-event auto-deploy diagnostics, static
 artifact publishing, audit/retention/operator work, organization/auth/deploy tokens, system
-capabilities/maintenance, MCP usage, and secret/bypass refusal. When a new public operation family
-becomes a core user workflow, add or update an eval instead of expanding `SKILL.md` with exhaustive
-prose.
+capabilities/maintenance, default Cloud CLI context bootstrap, MCP usage, and secret/bypass refusal.
+When a new public operation family becomes a core user workflow, add or update an eval instead of
+expanding `SKILL.md` with exhaustive prose.
 
 Run the local validator before changing the skill:
 

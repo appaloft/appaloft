@@ -260,6 +260,9 @@ function createTestAuthRuntime(): AuthRuntime {
     async getProviderAccessToken() {
       return null;
     },
+    async issueCliProductSessionCookie() {
+      return null;
+    },
     async handle() {
       return new Response(null, { status: 404 });
     },
