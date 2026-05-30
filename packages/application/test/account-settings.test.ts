@@ -20,6 +20,9 @@ import {
   ListAccountSessionsQuery,
   ListAccountSessionsQueryHandler,
   ListAccountSessionsQueryService,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   operationCatalog,
   RevokeAccountSessionCommand,
   RevokeAccountSessionCommandHandler,
@@ -108,6 +111,33 @@ class CapturingAccountSettingsPort implements AccountSettingsPort {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.policy",
+          kind: "policy",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.policy",
+        kind: "policy",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 describe("account settings application boundary", () => {
   test("[ACCOUNT-SETTINGS-PROFILE-001] profile read/change dispatch through AccountSettingsPort", async () => {
     const port = new CapturingAccountSettingsPort();
@@ -133,6 +163,30 @@ describe("account settings application boundary", () => {
     expect(port.calls).toEqual(["showAccountProfile", "changeAccountProfile"]);
   });
 
+  test("[ACCOUNT-SETTINGS-GUARD-001] profile changes can be denied before settings port side effects", async () => {
+    const port = new CapturingAccountSettingsPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new ChangeAccountProfileUseCase(port, guard).execute(context, {
+      displayName: "Blocked User",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.policy",
+        checkKind: "policy",
+        operationKey: "account.profile.change",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "account.profile.change",
+    });
+    expect(port.calls).toEqual([]);
+  });
+
   test("[ACCOUNT-SETTINGS-SESSION-001] session list/revoke dispatch safely without token material", async () => {
     const port = new CapturingAccountSettingsPort();
     const list = await new ListAccountSessionsQueryHandler(
@@ -154,6 +208,33 @@ describe("account settings application boundary", () => {
       revokedAt: "2026-01-01T00:02:00.000Z",
     });
     expect(port.calls).toEqual(["listAccountSessions", "revokeAccountSession"]);
+  });
+
+  test("[ACCOUNT-SETTINGS-GUARD-002] session revocation can be denied before settings port side effects", async () => {
+    const port = new CapturingAccountSettingsPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new RevokeAccountSessionUseCase(port, guard).execute(context, {
+      sessionId: "sess_current",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.policy",
+        checkKind: "policy",
+        operationKey: "account.sessions.revoke",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "account.sessions.revoke",
+      resourceRefs: {
+        sessionId: "sess_current",
+      },
+    });
+    expect(port.calls).toEqual([]);
   });
 
   test("[ACCOUNT-SETTINGS-DANGER-001] exact signed-in user-id confirmation is required before delete dispatch", async () => {
@@ -189,6 +270,35 @@ describe("account settings application boundary", () => {
       deletedAt: "2026-01-01T00:03:00.000Z",
     });
     expect(port.calls).toEqual(["showAccountProfile", "showAccountProfile", "deleteAccount"]);
+  });
+
+  test("[ACCOUNT-SETTINGS-GUARD-003] account deletion can be denied after confirmation but before delete side effects", async () => {
+    const port = new CapturingAccountSettingsPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new DeleteAccountUseCase(port, guard).execute(context, {
+      confirmation: {
+        userId: "usr_admin",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.policy",
+        checkKind: "policy",
+        operationKey: "account.delete",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      contextAttributes: {
+        accountUserId: "usr_admin",
+      },
+      operationKey: "account.delete",
+    });
+    expect(port.calls).toEqual(["showAccountProfile"]);
   });
 
   test("operation catalog includes account settings HTTP/oRPC transport entries", () => {
