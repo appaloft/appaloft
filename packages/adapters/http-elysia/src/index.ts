@@ -851,12 +851,12 @@ export function createHttpApp(input: {
       }
 
       if (existsSync(candidate) && statSync(candidate).isFile()) {
-        return new Response(Bun.file(candidate));
+        return staticFileResponse(candidate);
       }
 
       const routeIndexFile = join(candidate, "index.html");
       if (existsSync(routeIndexFile) && statSync(routeIndexFile).isFile()) {
-        return new Response(Bun.file(routeIndexFile));
+        return staticFileResponse(routeIndexFile);
       }
 
       if (cleanUrlHtmlPath) {
@@ -867,19 +867,19 @@ export function createHttpApp(input: {
           existsSync(cleanUrlHtmlFile) &&
           statSync(cleanUrlHtmlFile).isFile()
         ) {
-          return new Response(Bun.file(cleanUrlHtmlFile));
+          return staticFileResponse(cleanUrlHtmlFile);
         }
       }
 
       if (source.fallbackToRootIndex) {
         const fallbackFile = join(source.staticDir, "200.html");
         if (existsSync(fallbackFile) && statSync(fallbackFile).isFile()) {
-          return new Response(Bun.file(fallbackFile));
+          return staticFileResponse(fallbackFile);
         }
 
         const indexFile = join(source.staticDir, "index.html");
         return existsSync(indexFile) && statSync(indexFile).isFile()
-          ? new Response(Bun.file(indexFile))
+          ? staticFileResponse(indexFile)
           : null;
       }
 
@@ -913,6 +913,11 @@ export function createHttpApp(input: {
     const embeddedIndex =
       source.embeddedAssets["/200.html"] ?? source.embeddedAssets["/index.html"];
     return embeddedIndex ? new Response(embeddedIndex) : null;
+  }
+
+  function staticFileResponse(path: string): Response {
+    const file = Bun.file(path);
+    return new Response(file, file.type ? { headers: { "content-type": file.type } } : undefined);
   }
 
   function webStaticResponse(pathname: string): Response | null {
