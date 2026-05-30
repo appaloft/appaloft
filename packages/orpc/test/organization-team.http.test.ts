@@ -3,14 +3,19 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  ChangeAccountProfileCommand,
   ChangeOrganizationMemberRoleCommand,
+  ChangeOrganizationProfileCommand,
   type Command,
   type CommandBus,
   createExecutionContext,
+  DeleteAccountCommand,
+  DeleteOrganizationCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
   GetCurrentOrganizationContextQuery,
   InviteOrganizationMemberCommand,
+  ListAccountSessionsQuery,
   ListOrganizationInvitationsQuery,
   ListOrganizationMembersQuery,
   type ProductOrganizationRole,
@@ -18,7 +23,11 @@ import {
   type Query,
   type QueryBus,
   RemoveOrganizationMemberCommand,
+  RevokeAccountSessionCommand,
+  ShowAccountProfileQuery,
+  ShowOrganizationProfileQuery,
   SwitchCurrentOrganizationCommand,
+  TransferOrganizationOwnerCommand,
 } from "@appaloft/application";
 import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -168,7 +177,181 @@ function invitationSummary() {
   };
 }
 
+function accountProfileResponse() {
+  return {
+    userId: "usr_admin",
+    email: "admin@example.com",
+    displayName: "Admin",
+    avatarUrl: "https://example.com/avatar.png",
+    emailVerified: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:01:00.000Z",
+  };
+}
+
+function accountSessionResponse() {
+  return {
+    sessionId: "sess_current",
+    userId: "usr_admin",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2026-02-01T00:00:00.000Z",
+    current: true,
+    ipAddress: "127.0.0.1",
+    userAgent: "Appaloft Test",
+  };
+}
+
+function organizationProfileResponse() {
+  return {
+    organizationId: "org_self_hosted",
+    name: "Self Hosted",
+    slug: "self-hosted",
+    role: "owner" as const,
+    logoUrl: "https://example.com/logo.png",
+    permissions: {
+      canInviteMembers: true,
+      canListMembers: true,
+      canManageDeployTokens: true,
+      canRemoveMembers: true,
+      canUpdateMemberRoles: true,
+    },
+  };
+}
+
 describe("organization/team HTTP/oRPC routes", () => {
+  test("[ACCOUNT-SETTINGS-PROFILE-001] account profile routes dispatch safe query and command", async () => {
+    const capturedMessages: string[] = [];
+    const app = mountOrganizationTeamRoutes({
+      commandBus: {
+        execute: async <T>(context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+          expect(context.actor).toMatchObject({ kind: "user", id: "usr_admin" });
+          capturedMessages.push(command.constructor.name);
+          expect(command).toBeInstanceOf(ChangeAccountProfileCommand);
+          return ok({
+            ...accountProfileResponse(),
+            displayName: "Renamed Admin",
+          } as T);
+        },
+      } as CommandBus,
+      productSessionAuthorizationPort: productSessionPort({ expectedRoles: ["member", "member"] }),
+      queryBus: {
+        execute: async <T>(context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+          expect(context.actor).toMatchObject({ kind: "user", id: "usr_admin" });
+          capturedMessages.push(query.constructor.name);
+          expect(query).toBeInstanceOf(ShowAccountProfileQuery);
+          return ok(accountProfileResponse() as T);
+        },
+      } as QueryBus,
+    });
+
+    const showResponse = await app.handle(
+      new Request("http://localhost/api/account/profile", {
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+        },
+      }),
+    );
+    const updateResponse = await app.handle(
+      new Request("http://localhost/api/account/profile", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          displayName: "Renamed Admin",
+          avatarUrl: "https://example.com/avatar.png",
+        }),
+      }),
+    );
+
+    expect(showResponse.status).toBe(200);
+    expect(JSON.stringify(await showResponse.json())).not.toContain("providerToken");
+    expect(updateResponse.status).toBe(200);
+    expect(await updateResponse.json()).toMatchObject({ displayName: "Renamed Admin" });
+    expect(capturedMessages).toEqual(["ShowAccountProfileQuery", "ChangeAccountProfileCommand"]);
+  });
+
+  test("[ACCOUNT-SETTINGS-SESSION-001] [ACCOUNT-SETTINGS-DANGER-001] account sessions and delete routes dispatch safely", async () => {
+    const capturedMessages: string[] = [];
+    const app = mountOrganizationTeamRoutes({
+      commandBus: {
+        execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+          capturedMessages.push(command.constructor.name);
+          if (command instanceof RevokeAccountSessionCommand) {
+            return ok({
+              sessionId: "sess_current",
+              revokedAt: "2026-01-01T00:02:00.000Z",
+            } as T);
+          }
+          if (command instanceof DeleteAccountCommand) {
+            return ok({
+              userId: "usr_admin",
+              deletedAt: "2026-01-01T00:03:00.000Z",
+            } as T);
+          }
+          throw new Error(`Unexpected command ${command.constructor.name}`);
+        },
+      } as CommandBus,
+      productSessionAuthorizationPort: productSessionPort({
+        expectedRoles: ["member", "member", "member"],
+      }),
+      queryBus: {
+        execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+          capturedMessages.push(query.constructor.name);
+          expect(query).toBeInstanceOf(ListAccountSessionsQuery);
+          return ok({ items: [accountSessionResponse()] } as T);
+        },
+      } as QueryBus,
+    });
+
+    const listResponse = await app.handle(
+      new Request("http://localhost/api/account/sessions", {
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+        },
+      }),
+    );
+    const revokeResponse = await app.handle(
+      new Request("http://localhost/api/account/sessions/sess_current/revoke", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ sessionId: "sess_current" }),
+      }),
+    );
+    const deleteResponse = await app.handle(
+      new Request("http://localhost/api/account", {
+        method: "DELETE",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ confirmation: { userId: "usr_admin" } }),
+      }),
+    );
+
+    expect(listResponse.status).toBe(200);
+    expect(JSON.stringify(await listResponse.json())).not.toContain("token");
+    expect(revokeResponse.status).toBe(200);
+    expect(await revokeResponse.json()).toEqual({
+      sessionId: "sess_current",
+      revokedAt: "2026-01-01T00:02:00.000Z",
+    });
+    expect(deleteResponse.status).toBe(200);
+    expect(await deleteResponse.json()).toEqual({
+      userId: "usr_admin",
+      deletedAt: "2026-01-01T00:03:00.000Z",
+    });
+    expect(capturedMessages).toEqual([
+      "ListAccountSessionsQuery",
+      "RevokeAccountSessionCommand",
+      "DeleteAccountCommand",
+    ]);
+  });
+
   test("[ORG-TEAM-AUTH-001] current context rejects missing product sessions before query dispatch", async () => {
     const app = mountOrganizationTeamRoutes({
       commandBus: {
@@ -271,6 +454,110 @@ describe("organization/team HTTP/oRPC routes", () => {
     expect(capturedCommand).toBeInstanceOf(SwitchCurrentOrganizationCommand);
   });
 
+  test("[ORG-SETTINGS-PROFILE-001] organization profile read/change routes use member/admin authorization", async () => {
+    const capturedMessages: string[] = [];
+    const app = mountOrganizationTeamRoutes({
+      commandBus: {
+        execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+          capturedMessages.push(command.constructor.name);
+          expect(command).toBeInstanceOf(ChangeOrganizationProfileCommand);
+          return ok({
+            ...organizationProfileResponse(),
+            name: "Renamed Organization",
+          } as T);
+        },
+      } as CommandBus,
+      productSessionAuthorizationPort: productSessionPort({
+        expectedRoles: ["member", "admin"],
+        organizationId: "org_self_hosted",
+      }),
+      queryBus: {
+        execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+          capturedMessages.push(query.constructor.name);
+          expect(query).toBeInstanceOf(ShowOrganizationProfileQuery);
+          return ok(organizationProfileResponse() as T);
+        },
+      } as QueryBus,
+    });
+
+    const showResponse = await app.handle(
+      new Request("http://localhost/api/organizations/org_self_hosted/profile", {
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+        },
+      }),
+    );
+    const updateResponse = await app.handle(
+      new Request("http://localhost/api/organizations/org_self_hosted/profile", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_self_hosted",
+          name: "Renamed Organization",
+          slug: "renamed-organization",
+          logoUrl: null,
+        }),
+      }),
+    );
+
+    expect(showResponse.status).toBe(200);
+    expect(await showResponse.json()).toEqual(organizationProfileResponse());
+    expect(updateResponse.status).toBe(200);
+    expect(await updateResponse.json()).toMatchObject({ name: "Renamed Organization" });
+    expect(capturedMessages).toEqual([
+      "ShowOrganizationProfileQuery",
+      "ChangeOrganizationProfileCommand",
+    ]);
+  });
+
+  test("[ORG-SETTINGS-DANGER-001] organization delete route requires owner authorization", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const app = mountOrganizationTeamRoutes({
+      commandBus: {
+        execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+          capturedCommand = command as Command<unknown>;
+          return ok({
+            organizationId: "org_self_hosted",
+            deletedAt: "2026-01-01T00:03:00.000Z",
+          } as T);
+        },
+      } as CommandBus,
+      productSessionAuthorizationPort: productSessionPort({
+        expectedRole: "owner",
+        organizationId: "org_self_hosted",
+      }),
+      queryBus: {
+        execute: async () => ok({} as never),
+      } as QueryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/organizations/org_self_hosted", {
+        method: "DELETE",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_self_hosted",
+          confirmation: {
+            organizationId: "org_self_hosted",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      organizationId: "org_self_hosted",
+      deletedAt: "2026-01-01T00:03:00.000Z",
+    });
+    expect(capturedCommand).toBeInstanceOf(DeleteOrganizationCommand);
+  });
+
   test("[ORG-TEAM-MEMBERS-001] member and invitation list routes dispatch safe queries", async () => {
     const capturedQueries: string[] = [];
     const app = mountOrganizationTeamRoutes({
@@ -329,7 +616,7 @@ describe("organization/team HTTP/oRPC routes", () => {
     ]);
   });
 
-  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] mutation routes dispatch organization commands", async () => {
+  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [ORG-TEAM-OWNER-TRANSFER-001] mutation routes dispatch organization commands", async () => {
     const capturedCommands: string[] = [];
     const app = mountOrganizationTeamRoutes({
       commandBus: {
@@ -348,11 +635,18 @@ describe("organization/team HTTP/oRPC routes", () => {
               removedAt: "2026-01-01T00:30:00.000Z",
             } as T);
           }
+          if (command instanceof TransferOrganizationOwnerCommand) {
+            return ok({
+              fromMember: memberSummary({ memberId: "mem_admin", role: "admin" }),
+              toMember: memberSummary({ memberId: "mem_operator", role: "owner" }),
+              transferredAt: "2026-01-01T00:40:00.000Z",
+            } as T);
+          }
           throw new Error(`Unexpected command ${command.constructor.name}`);
         },
       } as CommandBus,
       productSessionAuthorizationPort: productSessionPort({
-        expectedRole: "admin",
+        expectedRoles: ["admin", "admin", "admin", "owner"],
         organizationId: "org_self_hosted",
       }),
       queryBus: {
@@ -401,6 +695,20 @@ describe("organization/team HTTP/oRPC routes", () => {
         }),
       }),
     );
+    const transferResponse = await app.handle(
+      new Request("http://localhost/api/organizations/org_self_hosted/owner-transfer", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_self_hosted",
+          fromMemberId: "mem_admin",
+          toMemberId: "mem_operator",
+        }),
+      }),
+    );
 
     expect(inviteResponse.status).toBe(201);
     expect(await inviteResponse.json()).toEqual(invitationSummary());
@@ -412,10 +720,17 @@ describe("organization/team HTTP/oRPC routes", () => {
       organizationId: "org_self_hosted",
       removedAt: "2026-01-01T00:30:00.000Z",
     });
+    expect(transferResponse.status).toBe(200);
+    expect(await transferResponse.json()).toMatchObject({
+      fromMember: { memberId: "mem_admin", role: "admin" },
+      toMember: { memberId: "mem_operator", role: "owner" },
+      transferredAt: "2026-01-01T00:40:00.000Z",
+    });
     expect(capturedCommands).toEqual([
       "InviteOrganizationMemberCommand",
       "ChangeOrganizationMemberRoleCommand",
       "RemoveOrganizationMemberCommand",
+      "TransferOrganizationOwnerCommand",
     ]);
   });
 });

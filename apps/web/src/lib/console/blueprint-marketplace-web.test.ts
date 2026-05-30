@@ -134,6 +134,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain('case "dependencyResources.provision"');
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.plan");
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.accept");
+    expect(quickDeploySource).toContain("capabilities: requirement.capabilities");
+    expect(quickDeploySource).toContain("capabilities: item.capabilities");
     expect(quickDeploySource).toContain("orpcClient.resources.dependencyBindings.bind");
     expect(quickDeploySource).toContain('from "@thesvg/icons/mysql"');
     expect(quickDeploySource).toContain('from "@thesvg/icons/clickhouse"');

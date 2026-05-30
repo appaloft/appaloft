@@ -2,7 +2,10 @@ import { z } from "zod";
 
 import { managedDependencyResourceKinds } from "../../ports";
 import { nonEmptyTrimmedString } from "../shared-schema";
-import { dependencyResourceBackupRelationshipInputSchema } from "./dependency-resource.schema";
+import {
+  dependencyResourceBackupRelationshipInputSchema,
+  dependencyResourceCapabilityRequirementsInputSchema,
+} from "./dependency-resource.schema";
 
 export const provisionDependencyResourceCommandInputSchema = z.object({
   kind: z.enum(managedDependencyResourceKinds),
@@ -12,6 +15,7 @@ export const provisionDependencyResourceCommandInputSchema = z.object({
   name: nonEmptyTrimmedString("Dependency resource name"),
   providerKey: nonEmptyTrimmedString("Provider key").optional(),
   description: nonEmptyTrimmedString("Description").optional(),
+  capabilities: dependencyResourceCapabilityRequirementsInputSchema,
   backupRelationship: dependencyResourceBackupRelationshipInputSchema,
 });
 

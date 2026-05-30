@@ -2,6 +2,8 @@ import {
   appaloftTraceAttributes,
   createReadModelSpanName,
   createRepositorySpanName,
+  type DependencyResourceCapabilityReadback,
+  type DependencyResourceCapabilityRequirement,
   type DependencyResourceDeleteBlocker,
   type DependencyResourceDeleteSafetyReader,
   type DependencyResourceReadModel,
@@ -91,6 +93,23 @@ interface SerializedDependencyProviderRealization extends Record<string, unknown
   failureMessage?: string;
 }
 
+interface SerializedDependencyCapabilityRequirement extends Record<string, unknown> {
+  type: "postgres-extension" | "redis-module";
+  name: string;
+  required: boolean;
+  description?: string;
+}
+
+interface SerializedDependencyCapabilityReadback extends Record<string, unknown> {
+  type: "postgres-extension" | "redis-module";
+  name: string;
+  required: boolean;
+  status: "satisfied" | "unsupported" | "failed";
+  evidence: string[];
+  version?: string;
+  checkedAt?: string;
+}
+
 class KyselyResourceInstanceSelectionVisitor
   implements ResourceInstanceSelectionSpecVisitor<DependencyResourceSelectionQuery>
 {
@@ -170,6 +189,33 @@ class KyselyResourceInstanceMutationVisitor
             : {}),
         } satisfies SerializedDependencyProviderRealization)
       : null;
+    const desiredCapabilities =
+      state.desiredCapabilities && state.desiredCapabilities.length > 0
+        ? state.desiredCapabilities.map(
+            (capability) =>
+              ({
+                type: capability.type,
+                name: capability.name,
+                required: capability.required,
+                ...(capability.description ? { description: capability.description.value } : {}),
+              }) satisfies SerializedDependencyCapabilityRequirement,
+          )
+        : null;
+    const capabilityReadbacks =
+      state.capabilityReadbacks && state.capabilityReadbacks.length > 0
+        ? state.capabilityReadbacks.map(
+            (capability) =>
+              ({
+                type: capability.type,
+                name: capability.name,
+                required: capability.required,
+                status: capability.status,
+                evidence: [...capability.evidence],
+                ...(capability.version ? { version: capability.version } : {}),
+                ...(capability.checkedAt ? { checkedAt: capability.checkedAt.value } : {}),
+              }) satisfies SerializedDependencyCapabilityReadback,
+          )
+        : null;
 
     return {
       dependencyResource: {
@@ -186,6 +232,8 @@ class KyselyResourceInstanceMutationVisitor
         endpoint,
         connection_secret_ref: state.connectionSecretRef?.value ?? null,
         provider_realization: providerRealization,
+        desired_capabilities: desiredCapabilities,
+        capability_readbacks: capabilityReadbacks,
         backup_relationship: backupRelationship,
         binding_readiness: bindingReadiness,
         lifecycle_status: state.status.value,
@@ -216,6 +264,12 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
   const providerRealization = row.provider_realization
     ? (row.provider_realization as SerializedDependencyProviderRealization)
     : undefined;
+  const desiredCapabilities = row.desired_capabilities
+    ? (row.desired_capabilities as SerializedDependencyCapabilityRequirement[])
+    : [];
+  const capabilityReadbacks = row.capability_readbacks
+    ? (row.capability_readbacks as SerializedDependencyCapabilityReadback[])
+    : [];
 
   return ResourceInstance.rehydrate({
     id: ResourceInstanceId.rehydrate(row.id),
@@ -263,6 +317,33 @@ function rehydrateResourceInstance(row: DependencyResourceRow): ResourceInstance
         : {}),
     ...(row.connection_secret_ref
       ? { connectionSecretRef: DependencyResourceSecretRef.rehydrate(row.connection_secret_ref) }
+      : {}),
+    ...(desiredCapabilities.length > 0
+      ? {
+          desiredCapabilities: desiredCapabilities.map((capability) => ({
+            type: capability.type,
+            name: capability.name,
+            required: capability.required,
+            ...(capability.description
+              ? { description: DescriptionText.rehydrate(capability.description) }
+              : {}),
+          })),
+        }
+      : {}),
+    ...(capabilityReadbacks.length > 0
+      ? {
+          capabilityReadbacks: capabilityReadbacks.map((capability) => ({
+            type: capability.type,
+            name: capability.name,
+            required: capability.required,
+            status: capability.status,
+            evidence: [...capability.evidence],
+            ...(capability.version ? { version: capability.version } : {}),
+            ...(capability.checkedAt
+              ? { checkedAt: OccurredAt.rehydrate(capability.checkedAt) }
+              : {}),
+          })),
+        }
       : {}),
     ...(providerRealization
       ? {
@@ -344,6 +425,12 @@ function toDependencyResourceSummary(
   const providerRealization = row.provider_realization
     ? (row.provider_realization as SerializedDependencyProviderRealization)
     : undefined;
+  const desiredCapabilities = row.desired_capabilities
+    ? (row.desired_capabilities as SerializedDependencyCapabilityRequirement[])
+    : [];
+  const capabilityReadbacks = row.capability_readbacks
+    ? (row.capability_readbacks as SerializedDependencyCapabilityReadback[])
+    : [];
   return {
     id: row.id,
     projectId: row.project_id,
@@ -389,6 +476,27 @@ function toDependencyResourceSummary(
           },
         }
       : {}),
+    desiredCapabilities: desiredCapabilities.map(
+      (capability) =>
+        ({
+          type: capability.type,
+          name: capability.name,
+          required: capability.required,
+          ...(capability.description ? { description: capability.description } : {}),
+        }) satisfies DependencyResourceCapabilityRequirement,
+    ),
+    capabilityReadbacks: capabilityReadbacks.map(
+      (capability) =>
+        ({
+          type: capability.type,
+          name: capability.name,
+          required: capability.required,
+          status: capability.status,
+          evidence: [...capability.evidence],
+          ...(capability.version ? { version: capability.version } : {}),
+          ...(capability.checkedAt ? { checkedAt: capability.checkedAt } : {}),
+        }) satisfies DependencyResourceCapabilityReadback,
+    ),
     bindingReadiness: {
       status: bindingReadiness?.status ?? "not-implemented",
       ...(bindingReadiness?.reason ? { reason: bindingReadiness.reason } : {}),
@@ -475,6 +583,8 @@ export class PgDependencyResourceRepository implements DependencyResourceReposit
                 endpoint: mutation.dependencyResource.endpoint,
                 connection_secret_ref: mutation.dependencyResource.connection_secret_ref,
                 provider_realization: mutation.dependencyResource.provider_realization,
+                desired_capabilities: mutation.dependencyResource.desired_capabilities,
+                capability_readbacks: mutation.dependencyResource.capability_readbacks,
                 backup_relationship: mutation.dependencyResource.backup_relationship,
                 binding_readiness: mutation.dependencyResource.binding_readiness,
                 lifecycle_status: mutation.dependencyResource.lifecycle_status,

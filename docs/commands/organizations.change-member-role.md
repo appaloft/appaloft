@@ -2,8 +2,8 @@
 
 ## Purpose
 
-`organizations.change-member-role` changes an existing organization member's role while preserving
-organization ownership invariants.
+`organizations.change-member-role` changes an existing non-owner organization member's non-owner
+role. Ownership changes are not role updates; they use `organizations.transfer-owner`.
 
 ## Status
 
@@ -33,8 +33,8 @@ organization ownership invariants.
 2. Missing sessions return `product_auth_missing`/`401`.
 3. Non-members or insufficient roles return `product_auth_forbidden`/`403`.
 4. The target member must belong to the organization.
-5. The new role must be a valid Appaloft organization role.
-6. The role change must not leave the organization without an owner.
+5. The new role must be a valid non-owner Appaloft organization role.
+6. The target member must not be an owner; owner role changes use ownership transfer.
 7. Better Auth or another auth runtime may persist the role change behind an Appaloft-owned port,
    but application semantics stay Appaloft-owned.
 
@@ -52,8 +52,10 @@ organization ownership invariants.
 - `product_auth_missing`, phase `organization-change-member-role`, no valid product session.
 - `product_auth_forbidden`, phase `organization-change-member-role`, actor cannot change roles.
 - `not_found`, phase `organization-change-member-role`, target member is absent or not visible.
-- `validation_error`, phase `organization-change-member-role`, invalid role.
-- `invariant`, phase `organization-change-member-role`, role change would remove the last owner.
+- `validation_error`, phase `organization-change-member-role`, invalid role or attempted owner
+  assignment.
+- `invariant`, phase `organization-change-member-role`, target is an owner and must use ownership
+  transfer.
 
 ## Related Specs
 

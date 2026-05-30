@@ -31,13 +31,15 @@ CLI help, interactive prompts, and recovery messages should point to stable publ
 
 <h2 id="cli-remote-control-plane-login">Remote control-plane login</h2>
 
-`appaloft login --url <url>` and `appaloft auth login --url <url>` store the endpoint, profile name, auth reference, and handshake summary for Appaloft Cloud or a self-hosted control plane in a local CLI profile. The profile lives under `APPALOFT_HOME` or the user's local Appaloft home, not in repository config.
+`appaloft login` and `appaloft auth login` default to Appaloft Cloud at `https://app.appaloft.com`. Pass `--url <url>` to connect to a self-hosted control plane or another trusted endpoint. After verification, the CLI stores the endpoint, profile name, auth reference, and handshake summary in a local CLI profile. The profile lives under `APPALOFT_HOME` or the user's local Appaloft home, not in repository config.
 
 Login first checks `/api/version` and verifies the current organization context. `appaloft auth status`, `appaloft logout`, `appaloft auth logout`, `appaloft context list`, `appaloft context show`, and `appaloft context use <profile>` only manage local profile/context state.
 
 Login is not deployment takeover and it is not SSH PGlite state adoption. It does not create projects, resources, deployments, source links, or domain bindings; it does not add `controlPlane` to `deployments.create`; and it does not write tokens, cookies, database URLs, SSH keys, credential ids, tenant/org secret identities, or raw secret values to committed `appaloft.yml`.
 
-Current Cloud support requires an explicit `--url` plus trusted local token or session input. Default Cloud URL selection and browser/device/OIDC login remain future capabilities.
+Interactive login uses a browser auth-session exchange. The CLI creates a short-lived login session, prints `verificationUriComplete` and the user code, opens the browser unless `--no-browser` or CI disables it, then polls for authorization. After the browser confirms, the CLI writes a profile only after one-time exchange succeeds and the current organization context verifies. Denied, expired, timed-out, interrupted, failed-exchange, and failed-context sessions do not write partial profiles.
+
+`APPALOFT_AUTH_COOKIE` and `APPALOFT_TOKEN` remain trusted local credential paths for automation and noninteractive use. They are not the default human flow, and users should not paste product-session cookies, bearer tokens, deploy tokens, browser cookies, or raw secret material into chat or committed config.
 
 <h2 id="cli-remote-control-plane-dispatch">Remote control-plane dispatch</h2>
 

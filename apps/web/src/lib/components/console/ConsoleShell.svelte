@@ -23,7 +23,6 @@
     ShieldCheck,
     Settings2,
     Sun,
-    KeyRound,
     UserRound,
   } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
@@ -388,7 +387,7 @@
           align="start"
           side="bottom"
           sideOffset={6}
-          class="max-h-[min(26rem,calc(100vh-7rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+          class="max-h-[min(26rem,calc(100vh-7rem))] w-(--bits-dropdown-menu-anchor-width) min-w-64"
         >
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
@@ -563,7 +562,7 @@
           align="start"
           side="top"
           sideOffset={6}
-          class="max-h-[min(28rem,calc(100vh-5rem))] w-(--bits-dropdown-menu-anchor-width) min-w-0"
+          class="max-h-[min(28rem,calc(100vh-5rem))] w-(--bits-dropdown-menu-anchor-width) min-w-64"
         >
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
@@ -580,9 +579,9 @@
             <UserRound class="size-4" />
             {$t(i18nKeys.console.nav.organization)}
           </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/account/security")}>
-            <KeyRound class="size-4" />
-            {$t(i18nKeys.console.nav.accountSecurity)}
+          <DropdownMenuItem onclick={() => navigateTo("/account/profile")}>
+            <UserRound class="size-4" />
+            {$t(i18nKeys.console.accountSettings.introTitle)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/instance")}>
             <Settings2 class="size-4" />

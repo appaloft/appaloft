@@ -11,10 +11,12 @@
   member metadata and roles.
 - [x] `ORG-TEAM-INVITE-001`: add application/adapter test proving invite-member creates a safe
   invitation through an Appaloft-owned port and rejects duplicate active membership.
-- [x] `ORG-TEAM-ROLE-001`: add core/application test proving role update preserves at least one
-  owner.
-- [x] `ORG-TEAM-REMOVE-001`: add core/application test proving remove member preserves at least one
-  owner and rejects unauthorized removal.
+- [x] `ORG-TEAM-ROLE-001`: add core/application test proving generic role update is limited to
+  non-owner members and rejects owner assignment/owner target changes.
+- [x] `ORG-TEAM-REMOVE-001`: add core/application test proving generic remove member is limited to
+  non-owner members and rejects owner removal.
+- [x] `ORG-TEAM-OWNER-TRANSFER-001`: add core/application/HTTP/CLI/Web source tests proving owner
+  changes use the dedicated ownership transfer command.
 - [x] `ORG-TEAM-AUTH-001`: add HTTP/oRPC tests proving missing sessions return `401` and
   insufficient roles return `403` before dispatch.
 - [x] `ORG-TEAM-ADAPTER-001`: add Better Auth adapter tests proving Better Auth stays behind
@@ -22,7 +24,7 @@
 - [x] `ORG-TEAM-DOCS-001`: add docs/help tests for organization/team public help anchors.
 - [x] `ORG-TEAM-WEB-001`: add Web source test proving `/organization` uses shared
   `organizations.*` oRPC contracts for current context, member list, invitations, invite, role
-  update, and remove.
+  update, ownership transfer, and remove.
 - [x] `ORG-TEAM-WEB-002`: add Web source test proving `/organization` uses shared
   `deployTokens.*` contracts for token list/create/rotate/revoke and does not couple to the auth
   runtime.
@@ -36,19 +38,20 @@
 - [x] Position organization/team operations in `docs/BUSINESS_OPERATION_MAP.md`.
 - [x] Add active organization/team operations to `docs/CORE_OPERATIONS.md`.
 - [x] Add command/query specs for current context, member list, invitation list, invite member,
-  change member role, and remove member.
+  change member role, transfer owner, and remove member.
 - [x] Add command spec for current organization switching.
 - [x] Extend self-hosted product-auth and identity-governance test matrices.
 
 ## Implementation
 
-- [x] Extend `Organization` core behavior for role update, member removal, and at-least-one-owner
-  policy.
+- [x] Extend `Organization` core behavior for non-owner role update, ownership transfer, non-owner
+  member removal, and owner protection.
 - [x] Add application-owned organization/team ports and DI tokens.
 - [x] Add current-context query service and message/handler.
 - [x] Add switch-current use case and message/handler.
 - [x] Add list-members and list-invitations query services and messages/handlers.
-- [x] Add invite-member, change-member-role, and remove-member use cases plus messages/handlers.
+- [x] Add invite-member, change-member-role, transfer-owner, and remove-member use cases plus
+  messages/handlers.
 - [x] Implement organization/team ports in `@appaloft/auth-better`.
 - [x] Add safe persistence/read-model adapters where the auth adapter does not already own the read.
 - [x] Add operation-catalog entries and application exports.
@@ -57,13 +60,14 @@
 - [x] Add operation-catalog entry and application exports for `organizations.switch-current`.
 - [x] Wire switch-current HTTP/oRPC route behind product-session authorization.
 - [x] Add CLI organization switch command over the same command message.
-- [x] Add Web current organization/member management surfaces with i18n keys.
+- [x] Add Web current organization/member management surfaces with i18n keys, including owner
+  transfer and non-owner generic role/remove controls.
 - [x] Add Web current organization switch surface with i18n keys.
 
 ## Entrypoints And Docs
 
-- [x] Add public docs/help for inviting operators, member list, role update, removal, and current
-  context.
+- [x] Add public docs/help for inviting operators, member list, non-owner role update, ownership
+  transfer, non-owner removal, and current context.
 - [x] Add public docs/help coverage for switching current organization.
 - [x] Update Web help anchors to point at stable public docs after Web organization/team surfaces
   exist.

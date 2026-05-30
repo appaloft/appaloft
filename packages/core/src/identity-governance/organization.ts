@@ -223,9 +223,17 @@ export class Organization extends AggregateRoot<OrganizationState> {
       return err(domainError.notFound("organization_member", input.memberId.value));
     }
 
-    if (member.isOwner() && !input.role.isOwner() && this.ownerCount() <= 1) {
+    if (input.role.isOwner()) {
       return err(
-        domainError.invariant("Organization must keep at least one owner", {
+        domainError.validation("Organization ownership changes require ownership transfer", {
+          memberId: input.memberId.value,
+        }),
+      );
+    }
+
+    if (member.isOwner()) {
+      return err(
+        domainError.invariant("Organization owners can only be changed by ownership transfer", {
           memberId: input.memberId.value,
         }),
       );
@@ -239,6 +247,47 @@ export class Organization extends AggregateRoot<OrganizationState> {
     return ok(undefined);
   }
 
+  transferOwnership(input: {
+    fromMemberId: OrganizationMemberId;
+    toMemberId: OrganizationMemberId;
+    transferredAt: OccurredAt;
+  }): Result<void> {
+    const fromMember = this.findMember(input.fromMemberId);
+    const toMember = this.findMember(input.toMemberId);
+
+    if (fromMember === undefined) {
+      return err(domainError.notFound("organization_member", input.fromMemberId.value));
+    }
+
+    if (toMember === undefined) {
+      return err(domainError.notFound("organization_member", input.toMemberId.value));
+    }
+
+    if (!fromMember.isOwner()) {
+      return err(
+        domainError.invariant("Organization ownership can only be transferred from an owner", {
+          fromMemberId: input.fromMemberId.value,
+        }),
+      );
+    }
+
+    if (fromMember === toMember) {
+      return err(
+        domainError.validation("Organization ownership transfer requires a different member", {
+          memberId: input.fromMemberId.value,
+        }),
+      );
+    }
+
+    toMember.changeRole(OrganizationRoleValue.rehydrate("owner"));
+    fromMember.changeRole(OrganizationRoleValue.rehydrate("admin"));
+    this.recordDomainEvent("organization.owner_transferred", input.transferredAt, {
+      fromMemberId: input.fromMemberId.value,
+      toMemberId: input.toMemberId.value,
+    });
+    return ok(undefined);
+  }
+
   removeMember(input: { memberId: OrganizationMemberId; removedAt: OccurredAt }): Result<void> {
     const member = this.findMember(input.memberId);
 
@@ -246,9 +295,9 @@ export class Organization extends AggregateRoot<OrganizationState> {
       return err(domainError.notFound("organization_member", input.memberId.value));
     }
 
-    if (member.isOwner() && this.ownerCount() <= 1) {
+    if (member.isOwner()) {
       return err(
-        domainError.invariant("Organization must keep at least one owner", {
+        domainError.invariant("Organization owners can only be removed after ownership transfer", {
           memberId: input.memberId.value,
         }),
       );

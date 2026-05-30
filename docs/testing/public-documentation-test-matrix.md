@@ -76,7 +76,8 @@ Current status:
   trusted origin configuration, and product auth 401/403 recovery under
   `self-hosting/first-admin-bootstrap#self-hosting-first-admin-bootstrap`.
   Self-hosted organization/team docs now describe current context, current organization switching,
-  member and invitation lists, member invitation, role updates, removal, CLI session handoff, safe
+  member and invitation lists, member invitation, non-owner role updates, ownership transfer,
+  non-owner removal, CLI session handoff, safe
   outputs, and product auth 401/403 recovery under
   `self-hosting/organization-team-management#self-hosting-organization-team-management`.
   Repository config docs now describe `controlPlane.mode`, safe `controlPlane.url` usage, and the
@@ -114,7 +115,7 @@ Current status:
   bootstrap HTTP/API, product auth error recovery, and future member/token management help topic.
   Organization/team operation contracts are now covered by the stable
   `self-hosting.organization-team-management` help topic for HTTP/API routes, CLI commands, session
-  input, safe outputs, owner-retention recovery, current organization switching, and apps/web
+  input, safe outputs, owner transfer recovery, current organization switching, and apps/web
   `/organization` member/deploy-token management.
   Repository config docs now cover user-facing application graphs for `dependencies`,
   `dependencies.<key>.backup`, `storage`, `scheduledTasks`, `autoDeploy`, `access.generated`,

@@ -71,6 +71,41 @@ function stringFromUnknownRecord(record: Record<string, unknown>, key: string): 
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function normalizeCommitSha(value: string | undefined): string | null {
+  const trimmed = value?.trim().replace(/^git:/i, "");
+  return trimmed && /^[a-f0-9]{7,40}$/i.test(trimmed) ? trimmed : null;
+}
+
+async function readCurrentCommitSha(): Promise<string | null> {
+  for (const key of [
+    "APPALOFT_INSTANCE_COMMIT_SHA",
+    "APPALOFT_GIT_COMMIT_SHA",
+    "APPALOFT_COMMIT_SHA",
+    "GITHUB_SHA",
+    "VERCEL_GIT_COMMIT_SHA",
+    "SOURCE_VERSION",
+  ]) {
+    const commitSha = normalizeCommitSha(process.env[key]);
+    if (commitSha) {
+      return commitSha;
+    }
+  }
+
+  try {
+    const processHandle = Bun.spawn(["git", "rev-parse", "HEAD"], {
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    const [exitCode, stdout] = await Promise.all([
+      processHandle.exited,
+      new Response(processHandle.stdout).text(),
+    ]);
+    return exitCode === 0 ? normalizeCommitSha(stdout) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function readLatestReleaseVersion(): Promise<{
   version: string | null;
   releaseNotesUrl?: string;
@@ -117,7 +152,10 @@ export class SelfHostedInstanceUpgradePort implements InstanceUpgradePort {
   constructor(private readonly config: AppConfig) {}
 
   async check(input: { targetVersion?: string } = {}): Promise<Result<InstanceUpgradeCheckResult>> {
-    const latestRelease = await readLatestReleaseVersion();
+    const [latestRelease, currentCommitSha] = await Promise.all([
+      readLatestReleaseVersion(),
+      readCurrentCommitSha(),
+    ]);
     const currentVersion = displayVersion(this.config.appVersion);
     const targetVersion = displayVersion(input.targetVersion ?? latestRelease.version ?? "latest");
     const updateAvailable =
@@ -134,6 +172,7 @@ export class SelfHostedInstanceUpgradePort implements InstanceUpgradePort {
     return ok({
       schemaVersion: "system.instance-upgrade.check/v1",
       currentVersion,
+      ...(currentCommitSha ? { currentCommitSha } : {}),
       targetVersion,
       latestVersion: latestRelease.version,
       updateAvailable,

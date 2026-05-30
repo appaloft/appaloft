@@ -6,6 +6,7 @@ import {
   ListOrganizationMembersQuery,
   RemoveOrganizationMemberCommand,
   SwitchCurrentOrganizationCommand,
+  TransferOrganizationOwnerCommand,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
@@ -17,6 +18,8 @@ const invitationStatuses = ["accepted", "expired", "pending", "revoked"] as cons
 
 const organizationIdOption = Options.text("organization-id");
 const memberIdArg = Args.text({ name: "memberId" });
+const fromMemberIdArg = Args.text({ name: "fromMemberId" });
+const toMemberIdArg = Args.text({ name: "toMemberId" });
 const organizationIdArg = Args.text({ name: "organizationId" });
 const emailOption = Options.text("email");
 const roleOption = Options.choice("role", organizationRoles);
@@ -150,6 +153,30 @@ const memberCommand = EffectCommand.make("member").pipe(
   EffectCommand.withSubcommands([memberInviteCommand, memberRoleCommand, memberRemoveCommand]),
 );
 
+const ownerTransferCommand = EffectCommand.make(
+  "transfer",
+  {
+    fromMemberId: fromMemberIdArg,
+    toMemberId: toMemberIdArg,
+    organizationId: organizationIdOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ fromMemberId, idempotencyKey, organizationId, toMemberId }) =>
+    runCommand(
+      TransferOrganizationOwnerCommand.create({
+        organizationId,
+        fromMemberId,
+        toMemberId,
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.organizationOwnerTransfer));
+
+const ownerCommand = EffectCommand.make("owner").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.organizationOwner),
+  EffectCommand.withSubcommands([ownerTransferCommand]),
+);
+
 export const organizationCommand = EffectCommand.make("organization").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.organization),
   EffectCommand.withSubcommands([
@@ -158,5 +185,6 @@ export const organizationCommand = EffectCommand.make("organization").pipe(
     membersCommand,
     invitationsCommand,
     memberCommand,
+    ownerCommand,
   ]),
 );

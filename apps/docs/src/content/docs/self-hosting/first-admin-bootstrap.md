@@ -131,7 +131,8 @@ callback URL 使用 auth API origin；GitHub 和 Google 默认路径是
 
 首次管理员会成为初始 organization 的 owner。登录后，使用
 [Organization team management](/docs/self-hosting/organization-team-management/) 查看当前
-organization context、邀请成员、更新角色、移除成员，并处理 `401 product_auth_missing` 和
+organization context、邀请成员、更新非 owner 角色、移交 owner、移除非 owner 成员，并处理
+`401 product_auth_missing` 和
 `403 product_auth_forbidden`。
 
 <h2 id="self-hosting-first-admin-recovery">恢复和排查</h2>

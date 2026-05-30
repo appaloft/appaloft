@@ -8,6 +8,7 @@ import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
   type CliControlPlaneProfile,
   createRemoteCliProgram,
+  defaultPublicCloudControlPlaneUrl,
   loginControlPlane,
   MemoryCliControlPlaneProfileStore,
   resolveCliExecutionTarget,
@@ -211,7 +212,560 @@ function createControlPlaneFetch(
   };
 }
 
+type CliAuthPollStatus = "pending" | "authorized" | "denied" | "expired";
+
+function createCliAuthExchangeFetch(
+  requests: Request[],
+  input: {
+    readonly auth?:
+      | { readonly kind: "bearer"; readonly token: string }
+      | { readonly kind: "product-session"; readonly cookie: string };
+    readonly exchangeStatus?: number;
+    readonly overrides?: Partial<Record<string, Response>>;
+    readonly sessionStatus?: number;
+    readonly statuses?: CliAuthPollStatus[];
+  } = {},
+): AppaloftSdkFetch {
+  const statuses = [...(input.statuses ?? ["authorized"])];
+  const baseFetch = createControlPlaneFetch(requests, input.overrides);
+
+  return async (request) => {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/cli-auth/sessions") {
+      const verificationUri = `${url.origin}/cli-auth/authorize`;
+      requests.push(request);
+      return (
+        input.overrides?.["/api/cli-auth/sessions"] ??
+        jsonResponse(
+          {
+            deviceCode: "dev_cli_fixture",
+            expiresIn: 600,
+            interval: 0,
+            userCode: "ABCD-EFGH",
+            verificationUri,
+            verificationUriComplete: `${verificationUri}?user_code=ABCD-EFGH`,
+          },
+          input.sessionStatus ?? 201,
+        )
+      );
+    }
+
+    if (url.pathname === "/api/cli-auth/sessions/dev_cli_fixture") {
+      requests.push(request);
+      return (
+        input.overrides?.["/api/cli-auth/sessions/dev_cli_fixture"] ??
+        jsonResponse({ status: statuses.shift() ?? "authorized", interval: 0 })
+      );
+    }
+
+    if (url.pathname === "/api/cli-auth/sessions/dev_cli_fixture/exchange") {
+      requests.push(request);
+      return (
+        input.overrides?.["/api/cli-auth/sessions/dev_cli_fixture/exchange"] ??
+        jsonResponse(
+          {
+            auth: input.auth ?? {
+              kind: "bearer",
+              token: "tok_exchanged_secret_5678",
+            },
+          },
+          input.exchangeStatus ?? 200,
+        )
+      );
+    }
+
+    if (url.pathname === "/api/cli-auth/sessions/dev_cli_fixture/cancel") {
+      requests.push(request);
+      return (
+        input.overrides?.["/api/cli-auth/sessions/dev_cli_fixture/cancel"] ??
+        jsonResponse({ canceled: true })
+      );
+    }
+
+    return baseFetch(request);
+  };
+}
+
 describe("CLI remote control-plane client", () => {
+  test("[CONTROL-PLANE-CLI-012] env credential login without --url defaults to the Appaloft Cloud profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--no-browser"],
+      env: {
+        APPALOFT_TOKEN: "tok_cloud_secret_1234",
+      },
+      fetch: createControlPlaneFetch(requests, {
+        "/api/version": jsonResponse({
+          name: "Appaloft Cloud",
+          version: "0.12.5-test",
+          apiVersion: "v1",
+          mode: "cloud",
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("cloud");
+    expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
+      mode: "cloud",
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+    });
+    expect(requests.map((request) => new URL(request.url).origin)).toEqual([
+      defaultPublicCloudControlPlaneUrl,
+      defaultPublicCloudControlPlaneUrl,
+    ]);
+    expect(rendered.stdout).toContain(defaultPublicCloudControlPlaneUrl);
+    expect(rendered.stdout).toContain("***1234");
+    expect(rendered.stdout).not.toContain("tok_cloud_secret_1234");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] browser auth exchange prints URL and code then writes the Cloud profile after exchange and current-context verification", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "login", "--no-browser"],
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests, {
+        statuses: ["pending", "authorized"],
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("cloud");
+    expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
+      mode: "cloud",
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+      auth: {
+        kind: "bearer",
+        token: "tok_exchanged_secret_5678",
+      },
+      currentOrganization: {
+        organizationId: "org_self_hosted",
+      },
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "POST /api/cli-auth/sessions",
+        "GET /api/cli-auth/sessions/dev_cli_fixture",
+        "GET /api/cli-auth/sessions/dev_cli_fixture",
+        "POST /api/cli-auth/sessions/dev_cli_fixture/exchange",
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+      ],
+    );
+    expect(requests[5]?.headers.get("authorization")).toBe("Bearer tok_exchanged_secret_5678");
+    expect(rendered.stdout).toContain(
+      "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    );
+    expect(rendered.stdout).toContain("ABCD-EFGH");
+    expect(rendered.stdout).toContain("***5678");
+    expect(rendered.stdout).not.toContain("tok_exchanged_secret_5678");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] browser open failure falls back to printed verification URL", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      {},
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests),
+        now: () => "2026-05-17T00:00:00.000Z",
+        openBrowser: () => Promise.reject(new Error("open failed")),
+        store,
+      },
+    );
+
+    const stored = await store.read();
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      name: "cloud",
+      auth: {
+        redacted: "***5678",
+      },
+    });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("cloud");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] browser open disabled prints the verification URL without launching a browser", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      { openBrowser: false },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch([]),
+        now: () => "2026-05-17T00:00:00.000Z",
+        openBrowser: () => {
+          throw new Error("browser should not open");
+        },
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      login: {
+        openedBrowser: false,
+        openBrowserFailed: false,
+        userCode: "ABCD-EFGH",
+        verificationUriComplete: "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+      },
+    });
+    expect((await store.read())._unsafeUnwrap().activeProfile).toBe("cloud");
+  });
+
+  test("[CONTROL-PLANE-CLI-013] denied browser auth exchange writes no profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+
+    const result = await loginControlPlane(
+      { openBrowser: false },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests, { statuses: ["denied"] }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+    const stored = await store.read();
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_denied",
+      details: {
+        phase: "control-plane-auth",
+      },
+    });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["POST /api/cli-auth/sessions", "GET /api/cli-auth/sessions/dev_cli_fixture"],
+    );
+  });
+
+  test("[CONTROL-PLANE-CLI-013] expired browser auth exchange writes no profile", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      { openBrowser: false },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch([], { statuses: ["expired"] }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_expired",
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-013] timeout browser auth exchange writes no profile", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    let clock = 0;
+    const result = await loginControlPlane(
+      {
+        openBrowser: false,
+        pollTimeoutMs: 1,
+      },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch([], { statuses: ["pending", "pending", "pending"] }),
+        monotonicNow: () => clock,
+        now: () => "2026-05-17T00:00:00.000Z",
+        sleep: async () => {
+          clock += 2;
+        },
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_timeout",
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-013] interrupted browser auth exchange cancels and writes no profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      {
+        openBrowser: false,
+        signal: AbortSignal.abort(),
+      },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests, { statuses: ["pending"] }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_interrupted",
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["POST /api/cli-auth/sessions", "POST /api/cli-auth/sessions/dev_cli_fixture/cancel"],
+    );
+  });
+
+  test("[CONTROL-PLANE-CLI-013] interrupted polling sleep cancels and writes no profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const abortController = new AbortController();
+    const result = await loginControlPlane(
+      {
+        openBrowser: false,
+        signal: abortController.signal,
+      },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests, { statuses: ["pending"] }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        sleep: async () => {
+          abortController.abort();
+        },
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_interrupted",
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "POST /api/cli-auth/sessions",
+        "GET /api/cli-auth/sessions/dev_cli_fixture",
+        "POST /api/cli-auth/sessions/dev_cli_fixture/cancel",
+      ],
+    );
+  });
+
+  test("[CONTROL-PLANE-CLI-013] exchange failure writes no profile and does not leak raw material", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      { openBrowser: false },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch([], {
+          exchangeStatus: 500,
+          overrides: {
+            "/api/cli-auth/sessions/dev_cli_fixture/exchange": jsonResponse(
+              {
+                code: "control_plane_auth_exchange_failed",
+                category: "infra",
+                message: "exchange failed",
+                retryable: true,
+                details: {
+                  rawToken: "tok_should_not_render",
+                },
+              },
+              500,
+            ),
+          },
+        }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_exchange_failed",
+      details: {
+        phase: "control-plane-auth",
+      },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("tok_should_not_render");
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-013] current-context verification failure after exchange writes no profile", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      { openBrowser: false },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch([], {
+          overrides: {
+            "/api/organizations/current-context": jsonResponse(
+              {
+                code: "product_auth_invalid",
+                category: "user",
+                message: "invalid session",
+                retryable: false,
+              },
+              401,
+            ),
+          },
+        }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "product_auth_invalid",
+      details: {
+        phase: "control-plane-auth",
+      },
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-012] self-hosted explicit URL uses the same browser auth exchange contract", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      {
+        url: "http://127.0.0.1:4310",
+        openBrowser: false,
+      },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      name: "127-0-0-1-4310",
+      mode: "self-hosted",
+      baseUrl: "http://127.0.0.1:4310",
+      auth: {
+        redacted: "***5678",
+      },
+    });
+    expect(requests.map((request) => new URL(request.url).origin)).toEqual([
+      "http://127.0.0.1:4310",
+      "http://127.0.0.1:4310",
+      "http://127.0.0.1:4310",
+      "http://127.0.0.1:4310",
+      "http://127.0.0.1:4310",
+    ]);
+    expect((await store.read())._unsafeUnwrap().activeProfile).toBe("127-0-0-1-4310");
+  });
+
+  test("[CONTROL-PLANE-CLI-014] self-hosted login returns structured unsupported when CLI auth exchange is unavailable", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await loginControlPlane(
+      {
+        url: "http://127.0.0.1:4310",
+        openBrowser: false,
+      },
+      {
+        env: {},
+        fetch: createCliAuthExchangeFetch(requests, {
+          overrides: {
+            "/api/cli-auth/sessions": jsonResponse(
+              {
+                code: "not_found",
+                category: "user",
+                message: "not found",
+                retryable: false,
+              },
+              404,
+            ),
+          },
+        }),
+        now: () => "2026-05-17T00:00:00.000Z",
+        store,
+      },
+    );
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_auth_unsupported",
+      details: {
+        phase: "control-plane-auth",
+      },
+    });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-001][CONTROL-PLANE-CLI-012] explicit self-hosted login still requires a URL", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "login", "--mode", "self-hosted", "--no-browser"],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      fetch: createControlPlaneFetch([]),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(rendered.stderr).toContain("Self-hosted control-plane login requires --url");
+    expect(rendered.stderr).toContain("validation_error");
+    expect(rendered.stdout).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud URL cannot be logged in as self-hosted", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "login",
+        "--mode",
+        "self-hosted",
+        "--url",
+        defaultPublicCloudControlPlaneUrl,
+        "--no-browser",
+      ],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      fetch: createControlPlaneFetch([]),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(rendered.stderr).toContain("The default Appaloft Cloud endpoint requires cloud mode");
+    expect(rendered.stderr).toContain("validation_error");
+    expect(rendered.stdout).toBe("");
+  });
+
   test("[CONTROL-PLANE-CLI-001][CONTROL-PLANE-CLI-004][CONTROL-PLANE-CLI-009] auth login writes an active redacted self-hosted profile after handshake", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
@@ -355,6 +909,7 @@ describe("CLI remote control-plane client", () => {
         "GET /api/projects/prj_remote",
       ],
     );
+    expect(requests.at(-1)?.headers.get("user-agent")).toBe("appaloft-cli");
     expect(listed.stdout).toContain("prj_remote");
     expect(shown.stdout).toContain("Remote Project");
   });
@@ -577,6 +1132,67 @@ describe("CLI remote control-plane client", () => {
       diagnostics: {
         source: "env",
         requestedMode: "self-hosted",
+      },
+    });
+    expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[CONTROL-PLANE-CLI-012] default Cloud URL cannot be dispatched as self-hosted", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: [
+        "node",
+        "appaloft",
+        "--control-plane-mode",
+        "self-hosted",
+        "--control-plane-url",
+        defaultPublicCloudControlPlaneUrl,
+        "server",
+        "list",
+      ],
+      env: {
+        APPALOFT_TOKEN: "tok_self_hosted_secret_1234",
+      },
+      store: new MemoryCliControlPlaneProfileStore(),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "control-plane-resolution",
+        requestedMode: "self-hosted",
+      },
+      message: "The default Appaloft Cloud endpoint requires cloud mode",
+    });
+  });
+
+  test("[CONTROL-PLANE-MODE-010][CONTROL-PLANE-CLI-012] explicit cloud mode uses the default Appaloft Cloud endpoint when no profile exists", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "--control-plane-mode", "cloud", "server", "list"],
+      env: {
+        APPALOFT_AUTH_COOKIE: "better-auth.session_token=cloud-session",
+      },
+      store,
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    const stored = await store.read();
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      profile: {
+        name: "cloud",
+        mode: "cloud",
+        baseUrl: defaultPublicCloudControlPlaneUrl,
+        auth: {
+          kind: "product-session",
+          cookie: "better-auth.session_token=cloud-session",
+        },
+      },
+      diagnostics: {
+        source: "cli",
+        requestedMode: "cloud",
+        effectiveMode: "cloud",
       },
     });
     expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });

@@ -34,7 +34,14 @@ interface DockerRealizationSpec {
 export class DockerBackedManagedDependencyProvider implements ManagedDependencyProviderPort {
   constructor(private readonly serverRepository: ServerRepository) {}
 
-  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyResourceKind,
+    capabilities?: ManagedDependencyRealizationInput["capabilities"],
+  ): boolean {
+    if (capabilities?.some((capability) => capability.required)) {
+      return false;
+    }
     return serviceForKind(kind)?.managedProviderKey === providerKey;
   }
 

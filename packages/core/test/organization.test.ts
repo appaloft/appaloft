@@ -136,18 +136,20 @@ describe("Organization", () => {
       expect(blocked.error.details?.memberId).toBe("om_owner");
     }
 
-    org
-      .changeMemberRole({
-        memberId: OrganizationMemberId.rehydrate("om_admin"),
-        role: OrganizationRoleValue.rehydrate("owner"),
-        changedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
-      })
-      ._unsafeUnwrap();
-    expect(org.ownerCount()).toBe(2);
+    const ownerRole = org.changeMemberRole({
+      memberId: OrganizationMemberId.rehydrate("om_admin"),
+      role: OrganizationRoleValue.rehydrate("owner"),
+      changedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
+    });
+    expect(ownerRole.isErr()).toBe(true);
+    if (ownerRole.isErr()) {
+      expect(ownerRole.error.code).toBe("validation_error");
+      expect(ownerRole.error.details?.memberId).toBe("om_admin");
+    }
 
     const changed = org.changeMemberRole({
-      memberId: OrganizationMemberId.rehydrate("om_owner"),
-      role: OrganizationRoleValue.rehydrate("admin"),
+      memberId: OrganizationMemberId.rehydrate("om_admin"),
+      role: OrganizationRoleValue.rehydrate("billing"),
       changedAt: OccurredAt.rehydrate("2026-01-01T00:05:00.000Z"),
     });
     expect(changed.isOk()).toBe(true);
@@ -156,7 +158,39 @@ describe("Organization", () => {
     const roleEvents = org
       .pullDomainEvents()
       .filter((event) => event.type === "organization.member_role_changed");
-    expect(roleEvents).toHaveLength(2);
+    expect(roleEvents).toHaveLength(1);
+  });
+
+  test("[IDENTITY-DOMAIN-003] transfers ownership through a dedicated domain operation", () => {
+    const org = organization({ seatLimit: 4 });
+    org.addMember(member({ id: "om_admin", userId: "usr_admin", role: "admin" }))._unsafeUnwrap();
+
+    const transferred = org.transferOwnership({
+      fromMemberId: OrganizationMemberId.rehydrate("om_owner"),
+      toMemberId: OrganizationMemberId.rehydrate("om_admin"),
+      transferredAt: OccurredAt.rehydrate("2026-01-01T00:06:00.000Z"),
+    });
+
+    expect(transferred.isOk()).toBe(true);
+    expect(org.ownerCount()).toBe(1);
+    const members = org.toState().members.map((existing) => existing.toState());
+    expect(members.find((existing) => existing.id.value === "om_owner")?.role.value).toBe("admin");
+    expect(members.find((existing) => existing.id.value === "om_admin")?.role.value).toBe("owner");
+
+    const selfTransfer = org.transferOwnership({
+      fromMemberId: OrganizationMemberId.rehydrate("om_admin"),
+      toMemberId: OrganizationMemberId.rehydrate("om_admin"),
+      transferredAt: OccurredAt.rehydrate("2026-01-01T00:07:00.000Z"),
+    });
+    expect(selfTransfer.isErr()).toBe(true);
+    if (selfTransfer.isErr()) {
+      expect(selfTransfer.error.code).toBe("validation_error");
+    }
+
+    const transferEvents = org
+      .pullDomainEvents()
+      .filter((event) => event.type === "organization.owner_transferred");
+    expect(transferEvents).toHaveLength(1);
   });
 
   test("[IDENTITY-DOMAIN-002] removes members while keeping at least one owner", () => {
@@ -179,13 +213,16 @@ describe("Organization", () => {
     expect(org.memberCount()).toBe(2);
     expect(org.hasMember(OrganizationMemberId.rehydrate("om_developer"))).toBe(false);
 
-    org
-      .removeMember({
-        memberId: OrganizationMemberId.rehydrate("om_owner_2"),
-        removedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
-      })
-      ._unsafeUnwrap();
-    expect(org.ownerCount()).toBe(1);
+    const extraOwner = org.removeMember({
+      memberId: OrganizationMemberId.rehydrate("om_owner_2"),
+      removedAt: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
+    });
+    expect(extraOwner.isErr()).toBe(true);
+    if (extraOwner.isErr()) {
+      expect(extraOwner.error.code).toBe("invariant_violation");
+      expect(extraOwner.error.details?.memberId).toBe("om_owner_2");
+    }
+    expect(org.ownerCount()).toBe(2);
 
     const blocked = org.removeMember({
       memberId: OrganizationMemberId.rehydrate("om_owner"),
@@ -200,6 +237,6 @@ describe("Organization", () => {
     const removedEvents = org
       .pullDomainEvents()
       .filter((event) => event.type === "organization.member_removed");
-    expect(removedEvents).toHaveLength(2);
+    expect(removedEvents).toHaveLength(1);
   });
 });

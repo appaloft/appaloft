@@ -309,8 +309,8 @@ Current implementation has Phase 1 and the ordinary CLI Phase 1.5 bridge active:
   list/use/show`, explicit Cloud/self-hosted URL token/session profiles, `/api/version` plus
   current-context handshake, flags/env/profile/config target resolution, pre-composition shell
   dispatch, and generic generated SDK non-streaming operation dispatch;
-- default Cloud browser/device/OIDC login, OS keychain storage, remote streaming/watch,
-  source-package quick deploy, terminal attach gateway, and future MCP exposure do not exist yet;
+- OS keychain storage, remote streaming/watch, source-package quick deploy, terminal attach gateway,
+  broader OIDC provider flows, and future MCP exposure do not exist yet;
 - adoption import/marker does not exist;
 - Web mode selection does not exist;
 - deploy-action has control-plane mode, URL, token, and optional trusted id inputs.

@@ -138,6 +138,113 @@ profiles:
     expect(result.ok).toBe(true);
   });
 
+  test("[CLOUD-BLUEPRINT-PUBLIC-DEPENDENCY-KINDS-022] validates neutral dependency capabilities on matching resource kinds", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-capabilities",
+      name: "Dependency Capabilities",
+      version: "1.0.0",
+      summary: "Blueprint dependency capability vocabulary smoke.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          capabilities: [
+            {
+              type: "postgres-extension",
+              name: "vector",
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "redis",
+          kind: "redis",
+          label: "Redis",
+          capabilities: [
+            {
+              type: "redis-module",
+              name: "search",
+              required: false,
+            },
+          ],
+        },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/api:latest",
+          },
+          usesResources: ["postgres", "redis"],
+        },
+      ],
+      profiles: {
+        production: {
+          label: "Production",
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.resources[0]?.capabilities).toEqual([
+        { type: "postgres-extension", name: "vector", required: true },
+      ]);
+      expect(result.value.resources[1]?.capabilities).toEqual([
+        { type: "redis-module", name: "search", required: false },
+      ]);
+    }
+  });
+
+  test("[CLOUD-BLUEPRINT-PUBLIC-DEPENDENCY-KINDS-022] rejects dependency capabilities on incompatible resource kinds", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "bad-dependency-capabilities",
+      name: "Bad Dependency Capabilities",
+      version: "1.0.0",
+      summary: "Invalid dependency capability vocabulary smoke.",
+      resources: [
+        {
+          id: "mysql",
+          kind: "mysql",
+          label: "MySQL",
+          capabilities: [{ type: "postgres-extension", name: "vector" }],
+        },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/api:latest",
+          },
+          usesResources: ["mysql"],
+        },
+      ],
+      profiles: {
+        production: {
+          label: "Production",
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((issue) => issue.message)).toContain(
+        "postgres-extension capability requires a postgres dependency resource",
+      );
+    }
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-032] exports JSON Schema for file validation", () => {
     expect(blueprintManifestJsonSchema).toMatchObject({
       $schema: "https://json-schema.org/draft/2020-12/schema",

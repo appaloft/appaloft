@@ -1,3 +1,5 @@
+export * from "./account-settings-handlers";
+export * from "./account-settings-messages";
 export * from "./audit-event-handlers";
 export * from "./audit-event-messages";
 export * from "./auth-handlers";

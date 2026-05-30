@@ -49,6 +49,7 @@
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     DeploymentProgressEvent,
+    DependencyResourceCapabilityRequirement,
     DependencyResourceSummary,
     CreateResourceInput,
     EnvironmentSummary,
@@ -138,6 +139,7 @@
     id: string;
     kind: DependencyKind;
     label: string;
+    capabilities: readonly DependencyResourceCapabilityRequirement[];
     optional?: boolean;
   };
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
@@ -229,7 +231,13 @@
       description?: string;
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
       secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
-      resources: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+      resources: readonly {
+        id: string;
+        kind: string;
+        label: string;
+        capabilities?: readonly DependencyResourceCapabilityRequirement[];
+        optional?: boolean;
+      }[];
       components: readonly BlueprintManifestComponent[];
       defaultVariant?: string;
       variants?: Record<string, {
@@ -239,7 +247,13 @@
         defaultProfile?: string;
         parameters?: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
         secrets?: readonly { key: string; label: string; required?: boolean; description?: string }[];
-        resources?: readonly { id: string; kind: string; label: string; optional?: boolean }[];
+        resources?: readonly {
+          id: string;
+          kind: string;
+          label: string;
+          capabilities?: readonly DependencyResourceCapabilityRequirement[];
+          optional?: boolean;
+        }[];
         components?: readonly BlueprintManifestComponent[];
         upgrade?: BlueprintUpgradePolicy;
       }>;
@@ -874,6 +888,7 @@
                 id: resource.id,
                 kind: resource.kind,
                 label: resource.label,
+                capabilities: resource.capabilities ?? [],
                 ...(resource.optional ? { optional: resource.optional } : {}),
               },
             ]
@@ -1772,6 +1787,7 @@
         requirementId: requirement.id,
         kind: requirement.kind,
         label: requirement.label,
+        capabilities: requirement.capabilities,
         mode: draft.mode,
         providerKey,
         ...(draft.mode === "create"
@@ -1818,6 +1834,7 @@
           requirementId: requirement.id,
           kind: requirement.kind,
           name: blueprintDependencyResourceName(requirement),
+          capabilities: [...requirement.capabilities],
           binding,
         };
       }
@@ -1829,6 +1846,7 @@
         name: blueprintDependencyResourceName(requirement),
         connectionUrl: draft.reuseConnectionUrl.trim(),
         secretRef: draft.reuseSecretRef.trim(),
+        capabilities: [...requirement.capabilities],
         binding,
       };
     });
@@ -2895,6 +2913,9 @@
                   projectId: input.projectId,
                   environmentId: input.environmentId,
                   name: item.name,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.serverId ? { serverId: item.serverId } : {}),
                   ...(item.providerKey ? { providerKey: item.providerKey } : {}),
                   ...(item.description ? { description: item.description } : {}),
@@ -2908,6 +2929,9 @@
                   environmentId: input.environmentId,
                   name: item.name,
                   connectionUrl: item.connectionUrl,
+                  ...(item.capabilities && item.capabilities.length > 0
+                    ? { capabilities: item.capabilities }
+                    : {}),
                   ...(item.secretRef ? { secretRef: item.secretRef } : {}),
                   ...(item.connectionSecret ? { connectionSecret: item.connectionSecret } : {}),
                   ...(item.description ? { description: item.description } : {}),
@@ -3348,7 +3372,7 @@
 
 </script>
 
-<div class="grid min-w-0 gap-5 pb-6 md:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+<div class="grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(22rem,1fr)_20rem] xl:grid-cols-[minmax(24rem,1fr)_22rem]">
   <div class="min-w-0 space-y-5">
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
@@ -3367,7 +3391,7 @@
               />
             </div>
             <div
-              class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+              class="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-3"
               role="radiogroup"
               aria-label={$t(i18nKeys.common.domain.source)}
             >
@@ -4330,7 +4354,7 @@
       </div>
     </div>
 
-  <aside class="min-w-0 space-y-5 md:sticky md:top-20 md:max-h-[calc(100svh-10rem)] md:self-start md:overflow-y-auto md:pb-3">
+  <aside class="min-w-0 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100svh-10rem)] lg:self-start lg:overflow-y-auto lg:pb-3">
       <section class="console-side-panel min-w-0 space-y-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>

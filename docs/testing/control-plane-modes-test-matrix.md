@@ -97,6 +97,9 @@ These rows are governed by
 | CONTROL-PLANE-CLI-009 | unit/import-boundary | Profile store secret boundary | Profile commands run inside a repository with `appaloft.yml` | No token, database URL, SSH key, credential id, tenant/org secret identity, provider account id, or raw secret is written to committed config, logs, diagnostics, or JSON output | `control_plane_profile_store_unavailable`, phase `control-plane-profile-read` or `control-plane-profile-write` only when local secure storage fails | Profile store read/write -> redacted diagnostics |
 | CONTROL-PLANE-CLI-010 | import-boundary/contract | Remote dispatch reuses typed client contracts | A CLI command is marked remote-capable | The remote dispatcher uses `@appaloft/sdk` generated operation descriptors or authenticated `@appaloft/orpc/client` contract metadata and does not define parallel CLI schemas | Boundary violation test failure | Operation key/input -> typed client descriptor -> remote request |
 | CONTROL-PLANE-CLI-011 | contract | Remote auth and handshake errors remain structured | Stored profile auth is missing/invalid or endpoint versions/features are incompatible | The CLI returns structured server/client error code, category, phase, retriable flag, and sanitized details without falling back to local dispatch | `product_auth_missing`, `product_auth_invalid`, `control_plane_handshake_failed`, or `control_plane_unsupported` | Target resolution -> handshake/auth -> structured error -> no local mutation |
+| CONTROL-PLANE-CLI-012 | CLI/unit | Login defaults to Appaloft Cloud browser auth exchange | No `--url` is supplied and no local env credential exists | `appaloft login` or `appaloft auth login` selects `https://app.appaloft.com`, creates a CLI auth session, prints `verificationUriComplete` and the user code, opens the browser unless disabled, polls pending then authorized, exchanges once, verifies current organization context, writes the active `cloud` profile, and does not print raw credential material | Browser-open failure is non-fatal and prints the URL/code; profile write happens only after exchange and current-context verification | Default Cloud endpoint -> auth session create -> print/open -> poll -> exchange -> version/current-context -> profile store write |
+| CONTROL-PLANE-CLI-013 | CLI/unit | Browser auth exchange failure writes no profile | A CLI auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current-context verification fails | Login returns a structured auth error, attempts cancel on interrupt when possible, and leaves existing profiles unchanged | `control_plane_auth_denied`, `control_plane_auth_expired`, `control_plane_auth_timeout`, `control_plane_auth_interrupted`, `control_plane_auth_exchange_failed`, `product_auth_invalid`, or `product_auth_missing`, phase `control-plane-auth` | Auth session create/poll/exchange/failure -> optional cancel -> no profile write |
+| CONTROL-PLANE-CLI-014 | CLI/unit | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local env credential exists | `appaloft login --url <self-hosted-url>` uses the same neutral CLI auth session contract; if the endpoint does not support session creation, the CLI returns structured unsupported and does not ask for env credential paste as the default human flow | `control_plane_auth_unsupported`, phase `control-plane-auth` | URL validation -> auth session create or unsupported -> no profile write on unsupported |
 
 ## Self-Hosted Install Matrix
 
@@ -190,8 +193,8 @@ client bridge:
 
 - `CONTROL-PLANE-CLI-001`, `CONTROL-PLANE-CLI-002`, `CONTROL-PLANE-CLI-003`,
   `CONTROL-PLANE-CLI-004`, `CONTROL-PLANE-CLI-005`, `CONTROL-PLANE-CLI-007`,
-  `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`, and
-  `CONTROL-PLANE-CLI-011`;
+  `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`,
+  `CONTROL-PLANE-CLI-011`, `CONTROL-PLANE-CLI-012`, and `CONTROL-PLANE-CLI-013`;
 - the adapter-level `CONTROL-PLANE-CLI-006` binding for typed SDK `projects.list/show`,
   `projects.rename`, and `servers.list` remote dispatch;
 - mode/profile mismatch and explicit local-only terminal/deploy unsupported checks under
@@ -204,9 +207,9 @@ login/logout/status commands, context command, self-hosted and explicit-URL Clou
 handshake, full flags/env/profile/config target resolution, dispatch-time handshake, and ordinary
 CLI remote dispatcher for generated SDK non-streaming operations.
 
-Default Cloud browser/device/OIDC login, OS keychain credential storage, source-package quick
-deploy, remote streaming/watch, terminal attach gateway, MCP exposure, and SSH PGlite adoption
-remain governed follow-ups.
+OS keychain credential storage, source-package quick deploy, remote streaming/watch, terminal attach
+gateway, MCP exposure, broader OIDC provider flows, and SSH PGlite adoption remain governed
+follow-ups.
 
 `remote-pglite-state-sync.test.ts` now also covers SSH `ssh-pglite` final upload refresh/merge
 behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under

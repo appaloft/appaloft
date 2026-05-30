@@ -33,8 +33,12 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  ChangeAccountProfileCommandHandler,
+  ChangeAccountProfileUseCase,
   ChangeOrganizationMemberRoleCommandHandler,
   ChangeOrganizationMemberRoleUseCase,
+  ChangeOrganizationProfileCommandHandler,
+  ChangeOrganizationProfileUseCase,
   CheckDomainBindingDeleteSafetyQueryHandler,
   CheckDomainBindingDeleteSafetyQueryService,
   CheckInstanceUpgradeQueryHandler,
@@ -121,12 +125,16 @@ import {
   DefaultRouteSurfacePort,
   DefaultTenantContextResolver,
   DefaultUsageIntentPort,
+  DeleteAccountCommandHandler,
+  DeleteAccountUseCase,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
   DeleteDependencyResourceCommandHandler,
   DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
   DeleteDomainBindingUseCase,
+  DeleteOrganizationCommandHandler,
+  DeleteOrganizationUseCase,
   DeletePreviewEnvironmentCommandHandler,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
@@ -197,6 +205,8 @@ import {
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
+  ListAccountSessionsQueryHandler,
+  ListAccountSessionsQueryService,
   ListAuditEventArchivesQueryHandler,
   ListAuditEventArchivesQueryService,
   ListAuditEventLegalHoldsQueryHandler,
@@ -369,6 +379,8 @@ import {
   RetryDomainBindingVerificationUseCase,
   RetryOperatorWorkCommandHandler,
   RetryOperatorWorkUseCase,
+  RevokeAccountSessionCommandHandler,
+  RevokeAccountSessionUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
   RevokeDeployTokenCommandHandler,
@@ -402,6 +414,8 @@ import {
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
+  ShowAccountProfileQueryHandler,
+  ShowAccountProfileQueryService,
   ShowAuditEventArchiveQueryHandler,
   ShowAuditEventArchiveQueryService,
   ShowAuditEventLegalHoldQueryHandler,
@@ -426,6 +440,8 @@ import {
   ShowDomainBindingQueryService,
   ShowEnvironmentQueryService,
   ShowOperatorWorkQueryHandler,
+  ShowOrganizationProfileQueryHandler,
+  ShowOrganizationProfileQueryService,
   ShowPreviewEnvironmentQueryHandler,
   ShowPreviewEnvironmentQueryService,
   ShowPreviewPolicyQueryHandler,
@@ -464,6 +480,8 @@ import {
   SwitchCurrentOrganizationUseCase,
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
+  TransferOrganizationOwnerCommandHandler,
+  TransferOrganizationOwnerUseCase,
   tokens,
   toRepositoryContext,
   UnbindResourceDependencyCommandHandler,
@@ -859,7 +877,14 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
     private readonly serverRepository?: ServerRepository,
   ) {}
 
-  supports(providerKey: string, kind: ManagedDependencyResourceKind): boolean {
+  supports(
+    providerKey: string,
+    kind: ManagedDependencyResourceKind,
+    capabilities?: ManagedDependencyRealizationInput["capabilities"],
+  ): boolean {
+    if (capabilities?.some((capability) => capability.required)) {
+      return false;
+    }
     return (
       shellManagedDependencyKinds.includes(kind) && providerKey === shellManagedProviderKey(kind)
     );
@@ -895,6 +920,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
         }),
         endpoint: spec.endpoint,
         connectionSecretValue: spec.connectionSecretValue,
+        ...(input.capabilities && input.capabilities.length > 0
+          ? { capabilityReadbacks: unsupportedCapabilityReadbacks(input) }
+          : {}),
         realizedAt: input.requestedAt,
       });
     }
@@ -904,6 +932,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
       providerResourceHandle: `${input.kind}/${input.dependencyResourceId}`,
       endpoint,
       secretRef: `secret://dependency/${input.kind}/${input.dependencyResourceId}`,
+      ...(input.capabilities && input.capabilities.length > 0
+        ? { capabilityReadbacks: unsupportedCapabilityReadbacks(input) }
+        : {}),
       realizedAt: input.requestedAt,
     };
     const artifact: ShellManagedDependencyResourceArtifact = {
@@ -1251,6 +1282,19 @@ function dockerManagedPostgresRealizationSpec(
       ].join("\n"),
     ].join("\n"),
   };
+}
+
+function unsupportedCapabilityReadbacks(
+  input: ManagedDependencyRealizationInput,
+): NonNullable<ManagedDependencyRealizationResult["capabilityReadbacks"]> {
+  return (input.capabilities ?? []).map((capability) => ({
+    type: capability.type,
+    name: capability.name,
+    required: capability.required,
+    status: "unsupported",
+    evidence: [`provider-capability-unsupported:${capability.type}:${capability.name}`],
+    checkedAt: input.requestedAt,
+  }));
 }
 
 function managedDependencyDockerCommandFailure(input: {
@@ -2349,12 +2393,21 @@ export function registerApplicationServices(
   container.registerSingleton(ShowStorageVolumeQueryHandler);
   container.registerSingleton(BootstrapFirstAdminCommandHandler);
   container.registerSingleton(GetAuthBootstrapStatusQueryHandler);
+  container.registerSingleton(ShowAccountProfileQueryHandler);
+  container.registerSingleton(ChangeAccountProfileCommandHandler);
+  container.registerSingleton(ListAccountSessionsQueryHandler);
+  container.registerSingleton(RevokeAccountSessionCommandHandler);
+  container.registerSingleton(DeleteAccountCommandHandler);
   container.registerSingleton(GetCurrentOrganizationContextQueryHandler);
+  container.registerSingleton(ShowOrganizationProfileQueryHandler);
+  container.registerSingleton(ChangeOrganizationProfileCommandHandler);
+  container.registerSingleton(DeleteOrganizationCommandHandler);
   container.registerSingleton(ListOrganizationMembersQueryHandler);
   container.registerSingleton(ListOrganizationInvitationsQueryHandler);
   container.registerSingleton(InviteOrganizationMemberCommandHandler);
   container.registerSingleton(SwitchCurrentOrganizationCommandHandler);
   container.registerSingleton(ChangeOrganizationMemberRoleCommandHandler);
+  container.registerSingleton(TransferOrganizationOwnerCommandHandler);
   container.registerSingleton(RemoveOrganizationMemberCommandHandler);
   container.registerSingleton(CreateDeployTokenCommandHandler);
   container.registerSingleton(RotateDeployTokenCommandHandler);
@@ -2396,9 +2449,29 @@ export function registerApplicationServices(
     GetAuthBootstrapStatusQueryService,
   );
   container.registerSingleton(
+    tokens.showAccountProfileQueryService,
+    ShowAccountProfileQueryService,
+  );
+  container.registerSingleton(tokens.changeAccountProfileUseCase, ChangeAccountProfileUseCase);
+  container.registerSingleton(
+    tokens.listAccountSessionsQueryService,
+    ListAccountSessionsQueryService,
+  );
+  container.registerSingleton(tokens.revokeAccountSessionUseCase, RevokeAccountSessionUseCase);
+  container.registerSingleton(tokens.deleteAccountUseCase, DeleteAccountUseCase);
+  container.registerSingleton(
     tokens.getCurrentOrganizationContextQueryService,
     GetCurrentOrganizationContextQueryService,
   );
+  container.registerSingleton(
+    tokens.showOrganizationProfileQueryService,
+    ShowOrganizationProfileQueryService,
+  );
+  container.registerSingleton(
+    tokens.changeOrganizationProfileUseCase,
+    ChangeOrganizationProfileUseCase,
+  );
+  container.registerSingleton(tokens.deleteOrganizationUseCase, DeleteOrganizationUseCase);
   container.registerSingleton(
     tokens.listOrganizationMembersQueryService,
     ListOrganizationMembersQueryService,
@@ -2418,6 +2491,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.changeOrganizationMemberRoleUseCase,
     ChangeOrganizationMemberRoleUseCase,
+  );
+  container.registerSingleton(
+    tokens.transferOrganizationOwnerUseCase,
+    TransferOrganizationOwnerUseCase,
   );
   container.registerSingleton(
     tokens.removeOrganizationMemberUseCase,
