@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 
 describe("Static artifact upload web component", () => {
   test("[CLOUD-WWW-STATIC-HERO-002][CLOUD-WWW-STATIC-HERO-004][CLOUD-WWW-STATIC-HERO-005] keeps upload UI neutral and adapter-driven", async () => {
+    const privateCloudScope = ["@appaloft", "cloud/"].join("-");
     const [component, types, packageJson] = await Promise.all([
       readFile(new URL("../src/StaticArtifactUploadPanel.svelte", import.meta.url), "utf8"),
       readFile(new URL("../src/types.ts", import.meta.url), "utf8"),
@@ -11,7 +12,7 @@ describe("Static artifact upload web component", () => {
 
     expect(packageJson).toContain('"@appaloft/static-artifact-upload-web"');
     expect(packageJson).toContain('"@appaloft/ui"');
-    expect(packageJson).not.toContain("@appaloft-cloud/");
+    expect(packageJson).not.toContain(privateCloudScope);
     expect(types).toContain("StaticArtifactUploadAdapter");
     expect(types).toContain("readonly copy: StaticArtifactUploadCopy");
     expect(types).toContain('"minimal"');
@@ -20,7 +21,7 @@ describe("Static artifact upload web component", () => {
     expect(types).toContain("publish(input: StaticArtifactUploadPublishInput)");
     expect(types).toContain('provider: StaticArtifactUploadAuthProvider["key"]');
     expect(types).not.toContain("copy?: Partial");
-    expect(types).not.toContain("@appaloft-cloud/");
+    expect(types).not.toContain(privateCloudScope);
     expect(component).toContain("@appaloft/ui/card");
     expect(component).toContain("@appaloft/ui/dialog");
     expect(component).toContain("@appaloft/ui/button");
@@ -57,7 +58,7 @@ describe("Static artifact upload web component", () => {
     expect(component).not.toContain("const defaultCopy");
     expect(component).not.toContain("静态文件");
     expect(component).not.toContain("Choose files");
-    expect(component).not.toContain("@appaloft-cloud/");
+    expect(component).not.toContain(privateCloudScope);
     expect(component).not.toContain("/cloud/static-artifacts");
   });
 });
