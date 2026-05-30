@@ -19,11 +19,15 @@ import {
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type Clock,
   type DestinationRepository,
   type EnvironmentRepository,
   type MutationCoordinator,
+  type OperationGuardPort,
   type ProjectRepository,
   type ResourceRepository,
   type ServerRepository,
@@ -35,6 +39,9 @@ import {
 import { tokens } from "../../tokens";
 import { sourceLinkScope } from "../deployments/deployment-mutation-scopes";
 import { type RelinkSourceLinkCommandInput } from "./relink-source-link.command";
+
+const relinkSourceLinkOperation = findOperationCatalogEntryByKey("source-links.relink");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 export interface RelinkSourceLinkResult {
   sourceFingerprint: string;
@@ -77,6 +84,8 @@ export class RelinkSourceLinkUseCase {
     private readonly clock: Clock,
     @inject(tokens.mutationCoordinator)
     private readonly mutationCoordinator: MutationCoordinator,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -92,6 +101,7 @@ export class RelinkSourceLinkUseCase {
       serverRepository,
       sourceLinkRepository,
       mutationCoordinator,
+      operationGuardPort,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -110,6 +120,28 @@ export class RelinkSourceLinkUseCase {
             destinationId: destinationId.value,
           }),
         );
+      }
+
+      if (relinkSourceLinkOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: relinkSourceLinkOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            resourceId: resourceId.value,
+            ...(serverId ? { serverId: serverId.value } : {}),
+            ...(destinationId ? { destinationId: destinationId.value } : {}),
+          },
+          contextAttributes: {
+            sourceFingerprint: input.sourceFingerprint,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       const project = await projectRepository.findOne(

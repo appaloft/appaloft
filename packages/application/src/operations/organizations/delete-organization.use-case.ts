@@ -2,14 +2,26 @@ import { domainError, err } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
-import { type DeleteOrganizationInput, type OrganizationTeamManagementPort } from "../../ports";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
+import {
+  AllowAllOperationGuardPort,
+  type DeleteOrganizationInput,
+  type OperationGuardPort,
+  type OrganizationTeamManagementPort,
+} from "../../ports";
 import { tokens } from "../../tokens";
+
+const deleteOrganizationOperation = findOperationCatalogEntryByKey("organizations.delete");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class DeleteOrganizationUseCase {
   constructor(
     @inject(tokens.organizationTeamManagementPort)
     private readonly organizationTeamManagement: OrganizationTeamManagementPort,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(context: ExecutionContext, input: DeleteOrganizationInput) {
@@ -22,6 +34,19 @@ export class DeleteOrganizationUseCase {
           phase: "organization-danger-zone",
         }),
       );
+    }
+
+    if (deleteOrganizationOperation) {
+      const checked = await checkOperationGuards({
+        context,
+        entry: deleteOrganizationOperation,
+        message: input,
+        operationGuardPort: this.operationGuardPort ?? defaultOperationGuardPort,
+        organizationId: input.organizationId,
+      });
+      if (checked.isErr()) {
+        return err(checked.error);
+      }
     }
 
     return this.organizationTeamManagement.deleteOrganization(context, input);

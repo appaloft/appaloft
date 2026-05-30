@@ -13,10 +13,14 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type DeploymentReadModel,
   type DeploymentSummary,
   type IdGenerator,
+  type OperationGuardPort,
   type ResourceReadModel,
   type ServerReadModel,
   type TerminalSessionDescriptor,
@@ -24,6 +28,9 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type OpenTerminalSessionCommand } from "./open-terminal-session.command";
+
+const openTerminalSessionOperation = findOperationCatalogEntryByKey("terminal-sessions.open");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function metadataValue(deployment: DeploymentSummary, key: string): string | undefined {
   const value = deployment.runtimePlan.execution.metadata?.[key];
@@ -114,6 +121,8 @@ export class OpenTerminalSessionUseCase {
     private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.terminalSessionGateway)
     private readonly terminalSessionGateway: TerminalSessionGateway,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -122,6 +131,25 @@ export class OpenTerminalSessionUseCase {
   ): Promise<Result<TerminalSessionDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
     const scope = command.scope;
+
+    if (openTerminalSessionOperation) {
+      const checked = await checkOperationGuards({
+        context,
+        entry: openTerminalSessionOperation,
+        message: command,
+        operationGuardPort: this.operationGuardPort ?? defaultOperationGuardPort,
+        resourceRefs:
+          scope.kind === "server"
+            ? { serverId: scope.serverId }
+            : {
+                resourceId: scope.resourceId,
+                ...(scope.deploymentId ? { deploymentId: scope.deploymentId } : {}),
+              },
+      });
+      if (checked.isErr()) {
+        return err(checked.error);
+      }
+    }
 
     if (scope.kind === "server") {
       if (command.relativeDirectory) {

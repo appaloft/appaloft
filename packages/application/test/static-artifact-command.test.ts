@@ -9,6 +9,7 @@ import {
   ProjectId,
   ProviderKey,
   ResourceId,
+  type Result,
   StaticArtifactByteSize,
   StaticArtifactDigest,
   StaticArtifactFileCount,
@@ -25,7 +26,11 @@ import {
 } from "@appaloft/core";
 import {
   createExecutionContext,
+  type ExecutionContext,
   type IdGenerator,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactArchiveCommandHandler,
   PublishStaticArtifactCommand,
@@ -37,6 +42,33 @@ import {
   type StaticArtifactPayloadReadResult,
   type StaticArtifactPublisherPort,
 } from "../src";
+
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
 
 describe("PublishStaticArtifactCommand", () => {
   test("[STATIC-ARTIFACT-EXT-007] reads a source path and publishes through the static artifact publisher port", async () => {
@@ -270,6 +302,173 @@ describe("PublishStaticArtifactCommand", () => {
       mimeType: "text/css",
       contentDigest: digestText("body { color: #222; }"),
     });
+  });
+
+  test("[STATIC-ARTIFACT-GUARD-001] publish command can be denied before reading or publishing", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const calls: string[] = [];
+    const reader: StaticArtifactPayloadReaderPort = {
+      async read() {
+        calls.push("read");
+        return ok<StaticArtifactPayloadReadResult>({
+          manifest: createManifest("static_artifact_denied"),
+          files: [],
+        });
+      },
+    };
+    const publisher: StaticArtifactPublisherPort = {
+      async publish(): Promise<Result<StaticArtifactPublication>> {
+        calls.push("publish");
+        throw new Error("publisher should not be called after operation guard denial");
+      },
+    };
+    const idGenerator: IdGenerator = {
+      next(prefix) {
+        return `${prefix}_denied`;
+      },
+    };
+
+    const command = PublishStaticArtifactCommand.create({
+      projectId: "project_docs",
+      resourceId: "res_docs",
+      sourcePath: "dist",
+    })._unsafeUnwrap();
+    const result = await new PublishStaticArtifactCommandHandler(
+      reader,
+      publisher,
+      idGenerator,
+      guard,
+    ).handle(createExecutionContext({ entrypoint: "system" }), command);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "static-artifacts.publish",
+        projectId: "project_docs",
+        resourceId: "res_docs",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "static-artifacts.publish",
+      resourceRefs: {
+        projectId: "project_docs",
+        resourceId: "res_docs",
+      },
+      contextAttributes: expect.objectContaining({
+        estimatedExternalProviderCalls: 2,
+        estimatedInputBytes: 4,
+        estimatedWriteUnits: 2,
+      }),
+    });
+    expect(calls).toEqual([]);
+  });
+
+  test("[STATIC-ARTIFACT-GUARD-002] inline publish estimates provider and payload cost before publishing", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const calls: string[] = [];
+    const publisher: StaticArtifactPublisherPort = {
+      async publish(): Promise<Result<StaticArtifactPublication>> {
+        calls.push("publish");
+        throw new Error("publisher should not be called after operation guard denial");
+      },
+    };
+    const idGenerator: IdGenerator = {
+      next(prefix) {
+        return `${prefix}_inline_denied`;
+      },
+    };
+
+    const command = PublishStaticArtifactPayloadCommand.create({
+      projectId: "project_docs",
+      resourceId: "res_docs",
+      files: [
+        {
+          path: "index.html",
+          mimeType: "text/html",
+          contentBase64: "PGh0bWw+ZG9jczwvaHRtbD4=",
+        },
+        {
+          path: "assets/app.css",
+          mimeType: "text/css",
+          contentBase64: "Ym9keSB7IGNvbG9yOiAjMjIyOyB9",
+        },
+      ],
+    })._unsafeUnwrap();
+    const result = await new PublishStaticArtifactPayloadCommandHandler(
+      publisher,
+      idGenerator,
+      guard,
+    ).handle(createExecutionContext({ entrypoint: "system" }), command);
+
+    expect(result.isErr()).toBe(true);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "static-artifacts.publish-payload",
+      resourceRefs: {
+        projectId: "project_docs",
+        resourceId: "res_docs",
+      },
+      contextAttributes: expect.objectContaining({
+        estimatedExternalProviderCalls: 2,
+        estimatedFieldCount: 6,
+        estimatedInputBytes: 52,
+        estimatedItemCount: 2,
+        estimatedNestingDepth: 2,
+        estimatedWriteUnits: 2,
+      }),
+    });
+    expect(calls).toEqual([]);
+  });
+
+  test("[STATIC-ARTIFACT-GUARD-003] archive publish estimates provider and archive cost before publishing", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const calls: string[] = [];
+    const publisher: StaticArtifactPublisherPort = {
+      async publish(): Promise<Result<StaticArtifactPublication>> {
+        calls.push("publish");
+        throw new Error("publisher should not be called after operation guard denial");
+      },
+    };
+    const idGenerator: IdGenerator = {
+      next(prefix) {
+        return `${prefix}_archive_denied`;
+      },
+    };
+    const archiveBase64 = Buffer.from(
+      createZipArchive([{ path: "assets/pages/index.html", content: "<html>docs</html>" }]),
+    ).toString("base64");
+
+    const command = PublishStaticArtifactArchiveCommand.create({
+      projectId: "project_docs",
+      resourceId: "res_docs",
+      archiveBase64,
+    })._unsafeUnwrap();
+    const result = await new PublishStaticArtifactArchiveCommandHandler(
+      publisher,
+      idGenerator,
+      guard,
+    ).handle(createExecutionContext({ entrypoint: "system" }), command);
+
+    expect(result.isErr()).toBe(true);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "static-artifacts.publish-archive",
+      resourceRefs: {
+        projectId: "project_docs",
+        resourceId: "res_docs",
+      },
+      contextAttributes: expect.objectContaining({
+        estimatedExternalProviderCalls: 2,
+        estimatedInputBytes: archiveBase64.length,
+        estimatedItemCount: 1,
+        estimatedNestingDepth: 3,
+        estimatedWriteUnits: 2,
+      }),
+    });
+    expect(calls).toEqual([]);
   });
 });
 

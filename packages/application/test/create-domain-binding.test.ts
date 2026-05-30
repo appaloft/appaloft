@@ -58,6 +58,9 @@ import {
 import {
   createExecutionContext,
   type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
@@ -100,12 +103,40 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 async function seedRoutingContext(input?: {
   environmentProjectId?: string;
   resourceEnvironmentId?: string;
   resourceProjectId?: string;
   destinationServerId?: string;
   resourceDestinationId?: string;
+  guard?: OperationGuardPort;
 }) {
   const context = createTestContext();
   const repositoryContext = toRepositoryContext(context);
@@ -187,6 +218,7 @@ async function seedRoutingContext(input?: {
     eventBus,
     logger,
     processAttemptRecorder,
+    input?.guard,
   );
 
   return {
@@ -408,6 +440,66 @@ describe("CreateDomainBindingUseCase", () => {
       redirectTo: "example.com",
       redirectStatus: 308,
     });
+  });
+
+  test("[DOMAIN-BINDING-GUARD-001] create binding can be denied before persistence and verification attempt side effects", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const {
+      context,
+      domainBindings,
+      eventBus,
+      processAttemptRecorder,
+      repositoryContext,
+      useCase,
+    } = await seedRoutingContext({ guard });
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "WWW.Example.COM",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+      idempotencyKey: "domain-bindings.create:test",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "domain-bindings.create",
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "domain-bindings.create",
+      organizationId: "org_self_hosted",
+      resourceRefs: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+    });
+    expect(
+      await domainBindings.findOne(
+        repositoryContext,
+        DomainBindingByIdSpec.create(DomainBindingId.rehydrate("dmb_0001")),
+      ),
+    ).toBeNull();
+    expect(eventBus.events).toHaveLength(0);
+    expect(processAttemptRecorder.records).toHaveLength(0);
   });
 
   test("[ROUTE-TLS-ENTRY-017] rejects a canonical redirect binding without an existing served target", async () => {

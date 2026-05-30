@@ -13,6 +13,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionPrincipal,
+  type ExecutionRequestSecurityContext,
   enrichResourceAccessFailureDiagnosticWithRouteContext,
   GetAuthBootstrapStatusQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
@@ -138,6 +139,15 @@ type TerminalClientMessage =
       kind: "close";
     };
 
+const requestSecurityHeaderMap = {
+  edgeAction: "x-appaloft-edge-action",
+  edgeProvider: "x-appaloft-edge-provider",
+  edgeRayId: "x-appaloft-edge-ray-id",
+  edgeRuleId: "x-appaloft-edge-rule-id",
+  botScore: "x-appaloft-bot-score",
+  fraudRiskScore: "x-appaloft-fraud-risk-score",
+} as const;
+
 interface TerminalWebSocket {
   data?: {
     params?: {
@@ -252,6 +262,39 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalBoundedInteger(value: string | null): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 100 ? parsed : undefined;
+}
+
+function requestSecurityContextFromHeaders(
+  headers: Headers,
+): ExecutionRequestSecurityContext | undefined {
+  const edgeAction = optionalString(headers.get(requestSecurityHeaderMap.edgeAction));
+  const edgeProvider = optionalString(headers.get(requestSecurityHeaderMap.edgeProvider));
+  const edgeRayId = optionalString(headers.get(requestSecurityHeaderMap.edgeRayId));
+  const edgeRuleId = optionalString(headers.get(requestSecurityHeaderMap.edgeRuleId));
+  const botScore = optionalBoundedInteger(headers.get(requestSecurityHeaderMap.botScore));
+  const fraudRiskScore = optionalBoundedInteger(
+    headers.get(requestSecurityHeaderMap.fraudRiskScore),
+  );
+  const requestSecurity = {
+    ...(edgeAction ? { edgeAction } : {}),
+    ...(edgeProvider ? { edgeProvider } : {}),
+    ...(edgeRayId ? { edgeRayId } : {}),
+    ...(edgeRuleId ? { edgeRuleId } : {}),
+    ...(botScore !== undefined ? { botScore } : {}),
+    ...(fraudRiskScore !== undefined ? { fraudRiskScore } : {}),
+  };
+
+  return Object.keys(requestSecurity).length > 0 ? requestSecurity : undefined;
 }
 
 function normalizePluginRouteResult(
@@ -714,9 +757,11 @@ export function createHttpApp(input: {
 
   function createHttpExecutionContext(request: Request): ExecutionContext {
     const requestId = request.headers.get("x-request-id");
+    const requestSecurity = requestSecurityContextFromHeaders(request.headers);
     return input.executionContextFactory.create({
       entrypoint: "http",
       locale: resolveAppaloftLocaleFromHeaders(request.headers),
+      ...(requestSecurity ? { requestSecurity } : {}),
       ...(requestId ? { requestId } : {}),
     });
   }
@@ -783,6 +828,7 @@ export function createHttpApp(input: {
       entrypoint: "http",
       locale: context.locale,
       principal,
+      ...(context.requestSecurity ? { requestSecurity: context.requestSecurity } : {}),
       requestId: context.requestId,
     });
   }
@@ -1038,12 +1084,7 @@ export function createHttpApp(input: {
       return null;
     }
 
-    const requestId = request.headers.get("x-request-id");
-    const context = input.executionContextFactory.create({
-      entrypoint: "http",
-      locale: resolveAppaloftLocaleFromHeaders(request.headers),
-      ...(requestId ? { requestId } : {}),
-    });
+    const context = createHttpExecutionContext(request);
     const query = GetAuthBootstrapStatusQuery.create({});
 
     if (query.isErr()) {
@@ -1212,12 +1253,7 @@ export function createHttpApp(input: {
       return notFound();
     }
 
-    const requestId = request.headers.get("x-request-id");
-    const context = input.executionContextFactory.create({
-      entrypoint: "http",
-      locale: resolveAppaloftLocaleFromHeaders(request.headers),
-      ...(requestId ? { requestId } : {}),
-    });
+    const context = createHttpExecutionContext(request);
     const result = await input.certificateHttpChallengeTokenStore.find(context, {
       token: normalizedToken,
       domainName,
@@ -1445,12 +1481,7 @@ export function createHttpApp(input: {
       timestamp: new Date().toISOString(),
     }))
     .get("/api/readiness", async ({ request }) => {
-      const requestId = request.headers.get("x-request-id");
-      const context = input.executionContextFactory.create({
-        entrypoint: "http",
-        locale: resolveAppaloftLocaleFromHeaders(request.headers),
-        ...(requestId ? { requestId } : {}),
-      });
+      const context = createHttpExecutionContext(request);
       const doctor = unwrapResult(context, DoctorQuery.create());
       const result = await input.queryBus.execute(context, doctor);
       return publicReadiness(unwrapResult(context, result).readiness);
@@ -1546,9 +1577,11 @@ export function createHttpApp(input: {
             return diagnostic;
           }
 
+          const requestSecurity = requestSecurityContextFromHeaders(request.headers);
           const context = input.executionContextFactory.create({
             entrypoint: "http",
             locale: resolveAppaloftLocaleFromHeaders(request.headers),
+            ...(requestSecurity ? { requestSecurity } : {}),
             requestId: diagnostic.requestId,
           });
 
@@ -1564,9 +1597,11 @@ export function createHttpApp(input: {
             return;
           }
 
+          const requestSecurity = requestSecurityContextFromHeaders(request.headers);
           const context = input.executionContextFactory.create({
             entrypoint: "http",
             locale: resolveAppaloftLocaleFromHeaders(request.headers),
+            ...(requestSecurity ? { requestSecurity } : {}),
             requestId: diagnostic.requestId,
           });
           const result = await input.resourceAccessFailureEvidenceRecorder.record(

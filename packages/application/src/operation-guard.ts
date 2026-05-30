@@ -1,4 +1,4 @@
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import { type DomainErrorDetails, domainError, err, ok, type Result } from "@appaloft/core";
 
 import { type ExecutionContext } from "./execution-context";
 import {
@@ -59,19 +59,46 @@ function readResourceRefs(message: unknown): OperationCheckResourceRefs | undefi
   return Object.keys(refs).length > 0 ? refs : undefined;
 }
 
+function readIdempotencyKey(message: unknown): string | undefined {
+  return readStringProperty(message, "idempotencyKey");
+}
+
+function requestSecurityContextAttributes(
+  context: ExecutionContext,
+): DomainErrorDetails | undefined {
+  const requestSecurity = context.requestSecurity;
+  if (!requestSecurity) {
+    return undefined;
+  }
+
+  return {
+    ...(requestSecurity.edgeAction ? { edgeAction: requestSecurity.edgeAction } : {}),
+    ...(requestSecurity.edgeProvider ? { edgeProvider: requestSecurity.edgeProvider } : {}),
+    ...(requestSecurity.edgeRayId ? { edgeRayId: requestSecurity.edgeRayId } : {}),
+    ...(requestSecurity.edgeRuleId ? { edgeRuleId: requestSecurity.edgeRuleId } : {}),
+    ...(requestSecurity.botScore !== undefined ? { botScore: requestSecurity.botScore } : {}),
+    ...(requestSecurity.fraudRiskScore !== undefined
+      ? { fraudRiskScore: requestSecurity.fraudRiskScore }
+      : {}),
+  };
+}
+
 export function createOperationCheckRequest(input: {
   context: ExecutionContext;
   entry: OperationCatalogEntry;
+  contextAttributes?: DomainErrorDetails;
   message?: unknown;
   organizationId?: string;
   resourceRefs?: OperationCheckResourceRefs;
 }): OperationCheckRequest {
   const { context, entry, message } = input;
+  const idempotencyKey = readIdempotencyKey(message);
   const activeOrganization = context.principal?.activeOrganization;
   const organizationId =
     input.organizationId ??
     readStringProperty(message, "organizationId") ??
     activeOrganization?.organizationId;
+  const requestSecurity = requestSecurityContextAttributes(context);
   const resourceRefs = {
     ...(readResourceRefs(message) ?? {}),
     ...(input.resourceRefs ?? {}),
@@ -91,7 +118,10 @@ export function createOperationCheckRequest(input: {
     ...(Object.keys(resourceRefs).length > 0 ? { resourceRefs } : {}),
     contextAttributes: {
       entrypoint: context.entrypoint,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
       requestId: context.requestId,
+      ...(requestSecurity ?? {}),
+      ...(input.contextAttributes ?? {}),
     },
   };
 }
@@ -120,6 +150,7 @@ export function operationGuardDeniedError(
 export async function checkOperationGuards(input: {
   context: ExecutionContext;
   entry: OperationCatalogEntry;
+  contextAttributes?: DomainErrorDetails;
   message?: unknown;
   operationGuardPort: OperationGuardPort;
   organizationId?: string;

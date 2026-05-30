@@ -18,7 +18,15 @@ import {
 } from "@appaloft/core";
 import { FixedClock, MemoryResourceRepository, SequenceIdGenerator } from "@appaloft/testkit";
 
-import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../src";
 import { type ScheduledTaskDefinitionRepository } from "../src/ports";
 import { CreateScheduledTaskUseCase } from "../src/use-cases";
 
@@ -51,6 +59,33 @@ class RecordingScheduledTaskDefinitionRepository implements ScheduledTaskDefinit
   ): Promise<void> {}
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 function resourceFixture(input?: { lifecycleStatus?: "active" | "archived" | "deleted" }) {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_api"),
@@ -65,7 +100,7 @@ function resourceFixture(input?: { lifecycleStatus?: "active" | "archived" | "de
   });
 }
 
-async function createHarness(input?: { resource?: Resource }) {
+async function createHarness(input?: { guard?: OperationGuardPort; resource?: Resource }) {
   const context = createExecutionContext({
     requestId: "req_scheduled_task_create_test",
     entrypoint: "system",
@@ -87,6 +122,7 @@ async function createHarness(input?: { resource?: Resource }) {
       resourceRepository,
       new SequenceIdGenerator(),
       new FixedClock("2026-05-05T00:20:00.000Z"),
+      input?.guard,
     ),
   };
 }
@@ -175,5 +211,43 @@ describe("CreateScheduledTaskUseCase", () => {
         field: "commandIntent",
       });
     }
+  });
+
+  test("[SCHED-TASK-CREATE-GUARD-001] create task can be denied by the generic operation guard", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const { context, taskRepository, useCase } = await createHarness({ guard });
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_api",
+      schedule: "0 1 * * *",
+      timezone: "UTC",
+      commandIntent: "bun run migrate",
+      timeoutSeconds: 600,
+      retryLimit: 2,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "scheduled-tasks.create",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_api",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "scheduled-tasks.create",
+      resourceRefs: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_api",
+      },
+    });
+    expect(taskRepository.records).toHaveLength(0);
   });
 });

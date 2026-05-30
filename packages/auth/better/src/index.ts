@@ -92,6 +92,7 @@ export interface AuthProviderStatus {
 export interface AuthSessionStatus {
   accountSecurity: AppaloftBetterAuthAccountSecurityStatus;
   accountRecovery: AppaloftBetterAuthAccountRecoveryStatus;
+  currentUserOrganizationCount?: number;
   enabled: boolean;
   emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   provider: "none" | "better-auth";
@@ -103,6 +104,7 @@ export interface AuthSessionStatus {
 
 export interface BetterAuthRuntimeConfig extends AppaloftBetterAuthConfig {
   enabled: boolean;
+  organizationAdmission?: BetterAuthOrganizationAdmissionPort;
 }
 
 export interface AuthRuntime
@@ -114,6 +116,31 @@ export interface AuthRuntime
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
   issueCliProductSessionCookie(request: Request): Promise<string | null>;
   handle(request: Request): Promise<Response>;
+}
+
+export type BetterAuthOrganizationProvisionReason =
+  | "default-organization"
+  | "pending-verification-intent";
+
+export interface BetterAuthOrganizationAdmissionRequest {
+  readonly currentUserOrganizationCount?: number;
+  readonly email?: string;
+  readonly name: string;
+  readonly reason: BetterAuthOrganizationProvisionReason;
+  readonly slug: string;
+  readonly userId: string;
+}
+
+export interface BetterAuthOrganizationAdmissionDecision {
+  readonly allowed: boolean;
+  readonly reason: string;
+  readonly details?: Record<string, unknown>;
+}
+
+export interface BetterAuthOrganizationAdmissionPort {
+  admitOrganizationCreate(
+    request: BetterAuthOrganizationAdmissionRequest,
+  ): Promise<BetterAuthOrganizationAdmissionDecision>;
 }
 
 interface ProvisionedDefaultOrganization {
@@ -178,6 +205,7 @@ export class BetterAuthRuntime implements AuthRuntime {
   private readonly emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   private readonly githubConfigured: boolean;
   private readonly googleConfigured: boolean;
+  private readonly organizationAdmission: BetterAuthOrganizationAdmissionPort | undefined;
   private readonly oidcConfigured: boolean;
 
   constructor(private readonly config: BetterAuthRuntimeConfig) {
@@ -186,6 +214,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     this.emailVerification = resolveAppaloftBetterAuthEmailVerificationStatus(config);
     this.githubConfigured = providers.github;
     this.googleConfigured = providers.google;
+    this.organizationAdmission = config.organizationAdmission;
     this.oidcConfigured = providers.oidc;
     this.auth = createAppaloftBetterAuth(config);
   }
@@ -217,6 +246,9 @@ export class BetterAuthRuntime implements AuthRuntime {
           headers: request.headers,
         })
       : [];
+    const currentUserOrganizationCount = session
+      ? await this.currentUserOrganizationCount(request.headers)
+      : undefined;
     const passwordState = session ? resolvePasswordState(accounts) : "unknown";
     const connectedProviders = new Set(
       accounts
@@ -231,6 +263,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     return {
       accountSecurity: resolveAppaloftBetterAuthAccountSecurityStatus({ passwordState }),
       accountRecovery: this.accountRecovery,
+      ...(currentUserOrganizationCount !== undefined ? { currentUserOrganizationCount } : {}),
       enabled: true,
       emailVerification: this.emailVerification,
       provider: "better-auth",
@@ -365,13 +398,24 @@ export class BetterAuthRuntime implements AuthRuntime {
   }
 
   private async firstVisibleOrganizationId(headers: Headers): Promise<string | undefined> {
-    const organizations = await this.auth.api.listOrganizations({ headers });
-    return toArray(organizations)
+    return (await this.visibleOrganizations(headers))
       .map(
         (organization) =>
           readString(organization, "id") ?? readString(organization, "organizationId"),
       )
       .find((organizationId) => Boolean(organizationId));
+  }
+
+  private async visibleOrganizations(headers: Headers): Promise<Record<string, unknown>[]> {
+    return toArray(await this.auth.api.listOrganizations({ headers }));
+  }
+
+  private async currentUserOrganizationCount(headers: Headers): Promise<number | undefined> {
+    try {
+      return (await this.visibleOrganizations(headers)).length;
+    } catch {
+      return undefined;
+    }
   }
 
   private async rememberActiveOrganization(
@@ -466,12 +510,29 @@ export class BetterAuthRuntime implements AuthRuntime {
 
     const intent = parsePendingVerificationIntent(intentValue);
     await this.clearPendingVerificationIntent(authContext, userId);
-    if (!intent || (await this.firstVisibleOrganizationId(headers))) {
+    if (!intent) {
       return;
     }
+    const visibleOrganizations = await this.visibleOrganizations(headers);
+    if (visibleOrganizations.length > 0) {
+      return;
+    }
+    const email = readString(userObject, "email");
 
     for (const slug of [intent.organizationSlug, `${intent.organizationSlug}-${randomHex(2)}`]) {
       try {
+        const admitted = await this.admitOrganizationCreate({
+          name: intent.organizationName,
+          reason: "pending-verification-intent",
+          slug,
+          userId,
+          currentUserOrganizationCount: visibleOrganizations.length,
+          ...(email ? { email } : {}),
+        });
+        if (!admitted.allowed) {
+          return;
+        }
+
         const organization = await this.auth.api.createOrganization({
           headers,
           body: {
@@ -516,7 +577,11 @@ export class BetterAuthRuntime implements AuthRuntime {
     const sessionObject = readObject(session, "session");
     const userObject = readObject(session, "user");
     const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
-    if (!userId || (await this.firstVisibleOrganizationId(headers))) {
+    if (!userId) {
+      return null;
+    }
+    const visibleOrganizations = await this.visibleOrganizations(headers);
+    if (visibleOrganizations.length > 0) {
       return null;
     }
 
@@ -525,12 +590,14 @@ export class BetterAuthRuntime implements AuthRuntime {
     return this.provisionDefaultOrganizationForSession({
       ...(displayName ? { displayName } : {}),
       ...(email ? { email } : {}),
+      currentUserOrganizationCount: visibleOrganizations.length,
       headers,
       userId,
     });
   }
 
   private async provisionDefaultOrganizationForSession(input: {
+    currentUserOrganizationCount?: number;
     displayName?: string;
     email?: string;
     headers: Headers;
@@ -543,6 +610,20 @@ export class BetterAuthRuntime implements AuthRuntime {
 
     for (const slug of [slugPrefix, `${slugPrefix}-${randomHex(2)}`]) {
       try {
+        const admitted = await this.admitOrganizationCreate({
+          ...(input.email ? { email: input.email } : {}),
+          name,
+          reason: "default-organization",
+          slug,
+          userId: input.userId,
+          ...(input.currentUserOrganizationCount !== undefined
+            ? { currentUserOrganizationCount: input.currentUserOrganizationCount }
+            : {}),
+        });
+        if (!admitted.allowed) {
+          return null;
+        }
+
         const organization = await this.auth.api.createOrganization({
           headers: input.headers,
           body: {
@@ -577,6 +658,17 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
 
     return null;
+  }
+
+  private async admitOrganizationCreate(
+    request: BetterAuthOrganizationAdmissionRequest,
+  ): Promise<BetterAuthOrganizationAdmissionDecision> {
+    return (
+      (await this.organizationAdmission?.admitOrganizationCreate(request)) ?? {
+        allowed: true,
+        reason: "organization-create-admission-not-configured",
+      }
+    );
   }
 
   async authorizeProductSession(

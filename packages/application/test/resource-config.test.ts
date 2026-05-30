@@ -7,6 +7,7 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
+  type DomainErrorDetails,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -31,7 +32,14 @@ import {
   NoopLogger,
 } from "@appaloft/testkit";
 
-import { createExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
+  toRepositoryContext,
+} from "../src";
 import {
   CreateResourceSecretReferenceUseCase,
   DeleteResourceSecretReferenceUseCase,
@@ -98,7 +106,42 @@ function archivedResourceFixture(): Resource {
   return resource;
 }
 
-async function createHarness(input?: { environment?: Environment; resource?: Resource }) {
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  constructor(private readonly details: DomainErrorDetails = {}) {}
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+          details: this.details,
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      details: this.details,
+      reason: "test-operation-denied",
+    };
+  }
+}
+
+async function createHarness(input?: {
+  environment?: Environment;
+  guard?: OperationGuardPort;
+  resource?: Resource;
+}) {
   const context = createExecutionContext({
     requestId: "req_resource_config_test",
     entrypoint: "system",
@@ -126,7 +169,13 @@ async function createHarness(input?: { environment?: Environment; resource?: Res
     resources,
     eventBus,
     setVariableUseCase: new SetResourceVariableUseCase(resources, clock, eventBus, logger),
-    importVariablesUseCase: new ImportResourceVariablesUseCase(resources, clock, eventBus, logger),
+    importVariablesUseCase: new ImportResourceVariablesUseCase(
+      resources,
+      clock,
+      eventBus,
+      logger,
+      input?.guard,
+    ),
     createSecretReferenceUseCase: new CreateResourceSecretReferenceUseCase(
       resources,
       clock,
@@ -757,6 +806,62 @@ describe("resource config operations", () => {
         commandName: "resources.import-variables",
       },
     });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-CONFIG-AUTHZ-019] import variables can be denied before resource mutation", async () => {
+    const guard = new DenyingOperationGuardPort({ reasonCode: "quota" });
+    const { context, eventBus, importVariablesUseCase, repositoryContext, resources } =
+      await createHarness({ guard });
+
+    const result = await importVariablesUseCase.execute(context, {
+      resourceId: "res_web",
+      exposure: "runtime",
+      content: "APP_PORT=3100\nDATABASE_URL=postgres://app:secret@example.test:5432/main",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "resources.import-variables",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_web",
+        reason: "test-operation-denied",
+        reasonCode: "quota",
+      },
+    });
+    expect(guard.requests).toEqual([
+      expect.objectContaining({
+        operationKey: "resources.import-variables",
+        resourceRefs: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+        },
+        contextAttributes: expect.objectContaining({
+          estimatedFieldCount: 2,
+          estimatedInputBytes: expect.any(Number),
+          estimatedItemCount: 2,
+          estimatedNestingDepth: 1,
+          estimatedSecretCount: 1,
+          estimatedWriteUnits: 2,
+        }),
+      }),
+    ]);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    const runtimeVariables = persisted
+      ?.toState()
+      .variables.toState()
+      .filter((entry) => entry.exposure.value === "runtime")
+      .map((entry) => entry.key.value);
+    expect(runtimeVariables).toEqual([]);
     expect(eventBus.events).toHaveLength(0);
   });
 });

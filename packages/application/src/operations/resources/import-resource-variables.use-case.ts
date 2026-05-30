@@ -16,7 +16,16 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type AppLogger, type Clock, type EventBus, type ResourceRepository } from "../../ports";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
+import {
+  AllowAllOperationGuardPort,
+  type AppLogger,
+  type Clock,
+  type EventBus,
+  type OperationGuardPort,
+  type ResourceRepository,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import {
@@ -27,6 +36,10 @@ import {
 } from "./import-resource-variables.command";
 
 const secretMask = "****";
+const importResourceVariablesOperation = findOperationCatalogEntryByKey(
+  "resources.import-variables",
+);
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const secretLikeKeyPattern =
   /(?:secret|password|passwd|token|api[_-]?key|database[_-]?url|connection[_-]?string|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
@@ -264,13 +277,15 @@ export class ImportResourceVariablesUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: ImportResourceVariablesCommandInput,
   ): Promise<Result<ImportResourceVariablesResponse>> {
-    const { clock, eventBus, logger, resourceRepository } = this;
+    const { clock, eventBus, logger, operationGuardPort, resourceRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -290,6 +305,34 @@ export class ImportResourceVariablesUseCase {
 
       if (!resource) {
         return err(domainError.notFound("resource", input.resourceId));
+      }
+      const resourceState = resource.toState();
+
+      if (importResourceVariablesOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: importResourceVariablesOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: {
+            projectId: resourceState.projectId.value,
+            environmentId: resourceState.environmentId.value,
+            resourceId: resourceId.value,
+          },
+          contextAttributes: {
+            estimatedFieldCount:
+              classified.length +
+              ((input.secretKeys?.length ?? 0) + (input.plainKeys?.length ?? 0)),
+            estimatedInputBytes: input.content.length,
+            estimatedItemCount: classified.length,
+            estimatedNestingDepth: 1,
+            estimatedSecretCount: classified.filter((entry) => entry.isSecret).length,
+            estimatedWriteUnits: classified.length,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       const existingIdentities = new Set(

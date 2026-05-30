@@ -33,7 +33,10 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type DestinationRepository,
@@ -41,6 +44,7 @@ import {
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProcessAttemptRecorder,
   type ProjectRepository,
   type ResourceRepository,
@@ -50,6 +54,9 @@ import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDomainBindingCommandInput } from "./create-domain-binding.command";
+
+const createDomainBindingOperation = findOperationCatalogEntryByKey("domain-bindings.create");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function contextMismatch(message: string, details: Record<string, string>): Result<never> {
   return err(
@@ -140,6 +147,8 @@ export class CreateDomainBindingUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -154,6 +163,7 @@ export class CreateDomainBindingUseCase {
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
       processAttemptRecorder,
       projectRepository,
       resourceRepository,
@@ -208,6 +218,7 @@ export class CreateDomainBindingUseCase {
       if (!project) {
         return err(domainError.notFound("Project", projectId.value));
       }
+      const projectState = project.toState();
 
       const environment = await environmentRepository.findOne(
         repositoryContext,
@@ -271,6 +282,28 @@ export class CreateDomainBindingUseCase {
           serverId: serverId.value,
           destinationId: destinationId.value,
         });
+      }
+
+      if (createDomainBindingOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: createDomainBindingOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(projectState.organizationId
+            ? { organizationId: projectState.organizationId.value }
+            : {}),
+          resourceRefs: {
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            resourceId: resourceId.value,
+            serverId: serverId.value,
+            destinationId: destinationId.value,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
       }
 
       const existing = await domainBindingRepository.findOne(
