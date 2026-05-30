@@ -1,0 +1,40 @@
+{
+  "name": "@appaloft/static-artifact-upload-web",
+  "version": "0.0.0",
+  "description": "Neutral static artifact upload components for Appaloft web surfaces.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "svelte": "./src/index.ts",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./StaticArtifactUploadPanel.svelte": {
+      "svelte": "./src/StaticArtifactUploadPanel.svelte",
+      "types": "./src/StaticArtifactUploadPanel.svelte",
+      "default": "./src/StaticArtifactUploadPanel.svelte"
+    }
+  },
+  "peerDependencies": {
+    "svelte": "^5.55.5"
+  },
+  "dependencies": {
+    "@appaloft/ui": "workspace:*",
+    "@lucide/svelte": "^1.14.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "svelte": "^5.55.5",
+    "svelte-check": "^4.4.8",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "test": "vitest --run",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  }
+}
