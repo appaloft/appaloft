@@ -554,6 +554,25 @@
         "tsyringe": "^4.10.0",
       },
     },
+    "packages/static-artifact-upload-web": {
+      "name": "@appaloft/static-artifact-upload-web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@appaloft/ui": "workspace:*",
+        "@lucide/svelte": "^1.14.0",
+      },
+      "devDependencies": {
+        "@sveltejs/vite-plugin-svelte": "^7.1.2",
+        "svelte": "^5.55.5",
+        "svelte-check": "^4.4.8",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.12",
+        "vitest": "^4.1.6",
+      },
+      "peerDependencies": {
+        "svelte": "^5.55.5",
+      },
+    },
     "packages/testkit": {
       "name": "@appaloft/testkit",
       "dependencies": {
@@ -691,6 +710,8 @@
     "@appaloft/server": ["@appaloft/server@workspace:packages/server"],
 
     "@appaloft/shell": ["@appaloft/shell@workspace:apps/shell"],
+
+    "@appaloft/static-artifact-upload-web": ["@appaloft/static-artifact-upload-web@workspace:packages/static-artifact-upload-web"],
 
     "@appaloft/testkit": ["@appaloft/testkit@workspace:packages/testkit"],
 
