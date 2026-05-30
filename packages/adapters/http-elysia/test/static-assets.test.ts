@@ -44,6 +44,7 @@ function createTestApp(input?: {
   docsStaticDir?: string;
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
+  middlewareHeaders?: Record<string, string>;
   onAuthSessionStatus?: (request: Request) => void;
   onExecutionContextCreate?: Parameters<
     typeof createHttpApp
@@ -112,6 +113,20 @@ function createTestApp(input?: {
       : {}),
     ...(input?.embeddedWebAssets ? { embeddedWebAssets: input.embeddedWebAssets } : {}),
     ...(input?.embeddedDocsAssets ? { embeddedDocsAssets: input.embeddedDocsAssets } : {}),
+    ...(input?.middlewareHeaders
+      ? {
+          pluginRuntime: {
+            listWebExtensions: () => [],
+            listHttpRoutes: () => [],
+            listHttpMiddlewares: () => [
+              {
+                name: "test-static-header-middleware",
+                handle: () => ({ headers: input.middlewareHeaders ?? {} }),
+              },
+            ],
+          },
+        }
+      : {}),
   });
 }
 
@@ -524,6 +539,38 @@ describe("HTTP static assets", () => {
           response.text(),
         ),
       ).resolves.toBe("web-spa-fallback");
+    });
+  });
+
+  test("[HTTP-STATIC-MIME-001] preserves static file MIME types when middleware adds response headers", async () => {
+    const webDir = await createTempDir();
+    await mkdir(join(webDir, "_app", "immutable", "assets"), { recursive: true });
+    await Bun.write(join(webDir, "index.html"), "<!doctype html><title>Appaloft</title>");
+    await Bun.write(join(webDir, "_app", "immutable", "assets", "app.css"), "body{}");
+
+    const app = createTestApp({
+      webStaticDir: webDir,
+      middlewareHeaders: {
+        "x-content-type-options": "nosniff",
+        "x-test-static-header": "applied",
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const rootResponse = await fetch(`${baseUrl}/`);
+      const cssResponse = await fetch(`${baseUrl}/_app/immutable/assets/app.css`);
+
+      expect(rootResponse.status).toBe(200);
+      expect(rootResponse.headers.get("content-type")).toContain("text/html");
+      expect(rootResponse.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(rootResponse.headers.get("x-test-static-header")).toBe("applied");
+      expect(await rootResponse.text()).toContain("<!doctype html>");
+
+      expect(cssResponse.status).toBe(200);
+      expect(cssResponse.headers.get("content-type")).toContain("text/css");
+      expect(cssResponse.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(cssResponse.headers.get("x-test-static-header")).toBe("applied");
+      expect(await cssResponse.text()).toBe("body{}");
     });
   });
 
