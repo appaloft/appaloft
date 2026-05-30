@@ -429,6 +429,33 @@ describe("organization/team application boundary", () => {
     expect(port.calls).toEqual(["showOrganizationProfile", "changeOrganizationProfile"]);
   });
 
+  test("[ORG-SETTINGS-GUARD-001] organization profile changes can be denied before settings port side effects", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new ChangeOrganizationProfileUseCase(port, guard).execute(context, {
+      organizationId: "org_self_hosted",
+      name: "Blocked Organization",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "organizations.profile.change",
+        organizationId: "org_self_hosted",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "organizations.profile.change",
+      organizationId: "org_self_hosted",
+    });
+    expect(port.calls).toEqual([]);
+  });
+
   test("[ORG-SETTINGS-DANGER-001] exact organization-id confirmation is required before delete dispatch", async () => {
     const port = new CapturingOrganizationTeamManagementPort();
     const handler = new DeleteOrganizationCommandHandler(new DeleteOrganizationUseCase(port));
@@ -464,6 +491,35 @@ describe("organization/team application boundary", () => {
       deletedAt: "2026-01-01T00:03:00.000Z",
     });
     expect(port.calls).toEqual(["deleteOrganization"]);
+  });
+
+  test("[ORG-SETTINGS-GUARD-002] organization deletion can be denied after confirmation but before delete side effects", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new DeleteOrganizationUseCase(port, guard).execute(context, {
+      organizationId: "org_self_hosted",
+      confirmation: {
+        organizationId: "org_self_hosted",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "organizations.delete",
+        organizationId: "org_self_hosted",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "organizations.delete",
+      organizationId: "org_self_hosted",
+    });
+    expect(port.calls).toEqual([]);
   });
 
   test("[ORG-TEAM-INVITE-001] rejects duplicate active membership before creating an invitation", async () => {
@@ -651,6 +707,34 @@ describe("organization/team application boundary", () => {
       toMember: { memberId: "om_operator", role: "owner" },
     });
     expect(port.calls).toEqual(["listMembers", "transferOwner"]);
+  });
+
+  test("[ORG-TEAM-GUARD-001] ownership transfer can be denied before team port side effects", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+    const guard = new DenyingOperationGuardPort();
+    const result = await new TransferOrganizationOwnerUseCase(port, guard).execute(context, {
+      organizationId: "org_self_hosted",
+      fromMemberId: "om_admin",
+      toMemberId: "om_operator",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "organizations.transfer-owner",
+        organizationId: "org_self_hosted",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "organizations.transfer-owner",
+      organizationId: "org_self_hosted",
+    });
+    expect(port.calls).toEqual([]);
   });
 
   test("[ORG-TEAM-ROLE-002] preserves non-owner organization team roles at the application boundary", async () => {
