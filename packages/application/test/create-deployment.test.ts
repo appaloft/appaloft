@@ -158,6 +158,9 @@ import {
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
   type ExecutionBackend,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type ProviderDescriptor,
@@ -525,6 +528,33 @@ class NoopDeploymentProgressReporter implements DeploymentProgressReporter {
   report(): void {}
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.quota",
+          kind: "quota",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.quota",
+        kind: "quota",
+      },
+      reason: "test-operation-denied",
+    };
+  }
+}
+
 class NullDeploymentConfigReader implements DeploymentConfigReader {
   async read() {
     return ok(null);
@@ -731,6 +761,7 @@ async function createDeploymentFixture(
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
     processAttemptRecorder?: ProcessAttemptRecorder;
+    operationGuardPort?: OperationGuardPort;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -870,6 +901,8 @@ async function createDeploymentFixture(
     dependencyBindingReadModel,
     dependencyResourceSecretStore,
     options.processAttemptRecorder,
+    undefined,
+    options.operationGuardPort,
   );
   const provisionDependency = new ProvisionDependencyResourceUseCase(
     projects,
@@ -1667,6 +1700,55 @@ describe("CreateDeploymentUseCase", () => {
     expect(JSON.stringify(processAttemptRecorder.records)).not.toContain(
       "Static artifact package failed",
     );
+  });
+
+  test("[DEP-CREATE-AUTHZ-001] deployment guard carries provider and timeout cost before persistence", async () => {
+    const guard = new DenyingOperationGuardPort();
+    const { context, createDeploymentInput, createDeploymentUseCase, deployments, eventBus } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        operationGuardPort: guard,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.quota",
+        checkKind: "quota",
+        operationKey: "deployments.create",
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toEqual([
+      expect.objectContaining({
+        operationKey: "deployments.create",
+        organizationId: "org_self_hosted",
+        resourceRefs: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+        },
+        contextAttributes: expect.objectContaining({
+          estimatedExternalProviderCalls: 1,
+          estimatedTimeoutSeconds: 3_600,
+          estimatedWriteUnits: 3,
+        }),
+      }),
+    ]);
+    expect(deployments.items.size).toBe(0);
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("[DEP-CREATE-ASYNC-019][PROC-DELIVERY-004] projects runtime target capacity exhaustion recovery details", async () => {

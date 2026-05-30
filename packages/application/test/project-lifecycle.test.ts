@@ -8,6 +8,8 @@ import {
   DescriptionText,
   type DomainErrorDetails,
   type DomainEvent,
+  EnvironmentByIdSpec,
+  EnvironmentId,
   OrganizationId,
   ok,
   Project,
@@ -21,6 +23,7 @@ import {
 import {
   CapturedEventBus,
   FixedClock,
+  MemoryEnvironmentReadModel,
   MemoryEnvironmentRepository,
   MemoryProjectReadModel,
   MemoryProjectRepository,
@@ -415,6 +418,7 @@ describe("project lifecycle operations", () => {
       eventBus,
       logger,
       guard,
+      new MemoryProjectReadModel(projects),
     );
 
     const result = await useCase.execute(context, {
@@ -437,6 +441,9 @@ describe("project lifecycle operations", () => {
     expect(guard.requests[0]).toMatchObject({
       operationKey: "projects.create",
       organizationId: "org_self_hosted",
+      contextAttributes: {
+        currentOrganizationProjectCount: 0,
+      },
     });
   });
 
@@ -843,6 +850,57 @@ describe("project lifecycle operations", () => {
         projectId: "prj_demo",
       },
     });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-CREATE-GUARD-001] create environment can be denied by the generic operation guard", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness();
+    const environments = new MemoryEnvironmentRepository();
+    const guard = new DenyingOperationGuardPort();
+    const useCase = new CreateEnvironmentUseCase(
+      projects,
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+      guard,
+      new MemoryEnvironmentReadModel(environments),
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      name: "Production",
+      kind: "production",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.authorization",
+        checkKind: "authorization",
+        operationKey: "environments.create",
+        projectId: "prj_demo",
+        reason: "test-operation-denied",
+      },
+    });
+    expect(guard.requests).toHaveLength(1);
+    expect(guard.requests[0]).toMatchObject({
+      operationKey: "environments.create",
+      contextAttributes: {
+        currentProjectEnvironmentCount: 0,
+      },
+      resourceRefs: {
+        projectId: "prj_demo",
+      },
+    });
+    expect(
+      await environments.findOne(
+        repositoryContext,
+        EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_0001")),
+      ),
+    ).toBeNull();
     expect(eventBus.events).toHaveLength(0);
   });
 });

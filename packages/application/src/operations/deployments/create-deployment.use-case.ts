@@ -22,7 +22,10 @@ import { inject, injectable } from "tsyringe";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type DependencyResourceSecretStore,
   type DeploymentOverlayPort,
@@ -33,6 +36,7 @@ import {
   type EventBus,
   type ExecutionBackend,
   type MutationCoordinator,
+  type OperationGuardPort,
   type ProcessAttemptNextAction,
   type ProcessAttemptRecorder,
   type RequestedDeploymentConfig,
@@ -95,6 +99,10 @@ function compactMetadata(input: Record<string, string | undefined>): Record<stri
 
   return metadata;
 }
+
+const createDeploymentOperation = findOperationCatalogEntryByKey("deployments.create");
+const redeployDeploymentOperation = findOperationCatalogEntryByKey("deployments.redeploy");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function previewMetadataForEnvironment(input: {
   environmentName: string;
@@ -604,6 +612,8 @@ export class CreateDeploymentUseCase {
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
     @inject(tokens.deploymentOverlayPort)
     private readonly deploymentOverlayPort?: DeploymentOverlayPort,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   private async persistDeployment(
@@ -759,6 +769,7 @@ export class CreateDeploymentUseCase {
       runtimePlanResolver,
       serverAppliedRouteStateRepository,
       sourceDetector,
+      operationGuardPort,
     } = this;
     const persistDeployment = this.persistDeployment.bind(this);
     const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
@@ -804,6 +815,41 @@ export class CreateDeploymentUseCase {
         effectiveInput,
       );
       const { project, server, destination, environment, resource } = yield* resolvedContextResult;
+      const projectState = project.toState();
+      const environmentState = environment.toState();
+      const resourceState = resource.toState();
+      const serverState = server.toState();
+      const destinationState = destination.toState();
+      const operationEntry =
+        recovery?.ownerLabel === "deployments.redeploy"
+          ? redeployDeploymentOperation
+          : createDeploymentOperation;
+      if (operationEntry) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: operationEntry,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          ...(projectState.organizationId
+            ? { organizationId: projectState.organizationId.value }
+            : {}),
+          resourceRefs: {
+            projectId: projectState.id.value,
+            environmentId: environmentState.id.value,
+            resourceId: resourceState.id.value,
+            serverId: serverState.id.value,
+            destinationId: destinationState.id.value,
+          },
+          contextAttributes: {
+            estimatedExternalProviderCalls: 1,
+            estimatedTimeoutSeconds: input.executionMode === "detached" ? 3_600 : 900,
+            estimatedWriteUnits: input.executionMode === "detached" ? 3 : 2,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
       yield* project.ensureCanAcceptMutation("deployments.create");
 
       const resourceSourceResult = createResourceSourceDescriptor(resource);

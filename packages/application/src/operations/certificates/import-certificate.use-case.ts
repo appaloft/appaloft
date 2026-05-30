@@ -30,7 +30,10 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type CertificateMaterialValidator,
   type CertificateRepository,
@@ -39,6 +42,7 @@ import {
   type DomainBindingRepository,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ProcessAttemptRecorder,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
@@ -51,6 +55,8 @@ import {
 
 const manualImportProviderKey = "manual-import";
 const manualImportChallengeType = "manual-import";
+const importCertificateOperation = findOperationCatalogEntryByKey("certificates.import");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function notFoundInCertificateContext(entity: string, id: string): DomainError {
   const error = domainError.notFound(entity, id);
@@ -155,6 +161,8 @@ export class ImportCertificateUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
@@ -170,6 +178,7 @@ export class ImportCertificateUseCase {
       eventBus,
       idGenerator,
       logger,
+      operationGuardPort,
       processAttemptRecorder,
     } = this;
     const repositoryContext = toRepositoryContext(context);
@@ -193,6 +202,36 @@ export class ImportCertificateUseCase {
         phase: "certificate-admission",
       });
       const domainBindingState = domainBinding.toState();
+
+      if (importCertificateOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: importCertificateOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          resourceRefs: {
+            projectId: domainBindingState.projectId.value,
+            environmentId: domainBindingState.environmentId.value,
+            resourceId: domainBindingState.resourceId.value,
+            serverId: domainBindingState.serverId.value,
+            domainBindingId: domainBindingState.id.value,
+          },
+          contextAttributes: {
+            estimatedFieldCount: input.passphrase ? 3 : 2,
+            estimatedInputBytes:
+              input.certificateChain.length +
+              input.privateKey.length +
+              (input.passphrase?.length ?? 0),
+            estimatedItemCount: 1,
+            estimatedNestingDepth: 1,
+            estimatedSecretCount: input.passphrase ? 3 : 2,
+            estimatedWriteUnits: 3,
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
 
       const validation = yield* await certificateMaterialValidator.validateImported(context, {
         domainName: certificateContext.domainName.value,

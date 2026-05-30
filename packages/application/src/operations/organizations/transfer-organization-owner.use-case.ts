@@ -2,7 +2,11 @@ import { domainError, err, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
+  type OperationGuardPort,
   type OrganizationMemberSummary,
   type OrganizationTeamManagementPort,
   type TransferOrganizationOwnerInput,
@@ -10,17 +14,37 @@ import {
 import { tokens } from "../../tokens";
 import { type TransferOrganizationOwnerResult } from "./transfer-organization-owner.command";
 
+const transferOrganizationOwnerOperation = findOperationCatalogEntryByKey(
+  "organizations.transfer-owner",
+);
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
+
 @injectable()
 export class TransferOrganizationOwnerUseCase {
   constructor(
     @inject(tokens.organizationTeamManagementPort)
     private readonly organizationTeamManagement: OrganizationTeamManagementPort,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: TransferOrganizationOwnerInput,
   ): Promise<Result<TransferOrganizationOwnerResult>> {
+    if (transferOrganizationOwnerOperation) {
+      const checked = await checkOperationGuards({
+        context,
+        entry: transferOrganizationOwnerOperation,
+        message: input,
+        operationGuardPort: this.operationGuardPort ?? defaultOperationGuardPort,
+        organizationId: input.organizationId,
+      });
+      if (checked.isErr()) {
+        return err(checked.error);
+      }
+    }
+
     const members = await this.organizationTeamManagement.listMembers(context, {
       organizationId: input.organizationId,
       limit: 250,

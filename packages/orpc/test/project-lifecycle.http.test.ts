@@ -38,6 +38,8 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
+      requestSecurity: input.requestSecurity,
     });
   }
 }
@@ -67,6 +69,54 @@ describe("project lifecycle HTTP routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ count: 3 });
     expect(capturedQuery).toBeInstanceOf(CountProjectsQuery);
+  });
+
+  test("[OP-GUARD-005] carries neutral request security headers into oRPC HTTP execution context", async () => {
+    let capturedContext: ExecutionContext | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(context: ExecutionContext, _query: Query<T>): Promise<Result<T>> => {
+        capturedContext = context;
+        return ok({ count: 3 } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/projects/count", {
+        headers: {
+          "x-appaloft-edge-action": "managed_challenge",
+          "x-appaloft-edge-provider": "edge-fixture",
+          "x-appaloft-edge-ray-id": "ray_fixture",
+          "x-appaloft-edge-rule-id": "rule_fixture",
+          "x-appaloft-bot-score": "7",
+          "x-appaloft-fraud-risk-score": "95",
+          "x-request-id": "req_orpc_request_security",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(capturedContext).toMatchObject({
+      entrypoint: "http",
+      requestId: "req_orpc_request_security",
+      requestSecurity: {
+        botScore: 7,
+        edgeAction: "managed_challenge",
+        edgeProvider: "edge-fixture",
+        edgeRayId: "ray_fixture",
+        edgeRuleId: "rule_fixture",
+        fraudRiskScore: 95,
+      },
+    });
   });
 
   test("[PROJ-LIFE-ENTRY-HTTP-001] dispatches ShowProjectQuery through HTTP", async () => {

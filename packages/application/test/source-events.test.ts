@@ -2,6 +2,10 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AllowAllOperationGuardPort,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
@@ -247,6 +251,29 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  constructor(private readonly decisionDetails: Record<string, string> = {}) {}
+
+  async checkOperation(
+    _context: Parameters<OperationGuardPort["checkOperation"]>[0],
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [],
+      deniedBy: {
+        checkKey: "test.guard",
+        kind: "quota",
+      },
+      details: this.decisionDetails,
+      reason: "test-denied",
+    };
+  }
+}
+
 function cloneRecord(record: SourceEventRecord): SourceEventRecord {
   return {
     ...record,
@@ -299,6 +326,7 @@ function createHarness(
     policyCandidates?: SourceEventPolicyCandidate[];
     deploymentDispatcher?: SourceEventDeploymentDispatcher;
     processAttemptRecorder?: ProcessAttemptRecorder;
+    operationGuardPort?: OperationGuardPort;
   } = {},
 ) {
   const context = createExecutionContext({
@@ -321,6 +349,7 @@ function createHarness(
       policyReader,
       options.deploymentDispatcher,
       options.processAttemptRecorder,
+      options.operationGuardPort ?? new AllowAllOperationGuardPort(),
     ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
@@ -457,6 +486,53 @@ describe("source event application baseline", () => {
     expect(sourceEvents.records[0]?.sourceIdentity.locator).toBe(
       "https://github.com/appaloft/demo",
     );
+  });
+
+  test("[SOURCE-EVENT-INGEST-AUTHZ-001] checks operation guard before recording source event deliveries", async () => {
+    const operationGuardPort = new DenyingOperationGuardPort({ resourceId: "res_web" });
+    const { context, ingest, sourceEvents } = createHarness({
+      operationGuardPort,
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      scopeResourceId: "res_web",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "abc123",
+      deliveryId: "delivery_guard_denied",
+      verification: {
+        status: "verified",
+        method: "provider-signature",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.guard",
+        operationKey: "source-events.ingest",
+        resourceId: "res_web",
+      },
+    });
+    expect(sourceEvents.records).toHaveLength(0);
+    expect(operationGuardPort.requests[0]).toMatchObject({
+      operationKey: "source-events.ingest",
+      resourceRefs: {
+        resourceId: "res_web",
+      },
+      contextAttributes: {
+        sourceKind: "github",
+        eventKind: "push",
+        estimatedExternalProviderCalls: 1,
+      },
+    });
   });
 
   test("[SRC-AUTO-EVENT-001] [PROC-DELIVERY-001] dispatches matching source events through deployment admission", async () => {

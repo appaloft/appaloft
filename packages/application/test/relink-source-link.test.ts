@@ -56,6 +56,10 @@ import {
   ShowSourceLinkQuery,
 } from "../src/messages";
 import {
+  AllowAllOperationGuardPort,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkReadModel,
   type SourceLinkRecord,
@@ -123,6 +127,29 @@ class TimeoutMutationCoordinator implements MutationCoordinator {
   }
 }
 
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  constructor(private readonly decisionDetails: Record<string, string> = {}) {}
+
+  async checkOperation(
+    _context: Parameters<OperationGuardPort["checkOperation"]>[0],
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [],
+      deniedBy: {
+        checkKey: "test.guard",
+        kind: "quota",
+      },
+      details: this.decisionDetails,
+      reason: "test-denied",
+    };
+  }
+}
+
 class MemorySourceLinkReadModel implements SourceLinkReadModel {
   constructor(private readonly records: SourceLinkRecord[]) {}
 
@@ -146,6 +173,7 @@ async function createRelinkFixture(input?: {
   resourceDestinationId?: string;
   sourceLink?: SourceLinkRecord | null;
   mutationCoordinator?: MutationCoordinator;
+  operationGuardPort?: OperationGuardPort;
 }) {
   const context = createExecutionContext({
     requestId: "req_source_link_test",
@@ -238,6 +266,7 @@ async function createRelinkFixture(input?: {
       destinations,
       clock,
       input?.mutationCoordinator ?? new PassThroughMutationCoordinator(),
+      input?.operationGuardPort ?? new AllowAllOperationGuardPort(),
     ),
   };
 }
@@ -388,6 +417,51 @@ describe("DeleteSourceLinkUseCase", () => {
 });
 
 describe("RelinkSourceLinkUseCase", () => {
+  test("[SOURCE-LINK-AUTHZ-001] checks operation guard before relink persistence", async () => {
+    const operationGuardPort = new DenyingOperationGuardPort({ resourceId: "res_demo" });
+    const { context, sourceLinkRepository, useCase } = await createRelinkFixture({
+      operationGuardPort,
+    });
+
+    const result = await useCase.execute(context, {
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      expectedCurrentResourceId: "res_old",
+      reason: "move to canonical resource",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        checkKey: "test.guard",
+        operationKey: "source-links.relink",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+      },
+    });
+    expect(sourceLinkRepository.upsertCalls).toHaveLength(0);
+    expect(operationGuardPort.requests[0]).toMatchObject({
+      operationKey: "source-links.relink",
+      resourceRefs: {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+      contextAttributes: {
+        sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      },
+    });
+  });
+
   test("[SOURCE-LINK-STATE-008] relinks a source fingerprint after target context validation", async () => {
     const { context, sourceLinkRepository, useCase } = await createRelinkFixture();
 
