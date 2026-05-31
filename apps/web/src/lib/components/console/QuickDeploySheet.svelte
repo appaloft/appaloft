@@ -1877,6 +1877,10 @@
 
   function effectiveResourceInternalPortText(): string {
     const requestedPort = resourceInternalPort.trim();
+    if (createsStaticSiteResource && (!requestedPort || requestedPort === "3000")) {
+      return resourceInternalPortDefault;
+    }
+
     if (sourceKind === "blueprint" && (!requestedPort || requestedPort === "3000")) {
       return selectedBlueprintDefaultPort;
     }
@@ -2399,7 +2403,9 @@
     resourceDockerfilePath = params.get("resourceDockerfilePath") ?? "";
     resourceDockerComposeFilePath = params.get("resourceDockerComposeFilePath") ?? "";
     resourceBuildTarget = params.get("resourceBuildTarget") ?? "";
-    resourceInternalPort = params.get("resourceInternalPort") ?? (nextSourceKind === "static-site" ? "80" : "3000");
+    resourceInternalPort =
+      params.get("resourceInternalPort") ??
+      (nextSourceKind === "static-site" || resourceKind === "static-site" ? "80" : "3000");
     staticPublishDirectory = params.get("staticPublishDirectory") ?? "/dist";
     staticInstallCommand = params.get("staticInstallCommand") ?? "";
     staticBuildCommand = params.get("staticBuildCommand") ?? "";
@@ -2711,6 +2717,9 @@
       case "dockerfile":
         return withHealthCheckPath({
           strategy: "dockerfile",
+          ...(resourceInstallCommand.trim() ? { installCommand: resourceInstallCommand.trim() } : {}),
+          ...(resourceBuildCommand.trim() ? { buildCommand: resourceBuildCommand.trim() } : {}),
+          ...(resourceStartCommand.trim() ? { startCommand: resourceStartCommand.trim() } : {}),
           ...(resourceDockerfilePath.trim()
             ? { dockerfilePath: resourceDockerfilePath.trim() }
             : { dockerfilePath: "Dockerfile" }),

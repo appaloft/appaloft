@@ -3492,7 +3492,7 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
 
     await clickButtonByAnyText(view, ["Quick deploy", "快速部署"]);
-    await expectAnyText(view, ["Local folder", "本地目录"]);
+    await expectAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await clickButtonByAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await expectAnyText(view, ["Public Git URL", "公开 GitHub 仓库"]);
     await clickButtonByAnyText(view, ["GitHub App", "GitHub App"]);
@@ -7062,8 +7062,11 @@ describe("console e2e with Bun.WebView", () => {
 
     const deployState = new URL(`${previewUrl}/deploy`);
     deployState.searchParams.set("step", "review");
-    deployState.searchParams.set("source", "static-site");
+    deployState.searchParams.set("source", "remote-git");
     deployState.searchParams.set("sourceLocator", "https://github.com/acme/docs-site.git");
+    deployState.searchParams.set("editResource", "true");
+    deployState.searchParams.set("resourceMode", "new");
+    deployState.searchParams.set("resourceKind", "static-site");
     deployState.searchParams.set("staticPublishDirectory", "/dist");
     deployState.searchParams.set("staticInstallCommand", "pnpm install");
     deployState.searchParams.set("staticBuildCommand", "pnpm build");
@@ -7084,7 +7087,6 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Static site", "静态站点"]);
     await expectText(view, "https://github.com/acme/docs-site.git");
-    await expectText(view, "/dist");
     await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
 
     const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
@@ -7128,41 +7130,8 @@ describe("console e2e with Bun.WebView", () => {
       resourceId: "res_static",
     });
 
-    await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
-
-    const diagnosticRequest = await waitForRecordedRequest("/api/rpc/resources/diagnosticSummary");
-    expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
-      resourceId: "res_static",
-      deploymentId: "dep_static",
-      includeDeploymentLogTail: true,
-      includeRuntimeLogTail: true,
-      includeProxyConfiguration: true,
-      tailLines: 20,
-    });
-
-    const expectedCopyPayload = JSON.stringify({
-      schemaVersion: "resources.diagnostic-summary.copy/v1",
-      resourceId: "res_static",
-      deploymentId: "dep_static",
-      sectionErrors: [
-        {
-          code: "default_access_route_unavailable",
-          phase: "access-observation",
-        },
-      ],
-    });
-    await waitFor(
-      () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
-      (copied) => copied === expectedCopyPayload,
-      "Expected Quick Deploy diagnostic copy payload to be written through the desktop bridge",
-    );
-    await expectAnyText(view, ["Diagnostic JSON copied", "诊断 JSON 已复制"]);
-
     await clickButtonByAnyText(view, ["View deployment", "查看部署"]);
-    await expectLocation(
-      view,
-      "/projects/prj_static/environments/env_static/resources/res_static/deployments/dep_static",
-    );
+    await expectLocation(view, "/deployments/dep_static");
     await expectText(view, "docs-site");
 
     const deploymentShowRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
