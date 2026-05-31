@@ -3374,7 +3374,7 @@
 
 </script>
 
-<div class="grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(22rem,1fr)_20rem] xl:grid-cols-[minmax(24rem,1fr)_22rem]">
+<div class="grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
   <div class="min-w-0 space-y-5">
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
@@ -3393,7 +3393,7 @@
               />
             </div>
             <div
-              class="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-3"
+              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
               role="radiogroup"
               aria-label={$t(i18nKeys.common.domain.source)}
             >
