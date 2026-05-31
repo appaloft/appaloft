@@ -6,6 +6,14 @@ const quickDeploySheetSource = readFileSync(
   fileURLToPath(new URL("./QuickDeploySheet.svelte", import.meta.url)),
   "utf8",
 );
+const resourceSourceOptionSource = readFileSync(
+  fileURLToPath(new URL("./ResourceSourceOption.svelte", import.meta.url)),
+  "utf8",
+);
+const deployPageSource = readFileSync(
+  fileURLToPath(new URL("../../../routes/deploy/+page.svelte", import.meta.url)),
+  "utf8",
+);
 
 describe("QuickDeploySheet structure", () => {
   test("[QUICK-DEPLOY-UX-001] keeps the lower quick deploy section scoped to variables", () => {
@@ -33,12 +41,17 @@ describe("QuickDeploySheet structure", () => {
   });
 
   test("[QUICK-DEPLOY-UX-003] keeps the deploy entry readable at constrained console widths", () => {
-    expect(quickDeploySheetSource).toContain("lg:grid-cols-[minmax(22rem,1fr)_20rem]");
+    expect(deployPageSource).toContain('<ConsoleResourceCanvas class="max-w-6xl">');
+    expect(quickDeploySheetSource).toContain("lg:grid-cols-[minmax(0,1fr)_20rem]");
     expect(quickDeploySheetSource).not.toContain("md:grid-cols-[minmax(0,1fr)_20rem]");
-    expect(quickDeploySheetSource).toContain("grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]");
+    expect(quickDeploySheetSource).toContain("grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3");
     expect(quickDeploySheetSource).not.toContain("sm:grid-cols-2 xl:grid-cols-5");
     expect(quickDeploySheetSource).toContain("lg:sticky");
     expect(quickDeploySheetSource).not.toContain("md:sticky");
+    expect(resourceSourceOptionSource).toContain("min-h-24");
+    expect(resourceSourceOptionSource).toContain("px-4 py-4");
+    expect(resourceSourceOptionSource).toContain("text-sm font-medium leading-5");
+    expect(resourceSourceOptionSource).not.toContain("block truncate text-sm font-medium");
   });
 
   test("[QD-GHA-001] shows hosted GitHub App install without requiring GitHub OAuth", () => {

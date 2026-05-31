@@ -10,7 +10,7 @@
 </svelte:head>
 
 <ConsoleShell title={$t(i18nKeys.common.actions.quickDeploy)} description={$t(i18nKeys.console.deployments.description)}>
-  <ConsoleResourceCanvas>
+  <ConsoleResourceCanvas class="max-w-6xl">
     <QuickDeploySheet />
   </ConsoleResourceCanvas>
 </ConsoleShell>
