@@ -114,6 +114,19 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain("onclick={openEnvironmentCreateDialog}");
     expect(dependencyResourcePageSource).toContain("onclick={openServerCreateDialog}");
     expect(dependencyResourcePageSource).toContain(
+      'const dependencyResourceSelectContentClass = "z-[60]"',
+    );
+    expect(dependencyResourcePageSource).toContain(
+      'const dependencyResourceNestedDialogClass = "z-[70]"',
+    );
+    expect(dependencyResourcePageSource).toContain(
+      "<Select.Content class={dependencyResourceSelectContentClass}>",
+    );
+    expect(dependencyResourcePageSource).toContain("class={dependencyResourceNestedDialogClass}");
+    expect(dependencyResourcePageSource).toContain(
+      "class={`max-w-5xl ${dependencyResourceNestedDialogClass}`}",
+    );
+    expect(dependencyResourcePageSource).toContain(
       "aria-label={$t(i18nKeys.console.dependencyResources.selectProject)}",
     );
     expect(dependencyResourcePageSource).toContain(
