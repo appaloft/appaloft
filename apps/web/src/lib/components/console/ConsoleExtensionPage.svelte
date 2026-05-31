@@ -78,9 +78,23 @@
   type ConsolePagePanelItem = {
     title: string;
     description?: string;
+    fields?: ConsolePagePanelField[];
     rows?: ConsolePageKeyValue[];
     actions?: ConsolePageRequestAction[];
     tone?: ConsolePageTone;
+  };
+
+  type ConsolePagePanelField = {
+    name: string;
+    label: string;
+    type: "number" | "range" | "range-number";
+    value: number;
+    min?: number;
+    max?: number;
+    step?: number;
+    displayDivisor?: number;
+    prefix?: string;
+    suffix?: string;
   };
 
   type ConsolePageRequestAction = {
@@ -88,6 +102,7 @@
     endpoint: string;
     method?: "POST";
     body?: Record<string, unknown>;
+    fieldBindings?: Record<string, string>;
     variant?: "primary" | "secondary";
     disabled?: boolean;
     disabledReason?: string;
@@ -98,6 +113,34 @@
     label: string;
     value: string;
     tone?: ConsolePageTone;
+    calculation?: ConsolePageRowCalculation;
+  };
+
+  type ConsolePageRowCalculation =
+    | {
+        kind: "field-money";
+        field: string;
+        divisor?: number;
+        currency?: string;
+      }
+    | {
+        kind: "tiered-multiple";
+        field: string;
+        divisor?: number;
+        tiers: ConsolePageCalculationTier[];
+      }
+    | {
+        kind: "tiered-unit-rate";
+        field: string;
+        divisor?: number;
+        tiers: ConsolePageCalculationTier[];
+        currency?: string;
+        suffix?: string;
+      };
+
+  type ConsolePageCalculationTier = {
+    min: number;
+    multiplier: number;
   };
 
   type ConsolePageTableSection = {
@@ -168,6 +211,7 @@
   let { settingsScope = null }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
+  let panelFieldValues = $state<Record<string, number>>({});
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -266,24 +310,151 @@
     return section.height === "tall" ? "min-h-[520px]" : "";
   }
 
-  function requestActionKey(action: ConsolePageRequestAction): string {
-    return `${action.method ?? "POST"}:${action.endpoint}:${action.label}`;
+  function requestActionKey(action: ConsolePageRequestAction, item?: ConsolePagePanelItem): string {
+    return `${item?.title ?? "page"}:${action.method ?? "POST"}:${action.endpoint}:${action.label}`;
   }
 
-  async function runRequestAction(action: ConsolePageRequestAction): Promise<void> {
+  function panelFieldKey(item: ConsolePagePanelItem, field: ConsolePagePanelField): string {
+    return `${item.title}:${field.name}`;
+  }
+
+  function panelFieldValue(item: ConsolePagePanelItem, field: ConsolePagePanelField): number {
+    const value = panelFieldValues[panelFieldKey(item, field)] ?? field.value;
+    return clampPanelFieldValue(value, field);
+  }
+
+  function panelFieldValueByName(item: ConsolePagePanelItem, fieldName: string): number | null {
+    const field = item.fields?.find((candidate) => candidate.name === fieldName);
+    return field ? panelFieldValue(item, field) : null;
+  }
+
+  function panelFieldDisplayDivisor(field: ConsolePagePanelField): number {
+    return field.displayDivisor && field.displayDivisor > 0 ? field.displayDivisor : 1;
+  }
+
+  function panelFieldDisplayValue(item: ConsolePagePanelItem, field: ConsolePagePanelField): number {
+    return panelFieldValue(item, field) / panelFieldDisplayDivisor(field);
+  }
+
+  function panelFieldDisplayBound(value: number | undefined, field: ConsolePagePanelField): number | undefined {
+    return typeof value === "number" ? value / panelFieldDisplayDivisor(field) : undefined;
+  }
+
+  function clampPanelFieldValue(value: number, field: ConsolePagePanelField): number {
+    const min = typeof field.min === "number" ? field.min : Number.NEGATIVE_INFINITY;
+    const max = typeof field.max === "number" ? field.max : Number.POSITIVE_INFINITY;
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function setPanelFieldDisplayValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePagePanelField,
+    displayValue: number,
+  ): void {
+    if (!Number.isFinite(displayValue)) return;
+    const nextValue = Math.round(displayValue * panelFieldDisplayDivisor(field));
+    panelFieldValues = {
+      ...panelFieldValues,
+      [panelFieldKey(item, field)]: clampPanelFieldValue(nextValue, field),
+    };
+  }
+
+  function resolveCalculationTier(
+    tiers: ConsolePageCalculationTier[],
+    fieldValue: number,
+  ): ConsolePageCalculationTier | null {
+    return (
+      [...tiers].sort((a, b) => b.min - a.min).find((tier) => fieldValue >= tier.min) ??
+      tiers[0] ??
+      null
+    );
+  }
+
+  function calculatedTieredValue(
+    item: ConsolePagePanelItem,
+    calculation: Extract<ConsolePageRowCalculation, { kind: "tiered-multiple" | "tiered-unit-rate" }>,
+  ): { readonly fieldValue: number; readonly units: number } | null {
+    const fieldValue = panelFieldValueByName(item, calculation.field);
+    if (fieldValue === null) return null;
+    const tier = resolveCalculationTier(calculation.tiers, fieldValue);
+    if (!tier) return null;
+    const units = Math.floor((fieldValue * tier.multiplier) / (calculation.divisor ?? 1));
+    return { fieldValue, units };
+  }
+
+  function formatConsoleMoney(cents: number, currency = "USD", maximumFractionDigits = 0): string {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits,
+      minimumFractionDigits: maximumFractionDigits,
+    }).format(cents / 100);
+  }
+
+  function formatConsoleUnitRate(amountCents: number, units: number, currency = "USD"): string {
+    if (units <= 0) return formatConsoleMoney(0, currency, 3);
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    }).format(amountCents / 100 / units);
+  }
+
+  function panelRowValue(item: ConsolePagePanelItem, row: ConsolePageKeyValue): string {
+    const calculation = row.calculation;
+    if (!calculation) return row.value;
+    if (calculation.kind === "field-money") {
+      const fieldValue = panelFieldValueByName(item, calculation.field);
+      return fieldValue === null
+        ? row.value
+        : formatConsoleMoney(fieldValue, calculation.currency, fieldValue % 100 === 0 ? 0 : 2);
+    }
+    if (calculation.kind === "tiered-multiple") {
+      const calculated = calculatedTieredValue(item, calculation);
+      return calculated ? String(calculated.units) : row.value;
+    }
+    if (calculation.kind === "tiered-unit-rate") {
+      const calculated = calculatedTieredValue(item, calculation);
+      return calculated
+        ? `${formatConsoleUnitRate(calculated.fieldValue, calculated.units, calculation.currency)}${calculation.suffix ?? ""}`
+        : row.value;
+    }
+    return row.value;
+  }
+
+  function requestActionBody(
+    action: ConsolePageRequestAction,
+    item?: ConsolePagePanelItem,
+  ): Record<string, unknown> {
+    const body: Record<string, unknown> = { ...(action.body ?? {}) };
+    if (!item || !action.fieldBindings) return body;
+    for (const [bodyKey, fieldName] of Object.entries(action.fieldBindings)) {
+      const value = panelFieldValueByName(item, fieldName);
+      if (value !== null) {
+        body[bodyKey] = value;
+      }
+    }
+    return body;
+  }
+
+  async function runRequestAction(
+    action: ConsolePageRequestAction,
+    item?: ConsolePagePanelItem,
+  ): Promise<void> {
     if (action.disabled) {
       actionErrorMessage = action.disabledReason ?? "";
       return;
     }
 
-    const actionKey = requestActionKey(action);
+    const actionKey = requestActionKey(action, item);
     pendingActionKey = actionKey;
     actionErrorMessage = "";
     try {
       const response = await request<Record<string, unknown>>(action.endpoint, {
         method: action.method ?? "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(action.body ?? {}),
+        body: JSON.stringify(requestActionBody(action, item)),
       });
       if (response.accepted === false) {
         actionErrorMessage =
@@ -441,32 +612,89 @@
                       <p class="text-sm text-muted-foreground">{item.description}</p>
                     {/if}
                   </div>
+                  {#if item.fields?.length}
+                    <div class="space-y-3">
+                      {#each item.fields as field (field.name)}
+                        <label
+                          class="block space-y-2 text-sm"
+                          data-console-page-panel-field={field.name}
+                        >
+                          <span class="font-medium text-foreground">{field.label}</span>
+                          <div class="flex items-center gap-3">
+                            {#if field.type === "range" || field.type === "range-number"}
+                              <input
+                                class="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                                type="range"
+                                value={panelFieldDisplayValue(item, field)}
+                                min={panelFieldDisplayBound(field.min, field)}
+                                max={panelFieldDisplayBound(field.max, field)}
+                                step={panelFieldDisplayBound(field.step, field)}
+                                oninput={(event) =>
+                                  setPanelFieldDisplayValue(
+                                    item,
+                                    field,
+                                    Number((event.currentTarget as HTMLInputElement).value),
+                                  )}
+                              />
+                            {/if}
+                            {#if field.prefix}
+                              <span class="shrink-0 text-sm font-medium text-muted-foreground">
+                                {field.prefix}
+                              </span>
+                            {/if}
+                            {#if field.type === "number" || field.type === "range-number"}
+                              <input
+                                class="h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-right text-sm font-medium shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                type="number"
+                                value={panelFieldDisplayValue(item, field)}
+                                min={panelFieldDisplayBound(field.min, field)}
+                                max={panelFieldDisplayBound(field.max, field)}
+                                step={panelFieldDisplayBound(field.step, field)}
+                                oninput={(event) =>
+                                  setPanelFieldDisplayValue(
+                                    item,
+                                    field,
+                                    Number((event.currentTarget as HTMLInputElement).value),
+                                  )}
+                              />
+                            {/if}
+                            {#if field.suffix}
+                              <span class="shrink-0 text-sm text-muted-foreground">{field.suffix}</span>
+                            {/if}
+                          </div>
+                        </label>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if item.rows?.length}
                     <dl class="divide-y">
                       {#each item.rows as row (row.label)}
                         <div class="flex items-center justify-between gap-4 py-2 text-sm">
                           <dt class="text-muted-foreground">{row.label}</dt>
-                          <dd class={["text-right font-medium", toneClass(row.tone)]}>{row.value}</dd>
+                          <dd class={["text-right font-medium", toneClass(row.tone)]}>
+                            {panelRowValue(item, row)}
+                          </dd>
                         </div>
                       {/each}
                     </dl>
                   {/if}
                   {#if item.actions?.length}
                     <div class="flex flex-wrap gap-2">
-                      {#each item.actions as action (requestActionKey(action))}
+                      {#each item.actions as action (requestActionKey(action, item))}
                         <Button
                           type="button"
                           variant={action.variant === "primary" ? "default" : "outline"}
-                          disabled={Boolean(action.disabled) || pendingActionKey === requestActionKey(action)}
-                          onclick={() => runRequestAction(action)}
+                          disabled={Boolean(action.disabled) ||
+                            pendingActionKey === requestActionKey(action, item)}
+                          onclick={() => runRequestAction(action, item)}
                         >
-                          {pendingActionKey === requestActionKey(action)
+                          {pendingActionKey === requestActionKey(action, item)
                             ? $t(i18nKeys.common.status.loading)
                             : action.label}
                         </Button>
                       {/each}
                     </div>
-                    {#each item.actions as action (requestActionKey(action))}
+                    {#each item.actions as action (requestActionKey(action, item))}
                       {#if action.disabled && action.disabledReason}
                         <p class="text-xs text-muted-foreground">{action.disabledReason}</p>
                       {/if}
