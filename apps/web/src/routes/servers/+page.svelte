@@ -38,7 +38,7 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { createConsoleQueries } from "$lib/console/queries";
+  import { createConsoleQueries, defaultConsoleListLimit } from "$lib/console/queries";
   import {
     isSshCredentialDeleteConfirmationValid,
     resolveSshCredentialDeleteReadiness,
@@ -56,8 +56,8 @@
   const { serversQuery, deploymentsQuery } = createConsoleQueries(browser);
   const sshCredentialsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["credentials", "ssh", "list"],
-      queryFn: () => orpcClient.credentials.ssh.list({}),
+      queryKey: ["credentials", "ssh", "list", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
       enabled: browser,
     }),
   );

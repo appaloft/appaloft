@@ -656,6 +656,31 @@ describe("CreateDomainBindingUseCase", () => {
     });
   });
 
+  test("ROUTE-TLS-READMODEL-008 bounds domain binding list results", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+
+    for (const domainName of ["one.example.com", "two.example.com"]) {
+      const result = await useCase.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        domainName,
+        proxyKind: "traefik",
+      });
+      expect(result.isOk()).toBe(true);
+    }
+
+    const queryService = new ListDomainBindingsQueryService(readModel);
+    const listed = await queryService.execute(context, {
+      projectId: "prj_demo",
+      limit: 1,
+    });
+
+    expect(listed.items).toHaveLength(1);
+  });
+
   test("ROUTE-TLS-READMODEL-009 lists matched DNS observation without confirming ownership", async () => {
     const { context, domainBindings, readModel, repositoryContext, useCase } =
       await seedRoutingContext();

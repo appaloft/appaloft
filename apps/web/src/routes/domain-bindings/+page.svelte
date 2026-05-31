@@ -58,7 +58,15 @@
     resourcesQuery,
     serversQuery,
     domainBindingsQuery,
-  } = createConsoleQueries(browser);
+  } = createConsoleQueries(browser, {
+    health: false,
+    readiness: false,
+    version: false,
+    deployments: false,
+    previewEnvironments: false,
+    certificates: false,
+    providers: false,
+  });
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);

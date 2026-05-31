@@ -15,6 +15,7 @@ export class ListCertificatesQueryService {
     context: ExecutionContext,
     input?: {
       domainBindingId?: string;
+      limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<CertificateReadModel["list"]>> }> {
     return { items: await this.readModel.list(toRepositoryContext(context), input) };
