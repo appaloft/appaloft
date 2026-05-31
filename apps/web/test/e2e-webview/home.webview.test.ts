@@ -5255,7 +5255,7 @@ describe("console e2e with Bun.WebView", () => {
       await expectText(view, previewSourceFingerprint);
 
       const listRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/list");
-      expect(readOrpcJsonPayload(listRequest.body)).toEqual({});
+      expect(readOrpcJsonPayload(listRequest.body)).toEqual({ limit: 100 });
 
       await clickLinkByHref(view, "prenv_global_27");
       const showRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/show");

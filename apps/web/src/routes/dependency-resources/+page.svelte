@@ -128,6 +128,8 @@
     "object-storage": ["s3:", "minio:", "http:", "https:"],
     opensearch: ["http:", "https:"],
   };
+  const dependencyResourceSelectContentClass = "z-[60]";
+  const dependencyResourceNestedDialogClass = "z-[70]";
 
   const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
     resources: false,
@@ -878,7 +880,7 @@
                       ? projectName(selectedProjectId)
                       : $t(i18nKeys.console.dependencyResources.selectProject)}
                   </Select.Trigger>
-                  <Select.Content>
+                  <Select.Content class={dependencyResourceSelectContentClass}>
                     {#each projects as project (project.id)}
                       <Select.Item value={project.id}>{project.name}</Select.Item>
                     {/each}
@@ -906,7 +908,7 @@
                       ? environmentName(selectedEnvironmentId)
                       : $t(i18nKeys.console.dependencyResources.selectEnvironment)}
                   </Select.Trigger>
-                  <Select.Content>
+                  <Select.Content class={dependencyResourceSelectContentClass}>
                     {#each projectEnvironments as environment (environment.id)}
                       <Select.Item value={environment.id}>{environment.name}</Select.Item>
                     {/each}
@@ -935,7 +937,7 @@
                         ? serverName(selectedServerId)
                         : $t(i18nKeys.console.dependencyResources.selectServer)}
                     </Select.Trigger>
-                    <Select.Content>
+                    <Select.Content class={dependencyResourceSelectContentClass}>
                       {#each activeSingleServerTargets as server (server.id)}
                         <Select.Item value={server.id}>{server.name}</Select.Item>
                       {/each}
@@ -1314,7 +1316,10 @@
   {/if}
 
   <Dialog.Root bind:open={projectCreateDialogOpen}>
-    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      class={dependencyResourceNestedDialogClass}
+    >
       <Dialog.Header>
         <Dialog.Title>{$t(i18nKeys.console.projects.createProjectTitle)}</Dialog.Title>
         <Dialog.Description>
@@ -1333,7 +1338,10 @@
   </Dialog.Root>
 
   <Dialog.Root bind:open={environmentCreateDialogOpen}>
-    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      class={dependencyResourceNestedDialogClass}
+    >
       <Dialog.Header>
         <Dialog.Title>{$t(i18nKeys.console.projects.environmentCreateTitle)}</Dialog.Title>
         <Dialog.Description>
@@ -1353,7 +1361,10 @@
   </Dialog.Root>
 
   <Dialog.Root bind:open={serverCreateDialogOpen}>
-    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      class={`max-w-5xl ${dependencyResourceNestedDialogClass}`}
+    >
       <Dialog.Header>
         <Dialog.Title>{$t(i18nKeys.console.servers.createFormTitle)}</Dialog.Title>
         <Dialog.Description>
