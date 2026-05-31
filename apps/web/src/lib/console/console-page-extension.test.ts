@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
@@ -60,5 +61,18 @@ describe("Console page extension surface", () => {
     ).toBe(
       "/example/usage-page?organizationId=org_123&path=%2Fusage&query=range%3D30d%26type%3Ddebit",
     );
+  });
+
+  test("[CONSOLE-EXT-PAGE-002] renderer supports neutral panel fields and request body bindings", () => {
+    const rendererSource = readFileSync(
+      new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(rendererSource).toContain('type: "number" | "range" | "range-number"');
+    expect(rendererSource).toContain("data-console-page-panel-field");
+    expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
+    expect(rendererSource).toContain("requestActionBody(action, item)");
+    expect(rendererSource).toContain('kind: "tiered-unit-rate"');
   });
 });
