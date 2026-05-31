@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { type AuthSessionResponse } from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
@@ -55,5 +56,29 @@ describe("canRunProductQueries", () => {
         authSession({ loginRequired: true, session: { user: { id: "usr_1" } } }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("console list query limits", () => {
+  test("shared console inventory queries send bounded list requests", async () => {
+    const source = await readFile(new URL("./queries.ts", import.meta.url), "utf8");
+
+    expect(source).toContain("orpcClient.domainBindings.list({ limit: defaultConsoleListLimit })");
+    expect(source).toContain("orpcClient.certificates.list({ limit: defaultConsoleListLimit })");
+    expect(source).toContain(
+      "orpcClient.previewEnvironments.list({ limit: defaultConsoleListLimit })",
+    );
+  });
+
+  test("domain bindings page disables unrelated inventory queries", async () => {
+    const source = await readFile(
+      new URL("../../routes/domain-bindings/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("deployments: false");
+    expect(source).toContain("previewEnvironments: false");
+    expect(source).toContain("certificates: false");
+    expect(source).toContain("providers: false");
   });
 });

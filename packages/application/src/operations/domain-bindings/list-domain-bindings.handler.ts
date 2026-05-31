@@ -30,8 +30,9 @@ export class ListDomainBindingsQueryHandler
               ...(query.projectId ? { projectId: query.projectId } : {}),
               ...(query.environmentId ? { environmentId: query.environmentId } : {}),
               ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+              limit: query.limit,
             }
-          : undefined,
+          : { limit: query.limit },
       ),
     );
   }

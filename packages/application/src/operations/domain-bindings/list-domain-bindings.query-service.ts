@@ -17,6 +17,7 @@ export class ListDomainBindingsQueryService {
       projectId?: string;
       environmentId?: string;
       resourceId?: string;
+      limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<DomainBindingReadModel["list"]>> }> {
     return { items: await this.readModel.list(toRepositoryContext(context), input) };

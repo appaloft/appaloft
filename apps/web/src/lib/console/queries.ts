@@ -132,22 +132,22 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
   );
   const previewEnvironmentsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["preview-environments"],
-      queryFn: () => orpcClient.previewEnvironments.list({}),
+      queryKey: ["preview-environments", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.previewEnvironments.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("previewEnvironments"),
     }),
   );
   const domainBindingsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["domain-bindings"],
-      queryFn: () => orpcClient.domainBindings.list({}),
+      queryKey: ["domain-bindings", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.domainBindings.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("domainBindings"),
     }),
   );
   const certificatesQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["certificates"],
-      queryFn: () => orpcClient.certificates.list({}),
+      queryKey: ["certificates", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.certificates.list({ limit: defaultConsoleListLimit }),
       enabled: productQueryEnabled("certificates"),
     }),
   );

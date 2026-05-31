@@ -26,6 +26,7 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
       projectId?: string;
       environmentId?: string;
       resourceId?: string;
+      limit?: number;
     },
   ): Promise<DomainBindingSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -65,7 +66,7 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
           query = query.where("resource_id", "=", input.resourceId);
         }
 
-        const rows = await query.execute();
+        const rows = await query.limit(input?.limit ?? 100).execute();
         return rows.map((row): DomainBindingSummary => {
           const verificationAttempts = (row.verification_attempts ??
             []) as unknown as SerializedDomainVerificationAttempt[];
