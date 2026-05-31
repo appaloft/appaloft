@@ -17,6 +17,7 @@
     OrganizationMemberSummary,
     OrganizationTeamRole,
     ProductLoginMethodStatus,
+    SystemPluginWebExtension,
   } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
@@ -33,7 +34,7 @@
   import { organizationSettingsItems } from "$lib/console/settings-nav";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { i18nKeys, t } from "$lib/i18n";
@@ -47,6 +48,9 @@
     | "danger-zone";
   type Props = {
     section?: OrganizationManagementSection | null;
+  };
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
   };
 
   const roleOptions = ["owner", "admin", "developer", "billing", "viewer"] as const;
@@ -82,6 +86,14 @@
       queryFn: () => orpcClient.organizations.currentContext({}),
       enabled: browser,
       retry: 0,
+    }),
+  );
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
     }),
   );
 
@@ -677,6 +689,14 @@
       revokeDeployTokenMutation.mutate(tokenId);
     }
   }
+
+  function centeredOrganizationSectionClass(baseClass: string): string {
+    return activeSection === "members" ||
+      activeSection === "invitations" ||
+      activeSection === "deploy-tokens"
+      ? `mx-auto w-full max-w-6xl ${baseClass}`
+      : baseClass;
+  }
 </script>
 
 <svelte:head>
@@ -688,7 +708,7 @@
   description={$t(i18nKeys.console.organization.pageDescription)}
   groupLabel={$t(i18nKeys.console.organization.pageTitle)}
   activePath={page.url.pathname}
-  items={organizationSettingsItems()}
+  items={organizationSettingsItems(webExtensionsQuery.data?.items ?? [])}
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.home), href: "/" },
     { label: $t(i18nKeys.console.organization.pageTitle) },
@@ -941,7 +961,7 @@
       {/if}
 
       {#if activeSection === "members"}
-      <section class="space-y-3">
+      <section class={centeredOrganizationSectionClass("space-y-3")}>
         <div>
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.membersTitle)}</h2>
           <p class="mt-1 text-sm text-muted-foreground">
@@ -1061,7 +1081,7 @@
       {/if}
 
       {#if activeSection === "invitations"}
-      <section class="space-y-5">
+      <section class={centeredOrganizationSectionClass("space-y-5")}>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="max-w-2xl">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.invitationsTitle)}</h2>
@@ -1116,7 +1136,7 @@
       {/if}
 
       {#if activeSection === "deploy-tokens"}
-      <section class="space-y-5">
+      <section class={centeredOrganizationSectionClass("space-y-5")}>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="max-w-2xl">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.deployTokensTitle)}</h2>
@@ -1253,12 +1273,14 @@
       </section>
       {/if}
 
-      <div class="flex flex-wrap gap-2">
-        <Button href={webDocsHrefs.organizationTeamManagement} target="_blank" variant="outline">
-          <BookOpen class="size-4" />
-          {$t(i18nKeys.console.organization.docsLink)}
-        </Button>
-      </div>
+      {#if activeSection === "profile"}
+        <div class="mx-auto flex w-full max-w-6xl flex-wrap gap-2">
+          <Button href={webDocsHrefs.organizationTeamManagement} target="_blank" variant="outline">
+            <BookOpen class="size-4" />
+            {$t(i18nKeys.console.organization.docsLink)}
+          </Button>
+        </div>
+      {/if}
     </div>
   {/if}
 

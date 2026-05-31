@@ -193,9 +193,13 @@ describe("organization auth management console surface", () => {
 
     expect(settingsShellSource).toContain("Sidebar");
     expect(settingsShellSource).toContain("labelKey");
+    expect(settingsShellSource).toContain("label?: string");
+    expect(settingsShellSource).toContain("itemLabel");
     expect(settingsShellSource).toContain("SettingsShellItem");
     expect(settingsNavSource).toContain("accountSettingsItems");
     expect(settingsNavSource).toContain("organizationSettingsItems");
+    expect(settingsNavSource).toContain('extension.placement === "settings"');
+    expect(settingsNavSource).toContain('extension.target === "console-route"');
     expect(settingsNavSource).toContain('href: "/account/profile"');
     expect(settingsNavSource).toContain('href: "/account/security"');
     expect(settingsNavSource).toContain('href: "/account/sessions"');
@@ -229,6 +233,10 @@ describe("organization auth management console surface", () => {
     expect(accountDangerSource).toContain("confirmation: { userId");
 
     expect(organizationPageSource).toContain("SettingsShell");
+    expect(organizationPageSource).toContain("/api/system-plugins/web-extensions");
+    expect(organizationPageSource).toContain(
+      "organizationSettingsItems(webExtensionsQuery.data?.items ?? [])",
+    );
     expect(organizationPageSource).toContain("orpcClient.organizations.showProfile");
     expect(organizationPageSource).toContain("orpcClient.organizations.changeProfile");
     expect(organizationPageSource).toContain("orpcClient.organizations.delete");
@@ -238,6 +246,8 @@ describe("organization auth management console surface", () => {
     );
     expect(organizationPageSource).toContain("deleteOrganizationDialogOpen");
     expect(organizationPageSource).toContain("openDeleteOrganizationDialog");
+    expect(organizationPageSource).toContain("centeredOrganizationSectionClass");
+    expect(organizationPageSource).toContain("mx-auto w-full max-w-6xl");
     expect(organizationPageSource).toContain("deleteConfirmationOrganizationName");
     expect(organizationPageSource).toContain("deleteConfirmationOrganizationName.trim() ===");
     expect(organizationPageSource).toContain(
