@@ -44,7 +44,12 @@ describe("QuickDeploySheet structure", () => {
     expect(deployPageSource).toContain('<ConsoleResourceCanvas class="max-w-6xl">');
     expect(quickDeploySheetSource).toContain("lg:grid-cols-[minmax(0,1fr)_20rem]");
     expect(quickDeploySheetSource).not.toContain("md:grid-cols-[minmax(0,1fr)_20rem]");
-    expect(quickDeploySheetSource).toContain("grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3");
+    expect(quickDeploySheetSource).toContain("grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4");
+    expect(quickDeploySheetSource).toContain("visibleSourceGroups");
+    expect(quickDeploySheetSource).toContain("gitSourceOptions");
+    expect(quickDeploySheetSource).toContain("dockerSourceOptions");
+    expect(quickDeploySheetSource).toContain('value === "local-folder"');
+    expect(quickDeploySheetSource).toContain('return "dockerfile";');
     expect(quickDeploySheetSource).not.toContain("sm:grid-cols-2 xl:grid-cols-5");
     expect(quickDeploySheetSource).toContain("lg:sticky");
     expect(quickDeploySheetSource).not.toContain("md:sticky");
@@ -101,6 +106,23 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("repositoryBaseDirectory");
     expect(quickDeploySheetSource).not.toContain(
       'sourceKind !== "docker-image" && sourceKind !== "blueprint"',
+    );
+  });
+
+  test("[QD-STATIC-001] treats static sites as uploaded artifacts with optional server hosting", () => {
+    expect(quickDeploySheetSource).toContain("data-static-site-upload-source");
+    expect(quickDeploySheetSource).toContain("data-static-publish-target");
+    expect(quickDeploySheetSource).toContain('type="file"');
+    expect(quickDeploySheetSource).toContain('staticPublishTarget === "managed"');
+    expect(quickDeploySheetSource).toContain("serverRequiredForQuickDeploy");
+    expect(quickDeploySheetSource).toContain("publishUploadedStaticSite");
+    expect(quickDeploySheetSource).toContain("orpcClient.staticArtifacts.publishPayload");
+    expect(quickDeploySheetSource).toContain("orpcClient.staticArtifacts.publishArchive");
+    expect(quickDeploySheetSource).toContain(
+      'sourceKind === "blueprint" || sourceKind === "static-site" ? "" : sourceLocator',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'sourceKind === "static-site" && !staticPublishDirectory.trim()',
     );
   });
 });
