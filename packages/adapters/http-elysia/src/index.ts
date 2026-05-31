@@ -1628,6 +1628,16 @@ export function createHttpApp(input: {
         },
       }),
     )
+    .options("/api", ({ request, set }) => {
+      applyCorsHeaders(request, set.headers as MutableHeaders, allowedOrigins);
+      set.status = 204;
+      return "";
+    })
+    .options("/api/*", ({ request, set }) => {
+      applyCorsHeaders(request, set.headers as MutableHeaders, allowedOrigins);
+      set.status = 204;
+      return "";
+    })
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),
     )
