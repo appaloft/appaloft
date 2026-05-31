@@ -152,6 +152,27 @@ async function withServer<T>(
 }
 
 describe("HTTP static assets", () => {
+  test("returns CORS preflight for API paths before route-specific auth handlers", async () => {
+    const app = createTestApp();
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/auth/get-session`, {
+        method: "OPTIONS",
+        headers: {
+          origin: "http://localhost:4173",
+          "access-control-request-headers": "content-type,x-request-id",
+        },
+      });
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:4173");
+      expect(response.headers.get("access-control-allow-methods")).toContain("OPTIONS");
+      expect(response.headers.get("access-control-allow-headers")).toBe(
+        "content-type,x-request-id",
+      );
+    });
+  });
+
   test("[FIRST-ADMIN-NAV-001] redirects console navigation to first-admin before serving SPA", async () => {
     const queries: Query<unknown>[] = [];
     const app = createTestApp({
