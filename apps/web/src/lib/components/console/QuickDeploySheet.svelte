@@ -5,6 +5,7 @@
   import {
     CheckCircle2,
     ChevronDown,
+    Code2,
     ExternalLink,
     Eye,
     FolderOpen,
@@ -17,6 +18,7 @@
     Settings2,
     ShieldCheck,
     TerminalSquare,
+    Upload,
     Wrench,
     Waypoints,
   } from "@lucide/svelte";
@@ -46,6 +48,7 @@
     ConfigureResourceNetworkInput,
     ConfigureResourceRuntimeInput,
     ConfigureResourceSourceInput,
+    CreateEnvironmentInput,
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     DeploymentProgressEvent,
@@ -112,14 +115,17 @@
 
   type SourceKind =
     | "local-folder"
+    | "dockerfile"
     | "github"
     | "blueprint"
     | "remote-git"
     | "docker-image"
     | "compose"
     | "static-site";
+  type SourceGroupKey = "git" | "docker" | "static-site" | "blueprint";
   type SourceOptionIcon = Component<{ class?: string }>;
   type GithubSourceMode = "url" | "browser";
+  type StaticPublishTarget = "managed" | "server";
   type DraftMode = "existing" | "new";
   type ResourceKind = ResourceSummary["kind"];
   type DependencyKind = DependencyResourceSummary["kind"];
@@ -155,6 +161,25 @@
   };
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
+  };
+  type StaticArtifactPayloadFileInput = {
+    path: string;
+    mimeType: string;
+    contentBase64: string;
+  };
+  type PublishStaticArtifactPayloadInput = {
+    projectId: string;
+    resourceId: string;
+    promoteAlias?: boolean;
+    files: StaticArtifactPayloadFileInput[];
+    metadata?: Record<string, string>;
+  };
+  type PublishStaticArtifactArchiveInput = {
+    projectId: string;
+    resourceId: string;
+    promoteAlias?: boolean;
+    archiveBase64: string;
+    metadata?: Record<string, string>;
   };
   type BlueprintCatalogListing = {
     slug: string;
@@ -353,6 +378,12 @@
       icon: FolderOpen,
     },
     {
+      key: "dockerfile",
+      labelKey: i18nKeys.console.quickDeploy.sourceDockerfile,
+      hintKey: i18nKeys.console.quickDeploy.sourceDockerfileHint,
+      icon: Code2,
+    },
+    {
       key: "github",
       labelKey: i18nKeys.console.quickDeploy.sourceGithub,
       hintKey: i18nKeys.console.quickDeploy.sourceGithubHint,
@@ -389,6 +420,48 @@
       icon: Package,
     },
   ];
+  const visibleSourceGroups: Array<{
+    key: SourceGroupKey;
+    labelKey: TranslationKey;
+    hintKey: TranslationKey;
+    icon: SourceOptionIcon;
+    defaultSourceKind: SourceKind;
+  }> = [
+    {
+      key: "git",
+      labelKey: i18nKeys.console.quickDeploy.sourceGroupGit,
+      hintKey: i18nKeys.console.quickDeploy.sourceGroupGitHint,
+      icon: GitFork,
+      defaultSourceKind: "github",
+    },
+    {
+      key: "docker",
+      labelKey: i18nKeys.console.quickDeploy.sourceGroupDocker,
+      hintKey: i18nKeys.console.quickDeploy.sourceGroupDockerHint,
+      icon: DockerIcon,
+      defaultSourceKind: "dockerfile",
+    },
+    {
+      key: "static-site",
+      labelKey: i18nKeys.console.quickDeploy.sourceStaticSite,
+      hintKey: i18nKeys.console.quickDeploy.sourceStaticSiteHint,
+      icon: Package,
+      defaultSourceKind: "static-site",
+    },
+    {
+      key: "blueprint",
+      labelKey: i18nKeys.console.quickDeploy.sourceBlueprint,
+      hintKey: i18nKeys.console.quickDeploy.sourceBlueprintHint,
+      icon: Package,
+      defaultSourceKind: "blueprint",
+    },
+  ];
+  const gitSourceOptions = sourceOptions.filter((option) =>
+    ["github", "remote-git"].includes(option.key),
+  );
+  const dockerSourceOptions = sourceOptions.filter((option) =>
+    ["dockerfile", "docker-image", "compose"].includes(option.key),
+  );
 
   const deploymentSteps: Array<{
     key: DeploymentStepKey;
@@ -609,6 +682,10 @@
   let dockerImageLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let composeLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let staticSiteLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? ".") : ".");
+  let staticPublishTarget = $state<StaticPublishTarget>(
+    parseStaticPublishTarget(browser ? page.url.searchParams.get("staticPublishTarget") : null),
+  );
+  let staticArtifactFiles = $state<File[]>([]);
   let selectedBlueprintSourceExtensionKey = $state(
     browser ? (page.url.searchParams.get("sourceExtension") ?? "") : "",
   );
@@ -662,12 +739,7 @@
     }) => orpcClient.credentials.ssh.create(input),
   }));
   const createEnvironmentMutation = createMutation(() => ({
-    mutationFn: (input: {
-      projectId: string;
-      name: string;
-      kind: EnvironmentKind;
-      parentEnvironmentId?: string;
-    }) => orpcClient.environments.create(input),
+    mutationFn: (input: CreateEnvironmentInput) => orpcClient.environments.create(input),
   }));
   const createResourceMutation = createMutation(() => ({
     mutationFn: (input: CreateResourceInput) => orpcClient.resources.create(input),
@@ -694,6 +766,14 @@
       isSecret?: boolean;
       scope?: "defaults" | "system" | "organization" | "project" | "environment" | "deployment";
     }) => orpcClient.environments.setVariable(input),
+  }));
+  const publishStaticArtifactPayloadMutation = createMutation(() => ({
+    mutationFn: (input: PublishStaticArtifactPayloadInput) =>
+      orpcClient.staticArtifacts.publishPayload(input),
+  }));
+  const publishStaticArtifactArchiveMutation = createMutation(() => ({
+    mutationFn: (input: PublishStaticArtifactArchiveInput) =>
+      orpcClient.staticArtifacts.publishArchive(input),
   }));
   const resourcesQuery = createQuery(() =>
     queryOptions({
@@ -793,7 +873,12 @@
     return Boolean(githubProvider?.configured) && Boolean(githubProvider?.connected);
   });
   const showSourceBuildSettings = $derived.by(() => {
-    if (sourceKind === "docker-image" || sourceKind === "blueprint") {
+    if (
+      sourceKind === "docker-image" ||
+      sourceKind === "compose" ||
+      sourceKind === "blueprint" ||
+      sourceKind === "static-site"
+    ) {
       return false;
     }
 
@@ -802,6 +887,21 @@
     }
 
     return true;
+  });
+  const staticPublishesToManaged = $derived(
+    sourceKind === "static-site" && staticPublishTarget === "managed",
+  );
+  const serverRequiredForQuickDeploy = $derived(!staticPublishesToManaged);
+  const staticArtifactSummary = $derived.by(() => {
+    if (staticArtifactFiles.length === 0) {
+      return $t(i18nKeys.console.quickDeploy.staticUploadEmpty);
+    }
+
+    const totalBytes = staticArtifactFiles.reduce((sum, file) => sum + file.size, 0);
+    return $t(i18nKeys.console.quickDeploy.staticUploadSummary, {
+      count: String(staticArtifactFiles.length),
+      size: formatFileSize(totalBytes),
+    });
   });
   const sourceBaseDirectoryLabel = $derived.by(() =>
     sourceKind === "github" && githubSourceMode === "browser"
@@ -1000,6 +1100,8 @@
       configureResourceRuntimeMutation.isPending ||
       configureResourceNetworkMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
+      publishStaticArtifactPayloadMutation.isPending ||
+      publishStaticArtifactArchiveMutation.isPending ||
       dependencyProvisioningInFlight ||
       deploymentCreateInFlight,
   );
@@ -1009,6 +1111,8 @@
         return githubLocator.trim();
       case "blueprint":
         return selectedBlueprintSourceExtension?.key ?? "";
+      case "dockerfile":
+        return localFolderLocator.trim();
       case "remote-git":
         return remoteGitLocator.trim();
       case "docker-image":
@@ -1027,6 +1131,8 @@
         return "https://github.com/acme/project.git";
       case "blueprint":
         return selectedBlueprintSourceExtension?.path ?? "/marketplace";
+      case "dockerfile":
+        return ".";
       case "remote-git":
         return "https://git.example.com/team/project.git";
       case "docker-image":
@@ -1049,6 +1155,7 @@
   const selectedSourceOption = $derived(
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
+  const selectedSourceGroupKey = $derived(sourceGroupForSourceKind(sourceKind));
   const serverProviderTitle = $derived(
     providerOptions.find((provider) => provider.key === serverDraft.providerKey)?.title ??
       serverDraft.providerKey,
@@ -1063,6 +1170,10 @@
         selectedBlueprintSlug.trim() ||
         (selectedBlueprintSourceExtension?.title ??
           $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector));
+    }
+
+    if (sourceKind === "static-site") {
+      return staticArtifactSummary;
     }
 
     return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
@@ -1178,6 +1289,25 @@
       ];
     }
 
+    if (sourceKind === "dockerfile") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceDockerfileContext),
+          value: sourceSummary,
+          mono: true,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.dockerfilePath),
+          value: resourceDockerfilePath.trim() || "Dockerfile",
+          mono: true,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessDockerfile),
+        },
+      ];
+    }
+
     if (sourceKind === "compose") {
       return [
         {
@@ -1195,18 +1325,20 @@
     if (sourceKind === "static-site") {
       return [
         {
-          label: $t(i18nKeys.console.quickDeploy.staticSource),
-          value: sourceSummary,
-          mono: true,
+          label: $t(i18nKeys.console.quickDeploy.staticUploadFiles),
+          value: staticArtifactSummary,
         },
         {
-          label: $t(i18nKeys.console.quickDeploy.staticPublishDirectory),
-          value: staticPublishDirectory.trim() || "/dist",
-          mono: true,
+          label: $t(i18nKeys.console.quickDeploy.staticPublishTarget),
+          value: $t(
+            staticPublishTarget === "managed"
+              ? i18nKeys.console.quickDeploy.staticPublishTargetManaged
+              : i18nKeys.console.quickDeploy.staticPublishTargetServer,
+          ),
         },
         {
           label: $t(i18nKeys.console.quickDeploy.sourceAccess),
-          value: $t(i18nKeys.console.quickDeploy.sourceAccessLocalFolder),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessStaticSite),
         },
       ];
     }
@@ -1316,6 +1448,10 @@
     return projectName.trim() || (projects.length === 0 ? "Local Workspace" : "待创建项目");
   });
   const serverSummary = $derived.by(() => {
+    if (staticPublishesToManaged) {
+      return $t(i18nKeys.console.quickDeploy.staticNoServerRequired);
+    }
+
     if (serverMode === "existing") {
       return selectedServer ? `${selectedServer.name} · ${selectedServer.host}` : "未选择服务器";
     }
@@ -1325,6 +1461,10 @@
       : "待创建服务器";
   });
   const serverCredentialSummary = $derived.by(() => {
+    if (staticPublishesToManaged) {
+      return $t(i18nKeys.console.quickDeploy.staticNoServerRequired);
+    }
+
     if (serverMode === "existing") {
       if (!selectedServer?.credential) {
         return "未配置 SSH 凭据";
@@ -1366,6 +1506,10 @@
   });
   const resourceSummary = $derived.by(() => {
     if (!resourceContextEnabled) {
+      if (staticPublishesToManaged) {
+        return `${inferredResourceInput.name} · static-site · ${$t(i18nKeys.console.quickDeploy.staticPublishTargetManaged)}`;
+      }
+
       return defaultResourceSummary;
     }
 
@@ -1373,6 +1517,10 @@
       return selectedResource
         ? `${selectedResource.name} · ${selectedResource.kind}`
         : "未选择资源";
+    }
+
+    if (staticPublishesToManaged) {
+      return `${editedResourceInput.name} · static-site · ${$t(i18nKeys.console.quickDeploy.staticPublishTargetManaged)}`;
     }
 
     return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${effectiveResourceInternalPortText()}`;
@@ -1423,7 +1571,9 @@
   const quickDeployGitHubReturnPathEncoded = encodeURIComponent(quickDeployGitHubReturnPath);
   const canAdvance = $derived(stepIsComplete(activeStep));
   const quickDeployReady = $derived(
-    stepIsComplete("source") && stepIsComplete("project") && stepIsComplete("server"),
+    stepIsComplete("source") &&
+      stepIsComplete("project") &&
+      (!serverRequiredForQuickDeploy || stepIsComplete("server")),
   );
   const quickDeployDiagnosticSummaryButtonLabel = $derived.by(() => {
     if (diagnosticSummaryLoading) {
@@ -1684,7 +1834,11 @@
   });
 
   function parseSourceKind(value: string | null): SourceKind {
-    return sourceKindKeys.includes(value as SourceKind) ? (value as SourceKind) : "local-folder";
+    if (value === "local-folder") {
+      return "dockerfile";
+    }
+
+    return sourceKindKeys.includes(value as SourceKind) ? (value as SourceKind) : "github";
   }
 
   function parseDeploymentStep(value: string | null): DeploymentStepKey {
@@ -1695,6 +1849,10 @@
 
   function parseGithubSourceMode(value: string | null): GithubSourceMode {
     return githubSourceModes.includes(value as GithubSourceMode) ? (value as GithubSourceMode) : "url";
+  }
+
+  function parseStaticPublishTarget(value: string | null): StaticPublishTarget {
+    return value === "server" ? "server" : "managed";
   }
 
   function parseDraftMode(value: string | null): DraftMode {
@@ -2096,11 +2254,15 @@
     setSearchParam(
       params,
       "sourceLocator",
-      sourceKind === "blueprint" ? "" : sourceLocator,
-      sourceKind === "local-folder"
+      sourceKind === "blueprint" || sourceKind === "static-site" ? "" : sourceLocator,
+      sourceKind === "local-folder" || sourceKind === "dockerfile"
         ? "."
         : "",
     );
+
+    if (sourceKind === "static-site") {
+      setSearchParam(params, "staticPublishTarget", staticPublishTarget, "managed");
+    }
 
     if (sourceKind === "github") {
       setSearchParam(params, "githubMode", githubSourceMode, "url");
@@ -2241,6 +2403,7 @@
     staticPublishDirectory = params.get("staticPublishDirectory") ?? "/dist";
     staticInstallCommand = params.get("staticInstallCommand") ?? "";
     staticBuildCommand = params.get("staticBuildCommand") ?? "";
+    staticPublishTarget = parseStaticPublishTarget(params.get("staticPublishTarget"));
     resourceHealthCheckEnabled = params.get("resourceHealthCheckEnabled") === "true";
     resourceHealthCheckMethod = parseHealthCheckMethod(params.get("resourceHealthCheckMethod"));
     resourceHealthCheckScheme = parseHealthCheckScheme(params.get("resourceHealthCheckScheme"));
@@ -2268,12 +2431,12 @@
     selectedBlueprintTitle = params.get("blueprintTitle") ?? "";
     selectedBlueprintVariant = params.get("blueprintVariant") ?? "";
 
-    localFolderLocator = nextSourceKind === "local-folder" ? nextSourceLocator || "." : localFolderLocator;
+    localFolderLocator = nextSourceKind === "local-folder" || nextSourceKind === "dockerfile" ? nextSourceLocator || "." : localFolderLocator;
     githubLocator = nextSourceKind === "github" ? nextSourceLocator : githubLocator;
     remoteGitLocator = nextSourceKind === "remote-git" ? nextSourceLocator : remoteGitLocator;
     dockerImageLocator = nextSourceKind === "docker-image" ? nextSourceLocator : dockerImageLocator;
     composeLocator = nextSourceKind === "compose" ? nextSourceLocator : composeLocator;
-    staticSiteLocator = nextSourceKind === "static-site" ? nextSourceLocator || "." : staticSiteLocator;
+    staticSiteLocator = nextSourceKind === "static-site" ? "." : staticSiteLocator;
   }
 
   function setSourceLocator(value: string): void {
@@ -2290,6 +2453,9 @@
         return;
       case "docker-image":
         dockerImageLocator = value;
+        return;
+      case "dockerfile":
+        localFolderLocator = value;
         return;
       case "compose":
         composeLocator = value;
@@ -2321,6 +2487,35 @@
     if (kind === "blueprint" && !selectedBlueprintSourceExtensionKey) {
       selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension?.key ?? "";
     }
+    if (kind === "dockerfile" && !resourceDockerfilePath.trim()) {
+      resourceDockerfilePath = "Dockerfile";
+    }
+  }
+
+  function selectSourceGroup(group: {
+    key: SourceGroupKey;
+    defaultSourceKind: SourceKind;
+  }): void {
+    const currentGroup = sourceGroupForSourceKind(sourceKind);
+    selectSourceKind(currentGroup === group.key ? sourceKind : group.defaultSourceKind);
+  }
+
+  function sourceGroupForSourceKind(kind: SourceKind): SourceGroupKey {
+    if (kind === "github" || kind === "remote-git") {
+      return "git";
+    }
+    if (
+      kind === "dockerfile" ||
+      kind === "docker-image" ||
+      kind === "compose" ||
+      kind === "local-folder"
+    ) {
+      return "docker";
+    }
+    if (kind === "blueprint") {
+      return "blueprint";
+    }
+    return "static-site";
   }
 
   function selectGithubSourceMode(mode: GithubSourceMode): void {
@@ -2394,6 +2589,11 @@
         });
       case "blueprint":
         return resourceSourceForBlueprintComponent(blueprintComponentForQuickDeploy());
+      case "dockerfile":
+        return withBaseDirectory({
+          kind: "local-folder",
+          locator,
+        });
       case "docker-image":
         return {
           kind: "docker-image",
@@ -2508,6 +2708,14 @@
         return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "docker-image":
         return withHealthCheckPath({ strategy: "prebuilt-image" });
+      case "dockerfile":
+        return withHealthCheckPath({
+          strategy: "dockerfile",
+          ...(resourceDockerfilePath.trim()
+            ? { dockerfilePath: resourceDockerfilePath.trim() }
+            : { dockerfilePath: "Dockerfile" }),
+          ...(resourceBuildTarget.trim() ? { buildTarget: resourceBuildTarget.trim() } : {}),
+        });
       case "compose":
         return withHealthCheckPath({
           strategy: "docker-compose",
@@ -2575,11 +2783,11 @@
           );
         }
 
-        if (!sourceLocator) {
-          return false;
+        if (sourceKind === "static-site") {
+          return staticArtifactFiles.length > 0;
         }
 
-        if (sourceKind === "static-site" && !staticPublishDirectory.trim()) {
+        if (!sourceLocator) {
           return false;
         }
 
@@ -2591,6 +2799,10 @@
           ? Boolean(selectedGitHubRepository)
           : Boolean(githubLocator.trim());
       case "server":
+        if (!serverRequiredForQuickDeploy) {
+          return true;
+        }
+
         if (serverMode === "existing") {
           return Boolean(selectedServerId);
         }
@@ -2897,6 +3109,252 @@
     ]);
   }
 
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+
+    const units = ["KB", "MB", "GB"] as const;
+    let value = bytes / 1024;
+    for (const unit of units) {
+      if (value < 1024 || unit === "GB") {
+        return `${value.toFixed(value < 10 ? 1 : 0)} ${unit}`;
+      }
+      value /= 1024;
+    }
+
+    return `${bytes} B`;
+  }
+
+  function handleStaticArtifactFileSelection(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    staticArtifactFiles = Array.from(input.files ?? []);
+  }
+
+  function staticArtifactFilePath(file: File): string {
+    const path =
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath?.trim() ||
+      file.name.trim();
+    return path.replaceAll("\\", "/").replace(/^\/+/, "") || "index.html";
+  }
+
+  function isStaticArtifactZipArchive(file: File): boolean {
+    return file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip";
+  }
+
+  async function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error("无法读取上传文件。"));
+      reader.onload = () => {
+        const result = typeof reader.result === "string" ? reader.result : "";
+        const [, base64 = ""] = result.split(",", 2);
+        resolve(base64);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function ensureQuickDeployProjectId(): Promise<string> {
+    if (projectMode === "existing") {
+      if (!selectedProjectId) {
+        throw new Error("请选择或创建一个项目。");
+      }
+      return selectedProjectId;
+    }
+
+    const nextProjectName =
+      projectName.trim() || (projects.length === 0 ? "Local Workspace" : "");
+    if (!nextProjectName) {
+      throw new Error("请填写项目名。");
+    }
+
+    const createdProject = await createProjectMutation.mutateAsync({
+      name: nextProjectName,
+      ...(projectDescription.trim() ? { description: projectDescription.trim() } : {}),
+    });
+    selectedProjectId = createdProject.id;
+    await projectsQuery.refetch();
+    return createdProject.id;
+  }
+
+  async function ensureQuickDeployEnvironmentId(projectId: string): Promise<string> {
+    if (environmentContextEnabled && environmentMode === "existing") {
+      if (!selectedEnvironmentId) {
+        throw new Error("请选择或创建一个环境。");
+      }
+      return selectedEnvironmentId;
+    }
+
+    if (environmentContextEnabled) {
+      if (!environmentName.trim()) {
+        throw new Error("请填写环境名。");
+      }
+      const createdEnvironment = await createEnvironmentMutation.mutateAsync({
+        projectId,
+        name: environmentName.trim(),
+        kind: environmentKind,
+      });
+      selectedEnvironmentId = createdEnvironment.id;
+      await environmentsQuery.refetch();
+      return createdEnvironment.id;
+    }
+
+    const existingEnvironment =
+      environments.find(
+        (environment) =>
+          environment.projectId === projectId &&
+          environment.name === "local" &&
+          environment.kind === "local",
+      ) ?? environments.find((environment) => environment.projectId === projectId);
+    if (existingEnvironment) {
+      selectedEnvironmentId = existingEnvironment.id;
+      return existingEnvironment.id;
+    }
+
+    const createdEnvironment = await createEnvironmentMutation.mutateAsync({
+      projectId,
+      name: environmentName.trim() || "local",
+      kind: environmentKind,
+    });
+    selectedEnvironmentId = createdEnvironment.id;
+    await environmentsQuery.refetch();
+    return createdEnvironment.id;
+  }
+
+  async function ensureStaticPublishServerId(): Promise<string | undefined> {
+    if (staticPublishTarget === "managed") {
+      return undefined;
+    }
+
+    if (serverMode === "existing") {
+      if (!selectedServerId) {
+        throw new Error("请选择或创建一个服务器。");
+      }
+      return selectedServerId;
+    }
+
+    const registerInput = createRegisterServerInput(serverDraft);
+    if (!registerInput) {
+      throw new Error($t(i18nKeys.console.servers.createValidationError));
+    }
+
+    if (!isServerRegistrationDraftComplete(serverDraft, sshCredentials)) {
+      throw new Error($t(i18nKeys.console.servers.createCredentialValidationError));
+    }
+
+    const createdServer = await registerServerMutation.mutateAsync(registerInput);
+    selectedServerId = createdServer.id;
+    const credential = createQuickDeployServerCredential(serverDraft, sshCredentials);
+
+    if (credential?.mode === "create-ssh-and-configure") {
+      const createdCredential = await createSshCredentialMutation.mutateAsync(credential.input);
+      serverDraft.selectedSshCredentialId = createdCredential.id;
+      await sshCredentialsQuery.refetch();
+      await configureServerCredentialMutation.mutateAsync({
+        serverId: createdServer.id,
+        credential: {
+          kind: "stored-ssh-private-key",
+          credentialId: createdCredential.id,
+          ...(credential.input.username ? { username: credential.input.username } : {}),
+        },
+      });
+    } else if (credential?.mode === "configure") {
+      await configureServerCredentialMutation.mutateAsync({
+        serverId: createdServer.id,
+        credential: credential.credential,
+      });
+    }
+
+    await serversQuery.refetch();
+    return createdServer.id;
+  }
+
+  async function ensureStaticSiteResourceId(
+    projectId: string,
+    environmentId: string,
+    serverId?: string,
+  ): Promise<string> {
+    if (resourceContextEnabled && resourceMode === "existing") {
+      if (!selectedResourceId) {
+        throw new Error("请选择资源，或切换为新建资源。");
+      }
+      return selectedResourceId;
+    }
+
+    const input = resourceContextEnabled ? editedResourceInput : inferredResourceInput;
+    const name = input.name.trim() || "static-site";
+    const createdResource = await createResourceMutation.mutateAsync({
+      projectId,
+      environmentId,
+      ...(serverId ? { destinationId: serverId } : {}),
+      name,
+      kind: "static-site",
+      ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "/",
+      },
+    });
+    selectedResourceId = createdResource.id;
+    await resourcesQuery.refetch();
+    return createdResource.id;
+  }
+
+  async function publishUploadedStaticSite(): Promise<void> {
+    if (staticArtifactFiles.length === 0) {
+      throw new Error($t(i18nKeys.console.quickDeploy.staticUploadRequired));
+    }
+
+    const projectId = await ensureQuickDeployProjectId();
+    const environmentId = await ensureQuickDeployEnvironmentId(projectId);
+    const serverId = await ensureStaticPublishServerId();
+    const resourceId = await ensureStaticSiteResourceId(projectId, environmentId, serverId);
+    const metadata = {
+      source: "quick-deploy",
+      publishTarget: staticPublishTarget,
+    };
+    const singleUploadedFile =
+      staticArtifactFiles.length === 1 ? staticArtifactFiles[0] : undefined;
+    const publication =
+      singleUploadedFile && isStaticArtifactZipArchive(singleUploadedFile)
+        ? await publishStaticArtifactArchiveMutation.mutateAsync({
+            projectId,
+            resourceId,
+            archiveBase64: await fileToBase64(singleUploadedFile),
+            promoteAlias: true,
+            metadata,
+          })
+        : await publishStaticArtifactPayloadMutation.mutateAsync({
+            projectId,
+            resourceId,
+            promoteAlias: true,
+            metadata,
+            files: await Promise.all(
+              staticArtifactFiles.map(async (file) => ({
+                path: staticArtifactFilePath(file),
+                mimeType: file.type || "application/octet-stream",
+                contentBase64: await fileToBase64(file),
+              })),
+            ),
+          });
+
+    selectedProjectId = publication.projectId;
+    selectedEnvironmentId = environmentId;
+    selectedResourceId = publication.resourceId;
+    lastAccessUrl = publication.routeUrl ?? "";
+    await refreshWorkspaceData();
+    deployFeedback = {
+      kind: "success",
+      title: $t(i18nKeys.console.quickDeploy.staticDeployFeedbackSuccessTitle),
+      detail:
+        publication.routeUrl ??
+        $t(i18nKeys.console.quickDeploy.staticPublicationIdDetail, {
+          publicationId: publication.publicationId,
+        }),
+    };
+  }
+
   async function executeQuickDeployDependencyProvisioning(
     input: QuickDeployProvisionDependencyResourcesInput,
   ): Promise<QuickDeployWorkflowStepOutput> {
@@ -3078,6 +3536,11 @@
     resetDiagnosticSummaryCopy();
 
     try {
+      if (sourceKind === "static-site") {
+        await publishUploadedStaticSite();
+        return;
+      }
+
       if (sourceKind === "blueprint") {
         if (selectedBlueprintSlug.trim()) {
           if (!selectedBlueprintManifest) {
@@ -3393,22 +3856,73 @@
               />
             </div>
             <div
-              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
               role="radiogroup"
               aria-label={$t(i18nKeys.common.domain.source)}
             >
-              {#each sourceOptions as option (option.key)}
+              {#each visibleSourceGroups as option (option.key)}
                 <ResourceSourceOption
-                  selected={sourceKind === option.key}
+                  selected={selectedSourceGroupKey === option.key}
                   label={$t(option.labelKey)}
                   description={$t(option.hintKey)}
                   icon={option.icon}
                   onselect={() => {
-                    selectSourceKind(option.key);
+                    selectSourceGroup(option);
                   }}
                 />
               {/each}
             </div>
+            {#if selectedSourceGroupKey === "git"}
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-muted-foreground">
+                  {$t(i18nKeys.console.quickDeploy.sourceGitMethod)}
+                </p>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  {#each gitSourceOptions as option (option.key)}
+                    {@const SourceIcon = option.icon}
+                    <Button
+                      type="button"
+                      variant={sourceKind === option.key ? "selected" : "outline"}
+                      class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                      onclick={() => selectSourceKind(option.key)}
+                    >
+                      <SourceIcon class="size-4 shrink-0" />
+                      <span class="min-w-0">
+                        <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
+                        <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                          {$t(option.hintKey)}
+                        </span>
+                      </span>
+                    </Button>
+                  {/each}
+                </div>
+              </div>
+            {:else if selectedSourceGroupKey === "docker"}
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-muted-foreground">
+                  {$t(i18nKeys.console.quickDeploy.sourceDockerMethod)}
+                </p>
+                <div class="grid gap-2 sm:grid-cols-3">
+                  {#each dockerSourceOptions as option (option.key)}
+                    {@const SourceIcon = option.icon}
+                    <Button
+                      type="button"
+                      variant={sourceKind === option.key ? "selected" : "outline"}
+                      class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                      onclick={() => selectSourceKind(option.key)}
+                    >
+                      <SourceIcon class="size-4 shrink-0" />
+                      <span class="min-w-0">
+                        <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
+                        <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                          {$t(option.hintKey)}
+                        </span>
+                      </span>
+                    </Button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
             {#if sourceKind === "github"}
               <div class="space-y-3">
                 <div class="grid gap-2 sm:grid-cols-2">
@@ -3717,6 +4231,69 @@
                   </div>
                 {/if}
               </div>
+            {:else if sourceKind === "static-site"}
+              <div class="space-y-4" data-static-site-upload-source>
+                <div class="grid gap-2 sm:grid-cols-2" data-static-publish-target>
+                  <Button
+                    type="button"
+                    variant={staticPublishTarget === "managed" ? "selected" : "outline"}
+                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                    onclick={() => {
+                      staticPublishTarget = "managed";
+                    }}
+                  >
+                    <Package class="size-4 shrink-0" />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">
+                        {$t(i18nKeys.console.quickDeploy.staticPublishTargetManaged)}
+                      </span>
+                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.staticPublishTargetManagedHint)}
+                      </span>
+                    </span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={staticPublishTarget === "server" ? "selected" : "outline"}
+                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                    onclick={() => {
+                      staticPublishTarget = "server";
+                    }}
+                  >
+                    <Server class="size-4 shrink-0" />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">
+                        {$t(i18nKeys.console.quickDeploy.staticPublishTargetServer)}
+                      </span>
+                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.staticPublishTargetServerHint)}
+                      </span>
+                    </span>
+                  </Button>
+                </div>
+                <div class="rounded-md border border-dashed bg-muted/20 px-4 py-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0 space-y-1">
+                      <label class="flex items-center gap-2 text-sm font-medium" for="static-artifact-upload">
+                        <Upload class="size-4 text-muted-foreground" />
+                        {$t(i18nKeys.console.quickDeploy.staticUploadFiles)}
+                      </label>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.staticUploadFilesHint)}
+                      </p>
+                    </div>
+                    <Input
+                      id="static-artifact-upload"
+                      class="sm:max-w-80"
+                      type="file"
+                      multiple
+                      accept=".zip,.html,.css,.js,.mjs,.json,.txt,.svg,.png,.jpg,.jpeg,.webp,.gif,.ico,.woff,.woff2"
+                      onchange={handleStaticArtifactFileSelection}
+                    />
+                  </div>
+                  <p class="mt-3 text-xs text-muted-foreground">{staticArtifactSummary}</p>
+                </div>
+              </div>
             {:else}
               <div class="space-y-2">
                 <label class="text-xs font-medium text-muted-foreground" for="source-locator">
@@ -3776,44 +4353,30 @@
                 />
               </div>
             {/if}
-            {#if sourceKind === "static-site"}
-              <div class="grid gap-3 sm:grid-cols-3">
+            {#if sourceKind === "dockerfile"}
+              <div class="grid gap-3 sm:grid-cols-2">
                 <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="static-publish-directory">
-                    {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-dockerfile-path">
+                    {$t(i18nKeys.console.quickDeploy.dockerfilePath)}
                   </label>
                   <Input
-                    id="static-publish-directory"
+                    id="runtime-dockerfile-path"
                     class="font-mono text-xs"
-                    bind:value={staticPublishDirectory}
-                    placeholder="/dist"
+                    bind:value={resourceDockerfilePath}
+                    placeholder="Dockerfile"
                   />
                 </div>
                 <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="static-install-command">
-                    {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-build-target">
+                    {$t(i18nKeys.console.quickDeploy.buildTarget)}
                   </label>
                   <Input
-                    id="static-install-command"
+                    id="runtime-build-target"
                     class="font-mono text-xs"
-                    bind:value={staticInstallCommand}
-                    placeholder="pnpm install"
+                    bind:value={resourceBuildTarget}
+                    placeholder="runner"
                   />
                 </div>
-                <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="static-build-command">
-                    {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
-                  </label>
-                  <Input
-                    id="static-build-command"
-                    class="font-mono text-xs"
-                    bind:value={staticBuildCommand}
-                    placeholder="pnpm build"
-                  />
-                </div>
-                <p class="text-xs text-muted-foreground sm:col-span-3">
-                  {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
-                </p>
               </div>
             {:else if showSourceBuildSettings}
               <div class="grid gap-3 sm:grid-cols-3">
@@ -4153,6 +4716,7 @@
           </div>
           </details>
 
+          {#if serverRequiredForQuickDeploy}
           <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("server")}>
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
               <span class="min-w-0">
@@ -4225,6 +4789,7 @@
             {/if}
           </div>
           </details>
+          {/if}
 
           <details class="group rounded-md border bg-card px-3 py-3">
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
@@ -4470,9 +5035,9 @@
       >
         <p class="min-w-0 text-xs text-muted-foreground">
           {#if quickDeployReady}
-            来源、项目和服务器已就绪。
+            {staticPublishesToManaged ? "静态文件和项目已就绪。" : "来源、项目和服务器已就绪。"}
           {:else}
-            请先完善来源、项目和服务器。
+            {staticPublishesToManaged ? "请先上传静态文件并确认项目。" : "请先完善来源、项目和服务器。"}
           {/if}
         </p>
         <Button
@@ -4486,6 +5051,9 @@
           {:else if sourceKind === "blueprint"}
             <Play class="size-4" />
             查看安装计划
+          {:else if sourceKind === "static-site"}
+            <Upload class="size-4" />
+            {$t(i18nKeys.console.quickDeploy.staticPublishAction)}
           {:else}
             <Play class="size-4" />
             {$t(i18nKeys.common.actions.createAndDeploy)}
@@ -4507,7 +5075,7 @@
           </div>
           <div>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
-            {#if deployFeedback.kind === "success" && lastCreatedDeploymentId}
+            {#if deployFeedback.kind === "success" && (lastCreatedDeploymentId || lastAccessUrl)}
               <div class="mt-4 flex flex-wrap gap-2">
                 {#if lastAccessUrl}
                   <Button
@@ -4520,51 +5088,53 @@
                     {$t(i18nKeys.console.resources.openGeneratedAccess)}
                   </Button>
                 {/if}
-                <Button
-                  size="sm"
-                  onclick={() => {
-                    void goto(lastCreatedDeploymentHref());
-                  }}
-                >
-                  {$t(i18nKeys.common.actions.viewDeployment)}
-                </Button>
-                <Button
-                  id="quick-deploy-diagnostic-summary-copy"
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={diagnosticSummaryLoading}
-                  onclick={() => {
-                    void copyQuickDeployDiagnosticSummary();
-                  }}
-                >
-                  {#if diagnosticSummaryLoading}
-                    <LoaderCircle class="size-4 animate-spin" />
+                {#if lastCreatedDeploymentId}
+                  <Button
+                    size="sm"
+                    onclick={() => {
+                      void goto(lastCreatedDeploymentHref());
+                    }}
+                  >
+                    {$t(i18nKeys.common.actions.viewDeployment)}
+                  </Button>
+                  <Button
+                    id="quick-deploy-diagnostic-summary-copy"
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={diagnosticSummaryLoading}
+                    onclick={() => {
+                      void copyQuickDeployDiagnosticSummary();
+                    }}
+                  >
+                    {#if diagnosticSummaryLoading}
+                      <LoaderCircle class="size-4 animate-spin" />
+                    {/if}
+                    {quickDeployDiagnosticSummaryButtonLabel}
+                  </Button>
+                  {#if diagnosticSummaryError}
+                    <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
                   {/if}
-                  {quickDeployDiagnosticSummaryButtonLabel}
-                </Button>
+                  {#if diagnosticSummaryCopyFallback}
+                    <div class="console-subtle-panel mt-3 space-y-2 border-dashed p-3">
+                      <div class="space-y-1">
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
+                        </p>
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
+                        </p>
+                      </div>
+                      <Textarea
+                        class="min-h-28 font-mono text-xs"
+                        readonly
+                        value={diagnosticSummaryCopyFallback}
+                        onfocus={selectDiagnosticSummaryFallback}
+                      />
+                    </div>
+                  {/if}
+                {/if}
               </div>
-              {#if diagnosticSummaryError}
-                <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
-              {/if}
-              {#if diagnosticSummaryCopyFallback}
-                <div class="console-subtle-panel mt-3 space-y-2 border-dashed p-3">
-                  <div class="space-y-1">
-                    <p class="text-sm font-medium">
-                      {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
-                    </p>
-                  </div>
-                  <Textarea
-                    class="min-h-28 font-mono text-xs"
-                    readonly
-                    value={diagnosticSummaryCopyFallback}
-                    onfocus={selectDiagnosticSummaryFallback}
-                  />
-                </div>
-              {/if}
             {/if}
           </div>
         </section>

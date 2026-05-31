@@ -106,6 +106,7 @@ import {
   type ListSourceEventsQueryInput,
   type ListSourceLinksQueryInput,
   type ListSshCredentialsQueryInput,
+  type ListStaticArtifactPublicationsQueryInput,
   type ListTerminalSessionsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
@@ -115,6 +116,9 @@ import {
   type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
   type PruneSourceEventsCommandInput,
+  type PublishStaticArtifactArchiveCommandInput,
+  type PublishStaticArtifactCommandInput,
+  type PublishStaticArtifactPayloadCommandInput,
   type QueryCapabilitiesInput,
   type QueryCapabilitiesResponse,
   type QueryEntitlementsInput,
@@ -306,6 +310,7 @@ import {
   type ListServersResponse,
   type ListSourceEventsResponse,
   type ListSshCredentialsResponse,
+  type ListStaticArtifactPublicationsResponse,
   type ListStorageVolumesInput,
   type ListStorageVolumesResponse,
   type ListTerminalSessionsResponse,
@@ -317,6 +322,7 @@ import {
   type PruneDeploymentsResponse,
   type PruneServerCapacityResponse,
   type PruneSourceEventsResponse,
+  type PublishStaticArtifactResponse,
   type RedeployDeploymentResponse,
   type RegisterServerResponse,
   type RemoveOrganizationMemberResponse,
@@ -1196,6 +1202,32 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientError
       >;
     };
+  };
+  staticArtifacts: {
+    listPublications: Client<
+      AppaloftClientContext,
+      ListStaticArtifactPublicationsQueryInput,
+      ListStaticArtifactPublicationsResponse,
+      AppaloftClientError
+    >;
+    publish: Client<
+      AppaloftClientContext,
+      PublishStaticArtifactCommandInput,
+      PublishStaticArtifactResponse,
+      AppaloftClientError
+    >;
+    publishArchive: Client<
+      AppaloftClientContext,
+      PublishStaticArtifactArchiveCommandInput,
+      PublishStaticArtifactResponse,
+      AppaloftClientError
+    >;
+    publishPayload: Client<
+      AppaloftClientContext,
+      PublishStaticArtifactPayloadCommandInput,
+      PublishStaticArtifactResponse,
+      AppaloftClientError
+    >;
   };
   storageVolumes: {
     create: Client<
