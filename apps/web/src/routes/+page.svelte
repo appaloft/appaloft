@@ -19,6 +19,7 @@
   } from "@appaloft/contracts";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import { Button } from "$lib/components/ui/button";
@@ -216,12 +217,15 @@
   title={$t(i18nKeys.console.home.pageTitle)}
   description={$t(i18nKeys.console.home.pageDescription)}
 >
+  <ConsoleResourceCanvas class="max-w-6xl">
   <div class="nothing-console-home">
     {#if pageLoading}
       <section class="nothing-home-heading" aria-hidden="true">
-        <Skeleton class="h-5 w-28" />
-        <Skeleton class="h-8 w-64" />
-        <Skeleton class="h-4 w-full max-w-xl" />
+        <div class="w-full max-w-2xl">
+          <Skeleton class="h-5 w-28" />
+          <Skeleton class="mt-3 h-8 w-64" />
+          <Skeleton class="mt-3 h-4 w-full max-w-xl" />
+        </div>
       </section>
       <section class="nothing-project-list" aria-hidden="true">
         {#each Array.from({ length: 4 }) as _, index (index)}
@@ -241,9 +245,11 @@
       </section>
     {:else if !hasWork}
       <section class="nothing-home-heading">
-        <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
-        <h1>{$t(i18nKeys.console.home.emptyHeading)}</h1>
-        <p>{$t(i18nKeys.console.home.emptyDescription)}</p>
+        <div>
+          <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
+          <h1>{$t(i18nKeys.console.home.emptyHeading)}</h1>
+          <p>{$t(i18nKeys.console.home.emptyDescription)}</p>
+        </div>
       </section>
 
       <ConsoleEmptyState
@@ -445,6 +451,7 @@
       </section>
     {/if}
   </div>
+  </ConsoleResourceCanvas>
 </ConsoleShell>
 
 <style>

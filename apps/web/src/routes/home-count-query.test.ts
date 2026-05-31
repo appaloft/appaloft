@@ -60,6 +60,15 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("i18nKeys.common.actions.quickDeploy");
   });
 
+  test("[HOME-LAYOUT-001] keeps the home empty and list states centered in the console canvas", () => {
+    expect(homePageSource).toContain(
+      'import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";',
+    );
+    expect(homePageSource).toContain('<ConsoleResourceCanvas class="max-w-6xl">');
+    expect(homePageSource).toContain('<section class="nothing-home-heading">');
+    expect(homePageSource).toContain('<div>\n          <p class="nothing-label">');
+  });
+
   test("[HOME-OPERATION-CONTEXT-001] keeps only compact operational context on home", () => {
     expect(homePageSource).toContain("nothing-side-stack");
     expect(homePageSource).toContain("i18nKeys.console.home.operationContextTitle");
