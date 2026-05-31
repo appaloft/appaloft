@@ -765,9 +765,9 @@ import {
 } from "@appaloft/deployment-config";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIHandler, type OpenAPIHandlerOptions } from "@orpc/openapi/fetch";
 import { eventIterator, ORPCError, os } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/fetch";
+import { RPCHandler, type RPCHandlerOptions } from "@orpc/server/fetch";
 import { type Elysia } from "elysia";
 import { z } from "zod";
 
@@ -1765,6 +1765,7 @@ function buildUnexpectedErrorContext(error: unknown): Record<string, unknown> {
   const details: Record<string, unknown> = {
     name: error.name,
     message: error.message,
+    ...(error.stack ? { stack: error.stack } : {}),
   };
 
   if (error instanceof ORPCError) {
@@ -1788,6 +1789,7 @@ function buildUnexpectedErrorContext(error: unknown): Record<string, unknown> {
     details.cause = {
       name: cause.name,
       message: cause.message,
+      ...(cause.stack ? { stack: cause.stack } : {}),
       ...(() => {
         const causeIssues = serializeValidationIssues(readObjectProperty(cause, "issues"));
         return causeIssues && causeIssues.length > 0
@@ -6072,8 +6074,12 @@ export type AppaloftOrpcRouter = typeof appaloftOrpcRouter;
 export type AppaloftOrpcRouterContribution = Readonly<Record<string, unknown>>;
 
 export interface AppaloftOrpcRouterOptions {
+  readonly logger?: AppLogger;
   readonly orpcRouterContributions?: readonly AppaloftOrpcRouterContribution[];
 }
+
+type AppaloftOrpcHandlerOptions = OpenAPIHandlerOptions<AppaloftOrpcRequestContext> &
+  RPCHandlerOptions<AppaloftOrpcRequestContext>;
 
 export function createAppaloftOrpcRouter(
   options: AppaloftOrpcRouterOptions = {},
@@ -6090,11 +6096,44 @@ export function createAppaloftOrpcRouter(
 }
 
 export function createAppaloftOpenApiHandler(options: AppaloftOrpcRouterOptions = {}) {
-  return new OpenAPIHandler(createAppaloftOrpcRouter(options) as AppaloftOrpcRouter);
+  return new OpenAPIHandler(
+    createAppaloftOrpcRouter(options) as AppaloftOrpcRouter,
+    createAppaloftOrpcHandlerOptions(options),
+  );
 }
 
 export function createAppaloftRpcHandler(options: AppaloftOrpcRouterOptions = {}) {
-  return new RPCHandler(createAppaloftOrpcRouter(options) as AppaloftOrpcRouter);
+  return new RPCHandler(
+    createAppaloftOrpcRouter(options) as AppaloftOrpcRouter,
+    createAppaloftOrpcHandlerOptions(options),
+  );
+}
+
+function createAppaloftOrpcHandlerOptions(
+  options: AppaloftOrpcRouterOptions,
+): AppaloftOrpcHandlerOptions | undefined {
+  const logger = options.logger;
+  if (!logger) {
+    return {};
+  }
+
+  return {
+    clientInterceptors: [
+      async (interceptorOptions) => {
+        try {
+          return await interceptorOptions.next();
+        } catch (error) {
+          logger.error("orpc_procedure_unhandled_error", {
+            path: interceptorOptions.path.join("."),
+            requestId: interceptorOptions.context.executionContext.requestId,
+            entrypoint: interceptorOptions.context.executionContext.entrypoint,
+            ...buildUnexpectedErrorContext(error),
+          });
+          throw error;
+        }
+      },
+    ],
+  };
 }
 
 function mergeAppaloftOrpcRouterContributions(
@@ -7964,6 +8003,7 @@ export function mountAppaloftOrpcRoutes(
   },
 ): Elysia {
   const routerOptions: AppaloftOrpcRouterOptions = {
+    logger: context.logger,
     ...(context.orpcRouterContributions
       ? { orpcRouterContributions: context.orpcRouterContributions }
       : {}),
