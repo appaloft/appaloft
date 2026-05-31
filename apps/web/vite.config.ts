@@ -28,6 +28,11 @@ function createWebDevPort(mode: string): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 4173;
 }
 
+function createWebDevHost(mode: string): string | undefined {
+  const env = loadEnv(mode, process.cwd(), "");
+  return env.APPALOFT_WEB_DEV_HOST?.trim() || undefined;
+}
+
 function createRuntimeExtensionProxyPrefixes(mode: string): string[] {
   const env = loadEnv(mode, process.cwd(), "");
   const rawPrefixes = env.APPALOFT_WEB_DEV_EXTENSION_PROXY_PREFIXES ?? "";
@@ -206,6 +211,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = createApiProxyTarget(mode);
   const docsRedirectTarget = createDocsRedirectTarget(mode);
   const webDevPort = createWebDevPort(mode);
+  const webDevHost = createWebDevHost(mode);
   const runtimeExtensionProxyPrefixes = createRuntimeExtensionProxyPrefixes(mode);
   const fsAllow = createFsAllow(mode);
   const apiProxy = {
@@ -225,6 +231,7 @@ export default defineConfig(({ mode }) => {
       sveltekit(),
     ],
     server: {
+      ...(webDevHost ? { host: webDevHost } : {}),
       port: webDevPort,
       strictPort: true,
       ...(fsAllow ? { fs: { allow: fsAllow } } : {}),

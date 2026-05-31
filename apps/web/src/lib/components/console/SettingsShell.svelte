@@ -32,7 +32,8 @@
   export type SettingsShellItem = {
     href: string;
     icon: Component;
-    labelKey: TranslationKey;
+    labelKey?: TranslationKey;
+    label?: string;
     matchPrefix?: string;
   };
 
@@ -93,6 +94,10 @@
   function itemIsActive(item: SettingsShellItem): boolean {
     return activePath === item.href || Boolean(item.matchPrefix && activePath.startsWith(item.matchPrefix));
   }
+
+  function itemLabel(item: SettingsShellItem): string {
+    return item.labelKey ? $t(item.labelKey) : (item.label ?? item.href);
+  }
 </script>
 
 <SidebarProvider>
@@ -120,11 +125,11 @@
           <SidebarMenu>
             {#each items as item (item.href)}
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={itemIsActive(item)} tooltipContent={$t(item.labelKey)}>
+                <SidebarMenuButton isActive={itemIsActive(item)} tooltipContent={itemLabel(item)}>
                   {#snippet child({ props })}
                     <a href={item.href} {...props}>
                       <item.icon class="size-4" />
-                      <span>{$t(item.labelKey)}</span>
+                      <span>{itemLabel(item)}</span>
                     </a>
                   {/snippet}
                 </SidebarMenuButton>
