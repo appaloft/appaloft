@@ -1,9 +1,21 @@
 import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
+import { type AppLogger, createExecutionContext } from "@appaloft/application";
 import { os } from "@orpc/server";
 import { z } from "zod";
 import { createAppaloftOpenApiHandler, createAppaloftOrpcRouter } from "../src/index";
+
+class CapturingLogger implements AppLogger {
+  readonly errors: Array<{ message: string; context?: Record<string, unknown> }> = [];
+
+  debug(): void {}
+  info(): void {}
+  warn(): void {}
+  error(message: string, context?: Record<string, unknown>): void {
+    this.errors.push({ message, context });
+  }
+}
 
 describe("Appaloft oRPC router contributions", () => {
   test("mounts an additional neutral router namespace", async () => {
@@ -42,5 +54,56 @@ describe("Appaloft oRPC router contributions", () => {
         orpcRouterContributions: [{ projects: {} }],
       }),
     ).toThrow('Appaloft oRPC router contribution conflicts at "projects".');
+  });
+
+  test("logs raw procedure errors before oRPC maps them to internal server errors", async () => {
+    const logger = new CapturingLogger();
+    const extensionRouter = {
+      extensions: {
+        explode: os
+          .route({
+            method: "GET",
+            path: "/extensions/explode",
+            successStatus: 200,
+          })
+          .handler(() => {
+            throw new Error("database relation cloud_tenants does not exist");
+          }),
+      },
+    };
+
+    const handler = createAppaloftOpenApiHandler({
+      logger,
+      orpcRouterContributions: [extensionRouter],
+    });
+    const { matched, response } = await handler.handle(
+      new Request("http://localhost/api/extensions/explode"),
+      {
+        prefix: "/api",
+        context: {
+          executionContext: createExecutionContext({
+            entrypoint: "http",
+            requestId: "req_orpc_raw_error_logging_test",
+          }),
+        },
+      },
+    );
+
+    expect(matched).toBe(true);
+    expect(response.status).toBe(500);
+    expect(logger.errors).toHaveLength(1);
+    expect(logger.errors[0]).toMatchObject({
+      message: "orpc_procedure_unhandled_error",
+      context: {
+        path: "extensions.explode",
+        requestId: "req_orpc_raw_error_logging_test",
+        entrypoint: "http",
+        name: "Error",
+        message: "database relation cloud_tenants does not exist",
+      },
+    });
+    expect(logger.errors[0]?.context?.stack).toContain(
+      "database relation cloud_tenants does not exist",
+    );
   });
 });
