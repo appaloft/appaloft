@@ -2139,6 +2139,7 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
       projectId?: string;
       environmentId?: string;
       resourceId?: string;
+      limit?: number;
     },
   ) {
     void context;
@@ -2153,6 +2154,7 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
       .filter((domainBinding) =>
         input?.resourceId ? domainBinding.resourceId.value === input.resourceId : true,
       )
+      .slice(0, input?.limit ?? defaultReadModelListLimit)
       .map(
         (domainBinding): DomainBindingSummary => ({
           id: domainBinding.id.value,
@@ -2430,6 +2432,7 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
     context: RepositoryContext,
     input?: {
       domainBindingId?: string;
+      limit?: number;
     },
   ): Promise<CertificateSummary[]> {
     void context;
@@ -2438,6 +2441,7 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
       .filter((certificate) =>
         input?.domainBindingId ? certificate.domainBindingId.value === input.domainBindingId : true,
       )
+      .slice(0, input?.limit ?? defaultReadModelListLimit)
       .map((certificate): CertificateSummary => {
         const latestAttempt = certificate.attempts[certificate.attempts.length - 1];
         const attempts = certificate.attempts.map((attempt) => ({

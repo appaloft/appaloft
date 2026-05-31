@@ -1,7 +1,9 @@
-import { type z } from "zod";
+import { z } from "zod";
 
-import { emptyOperationInputSchema } from "../shared-schema";
+import { listLimitSchema } from "../shared-schema";
 
-export const listSshCredentialsQueryInputSchema = emptyOperationInputSchema;
+export const listSshCredentialsQueryInputSchema = z.object({
+  limit: listLimitSchema,
+});
 
 export type ListSshCredentialsQueryInput = z.input<typeof listSshCredentialsQueryInputSchema>;

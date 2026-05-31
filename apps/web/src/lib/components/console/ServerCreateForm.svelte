@@ -14,6 +14,7 @@
     isServerRegistrationDraftComplete,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
+  import { defaultConsoleListLimit } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -47,8 +48,8 @@
   );
   const sshCredentialsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["credentials", "ssh"],
-      queryFn: () => orpcClient.credentials.ssh.list({}),
+      queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
       enabled: browser,
     }),
   );

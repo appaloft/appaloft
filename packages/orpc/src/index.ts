@@ -3332,7 +3332,9 @@ export const listSshCredentialsProcedure = base
   })
   .input(listSshCredentialsQueryInputSchema)
   .output(listSshCredentialsResponseSchema)
-  .handler(async ({ context }) => executeQuery(context, ListSshCredentialsQuery.create()));
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSshCredentialsQuery.create(input)),
+  );
 
 export const showSshCredentialProcedure = base
   .route({

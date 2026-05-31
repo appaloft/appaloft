@@ -2,7 +2,7 @@ import { type Result } from "@appaloft/core";
 
 import { Query } from "../../cqrs";
 import { type DomainBindingSummary } from "../../ports";
-import { parseOperationInput, trimToUndefined } from "../shared-schema";
+import { boundedListLimit, parseOperationInput, trimToUndefined } from "../shared-schema";
 import {
   type ListDomainBindingsQueryInput,
   listDomainBindingsQueryInputSchema,
@@ -18,6 +18,7 @@ export class ListDomainBindingsQuery extends Query<{ items: DomainBindingSummary
     public readonly projectId?: string,
     public readonly environmentId?: string,
     public readonly resourceId?: string,
+    public readonly limit: number = boundedListLimit(),
   ) {
     super();
   }
@@ -29,6 +30,7 @@ export class ListDomainBindingsQuery extends Query<{ items: DomainBindingSummary
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.environmentId),
           trimToUndefined(parsed.resourceId),
+          boundedListLimit(parsed.limit),
         ),
     );
   }

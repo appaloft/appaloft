@@ -10,9 +10,12 @@ export class ListSshCredentialsQueryService {
     private readonly readModel: SshCredentialReadModel,
   ) {}
 
-  async execute(context: ExecutionContext): Promise<{
+  async execute(
+    context: ExecutionContext,
+    input?: { limit?: number },
+  ): Promise<{
     items: Awaited<ReturnType<SshCredentialReadModel["list"]>>;
   }> {
-    return { items: await this.readModel.list(toRepositoryContext(context)) };
+    return { items: await this.readModel.list(toRepositoryContext(context), input) };
   }
 }

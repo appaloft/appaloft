@@ -701,6 +701,7 @@
         "resources",
         selectedProjectId,
         environmentContextEnabled ? selectedEnvironmentId : "",
+        { limit: defaultConsoleListLimit },
       ],
       queryFn: () =>
         orpcClient.resources.list({
@@ -708,14 +709,15 @@
           ...(environmentContextEnabled && selectedEnvironmentId
             ? { environmentId: selectedEnvironmentId }
             : {}),
+          limit: defaultConsoleListLimit,
         }),
       enabled: browser && enabled,
     }),
   );
   const sshCredentialsQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["credentials", "ssh"],
-      queryFn: () => orpcClient.credentials.ssh.list({}),
+      queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
+      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
       enabled: browser && enabled,
     }),
   );

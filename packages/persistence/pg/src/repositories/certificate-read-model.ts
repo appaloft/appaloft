@@ -23,6 +23,7 @@ export class PgCertificateReadModel implements CertificateReadModel {
     context: RepositoryContext,
     input?: {
       domainBindingId?: string;
+      limit?: number;
     },
   ): Promise<CertificateSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -54,7 +55,7 @@ export class PgCertificateReadModel implements CertificateReadModel {
           );
         }
 
-        const rows = await query.execute();
+        const rows = await query.limit(input?.limit ?? 100).execute();
         return rows.map((row): CertificateSummary => {
           const attempts = (row.attempts ?? []) as unknown as SerializedCertificateAttempt[];
           const safeMetadata = (row.safe_metadata ?? {}) as SerializedImportedCertificateMetadata;

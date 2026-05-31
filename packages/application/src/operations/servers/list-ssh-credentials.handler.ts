@@ -22,7 +22,6 @@ export class ListSshCredentialsQueryHandler
     context: ExecutionContext,
     query: ListSshCredentialsQuery,
   ): Promise<Result<{ items: SshCredentialSummary[] }>> {
-    void query;
-    return ok(await this.queryService.execute(context));
+    return ok(await this.queryService.execute(context, { limit: query.limit }));
   }
 }

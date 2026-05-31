@@ -25,7 +25,9 @@ export class ListCertificatesQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.domainBindingId ? { domainBindingId: query.domainBindingId } : undefined,
+        query.domainBindingId
+          ? { domainBindingId: query.domainBindingId, limit: query.limit }
+          : { limit: query.limit },
       ),
     );
   }

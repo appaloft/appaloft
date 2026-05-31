@@ -8055,7 +8055,7 @@ export interface ServerReadModel {
 }
 
 export interface SshCredentialReadModel {
-  list(context: RepositoryContext): Promise<SshCredentialSummary[]>;
+  list(context: RepositoryContext, input?: { limit?: number }): Promise<SshCredentialSummary[]>;
   findOne(
     context: RepositoryContext,
     spec: SshCredentialSelectionSpec,
@@ -8428,6 +8428,7 @@ export interface DomainBindingReadModel {
       projectId?: string;
       environmentId?: string;
       resourceId?: string;
+      limit?: number;
     },
   ): Promise<DomainBindingSummary[]>;
 }
@@ -8437,6 +8438,7 @@ export interface CertificateReadModel {
     context: RepositoryContext,
     input?: {
       domainBindingId?: string;
+      limit?: number;
     },
   ): Promise<CertificateSummary[]>;
   findOne(

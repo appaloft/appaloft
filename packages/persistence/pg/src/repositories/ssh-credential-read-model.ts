@@ -73,7 +73,7 @@ function toSshCredentialSummary(
 export class PgSshCredentialReadModel implements SshCredentialReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async list(context: RepositoryContext) {
+  async list(context: RepositoryContext, input?: { limit?: number }) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("ssh_credential", "list"),
@@ -92,7 +92,10 @@ export class PgSshCredentialReadModel implements SshCredentialReadModel {
           query = query.where("organization_id", "=", organizationId);
         }
 
-        return query.execute().then((rows) => rows.map(toSshCredentialSummary));
+        return query
+          .limit(input?.limit ?? 100)
+          .execute()
+          .then((rows) => rows.map(toSshCredentialSummary));
       },
     );
   }
