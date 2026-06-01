@@ -528,31 +528,35 @@
         </section>
       {/if}
 
-      {#if pageDocument.badge || (pageDocument.actions?.length ?? 0) > 0}
-        <div class="flex flex-wrap items-center justify-between gap-3">
+      <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div class="min-w-0 max-w-2xl space-y-2">
+          <h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>
+          {#if pageDocument.description}
+            <p class="text-sm leading-6 text-muted-foreground">{pageDocument.description}</p>
+          {/if}
           {#if pageDocument.badge}
             <Badge variant="outline">{pageDocument.badge}</Badge>
           {/if}
-          {#if pageDocument.actions?.length}
-            <div class="flex flex-wrap gap-2">
-              {#each pageDocument.actions as action (action.href)}
-                <Button
-                  href={action.href}
-                  target={action.external ? "_blank" : undefined}
-                  rel={action.external ? "noreferrer" : undefined}
-                  variant={action.variant === "primary" ? "default" : "outline"}
-                  size="sm"
-                >
-                  {action.label}
-                  {#if action.external}
-                    <ArrowUpRight class="size-4" />
-                  {/if}
-                </Button>
-              {/each}
-            </div>
-          {/if}
         </div>
-      {/if}
+        {#if pageDocument.actions?.length}
+          <div class="flex shrink-0 flex-wrap gap-2">
+            {#each pageDocument.actions as action (action.href)}
+              <Button
+                href={action.href}
+                target={action.external ? "_blank" : undefined}
+                rel={action.external ? "noreferrer" : undefined}
+                variant={action.variant === "primary" ? "default" : "outline"}
+                size="sm"
+              >
+                {action.label}
+                {#if action.external}
+                  <ArrowUpRight class="size-4" />
+                {/if}
+              </Button>
+            {/each}
+          </div>
+        {/if}
+      </section>
 
       {#each pageDocument.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
         {#if section.kind === "summary-grid"}
@@ -752,34 +756,36 @@
               {/if}
             </div>
             {#if section.rows.length > 0}
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    {#each section.columns as column (column.key)}
-                      <Table.Head class={column.align === "right" ? "text-right" : ""}>
-                        {column.label}
-                      </Table.Head>
-                    {/each}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {#each section.rows as row, rowIndex (rowIndex)}
+              <div class="border-t px-5" data-console-page-table-body>
+                <Table.Root>
+                  <Table.Header>
                     <Table.Row>
                       {#each section.columns as column (column.key)}
-                        {@const cell = readTableCell(row, column.key)}
-                        <Table.Cell
-                          class={[
-                            column.align === "right" ? "text-right tabular-nums" : "",
-                            toneClass(cell.tone),
-                          ]}
-                        >
-                          {cell.text}
-                        </Table.Cell>
+                        <Table.Head class={column.align === "right" ? "text-right" : ""}>
+                          {column.label}
+                        </Table.Head>
                       {/each}
                     </Table.Row>
-                  {/each}
-                </Table.Body>
-              </Table.Root>
+                  </Table.Header>
+                  <Table.Body>
+                    {#each section.rows as row, rowIndex (rowIndex)}
+                      <Table.Row>
+                        {#each section.columns as column (column.key)}
+                          {@const cell = readTableCell(row, column.key)}
+                          <Table.Cell
+                            class={[
+                              column.align === "right" ? "text-right tabular-nums" : "",
+                              toneClass(cell.tone),
+                            ]}
+                          >
+                            {cell.text}
+                          </Table.Cell>
+                        {/each}
+                      </Table.Row>
+                    {/each}
+                  </Table.Body>
+                </Table.Root>
+              </div>
             {:else}
               <div class="border-t p-5 text-sm text-muted-foreground">
                 {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}

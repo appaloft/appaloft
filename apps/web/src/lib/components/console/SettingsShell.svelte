@@ -45,6 +45,7 @@
     activePath: string;
     items: SettingsShellItem[];
     breadcrumbs?: BreadcrumbItem[];
+    sidebarHeader?: Snippet;
     children: Snippet;
   };
 
@@ -55,6 +56,7 @@
     activePath,
     items,
     breadcrumbs = [],
+    sidebarHeader,
     children,
   }: Props = $props();
   let colorMode = $state<"light" | "dark">("light");
@@ -104,19 +106,23 @@
 <SidebarProvider>
   <Sidebar variant="sidebar" collapsible="offcanvas">
     <SidebarHeader class="gap-3">
-      <a class="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent" href="/">
-        <img
-          src={appaloftIcon}
-          alt={$t(i18nKeys.common.app.productName)}
-          class="size-7 shrink-0 object-contain"
-        />
-        <span class="min-w-0">
-          <span class="block truncate text-sm font-semibold">
-            {$t(i18nKeys.common.app.productName)}
+      {#if sidebarHeader}
+        {@render sidebarHeader()}
+      {:else}
+        <a class="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent" href="/">
+          <img
+            src={appaloftIcon}
+            alt={$t(i18nKeys.common.app.productName)}
+            class="size-7 shrink-0 object-contain"
+          />
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-semibold">
+              {$t(i18nKeys.common.app.productName)}
+            </span>
+            <span class="block truncate text-xs text-muted-foreground">{title}</span>
           </span>
-          <span class="block truncate text-xs text-muted-foreground">{title}</span>
-        </span>
-      </a>
+        </a>
+      {/if}
     </SidebarHeader>
 
     <SidebarContent>
