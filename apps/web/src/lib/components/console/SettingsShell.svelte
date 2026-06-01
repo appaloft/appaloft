@@ -1,11 +1,12 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { ArrowLeft, Moon, Play, Sun } from "@lucide/svelte";
+  import { Moon, Play, Sun } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Component, Snippet } from "svelte";
 
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import ConsoleUserMenu from "$lib/components/console/ConsoleUserMenu.svelte";
   import {
     Sidebar,
     SidebarContent,
@@ -141,10 +142,7 @@
     </SidebarContent>
 
     <SidebarFooter>
-      <Button href="/" variant="outline" class="justify-start">
-        <ArrowLeft class="size-4" />
-        {$t(i18nKeys.console.nav.workspace)}
-      </Button>
+      <ConsoleUserMenu />
     </SidebarFooter>
   </Sidebar>
 

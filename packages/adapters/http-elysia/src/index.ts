@@ -404,23 +404,34 @@ function resolveStatusCode(status: unknown): number | undefined {
   return undefined;
 }
 
-function createAllowedOrigins(webOrigin: string): Set<string> {
+function createAllowedOrigins(input: {
+  webOrigin: string;
+  trustedOrigins?: readonly string[];
+}): Set<string> {
   const origins = new Set<string>();
-  const normalizedWebOrigin = normalizeOrigin(webOrigin);
-  origins.add(normalizedWebOrigin);
+  const configuredOrigins = [input.webOrigin, ...(input.trustedOrigins ?? [])];
 
-  try {
-    const parsed = new URL(webOrigin);
-
-    if (parsed.hostname === "localhost") {
-      parsed.hostname = "127.0.0.1";
-      origins.add(normalizeOrigin(parsed.toString()));
-    } else if (parsed.hostname === "127.0.0.1") {
-      parsed.hostname = "localhost";
-      origins.add(normalizeOrigin(parsed.toString()));
+  for (const origin of configuredOrigins) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) {
+      continue;
     }
-  } catch {
-    // Ignore invalid configured origins and fall back to the raw value.
+
+    origins.add(normalizedOrigin);
+
+    try {
+      const parsed = new URL(origin);
+
+      if (parsed.hostname === "localhost") {
+        parsed.hostname = "127.0.0.1";
+        origins.add(normalizeOrigin(parsed.toString()));
+      } else if (parsed.hostname === "127.0.0.1") {
+        parsed.hostname = "localhost";
+        origins.add(normalizeOrigin(parsed.toString()));
+      }
+    } catch {
+      // Ignore invalid configured origins and fall back to the raw value.
+    }
   }
 
   return origins;
@@ -428,6 +439,74 @@ function createAllowedOrigins(webOrigin: string): Set<string> {
 
 function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function pluginRouteMatchesPath(routePath: string, pathname: string): boolean {
+  if (routePath === pathname) {
+    return true;
+  }
+
+  const wildcardIndex = routePath.indexOf("*");
+  if (wildcardIndex >= 0) {
+    return pathname.startsWith(routePath.slice(0, wildcardIndex));
+  }
+
+  const parameterIndex = routePath.indexOf(":");
+  if (parameterIndex >= 0) {
+    return pathname.startsWith(routePath.slice(0, parameterIndex));
+  }
+
+  return false;
+}
+
+function collectOrpcRoutePaths(contributions: readonly AppaloftOrpcRouterContribution[]): string[] {
+  const paths = new Set<string>();
+  const visited = new WeakSet<object>();
+
+  function visit(value: unknown): void {
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    if (visited.has(value)) {
+      return;
+    }
+    visited.add(value);
+
+    const record = value as Record<string, unknown>;
+    const orpc = record["~orpc"];
+    if (orpc && typeof orpc === "object") {
+      const route = (orpc as Record<string, unknown>).route;
+      if (route && typeof route === "object") {
+        const path = (route as Record<string, unknown>).path;
+        if (typeof path === "string" && path.length > 0) {
+          paths.add(path);
+        }
+      }
+    }
+
+    for (const child of Object.values(record)) {
+      visit(child);
+    }
+  }
+
+  for (const contribution of contributions) {
+    visit(contribution);
+  }
+
+  return Array.from(paths);
+}
+
+function isCorsPath(input: {
+  pathname: string;
+  pluginRoutes: readonly SystemPluginHttpRoute[];
+  orpcRoutePaths: readonly string[];
+}): boolean {
+  return (
+    isApiPath(input.pathname) ||
+    input.pluginRoutes.some((route) => pluginRouteMatchesPath(route.path, input.pathname)) ||
+    input.orpcRoutePaths.some((routePath) => pluginRouteMatchesPath(routePath, input.pathname))
+  );
 }
 
 function isDocsPath(pathname: string): boolean {
@@ -679,7 +758,11 @@ function decodeTerminalClientMessage(message: unknown): TerminalClientMessage | 
   return null;
 }
 
-function registerPluginRoute(app: Elysia, route: SystemPluginHttpRoute): Elysia {
+function registerPluginRoute(
+  app: Elysia,
+  route: SystemPluginHttpRoute,
+  allowedOrigins: Set<string>,
+): Elysia {
   const handler = async ({
     request,
     params,
@@ -705,18 +788,32 @@ function registerPluginRoute(app: Elysia, route: SystemPluginHttpRoute): Elysia 
       }),
     );
 
+  const appWithPreflight = registerCorsPreflightRoute(app, route.path, allowedOrigins);
+
   switch (route.method) {
     case "GET":
-      return app.get(route.path, handler);
+      return appWithPreflight.get(route.path, handler);
     case "POST":
-      return app.post(route.path, handler);
+      return appWithPreflight.post(route.path, handler);
     case "PUT":
-      return app.put(route.path, handler);
+      return appWithPreflight.put(route.path, handler);
     case "PATCH":
-      return app.patch(route.path, handler);
+      return appWithPreflight.patch(route.path, handler);
     case "DELETE":
-      return app.delete(route.path, handler);
+      return appWithPreflight.delete(route.path, handler);
   }
+}
+
+function registerCorsPreflightRoute(
+  app: Elysia,
+  routePath: string,
+  allowedOrigins: Set<string>,
+): Elysia {
+  return app.options(routePath, ({ request, set }) => {
+    applyCorsHeaders(request, set.headers as MutableHeaders, allowedOrigins);
+    set.status = 204;
+    return "";
+  }) as unknown as Elysia;
 }
 
 export function createHttpApp(input: {
@@ -745,11 +842,17 @@ export function createHttpApp(input: {
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
+  const orpcRoutePaths = collectOrpcRoutePaths(input.orpcRouterContributions ?? []);
   const webStaticDir = input.config.webStaticDir ? resolve(input.config.webStaticDir) : null;
   const docsStaticDir = input.config.docsStaticDir ? resolve(input.config.docsStaticDir) : null;
   const embeddedWebAssets = input.embeddedWebAssets ?? input.embeddedStaticAssets ?? {};
   const embeddedDocsAssets = input.embeddedDocsAssets ?? {};
-  const allowedOrigins = createAllowedOrigins(input.config.webOrigin);
+  const allowedOrigins = createAllowedOrigins({
+    webOrigin: input.config.webOrigin,
+    ...(input.config.betterAuthTrustedOrigins
+      ? { trustedOrigins: input.config.betterAuthTrustedOrigins }
+      : {}),
+  });
   const terminalSessionsBySocket = new WeakMap<object, TerminalSession>();
   const terminalSessionsBySessionId = new Map<string, TerminalSession>();
   const requestStartTimes = new WeakMap<Request, number>();
@@ -1411,7 +1514,7 @@ export function createHttpApp(input: {
     .onBeforeHandle(async ({ request, set }) => {
       const pathname = new URL(request.url).pathname;
 
-      if (isApiPath(pathname)) {
+      if (isCorsPath({ pathname, pluginRoutes, orpcRoutePaths })) {
         applyCorsHeaders(request, set.headers as MutableHeaders, allowedOrigins);
 
         if (request.method === "OPTIONS") {
@@ -1450,7 +1553,7 @@ export function createHttpApp(input: {
 
       const pathname = new URL(request.url).pathname;
 
-      if (!isApiPath(pathname)) {
+      if (!isCorsPath({ pathname, pluginRoutes, orpcRoutePaths })) {
         return;
       }
 
@@ -1712,7 +1815,13 @@ export function createHttpApp(input: {
   let app = baseApp as unknown as Elysia;
 
   for (const route of pluginRoutes) {
-    app = registerPluginRoute(app, route);
+    app = registerPluginRoute(app, route, allowedOrigins);
+  }
+
+  for (const routePath of orpcRoutePaths) {
+    if (!isApiPath(routePath)) {
+      app = registerCorsPreflightRoute(app, routePath, allowedOrigins);
+    }
   }
 
   if (input.authRuntime) {

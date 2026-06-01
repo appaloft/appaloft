@@ -112,6 +112,7 @@ export interface AppConfig {
   betterAuthSecret: string;
   betterAuthMinPasswordLength?: number;
   betterAuthTrustedProxyHeaders?: boolean;
+  betterAuthTrustedOrigins?: string[];
   actionDeployToken?: string;
   actionDeployTokenScope?: ActionDeployTokenScopeConfig;
   bootstrapDeployTokenOutputFile?: string;
@@ -368,6 +369,19 @@ function parsePositiveInteger(value: string | number | undefined): number | unde
 
   const normalized = Math.trunc(numberValue);
   return normalized > 0 ? normalized : undefined;
+}
+
+function parseStringList(value: readonly string[] | string | undefined): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const items: readonly string[] = typeof value === "string" ? value.split(",") : value;
+  const normalized = items
+    .map((item: string) => item.trim())
+    .filter((item: string) => item.length > 0);
+
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
 }
 
 function defaultBetterAuthCallbackUrl(baseUrl: string, path: string): string | undefined {
@@ -693,6 +707,10 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     env.APPALOFT_WEB_ORIGIN ??
     fileConfig.webOrigin ??
     defaults.webOrigin;
+  const betterAuthTrustedOrigins =
+    parseStringList(source.flags?.betterAuthTrustedOrigins) ??
+    parseStringList(env.APPALOFT_BETTER_AUTH_TRUSTED_ORIGINS) ??
+    parseStringList(fileConfig.betterAuthTrustedOrigins);
   const githubClientId =
     source.flags?.githubClientId ?? env.APPALOFT_GITHUB_CLIENT_ID ?? fileConfig.githubClientId;
   const githubClientSecret =
@@ -830,6 +848,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
             fileConfig.betterAuthTrustedProxyHeaders,
         }
       : {}),
+    ...(betterAuthTrustedOrigins ? { betterAuthTrustedOrigins } : {}),
     ...(source.flags?.betterAuthMinPasswordLength ||
     env.APPALOFT_BETTER_AUTH_LOCAL_MIN_LENGTH ||
     fileConfig.betterAuthMinPasswordLength

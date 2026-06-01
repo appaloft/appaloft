@@ -323,12 +323,19 @@ describe("resolveConfig", () => {
       env: {
         APPALOFT_BETTER_AUTH_COOKIE_DOMAIN: ".appaloft.com",
         APPALOFT_BETTER_AUTH_COOKIE_PREFIX: "appaloft-auth",
+        APPALOFT_BETTER_AUTH_TRUSTED_ORIGINS:
+          "https://www.appaloft.com, https://appaloft.com, https://app.appaloft.com",
         APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS: "true",
       },
     });
 
     expect(config.betterAuthCookieDomain).toBe(".appaloft.com");
     expect(config.betterAuthCookiePrefix).toBe("appaloft-auth");
+    expect(config.betterAuthTrustedOrigins).toEqual([
+      "https://www.appaloft.com",
+      "https://appaloft.com",
+      "https://app.appaloft.com",
+    ]);
     expect(config.betterAuthTrustedProxyHeaders).toBe(true);
   });
 

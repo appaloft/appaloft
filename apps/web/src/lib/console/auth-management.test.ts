@@ -6,10 +6,14 @@ import { webDocsHrefs } from "./docs-help";
 
 describe("organization auth management console surface", () => {
   test("[ORG-TEAM-WEB-001] exposes organization/team operations through shared oRPC contracts", async () => {
-    const [pageSource, shellSource, clientContractSource] = await Promise.all([
+    const [pageSource, shellSource, userMenuSource, clientContractSource] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(
         new URL("../../lib/components/console/ConsoleShell.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../lib/components/console/ConsoleUserMenu.svelte", import.meta.url),
         "utf8",
       ),
       readFile(
@@ -38,9 +42,14 @@ describe("organization auth management console surface", () => {
     expect(shellSource).toContain('navigateTo("/instance")');
     expect(shellSource).toContain("i18nKeys.console.nav.organization");
     expect(shellSource).toContain("i18nKeys.console.nav.instance");
-    expect(shellSource).toContain('"/api/auth/sign-out"');
-    expect(shellSource).toContain("i18nKeys.common.actions.signOut");
-    expect(shellSource).toContain("data-console-sign-out-action");
+    expect(shellSource).toContain("ConsoleUserMenu");
+    expect(userMenuSource).toContain('"/api/auth/sign-out"');
+    expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
+    expect(userMenuSource).toContain("data-console-sign-out-action");
+    expect(userMenuSource).toContain("DropdownMenuSeparator");
+    expect(userMenuSource.indexOf("i18nKeys.common.language.label")).toBeLessThan(
+      userMenuSource.indexOf("data-console-sign-out-action"),
+    );
     expect(clientContractSource).toContain("organizations: {");
     expect(clientContractSource).toContain("SwitchCurrentOrganizationCommandInput");
     expect(clientContractSource).toContain("InviteOrganizationMemberCommandInput");
@@ -148,6 +157,7 @@ describe("organization auth management console surface", () => {
       settingsShellSource,
       settingsNavSource,
       consoleShellSource,
+      userMenuSource,
       clientContractSource,
       enUSSource,
       zhCNSource,
@@ -177,6 +187,10 @@ describe("organization auth management console surface", () => {
         "utf8",
       ),
       readFile(
+        new URL("../../lib/components/console/ConsoleUserMenu.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
         new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
         "utf8",
       ),
@@ -196,6 +210,7 @@ describe("organization auth management console surface", () => {
     expect(settingsShellSource).toContain("label?: string");
     expect(settingsShellSource).toContain("itemLabel");
     expect(settingsShellSource).toContain("SettingsShellItem");
+    expect(settingsShellSource).toContain("ConsoleUserMenu");
     expect(settingsNavSource).toContain("accountSettingsItems");
     expect(settingsNavSource).toContain("organizationSettingsItems");
     expect(settingsNavSource).toContain('extension.placement === "settings"');
@@ -353,8 +368,9 @@ describe("organization auth management console surface", () => {
       expect(source).not.toContain("better-auth");
     }
 
-    expect(consoleShellSource).toContain('navigateTo("/account/profile")');
-    expect(consoleShellSource).not.toContain('navigateTo("/account/security")');
+    expect(consoleShellSource).toContain("ConsoleUserMenu");
+    expect(userMenuSource).toContain('navigateTo("/account/profile")');
+    expect(userMenuSource).not.toContain('navigateTo("/account/security")');
     expect(clientContractSource).toContain("account: {");
     expect(clientContractSource).toContain("ShowAccountProfileQueryInput");
     expect(clientContractSource).toContain("ChangeAccountProfileCommandInput");
