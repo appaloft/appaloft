@@ -1964,6 +1964,22 @@ export const enUS = {
       dockerImage: "Docker image",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
       githubAppConnectedTitle: "GitHub App installed",
+      githubAppConfigurationDiagnosticsEmpty:
+        "No specific diagnostics were returned. Confirm the GitHub App environment variables and secrets are injected into the runtime.",
+      githubAppConfigurationPendingDescription:
+        "Resolve the readiness diagnostics below, then restart the local server or redeploy production.",
+      githubAppConfigurationPendingTitle: "Complete GitHub App runtime configuration",
+      githubAppDiagnosticCode: "Diagnostic code: {{code}}",
+      githubAppDiagnosticEnvMissing:
+        "A required GitHub App environment variable or secret is missing. Check that APPALOFT_CLOUD_GITHUB_APP_* is injected into the runtime.",
+      githubAppDiagnosticInstallationSmokePending:
+        "The GitHub App is configured, but the installation-event smoke check has not completed. Finish one installation callback to clear this hint.",
+      githubAppDiagnosticPermissionsPending:
+        "APPALOFT_CLOUD_GITHUB_APP_PERMISSIONS_REVIEWED must be set exactly to true after the permissions have been reviewed.",
+      githubAppDiagnosticPrivateKeyInvalid:
+        "APPALOFT_CLOUD_GITHUB_APP_PRIVATE_KEY_BASE64 is not valid base64 content for a PEM private key.",
+      githubAppDiagnosticUrlInvalid:
+        "The GitHub App install, callback, or webhook URL must be a valid HTTPS URL.",
       githubAppLoginRequired:
         "Sign in or create an Appaloft account first. The GitHub App installation callback binds the selected GitHub account or organization to your current workspace.",
       githubAppLoginRequiredTitle: "Sign in to connect a workspace",
@@ -2139,9 +2155,8 @@ export const enUS = {
       connectivityTestPending: "Testing",
       credentialRequired: "Choose SSH agent, a saved credential, or provide a private key first.",
       hostRequired: "Enter a server host first.",
-      identitySectionDescription:
-        "Define the deployment target name, address, port, and provider capability.",
-      identitySectionTitle: "Target identity",
+      identitySectionDescription: "Set the server name, host, and SSH port.",
+      identitySectionTitle: "Server details",
       localSshAgent: "Local SSH agent",
       localSshAgentDescriptionOne:
         "Local SSH agent uses SSH_AUTH_SOCK and loaded keys on the machine running the Appaloft backend.",
