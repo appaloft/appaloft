@@ -590,6 +590,10 @@ export async function createAppaloftServer(
     typeof resourceAccessFailureRendererTargetForStartedServer
   >;
 
+  const authTrustedOrigins = Array.from(
+    new Set([config.webOrigin, ...(config.betterAuthTrustedOrigins ?? [])]),
+  );
+
   let authRuntime =
     options.authRuntime ??
     createBetterAuthRuntime({
@@ -619,7 +623,7 @@ export async function createAppaloftServer(
       ...(config.oidcDiscoveryUrl ? { oidcDiscoveryUrl: config.oidcDiscoveryUrl } : {}),
       ...(config.oidcIssuer ? { oidcIssuer: config.oidcIssuer } : {}),
       ...(config.oidcRedirectUri ? { oidcRedirectUri: config.oidcRedirectUri } : {}),
-      trustedOrigins: [config.webOrigin],
+      trustedOrigins: authTrustedOrigins,
     });
 
   let authRuntimeContext: AppaloftServerAuthRuntimeContext = {
