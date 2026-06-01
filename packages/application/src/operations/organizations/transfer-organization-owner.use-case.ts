@@ -83,6 +83,15 @@ export class TransferOrganizationOwnerUseCase {
       );
     }
 
+    if (toMember.status === "deactivated") {
+      return err(
+        domainError.invariant("Organization ownership cannot transfer to a deactivated member", {
+          phase: "organization-transfer-owner",
+          toMemberId: input.toMemberId,
+        }),
+      );
+    }
+
     return this.organizationTeamManagement.transferOwner(context, input);
   }
 }

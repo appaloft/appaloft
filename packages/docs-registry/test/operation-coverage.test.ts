@@ -2181,6 +2181,7 @@ describe("public docs operation coverage", () => {
         "organizations.invite-member",
         "organizations.change-member-role",
         "organizations.remove-member",
+        "organizations.reactivate-member",
         "organizations.transfer-owner",
       ],
       "self-hosting.action-deploy-token-auth": [
@@ -2223,6 +2224,7 @@ describe("public docs operation coverage", () => {
       "organizations.invite-member",
       "organizations.change-member-role",
       "organizations.remove-member",
+      "organizations.reactivate-member",
       "organizations.transfer-owner",
     ] as const) {
       expect(getPublicDocsOperationCoverage(operationKey)).toMatchObject({

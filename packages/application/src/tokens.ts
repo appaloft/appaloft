@@ -222,6 +222,9 @@ export const tokens = {
     "appaloft.list_organization_members_query_service",
   ),
   removeOrganizationMemberUseCase: Symbol.for("appaloft.remove_organization_member_use_case"),
+  reactivateOrganizationMemberUseCase: Symbol.for(
+    "appaloft.reactivate_organization_member_use_case",
+  ),
   revokeDeployTokenUseCase: Symbol.for("appaloft.revoke_deploy_token_use_case"),
   rotateDeployTokenUseCase: Symbol.for("appaloft.rotate_deploy_token_use_case"),
   showDeployTokenQueryService: Symbol.for("appaloft.show_deploy_token_query_service"),

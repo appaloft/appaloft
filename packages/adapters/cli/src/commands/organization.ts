@@ -4,6 +4,7 @@ import {
   InviteOrganizationMemberCommand,
   ListOrganizationInvitationsQuery,
   ListOrganizationMembersQuery,
+  ReactivateOrganizationMemberCommand,
   RemoveOrganizationMemberCommand,
   SwitchCurrentOrganizationCommand,
   TransferOrganizationOwnerCommand,
@@ -148,9 +149,31 @@ const memberRemoveCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.organizationMemberRemove));
 
+const memberRestoreCommand = EffectCommand.make(
+  "restore",
+  {
+    memberId: memberIdArg,
+    organizationId: organizationIdOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ idempotencyKey, memberId, organizationId }) =>
+    runCommand(
+      ReactivateOrganizationMemberCommand.create({
+        organizationId,
+        memberId,
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.organizationMemberRestore));
+
 const memberCommand = EffectCommand.make("member").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.organizationMember),
-  EffectCommand.withSubcommands([memberInviteCommand, memberRoleCommand, memberRemoveCommand]),
+  EffectCommand.withSubcommands([
+    memberInviteCommand,
+    memberRoleCommand,
+    memberRemoveCommand,
+    memberRestoreCommand,
+  ]),
 );
 
 const ownerTransferCommand = EffectCommand.make(

@@ -91,6 +91,7 @@ export const betterAuthMigration = {
         column.notNull().references("user.id").onDelete("cascade"),
       )
       .addColumn("role", "text", (column) => column.notNull())
+      .addColumn("status", "text", (column) => column.defaultTo("active").notNull())
       .addColumn("createdAt", "timestamptz", (column) => column.notNull())
       .execute();
 

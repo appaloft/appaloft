@@ -87,6 +87,7 @@ import { sshCredentialOrganizationOwnershipMigration } from "./migrations/078_ss
 import { githubAppInstallationsMigration } from "./migrations/079_github_app_installations";
 import { authPendingVerificationIntentMigration } from "./migrations/080_auth_pending_verification_intent";
 import { dependencyResourceCapabilitiesMigration } from "./migrations/081_dependency_resource_capabilities";
+import { memberLifecycleStatusMigration } from "./migrations/082_member_lifecycle_status";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -264,6 +265,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "079_github_app_installations": githubAppInstallationsMigration,
       "080_auth_pending_verification_intent": authPendingVerificationIntentMigration,
       "081_dependency_resource_capabilities": dependencyResourceCapabilitiesMigration,
+      "082_member_lifecycle_status": memberLifecycleStatusMigration,
     };
   }
 }

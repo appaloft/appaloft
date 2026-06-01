@@ -36,6 +36,7 @@ import {
   type ProductSessionAuthorizationInput,
   type ProductSessionAuthorizationPort,
   type ProductSessionAuthorizationResult,
+  type ReactivateOrganizationMemberInput,
   type RemoveOrganizationMemberInput,
   type RevokeAccountSessionInput,
   type SwitchCurrentOrganizationInput,
@@ -158,6 +159,7 @@ interface ProvisionedDefaultOrganization {
 
 interface DirectAuthDatabase {
   selectFrom(table: string): DirectMemberQueryBuilder;
+  updateTable(table: string): DirectMemberUpdateBuilder;
 }
 
 interface DirectMemberQueryBuilder {
@@ -166,6 +168,13 @@ interface DirectMemberQueryBuilder {
   where(column: string, operator: "=", value: string): DirectMemberQueryBuilder;
   limit(limit: number): DirectMemberQueryBuilder;
   execute(): Promise<Record<string, unknown>[]>;
+}
+
+interface DirectMemberUpdateBuilder {
+  set(values: Record<string, unknown>): DirectMemberUpdateBuilder;
+  where(column: string, operator: "=", value: string): DirectMemberUpdateBuilder;
+  returning(selection: readonly string[]): DirectMemberUpdateBuilder;
+  executeTakeFirst(): Promise<Record<string, unknown> | undefined>;
 }
 
 type ForcedIdCreateAdapter = {
@@ -513,7 +522,11 @@ export class BetterAuthRuntime implements AuthRuntime {
           query: { organizationId },
         });
     const role = normalizeProductOrganizationRole(readString(activeRole, "role"));
-    return role ? { organizationId, role } : null;
+    if (!role) {
+      return null;
+    }
+    const status = await this.activeOrganizationMemberStatus(context, headers, organizationId);
+    return status === "deactivated" ? null : { organizationId, role };
   }
 
   private async ensureDefaultOrganizationAfterAuthRoute(
@@ -1283,6 +1296,14 @@ export class BetterAuthRuntime implements AuthRuntime {
       if (!role) {
         return err(productAuthForbidden(authInput, "organization-member-missing"));
       }
+      const memberStatus = await this.activeOrganizationMemberStatus(
+        context,
+        headers,
+        organizationId,
+      );
+      if (memberStatus === "deactivated") {
+        return err(productAuthForbidden(authInput, "organization-member-deactivated"));
+      }
 
       const authContext = await this.auth.$context;
       const organization = (await authContext.adapter.findOne<Record<string, unknown>>({
@@ -1327,12 +1348,32 @@ export class BetterAuthRuntime implements AuthRuntime {
       }
 
       const organizations = await this.getCachedVisibleOrganizations(context, headers);
-      const organizationSummaries = toArray(organizations).map(mapContextOrganization);
+      const organizationSummaries = (
+        await Promise.all(
+          toArray(organizations).map(async (organization) => {
+            const summary = mapContextOrganization(organization);
+            const status = await this.activeOrganizationMemberStatus(
+              context,
+              headers,
+              summary.organizationId,
+            );
+            return status === "deactivated" ? null : summary;
+          }),
+        )
+      ).filter((summary): summary is NonNullable<typeof summary> => Boolean(summary));
       const displayName = readString(userObject, "name");
       const avatarUrl = readString(userObject, "image");
       let activeOrganizationId =
         readString(sessionObject, "activeOrganizationId") ??
         organizationSummaries[0]?.organizationId;
+      if (
+        activeOrganizationId &&
+        !organizationSummaries.some(
+          (organization) => organization.organizationId === activeOrganizationId,
+        )
+      ) {
+        activeOrganizationId = organizationSummaries[0]?.organizationId;
+      }
       if (!readString(sessionObject, "activeOrganizationId") && activeOrganizationId) {
         await this.rememberActiveOrganization(headers, activeOrganizationId);
       }
@@ -1473,6 +1514,11 @@ export class BetterAuthRuntime implements AuthRuntime {
 
     try {
       await this.rememberActiveOrganization(headers, input.organizationId);
+      const directReadback = await this.listMembersFromDatabase(headers, input);
+      if ("result" in directReadback) {
+        return directReadback.result;
+      }
+
       const result = await this.auth.api.listMembers({
         headers,
         query: {
@@ -1521,6 +1567,14 @@ export class BetterAuthRuntime implements AuthRuntime {
     if (!role) {
       return { reasonCode: "organization-member-missing" };
     }
+    const memberStatus = await this.activeOrganizationMemberStatus(
+      undefined,
+      headers,
+      input.organizationId,
+    );
+    if (memberStatus === "deactivated") {
+      return { reasonCode: "organization-member-deactivated" };
+    }
 
     try {
       const limit = Math.max(1, Math.min(input.limit ?? 100, 100));
@@ -1531,6 +1585,7 @@ export class BetterAuthRuntime implements AuthRuntime {
           "member.id as memberId",
           "member.userId as userId",
           "member.role as role",
+          "member.status as status",
           "member.createdAt as joinedAt",
           "auth_user.email as email",
           "auth_user.name as displayName",
@@ -1667,14 +1722,34 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
 
     try {
-      const result = await this.auth.api.removeMember({
-        headers,
-        body: {
-          organizationId: input.organizationId,
-          memberIdOrEmail: input.memberId,
-        },
-      });
-      const member = readObject(result, "member") ?? {};
+      const db = directAuthDatabase(this.config.database);
+      if (!db) {
+        return err(
+          productAuthInvalid(
+            organizationTeamAuthInput("DELETE", "organization-member", input.organizationId),
+            "remove-member-lifecycle-unavailable",
+          ),
+        );
+      }
+
+      await this.rememberActiveOrganization(headers, input.organizationId);
+      const member = await db
+        .updateTable("member")
+        .set({ status: "deactivated" })
+        .where("id", "=", input.memberId)
+        .where("organizationId", "=", input.organizationId)
+        .returning(["id", "organizationId"])
+        .executeTakeFirst();
+
+      if (!member) {
+        return err(
+          productAuthForbidden(
+            organizationTeamAuthInput("DELETE", "organization-member", input.organizationId),
+            "organization-member-missing",
+          ),
+        );
+      }
+
       return ok({
         memberId: readString(member, "id") ?? input.memberId,
         organizationId: readString(member, "organizationId") ?? input.organizationId,
@@ -1685,6 +1760,68 @@ export class BetterAuthRuntime implements AuthRuntime {
         productAuthForbidden(
           organizationTeamAuthInput("DELETE", "organization-member", input.organizationId),
           "remove-member-failed",
+        ),
+      );
+    }
+  }
+
+  async reactivateMember(
+    context: ExecutionContext,
+    input: ReactivateOrganizationMemberInput,
+  ): Promise<Result<OrganizationMemberSummary>> {
+    const headers = contextAuthHeaders(context);
+    if (!headers) {
+      return err(
+        productAuthMissing(
+          organizationTeamAuthInput("POST", "organization-member-reactivate"),
+          "session-missing",
+        ),
+      );
+    }
+
+    try {
+      const db = directAuthDatabase(this.config.database);
+      if (!db) {
+        return err(
+          productAuthInvalid(
+            organizationTeamAuthInput(
+              "POST",
+              "organization-member-reactivate",
+              input.organizationId,
+            ),
+            "reactivate-member-lifecycle-unavailable",
+          ),
+        );
+      }
+
+      await this.rememberActiveOrganization(headers, input.organizationId);
+      const member = await db
+        .updateTable("member")
+        .set({ status: "active" })
+        .where("id", "=", input.memberId)
+        .where("organizationId", "=", input.organizationId)
+        .returning(["id", "organizationId", "userId", "role", "status", "createdAt"])
+        .executeTakeFirst();
+
+      if (!member) {
+        return err(
+          productAuthForbidden(
+            organizationTeamAuthInput(
+              "POST",
+              "organization-member-reactivate",
+              input.organizationId,
+            ),
+            "organization-member-missing",
+          ),
+        );
+      }
+
+      return ok(mapMemberSummary(member));
+    } catch {
+      return err(
+        productAuthForbidden(
+          organizationTeamAuthInput("POST", "organization-member-reactivate", input.organizationId),
+          "reactivate-member-failed",
         ),
       );
     }
@@ -1741,6 +1878,36 @@ export class BetterAuthRuntime implements AuthRuntime {
         ),
       );
     }
+  }
+
+  private async activeOrganizationMemberStatus(
+    context: ExecutionContext | undefined,
+    headers: Headers,
+    organizationId: string,
+  ): Promise<OrganizationMemberSummary["status"]> {
+    const db = directAuthDatabase(this.config.database);
+    if (!db) {
+      return "active";
+    }
+
+    const session = context
+      ? await this.getCachedSession(context, headers)
+      : await this.auth.api.getSession({ headers });
+    const sessionObject = readObject(session, "session");
+    const userObject = readObject(session, "user");
+    const userId = readString(userObject, "id") ?? readString(sessionObject, "userId");
+    if (!userId) {
+      return undefined;
+    }
+
+    const rows = await db
+      .selectFrom("member")
+      .select(["status"])
+      .where("organizationId", "=", organizationId)
+      .where("userId", "=", userId)
+      .limit(1)
+      .execute();
+    return normalizeMemberStatus(readString(rows[0], "status")) ?? "active";
   }
 }
 
@@ -2270,6 +2437,7 @@ function mapMemberSummary(value: unknown): OrganizationMemberSummary {
   const avatarUrl = readString(user, "image");
   const displayName = readString(user, "name");
   const email = readString(user, "email");
+  const status = normalizeMemberStatus(readString(member, "status"));
   return {
     memberId: readString(member, "id") ?? "",
     userId: readString(member, "userId") ?? readString(user, "id") ?? "",
@@ -2281,6 +2449,7 @@ function mapMemberSummary(value: unknown): OrganizationMemberSummary {
     ...(avatarUrl ? { avatarUrl } : {}),
     ...(displayName ? { displayName } : {}),
     ...(email ? { email } : {}),
+    ...(status ? { status } : {}),
   };
 }
 
@@ -2288,6 +2457,7 @@ function mapDirectMemberSummary(value: Record<string, unknown>): OrganizationMem
   const avatarUrl = readString(value, "avatarUrl");
   const displayName = readString(value, "displayName");
   const email = readString(value, "email");
+  const status = normalizeMemberStatus(readString(value, "status"));
   return {
     memberId: readString(value, "memberId") ?? "",
     userId: readString(value, "userId") ?? "",
@@ -2296,7 +2466,15 @@ function mapDirectMemberSummary(value: Record<string, unknown>): OrganizationMem
     ...(avatarUrl ? { avatarUrl } : {}),
     ...(displayName ? { displayName } : {}),
     ...(email ? { email } : {}),
+    ...(status ? { status } : {}),
   };
+}
+
+function normalizeMemberStatus(status: string | undefined): OrganizationMemberSummary["status"] {
+  if (status === "active" || status === "deactivated") {
+    return status;
+  }
+  return undefined;
 }
 
 function normalizeInvitationStatus(status: string | undefined): OrganizationInvitationStatus {
@@ -2454,7 +2632,9 @@ function directAuthDatabase(
   database: BetterAuthRuntimeConfig["database"] | undefined,
 ): DirectAuthDatabase | null {
   const db = readObject(database, "db");
-  return db && typeof db.selectFrom === "function" ? (db as unknown as DirectAuthDatabase) : null;
+  return db && typeof db.selectFrom === "function" && typeof db.updateTable === "function"
+    ? (db as unknown as DirectAuthDatabase)
+    : null;
 }
 
 export interface StaticActionDeployTokenScope {

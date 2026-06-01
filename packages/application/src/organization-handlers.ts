@@ -5,6 +5,7 @@ export * from "./operations/organizations/get-current-organization-context.handl
 export * from "./operations/organizations/invite-organization-member.handler";
 export * from "./operations/organizations/list-organization-invitations.handler";
 export * from "./operations/organizations/list-organization-members.handler";
+export * from "./operations/organizations/reactivate-organization-member.handler";
 export * from "./operations/organizations/remove-organization-member.handler";
 export * from "./operations/organizations/show-organization-profile.handler";
 export * from "./operations/organizations/switch-current-organization.handler";

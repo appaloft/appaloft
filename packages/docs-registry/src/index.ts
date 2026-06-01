@@ -3553,6 +3553,11 @@ export const publicDocsOperationCoverage = [
     topicId: "self-hosting.organization-team-management",
   },
   {
+    operationKey: "organizations.reactivate-member",
+    status: "documented",
+    topicId: "self-hosting.organization-team-management",
+  },
+  {
     operationKey: "organizations.transfer-owner",
     status: "documented",
     topicId: "self-hosting.organization-team-management",

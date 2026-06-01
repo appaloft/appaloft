@@ -5,13 +5,13 @@ import { type ExecutionContext } from "../../execution-context";
 import {
   type OrganizationMemberSummary,
   type OrganizationTeamManagementPort,
-  type RemoveOrganizationMemberInput,
+  type ReactivateOrganizationMemberInput,
 } from "../../ports";
 import { tokens } from "../../tokens";
-import { type RemoveOrganizationMemberResult } from "./remove-organization-member.command";
+import { type ReactivateOrganizationMemberResult } from "./reactivate-organization-member.command";
 
 @injectable()
-export class RemoveOrganizationMemberUseCase {
+export class ReactivateOrganizationMemberUseCase {
   constructor(
     @inject(tokens.organizationTeamManagementPort)
     private readonly organizationTeamManagement: OrganizationTeamManagementPort,
@@ -19,8 +19,8 @@ export class RemoveOrganizationMemberUseCase {
 
   async execute(
     context: ExecutionContext,
-    input: RemoveOrganizationMemberInput,
-  ): Promise<Result<RemoveOrganizationMemberResult>> {
+    input: ReactivateOrganizationMemberInput,
+  ): Promise<Result<ReactivateOrganizationMemberResult>> {
     const members = await this.organizationTeamManagement.listMembers(context, {
       organizationId: input.organizationId,
       limit: 250,
@@ -36,25 +36,16 @@ export class RemoveOrganizationMemberUseCase {
       return err(domainError.notFound("organization_member", input.memberId));
     }
 
-    if (member.role === "owner") {
+    if (member.status !== "deactivated") {
       return err(
-        domainError.invariant("Organization owners can only be removed after ownership transfer", {
+        domainError.invariant("Only deactivated organization members can be reactivated", {
           memberId: input.memberId,
-          phase: "organization-remove-member",
+          phase: "organization-reactivate-member",
         }),
       );
     }
 
-    if (member.status === "deactivated") {
-      return err(
-        domainError.invariant("Organization member is already deactivated", {
-          memberId: input.memberId,
-          phase: "organization-remove-member",
-        }),
-      );
-    }
-
-    return this.organizationTeamManagement.removeMember(context, input);
+    return this.organizationTeamManagement.reactivateMember(context, input);
   }
 }
 

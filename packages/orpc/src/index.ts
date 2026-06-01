@@ -348,6 +348,7 @@ import {
   queryCapabilitiesResponseSchema,
   queryEntitlementsInputSchema,
   queryEntitlementsResponseSchema,
+  ReactivateOrganizationMemberCommand,
   RecordUsageIntentCommand,
   RedeployDeploymentCommand,
   RegisterServerCommand,
@@ -392,6 +393,7 @@ import {
   RotateSshCredentialCommand,
   RunScheduledTaskNowCommand,
   RuntimeMonitoringRollupQuery,
+  reactivateOrganizationMemberCommandInputSchema,
   recordUsageIntentInputSchema,
   recordUsageIntentResponseSchema,
   redeployDeploymentCommandInputSchema,
@@ -672,6 +674,7 @@ import {
   pruneServerCapacityResponseSchema,
   pruneSourceEventsResponseSchema,
   publishStaticArtifactResponseSchema,
+  reactivateOrganizationMemberResponseSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   removeOrganizationMemberResponseSchema,
@@ -2918,6 +2921,18 @@ export const removeOrganizationMemberProcedure = base
   .output(removeOrganizationMemberResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, RemoveOrganizationMemberCommand.create(input)),
+  );
+
+export const reactivateOrganizationMemberProcedure = base
+  .route({
+    method: "POST",
+    path: "/organizations/{organizationId}/members/{memberId}/reactivate",
+    successStatus: 200,
+  })
+  .input(reactivateOrganizationMemberCommandInputSchema)
+  .output(reactivateOrganizationMemberResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReactivateOrganizationMemberCommand.create(input)),
   );
 
 export const transferOrganizationOwnerProcedure = base
@@ -5765,6 +5780,7 @@ export const appaloftOrpcRouter = {
     inviteMember: inviteOrganizationMemberProcedure,
     updateMemberRole: changeOrganizationMemberRoleProcedure,
     removeMember: removeOrganizationMemberProcedure,
+    reactivateMember: reactivateOrganizationMemberProcedure,
     transferOwner: transferOrganizationOwnerProcedure,
   },
   projects: {
@@ -8266,6 +8282,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/organizations/:organizationId/invitations",
     "/api/organizations/:organizationId/members/:memberId/role",
     "/api/organizations/:organizationId/members/:memberId",
+    "/api/organizations/:organizationId/members/:memberId/reactivate",
     "/api/organizations/:organizationId/owner-transfer",
     "/api/projects",
     "/api/projects/:projectId",

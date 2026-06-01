@@ -281,10 +281,11 @@ describe("CLI organization commands", () => {
     });
   });
 
-  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [ORG-TEAM-OWNER-TRANSFER-001] member mutation commands dispatch organization commands", async () => {
+  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [CLOUD-IDENTITY-MEMBER-REACTIVATE-004] [ORG-TEAM-OWNER-TRANSFER-001] member mutation commands dispatch organization commands", async () => {
     const {
       InviteOrganizationMemberCommand,
       RemoveOrganizationMemberCommand,
+      ReactivateOrganizationMemberCommand,
       ChangeOrganizationMemberRoleCommand,
       TransferOrganizationOwnerCommand,
     } = await import("@appaloft/application");
@@ -331,6 +332,16 @@ describe("CLI organization commands", () => {
       "node",
       "appaloft",
       "organization",
+      "member",
+      "restore",
+      "mem_operator",
+      "--organization-id",
+      "org_self_hosted",
+    ]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "organization",
       "owner",
       "transfer",
       "mem_admin",
@@ -341,7 +352,7 @@ describe("CLI organization commands", () => {
       "idem_owner_transfer",
     ]);
 
-    expect(commands).toHaveLength(4);
+    expect(commands).toHaveLength(5);
     expect(commands[0]).toBeInstanceOf(InviteOrganizationMemberCommand);
     expect(commands[0]).toMatchObject({
       organizationId: "org_self_hosted",
@@ -359,8 +370,13 @@ describe("CLI organization commands", () => {
       organizationId: "org_self_hosted",
       memberId: "mem_operator",
     });
-    expect(commands[3]).toBeInstanceOf(TransferOrganizationOwnerCommand);
+    expect(commands[3]).toBeInstanceOf(ReactivateOrganizationMemberCommand);
     expect(commands[3]).toMatchObject({
+      organizationId: "org_self_hosted",
+      memberId: "mem_operator",
+    });
+    expect(commands[4]).toBeInstanceOf(TransferOrganizationOwnerCommand);
+    expect(commands[4]).toMatchObject({
       organizationId: "org_self_hosted",
       fromMemberId: "mem_admin",
       toMemberId: "mem_operator",

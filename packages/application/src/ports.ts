@@ -6514,6 +6514,12 @@ export interface RemoveOrganizationMemberInput {
   idempotencyKey?: string;
 }
 
+export interface ReactivateOrganizationMemberInput {
+  organizationId: string;
+  memberId: string;
+  idempotencyKey?: string;
+}
+
 export interface TransferOrganizationOwnerInput {
   organizationId: string;
   fromMemberId: string;
@@ -6601,6 +6607,10 @@ export interface OrganizationTeamManagementPort {
     context: ExecutionContext,
     input: RemoveOrganizationMemberInput,
   ): Promise<Result<{ memberId: string; organizationId: string; removedAt: string }>>;
+  reactivateMember(
+    context: ExecutionContext,
+    input: ReactivateOrganizationMemberInput,
+  ): Promise<Result<OrganizationMemberSummary>>;
 }
 
 export type OperationKind = "command" | "query";

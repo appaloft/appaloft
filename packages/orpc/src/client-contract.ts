@@ -123,6 +123,7 @@ import {
   type QueryCapabilitiesResponse,
   type QueryEntitlementsInput,
   type QueryEntitlementsResponse,
+  type ReactivateOrganizationMemberCommandInput,
   type RedeployDeploymentCommandInput,
   type RegisterServerCommandInput,
   type RelinkSourceLinkCommandInput,
@@ -323,6 +324,7 @@ import {
   type PruneServerCapacityResponse,
   type PruneSourceEventsResponse,
   type PublishStaticArtifactResponse,
+  type ReactivateOrganizationMemberResponse,
   type RedeployDeploymentResponse,
   type RegisterServerResponse,
   type RemoveOrganizationMemberResponse,
@@ -636,6 +638,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RemoveOrganizationMemberCommandInput,
       RemoveOrganizationMemberResponse,
+      AppaloftClientError
+    >;
+    reactivateMember: Client<
+      AppaloftClientContext,
+      ReactivateOrganizationMemberCommandInput,
+      ReactivateOrganizationMemberResponse,
       AppaloftClientError
     >;
     transferOwner: Client<

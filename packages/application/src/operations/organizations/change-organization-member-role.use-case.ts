@@ -53,6 +53,15 @@ export class ChangeOrganizationMemberRoleUseCase {
       );
     }
 
+    if (member.status === "deactivated") {
+      return err(
+        domainError.invariant("Deactivated organization members cannot change roles", {
+          memberId: input.memberId,
+          phase: "organization-change-member-role",
+        }),
+      );
+    }
+
     return this.organizationTeamManagement.updateMemberRole(context, input);
   }
 }
