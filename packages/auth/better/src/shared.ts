@@ -16,6 +16,7 @@ export interface AppaloftBetterAuthEmailOTPInput {
 
 type BetterAuthEmailVerificationOptions = NonNullable<BetterAuthOptions["emailVerification"]>;
 type BetterAuthEmailAndPasswordOptions = NonNullable<BetterAuthOptions["emailAndPassword"]>;
+type BetterAuthOrganizationOptions = NonNullable<Parameters<typeof organization>[0]>;
 
 export const defaultAppaloftAccountRecoveryCooldownSeconds = 60;
 export const defaultAppaloftEmailOtpCooldownSeconds = 60;
@@ -66,6 +67,14 @@ export interface AppaloftBetterAuthAccountRecoveryConfig {
   readonly sendResetPassword?: BetterAuthEmailAndPasswordOptions["sendResetPassword"];
 }
 
+export type AppaloftBetterAuthSendInvitationEmail = NonNullable<
+  BetterAuthOrganizationOptions["sendInvitationEmail"]
+>;
+
+export interface AppaloftBetterAuthOrganizationConfig {
+  readonly sendInvitationEmail?: AppaloftBetterAuthSendInvitationEmail;
+}
+
 export interface AppaloftBetterAuthConfig {
   baseURL: string;
   secret: string;
@@ -87,6 +96,7 @@ export interface AppaloftBetterAuthConfig {
   oidcDiscoveryUrl?: string;
   oidcIssuer?: string;
   oidcRedirectUri?: string;
+  organization?: AppaloftBetterAuthOrganizationConfig;
   trustedProxyHeaders?: boolean;
   trustedOrigins?: readonly string[];
 }
@@ -417,7 +427,11 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     },
     plugins: [
       bearer(),
-      organization(),
+      organization({
+        ...(config.organization?.sendInvitationEmail
+          ? { sendInvitationEmail: config.organization.sendInvitationEmail }
+          : {}),
+      }),
       ...(emailVerificationStatus.otpEnabled && config.emailVerification?.sendVerificationOTP
         ? [
             emailOTP({
