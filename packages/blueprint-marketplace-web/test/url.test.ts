@@ -36,16 +36,19 @@ describe("Blueprint marketplace web URLs", () => {
     );
   });
 
-  test("keeps product icon and primary button visuals in the shared component", async () => {
-    const source = await readFile(
-      new URL("../src/BlueprintMarketplacePage.svelte", import.meta.url),
-      "utf8",
-    );
+  test("keeps product icon and primary button visuals in the shared card component", async () => {
+    const [pageSource, cardSource] = await Promise.all([
+      readFile(new URL("../src/BlueprintMarketplacePage.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../src/BlueprintMarketplaceCard.svelte", import.meta.url), "utf8"),
+    ]);
 
-    expect(source).toContain("class:has-image={hasIconImage(item)}");
-    expect(source).toContain("markIconFailed(item)");
-    expect(source).toContain("--marketplace-primary: #4e84ff");
-    expect(source).toContain("background: white;");
-    expect(source).toContain("hasIconImage(item) ? undefined : iconFallbackStyle(item)");
+    expect(pageSource).toContain("BlueprintMarketplaceCard");
+    expect(cardSource).toContain("@appaloft/ui/card");
+    expect(cardSource).toContain("@appaloft/ui/button");
+    expect(cardSource).toContain("@appaloft/ui/badge");
+    expect(cardSource).toContain("iconFailed = true");
+    expect(cardSource).toContain("bg-card");
+    expect(cardSource).toContain("data-blueprint-marketplace-card");
+    expect(cardSource).not.toContain("<style>");
   });
 });

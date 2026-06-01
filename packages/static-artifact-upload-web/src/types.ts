@@ -8,6 +8,7 @@ export interface StaticArtifactUploadSessionState {
 export interface StaticArtifactUploadAuthProvider {
   readonly key: "github" | "email";
   readonly available: boolean;
+  readonly mode?: "magic-link" | "otp";
 }
 
 export interface StaticArtifactUploadLoginRequest {
@@ -19,7 +20,7 @@ export interface StaticArtifactUploadLoginRequest {
 
 export interface StaticArtifactUploadLoginResult extends StaticArtifactUploadSessionState {
   readonly message?: string;
-  readonly nextStep?: "otp" | "authenticated";
+  readonly nextStep?: "otp" | "sent" | "authenticated";
 }
 
 export interface StaticArtifactUploadFilePayload {
@@ -71,6 +72,7 @@ export interface StaticArtifactUploadCopy {
   readonly emailLabel: string;
   readonly emailPlaceholder: string;
   readonly emailSend: string;
+  readonly emailLinkSent: string;
   readonly otpLabel: string;
   readonly otpPlaceholder: string;
   readonly otpVerify: string;

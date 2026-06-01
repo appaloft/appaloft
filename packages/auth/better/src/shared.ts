@@ -1,5 +1,5 @@
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { bearer, emailOTP, organization } from "better-auth/plugins";
+import { bearer, emailOTP, magicLink, organization } from "better-auth/plugins";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 
 export type AppaloftBetterAuthEmailOTPType =
@@ -16,11 +16,14 @@ export interface AppaloftBetterAuthEmailOTPInput {
 
 type BetterAuthEmailVerificationOptions = NonNullable<BetterAuthOptions["emailVerification"]>;
 type BetterAuthEmailAndPasswordOptions = NonNullable<BetterAuthOptions["emailAndPassword"]>;
+type BetterAuthMagicLinkOptions = NonNullable<Parameters<typeof magicLink>[0]>;
 type BetterAuthOrganizationOptions = NonNullable<Parameters<typeof organization>[0]>;
 
 export const defaultAppaloftAccountRecoveryCooldownSeconds = 60;
 export const defaultAppaloftEmailOtpCooldownSeconds = 60;
 export const defaultAppaloftEmailOtpLength = 6;
+export const defaultAppaloftMagicLinkCooldownSeconds = 60;
+export const defaultAppaloftMagicLinkExpiresInSeconds = 300;
 
 export interface AppaloftBetterAuthEmailOTPConfig {
   readonly enabled?: boolean;
@@ -67,6 +70,20 @@ export interface AppaloftBetterAuthAccountRecoveryConfig {
   readonly sendResetPassword?: BetterAuthEmailAndPasswordOptions["sendResetPassword"];
 }
 
+export interface AppaloftBetterAuthMagicLinkConfig {
+  readonly cooldownSeconds?: number;
+  readonly disableSignUp?: boolean;
+  readonly enabled?: boolean;
+  readonly expiresIn?: number;
+  readonly generateToken?: BetterAuthMagicLinkOptions["generateToken"];
+  readonly rateLimit?: {
+    readonly max: number;
+    readonly window: number;
+  };
+  readonly sendMagicLink?: BetterAuthMagicLinkOptions["sendMagicLink"];
+  readonly storeToken?: BetterAuthMagicLinkOptions["storeToken"];
+}
+
 export type AppaloftBetterAuthSendInvitationEmail = NonNullable<
   BetterAuthOrganizationOptions["sendInvitationEmail"]
 >;
@@ -83,6 +100,7 @@ export interface AppaloftBetterAuthConfig {
   cookiePrefix?: string;
   database?: BetterAuthOptions["database"];
   emailVerification?: AppaloftBetterAuthEmailVerificationConfig;
+  magicLink?: AppaloftBetterAuthMagicLinkConfig;
   rateLimit?: BetterAuthOptions["rateLimit"];
   minPasswordLength?: number;
   githubClientId?: string;
@@ -132,6 +150,13 @@ export interface AppaloftBetterAuthAccountRecoveryStatus {
   requestPath?: string;
   resetPagePath?: string;
   resetPath?: string;
+}
+
+export interface AppaloftBetterAuthMagicLinkStatus {
+  cooldownSeconds?: number;
+  enabled: boolean;
+  requestPath?: string;
+  verifyPath?: string;
 }
 
 export interface AppaloftBetterAuthAccountSecurityStatus {
@@ -258,6 +283,25 @@ export function resolveAppaloftBetterAuthAccountRecoveryStatus(
   };
 }
 
+export function resolveAppaloftBetterAuthMagicLinkStatus(
+  config: AppaloftBetterAuthConfig,
+): AppaloftBetterAuthMagicLinkStatus {
+  const enabled =
+    config.magicLink?.enabled === true && typeof config.magicLink.sendMagicLink === "function";
+  const cooldownSeconds = resolveMagicLinkCooldownSeconds(config);
+
+  return {
+    enabled,
+    ...(enabled
+      ? {
+          cooldownSeconds,
+          requestPath: "/api/auth/sign-in/magic-link",
+          verifyPath: "/api/auth/magic-link/verify",
+        }
+      : {}),
+  };
+}
+
 export function resolveAppaloftBetterAuthAccountSecurityStatus(input?: {
   readonly passwordState?: AppaloftBetterAuthAccountSecurityStatus["passwordState"];
 }): AppaloftBetterAuthAccountSecurityStatus {
@@ -298,6 +342,7 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
   const emailVerification = createEmailVerificationOptions(config);
   const accountRecoveryStatus = resolveAppaloftBetterAuthAccountRecoveryStatus(config);
   const emailVerificationStatus = resolveAppaloftBetterAuthEmailVerificationStatus(config);
+  const magicLinkStatus = resolveAppaloftBetterAuthMagicLinkStatus(config);
   const accountRecoveryRateLimit =
     config.accountRecovery?.rateLimit ??
     (accountRecoveryStatus.enabled
@@ -313,6 +358,14 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
       ? {
           max: 1,
           window: emailVerificationStatus.cooldownSeconds ?? defaultAppaloftEmailOtpCooldownSeconds,
+        }
+      : undefined);
+  const magicLinkRateLimit =
+    config.magicLink?.rateLimit ??
+    (magicLinkStatus.enabled
+      ? {
+          max: 1,
+          window: magicLinkStatus.cooldownSeconds ?? defaultAppaloftMagicLinkCooldownSeconds,
         }
       : undefined);
 
@@ -336,14 +389,19 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     basePath: "/api/auth",
     secret: config.secret,
     ...(config.database ? { database: config.database } : {}),
-    ...(config.rateLimit || emailVerificationStatus.otpEnabled || accountRecoveryStatus.enabled
+    ...(config.rateLimit ||
+    emailVerificationStatus.otpEnabled ||
+    accountRecoveryStatus.enabled ||
+    magicLinkStatus.enabled
       ? {
           rateLimit: {
             ...(config.rateLimit ?? {}),
-            ...(emailVerificationStatus.otpEnabled || accountRecoveryStatus.enabled
+            ...(emailVerificationStatus.otpEnabled ||
+            accountRecoveryStatus.enabled ||
+            magicLinkStatus.enabled
               ? { enabled: true }
               : {}),
-            ...(otpSendRateLimit || accountRecoveryRateLimit
+            ...(otpSendRateLimit || accountRecoveryRateLimit || magicLinkRateLimit
               ? {
                   customRules: {
                     ...(config.rateLimit?.customRules ?? {}),
@@ -356,6 +414,7 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
                     ...(accountRecoveryRateLimit
                       ? { "/request-password-reset": accountRecoveryRateLimit }
                       : {}),
+                    ...(magicLinkRateLimit ? { "/sign-in/magic-link": magicLinkRateLimit } : {}),
                   },
                 }
               : {}),
@@ -468,6 +527,25 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
             }),
           ]
         : []),
+      ...(magicLinkStatus.enabled && config.magicLink?.sendMagicLink
+        ? [
+            magicLink({
+              ...(config.magicLink.disableSignUp !== undefined
+                ? { disableSignUp: config.magicLink.disableSignUp }
+                : {}),
+              expiresIn: config.magicLink.expiresIn ?? defaultAppaloftMagicLinkExpiresInSeconds,
+              ...(config.magicLink.generateToken
+                ? { generateToken: config.magicLink.generateToken }
+                : {}),
+              rateLimit: config.magicLink.rateLimit ?? {
+                max: 1,
+                window: magicLinkStatus.cooldownSeconds ?? defaultAppaloftMagicLinkCooldownSeconds,
+              },
+              sendMagicLink: config.magicLink.sendMagicLink,
+              ...(config.magicLink.storeToken ? { storeToken: config.magicLink.storeToken } : {}),
+            }),
+          ]
+        : []),
       ...(providers.oidc &&
       config.oidcClientId &&
       config.oidcClientSecret &&
@@ -531,6 +609,14 @@ function resolveAccountRecoveryCooldownSeconds(config: AppaloftBetterAuthConfig)
     positiveInteger(config.accountRecovery?.cooldownSeconds) ??
     positiveInteger(config.accountRecovery?.rateLimit?.window) ??
     defaultAppaloftAccountRecoveryCooldownSeconds
+  );
+}
+
+function resolveMagicLinkCooldownSeconds(config: AppaloftBetterAuthConfig): number {
+  return (
+    positiveInteger(config.magicLink?.cooldownSeconds) ??
+    positiveInteger(config.magicLink?.rateLimit?.window) ??
+    defaultAppaloftMagicLinkCooldownSeconds
   );
 }
 
