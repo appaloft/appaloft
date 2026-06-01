@@ -122,6 +122,12 @@ export type BetterAuthOrganizationProvisionReason =
   | "default-organization"
   | "pending-verification-intent";
 
+interface BetterAuthRequestCache {
+  activeMemberRoles: Map<string, Promise<unknown>>;
+  organizations?: Promise<Record<string, unknown>[]>;
+  session?: Promise<unknown | null>;
+}
+
 export interface BetterAuthOrganizationAdmissionRequest {
   readonly currentUserOrganizationCount?: number;
   readonly email?: string;
@@ -207,6 +213,7 @@ export class BetterAuthRuntime implements AuthRuntime {
   private readonly googleConfigured: boolean;
   private readonly organizationAdmission: BetterAuthOrganizationAdmissionPort | undefined;
   private readonly oidcConfigured: boolean;
+  private readonly requestCaches = new WeakMap<ExecutionContext, BetterAuthRequestCache>();
 
   constructor(private readonly config: BetterAuthRuntimeConfig) {
     const providers = resolveAppaloftBetterAuthProviderConfig(config);
@@ -397,8 +404,65 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
   }
 
-  private async firstVisibleOrganizationId(headers: Headers): Promise<string | undefined> {
-    return (await this.visibleOrganizations(headers))
+  private requestCache(context: ExecutionContext): BetterAuthRequestCache {
+    const cached = this.requestCaches.get(context);
+    if (cached) {
+      return cached;
+    }
+    const created: BetterAuthRequestCache = {
+      activeMemberRoles: new Map(),
+    };
+    this.requestCaches.set(context, created);
+    return created;
+  }
+
+  private clearRequestCache(context: ExecutionContext): void {
+    this.requestCaches.delete(context);
+  }
+
+  private async getCachedSession(
+    context: ExecutionContext,
+    headers: Headers,
+  ): Promise<unknown | null> {
+    const cache = this.requestCache(context);
+    cache.session ??= this.auth.api.getSession({ headers });
+    return cache.session;
+  }
+
+  private async getCachedVisibleOrganizations(
+    context: ExecutionContext,
+    headers: Headers,
+  ): Promise<Record<string, unknown>[]> {
+    const cache = this.requestCache(context);
+    cache.organizations ??= this.visibleOrganizations(headers);
+    return cache.organizations;
+  }
+
+  private async getCachedActiveMemberRole(
+    context: ExecutionContext,
+    headers: Headers,
+    organizationId: string,
+  ): Promise<unknown> {
+    const cache = this.requestCache(context);
+    let activeRole = cache.activeMemberRoles.get(organizationId);
+    if (!activeRole) {
+      activeRole = this.auth.api.getActiveMemberRole({
+        headers,
+        query: { organizationId },
+      });
+      cache.activeMemberRoles.set(organizationId, activeRole);
+    }
+    return activeRole;
+  }
+
+  private async firstVisibleOrganizationId(
+    headers: Headers,
+    context?: ExecutionContext,
+  ): Promise<string | undefined> {
+    return (context
+      ? await this.getCachedVisibleOrganizations(context, headers)
+      : await this.visibleOrganizations(headers)
+    )
       .map(
         (organization) =>
           readString(organization, "id") ?? readString(organization, "organizationId"),
@@ -434,16 +498,19 @@ export class BetterAuthRuntime implements AuthRuntime {
 
   private async firstAuthorizedOrganizationRole(
     headers: Headers,
+    context?: ExecutionContext,
   ): Promise<{ organizationId: string; role: ProductOrganizationRole } | null> {
-    const organizationId = await this.firstVisibleOrganizationId(headers);
+    const organizationId = await this.firstVisibleOrganizationId(headers, context);
     if (!organizationId) {
       return null;
     }
 
-    const activeRole = await this.auth.api.getActiveMemberRole({
-      headers,
-      query: { organizationId },
-    });
+    const activeRole = context
+      ? await this.getCachedActiveMemberRole(context, headers, organizationId)
+      : await this.auth.api.getActiveMemberRole({
+          headers,
+          query: { organizationId },
+        });
     const role = normalizeProductOrganizationRole(readString(activeRole, "role"));
     return role ? { organizationId, role } : null;
   }
@@ -682,9 +749,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     const headers = productAuthHeaders(input);
 
     try {
-      const session = await this.auth.api.getSession({
-        headers,
-      });
+      const session = await this.getCachedSession(_context, headers);
       if (!session) {
         return err(productAuthMissing(input, "session-missing"));
       }
@@ -701,7 +766,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         input.organizationId ?? readString(sessionObject, "activeOrganizationId");
       const visibleOrganizationId = activeOrganizationId
         ? undefined
-        : await this.firstVisibleOrganizationId(headers);
+        : await this.firstVisibleOrganizationId(headers, _context);
       let organizationId = activeOrganizationId ?? visibleOrganizationId;
       if (!organizationId) {
         const provisioned = input.organizationId
@@ -716,18 +781,13 @@ export class BetterAuthRuntime implements AuthRuntime {
         await this.rememberActiveOrganization(headers, visibleOrganizationId);
       }
 
-      const activeRole = await this.auth.api.getActiveMemberRole({
-        headers,
-        query: {
-          organizationId,
-        },
-      });
+      const activeRole = await this.getCachedActiveMemberRole(_context, headers, organizationId);
       let resolvedOrganizationId = organizationId;
       const activeRoleValue = readString(activeRole, "role");
       let organizationRole = normalizeOrganizationTeamRole(activeRoleValue);
       let role = normalizeProductOrganizationRole(activeRoleValue);
       if (!role && !input.organizationId) {
-        const fallback = await this.firstAuthorizedOrganizationRole(headers);
+        const fallback = await this.firstAuthorizedOrganizationRole(headers, _context);
         if (fallback) {
           resolvedOrganizationId = fallback.organizationId;
           role = fallback.role;
@@ -1252,7 +1312,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     }
 
     try {
-      const session = await this.auth.api.getSession({ headers });
+      const session = await this.getCachedSession(context, headers);
       if (!session) {
         return err(productAuthMissing(authInput, "session-missing"));
       }
@@ -1265,7 +1325,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         return err(productAuthInvalid(authInput, "session-user-missing"));
       }
 
-      const organizations = await this.auth.api.listOrganizations({ headers });
+      const organizations = await this.getCachedVisibleOrganizations(context, headers);
       const organizationSummaries = toArray(organizations).map(mapContextOrganization);
       const displayName = readString(userObject, "name");
       const avatarUrl = readString(userObject, "image");
@@ -1311,18 +1371,20 @@ export class BetterAuthRuntime implements AuthRuntime {
         });
       }
 
-      const activeRole = await this.auth.api.getActiveMemberRole({
+      const activeRole = await this.getCachedActiveMemberRole(
+        context,
         headers,
-        query: { organizationId: activeOrganizationId },
-      });
+        activeOrganizationId,
+      );
       let currentRole = normalizeOrganizationTeamRole(readString(activeRole, "role"));
       if (!currentRole && organizationSummaries[0]?.organizationId) {
         activeOrganizationId = organizationSummaries[0].organizationId;
         await this.rememberActiveOrganization(headers, activeOrganizationId);
-        const fallbackRole = await this.auth.api.getActiveMemberRole({
+        const fallbackRole = await this.getCachedActiveMemberRole(
+          context,
           headers,
-          query: { organizationId: activeOrganizationId },
-        });
+          activeOrganizationId,
+        );
         currentRole = normalizeOrganizationTeamRole(readString(fallbackRole, "role"));
       }
       if (!currentRole) {
@@ -1386,6 +1448,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       if (!selected) {
         return err(productAuthForbidden(authInput, "organization-switch-forbidden"));
       }
+      this.clearRequestCache(context);
     } catch {
       return err(productAuthForbidden(authInput, "organization-switch-failed"));
     }

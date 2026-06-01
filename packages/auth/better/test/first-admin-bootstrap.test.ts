@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { type ExecutionContext } from "@appaloft/application";
 import { makeSignature } from "better-auth/crypto";
 
-import { createBetterAuthRuntime } from "../src";
+import { BetterAuthRuntime, createBetterAuthRuntime } from "../src";
 import {
   createAppaloftBetterAuthOptions,
   resolveAppaloftBetterAuthAccountRecoveryStatus,
@@ -390,6 +390,70 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       loginRequired: true,
       session: null,
     });
+  });
+
+  test("[AUTH-SESSION-004] reuses session and active role reads inside one execution context", async () => {
+    const runtime = new BetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+    });
+    let getSessionCalls = 0;
+    let getActiveMemberRoleCalls = 0;
+    let listOrganizationsCalls = 0;
+    (runtime as unknown as { auth: unknown }).auth = {
+      api: {
+        async getSession() {
+          getSessionCalls += 1;
+          return {
+            session: {
+              activeOrganizationId: "org_test",
+              userId: "usr_test",
+            },
+            user: {
+              email: "owner@appaloft.test",
+              id: "usr_test",
+              name: "Owner",
+            },
+          };
+        },
+        async getActiveMemberRole() {
+          getActiveMemberRoleCalls += 1;
+          return { role: "owner" };
+        },
+        async listOrganizations() {
+          listOrganizationsCalls += 1;
+          return [
+            {
+              id: "org_test",
+              name: "Test Organization",
+              role: "owner",
+              slug: "test-organization",
+            },
+          ];
+        },
+      },
+    };
+    const requestContext = {
+      ...context,
+      auth: {
+        cookieHeader: "better-auth.session_token=test",
+      },
+    } satisfies ExecutionContext;
+
+    const authorized = await runtime.authorizeProductSession(requestContext, {
+      cookieHeader: "better-auth.session_token=test",
+      method: "GET",
+      path: "/api/rpc/deployments/list",
+      requiredRole: "member",
+    });
+    const currentContext = await runtime.getCurrentContext(requestContext);
+
+    expect(authorized.isOk()).toBe(true);
+    expect(currentContext.isOk()).toBe(true);
+    expect(getSessionCalls).toBe(1);
+    expect(getActiveMemberRoleCalls).toBe(1);
+    expect(listOrganizationsCalls).toBe(1);
   });
 
   test("[FIRST-ADMIN-BOOTSTRAP-004] creates local user and organization through Appaloft port", async () => {
