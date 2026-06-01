@@ -254,6 +254,22 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
   });
 
+  test("[ORG-TEAM-INVITE-002] registers neutral organization invitation delivery when injected", () => {
+    const sendInvitationEmail = async () => undefined;
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+      organization: {
+        sendInvitationEmail,
+      },
+    });
+
+    const organizationPlugin = options.plugins?.find((plugin) => plugin.id === "organization") as
+      | { options?: { sendInvitationEmail?: unknown } }
+      | undefined;
+    expect(organizationPlugin?.options?.sendInvitationEmail).toBe(sendInvitationEmail);
+  });
+
   test("[CLOUD-AUTH-EMAIL-002][CLOUD-AUTH-ACCOUNT-010] registers neutral email verification and change-email OTP policy when injected", () => {
     const options = createAppaloftBetterAuthOptions({
       baseURL: "https://appaloft.example.com",
@@ -1282,10 +1298,16 @@ describe("Better Auth first-admin bootstrap adapter", () => {
   });
 
   test("[ORG-TEAM-INVITE-003] invitations require membership and preserve pending-invitation lifecycle", async () => {
+    const invitationDeliveries: unknown[] = [];
     const runtime = createBetterAuthRuntime({
       enabled: true,
       baseURL: "http://localhost:3721",
       secret: "test-secret-at-least-long-enough",
+      organization: {
+        sendInvitationEmail: async (invitation) => {
+          invitationDeliveries.push(invitation);
+        },
+      },
     });
 
     const owner = await signUpWithSessionCookie(runtime, {
@@ -1323,6 +1345,12 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       role: "developer",
       status: "pending",
     });
+    expect(invitationDeliveries).toEqual([
+      expect.objectContaining({
+        email: "pending-member@example.com",
+        role: "member",
+      }),
+    ]);
 
     const duplicateInvitation = await runtime.inviteMember(
       {
