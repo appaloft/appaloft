@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
     Building2,
@@ -22,6 +23,7 @@
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -72,7 +74,6 @@
   let createdTokenSecret = $state("");
   let operationNotice = $state("");
   let operationError = $state("");
-  let selectedOrganizationId = $state("");
   let roleDrafts = $state<Record<string, OrganizationTeamRole>>({});
   let ownerTransferDrafts = $state<Record<string, string>>({});
   let inviteDialogOpen = $state(false);
@@ -223,10 +224,9 @@
   }));
 
   const switchCurrentOrganizationMutation = createMutation(() => ({
-    mutationFn: () =>
-      orpcClient.organizations.switchCurrent({ organizationId: selectedOrganizationId }),
+    mutationFn: (organizationId: string) =>
+      orpcClient.organizations.switchCurrent({ organizationId }),
     onSuccess: (result) => {
-      selectedOrganizationId = result.currentOrganization.organizationId;
       createdTokenSecret = "";
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.switchSucceeded);
@@ -477,11 +477,6 @@
         (organizationProfile?.name ?? currentOrganization?.name ?? "") &&
       !deleteOrganizationMutation.isPending,
   );
-  const canSwitchOrganization = $derived(
-    Boolean(selectedOrganizationId) &&
-      selectedOrganizationId !== currentOrganizationId &&
-      !switchCurrentOrganizationMutation.isPending,
-  );
 
   $effect(() => {
     for (const member of activeMembers) {
@@ -492,12 +487,6 @@
           ownerTransferDrafts[member.memberId] = candidates[0]?.memberId ?? "";
         }
       }
-    }
-  });
-
-  $effect(() => {
-    if (currentOrganizationId && !selectedOrganizationId) {
-      selectedOrganizationId = currentOrganizationId;
     }
   });
 
@@ -638,10 +627,21 @@
     }
   }
 
-  function submitOrganizationSwitch(event: SubmitEvent): void {
-    event.preventDefault();
-    if (canSwitchOrganization) {
-      switchCurrentOrganizationMutation.mutate();
+  function switchOrganization(organizationId: string): void {
+    if (
+      !organizationId ||
+      organizationId === currentOrganizationId ||
+      switchCurrentOrganizationMutation.isPending
+    ) {
+      return;
+    }
+
+    switchCurrentOrganizationMutation.mutate(organizationId);
+  }
+
+  function navigateTo(path: string): void {
+    if (browser) {
+      void goto(path);
     }
   }
 
@@ -742,6 +742,16 @@
     { label: $t(i18nKeys.console.organization.pageTitle) },
   ]}
 >
+  {#snippet sidebarHeader()}
+    <ConsoleOrganizationSwitcher
+      {currentOrganization}
+      organizations={context?.organizations ?? []}
+      pending={switchCurrentOrganizationMutation.isPending}
+      onSwitch={switchOrganization}
+      onNavigate={navigateTo}
+    />
+  {/snippet}
+
   {#if contextQuery.isPending}
     <div class="space-y-5">
       <Skeleton class="h-5 w-40" />
@@ -933,43 +943,18 @@
               </div>
             {/if}
           </div>
-          <div class="mt-4 flex flex-wrap gap-2">
-            {#each context.organizations as organization (organization.organizationId)}
-              <Badge variant={organization.organizationId === currentOrganizationId ? "default" : "outline"}>
-                {organization.name} · {roleLabel(organization.role)}
-              </Badge>
-            {/each}
-          </div>
           {#if context.organizations.length > 1}
-            <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" onsubmit={submitOrganizationSwitch}>
-              <label class="min-w-0 flex-1 space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.organization.switchTitle)}</span>
-                <Select.Root
-                  bind:value={selectedOrganizationId}
-                  disabled={switchCurrentOrganizationMutation.isPending}
-                  type="single"
-                >
-                  <Select.Trigger class="w-full">
-                    {context.organizations.find(
-                      (organization) => organization.organizationId === selectedOrganizationId,
-                    )?.name ?? currentOrganization.name}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each context.organizations as organization (organization.organizationId)}
-                      <Select.Item value={organization.organizationId}>
-                        {organization.name} · {roleLabel(organization.role)}
-                      </Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </label>
-              <Button disabled={!canSwitchOrganization} type="submit" variant="outline">
-                <RotateCw class="size-4" />
-                {switchCurrentOrganizationMutation.isPending
-                  ? $t(i18nKeys.console.organization.switchingAction)
-                  : $t(i18nKeys.console.organization.switchAction)}
-              </Button>
-            </form>
+            <div class="mt-5">
+              <ConsoleOrganizationSwitcher
+                {currentOrganization}
+                organizations={context.organizations}
+                pending={switchCurrentOrganizationMutation.isPending}
+                showManagementLinks={false}
+                triggerClass="border bg-background hover:bg-muted"
+                collapsedClass=""
+                onSwitch={switchOrganization}
+              />
+            </div>
             <p class="mt-2 text-xs leading-5 text-muted-foreground">
               {$t(i18nKeys.console.organization.switchDescription)}
             </p>

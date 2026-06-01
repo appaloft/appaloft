@@ -6,10 +6,20 @@ import { webDocsHrefs } from "./docs-help";
 
 describe("organization auth management console surface", () => {
   test("[ORG-TEAM-WEB-001] exposes organization/team operations through shared oRPC contracts", async () => {
-    const [pageSource, shellSource, userMenuSource, clientContractSource] = await Promise.all([
+    const [
+      pageSource,
+      shellSource,
+      organizationSwitcherSource,
+      userMenuSource,
+      clientContractSource,
+    ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(
         new URL("../../lib/components/console/ConsoleShell.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../lib/components/console/ConsoleOrganizationSwitcher.svelte", import.meta.url),
         "utf8",
       ),
       readFile(
@@ -39,10 +49,12 @@ describe("organization auth management console surface", () => {
     expect(pageSource).not.toContain("better-auth");
     expect(shellSource).not.toContain('href: "/organization"');
     expect(shellSource).not.toContain('href: "/instance"');
-    expect(shellSource).toContain('navigateTo("/organization")');
-    expect(shellSource).toContain('navigateTo("/instance")');
-    expect(shellSource).toContain("i18nKeys.console.nav.organization");
-    expect(shellSource).toContain("i18nKeys.console.nav.instance");
+    expect(shellSource).toContain("ConsoleOrganizationSwitcher");
+    expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
+    expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
+    expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.organization");
+    expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.instance");
+    expect(organizationSwitcherSource).toContain("data-console-organization-switcher-trigger");
     expect(shellSource).toContain("ConsoleUserMenu");
     expect(userMenuSource).toContain('"/api/auth/sign-out"');
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
@@ -158,6 +170,8 @@ describe("organization auth management console surface", () => {
       settingsShellSource,
       settingsNavSource,
       consoleShellSource,
+      organizationSwitcherSource,
+      consoleExtensionPageSource,
       userMenuSource,
       clientContractSource,
       enUSSource,
@@ -188,6 +202,14 @@ describe("organization auth management console surface", () => {
         "utf8",
       ),
       readFile(
+        new URL("../../lib/components/console/ConsoleOrganizationSwitcher.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../lib/components/console/ConsoleExtensionPage.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
         new URL("../../lib/components/console/ConsoleUserMenu.svelte", import.meta.url),
         "utf8",
       ),
@@ -207,6 +229,8 @@ describe("organization auth management console surface", () => {
     ]);
 
     expect(settingsShellSource).toContain("Sidebar");
+    expect(settingsShellSource).toContain("sidebarHeader?: Snippet");
+    expect(settingsShellSource).toContain("{@render sidebarHeader()}");
     expect(settingsShellSource).toContain("labelKey");
     expect(settingsShellSource).toContain("label?: string");
     expect(settingsShellSource).toContain("itemLabel");
@@ -249,6 +273,9 @@ describe("organization auth management console surface", () => {
     expect(accountDangerSource).toContain("confirmation: { userId");
 
     expect(organizationPageSource).toContain("SettingsShell");
+    expect(organizationPageSource).toContain("ConsoleOrganizationSwitcher");
+    expect(organizationPageSource).toContain("{#snippet sidebarHeader()}");
+    expect(organizationPageSource).toContain("showManagementLinks={false}");
     expect(organizationPageSource).toContain("/api/system-plugins/web-extensions");
     expect(organizationPageSource).toContain(
       "organizationSettingsItems(webExtensionsQuery.data?.items ?? [])",
@@ -375,6 +402,16 @@ describe("organization auth management console surface", () => {
     }
 
     expect(consoleShellSource).toContain("ConsoleUserMenu");
+    expect(consoleShellSource).toContain("ConsoleOrganizationSwitcher");
+    expect(organizationSwitcherSource).toContain("DropdownMenuContent");
+    expect(organizationSwitcherSource).toContain("DropdownMenuItem");
+    expect(consoleExtensionPageSource).toContain(
+      '<h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>',
+    );
+    expect(consoleExtensionPageSource).toContain("{pageDocument.description}");
+    expect(consoleExtensionPageSource).toContain("pageDocument.actions");
+    expect(consoleExtensionPageSource).toContain("data-console-page-table-body");
+    expect(consoleExtensionPageSource).toContain('class="border-t px-5"');
     expect(userMenuSource).toContain('navigateTo("/account/profile")');
     expect(userMenuSource).not.toContain('navigateTo("/account/security")');
     expect(clientContractSource).toContain("account: {");
