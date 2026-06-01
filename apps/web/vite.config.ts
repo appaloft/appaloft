@@ -224,6 +224,7 @@ export default defineConfig(({ mode }) => {
   );
 
   return {
+    clearScreen: false,
     plugins: [
       createDocsRedirectPlugin(docsRedirectTarget),
       createFirstAdminBootstrapGatePlugin(proxyTarget),
