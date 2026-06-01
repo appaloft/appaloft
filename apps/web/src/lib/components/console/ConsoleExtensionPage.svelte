@@ -311,6 +311,10 @@
     return section.height === "tall" ? "min-h-[520px]" : "";
   }
 
+  function summaryGridClass(section: ConsolePageSummaryGridSection): string {
+    return section.items.length <= 3 ? "xl:grid-cols-3" : "xl:grid-cols-4";
+  }
+
   function requestActionKey(action: ConsolePageRequestAction, item?: ConsolePagePanelItem): string {
     return `${item?.title ?? "page"}:${action.method ?? "POST"}:${action.endpoint}:${action.label}`;
   }
@@ -541,7 +545,7 @@
 
       {#each pageDocument.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
         {#if section.kind === "summary-grid"}
-          <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-console-page-summary-grid>
+          <section class={["grid gap-4 md:grid-cols-2", summaryGridClass(section)]} data-console-page-summary-grid>
             {#each section.items as item (item.label)}
               {@const Icon = iconComponent(item.icon)}
               {#if item.href}
