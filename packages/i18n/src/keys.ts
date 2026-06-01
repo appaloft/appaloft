@@ -1808,6 +1808,20 @@ export const i18nKeys = {
       dockerImage: "console:quickDeploy.dockerImage",
       dockerImagePlaceholder: "console:quickDeploy.dockerImagePlaceholder",
       githubAppConnectedTitle: "console:quickDeploy.githubAppConnectedTitle",
+      githubAppConfigurationDiagnosticsEmpty:
+        "console:quickDeploy.githubAppConfigurationDiagnosticsEmpty",
+      githubAppConfigurationPendingDescription:
+        "console:quickDeploy.githubAppConfigurationPendingDescription",
+      githubAppConfigurationPendingTitle: "console:quickDeploy.githubAppConfigurationPendingTitle",
+      githubAppDiagnosticCode: "console:quickDeploy.githubAppDiagnosticCode",
+      githubAppDiagnosticEnvMissing: "console:quickDeploy.githubAppDiagnosticEnvMissing",
+      githubAppDiagnosticInstallationSmokePending:
+        "console:quickDeploy.githubAppDiagnosticInstallationSmokePending",
+      githubAppDiagnosticPermissionsPending:
+        "console:quickDeploy.githubAppDiagnosticPermissionsPending",
+      githubAppDiagnosticPrivateKeyInvalid:
+        "console:quickDeploy.githubAppDiagnosticPrivateKeyInvalid",
+      githubAppDiagnosticUrlInvalid: "console:quickDeploy.githubAppDiagnosticUrlInvalid",
       githubAppLoginRequired: "console:quickDeploy.githubAppLoginRequired",
       githubAppLoginRequiredTitle: "console:quickDeploy.githubAppLoginRequiredTitle",
       githubAppRepositoryAccessAll: "console:quickDeploy.githubAppRepositoryAccessAll",

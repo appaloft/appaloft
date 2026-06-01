@@ -89,11 +89,7 @@
   } from "$lib/console/blueprint-marketplace-extension";
   import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
-  import {
-    defaultAuthSession,
-    defaultConsoleListLimit,
-    type ProviderSummary,
-  } from "$lib/console/queries";
+  import { defaultAuthSession, defaultConsoleListLimit } from "$lib/console/queries";
   import {
     environmentKinds,
     parseEnvironmentKind,
@@ -104,8 +100,8 @@
     createQuickDeployServerCredential,
     createRegisterServerInput,
     createServerRegistrationDraft,
-    fallbackServerProviderOptions,
     isServerRegistrationDraftComplete,
+    sshServerProviderKey,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
   import { deploymentDetailHref, readSessionIdentity } from "$lib/console/utils";
@@ -129,6 +125,9 @@
   type DraftMode = "existing" | "new";
   type ResourceKind = ResourceSummary["kind"];
   type DependencyKind = DependencyResourceSummary["kind"];
+  type GitHubAppConfigurationDiagnostic = NonNullable<
+    IntegrationDescriptor["configuration"]
+  >["diagnostics"][number];
   type DependencyKindIcon = {
     title: string;
     svg: string;
@@ -531,13 +530,6 @@
       enabled: browser && enabled,
     }),
   );
-  const providersQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["providers"],
-      queryFn: () => orpcClient.providers.list(),
-      enabled: browser && enabled,
-    }),
-  );
   const integrationsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["integrations"],
@@ -595,9 +587,6 @@
       name: browser ? (page.url.searchParams.get("serverName") ?? "local-machine") : "local-machine",
       host: browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1",
       port: browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22",
-      providerKey: browser
-        ? (page.url.searchParams.get("serverProvider") ?? "generic-ssh")
-        : "generic-ssh",
     }),
   );
   let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
@@ -808,7 +797,6 @@
   const servers = $derived((serversQuery.data?.items ?? []) as ServerSummary[]);
   const environments = $derived((environmentsQuery.data?.items ?? []) as EnvironmentSummary[]);
   const resources = $derived((resourcesQuery.data?.items ?? []) as ResourceSummary[]);
-  const providers = $derived((providersQuery.data?.items ?? []) as ProviderSummary[]);
   const integrations = $derived((integrationsQuery.data?.items ?? []) as IntegrationDescriptor[]);
   const githubIntegration = $derived(
     integrations.find((integration) => integration.key === "github") ?? null,
@@ -822,6 +810,9 @@
   const githubUsesHostedProviderApp = $derived(githubConnectionMode?.key === "hosted-provider-app");
   const githubHostedProviderAppConfigured = $derived(
     githubIntegration?.configuration?.status === "configured",
+  );
+  const githubAppConfigurationDiagnostics = $derived(
+    githubIntegration?.configuration?.diagnostics ?? [],
   );
   const githubAppConnectionQuery = createQuery(() =>
     queryOptions({
@@ -866,6 +857,22 @@
 
     return $t(i18nKeys.console.quickDeploy.githubAppRepositoryAccessUnknown);
   });
+  function githubAppDiagnosticMessage(diagnostic: GitHubAppConfigurationDiagnostic): string {
+    switch (diagnostic.code) {
+      case "cloud-github-app-env-missing":
+        return $t(i18nKeys.console.quickDeploy.githubAppDiagnosticEnvMissing);
+      case "cloud-github-app-private-key-base64-invalid":
+        return $t(i18nKeys.console.quickDeploy.githubAppDiagnosticPrivateKeyInvalid);
+      case "cloud-github-app-url-invalid":
+        return $t(i18nKeys.console.quickDeploy.githubAppDiagnosticUrlInvalid);
+      case "cloud-github-app-permissions-review-pending":
+        return $t(i18nKeys.console.quickDeploy.githubAppDiagnosticPermissionsPending);
+      case "cloud-github-app-installation-smoke-pending":
+        return $t(i18nKeys.console.quickDeploy.githubAppDiagnosticInstallationSmokePending);
+      default:
+        return diagnostic.message;
+    }
+  }
   const githubRepositoryBrowsingEnabled = $derived.by(() => {
     if (githubUsesHostedProviderApp) {
       return githubHostedProviderAppConfigured && githubAppConnected;
@@ -1086,9 +1093,6 @@
 
     return environments;
   });
-  const providerOptions = $derived(
-    providers.length > 0 ? providers : fallbackServerProviderOptions,
-  );
   const deployPending = $derived(
     createProjectMutation.isPending ||
       registerServerMutation.isPending ||
@@ -1157,10 +1161,6 @@
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
   const selectedSourceGroupKey = $derived(sourceGroupForSourceKind(sourceKind));
-  const serverProviderTitle = $derived(
-    providerOptions.find((provider) => provider.key === serverDraft.providerKey)?.title ??
-      serverDraft.providerKey,
-  );
   const sourceSummary = $derived.by(() => {
     if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
       return selectedGitHubRepository.fullName;
@@ -1458,7 +1458,7 @@
     }
 
     return serverDraft.name.trim() && serverDraft.host.trim()
-      ? `${serverDraft.name.trim()} · ${serverProviderTitle} · ${serverDraft.host.trim()}`
+      ? `${serverDraft.name.trim()} · ${serverDraft.host.trim()}`
       : "待创建服务器";
   });
   const serverCredentialSummary = $derived.by(() => {
@@ -1474,10 +1474,6 @@
       return selectedServer.credential.kind === "ssh-private-key"
         ? `SSH 私钥${selectedServer.credential.username ? ` · ${selectedServer.credential.username}` : ""}`
         : `本机 SSH agent${selectedServer.credential.username ? ` · ${selectedServer.credential.username}` : ""}`;
-    }
-
-    if (serverDraft.providerKey !== "generic-ssh") {
-      return "本机或提供商默认凭据";
     }
 
     return serverDraft.credentialKind === "ssh-private-key"
@@ -1714,15 +1710,6 @@
 
     if (environmentMode === "existing" && !selectedEnvironmentId && filteredEnvironments.length > 0) {
       selectedEnvironmentId = filteredEnvironments[0].id;
-    }
-  });
-
-  $effect(() => {
-    if (
-      providerOptions.length > 0 &&
-      !providerOptions.some((provider) => provider.key === serverDraft.providerKey)
-    ) {
-      serverDraft.providerKey = providerOptions[0].key;
     }
   });
 
@@ -2302,7 +2289,7 @@
     setSearchParam(params, "serverName", serverDraft.name, "local-machine");
     setSearchParam(params, "serverHost", serverDraft.host, "127.0.0.1");
     setSearchParam(params, "serverPort", serverDraft.port, "22");
-    setSearchParam(params, "serverProvider", serverDraft.providerKey, "generic-ssh");
+    setSearchParam(params, "serverProvider", null);
 
     setSearchParam(params, "editEnvironment", environmentContextEnabled ? "true" : "false", "false");
     if (environmentContextEnabled) {
@@ -2388,7 +2375,7 @@
     serverDraft.name = params.get("serverName") ?? "local-machine";
     serverDraft.host = params.get("serverHost") ?? "127.0.0.1";
     serverDraft.port = params.get("serverPort") ?? "22";
-    serverDraft.providerKey = params.get("serverProvider") ?? "generic-ssh";
+    serverDraft.providerKey = sshServerProviderKey;
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
     resourceName = params.get("resourceName") ?? "";
@@ -4492,8 +4479,41 @@
               {/if}
 
               {#if githubUsesHostedProviderApp && !githubHostedProviderAppConfigured}
-                <div class="console-subtle-panel space-y-2 px-3 py-3 text-sm text-muted-foreground">
-                  <p>{$t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending)}</p>
+                <div class="console-subtle-panel space-y-3 px-3 py-3 text-sm">
+                  <div class="flex items-start gap-3">
+                    <Settings2 class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div class="min-w-0 space-y-1">
+                      <p class="font-medium text-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubAppConfigurationPendingTitle)}
+                      </p>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending)}
+                      </p>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubAppConfigurationPendingDescription)}
+                      </p>
+                    </div>
+                  </div>
+                  {#if githubAppConfigurationDiagnostics.length > 0}
+                    <div class="space-y-2 border-t pt-2">
+                      {#each githubAppConfigurationDiagnostics as diagnostic (diagnostic.code)}
+                        <div class="space-y-1 border-t pt-2 first:border-t-0 first:pt-0">
+                          <p class="text-xs leading-5 text-foreground">
+                            {githubAppDiagnosticMessage(diagnostic)}
+                          </p>
+                          <p class="font-mono text-[0.7rem] leading-4 text-muted-foreground">
+                            {$t(i18nKeys.console.quickDeploy.githubAppDiagnosticCode, {
+                              code: diagnostic.code,
+                            })}
+                          </p>
+                        </div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <p class="border-t pt-2 text-xs leading-5 text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.githubAppConfigurationDiagnosticsEmpty)}
+                    </p>
+                  {/if}
                 </div>
               {:else if githubUsesHostedProviderApp && loginRequired}
                 <div class="console-subtle-panel space-y-3 px-3 py-3 text-sm">
@@ -4792,7 +4812,6 @@
                 bind:connectivityResult={serverConnectivityResult}
                 bind:connectivityError={serverConnectivityError}
                 bind:testPending={serverConnectivityTestPending}
-                providers={providerOptions}
                 {sshCredentials}
                 testConnectivity={testDraftServerConnectivity}
               />

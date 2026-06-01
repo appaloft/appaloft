@@ -24,7 +24,6 @@
     "@appaloft/plugin-builtins": "workspace:*",
     "@appaloft/plugin-host": "workspace:*",
     "@appaloft/plugin-sdk": "workspace:*",
-    "@appaloft/provider-aliyun": "workspace:*",
     "@appaloft/provider-certificate-acme": "workspace:*",
     "@appaloft/provider-core": "workspace:*",
     "@appaloft/provider-default-access-domain-sslip": "workspace:*",
@@ -32,7 +31,6 @@
     "@appaloft/provider-edge-proxy-traefik": "workspace:*",
     "@appaloft/provider-generic-ssh": "workspace:*",
     "@appaloft/provider-local-shell": "workspace:*",
-    "@appaloft/provider-tencent": "workspace:*",
     "nanoid": "^5.1.11",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"

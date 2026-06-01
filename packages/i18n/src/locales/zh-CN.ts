@@ -1861,6 +1861,22 @@ export const zhCN = {
       dockerImage: "Docker 镜像",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
       githubAppConnectedTitle: "GitHub App 已安装",
+      githubAppConfigurationDiagnosticsEmpty:
+        "后端没有返回具体诊断；请确认 GitHub App 环境变量和 secrets 已注入 runtime。",
+      githubAppConfigurationPendingDescription:
+        "请处理下面的 readiness 诊断项，然后重启本地 server 或重新部署生产环境。",
+      githubAppConfigurationPendingTitle: "需要完成 GitHub App 运行配置",
+      githubAppDiagnosticCode: "诊断码：{{code}}",
+      githubAppDiagnosticEnvMissing:
+        "缺少必需的 GitHub App 环境变量或 secret。请检查 APPALOFT_CLOUD_GITHUB_APP_* 是否已注入 runtime。",
+      githubAppDiagnosticInstallationSmokePending:
+        "GitHub App 已配置，但安装事件 smoke 还没有完成。完成一次安装回调后可以消除这个提示。",
+      githubAppDiagnosticPermissionsPending:
+        "APPALOFT_CLOUD_GITHUB_APP_PERMISSIONS_REVIEWED 必须精确设置为 true，表示权限已经人工复核。",
+      githubAppDiagnosticPrivateKeyInvalid:
+        "APPALOFT_CLOUD_GITHUB_APP_PRIVATE_KEY_BASE64 不是有效 PEM 私钥的 base64 内容。",
+      githubAppDiagnosticUrlInvalid:
+        "GitHub App 的 install、callback 或 webhook URL 必须是有效的 HTTPS 地址。",
       githubAppLoginRequired:
         "请先登录或注册 Appaloft。GitHub App 安装回调需要把你在 GitHub 选择的个人账号或组织绑定到当前工作区。",
       githubAppLoginRequiredTitle: "先登录以连接工作区",
@@ -2026,8 +2042,8 @@ export const zhCN = {
       connectivityTestPending: "测试中",
       credentialRequired: "请先选择 SSH agent、已保存凭据，或提供私钥。",
       hostRequired: "请先填写服务器地址。",
-      identitySectionDescription: "定义这个部署目标的名称、地址、端口和 Provider 能力。",
-      identitySectionTitle: "目标身份",
+      identitySectionDescription: "填写服务器名称、主机地址和 SSH 端口。",
+      identitySectionTitle: "服务器信息",
       localSshAgent: "本机 SSH agent",
       localSshAgentDescriptionOne:
         "本机 SSH agent 会使用运行 Appaloft 后端这台机器上的 SSH_AUTH_SOCK 和已加载的 key。",

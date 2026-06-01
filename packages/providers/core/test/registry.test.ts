@@ -1,16 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { aliyunProvider } from "@appaloft/provider-aliyun";
+import { acmeCertificateProvider } from "@appaloft/provider-certificate-acme";
 import { genericSshProvider } from "@appaloft/provider-generic-ssh";
-import { tencentProvider } from "@appaloft/provider-tencent";
 import { InMemoryProviderRegistry } from "../src/index";
 
 describe("provider registry contract", () => {
   test("[SYSTEM-DIAG-001] returns provider descriptors with safe capability diagnostics", () => {
-    const registry = new InMemoryProviderRegistry([
-      genericSshProvider,
-      aliyunProvider,
-      tencentProvider,
-    ]);
+    const registry = new InMemoryProviderRegistry([genericSshProvider, acmeCertificateProvider]);
 
     expect(registry.list()).toEqual(
       expect.arrayContaining([
@@ -33,15 +28,11 @@ describe("provider registry contract", () => {
           }),
         }),
         expect.objectContaining({
-          key: "aliyun",
-          category: "cloud-provider",
+          key: "acme",
+          category: "infra-service",
           configuration: expect.objectContaining({
-            status: "not-configured",
+            status: "partial",
           }),
-        }),
-        expect.objectContaining({
-          key: "tencent-cloud",
-          category: "cloud-provider",
         }),
       ]),
     );
@@ -50,11 +41,7 @@ describe("provider registry contract", () => {
   });
 
   test("finds a provider descriptor by normalized key without scanning callers", () => {
-    const registry = new InMemoryProviderRegistry([
-      genericSshProvider,
-      aliyunProvider,
-      tencentProvider,
-    ]);
+    const registry = new InMemoryProviderRegistry([genericSshProvider, acmeCertificateProvider]);
 
     expect(registry.findByKey("generic-ssh")).toMatchObject({
       key: "generic-ssh",

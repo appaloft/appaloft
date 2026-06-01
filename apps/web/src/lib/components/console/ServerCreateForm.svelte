@@ -39,13 +39,6 @@
   let submitError = $state("");
   let createdServerId = $state("");
 
-  const providersQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["providers"],
-      queryFn: () => orpcClient.providers.list(),
-      enabled: browser,
-    }),
-  );
   const sshCredentialsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
@@ -54,7 +47,6 @@
     }),
   );
 
-  const providers = $derived(providersQuery.data?.items ?? []);
   const sshCredentials = $derived(sshCredentialsQuery.data?.items ?? []);
 
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
@@ -125,7 +117,6 @@
     bind:connectivityResult
     bind:connectivityError
     bind:testPending
-    {providers}
     {sshCredentials}
     disabled={submitPending}
     {idPrefix}

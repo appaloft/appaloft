@@ -8,13 +8,11 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Textarea } from "$lib/components/ui/textarea";
-  import type { ProviderSummary } from "$lib/console/queries";
   import {
     activeServerPrivateKeyInputMode,
     canTestServerRegistrationDraft,
     createDraftServerConnectivityInput,
     createServerRegistrationDraft,
-    fallbackServerProviderOptions,
     parseServerRegistrationPort,
     type DraftServerConnectivityInput,
     type ServerRegistrationDraft,
@@ -25,7 +23,6 @@
 
   type Props = {
     draft?: ServerRegistrationDraft;
-    providers?: ProviderSummary[];
     sshCredentials?: SshCredentialSummary[];
     connectivityResult?: TestServerConnectivityResponse | null;
     connectivityError?: string;
@@ -39,7 +36,6 @@
 
   let {
     draft = $bindable(createServerRegistrationDraft()),
-    providers = [],
     sshCredentials = [],
     connectivityResult = $bindable<TestServerConnectivityResponse | null>(null),
     connectivityError = $bindable(""),
@@ -49,9 +45,6 @@
     testConnectivity,
   }: Props = $props();
 
-  const providerOptions = $derived(
-    providers.length > 0 ? providers : fallbackServerProviderOptions,
-  );
   const activePrivateKeyInputMode = $derived(
     activeServerPrivateKeyInputMode(draft, sshCredentials),
   );
@@ -163,7 +156,7 @@
       return;
     }
 
-    if (draft.providerKey === "generic-ssh" && !input.server.credential) {
+    if (!input.server.credential) {
       connectivityError = $t(i18nKeys.console.serverForm.credentialRequired);
       return;
     }
@@ -184,8 +177,8 @@
 <div class="console-panel overflow-hidden">
   <div class="space-y-0">
     <section class="p-4 md:p-5">
-      <div class="grid gap-5 xl:grid-cols-[16rem_minmax(0,1fr)]">
-        <div class="space-y-1">
+      <div class="grid gap-4">
+        <div class="max-w-2xl space-y-1">
           <h2 class="text-base font-semibold">{$t(i18nKeys.console.serverForm.identitySectionTitle)}</h2>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.serverForm.identitySectionDescription)}
@@ -235,60 +228,49 @@
               placeholder="203.0.113.10"
             />
           </div>
-          <div class="space-y-1.5 lg:col-span-2">
-            <div class="console-field-label">
-              {$t(i18nKeys.common.domain.provider)}
-              <DocsHelpLink
-                href={webDocsHrefs.serverDockerSwarmTarget}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                className="size-4 border-0 bg-transparent shadow-none"
-              />
-            </div>
-            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {#each providerOptions as provider (provider.key)}
-                <Button
-                  class="h-10 justify-start"
-                  size="sm"
-                  disabled={disabled}
-                  variant={draft.providerKey === provider.key ? "selected" : "outline"}
-                  onclick={() => {
-                    draft.providerKey = provider.key;
-                  }}
-                >
-                  {provider.title}
-                </Button>
-              {/each}
-            </div>
-          </div>
         </div>
       </div>
     </section>
 
-    {#if draft.providerKey === "generic-ssh"}
-      <section class="border-t p-4 md:p-5">
-        <div class="grid gap-5 xl:grid-cols-[16rem_minmax(0,1fr)]">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <h2 class="text-base font-semibold">{$t(i18nKeys.console.serverForm.accessSectionTitle)}</h2>
-              <DocsHelpLink
-                href={webDocsHrefs.serverSshCredential}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                className="size-5"
-              />
-            </div>
+    <section class="border-t p-4 md:p-5">
+      <div class="grid gap-4">
+        <div class="max-w-2xl space-y-1">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-semibold">{$t(i18nKeys.console.serverForm.accessSectionTitle)}</h2>
+            <DocsHelpLink
+              href={webDocsHrefs.serverSshCredential}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              className="size-5"
+            />
+          </div>
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.serverForm.accessSectionDescription)}
+          </p>
+        </div>
+
+        <div class="space-y-5">
+          <div class="console-subtle-panel p-3">
             <p class="text-sm leading-6 text-muted-foreground">
-              {$t(i18nKeys.console.serverForm.accessSectionDescription)}
+              {$t(i18nKeys.console.serverForm.sshCredentialDescription)}
             </p>
           </div>
 
-          <div class="space-y-5">
-            <div class="console-subtle-panel p-3">
-              <p class="text-sm leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.serverForm.sshCredentialDescription)}
-              </p>
-            </div>
-
             <div class="grid gap-2 sm:grid-cols-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={disabled}
+                variant={draft.credentialKind === "ssh-private-key" ? "selected" : "outline"}
+                class="h-10 justify-start"
+                onclick={() => {
+                  draft.credentialKind = "ssh-private-key";
+                  if (draft.privateKeyInputMode === "saved" && sshCredentials.length === 0) {
+                    draft.privateKeyInputMode = "paste";
+                  }
+                }}
+              >
+                {$t(i18nKeys.console.serverForm.sshPrivateKey)}
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -300,21 +282,6 @@
                 }}
               >
                 {$t(i18nKeys.console.serverForm.localSshAgent)}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={disabled}
-                variant={draft.credentialKind === "ssh-private-key" ? "selected" : "outline"}
-                class="h-10 justify-start"
-                onclick={() => {
-                  draft.credentialKind = "ssh-private-key";
-                  if (draft.privateKeyInputMode === "saved" && sshCredentials.length === 0) {
-                    draft.privateKeyInputMode = "file";
-                  }
-                }}
-              >
-                {$t(i18nKeys.console.serverForm.sshPrivateKey)}
               </Button>
             </div>
 
@@ -333,6 +300,23 @@
               </p>
             </div>
 
+            {#if draft.credentialKind === "ssh-private-key" && (activePrivateKeyInputMode === "file" || activePrivateKeyInputMode === "paste")}
+              <div class="space-y-1.5">
+                <label class="console-field-label" for={`${idPrefix}-ssh-credential-name`}>
+                  {$t(i18nKeys.console.serverForm.sshCredentialName)}
+                </label>
+                <Input
+                  id={`${idPrefix}-ssh-credential-name`}
+                  bind:value={draft.sshCredentialName}
+                  disabled={disabled}
+                  placeholder={draft.credentialPrivateKeyFileName || `${draft.name || "server"} SSH key`}
+                />
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.serverForm.sshCredentialNameHint)}
+                </p>
+              </div>
+            {/if}
+
             {#if draft.credentialKind === "local-ssh-agent"}
               <div class="console-subtle-panel space-y-1 p-3 text-sm leading-6 text-muted-foreground">
                 <p>{$t(i18nKeys.console.serverForm.localSshAgentDescriptionOne)}</p>
@@ -344,6 +328,24 @@
                   {$t(i18nKeys.console.serverForm.privateKeySource)}
                 </p>
                 <div class="grid gap-2 md:grid-cols-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={disabled}
+                    variant={activePrivateKeyInputMode === "paste" ? "selected" : "outline"}
+                    class="h-auto min-h-14 flex-col items-start gap-0.5 px-3 py-2 text-left"
+                    onclick={() => {
+                      draft.privateKeyInputMode = "paste";
+                      draft.selectedSshCredentialId = "";
+                      draft.credentialPrivateKeyFileName = "";
+                      draft.credentialPrivateKeyImportError = null;
+                    }}
+                  >
+                    <span>{$t(i18nKeys.console.serverForm.pastePrivateKey)}</span>
+                    <span class="text-[0.72rem] font-normal opacity-75">
+                      {$t(i18nKeys.console.serverForm.manualInput)}
+                    </span>
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -383,24 +385,6 @@
                     <span>{$t(i18nKeys.console.serverForm.choosePrivateKeyFile)}</span>
                     <span class="text-[0.72rem] font-normal opacity-75">
                       {$t(i18nKeys.console.serverForm.privateKeyFileKind)}
-                    </span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={disabled}
-                    variant={activePrivateKeyInputMode === "paste" ? "selected" : "outline"}
-                    class="h-auto min-h-14 flex-col items-start gap-0.5 px-3 py-2 text-left"
-                    onclick={() => {
-                      draft.privateKeyInputMode = "paste";
-                      draft.selectedSshCredentialId = "";
-                      draft.credentialPrivateKeyFileName = "";
-                      draft.credentialPrivateKeyImportError = null;
-                    }}
-                  >
-                    <span>{$t(i18nKeys.console.serverForm.pastePrivateKey)}</span>
-                    <span class="text-[0.72rem] font-normal opacity-75">
-                      {$t(i18nKeys.console.serverForm.manualInput)}
                     </span>
                   </Button>
                 </div>
@@ -480,81 +464,65 @@
               {/if}
 
               {#if activePrivateKeyInputMode === "file" || activePrivateKeyInputMode === "paste"}
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <div class="space-y-1.5">
-                    <label class="console-field-label" for={`${idPrefix}-ssh-credential-name`}>
-                      {$t(i18nKeys.console.serverForm.sshCredentialName)}
-                    </label>
-                    <Input
-                      id={`${idPrefix}-ssh-credential-name`}
-                      bind:value={draft.sshCredentialName}
-                      disabled={disabled}
-                      placeholder={draft.credentialPrivateKeyFileName || `${draft.name || "server"} SSH key`}
-                    />
-                    <p class="text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.serverForm.sshCredentialNameHint)}
-                    </p>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="console-field-label" for={`${idPrefix}-ssh-public-key`}>
-                      {$t(i18nKeys.console.serverForm.sshPublicKey)}
-                    </label>
-                    <Textarea
-                      id={`${idPrefix}-ssh-public-key`}
-                      class="font-mono text-xs"
-                      bind:value={draft.credentialPublicKey}
-                      disabled={disabled}
-                      placeholder="ssh-ed25519 AAAA..."
-                      rows={3}
-                    />
-                    <p class="text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.serverForm.sshPublicKeyHint)}
-                    </p>
-                  </div>
+                <div class="space-y-1.5">
+                  <label class="console-field-label" for={`${idPrefix}-ssh-public-key`}>
+                    {$t(i18nKeys.console.serverForm.sshPublicKey)}
+                  </label>
+                  <Textarea
+                    id={`${idPrefix}-ssh-public-key`}
+                    class="font-mono text-xs"
+                    bind:value={draft.credentialPublicKey}
+                    disabled={disabled}
+                    placeholder="ssh-ed25519 AAAA..."
+                    rows={3}
+                  />
+                  <p class="text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.serverForm.sshPublicKeyHint)}
+                  </p>
                 </div>
               {/if}
             {/if}
-          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="border-t bg-muted/20 p-4 md:p-5">
-        <div class="grid gap-5 xl:grid-cols-[16rem_minmax(0,1fr)]">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <h2 class="text-base font-semibold">{$t(i18nKeys.console.serverForm.readinessSectionTitle)}</h2>
-              <DocsHelpLink
-                href={webDocsHrefs.serverConnectivityTest}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                className="size-5"
-              />
-            </div>
-            <p class="text-sm leading-6 text-muted-foreground">
-              {$t(i18nKeys.console.serverForm.readinessSectionDescription)}
-            </p>
+    <section class="border-t bg-muted/20 p-4 md:p-5">
+      <div class="grid gap-5 xl:grid-cols-[16rem_minmax(0,1fr)]">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-semibold">{$t(i18nKeys.console.serverForm.readinessSectionTitle)}</h2>
+            <DocsHelpLink
+              href={webDocsHrefs.serverConnectivityTest}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              className="size-5"
+            />
           </div>
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.serverForm.readinessSectionDescription)}
+          </p>
+        </div>
 
-          <div class="space-y-3">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-sm leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.serverForm.connectivityDraftDescription)}
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                class="w-full sm:w-auto"
-                disabled={disabled || !canTestConnectivity || testPending || !testConnectivity}
-                onclick={handleTestConnectivity}
-              >
-                {#if testPending}
-                  <LoaderCircle class="size-3 animate-spin" />
-                  {$t(i18nKeys.console.serverForm.connectivityTestPending)}
-                {:else}
-                  {$t(i18nKeys.common.actions.testConnectivity)}
-                {/if}
-              </Button>
-            </div>
+        <div class="space-y-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.serverForm.connectivityDraftDescription)}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              class="w-full sm:w-auto"
+              disabled={disabled || !canTestConnectivity || testPending || !testConnectivity}
+              onclick={handleTestConnectivity}
+            >
+              {#if testPending}
+                <LoaderCircle class="size-3 animate-spin" />
+                {$t(i18nKeys.console.serverForm.connectivityTestPending)}
+              {:else}
+                {$t(i18nKeys.common.actions.testConnectivity)}
+              {/if}
+            </Button>
+          </div>
 
             {#if connectivityError}
               <div class="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
@@ -583,9 +551,8 @@
                 </div>
               </div>
             {/if}
-          </div>
         </div>
-      </section>
-    {/if}
+      </div>
+    </section>
   </div>
 </div>

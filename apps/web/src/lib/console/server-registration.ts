@@ -5,10 +5,9 @@ import {
   type SshCredentialSummary,
 } from "@appaloft/contracts";
 
-import { type ProviderSummary } from "$lib/console/queries";
-
 export type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
 export type ServerPrivateKeyInputMode = "saved" | "file" | "paste";
+export const sshServerProviderKey = "generic-ssh";
 
 export type ServerRegistrationDraft = {
   name: string;
@@ -37,29 +36,16 @@ export type DraftServerConnectivityInput = {
   };
 };
 
-export const fallbackServerProviderOptions: ProviderSummary[] = [
-  {
-    key: "local-shell",
-    title: "Local Shell",
-    category: "deploy-target",
-    capabilities: ["local-command", "docker-host", "docker-compose", "single-server"],
-  },
-  {
-    key: "generic-ssh",
-    title: "Generic SSH",
-    category: "deploy-target",
-    capabilities: ["ssh", "single-server"],
-  },
-];
-
 export function createServerRegistrationDraft(
   overrides: Partial<ServerRegistrationDraft> = {},
 ): ServerRegistrationDraft {
+  const safeOverrides = { ...overrides };
+  delete safeOverrides.providerKey;
+
   return {
     name: "local-machine",
     host: "127.0.0.1",
     port: "22",
-    providerKey: "generic-ssh",
     targetKind: "single-server",
     credentialKind: "ssh-private-key",
     credentialUsername: "",
@@ -70,7 +56,8 @@ export function createServerRegistrationDraft(
     sshCredentialName: "",
     credentialPrivateKeyFileName: "",
     credentialPrivateKeyImportError: null,
-    ...overrides,
+    ...safeOverrides,
+    providerKey: sshServerProviderKey,
   };
 }
 
@@ -89,7 +76,7 @@ export function activeServerPrivateKeyInputMode(
   sshCredentials: SshCredentialSummary[],
 ): ServerPrivateKeyInputMode {
   return draft.privateKeyInputMode === "saved" && sshCredentials.length === 0
-    ? "file"
+    ? "paste"
     : draft.privateKeyInputMode;
 }
 
@@ -105,10 +92,6 @@ export function createDraftServerCredential(
   draft: ServerRegistrationDraft,
   sshCredentials: SshCredentialSummary[],
 ): ConfigureServerCredentialInput["credential"] | undefined {
-  if (draft.providerKey !== "generic-ssh") {
-    return undefined;
-  }
-
   const username = draft.credentialUsername.trim();
 
   if (draft.credentialKind === "local-ssh-agent") {
@@ -145,10 +128,6 @@ export function createQuickDeployServerCredential(
   draft: ServerRegistrationDraft,
   sshCredentials: SshCredentialSummary[],
 ): QuickDeployServerCredential | undefined {
-  if (draft.providerKey !== "generic-ssh") {
-    return undefined;
-  }
-
   const username = draft.credentialUsername.trim();
 
   if (draft.credentialKind === "local-ssh-agent") {
@@ -205,7 +184,7 @@ export function createRegisterServerInput(
   return {
     name,
     host,
-    providerKey: draft.providerKey,
+    providerKey: sshServerProviderKey,
     targetKind: draft.targetKind,
     proxyKind: "traefik",
     port,
@@ -229,7 +208,7 @@ export function createDraftServerConnectivityInput(
     server: {
       name: draft.name.trim() || host,
       host,
-      providerKey: draft.providerKey,
+      providerKey: sshServerProviderKey,
       port,
       ...(credential ? { credential } : {}),
     },
@@ -242,10 +221,6 @@ export function isServerRegistrationDraftComplete(
 ): boolean {
   if (!draft.name.trim() || !draft.host.trim() || !parseServerRegistrationPort(draft)) {
     return false;
-  }
-
-  if (draft.providerKey !== "generic-ssh") {
-    return true;
   }
 
   return (
@@ -261,7 +236,6 @@ export function canTestServerRegistrationDraft(
   sshCredentials: SshCredentialSummary[],
 ): boolean {
   return (
-    draft.providerKey === "generic-ssh" &&
     Boolean(draft.host.trim()) &&
     Boolean(parseServerRegistrationPort(draft)) &&
     (draft.credentialKind === "local-ssh-agent" ||

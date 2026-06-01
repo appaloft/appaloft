@@ -202,7 +202,6 @@ import {
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
-import { aliyunProvider } from "@appaloft/provider-aliyun";
 import {
   AcmeCertificateProvider,
   acmeCertificateProvider,
@@ -212,7 +211,6 @@ import { caddyEdgeProxyProvider } from "@appaloft/provider-edge-proxy-caddy";
 import { traefikEdgeProxyProvider } from "@appaloft/provider-edge-proxy-traefik";
 import { genericSshProvider } from "@appaloft/provider-generic-ssh";
 import { localShellProvider } from "@appaloft/provider-local-shell";
-import { tencentProvider } from "@appaloft/provider-tencent";
 import { customAlphabet } from "nanoid";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
 import {
@@ -1677,8 +1675,6 @@ export function registerRuntimeDependencies(
         new InMemoryProviderRegistry([
           localShellProvider,
           genericSshProvider,
-          aliyunProvider,
-          tencentProvider,
           acmeCertificateProvider,
         ]),
     ),

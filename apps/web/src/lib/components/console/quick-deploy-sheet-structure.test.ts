@@ -90,6 +90,10 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("data-github-app-configure-action");
     expect(quickDeploySheetSource).toContain("data-github-app-configure-empty-action");
     expect(quickDeploySheetSource).toContain("githubNoAppRepositoryResults");
+    expect(quickDeploySheetSource).toContain("githubAppConfigurationDiagnostics");
+    expect(quickDeploySheetSource).toContain("githubAppDiagnosticMessage");
+    expect(quickDeploySheetSource).toContain("cloud-github-app-env-missing");
+    expect(quickDeploySheetSource).toContain("cloud-github-app-permissions-review-pending");
     expect(quickDeploySheetSource).not.toContain("APPALOFT_CLOUD_GITHUB_APP_PRIVATE_KEY");
     expect(quickDeploySheetSource).not.toContain("webhookSecret");
     expect(quickDeploySheetSource).not.toContain("clientSecret");
