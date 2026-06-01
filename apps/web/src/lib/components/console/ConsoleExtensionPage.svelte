@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
     Activity,
@@ -249,6 +250,7 @@
       queryKey: ["console-extension-page", pageEndpoint],
       queryFn: () => request<ConsolePageDocument>(pageEndpoint ?? "/"),
       enabled: browser && Boolean(pageEndpoint),
+      placeholderData: (previousData) => previousData,
       staleTime: 15_000,
     }),
   );
@@ -265,7 +267,7 @@
   const loading = $derived(
     webExtensionsQuery.isPending ||
       organizationContextQuery.isPending ||
-      (Boolean(pageEndpoint) && pageDocumentQuery.isPending),
+      (Boolean(pageEndpoint) && pageDocumentQuery.isPending && !pageDocumentQuery.data),
   );
   const errorMessage = $derived(
     webExtensionsQuery.error
@@ -282,6 +284,15 @@
     if (icon === "card") return CreditCard;
     if (icon === "file") return FileText;
     return WalletCards;
+  }
+
+  function navigateConsolePageHref(href: string | undefined) {
+    if (!href) return;
+
+    void goto(href, {
+      keepFocus: true,
+      noScroll: true,
+    });
   }
 
   function toneClass(tone: ConsolePageTone | undefined): string {
@@ -726,9 +737,10 @@
                       <div class="flex flex-wrap gap-1.5">
                         {#each filterGroup.items as filter (filter.href)}
                           <Button
-                            href={filter.href}
+                            type="button"
                             variant={filter.active ? "default" : "outline"}
                             size="sm"
+                            onclick={() => navigateConsolePageHref(filter.href)}
                           >
                             {filter.label}
                           </Button>
@@ -778,7 +790,12 @@
                 <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
                 <div class="flex items-center gap-2">
                   {#if section.pagination.previousHref}
-                    <Button href={section.pagination.previousHref} variant="outline" size="sm">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onclick={() => navigateConsolePageHref(section.pagination?.previousHref)}
+                    >
                       {section.pagination.previousLabel}
                     </Button>
                   {:else}
@@ -787,7 +804,12 @@
                     </Button>
                   {/if}
                   {#if section.pagination.nextHref}
-                    <Button href={section.pagination.nextHref} variant="outline" size="sm">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onclick={() => navigateConsolePageHref(section.pagination?.nextHref)}
+                    >
                       {section.pagination.nextLabel}
                     </Button>
                   {:else}
