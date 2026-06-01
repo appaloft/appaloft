@@ -13,6 +13,7 @@ import {
   resolveAppaloftBetterAuthAccountRecoveryStatus,
   resolveAppaloftBetterAuthAccountSecurityStatus,
   resolveAppaloftBetterAuthEmailVerificationStatus,
+  resolveAppaloftBetterAuthMagicLinkStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "../src/shared";
 
@@ -182,6 +183,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
     expect(options.rateLimit?.customRules).not.toHaveProperty("/request-password-reset");
     expect(options.plugins?.map((plugin) => plugin.id)).not.toContain("email-otp");
+    expect(options.plugins?.map((plugin) => plugin.id)).not.toContain("magic-link");
     expect(
       resolveAppaloftBetterAuthEmailVerificationStatus({
         baseURL: "https://appaloft.example.com",
@@ -194,6 +196,14 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
     expect(
       resolveAppaloftBetterAuthAccountRecoveryStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+      }),
+    ).toEqual({
+      enabled: false,
+    });
+    expect(
+      resolveAppaloftBetterAuthMagicLinkStatus({
         baseURL: "https://appaloft.example.com",
         secret: "test-secret-at-least-long-enough",
       }),
@@ -271,6 +281,67 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       | { options?: { sendInvitationEmail?: unknown } }
       | undefined;
     expect(organizationPlugin?.options?.sendInvitationEmail).toBe(sendInvitationEmail);
+  });
+
+  test("[CLOUD-AUTH-EMAIL-010] registers neutral magic-link policy only when a sender is injected", () => {
+    const optionsWithoutSender = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+      magicLink: {
+        enabled: true,
+      },
+    });
+    expect(optionsWithoutSender.plugins?.map((plugin) => plugin.id)).not.toContain("magic-link");
+    expect(
+      resolveAppaloftBetterAuthMagicLinkStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+        magicLink: {
+          enabled: true,
+        },
+      }),
+    ).toEqual({
+      enabled: false,
+    });
+
+    const sendMagicLink = async () => undefined;
+    const options = createAppaloftBetterAuthOptions({
+      baseURL: "https://appaloft.example.com",
+      secret: "test-secret-at-least-long-enough",
+      magicLink: {
+        enabled: true,
+        cooldownSeconds: 45,
+        expiresIn: 600,
+        sendMagicLink,
+        storeToken: "hashed",
+      },
+    });
+
+    expect(options.plugins?.map((plugin) => plugin.id)).toContain("magic-link");
+    expect(options.rateLimit).toMatchObject({
+      enabled: true,
+      customRules: {
+        "/sign-in/magic-link": {
+          max: 1,
+          window: 45,
+        },
+      },
+    });
+    expect(
+      resolveAppaloftBetterAuthMagicLinkStatus({
+        baseURL: "https://appaloft.example.com",
+        secret: "test-secret-at-least-long-enough",
+        magicLink: {
+          enabled: true,
+          sendMagicLink,
+        },
+      }),
+    ).toEqual({
+      cooldownSeconds: 60,
+      enabled: true,
+      requestPath: "/api/auth/sign-in/magic-link",
+      verifyPath: "/api/auth/magic-link/verify",
+    });
   });
 
   test("[CLOUD-AUTH-EMAIL-002][CLOUD-AUTH-ACCOUNT-010] registers neutral email verification and change-email OTP policy when injected", () => {
@@ -388,6 +459,9 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         enabled: false,
         otpEnabled: false,
         required: false,
+      },
+      magicLink: {
+        enabled: false,
       },
       provider: "better-auth",
       loginRequired: true,
