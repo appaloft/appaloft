@@ -1,6 +1,9 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type ExecutionContext } from "@appaloft/application";
 import { makeSignature } from "better-auth/crypto";
 
@@ -1315,6 +1318,151 @@ describe("Better Auth first-admin bootstrap adapter", () => {
         userId: expect.any(String),
       }),
     ]);
+  });
+
+  test("[CLOUD-IDENTITY-MEMBER-DEACTIVATE-002] remove member deactivates the row instead of deleting it", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-auth-member-lifecycle-"));
+    const { createDatabase, createMigrator } = await import("../../../persistence/pg/src/index");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: join(workspaceDir, ".appaloft", "data", "pglite"),
+    });
+
+    try {
+      const migrations = await createMigrator(database.db).migrateToLatest();
+      if (migrations.error) {
+        throw migrations.error;
+      }
+
+      const runtime = createBetterAuthRuntime({
+        enabled: true,
+        baseURL: "http://localhost:3721",
+        secret: "test-secret-at-least-long-enough",
+        database: {
+          db: database.db,
+          type: "postgres",
+        },
+      });
+      const owner = await signUpWithSessionCookie(runtime, {
+        email: "soft-remove-owner@example.com",
+        name: "Soft Remove Owner",
+      });
+      const ownerContext = await runtime.getCurrentContext({
+        ...context,
+        auth: { cookieHeader: owner.sessionCookie },
+        requestId: "req_soft_remove_owner_context",
+      });
+      expect(ownerContext.isOk()).toBe(true);
+      const organizationId = ownerContext._unsafeUnwrap().currentOrganization.organizationId;
+
+      await database.db
+        .insertInto("user")
+        .values({
+          id: "usr_soft_removed",
+          name: "Soft Removed Member",
+          email: "soft-removed-member@example.com",
+          emailVerified: true,
+          image: null,
+        })
+        .execute();
+      await database.db
+        .insertInto("member")
+        .values({
+          id: "mem_soft_removed",
+          organizationId,
+          userId: "usr_soft_removed",
+          role: "developer",
+          status: "active",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+
+      const removed = await runtime.removeMember(
+        {
+          ...context,
+          auth: { cookieHeader: owner.sessionCookie },
+          requestId: "req_soft_remove_member",
+        },
+        {
+          organizationId,
+          memberId: "mem_soft_removed",
+        },
+      );
+      const members = await runtime.listMembers(
+        {
+          ...context,
+          auth: { cookieHeader: owner.sessionCookie },
+          requestId: "req_soft_remove_member_list",
+        },
+        {
+          organizationId,
+          limit: 100,
+        },
+      );
+      const retainedRow = await database.db
+        .selectFrom("member")
+        .select(["id", "status"])
+        .where("id", "=", "mem_soft_removed")
+        .executeTakeFirst();
+      const restored = await runtime.reactivateMember(
+        {
+          ...context,
+          auth: { cookieHeader: owner.sessionCookie },
+          requestId: "req_soft_restore_member",
+        },
+        {
+          organizationId,
+          memberId: "mem_soft_removed",
+        },
+      );
+      const restoredMembers = await runtime.listMembers(
+        {
+          ...context,
+          auth: { cookieHeader: owner.sessionCookie },
+          requestId: "req_soft_restore_member_list",
+        },
+        {
+          organizationId,
+          limit: 100,
+        },
+      );
+      const restoredRow = await database.db
+        .selectFrom("member")
+        .select(["id", "status"])
+        .where("id", "=", "mem_soft_removed")
+        .executeTakeFirst();
+
+      expect(removed.isOk()).toBe(true);
+      expect(retainedRow).toEqual({ id: "mem_soft_removed", status: "deactivated" });
+      expect(members.isOk()).toBe(true);
+      expect(members._unsafeUnwrap().items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            memberId: "mem_soft_removed",
+            status: "deactivated",
+          }),
+        ]),
+      );
+      expect(restored.isOk()).toBe(true);
+      expect(restored._unsafeUnwrap()).toEqual(
+        expect.objectContaining({
+          memberId: "mem_soft_removed",
+          status: "active",
+        }),
+      );
+      expect(restoredRow).toEqual({ id: "mem_soft_removed", status: "active" });
+      expect(restoredMembers.isOk()).toBe(true);
+      expect(restoredMembers._unsafeUnwrap().items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            memberId: "mem_soft_removed",
+            status: "active",
+          }),
+        ]),
+      );
+    } finally {
+      await database.close();
+    }
   });
 
   test("[ORG-TEAM-SWITCH-003] organization switching fails closed for non-member organizations", async () => {

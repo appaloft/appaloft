@@ -160,6 +160,10 @@ export {
   listOrganizationMembersQueryInputSchema,
 } from "./operations/organizations/list-organization-members.query";
 export {
+  type ReactivateOrganizationMemberCommandInput,
+  reactivateOrganizationMemberCommandInputSchema,
+} from "./operations/organizations/reactivate-organization-member.command";
+export {
   type RemoveOrganizationMemberCommandInput,
   removeOrganizationMemberCommandInputSchema,
 } from "./operations/organizations/remove-organization-member.command";

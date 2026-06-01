@@ -94,7 +94,8 @@ core, application, transport contracts, Web, CLI, or public docs.
   `GET /api/organizations/{organizationId}/invitations`,
   `POST /api/organizations/{organizationId}/invitations`,
   `POST /api/organizations/{organizationId}/members/{memberId}/role`,
-  `DELETE /api/organizations/{organizationId}/members/{memberId}`, and
+  `DELETE /api/organizations/{organizationId}/members/{memberId}`,
+  `POST /api/organizations/{organizationId}/members/{memberId}/reactivate`, and
   `POST /api/organizations/{organizationId}/owner-transfer`. These routes dispatch through
   `QueryBus`/`CommandBus`, authorize through `ProductSessionAuthorizationPort` before dispatch, and
   pass request auth headers through `ExecutionContext.auth` for the auth adapter boundary.
@@ -102,7 +103,8 @@ core, application, transport contracts, Web, CLI, or public docs.
   `appaloft organization switch <organizationId>`,
   `appaloft organization members list`, `appaloft organization invitations list`,
   `appaloft organization member invite`, `appaloft organization member role <memberId>`,
-  `appaloft organization member remove <memberId>`, and
+  `appaloft organization member remove <memberId>`,
+  `appaloft organization member restore <memberId>`, and
   `appaloft organization owner transfer <fromMemberId> <toMemberId>`. CLI execution reads
   `APPALOFT_AUTH_COOKIE` and `APPALOFT_AUTHORIZATION` into `ExecutionContext.auth` so the same
   organization/team port can verify the current product session without Better Auth leaking into CLI
@@ -110,11 +112,11 @@ core, application, transport contracts, Web, CLI, or public docs.
 - Public docs/help coverage is active under `self-hosting.organization-team-management`, anchored
   at `/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management`,
   for current context, current organization switching, member and invitation lists, invitation,
-  non-owner role updates, ownership transfer, non-owner removal, CLI session handoff, safe outputs,
-  owner recovery, and product auth `401`/`403` recovery.
+  non-owner role updates, ownership transfer, non-owner removal, member restoration, CLI session
+  handoff, safe outputs, owner recovery, and product auth `401`/`403` recovery.
 - Web `/organization` is active for current organization context, safe member and invitation reads,
   current organization switching, invite, non-owner role update, ownership transfer, non-owner
-  member removal, and deploy-token
+  member removal, member restoration, removed-member grouping, and deploy-token
   list/create/rotate/revoke. The page uses `packages/i18n` keys and shared oRPC clients for the
   existing application command/query contracts; it does not depend on Better Auth runtime details.
 - `organizations.switch-current` is active through the application message/use case, operation

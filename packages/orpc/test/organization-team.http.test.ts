@@ -22,6 +22,7 @@ import {
   type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
+  ReactivateOrganizationMemberCommand,
   RemoveOrganizationMemberCommand,
   RevokeAccountSessionCommand,
   ShowAccountProfileQuery,
@@ -159,6 +160,7 @@ function memberSummaryBase() {
     memberId: "mem_admin",
     userId: "usr_admin",
     role: "owner" as const,
+    status: "active" as const,
     joinedAt: "2026-01-01T00:00:00.000Z",
     email: "admin@example.com",
     displayName: "Admin",
@@ -616,7 +618,7 @@ describe("organization/team HTTP/oRPC routes", () => {
     ]);
   });
 
-  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [ORG-TEAM-OWNER-TRANSFER-001] mutation routes dispatch organization commands", async () => {
+  test("[ORG-TEAM-INVITE-001] [ORG-TEAM-ROLE-001] [ORG-TEAM-REMOVE-001] [CLOUD-IDENTITY-MEMBER-REACTIVATE-004] [ORG-TEAM-OWNER-TRANSFER-001] mutation routes dispatch organization commands", async () => {
     const capturedCommands: string[] = [];
     const app = mountOrganizationTeamRoutes({
       commandBus: {
@@ -635,6 +637,9 @@ describe("organization/team HTTP/oRPC routes", () => {
               removedAt: "2026-01-01T00:30:00.000Z",
             } as T);
           }
+          if (command instanceof ReactivateOrganizationMemberCommand) {
+            return ok(memberSummary({ memberId: "mem_operator", status: "active" }) as T);
+          }
           if (command instanceof TransferOrganizationOwnerCommand) {
             return ok({
               fromMember: memberSummary({ memberId: "mem_admin", role: "admin" }),
@@ -646,7 +651,7 @@ describe("organization/team HTTP/oRPC routes", () => {
         },
       } as CommandBus,
       productSessionAuthorizationPort: productSessionPort({
-        expectedRoles: ["admin", "admin", "admin", "owner"],
+        expectedRoles: ["admin", "admin", "admin", "admin", "owner"],
         organizationId: "org_self_hosted",
       }),
       queryBus: {
@@ -695,6 +700,22 @@ describe("organization/team HTTP/oRPC routes", () => {
         }),
       }),
     );
+    const restoreResponse = await app.handle(
+      new Request(
+        "http://localhost/api/organizations/org_self_hosted/members/mem_operator/reactivate",
+        {
+          method: "POST",
+          headers: {
+            cookie: "better-auth.session_token=test-admin-session",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            organizationId: "org_self_hosted",
+            memberId: "mem_operator",
+          }),
+        },
+      ),
+    );
     const transferResponse = await app.handle(
       new Request("http://localhost/api/organizations/org_self_hosted/owner-transfer", {
         method: "POST",
@@ -720,6 +741,10 @@ describe("organization/team HTTP/oRPC routes", () => {
       organizationId: "org_self_hosted",
       removedAt: "2026-01-01T00:30:00.000Z",
     });
+    expect(restoreResponse.status).toBe(200);
+    expect(await restoreResponse.json()).toEqual(
+      memberSummary({ memberId: "mem_operator", status: "active" }),
+    );
     expect(transferResponse.status).toBe(200);
     expect(await transferResponse.json()).toMatchObject({
       fromMember: { memberId: "mem_admin", role: "admin" },
@@ -730,6 +755,7 @@ describe("organization/team HTTP/oRPC routes", () => {
       "InviteOrganizationMemberCommand",
       "ChangeOrganizationMemberRoleCommand",
       "RemoveOrganizationMemberCommand",
+      "ReactivateOrganizationMemberCommand",
       "TransferOrganizationOwnerCommand",
     ]);
   });

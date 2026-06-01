@@ -331,6 +331,8 @@ import {
   QueryCapabilitiesQueryService,
   QueryEntitlementsQueryHandler,
   QueryEntitlementsQueryService,
+  ReactivateOrganizationMemberCommandHandler,
+  ReactivateOrganizationMemberUseCase,
   RecordUsageIntentCommandHandler,
   RecordUsageIntentUseCase,
   RedeployDeploymentCommandHandler,
@@ -2409,6 +2411,7 @@ export function registerApplicationServices(
   container.registerSingleton(ChangeOrganizationMemberRoleCommandHandler);
   container.registerSingleton(TransferOrganizationOwnerCommandHandler);
   container.registerSingleton(RemoveOrganizationMemberCommandHandler);
+  container.registerSingleton(ReactivateOrganizationMemberCommandHandler);
   container.registerSingleton(CreateDeployTokenCommandHandler);
   container.registerSingleton(RotateDeployTokenCommandHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
@@ -2499,6 +2502,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.removeOrganizationMemberUseCase,
     RemoveOrganizationMemberUseCase,
+  );
+  container.registerSingleton(
+    tokens.reactivateOrganizationMemberUseCase,
+    ReactivateOrganizationMemberUseCase,
   );
   container.registerSingleton(tokens.createDeployTokenUseCase, CreateDeployTokenUseCase);
   container.registerSingleton(tokens.listDeployTokensQueryService, ListDeployTokensQueryService);

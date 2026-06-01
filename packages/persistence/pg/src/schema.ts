@@ -892,6 +892,7 @@ export interface BetterAuthMembersTable {
   organizationId: string;
   userId: string;
   role: string;
+  status: ColumnType<string, string | undefined, string>;
   createdAt: string;
 }
 
