@@ -74,5 +74,10 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
     expect(rendererSource).toContain("requestActionBody(action, item)");
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
+    expect(rendererSource).toContain('import { goto } from "$app/navigation";');
+    expect(rendererSource).toContain("placeholderData: (previousData) => previousData");
+    expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
+    expect(rendererSource).toContain("noScroll: true");
+    expect(rendererSource).not.toContain("href={filter.href}");
   });
 });
