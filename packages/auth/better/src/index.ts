@@ -459,9 +459,10 @@ export class BetterAuthRuntime implements AuthRuntime {
     headers: Headers,
     context?: ExecutionContext,
   ): Promise<string | undefined> {
-    return (context
-      ? await this.getCachedVisibleOrganizations(context, headers)
-      : await this.visibleOrganizations(headers)
+    return (
+      context
+        ? await this.getCachedVisibleOrganizations(context, headers)
+        : await this.visibleOrganizations(headers)
     )
       .map(
         (organization) =>
