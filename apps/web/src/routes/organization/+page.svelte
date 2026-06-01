@@ -316,6 +316,20 @@
     },
   }));
 
+  const reactivateMemberMutation = createMutation(() => ({
+    mutationFn: (memberId: string) =>
+      orpcClient.organizations.reactivateMember({ organizationId: currentOrganizationId, memberId }),
+    onSuccess: () => {
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.memberRestored);
+      void queryClient.invalidateQueries({ queryKey: ["organizations", currentOrganizationId] });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
   const transferOwnerMutation = createMutation(() => ({
     mutationFn: (input: { fromMemberId: string; toMemberId: string }) =>
       orpcClient.organizations.transferOwner({
@@ -401,6 +415,8 @@
   }));
 
   const members = $derived(membersQuery.data?.items ?? []);
+  const activeMembers = $derived(members.filter((member) => member.status !== "deactivated"));
+  const removedMembers = $derived(members.filter((member) => member.status === "deactivated"));
   const invitations = $derived(invitationsQuery.data?.items ?? []);
   const deployTokens = $derived(deployTokensQuery.data?.items ?? []);
   const organizationProfile = $derived(profileQuery.data ?? null);
@@ -468,7 +484,7 @@
   );
 
   $effect(() => {
-    for (const member of members) {
+    for (const member of activeMembers) {
       roleDrafts[member.memberId] ??= member.role;
       if (member.role === "owner") {
         const candidates = ownerTransferCandidates(member.memberId);
@@ -591,7 +607,7 @@
   }
 
   function ownerTransferCandidates(fromMemberId: string): OrganizationMemberSummary[] {
-    return members.filter(
+    return activeMembers.filter(
       (candidate) =>
         candidate.memberId !== fromMemberId &&
         candidate.role !== "owner" &&
@@ -645,7 +661,7 @@
 
   function updateMemberRole(memberId: string): void {
     const role = roleDrafts[memberId];
-    const member = members.find((candidate) => candidate.memberId === memberId);
+    const member = activeMembers.find((candidate) => candidate.memberId === memberId);
     if (role && role !== "owner" && member?.role !== "owner" && canUpdateMemberRoles) {
       updateMemberRoleMutation.mutate({ memberId, role });
     }
@@ -653,8 +669,8 @@
 
   function transferOwner(fromMemberId: string): void {
     const toMemberId = ownerTransferDrafts[fromMemberId];
-    const fromMember = members.find((candidate) => candidate.memberId === fromMemberId);
-    const toMember = members.find((candidate) => candidate.memberId === toMemberId);
+    const fromMember = activeMembers.find((candidate) => candidate.memberId === fromMemberId);
+    const toMember = activeMembers.find((candidate) => candidate.memberId === toMemberId);
     if (fromMember?.role === "owner" && toMember?.role !== "owner" && toMemberId && canTransferOwnership) {
       transferOwnerMutation.mutate({ fromMemberId, toMemberId });
     }
@@ -665,12 +681,23 @@
       return;
     }
     const member = members.find((candidate) => candidate.memberId === memberId);
-    if (member?.role === "owner") {
+    if (member?.role === "owner" || member?.status === "deactivated") {
       return;
     }
     if (window.confirm($t(i18nKeys.console.organization.removeMemberConfirm, { memberId }))) {
       removeMemberMutation.mutate(memberId);
     }
+  }
+
+  function reactivateMember(memberId: string): void {
+    if (!browser || !canRemoveMembers) {
+      return;
+    }
+    const member = removedMembers.find((candidate) => candidate.memberId === memberId);
+    if (!member) {
+      return;
+    }
+    reactivateMemberMutation.mutate(memberId);
   }
 
   function rotateDeployToken(tokenId: string): void {
@@ -979,102 +1006,152 @@
             </div>
           </div>
         {:else}
-        <div class="console-record-list">
-          {#if members.length === 0}
-            <div class="console-record-row text-sm text-muted-foreground">
-              {$t(i18nKeys.console.organization.emptyMembers)}
-            </div>
-          {:else}
-            {#each members as member (member.memberId)}
-              {@const transferCandidates = ownerTransferCandidates(member.memberId)}
-              <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-center">
-                <div class="min-w-0 space-y-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="truncate text-base font-semibold">
-                      {member.displayName ?? member.email ?? member.userId}
-                    </h3>
-                    <Badge variant="outline">{roleLabel(member.role)}</Badge>
-                  </div>
-                  <p class="break-all text-sm text-muted-foreground">
-                    {member.email ?? member.userId}
-                  </p>
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.organization.joinedAt)} · {formatTime(member.joinedAt)}
-                  </p>
-                </div>
-                {#if member.role === "owner"}
-                  <Select.Root
-                    bind:value={ownerTransferDrafts[member.memberId]}
-                    disabled={!canTransferOwnership || transferOwnerMutation.isPending || transferCandidates.length === 0}
-                    type="single"
-                  >
-                    <Select.Trigger class="w-full">
-                      {ownerTransferLabel(member.memberId)}
-                    </Select.Trigger>
-                    <Select.Content>
-                      {#each transferCandidates as candidate (candidate.memberId)}
-                        <Select.Item value={candidate.memberId}>
-                          {memberDisplayLabel(candidate)}
-                        </Select.Item>
-                      {/each}
-                    </Select.Content>
-                  </Select.Root>
-                  <div class="flex flex-wrap gap-2">
-                    <Button
-                      disabled={!canTransferOwnership ||
-                        transferOwnerMutation.isPending ||
-                        !ownerTransferDrafts[member.memberId]}
-                      onclick={() => transferOwner(member.memberId)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <ShieldCheck class="size-3.5" />
-                      {transferOwnerMutation.isPending
-                        ? $t(i18nKeys.console.organization.transferringOwner)
-                        : $t(i18nKeys.console.organization.transferOwner)}
-                    </Button>
-                  </div>
-                {:else}
-                  <Select.Root
-                    bind:value={roleDrafts[member.memberId]}
-                    disabled={!canUpdateMemberRoles || updateMemberRoleMutation.isPending}
-                    type="single"
-                  >
-                    <Select.Trigger class="w-full">
-                      {roleLabel(roleDrafts[member.memberId] ?? member.role)}
-                    </Select.Trigger>
-                    <Select.Content>
-                      {#each memberRoleOptions as role (role)}
-                        <Select.Item value={role}>{roleLabel(role)}</Select.Item>
-                      {/each}
-                    </Select.Content>
-                  </Select.Root>
-                  <div class="flex flex-wrap gap-2">
-                    <Button
-                      disabled={!canUpdateMemberRoles || updateMemberRoleMutation.isPending}
-                      onclick={() => updateMemberRole(member.memberId)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {updateMemberRoleMutation.isPending
-                        ? $t(i18nKeys.console.organization.updatingRole)
-                        : $t(i18nKeys.console.organization.updateRole)}
-                    </Button>
-                    <Button
-                      disabled={!canRemoveMembers || removeMemberMutation.isPending}
-                      onclick={() => removeMember(member.memberId)}
-                      size="sm"
-                      variant="destructive"
-                    >
-                      <Trash2 class="size-3.5" />
-                      {removeMemberMutation.isPending
-                        ? $t(i18nKeys.console.organization.removingMember)
-                        : $t(i18nKeys.console.organization.removeMember)}
-                    </Button>
-                  </div>
-                {/if}
+        <div class="space-y-5">
+          <div class="console-record-list">
+            {#if members.length === 0}
+              <div class="console-record-row text-sm text-muted-foreground">
+                {$t(i18nKeys.console.organization.emptyMembers)}
               </div>
-            {/each}
+            {:else}
+              {#each activeMembers as member (member.memberId)}
+                {@const transferCandidates = ownerTransferCandidates(member.memberId)}
+                <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-center">
+                  <div class="min-w-0 space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="truncate text-base font-semibold">
+                        {member.displayName ?? member.email ?? member.userId}
+                      </h3>
+                      <Badge variant="outline">{roleLabel(member.role)}</Badge>
+                    </div>
+                    <p class="break-all text-sm text-muted-foreground">
+                      {member.email ?? member.userId}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.organization.joinedAt)} · {formatTime(member.joinedAt)}
+                    </p>
+                  </div>
+                  {#if member.role === "owner"}
+                    <Select.Root
+                      bind:value={ownerTransferDrafts[member.memberId]}
+                      disabled={!canTransferOwnership || transferOwnerMutation.isPending || transferCandidates.length === 0}
+                      type="single"
+                    >
+                      <Select.Trigger class="w-full">
+                        {ownerTransferLabel(member.memberId)}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each transferCandidates as candidate (candidate.memberId)}
+                          <Select.Item value={candidate.memberId}>
+                            {memberDisplayLabel(candidate)}
+                          </Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        disabled={!canTransferOwnership ||
+                          transferOwnerMutation.isPending ||
+                          !ownerTransferDrafts[member.memberId]}
+                        onclick={() => transferOwner(member.memberId)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <ShieldCheck class="size-3.5" />
+                        {transferOwnerMutation.isPending
+                          ? $t(i18nKeys.console.organization.transferringOwner)
+                          : $t(i18nKeys.console.organization.transferOwner)}
+                      </Button>
+                    </div>
+                  {:else}
+                    <Select.Root
+                      bind:value={roleDrafts[member.memberId]}
+                      disabled={!canUpdateMemberRoles || updateMemberRoleMutation.isPending}
+                      type="single"
+                    >
+                      <Select.Trigger class="w-full">
+                        {roleLabel(roleDrafts[member.memberId] ?? member.role)}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each memberRoleOptions as role (role)}
+                          <Select.Item value={role}>{roleLabel(role)}</Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        disabled={!canUpdateMemberRoles || updateMemberRoleMutation.isPending}
+                        onclick={() => updateMemberRole(member.memberId)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {updateMemberRoleMutation.isPending
+                          ? $t(i18nKeys.console.organization.updatingRole)
+                          : $t(i18nKeys.console.organization.updateRole)}
+                      </Button>
+                      <Button
+                        disabled={!canRemoveMembers || removeMemberMutation.isPending}
+                        onclick={() => removeMember(member.memberId)}
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <Trash2 class="size-3.5" />
+                        {removeMemberMutation.isPending
+                          ? $t(i18nKeys.console.organization.removingMember)
+                          : $t(i18nKeys.console.organization.removeMember)}
+                      </Button>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+              {#if activeMembers.length === 0}
+                <div class="console-record-row text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.organization.emptyMembers)}
+                </div>
+              {/if}
+            {/if}
+          </div>
+
+          {#if removedMembers.length > 0}
+            <div class="space-y-3">
+              <div>
+                <h3 class="text-sm font-semibold">{$t(i18nKeys.console.organization.removedMembersTitle)}</h3>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.organization.removedMembersDescription)}
+                </p>
+              </div>
+              <div class="console-record-list">
+                {#each removedMembers as member (member.memberId)}
+                  <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div class="min-w-0 space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="truncate text-base font-semibold">
+                          {member.displayName ?? member.email ?? member.userId}
+                        </h3>
+                        <Badge variant="outline">{roleLabel(member.role)}</Badge>
+                        <Badge variant="secondary">{$t(i18nKeys.console.organization.statusDeactivated)}</Badge>
+                      </div>
+                      <p class="break-all text-sm text-muted-foreground">
+                        {member.email ?? member.userId}
+                      </p>
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.organization.joinedAt)} · {formatTime(member.joinedAt)}
+                      </p>
+                    </div>
+                    <Button
+                      disabled={!canRemoveMembers || reactivateMemberMutation.isPending}
+                      onclick={() => reactivateMember(member.memberId)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <RotateCw class="size-3.5" />
+                      {reactivateMemberMutation.isPending
+                        ? $t(i18nKeys.console.organization.restoringMember)
+                        : $t(i18nKeys.console.organization.restoreMember)}
+                    </Button>
+                  </div>
+                {/each}
+              </div>
+            </div>
           {/if}
         </div>
         {/if}

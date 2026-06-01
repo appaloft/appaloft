@@ -25,6 +25,7 @@ describe("organization auth management console surface", () => {
     expect(pageSource).toContain("orpcClient.organizations.inviteMember");
     expect(pageSource).toContain("orpcClient.organizations.updateMemberRole");
     expect(pageSource).toContain("orpcClient.organizations.removeMember");
+    expect(pageSource).toContain("orpcClient.organizations.reactivateMember");
     expect(pageSource).toContain("orpcClient.organizations.transferOwner");
     expect(pageSource).toContain('member.role === "owner"');
     expect(pageSource).toContain("memberRoleOptions");
@@ -314,6 +315,11 @@ describe("organization auth management console surface", () => {
     }
     expect(membersSectionSource).not.toContain("submitInvite");
     expect(membersSectionSource).not.toContain("inviteEmail");
+    expect(membersSectionSource).toContain("activeMembers");
+    expect(membersSectionSource).toContain("removedMembers");
+    expect(membersSectionSource).toContain("removedMembersTitle");
+    expect(membersSectionSource).toContain("reactivateMember");
+    expect(membersSectionSource).toContain("statusDeactivated");
     expect(invitationsSectionSource).toContain("openInviteDialog");
     expect(invitationsSectionSource).toContain('tone="invitation"');
     expect(invitationsSectionSource).toContain("emptyInvitationsTitle");

@@ -20,12 +20,12 @@
 - Application:
   - add Appaloft-owned organization/team ports for current-context reads, current organization
     switching, member list reads, invitation creation, non-owner role update, ownership transfer,
-    and member removal;
+    member removal, and member restoration;
   - add command/query messages, handlers, and use cases/query services for
     `organizations.current-context`, `organizations.switch-current`,
     `organizations.list-members`, `organizations.list-invitations`, `organizations.invite-member`,
-    `organizations.change-member-role`, `organizations.transfer-owner`, and
-    `organizations.remove-member`;
+    `organizations.change-member-role`, `organizations.transfer-owner`,
+    `organizations.remove-member`, and `organizations.reactivate-member`;
   - keep Better Auth out of application types and only depend on stable ports/tokens.
 - Auth adapter:
   - implement the application ports in `@appaloft/auth-better` with Better Auth organization,

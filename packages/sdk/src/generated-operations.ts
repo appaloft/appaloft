@@ -1795,6 +1795,24 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "organizations.reactivate-member",
+    operationGroup: "organizations",
+    operationMethod: "reactivateMember",
+    operationId: "organizations.reactivateMember",
+    kind: "command",
+    domain: "organizations",
+    messageName: "ReactivateOrganizationMemberCommand",
+    route: {
+      method: "POST",
+      path: "/organizations/{organizationId}/members/{memberId}/reactivate",
+    },
+    docsHref:
+      "/docs/self-hosting/organization-team-management/#self-hosting-organization-team-management",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "organizations.switch-current",
     operationGroup: "organizations",
     operationMethod: "switchCurrent",

@@ -42,6 +42,10 @@ import {
   type OrganizationTeamManagementPort,
   type OrganizationTeamRole,
   operationCatalog,
+  ReactivateOrganizationMemberCommand,
+  ReactivateOrganizationMemberCommandHandler,
+  type ReactivateOrganizationMemberInput,
+  ReactivateOrganizationMemberUseCase,
   RemoveOrganizationMemberCommand,
   RemoveOrganizationMemberCommandHandler,
   type RemoveOrganizationMemberInput,
@@ -110,6 +114,11 @@ const operatorMember: OrganizationMemberSummary = {
   joinedAt: "2026-01-01T00:02:00.000Z",
 };
 
+const deactivatedOperatorMember: OrganizationMemberSummary = {
+  ...operatorMember,
+  status: "deactivated",
+};
+
 const invitation: OrganizationInvitationSummary = {
   invitationId: "inv_operator",
   organizationId: "org_self_hosted",
@@ -138,6 +147,10 @@ const profile: OrganizationProfileSummary = {
 class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagementPort {
   readonly calls: string[] = [];
   readonly inputs: unknown[] = [];
+
+  constructor(
+    private readonly memberItems: OrganizationMemberSummary[] = [member, operatorMember],
+  ) {}
 
   async getCurrentContext(_context: ExecutionContext): Promise<Result<CurrentOrganizationContext>> {
     this.calls.push("getCurrentContext");
@@ -187,7 +200,7 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
   ): Promise<Result<{ items: OrganizationMemberSummary[]; nextCursor?: string }>> {
     this.calls.push("listMembers");
     this.inputs.push(input);
-    return ok({ items: [member, operatorMember], nextCursor: "next-members" });
+    return ok({ items: this.memberItems, nextCursor: "next-members" });
   }
 
   async switchCurrentOrganization(
@@ -231,7 +244,8 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
   ): Promise<Result<OrganizationMemberSummary>> {
     this.calls.push("updateMemberRole");
     this.inputs.push(input);
-    return ok({ ...member, memberId: input.memberId, role: input.role });
+    const target = this.memberItems.find((item) => item.memberId === input.memberId) ?? member;
+    return ok({ ...target, memberId: input.memberId, role: input.role });
   }
 
   async transferOwner(
@@ -264,6 +278,16 @@ class CapturingOrganizationTeamManagementPort implements OrganizationTeamManagem
       organizationId: input.organizationId,
       removedAt: "2026-01-01T00:02:00.000Z",
     });
+  }
+
+  async reactivateMember(
+    _context: ExecutionContext,
+    input: ReactivateOrganizationMemberInput,
+  ): Promise<Result<OrganizationMemberSummary>> {
+    this.calls.push("reactivateMember");
+    this.inputs.push(input);
+    const target = this.memberItems.find((item) => item.memberId === input.memberId) ?? member;
+    return ok({ ...target, status: "active" });
   }
 }
 
@@ -307,6 +331,28 @@ describe("organization/team application boundary", () => {
     expect(result._unsafeUnwrap()).toEqual(currentContext);
     expect(port.calls).toEqual(["getCurrentContext"]);
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("providerToken");
+  });
+
+  test("[CLOUD-IDENTITY-MEMBER-DEACTIVATE-002] deactivated members do not block reinvitation", async () => {
+    const port = new CapturingOrganizationTeamManagementPort([member, deactivatedOperatorMember]);
+
+    const result = await new InviteOrganizationMemberCommandHandler(
+      new InviteOrganizationMemberUseCase(port),
+    ).handle(
+      context,
+      InviteOrganizationMemberCommand.create({
+        organizationId: "org_self_hosted",
+        email: "existing-operator@example.com",
+        role: "developer",
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      email: "existing-operator@example.com",
+      role: "developer",
+    });
+    expect(port.calls).toEqual(["listMembers", "listInvitations", "inviteMember"]);
   });
 
   test("[ORG-TEAM-INVITE-GUARD-001] invite member can be denied before team port side effects", async () => {
@@ -688,6 +734,111 @@ describe("organization/team application boundary", () => {
     expect(port.calls).toEqual(["listMembers"]);
   });
 
+  test("[CLOUD-IDENTITY-MEMBER-ACTIVE-GUARD-003] rejects governance commands for deactivated members", async () => {
+    const port = new CapturingOrganizationTeamManagementPort([member, deactivatedOperatorMember]);
+
+    const role = await new ChangeOrganizationMemberRoleCommandHandler(
+      new ChangeOrganizationMemberRoleUseCase(port),
+    ).handle(
+      context,
+      ChangeOrganizationMemberRoleCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_operator",
+        role: "admin",
+      })._unsafeUnwrap(),
+    );
+    const remove = await new RemoveOrganizationMemberCommandHandler(
+      new RemoveOrganizationMemberUseCase(port),
+    ).handle(
+      context,
+      RemoveOrganizationMemberCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_operator",
+      })._unsafeUnwrap(),
+    );
+    const transfer = await new TransferOrganizationOwnerCommandHandler(
+      new TransferOrganizationOwnerUseCase(port),
+    ).handle(
+      context,
+      TransferOrganizationOwnerCommand.create({
+        organizationId: "org_self_hosted",
+        fromMemberId: "om_admin",
+        toMemberId: "om_operator",
+      })._unsafeUnwrap(),
+    );
+
+    expect(role.isErr()).toBe(true);
+    expect(role._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        memberId: "om_operator",
+        phase: "organization-change-member-role",
+      },
+    });
+    expect(remove.isErr()).toBe(true);
+    expect(remove._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        memberId: "om_operator",
+        phase: "organization-remove-member",
+      },
+    });
+    expect(transfer.isErr()).toBe(true);
+    expect(transfer._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        phase: "organization-transfer-owner",
+        toMemberId: "om_operator",
+      },
+    });
+    expect(port.calls).toEqual(["listMembers", "listMembers", "listMembers"]);
+  });
+
+  test("[CLOUD-IDENTITY-MEMBER-REACTIVATE-004] restores deactivated members through a dedicated command", async () => {
+    const port = new CapturingOrganizationTeamManagementPort([member, deactivatedOperatorMember]);
+
+    const restored = await new ReactivateOrganizationMemberCommandHandler(
+      new ReactivateOrganizationMemberUseCase(port),
+    ).handle(
+      context,
+      ReactivateOrganizationMemberCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_operator",
+      })._unsafeUnwrap(),
+    );
+
+    expect(restored.isOk()).toBe(true);
+    expect(restored._unsafeUnwrap()).toMatchObject({
+      memberId: "om_operator",
+      status: "active",
+    });
+    expect(port.calls).toEqual(["listMembers", "reactivateMember"]);
+  });
+
+  test("[CLOUD-IDENTITY-MEMBER-REACTIVATE-004] rejects reactivation for active members", async () => {
+    const port = new CapturingOrganizationTeamManagementPort();
+
+    const restored = await new ReactivateOrganizationMemberCommandHandler(
+      new ReactivateOrganizationMemberUseCase(port),
+    ).handle(
+      context,
+      ReactivateOrganizationMemberCommand.create({
+        organizationId: "org_self_hosted",
+        memberId: "om_operator",
+      })._unsafeUnwrap(),
+    );
+
+    expect(restored.isErr()).toBe(true);
+    expect(restored._unsafeUnwrapErr()).toMatchObject({
+      code: "invariant_violation",
+      details: {
+        memberId: "om_operator",
+        phase: "organization-reactivate-member",
+      },
+    });
+    expect(port.calls).toEqual(["listMembers"]);
+  });
+
   test("[ORG-TEAM-OWNER-TRANSFER-001] transfers ownership through the dedicated command", async () => {
     const port = new CapturingOrganizationTeamManagementPort();
     const result = await new TransferOrganizationOwnerCommandHandler(
@@ -785,6 +936,7 @@ describe("organization/team application boundary", () => {
       "organizations.invite-member",
       "organizations.change-member-role",
       "organizations.remove-member",
+      "organizations.reactivate-member",
       "organizations.transfer-owner",
     ]);
     expect(entries.map((entry) => entry.transports.orpc?.path)).toEqual([
@@ -798,6 +950,7 @@ describe("organization/team application boundary", () => {
       "/api/organizations/{organizationId}/invitations",
       "/api/organizations/{organizationId}/members/{memberId}/role",
       "/api/organizations/{organizationId}/members/{memberId}",
+      "/api/organizations/{organizationId}/members/{memberId}/reactivate",
       "/api/organizations/{organizationId}/owner-transfer",
     ]);
     expect(
@@ -813,6 +966,7 @@ describe("organization/team application boundary", () => {
       "appaloft organization member invite",
       "appaloft organization member role <memberId>",
       "appaloft organization member remove <memberId>",
+      "appaloft organization member restore <memberId>",
       "appaloft organization owner transfer <fromMemberId> <toMemberId>",
     ]);
     expect(entries.find((entry) => entry.key === "organizations.transfer-owner")).toMatchObject({

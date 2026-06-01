@@ -106,6 +106,7 @@ import { getCurrentOrganizationContextQueryInputSchema } from "./operations/orga
 import { inviteOrganizationMemberCommandInputSchema } from "./operations/organizations/invite-organization-member.command";
 import { listOrganizationInvitationsQueryInputSchema } from "./operations/organizations/list-organization-invitations.query";
 import { listOrganizationMembersQueryInputSchema } from "./operations/organizations/list-organization-members.query";
+import { reactivateOrganizationMemberCommandInputSchema } from "./operations/organizations/reactivate-organization-member.command";
 import { removeOrganizationMemberCommandInputSchema } from "./operations/organizations/remove-organization-member.command";
 import { showOrganizationProfileQueryInputSchema } from "./operations/organizations/show-organization-profile.query";
 import { switchCurrentOrganizationCommandInputSchema } from "./operations/organizations/switch-current-organization.command";
@@ -647,6 +648,23 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft organization member remove <memberId>",
       orpc: { method: "DELETE", path: "/api/organizations/{organizationId}/members/{memberId}" },
+    },
+  },
+  {
+    key: "organizations.reactivate-member",
+    kind: "command",
+    domain: "organizations",
+    messageName: "ReactivateOrganizationMemberCommand",
+    handlerName: "ReactivateOrganizationMemberCommandHandler",
+    serviceName: "ReactivateOrganizationMemberUseCase",
+    inputSchema: reactivateOrganizationMemberCommandInputSchema,
+    serviceToken: tokens.reactivateOrganizationMemberUseCase,
+    transports: {
+      cli: "appaloft organization member restore <memberId>",
+      orpc: {
+        method: "POST",
+        path: "/api/organizations/{organizationId}/members/{memberId}/reactivate",
+      },
     },
   },
   {

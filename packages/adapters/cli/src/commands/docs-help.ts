@@ -629,6 +629,10 @@ export const cliCommandDescriptions = {
     "Remove an organization member",
     "self-hosting.organization-team-management",
   ),
+  organizationMemberRestore: withDocs(
+    "Restore a deactivated organization member",
+    "self-hosting.organization-team-management",
+  ),
   organizationOwner: withDocs(
     "Organization owner operations",
     "self-hosting.organization-team-management",

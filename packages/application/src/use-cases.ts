@@ -123,6 +123,7 @@ export * from "./operations/organizations/get-current-organization-context.query
 export * from "./operations/organizations/invite-organization-member.use-case";
 export * from "./operations/organizations/list-organization-invitations.query-service";
 export * from "./operations/organizations/list-organization-members.query-service";
+export * from "./operations/organizations/reactivate-organization-member.use-case";
 export * from "./operations/organizations/remove-organization-member.use-case";
 export * from "./operations/organizations/show-organization-profile.query-service";
 export * from "./operations/organizations/switch-current-organization.use-case";
