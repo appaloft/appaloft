@@ -150,6 +150,7 @@
       queryFn: () => orpcClient.organizations.currentContext({}),
       enabled: browser,
       retry: 0,
+      staleTime: 30_000,
     }),
   );
   const switchCurrentOrganizationMutation = createMutation(() => ({

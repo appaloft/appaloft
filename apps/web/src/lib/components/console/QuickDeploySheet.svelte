@@ -507,6 +507,7 @@
       queryKey: ["system", "auth-session"],
       queryFn: () => request<AuthSessionResponse>("/api/auth/session"),
       enabled: browser && enabled,
+      staleTime: 30_000,
     }),
   );
   const projectsQuery = createQuery(() =>

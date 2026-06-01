@@ -91,6 +91,7 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
       queryKey: ["system", "auth-session"],
       queryFn: () => request<AuthSessionResponse>("/api/auth/session"),
       enabled: queryEnabled("authSession"),
+      staleTime: 30_000,
     }),
   );
   const productQueryEnabled = (key: ConsoleQueryKey) =>
