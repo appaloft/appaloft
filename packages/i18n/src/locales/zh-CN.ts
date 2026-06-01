@@ -840,7 +840,8 @@ export const zhCN = {
       removeMember: "移除",
       removeMemberConfirm: "确定从当前组织移除成员 {{memberId}} 吗？",
       removingMember: "正在移除",
-      removedMembersDescription: "已移除成员不再拥有有效访问权限，会保留在这里用于审计，可一键恢复。",
+      removedMembersDescription:
+        "已移除成员不再拥有有效访问权限，会保留在这里用于审计，可一键恢复。",
       removedMembersTitle: "已移除成员",
       repositoryScopeLabel: "仓库范围",
       repositoryScopePlaceholder: "组织名/仓库名",
