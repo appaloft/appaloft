@@ -1,4 +1,5 @@
 export type BlueprintMarketplaceChrome = "standalone" | "embedded";
+export type BlueprintMarketplaceCardDensity = "default" | "compact" | "mini";
 export type BlueprintMarketplacePrimaryAction = "deploy" | "detail" | "select";
 
 export interface BlueprintMarketplaceCategory {
@@ -66,4 +67,21 @@ export interface BlueprintMarketplaceDeployHandoffInput {
   readonly title: string;
   readonly sourceExtension?: string;
   readonly projectName?: string;
+}
+
+export interface BlueprintMarketplaceCardLabels {
+  readonly dependencies: string;
+  readonly components: string;
+  readonly variants: string;
+  readonly ports: string;
+  readonly noDependencies: string;
+  readonly noPorts: string;
+  readonly componentCount: string;
+  readonly defaultVariant: string;
+  readonly variantCount: string;
+  readonly variantCountWithLabel: string;
+  readonly official: string;
+  readonly featured: string;
+  readonly selected: string;
+  readonly website: string;
 }

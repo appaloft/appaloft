@@ -70,10 +70,12 @@ import {
   type AppaloftBetterAuthAccountSecurityStatus,
   type AppaloftBetterAuthConfig,
   type AppaloftBetterAuthEmailVerificationStatus,
+  type AppaloftBetterAuthMagicLinkStatus,
   createAppaloftBetterAuth,
   resolveAppaloftBetterAuthAccountRecoveryStatus,
   resolveAppaloftBetterAuthAccountSecurityStatus,
   resolveAppaloftBetterAuthEmailVerificationStatus,
+  resolveAppaloftBetterAuthMagicLinkStatus,
   resolveAppaloftBetterAuthProviderConfig,
 } from "./shared";
 
@@ -96,6 +98,7 @@ export interface AuthSessionStatus {
   currentUserOrganizationCount?: number;
   enabled: boolean;
   emailVerification: AppaloftBetterAuthEmailVerificationStatus;
+  magicLink: AppaloftBetterAuthMagicLinkStatus;
   provider: "none" | "better-auth";
   loginRequired: boolean;
   deferredAuth: boolean;
@@ -220,6 +223,7 @@ export class BetterAuthRuntime implements AuthRuntime {
   private readonly emailVerification: AppaloftBetterAuthEmailVerificationStatus;
   private readonly githubConfigured: boolean;
   private readonly googleConfigured: boolean;
+  private readonly magicLink: AppaloftBetterAuthMagicLinkStatus;
   private readonly organizationAdmission: BetterAuthOrganizationAdmissionPort | undefined;
   private readonly oidcConfigured: boolean;
   private readonly requestCaches = new WeakMap<ExecutionContext, BetterAuthRequestCache>();
@@ -230,6 +234,7 @@ export class BetterAuthRuntime implements AuthRuntime {
     this.emailVerification = resolveAppaloftBetterAuthEmailVerificationStatus(config);
     this.githubConfigured = providers.github;
     this.googleConfigured = providers.google;
+    this.magicLink = resolveAppaloftBetterAuthMagicLinkStatus(config);
     this.organizationAdmission = config.organizationAdmission;
     this.oidcConfigured = providers.oidc;
     this.auth = createAppaloftBetterAuth(config);
@@ -242,6 +247,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         accountRecovery: disabledAccountRecoveryStatus(),
         enabled: false,
         emailVerification: disabledEmailVerificationStatus(),
+        magicLink: disabledMagicLinkStatus(),
         provider: "none",
         loginRequired: false,
         deferredAuth: false,
@@ -282,6 +288,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       ...(currentUserOrganizationCount !== undefined ? { currentUserOrganizationCount } : {}),
       enabled: true,
       emailVerification: this.emailVerification,
+      magicLink: this.magicLink,
       provider: "better-auth",
       loginRequired: !session,
       deferredAuth: true,
@@ -1974,6 +1981,7 @@ function shouldEnsureDefaultOrganizationAfterAuthRoute(request: Request): boolea
   return (
     path === "/api/auth/sign-up/email" ||
     path === "/api/auth/sign-in/email" ||
+    path === "/api/auth/magic-link/verify" ||
     path === "/api/auth/callback/github" ||
     path === "/api/auth/callback/google" ||
     path === "/api/auth/oauth2/callback/oidc"
@@ -1981,7 +1989,8 @@ function shouldEnsureDefaultOrganizationAfterAuthRoute(request: Request): boolea
 }
 
 function shouldConsumePendingVerificationIntentAfterAuthRoute(request: Request): boolean {
-  return new URL(request.url).pathname === "/api/auth/email-otp/verify-email";
+  const path = new URL(request.url).pathname;
+  return path === "/api/auth/email-otp/verify-email" || path === "/api/auth/magic-link/verify";
 }
 
 function isSetPasswordHttpWrapperRequest(request: Request): boolean {
@@ -2029,6 +2038,12 @@ function disabledEmailVerificationStatus(): AppaloftBetterAuthEmailVerificationS
 }
 
 function disabledAccountRecoveryStatus(): AppaloftBetterAuthAccountRecoveryStatus {
+  return {
+    enabled: false,
+  };
+}
+
+function disabledMagicLinkStatus(): AppaloftBetterAuthMagicLinkStatus {
   return {
     enabled: false,
   };

@@ -54,7 +54,7 @@
   let loginOpen = $state(false);
   let email = $state("");
   let otp = $state("");
-  let emailStep = $state<"email" | "otp">("email");
+  let emailStep = $state<"email" | "otp" | "sent">("email");
   let copied = $state(false);
   let busy = $state(false);
   let checkingSession = $state(true);
@@ -225,7 +225,7 @@
     });
   }
 
-  async function sendEmailOtp() {
+  async function sendEmailLogin() {
     await login({
       provider: "email",
       email,
@@ -255,6 +255,8 @@
 
       if (result.nextStep === "otp") {
         emailStep = "otp";
+      } else if (result.nextStep === "sent") {
+        emailStep = "sent";
       }
 
       if (result.status === "authenticated") {
@@ -489,9 +491,22 @@
               type="email"
               placeholder={copy.emailPlaceholder}
               bind:value={email}
-              disabled={busy || emailStep === "otp"}
+              disabled={busy || emailStep !== "email"}
             />
-            {#if emailStep === "otp"}
+            {#if emailStep === "sent"}
+              <p class="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-semibold text-muted-foreground">
+                {copy.emailLinkSent}
+              </p>
+              <Button
+                class="mt-2"
+                variant="outline"
+                size="lg"
+                onclick={sendEmailLogin}
+                disabled={busy || !email.trim()}
+              >
+                {copy.emailSend}
+              </Button>
+            {:else if emailStep === "otp"}
               <label class="mt-1 text-xs font-bold text-foreground" for="static-upload-otp">
                 {copy.otpLabel}
               </label>
@@ -515,7 +530,7 @@
                 class="mt-2"
                 variant="outline"
                 size="lg"
-                onclick={sendEmailOtp}
+                onclick={sendEmailLogin}
                 disabled={busy || !email.trim()}
               >
                 {copy.emailSend}

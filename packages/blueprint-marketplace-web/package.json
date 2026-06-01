@@ -15,6 +15,19 @@
       "svelte": "./src/BlueprintMarketplacePage.svelte",
       "types": "./src/BlueprintMarketplacePage.svelte",
       "default": "./src/BlueprintMarketplacePage.svelte"
+    },
+    "./BlueprintMarketplaceCard.svelte": {
+      "svelte": "./src/BlueprintMarketplaceCard.svelte",
+      "types": "./src/BlueprintMarketplaceCard.svelte",
+      "default": "./src/BlueprintMarketplaceCard.svelte"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    },
+    "./url": {
+      "types": "./src/url.ts",
+      "default": "./src/url.ts"
     }
   },
   "peerDependencies": {

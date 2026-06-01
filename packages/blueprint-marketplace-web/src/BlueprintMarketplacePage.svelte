@@ -1,6 +1,8 @@
 <script lang="ts">
+  import BlueprintMarketplaceCard from "./BlueprintMarketplaceCard.svelte";
   import type {
     BlueprintMarketplaceCategory,
+    BlueprintMarketplaceCardLabels,
     BlueprintMarketplaceChrome,
     BlueprintMarketplaceListResponse,
     BlueprintMarketplaceListing,
@@ -57,8 +59,19 @@
   let isLoading = $state(true);
   let errorMessage = $state("");
   let marketplace = $state<BlueprintMarketplaceListResponse | null>(null);
-  let failedIconSlugs = $state<Record<string, true>>({});
   let loadRequestId = 0;
+  const cardLabels: Partial<BlueprintMarketplaceCardLabels> = {
+    dependencies: "依赖资源",
+    components: "运行单元",
+    variants: "部署方案",
+    ports: "公开入口",
+    noDependencies: "无托管依赖",
+    noPorts: "无公开端口",
+    official: "官方",
+    featured: "精选",
+    selected: "已选择",
+    website: "网站",
+  };
 
   const categories = $derived(marketplace?.categories ?? []);
   const listings = $derived(marketplace?.items ?? []);
@@ -164,58 +177,6 @@
         isLoading = false;
       }
     }
-  }
-
-  function dependencySummary(item: BlueprintMarketplaceListing): string {
-    const dependencies = item.requirementsSummary?.dependencies ?? [];
-    return dependencies.length > 0 ? dependencies.join(" / ") : "无托管依赖";
-  }
-
-  function portSummary(item: BlueprintMarketplaceListing): string {
-    const ports = item.requirementsSummary?.ports ?? [];
-    if (ports.length === 0) {
-      return "无公开端口";
-    }
-    return ports
-      .map((port) => port.split(":").at(-1) ?? port)
-      .slice(0, 2)
-      .join(" / ");
-  }
-
-  function iconLabel(item: BlueprintMarketplaceListing): string {
-    return (item.icon?.label ?? item.title.slice(0, 2)).trim();
-  }
-
-  function hasIconImage(item: BlueprintMarketplaceListing): boolean {
-    return Boolean(item.icon?.url && !failedIconSlugs[item.slug]);
-  }
-
-  function iconFallbackStyle(item: BlueprintMarketplaceListing): string | undefined {
-    return item.icon?.tone
-      ? `background:${item.icon.tone};color:white;border-color:${item.icon.tone}`
-      : undefined;
-  }
-
-  function markIconFailed(item: BlueprintMarketplaceListing): void {
-    failedIconSlugs = { ...failedIconSlugs, [item.slug]: true };
-  }
-
-  function componentSummary(item: BlueprintMarketplaceListing): string {
-    const count = item.requirementsSummary?.components ?? 1;
-    return `${count.toString()} 个组件`;
-  }
-
-  function variantSummary(item: BlueprintMarketplaceListing): string {
-    const variants = item.variants ?? [];
-    if (variants.length === 0) {
-      return "默认方案";
-    }
-
-    const defaultVariant = variants.find((variant) => variant.id === item.defaultVariant);
-    const firstLabel = defaultVariant?.label ?? variants[0]?.label ?? variants[0]?.id;
-    return variants.length === 1
-      ? (firstLabel ?? "1 个方案")
-      : `${variants.length.toString()} 个方案 · ${firstLabel ?? "默认"}`;
   }
 
   function actionHref(item: BlueprintMarketplaceListing): string {
@@ -379,100 +340,20 @@
           </div>
           <div class="marketplace-grid">
             {#each group.items as item (item.slug)}
-              <article class:selected={selectedSlug === item.slug} class="listing-card">
-                <div class="listing-card-header">
-                  <div class="listing-card-main">
-                    <div
-                      class:has-image={hasIconImage(item)}
-                      class="listing-icon"
-                      style={hasIconImage(item) ? undefined : iconFallbackStyle(item)}
-                    >
-                      {#if hasIconImage(item)}
-                        <img
-                          src={item.icon?.url ?? ""}
-                          alt={item.icon?.alt ?? `${item.title} icon`}
-                          loading="lazy"
-                          decoding="async"
-                          onerror={() => {
-                            markIconFailed(item);
-                          }}
-                        />
-                      {:else if iconLabel(item)}
-                        <span>{iconLabel(item)}</span>
-                      {:else}
-                        <span aria-hidden="true">□</span>
-                      {/if}
-                    </div>
-                    <div class="listing-title">
-                      <h3>{item.title}</h3>
-                      <p>{item.subtitle}</p>
-                    </div>
-                  </div>
-                  <div class="status-badges">
-                    <span>{item.featured ? "精选" : "官方"}</span>
-                    {#if selectedSlug === item.slug}
-                      <span>已选择</span>
-                    {/if}
-                  </div>
-                </div>
-
-                <p class="listing-summary">{item.blueprint.summary}</p>
-
-                <dl class="listing-facts">
-                  <div>
-                    <dt>依赖资源</dt>
-                    <dd>{dependencySummary(item)}</dd>
-                  </div>
-                  <div>
-                    <dt>运行单元</dt>
-                    <dd>{componentSummary(item)}</dd>
-                  </div>
-                  <div>
-                    <dt>部署方案</dt>
-                    <dd>{variantSummary(item)}</dd>
-                  </div>
-                  <div>
-                    <dt>公开入口</dt>
-                    <dd>{portSummary(item)}</dd>
-                  </div>
-                </dl>
-
-                <div class="tag-row">
-                  {#each item.blueprint.tags.slice(0, 5) as tag (tag)}
-                    <span>{tag}</span>
-                  {/each}
-                </div>
-
-                <div class="listing-footer">
-                  <span>{item.publisher.name} / {item.blueprint.version}</span>
-                  <div class="action-row">
-                    {#if item.websiteUrl}
-                      <a
-                        class="icon-link"
-                        href={item.websiteUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`${item.title} website`}
-                        title={`${item.title} website`}
-                      >
-                        ↗
-                      </a>
-                    {/if}
-                    {#if onview}
-                      <button type="button" class="outline-action" onclick={() => onview?.(item)}>
-                        查看 <span aria-hidden="true">↗</span>
-                      </button>
-                    {/if}
-                    {#if primaryAction === "select"}
-                      <button type="button" class="primary-action" onclick={() => handlePrimaryAction(item)}>
-                        {actionLabel} <span aria-hidden="true">→</span>
-                      </button>
-                    {:else}
-                      <a class="primary-action" href={actionHref(item)}>{actionLabel} <span aria-hidden="true">→</span></a>
-                    {/if}
-                  </div>
-                </div>
-              </article>
+              <BlueprintMarketplaceCard
+                {item}
+                actionHref={primaryAction === "select" ? "#" : actionHref(item)}
+                {actionLabel}
+                labels={cardLabels}
+                selected={selectedSlug === item.slug}
+                onprimaryaction={(event) => {
+                  if (primaryAction === "select") {
+                    event.preventDefault();
+                    handlePrimaryAction(item);
+                  }
+                }}
+                {onview}
+              />
             {/each}
           </div>
         </section>
