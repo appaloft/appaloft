@@ -644,18 +644,6 @@ class StaticProviderRegistry implements ProviderRegistry {
       category: "deploy-target",
       capabilities: ["single-server"],
     },
-    {
-      key: "aliyun",
-      title: "Alibaba Cloud",
-      category: "cloud-provider",
-      capabilities: ["ecs"],
-    },
-    {
-      key: "tencent-cloud",
-      title: "Tencent Cloud",
-      category: "cloud-provider",
-      capabilities: ["cvm"],
-    },
   ];
 
   list(): ProviderDescriptor[] {
@@ -4171,15 +4159,15 @@ describe("CreateDeploymentUseCase", () => {
           },
           targets: [
             {
-              key: "aliyun",
-              name: "Aliyun Production",
-              providerKey: "aliyun",
+              key: "production-ssh",
+              name: "Production SSH",
+              providerKey: "generic-ssh",
               host: "203.0.113.10",
               port: 22,
             },
           ],
           deployment: {
-            targetKey: "aliyun",
+            targetKey: "production-ssh",
             method: "workspace-commands",
             startCommand: "node dist/server.js",
             port: 3000,
@@ -4220,7 +4208,7 @@ describe("CreateDeploymentUseCase", () => {
     expect([...projects.items.values()][0]?.toState().name.value).toBe("Configured App");
     expect([...environments.items.values()][0]?.toState().name.value).toBe("production");
     expect([...resources.items.values()][0]?.toState().name.value).toBe("web");
-    expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("aliyun");
+    expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("generic-ssh");
     expect([...destinations.items.values()][0]?.toState().name.value).toBe("default");
 
     const deployment = await deployments.findOne(

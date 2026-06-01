@@ -299,6 +299,6 @@ describe("console docs help links", () => {
         new URL("../../lib/components/console/ServerRegistrationForm.svelte", import.meta.url),
         "utf8",
       ),
-    ).toContain("serverDockerSwarmTarget");
+    ).toContain("serverDeploymentTarget");
   });
 });
