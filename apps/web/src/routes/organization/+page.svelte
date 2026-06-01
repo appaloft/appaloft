@@ -1352,7 +1352,7 @@
       {/if}
 
       {#if activeSection === "profile"}
-        <div class="mx-auto flex w-full max-w-6xl flex-wrap gap-2">
+        <div class="flex w-full flex-wrap gap-2">
           <Button href={webDocsHrefs.organizationTeamManagement} target="_blank" variant="outline">
             <BookOpen class="size-4" />
             {$t(i18nKeys.console.organization.docsLink)}

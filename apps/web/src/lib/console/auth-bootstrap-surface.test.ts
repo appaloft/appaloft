@@ -35,6 +35,10 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
       new URL("../../lib/components/console/ConsoleShell.svelte", import.meta.url),
       "utf8",
     );
+    const consoleUserMenuSource = await readFile(
+      new URL("../../lib/components/console/ConsoleUserMenu.svelte", import.meta.url),
+      "utf8",
+    );
 
     expect(loginPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(loginPageSource).not.toContain("createAdmin");
@@ -89,8 +93,8 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(accountSecurityPageSource).not.toContain("ManagementShell");
     expect(consoleShellSource).toContain("min-w-64");
     expect(consoleShellSource).not.toContain("w-(--bits-dropdown-menu-anchor-width) min-w-0");
-    expect(consoleShellSource).toContain("/account/profile");
-    expect(consoleShellSource).toContain("accountSettings.introTitle");
+    expect(consoleUserMenuSource).toContain("/account/profile");
+    expect(consoleUserMenuSource).toContain("accountSettings.introTitle");
     expect(consoleShellSource).not.toContain('navigateTo("/account/security")');
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
