@@ -3,6 +3,7 @@
 @import "shadcn-svelte/tailwind.css";
 @import "@appaloft/design/styles/web.css";
 @source "../../../../packages/ui/src";
+@source "../../../../packages/blueprint-marketplace-web/src";
 
 :root,
 :root[data-theme="light"],

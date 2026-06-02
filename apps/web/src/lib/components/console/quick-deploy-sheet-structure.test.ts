@@ -59,6 +59,48 @@ describe("QuickDeploySheet structure", () => {
     expect(resourceSourceOptionSource).not.toContain("block truncate text-sm font-medium");
   });
 
+  test("[QUICK-DEPLOY-UX-004] locks the source picker after a Blueprint is selected", () => {
+    expect(quickDeploySheetSource).toContain("selectedBlueprintSourceLocked");
+    expect(quickDeploySheetSource).toContain(
+      'sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim())',
+    );
+    expect(quickDeploySheetSource).toContain("{#if !selectedBlueprintSourceLocked}");
+    expect(quickDeploySheetSource).toContain(
+      'selectedSourceGroupKey === "git" && !selectedBlueprintSourceLocked',
+    );
+    expect(quickDeploySheetSource).toContain(
+      'selectedSourceGroupKey === "docker" && !selectedBlueprintSourceLocked',
+    );
+    expect(quickDeploySheetSource).toContain(
+      "quickDeploySourceExtensions.length > 1 && !selectedBlueprintSourceLocked",
+    );
+    expect(quickDeploySheetSource).toContain(
+      "selectedBlueprintSourceExtension && !selectedBlueprintSourceLocked",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      "{selectedBlueprintSourceExtension.pluginDisplayName}",
+    );
+  });
+
+  test("[QUICK-DEPLOY-UX-005] renders the selected Blueprint with its product icon", () => {
+    expect(quickDeploySheetSource).toContain("selectedBlueprintDisplayTitle");
+    expect(quickDeploySheetSource).toContain("selectedBlueprintListing?.title");
+    expect(quickDeploySheetSource).toContain("<BlueprintProductIcon");
+    expect(quickDeploySheetSource).toContain("icon={selectedBlueprintListing?.icon}");
+    expect(quickDeploySheetSource).toContain('imageClass="size-6"');
+    expect(quickDeploySheetSource).toContain('icon?: "blueprint"');
+    expect(quickDeploySheetSource).toContain("data-blueprint-summary-icon");
+    expect(quickDeploySheetSource).toContain("data-blueprint-variable-list");
+    expect(quickDeploySheetSource).toContain("data-blueprint-variable-key");
+    expect(quickDeploySheetSource).toContain("readonly");
+    expect(quickDeploySheetSource).not.toContain(
+      'value: selectedBlueprintSourceExtension?.path ?? "/marketplace"',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      '<Package class="size-4 shrink-0 text-muted-foreground" />',
+    );
+  });
+
   test("[QD-GHA-001] shows hosted GitHub App install without requiring GitHub OAuth", () => {
     expect(quickDeploySheetSource).toContain("data-github-app-install-panel");
     expect(quickDeploySheetSource).toContain("data-github-app-install-action");
@@ -131,6 +173,9 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain(
       'sourceKind === "blueprint" || sourceKind === "static-site" ? "" : sourceLocator',
     );
+    expect(quickDeploySheetSource).not.toContain('serverName") ?? "local-machine"');
+    expect(quickDeploySheetSource).not.toContain('serverHost") ?? "127.0.0.1"');
+    expect(quickDeploySheetSource).not.toContain('serverPort") ?? "22"');
     expect(quickDeploySheetSource).not.toContain(
       'sourceKind === "static-site" && !staticPublishDirectory.trim()',
     );

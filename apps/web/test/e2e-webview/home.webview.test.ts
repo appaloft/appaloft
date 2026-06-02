@@ -1002,6 +1002,143 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       apiVersion: "v1",
       mode: "self-hosted",
     },
+    "/api/system-plugins/web-extensions": {
+      items: [
+        {
+          key: "cloud-blueprint-marketplace",
+          title: "应用市场",
+          description: "官方蓝图应用市场。",
+          path: "/marketplace",
+          placement: "navigation",
+          target: "console-route",
+          requiresAuth: false,
+          pluginName: "server-configured-extensions",
+          pluginDisplayName: "Server Configured Extensions",
+          metadata: {
+            renderer: "blueprint-catalog",
+            listEndpoint: "/api/cloud/marketplace/blueprints",
+            detailEndpointTemplate: "/api/cloud/marketplace/blueprints/{slug}",
+          },
+        },
+        {
+          key: "cloud-blueprint-marketplace.quick-deploy-source",
+          title: "蓝图市场",
+          description: "为快速部署选择官方应用蓝图。",
+          path: "/marketplace?surface=quick-deploy",
+          placement: "quick-deploy-source",
+          target: "console-route",
+          requiresAuth: false,
+          pluginName: "server-configured-extensions",
+          pluginDisplayName: "Server Configured Extensions",
+          metadata: {
+            renderer: "blueprint-catalog",
+            listEndpoint: "/api/cloud/marketplace/blueprints",
+            detailEndpointTemplate: "/api/cloud/marketplace/blueprints/{slug}",
+          },
+        },
+      ],
+    },
+    "/api/cloud/marketplace/blueprints/baserow": {
+      listing: {
+        slug: "baserow",
+        title: "Baserow",
+        subtitle: "Open source no-code database",
+        category: "Data",
+        featured: true,
+        websiteUrl: "https://baserow.io",
+        documentationUrl: "https://baserow.io/docs",
+        icon: {
+          label: "Ba",
+          tone: "#0f766e",
+          url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 8h10a5 5 0 0 1 0 10H9z' fill='white'/%3E%3Cpath d='M9 16h12a5 5 0 0 1 0 10H9z' fill='%23d1fae5'/%3E%3C/svg%3E",
+          alt: "Baserow icon",
+        },
+        publisher: {
+          name: "Appaloft",
+          verified: true,
+        },
+        blueprint: {
+          id: "baserow",
+          version: "1.0.0",
+          summary: "Deploy Baserow with managed dependencies.",
+          tags: ["database", "nocode"],
+        },
+        overview: {
+          highlights: ["Managed Postgres dependency", "Container image runtime"],
+          useCases: ["Internal no-code database"],
+        },
+        defaultVariant: "standard",
+        variants: [
+          {
+            id: "standard",
+            label: "Standard",
+            summary: "Default Baserow deployment.",
+          },
+        ],
+      },
+      manifest: {
+        summary: "Baserow application",
+        description: "Open source no-code database.",
+        parameters: [],
+        secrets: [],
+        resources: [
+          {
+            id: "postgres",
+            kind: "postgres",
+            label: "Postgres database",
+            capabilities: [{ key: "postgres.database", required: true }],
+          },
+        ],
+        components: [
+          {
+            id: "web",
+            name: "Baserow",
+            kind: "application",
+            runtime: {
+              strategy: "container-image",
+              image: "baserow/baserow:latest",
+            },
+            ports: [{ name: "http", containerPort: 80, protocol: "http", public: true }],
+            routes: [{ port: "http", pathPrefix: "/" }],
+            variables: [
+              {
+                key: "DATABASE_URL",
+                value: "postgres://dependency/postgres",
+                description: "Postgres connection string",
+              },
+              {
+                key: "SECRET_KEY",
+                value: "change-me",
+                description: "Baserow application secret",
+              },
+            ],
+            usesSecrets: [],
+            usesResources: ["postgres"],
+          },
+        ],
+        defaultVariant: "standard",
+        variants: {
+          standard: {
+            label: "Standard",
+            summary: "Default Baserow deployment.",
+          },
+        },
+      },
+      install: {
+        profiles: ["default"],
+        defaultProfile: "default",
+        parameters: [],
+        secrets: [],
+        defaultVariant: "standard",
+        variants: [
+          {
+            id: "standard",
+            label: "Standard",
+            summary: "Default Baserow deployment.",
+          },
+        ],
+      },
+    },
     "/api/instance-upgrade/check": {
       schemaVersion: "system.instance-upgrade.check/v1",
       currentVersion: "0.1.0-test",
@@ -3497,6 +3634,83 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Public Git URL", "公开 GitHub 仓库"]);
     await clickButtonByAnyText(view, ["GitHub App", "GitHub App"]);
     await expectAnyText(view, ["GitHub URL", "GitHub URL"]);
+  }, 45_000);
+
+  test("[QUICK-DEPLOY-UX-004][QUICK-DEPLOY-UX-005] locks selected Blueprint source and renders its icon", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
+    );
+
+    await expectText(view, "Baserow");
+    await expectText(view, "已从蓝图市场选择应用");
+
+    const renderedStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`JSON.stringify({
+        sourcePickerCount: document.querySelectorAll('[role="radiogroup"][aria-label="来源"]').length,
+        blueprintCatalogSourceVisible: document.body.innerText.includes('蓝图目录来源'),
+        blueprintSourceAddressVisible: document.body.innerText.includes('/marketplace?surface=quick-deploy'),
+        sourceExtensionDisplayNameVisible: document.body.innerText.includes('Server Configured Extensions'),
+        blueprintVariableKeys: Array.from(document.querySelectorAll('[data-blueprint-variable-key]'))
+          .map((input) => input.getAttribute('data-blueprint-variable-key')),
+        serverDraftValues: {
+          name: document.querySelector('#server-name')?.value ?? null,
+          host: document.querySelector('#server-host')?.value ?? null,
+          port: document.querySelector('#server-port')?.value ?? null,
+        },
+        baserowIconImages: Array.from(document.querySelectorAll('img'))
+          .filter((img) => img.alt.includes('Baserow'))
+          .map((img) => ({ alt: img.alt, width: img.naturalWidth, height: img.naturalHeight })),
+        summaryBaserowIconImages: Array.from(document.querySelectorAll('[data-blueprint-summary-icon] img'))
+          .filter((img) => img.alt.includes('Baserow'))
+          .map((img) => ({ alt: img.alt, width: img.naturalWidth, height: img.naturalHeight })),
+        bodyText: document.body.innerText,
+      })`),
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          baserowIconImages: Array<{ width: number; height: number }>;
+          summaryBaserowIconImages: Array<{ width: number; height: number }>;
+        };
+        return (
+          state.baserowIconImages.some((image) => image.width > 0 && image.height > 0) &&
+          state.summaryBaserowIconImages.some((image) => image.width > 0 && image.height > 0)
+        );
+      },
+      "Expected selected Blueprint icon to render",
+    );
+    const renderedState = JSON.parse(renderedStateJson) as {
+      sourcePickerCount: number;
+      blueprintCatalogSourceVisible: boolean;
+      blueprintSourceAddressVisible: boolean;
+      sourceExtensionDisplayNameVisible: boolean;
+      blueprintVariableKeys: string[];
+      serverDraftValues: { name: string | null; host: string | null; port: string | null };
+      baserowIconImages: Array<{ alt: string; width: number; height: number }>;
+      summaryBaserowIconImages: Array<{ alt: string; width: number; height: number }>;
+    };
+
+    expect(renderedState.sourcePickerCount).toBe(0);
+    expect(renderedState.blueprintCatalogSourceVisible).toBe(false);
+    expect(renderedState.blueprintSourceAddressVisible).toBe(false);
+    expect(renderedState.sourceExtensionDisplayNameVisible).toBe(false);
+    expect(renderedState.blueprintVariableKeys).toEqual(["DATABASE_URL", "SECRET_KEY"]);
+    expect(renderedState.serverDraftValues).toEqual({ name: "", host: "", port: "" });
+    expect(renderedState.baserowIconImages.length).toBeGreaterThanOrEqual(2);
+    expect(renderedState.summaryBaserowIconImages).toEqual([
+      expect.objectContaining({
+        alt: "Baserow icon",
+        width: expect.any(Number),
+        height: expect.any(Number),
+      }),
+    ]);
+    expect(renderedState.baserowIconImages[0]?.width).toBeGreaterThan(0);
+    expect(renderedState.baserowIconImages[0]?.height).toBeGreaterThan(0);
+    expect(renderedState.summaryBaserowIconImages[0]?.width).toBeGreaterThan(0);
+    expect(renderedState.summaryBaserowIconImages[0]?.height).toBeGreaterThan(0);
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
@@ -7053,7 +7267,15 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Project", "项目"]);
     await expectText(view, "acme/platform");
     await expectAnyText(view, ["Server", "服务器"]);
-    await expectAnyText(view, ["local-machine", "目标身份"]);
+    expect(
+      await view.evaluate<string>(
+        `JSON.stringify({
+          name: document.querySelector('#server-name')?.value ?? null,
+          host: document.querySelector('#server-host')?.value ?? null,
+          port: document.querySelector('#server-port')?.value ?? null,
+        })`,
+      ),
+    ).toBe(JSON.stringify({ name: "", host: "", port: "" }));
   }, 15_000);
 
   test("[QUICK-DEPLOY-ENTRY-008] maps Web static site draft fields through resources.create", async () => {

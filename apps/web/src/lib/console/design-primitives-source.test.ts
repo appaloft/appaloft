@@ -6,6 +6,7 @@ describe("community design primitives CSS source", () => {
     const layoutCss = await readFile(new URL("../../routes/layout.css", import.meta.url), "utf8");
 
     expect(layoutCss).toContain('@source "../../../../packages/ui/src";');
+    expect(layoutCss).toContain('@source "../../../../packages/blueprint-marketplace-web/src";');
   });
 
   test("does not define a second stronger generic border token for console panels", async () => {
