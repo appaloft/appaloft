@@ -72,7 +72,46 @@ export interface SystemPluginHttpMiddleware {
     | Promise<SystemPluginHttpMiddlewareResult | undefined>;
 }
 
-export type SystemPluginHttpRouteResult = Response | string | Record<string, unknown> | null;
+export interface SystemPluginHtmlRouteResult {
+  kind: "html";
+  body: string;
+  status?: number;
+  headers?: Record<string, string>;
+}
+
+export interface SystemPluginHtmlRouteResultOptions {
+  status?: number;
+  headers?: Record<string, string>;
+}
+
+export function systemPluginHtml(
+  body: string,
+  options: SystemPluginHtmlRouteResultOptions = {},
+): SystemPluginHtmlRouteResult {
+  return {
+    body,
+    ...(options.headers ? { headers: options.headers } : {}),
+    kind: "html",
+    ...(options.status !== undefined ? { status: options.status } : {}),
+  };
+}
+
+export function isSystemPluginHtmlRouteResult(
+  value: unknown,
+): value is SystemPluginHtmlRouteResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return record.kind === "html" && typeof record.body === "string";
+}
+
+export type SystemPluginHttpRouteResult =
+  | Response
+  | string
+  | SystemPluginHtmlRouteResult
+  | Record<string, unknown>
+  | null;
 
 export interface SystemPluginHttpRoute {
   method: SystemPluginRouteMethod;
