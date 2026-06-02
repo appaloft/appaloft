@@ -50,6 +50,7 @@ import {
   type RequestContextRunnerOptions,
 } from "@appaloft/orpc";
 import {
+  isSystemPluginHtmlRouteResult,
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
   type SystemPluginHttpRouteResult,
@@ -300,6 +301,16 @@ function requestSecurityContextFromHeaders(
 function normalizePluginRouteResult(
   result: SystemPluginHttpRouteResult,
 ): Response | Record<string, unknown> | string | null {
+  if (isSystemPluginHtmlRouteResult(result)) {
+    const headers = new Headers(result.headers);
+    if (!headers.has("content-type")) {
+      headers.set("content-type", "text/html; charset=utf-8");
+    }
+    return new Response(result.body, {
+      headers,
+      status: result.status ?? 200,
+    });
+  }
   return result;
 }
 
