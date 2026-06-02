@@ -78,6 +78,7 @@ export const uiPackage = {
     empty: "@appaloft/ui/empty",
     input: "@appaloft/ui/input",
     popover: "@appaloft/ui/popover",
+    progress: "@appaloft/ui/progress",
     select: "@appaloft/ui/select",
     separator: "@appaloft/ui/separator",
     sheet: "@appaloft/ui/sheet",

@@ -1,10 +1,22 @@
 import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { type AppLogger, createExecutionContext } from "@appaloft/application";
+import {
+  type AppLogger,
+  type CommandBus,
+  createExecutionContext,
+  type ExecutionContext,
+  type ExecutionContextFactory,
+  type QueryBus,
+} from "@appaloft/application";
 import { os } from "@orpc/server";
+import { Elysia } from "elysia";
 import { z } from "zod";
-import { createAppaloftOpenApiHandler, createAppaloftOrpcRouter } from "../src/index";
+import {
+  createAppaloftOpenApiHandler,
+  createAppaloftOrpcRouter,
+  mountAppaloftOrpcRoutes,
+} from "../src/index";
 
 class CapturingLogger implements AppLogger {
   readonly errors: Array<{ message: string; context?: Record<string, unknown> }> = [];
@@ -14,6 +26,19 @@ class CapturingLogger implements AppLogger {
   warn(): void {}
   error(message: string, context?: Record<string, unknown>): void {
     this.errors.push({ message, context });
+  }
+}
+
+class TestExecutionContextFactory implements ExecutionContextFactory {
+  create(input: Parameters<ExecutionContextFactory["create"]>[0]): ExecutionContext {
+    return createExecutionContext({
+      requestId: input.requestId ?? "req_orpc_router_contribution_test",
+      entrypoint: input.entrypoint,
+      locale: input.locale,
+      actor: input.actor,
+      principal: input.principal,
+      tenant: input.tenant,
+    });
   }
 }
 
@@ -46,6 +71,42 @@ describe("Appaloft oRPC router contributions", () => {
     expect(matched).toBe(true);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
+  });
+
+  test("mounts contribution OpenAPI routes at their declared HTTP path", async () => {
+    const extensionRouter = {
+      extensions: {
+        ping: os
+          .route({
+            method: "POST",
+            path: "/extensions/ping",
+            successStatus: 202,
+          })
+          .input(z.object({ name: z.string() }))
+          .output(z.object({ ok: z.boolean(), name: z.string() }))
+          .handler(({ input }) => ({ ok: true, name: input.name })),
+      },
+    };
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: {} as CommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new CapturingLogger(),
+      queryBus: {} as QueryBus,
+      orpcRouterContributions: [extensionRouter],
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/extensions/ping", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "contribution" }),
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ ok: true, name: "contribution" });
   });
 
   test("rejects contributions that overwrite the public router", () => {
