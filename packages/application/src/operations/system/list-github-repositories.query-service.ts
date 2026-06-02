@@ -2,12 +2,14 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
+  DefaultTenantContextResolver,
   type GitHubAppInstallationRepository,
   type GitHubAppRuntime,
   type GitHubRepositoryBrowser,
   type GitHubRepositorySummary,
   type IntegrationAuthPort,
   type IntegrationRegistry,
+  type TenantContextResolver,
 } from "../../ports";
 import { tokens } from "../../tokens";
 
@@ -24,6 +26,8 @@ export class ListGitHubRepositoriesQueryService {
     private readonly githubAppInstallationRepository: GitHubAppInstallationRepository,
     @inject(tokens.githubAppRuntime)
     private readonly githubAppRuntime: GitHubAppRuntime,
+    @inject(tokens.tenantContextResolver)
+    private readonly tenantContextResolver?: TenantContextResolver,
   ) {}
 
   async execute(
@@ -74,7 +78,11 @@ export class ListGitHubRepositoriesQueryService {
       search?: string;
     },
   ): Promise<Result<{ items: GitHubRepositorySummary[] }>> {
-    const tenantId = context.tenant?.tenantId;
+    const tenantContext = await (
+      this.tenantContextResolver ?? new DefaultTenantContextResolver()
+    ).resolveTenantContext(context);
+    const effectiveContext = { ...context, tenant: tenantContext };
+    const tenantId = tenantContext.tenantId;
     if (!tenantId) {
       return err(
         domainError.validation("GitHub App repository browsing requires a tenant context", {
@@ -84,7 +92,7 @@ export class ListGitHubRepositoriesQueryService {
     }
 
     const installation = await this.githubAppInstallationRepository.findForTenant(
-      toRepositoryContext(context),
+      toRepositoryContext(effectiveContext),
       {
         providerKey: "github",
         tenantId,
@@ -104,7 +112,7 @@ export class ListGitHubRepositoriesQueryService {
       );
     }
 
-    const token = await this.githubAppRuntime.createInstallationAccessToken(context, {
+    const token = await this.githubAppRuntime.createInstallationAccessToken(effectiveContext, {
       installationId: installation.value.installationId,
     });
     if (token.isErr()) {
@@ -112,7 +120,7 @@ export class ListGitHubRepositoriesQueryService {
     }
 
     try {
-      const repositories = await this.githubRepositoryBrowser.listRepositories(context, {
+      const repositories = await this.githubRepositoryBrowser.listRepositories(effectiveContext, {
         accessToken: token.value.token,
         accessTokenKind: "installation",
         ...(input?.search ? { search: input.search } : {}),

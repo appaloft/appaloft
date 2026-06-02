@@ -4568,9 +4568,9 @@
                     <GitHubIcon class="size-4" />
                     {$t(i18nKeys.console.quickDeploy.githubInstallApp)}
                   </Button>
-                  {#if githubAppConnectionQuery.isError}
-                    <p class="text-xs text-destructive">
-                      {readErrorMessage(githubAppConnectionQuery.error)}
+                  {#if githubAppConnectionQuery.isError && !githubAppInstallUrl}
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.githubHostedProviderAppSetupPending)}
                     </p>
                   {/if}
                 </div>
