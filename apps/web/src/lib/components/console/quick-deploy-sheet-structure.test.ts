@@ -61,9 +61,16 @@ describe("QuickDeploySheet structure", () => {
 
   test("[QUICK-DEPLOY-UX-004] locks the source picker after a Blueprint is selected", () => {
     expect(quickDeploySheetSource).toContain("selectedBlueprintSourceLocked");
+    expect(quickDeploySheetSource).toContain("initialBlueprintSourceLocked");
+    expect(quickDeploySheetSource).toContain("blueprintSourceLockedByEntry");
+    expect(quickDeploySheetSource).toContain("isLockedBlueprintSourceEntry(page.url.searchParams)");
+    expect(quickDeploySheetSource).toContain('params.get("source") === "blueprint"');
+    expect(quickDeploySheetSource).toContain('params.get("step") !== "source"');
     expect(quickDeploySheetSource).toContain(
-      'sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim())',
+      'blueprintSourceLockedByEntry && sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim())',
     );
+    expect(quickDeploySheetSource).toContain('if (kind !== "blueprint")');
+    expect(quickDeploySheetSource).toContain("blueprintSourceLockedByEntry = false");
     expect(quickDeploySheetSource).toContain("{#if !selectedBlueprintSourceLocked}");
     expect(quickDeploySheetSource).toContain(
       'selectedSourceGroupKey === "git" && !selectedBlueprintSourceLocked',
@@ -80,6 +87,8 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain(
       "{selectedBlueprintSourceExtension.pluginDisplayName}",
     );
+    expect(quickDeploySheetSource).not.toContain("<style>");
+    expect(quickDeploySheetSource).not.toContain("dependency-kind-logo");
   });
 
   test("[QUICK-DEPLOY-UX-005] renders the selected Blueprint with its product icon", () => {
