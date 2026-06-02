@@ -319,7 +319,7 @@ function routeProbeCommand(input: {
       `wget -q --timeout=2 --header=${shellQuote(hostHeader)} -O /dev/null ${shellQuote(url)}`,
       "fi",
       "}",
-    ].join(" "),
+    ].join("\n"),
     [
       "dump_http() {",
       "if command -v curl >/dev/null 2>&1; then",
@@ -328,7 +328,7 @@ function routeProbeCommand(input: {
       `wget -S --timeout=2 --header=${shellQuote(hostHeader)} -O - ${shellQuote(url)} || true`,
       "fi",
       "}",
-    ].join(" "),
+    ].join("\n"),
     "trap cleanup EXIT",
     "cleanup",
     [
@@ -357,10 +357,10 @@ function routeProbeCommand(input: {
       "i=$((i + 1))",
       "sleep 1",
       "done",
-    ].join("; "),
+    ].join("\n"),
     "dump_http",
     "exit 1",
-  ].join("; ");
+  ].join("\n");
 }
 
 function labelsForTraefik(input: {
