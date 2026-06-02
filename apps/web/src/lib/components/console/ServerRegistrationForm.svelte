@@ -13,8 +13,10 @@
     canTestServerRegistrationDraft,
     createDraftServerConnectivityInput,
     createServerRegistrationDraft,
+    defaultServerCredentialKindOptions,
     parseServerRegistrationPort,
     type DraftServerConnectivityInput,
+    type ServerCredentialKind,
     type ServerRegistrationDraft,
   } from "$lib/console/server-registration";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -29,6 +31,7 @@
     testPending?: boolean;
     disabled?: boolean;
     idPrefix?: string;
+    credentialKindOptions?: readonly ServerCredentialKind[];
     testConnectivity?: (
       input: DraftServerConnectivityInput,
     ) => Promise<TestServerConnectivityResponse>;
@@ -42,6 +45,7 @@
     testPending = $bindable(false),
     disabled = false,
     idPrefix = "server",
+    credentialKindOptions = defaultServerCredentialKindOptions,
     testConnectivity,
   }: Props = $props();
 
@@ -49,6 +53,19 @@
     activeServerPrivateKeyInputMode(draft, sshCredentials),
   );
   const canTestConnectivity = $derived(canTestServerRegistrationDraft(draft, sshCredentials));
+  const sshPrivateKeyCredentialEnabled = $derived(credentialKindOptions.includes("ssh-private-key"));
+  const localSshAgentCredentialEnabled = $derived(
+    credentialKindOptions.includes("local-ssh-agent"),
+  );
+  const multipleCredentialKindsEnabled = $derived(
+    sshPrivateKeyCredentialEnabled && localSshAgentCredentialEnabled,
+  );
+
+  $effect(() => {
+    if (!credentialKindOptions.includes(draft.credentialKind)) {
+      draft.credentialKind = credentialKindOptions[0] ?? "ssh-private-key";
+    }
+  });
 
   function connectivityLabel(status: TestServerConnectivityResponse["status"]): string {
     switch (status) {
@@ -157,7 +174,9 @@
     }
 
     if (!input.server.credential) {
-      connectivityError = $t(i18nKeys.console.serverForm.credentialRequired);
+      connectivityError = localSshAgentCredentialEnabled
+        ? $t(i18nKeys.console.serverForm.credentialRequired)
+        : $t(i18nKeys.console.serverForm.credentialPrivateKeyRequired);
       return;
     }
 
@@ -251,10 +270,13 @@
         <div class="space-y-5">
           <div class="console-subtle-panel p-3">
             <p class="text-sm leading-6 text-muted-foreground">
-              {$t(i18nKeys.console.serverForm.sshCredentialDescription)}
+              {localSshAgentCredentialEnabled
+                ? $t(i18nKeys.console.serverForm.sshCredentialDescription)
+                : $t(i18nKeys.console.serverForm.sshCredentialDescriptionWithoutLocalAgent)}
             </p>
           </div>
 
+          {#if multipleCredentialKindsEnabled}
             <div class="grid gap-2 sm:grid-cols-2">
               <Button
                 type="button"
@@ -284,6 +306,7 @@
                 {$t(i18nKeys.console.serverForm.localSshAgent)}
               </Button>
             </div>
+          {/if}
 
             <div class="space-y-1.5">
               <label class="console-field-label" for={`${idPrefix}-ssh-username`}>

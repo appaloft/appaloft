@@ -3,11 +3,16 @@ import {
   type QuickDeployServerCredential,
   type RegisterServerInput,
   type SshCredentialSummary,
+  type SystemPluginWebExtension,
 } from "@appaloft/contracts";
 
 export type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
 export type ServerPrivateKeyInputMode = "saved" | "file" | "paste";
 export const sshServerProviderKey = "generic-ssh";
+export const defaultServerCredentialKindOptions = [
+  "ssh-private-key",
+  "local-ssh-agent",
+] as const satisfies readonly ServerCredentialKind[];
 
 export type ServerRegistrationDraft = {
   name: string;
@@ -243,4 +248,39 @@ export function canTestServerRegistrationDraft(
         Boolean(draft.selectedSshCredentialId)) ||
       Boolean(draft.credentialPrivateKey.trim()))
   );
+}
+
+export function serverCredentialKindOptionsFromWebExtensions(
+  extensions: readonly SystemPluginWebExtension[] = [],
+): readonly ServerCredentialKind[] {
+  for (const extension of extensions) {
+    const options = readServerCredentialKindOptions(extension.metadata);
+    if (options) {
+      return options;
+    }
+  }
+
+  return defaultServerCredentialKindOptions;
+}
+
+function readServerCredentialKindOptions(
+  metadata: SystemPluginWebExtension["metadata"] | undefined,
+): readonly ServerCredentialKind[] | null {
+  const consoleRuntime = metadata?.consoleRuntime;
+
+  if (!consoleRuntime || typeof consoleRuntime !== "object" || Array.isArray(consoleRuntime)) {
+    return null;
+  }
+
+  const serverCredentialKinds = (consoleRuntime as Record<string, unknown>).serverCredentialKinds;
+  if (!Array.isArray(serverCredentialKinds)) {
+    return null;
+  }
+
+  const options = Array.from(new Set(serverCredentialKinds.filter(isServerCredentialKind)));
+  return options.length > 0 ? options : null;
+}
+
+function isServerCredentialKind(value: unknown): value is ServerCredentialKind {
+  return value === "ssh-private-key" || value === "local-ssh-agent";
 }

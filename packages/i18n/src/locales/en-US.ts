@@ -2154,6 +2154,8 @@ export const enUS = {
       connectivityResultTitle: "Connection result",
       connectivityTestPending: "Testing",
       credentialRequired: "Choose SSH agent, a saved credential, or provide a private key first.",
+      credentialPrivateKeyRequired:
+        "Choose a saved credential or provide an SSH private key first.",
       hostRequired: "Enter a server host first.",
       identitySectionDescription: "Set the server name, host, and SSH port.",
       identitySectionTitle: "Server details",
@@ -2182,6 +2184,8 @@ export const enUS = {
       selectCredential: "Select credential",
       sshCredentialDescription:
         "Choose one authentication source: local SSH agent, saved credential, imported .pem/OpenSSH private key file, or pasted private key content. The public key is optional metadata.",
+      sshCredentialDescriptionWithoutLocalAgent:
+        "Choose one authentication source: saved credential, imported .pem/OpenSSH private key file, or pasted private key content. The public key is optional metadata.",
       sshCredentialName: "Credential name",
       sshCredentialNameHint:
         "Creating a server saves this private key to the credential library so later servers can reuse it.",
