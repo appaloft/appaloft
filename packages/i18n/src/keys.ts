@@ -1975,6 +1975,7 @@ export const i18nKeys = {
       connectivityDraftTitle: "console:serverForm.connectivityDraftTitle",
       connectivityResultTitle: "console:serverForm.connectivityResultTitle",
       connectivityTestPending: "console:serverForm.connectivityTestPending",
+      credentialPrivateKeyRequired: "console:serverForm.credentialPrivateKeyRequired",
       credentialRequired: "console:serverForm.credentialRequired",
       hostRequired: "console:serverForm.hostRequired",
       identitySectionDescription: "console:serverForm.identitySectionDescription",
@@ -2000,6 +2001,8 @@ export const i18nKeys = {
       savedCredentialUnavailable: "console:serverForm.savedCredentialUnavailable",
       selectCredential: "console:serverForm.selectCredential",
       sshCredentialDescription: "console:serverForm.sshCredentialDescription",
+      sshCredentialDescriptionWithoutLocalAgent:
+        "console:serverForm.sshCredentialDescriptionWithoutLocalAgent",
       sshCredentialName: "console:serverForm.sshCredentialName",
       sshCredentialNameHint: "console:serverForm.sshCredentialNameHint",
       sshCredentialTitle: "console:serverForm.sshCredentialTitle",

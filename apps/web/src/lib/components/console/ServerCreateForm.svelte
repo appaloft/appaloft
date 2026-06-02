@@ -2,9 +2,13 @@
   import { browser } from "$app/environment";
   import { CheckCircle2, LoaderCircle } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
-  import type { RegisterServerResponse, TestServerConnectivityResponse } from "@appaloft/contracts";
+  import type {
+    RegisterServerResponse,
+    SystemPluginWebExtension,
+    TestServerConnectivityResponse,
+  } from "@appaloft/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import ServerRegistrationForm from "$lib/components/console/ServerRegistrationForm.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
@@ -12,6 +16,7 @@
     createRegisterServerInput,
     createServerRegistrationDraft,
     isServerRegistrationDraftComplete,
+    serverCredentialKindOptionsFromWebExtensions,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
   import { defaultConsoleListLimit } from "$lib/console/queries";
@@ -23,6 +28,9 @@
     idPrefix?: string;
     showSuccessLink?: boolean;
     onCreated?: (server: RegisterServerResponse) => void;
+  };
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
   };
 
   let {
@@ -48,6 +56,17 @@
   );
 
   const sshCredentials = $derived(sshCredentialsQuery.data?.items ?? []);
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+  const credentialKindOptions = $derived(
+    serverCredentialKindOptionsFromWebExtensions(webExtensionsQuery.data?.items ?? []),
+  );
 
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
     return orpcClient.servers.testDraftConnectivity(input);
@@ -118,6 +137,7 @@
     bind:connectivityError
     bind:testPending
     {sshCredentials}
+    {credentialKindOptions}
     disabled={submitPending}
     {idPrefix}
     testConnectivity={testDraftServerConnectivity}

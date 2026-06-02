@@ -101,6 +101,7 @@
     createRegisterServerInput,
     createServerRegistrationDraft,
     isServerRegistrationDraftComplete,
+    serverCredentialKindOptionsFromWebExtensions,
     sshServerProviderKey,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
@@ -546,6 +547,9 @@
       enabled: browser && enabled,
       staleTime: 30_000,
     }),
+  );
+  const serverCredentialKindOptions = $derived(
+    serverCredentialKindOptionsFromWebExtensions(webExtensionsQuery.data?.items ?? []),
   );
 
   const initialSourceKind = parseSourceKind(browser ? page.url.searchParams.get("source") : null);
@@ -4864,6 +4868,7 @@
                 bind:connectivityError={serverConnectivityError}
                 bind:testPending={serverConnectivityTestPending}
                 {sshCredentials}
+                credentialKindOptions={serverCredentialKindOptions}
                 testConnectivity={testDraftServerConnectivity}
               />
             {/if}
