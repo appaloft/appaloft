@@ -200,6 +200,14 @@ function createControlPlaneFetch(
       });
     }
 
+    if (url.pathname === "/api/servers/srv_remote/connectivity-tests") {
+      return jsonResponse({
+        status: "reachable",
+        checks: [],
+        testedAt: "2026-05-17T00:00:00.000Z",
+      });
+    }
+
     return jsonResponse(
       {
         code: "not_found",
@@ -287,6 +295,36 @@ function createCliAuthExchangeFetch(
 }
 
 describe("CLI remote control-plane client", () => {
+  test("[CONTROL-PLANE-CLI-012] root help and version do not initialize the local runtime", async () => {
+    const helpOutput = captureOutput();
+    const versionOutput = captureOutput();
+
+    const help = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "--help"],
+      stderr: helpOutput.stderr,
+      stdout: helpOutput.stdout,
+    });
+    const version = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "--version"],
+      env: {
+        APPALOFT_APP_VERSION: "1.2.3-test",
+      },
+      stderr: versionOutput.stderr,
+      stdout: versionOutput.stdout,
+    });
+
+    expect(help).toEqual({ handled: true, exitCode: 0 });
+    expect(version).toEqual({ handled: true, exitCode: 0 });
+    expect(helpOutput.read()).toMatchObject({
+      stdout: expect.stringContaining("Usage:"),
+      stderr: "",
+    });
+    expect(versionOutput.read()).toMatchObject({
+      stdout: "1.2.3-test\n",
+      stderr: "",
+    });
+  });
+
   test("[CONTROL-PLANE-CLI-012] env credential login without --url defaults to the Appaloft Cloud profile", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
@@ -380,7 +418,9 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stdout).toContain("ABCD-EFGH");
     expect(rendered.stdout).toContain("***5678");
     expect(rendered.stdout).not.toContain("tok_exchanged_secret_5678");
-    expect(rendered.stderr).toBe("");
+    expect(rendered.stderr).toContain(
+      "https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    );
   });
 
   test("[CONTROL-PLANE-CLI-012] browser open failure falls back to printed verification URL", async () => {
@@ -976,7 +1016,32 @@ describe("CLI remote control-plane client", () => {
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       ["GET /api/version", "GET /api/organizations/current-context", "GET /api/servers"],
     );
+    expect(new URL(requests[2]?.url ?? "http://localhost").search).toBe("");
     expect(listed.stdout).toContain("srv_remote");
+  });
+
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] server test dispatches to the persisted server endpoint", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const tested = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "server", "test", "srv_remote"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/servers/srv_remote/connectivity-tests",
+      ],
+    );
+    expect(await requests[2]?.json()).toMatchObject({ serverId: "srv_remote" });
+    expect(tested.stdout).toContain("reachable");
   });
 
   test("[STATIC-ARTIFACT-EXT-018][CONTROL-PLANE-CLI-010] static artifact publish uploads local dist files through the remote payload route", async () => {

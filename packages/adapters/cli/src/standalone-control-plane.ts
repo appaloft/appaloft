@@ -20,6 +20,7 @@ export interface StandaloneControlPlaneCliInput {
   readonly monotonicNow?: () => number;
   readonly store?: CliControlPlaneProfileStore;
   readonly now?: () => string;
+  readonly onLoginSession?: CliControlPlaneDependencies["onLoginSession"];
   readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly stdout?: Pick<NodeJS.WriteStream, "write">;
@@ -140,9 +141,49 @@ function deps(input: StandaloneControlPlaneCliInput): CliControlPlaneDependencie
     ...(input.monotonicNow ? { monotonicNow: input.monotonicNow } : {}),
     ...(input.store ? { store: input.store } : {}),
     ...(input.now ? { now: input.now } : {}),
+    ...(input.onLoginSession ? { onLoginSession: input.onLoginSession } : {}),
     ...(input.openBrowser ? { openBrowser: input.openBrowser } : {}),
     ...(input.sleep ? { sleep: input.sleep } : {}),
   };
+}
+
+function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
+  stdout.write(`Appaloft CLI
+
+Usage:
+  appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+  appaloft auth status
+  appaloft context show
+  appaloft server list
+  appaloft deploy <path>
+
+Options:
+  --help, -h     Show this help
+  --version      Show CLI version
+`);
+}
+
+function renderVersion(
+  stdout: Pick<NodeJS.WriteStream, "write">,
+  env: CliControlPlaneEnvironment | undefined,
+): void {
+  stdout.write(`${env?.APPALOFT_APP_VERSION ?? process.env.APPALOFT_APP_VERSION ?? "0.0.0"}\n`);
+}
+
+function renderLoginSession(
+  stderr: Pick<NodeJS.WriteStream, "write">,
+  session: Parameters<NonNullable<CliControlPlaneDependencies["onLoginSession"]>>[0],
+): void {
+  const browserLine = session.openedBrowser
+    ? "Opened the Appaloft CLI login page in your browser."
+    : "Open this Appaloft CLI login URL in a signed-in browser.";
+  const fallbackLine = session.openBrowserFailed
+    ? "\nBrowser launch failed, use this URL manually."
+    : "";
+
+  stderr.write(
+    `${browserLine}${fallbackLine}\nURL: ${session.verificationUriComplete}\nCode: ${session.userCode}\n`,
+  );
 }
 
 function modeValue(value: string | undefined): Result<CliControlPlaneMode | undefined> {
@@ -189,6 +230,7 @@ async function handleLogin(
   const abortController = new AbortController();
   const abort = () => abortController.abort();
   process.once("SIGINT", abort);
+  const stderr = input.stderr ?? process.stderr;
 
   try {
     return await finish(
@@ -200,7 +242,11 @@ async function handleLogin(
           ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
           signal: abortController.signal,
         },
-        deps(input),
+        deps({
+          ...input,
+          onLoginSession:
+            input.onLoginSession ?? ((session) => renderLoginSession(stderr, session)),
+        }),
       ),
       input,
     );
@@ -258,6 +304,16 @@ export async function runStandaloneControlPlaneCli(
 ): Promise<StandaloneControlPlaneCliResult> {
   const args = commandArgs(input.argv ?? process.argv);
   const command = args[0];
+  const stdout = input.stdout ?? process.stdout;
+
+  if (!command || command === "--help" || command === "-h" || command === "help") {
+    renderRootHelp(stdout);
+    return { handled: true, exitCode: 0 };
+  }
+  if (command === "--version" || command === "version") {
+    renderVersion(stdout, input.env);
+    return { handled: true, exitCode: 0 };
+  }
 
   if (command === "login") {
     return handleLogin(args.slice(1), input);

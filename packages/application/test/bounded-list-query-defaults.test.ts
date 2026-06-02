@@ -29,4 +29,8 @@ describe("bounded list query defaults", () => {
     expect(ListDeploymentsQuery.create({ limit: 1_000 }).isErr()).toBe(true);
     expect(ListDependencyResourcesQuery.create({ limit: 1_000 }).isErr()).toBe(true);
   });
+
+  test("[CQRS-LIST-BOUND-003] HTTP query string limits are coerced before handlers run", () => {
+    expect(ListServersQuery.create({ limit: "50" })._unsafeUnwrap().limit).toBe(50);
+  });
 });

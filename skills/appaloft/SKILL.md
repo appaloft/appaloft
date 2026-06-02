@@ -22,6 +22,10 @@ surface available in the session.
    Cloud/control-plane task needs product context. If no active profile exists and the user has not
    selected another endpoint, run `appaloft login`; the public CLI defaults to
    `https://app.appaloft.com` and stores the verified `cloud` profile locally.
+   If `appaloft` is not on PATH, do not assume `npx skills add appaloft/appaloft` installed it:
+   that command installs only this skill. Install the CLI from the Appaloft GitHub Release archive
+   for the current platform, then rerun `appaloft --version`, `appaloft auth status`, and the
+   requested operation.
 3. Use existing Appaloft operations only. Do not invent hidden agent commands, bypass adapters, call
    provider SDKs directly, mutate Docker/SSH/database state directly, or inspect repositories/use
    cases/persistence internals for product behavior.
@@ -45,6 +49,12 @@ surface available in the session.
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
   plan when useful, deploy, observe, and return URL plus diagnostics.
+- Cloud Blueprint deployment: use the Cloud Blueprint Marketplace quick-deploy entrypoint when the
+  source is an official Blueprint such as PocketBase. Do not invent a separate `blueprint deploy`
+  CLI command unless the operation catalog adds one. Before accepting a deployment target, run
+  `appaloft server test <serverId>`; if the control plane reports `Executable not found in $PATH:
+  "ssh"`, treat that as a control-plane runtime packaging blocker rather than manually SSHing
+  around the Appaloft operation.
 - GitHub Action deploy: default to Pure SSH Action when the user supplies an SSH target and no
   control plane; use Self-hosted Server Action only when `control-plane-url` selects an Appaloft
   instance and a deploy token is available; treat product-grade previews as control-plane-owned,

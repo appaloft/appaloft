@@ -51,6 +51,7 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain('value === "local-folder"');
     expect(quickDeploySheetSource).toContain('return "dockerfile";');
     expect(quickDeploySheetSource).not.toContain("sm:grid-cols-2 xl:grid-cols-5");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-source-picker");
     expect(quickDeploySheetSource).toContain("lg:sticky");
     expect(quickDeploySheetSource).not.toContain("md:sticky");
     expect(resourceSourceOptionSource).toContain("min-h-24");
@@ -65,7 +66,9 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("blueprintSourceLockedByEntry");
     expect(quickDeploySheetSource).toContain("isLockedBlueprintSourceEntry(page.url.searchParams)");
     expect(quickDeploySheetSource).toContain('params.get("source") === "blueprint"');
-    expect(quickDeploySheetSource).toContain('params.get("step") !== "source"');
+    expect(quickDeploySheetSource).toContain(
+      'parseDeploymentStep(params.get("step")) !== "source"',
+    );
     expect(quickDeploySheetSource).toContain(
       'blueprintSourceLockedByEntry && sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim())',
     );

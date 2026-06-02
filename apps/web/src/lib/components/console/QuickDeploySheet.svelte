@@ -1844,7 +1844,7 @@
     return (
       params.get("source") === "blueprint" &&
       Boolean(params.get("blueprintSlug")?.trim()) &&
-      params.get("step") !== "source"
+      parseDeploymentStep(params.get("step")) !== "source"
     );
   }
 
@@ -3884,6 +3884,7 @@
                 class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
                 role="radiogroup"
                 aria-label={$t(i18nKeys.common.domain.source)}
+                data-quick-deploy-source-picker
               >
                 {#each visibleSourceGroups as option (option.key)}
                   <ResourceSourceOption

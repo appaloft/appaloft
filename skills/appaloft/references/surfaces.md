@@ -15,6 +15,11 @@ Appaloft does not provide a separate npm skill installer. Do not suggest an Appa
 installer; that would blur the boundary between installing an agent skill and running the
 `appaloft` CLI.
 
+The skill manager does not install the `appaloft` binary. If a shell-capable agent cannot run
+`appaloft --version`, install the CLI from the platform-specific Appaloft GitHub Release archive and
+put the extracted binary on PATH before continuing. Do not suggest `npm install -g appaloft` unless
+the npm package is actually published and verified in the user's environment.
+
 ## Surface Selection
 
 1. CLI: use when the agent has a trusted local shell and the user expects direct project, server,
@@ -31,6 +36,9 @@ installer; that would blur the boundary between installing an agent skill and ru
    Action must not SSH or run the CLI.
 3. Web: use when guiding a human through the console. Describe the next UI action and keep business
    behavior aligned with the same operation catalog.
+   Cloud Blueprint Marketplace quick deploy is currently a Web workflow. For an official Blueprint
+   such as PocketBase, enter Cloud through `/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=<slug>`;
+   then use CLI/API operations for auth, server readiness, deployment observation, and recovery.
 4. Repository config: use Appaloft config files as deployment intent, not as a replacement for
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
