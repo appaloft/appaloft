@@ -6172,6 +6172,44 @@ function mergeAppaloftOrpcRouterContributions(
   return merged;
 }
 
+function collectOrpcRoutePaths(contributions: readonly AppaloftOrpcRouterContribution[]): string[] {
+  const paths = new Set<string>();
+  const visited = new WeakSet<object>();
+
+  function visit(value: unknown): void {
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    if (visited.has(value)) {
+      return;
+    }
+    visited.add(value);
+
+    const record = value as Record<string, unknown>;
+    const orpc = record["~orpc"];
+    if (orpc && typeof orpc === "object") {
+      const route = (orpc as Record<string, unknown>).route;
+      if (route && typeof route === "object") {
+        const path = (route as Record<string, unknown>).path;
+        if (typeof path === "string" && path.length > 0) {
+          paths.add(path);
+        }
+      }
+    }
+
+    for (const child of Object.values(record)) {
+      visit(child);
+    }
+  }
+
+  for (const contribution of contributions) {
+    visit(contribution);
+  }
+
+  return Array.from(paths);
+}
+
 function createRequestRunner(
   request: Request,
   executionContext: ExecutionContext,
@@ -8026,6 +8064,7 @@ export function mountAppaloftOrpcRoutes(
       ? { orpcRouterContributions: context.orpcRouterContributions }
       : {}),
   };
+  const contributionRoutePaths = collectOrpcRoutePaths(context.orpcRouterContributions ?? []);
   const openApiHandler = createAppaloftOpenApiHandler(routerOptions);
   const rpcHandler = createAppaloftRpcHandler(routerOptions);
 
@@ -8037,9 +8076,10 @@ export function mountAppaloftOrpcRoutes(
     );
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
     try {
+      const pathname = new URL(request.url).pathname;
       const { matched, response } = await run(() =>
         openApiHandler.handle(request, {
-          prefix: "/api",
+          ...(pathname.startsWith("/api") ? { prefix: "/api" as const } : {}),
           context: {
             ...context,
             currentRequest: request,
@@ -8452,6 +8492,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/integrations",
     "/api/integrations/github/app-connection",
     "/api/integrations/github/repositories",
+    ...contributionRoutePaths,
   ] as const;
 
   let mounted = app;
