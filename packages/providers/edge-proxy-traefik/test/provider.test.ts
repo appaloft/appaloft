@@ -121,8 +121,12 @@ describe("TraefikEdgeProxyProvider", () => {
       "edge-proxy-provider-logs",
       "edge-proxy-route-probe",
     ]);
+    const routeProbeCommand = diagnostics._unsafeUnwrap().checks[2]?.command ?? "";
+    const routeProbeSyntax = Bun.spawnSync(["sh", "-n", "-c", routeProbeCommand]);
     expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain("traefik:v3.6.2");
-    expect(diagnostics._unsafeUnwrap().checks[2]?.command).toContain("traefik.enable=true");
+    expect(routeProbeCommand).toContain("traefik.enable=true");
+    expect(routeProbeSyntax.exitCode).toBe(0);
+    expect(routeProbeSyntax.stderr.toString()).toBe("");
     expect(realized._unsafeUnwrap().labels).toContain("traefik.enable=true");
     expect(reload.isOk()).toBe(true);
     expect(reload._unsafeUnwrap()).toMatchObject({
