@@ -152,6 +152,7 @@
     label: string;
     value: string;
     mono?: boolean;
+    icon?: "blueprint";
   };
   type QuickDeployWorkflowStepStatus = "pending" | "running" | "succeeded" | "failed";
   type QuickDeployWorkflowProgressItem = {
@@ -584,9 +585,9 @@
   let projectDescription = $state(browser ? (page.url.searchParams.get("projectDescription") ?? "") : "");
   let serverDraft = $state(
     createServerRegistrationDraft({
-      name: browser ? (page.url.searchParams.get("serverName") ?? "local-machine") : "local-machine",
-      host: browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1",
-      port: browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22",
+      name: browser ? (page.url.searchParams.get("serverName") ?? "") : "",
+      host: browser ? (page.url.searchParams.get("serverHost") ?? "") : "",
+      port: browser ? (page.url.searchParams.get("serverPort") ?? "") : "",
     }),
   );
   let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
@@ -1161,6 +1162,16 @@
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
   const selectedSourceGroupKey = $derived(sourceGroupForSourceKind(sourceKind));
+  const selectedBlueprintSourceLocked = $derived(
+    sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()),
+  );
+  const selectedBlueprintDisplayTitle = $derived.by(
+    () =>
+      selectedBlueprintListing?.title ||
+      selectedBlueprintTitle.trim() ||
+      selectedBlueprintSlug.trim() ||
+      $t(i18nKeys.console.quickDeploy.sourceBlueprint),
+  );
   const sourceSummary = $derived.by(() => {
     if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
       return selectedGitHubRepository.fullName;
@@ -1214,6 +1225,7 @@
           value: selectedBlueprintValue ||
             (selectedBlueprintSourceExtension?.title ??
               $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)),
+          icon: selectedBlueprintValue ? "blueprint" : undefined,
         },
         ...(selectedBlueprintSlug.trim()
           ? [
@@ -1232,11 +1244,6 @@
               },
             ]
           : []),
-        {
-          label: $t(i18nKeys.console.quickDeploy.sourceAddress),
-          value: selectedBlueprintSourceExtension?.path ?? "/marketplace",
-          mono: true,
-        },
       ];
     }
 
@@ -2286,9 +2293,9 @@
 
     setSearchParam(params, "serverMode", serverMode, "existing");
     setSearchParam(params, "serverId", selectedServerId);
-    setSearchParam(params, "serverName", serverDraft.name, "local-machine");
-    setSearchParam(params, "serverHost", serverDraft.host, "127.0.0.1");
-    setSearchParam(params, "serverPort", serverDraft.port, "22");
+    setSearchParam(params, "serverName", serverDraft.name);
+    setSearchParam(params, "serverHost", serverDraft.host);
+    setSearchParam(params, "serverPort", serverDraft.port);
     setSearchParam(params, "serverProvider", null);
 
     setSearchParam(params, "editEnvironment", environmentContextEnabled ? "true" : "false", "false");
@@ -2372,9 +2379,9 @@
 
     projectName = params.get("projectName") ?? "";
     projectDescription = params.get("projectDescription") ?? "";
-    serverDraft.name = params.get("serverName") ?? "local-machine";
-    serverDraft.host = params.get("serverHost") ?? "127.0.0.1";
-    serverDraft.port = params.get("serverPort") ?? "22";
+    serverDraft.name = params.get("serverName") ?? "";
+    serverDraft.host = params.get("serverHost") ?? "";
+    serverDraft.port = params.get("serverPort") ?? "";
     serverDraft.providerKey = sshServerProviderKey;
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
@@ -3839,37 +3846,43 @@
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">部署入口</h2>
-          <p class="text-sm text-muted-foreground">选择来源，并在同一页确认项目、服务器与运行配置。</p>
+          <p class="text-sm text-muted-foreground">
+            {selectedBlueprintSourceLocked
+              ? "已从蓝图市场选择应用，在同一页确认项目、服务器与运行配置。"
+              : "选择来源，并在同一页确认项目、服务器与运行配置。"}
+          </p>
         </div>
         <div class="space-y-6">
           <section class="space-y-3">
           <div class="space-y-3">
-            <div class="flex items-center gap-2 text-sm font-medium">
-              <Waypoints class="size-4 text-muted-foreground" />
-              <span>{$t(i18nKeys.common.domain.source)}</span>
-              <DocsHelpLink
-                href={quickDeploySourceHelpHref}
-                ariaLabel={$t(i18nKeys.console.quickDeploy.sourceHelpLink)}
-              />
-            </div>
-            <div
-              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
-              role="radiogroup"
-              aria-label={$t(i18nKeys.common.domain.source)}
-            >
-              {#each visibleSourceGroups as option (option.key)}
-                <ResourceSourceOption
-                  selected={selectedSourceGroupKey === option.key}
-                  label={$t(option.labelKey)}
-                  description={$t(option.hintKey)}
-                  icon={option.icon}
-                  onselect={() => {
-                    selectSourceGroup(option);
-                  }}
+            {#if !selectedBlueprintSourceLocked}
+              <div class="flex items-center gap-2 text-sm font-medium">
+                <Waypoints class="size-4 text-muted-foreground" />
+                <span>{$t(i18nKeys.common.domain.source)}</span>
+                <DocsHelpLink
+                  href={quickDeploySourceHelpHref}
+                  ariaLabel={$t(i18nKeys.console.quickDeploy.sourceHelpLink)}
                 />
-              {/each}
-            </div>
-            {#if selectedSourceGroupKey === "git"}
+              </div>
+              <div
+                class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                role="radiogroup"
+                aria-label={$t(i18nKeys.common.domain.source)}
+              >
+                {#each visibleSourceGroups as option (option.key)}
+                  <ResourceSourceOption
+                    selected={selectedSourceGroupKey === option.key}
+                    label={$t(option.labelKey)}
+                    description={$t(option.hintKey)}
+                    icon={option.icon}
+                    onselect={() => {
+                      selectSourceGroup(option);
+                    }}
+                  />
+                {/each}
+              </div>
+            {/if}
+            {#if selectedSourceGroupKey === "git" && !selectedBlueprintSourceLocked}
               <div class="space-y-2">
                 <p class="text-xs font-medium text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.sourceGitMethod)}
@@ -3894,7 +3907,7 @@
                   {/each}
                 </div>
               </div>
-            {:else if selectedSourceGroupKey === "docker"}
+            {:else if selectedSourceGroupKey === "docker" && !selectedBlueprintSourceLocked}
               <div class="space-y-2">
                 <p class="text-xs font-medium text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.sourceDockerMethod)}
@@ -3987,9 +4000,6 @@
                       {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogsHint)}
                     </p>
                   </div>
-                  {#if selectedBlueprintSourceExtension}
-                    <Badge variant="outline">{selectedBlueprintSourceExtension.pluginDisplayName}</Badge>
-                  {/if}
                 </div>
                 {#if webExtensionsQuery.isPending}
                   <div class="grid gap-2 sm:grid-cols-2">
@@ -4000,10 +4010,15 @@
                   {#if selectedBlueprintSlug.trim()}
                     <div class="console-subtle-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div class="flex min-w-0 items-center gap-3">
-                        <Package class="size-4 shrink-0 text-muted-foreground" />
+                        <BlueprintProductIcon
+                          title={selectedBlueprintDisplayTitle}
+                          icon={selectedBlueprintListing?.icon}
+                          class="size-10"
+                          imageClass="size-6"
+                        />
                         <div class="min-w-0">
                           <p class="truncate text-sm font-medium">
-                            {selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()}
+                            {selectedBlueprintDisplayTitle}
                           </p>
                           <p class="truncate font-mono text-xs text-muted-foreground">
                             {selectedBlueprintSlug.trim()}
@@ -4190,7 +4205,7 @@
                       {/if}
                     </div>
                   {/if}
-                  {#if quickDeploySourceExtensions.length > 1}
+                  {#if quickDeploySourceExtensions.length > 1 && !selectedBlueprintSourceLocked}
                     <div class="space-y-2">
                       <p class="text-xs font-medium text-muted-foreground">蓝图目录来源</p>
                       <div class="grid gap-2 sm:grid-cols-2">
@@ -4217,7 +4232,7 @@
                         {/each}
                       </div>
                     </div>
-                  {:else if selectedBlueprintSourceExtension}
+                  {:else if selectedBlueprintSourceExtension && !selectedBlueprintSourceLocked}
                     <p class="text-xs text-muted-foreground">
                       蓝图目录来源：{selectedBlueprintSourceExtension.title}
                     </p>
@@ -4930,6 +4945,30 @@
                 />
               </div>
               <div class="space-y-3">
+                {#if sourceKind === "blueprint" && selectedBlueprintVariables.length > 0}
+                  <div class="space-y-2" data-blueprint-variable-list>
+                    {#each selectedBlueprintVariables as variable (`${variable.key}:${variable.value}`)}
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <Input
+                          value={variable.key}
+                          readonly
+                          data-blueprint-variable-key={variable.key}
+                          aria-label={`Blueprint variable ${variable.key}`}
+                        />
+                        <Input
+                          value={variable.value}
+                          readonly
+                          data-blueprint-variable-value={variable.key}
+                          aria-label={`Blueprint variable value ${variable.key}`}
+                        />
+                      </div>
+                      {#if variable.description}
+                        <p class="text-xs text-muted-foreground">{variable.description}</p>
+                      {/if}
+                    {/each}
+                  </div>
+                  <Separator />
+                {/if}
                 <div class="grid gap-3 sm:grid-cols-2">
                   <Input bind:value={variableKey} placeholder="DATABASE_URL" />
                   <Input bind:value={variableValue} placeholder="postgres://..." />
@@ -4983,7 +5022,22 @@
                 <div class="flex min-w-0 items-start justify-between gap-3">
                   <span class="shrink-0 text-muted-foreground">{row.label}</span>
                   <span class={`min-w-0 flex-1 break-all text-right font-medium ${row.mono ? "font-mono text-xs" : ""}`}>
-                    {row.value}
+                    {#if row.icon === "blueprint"}
+                      <span
+                        class="inline-flex max-w-full items-center justify-end gap-2 align-middle"
+                        data-blueprint-summary-icon
+                      >
+                        <BlueprintProductIcon
+                          title={selectedBlueprintDisplayTitle}
+                          icon={selectedBlueprintListing?.icon}
+                          class="size-7 rounded-md"
+                          imageClass="size-4"
+                        />
+                        <span class="min-w-0 truncate">{row.value}</span>
+                      </span>
+                    {:else}
+                      {row.value}
+                    {/if}
                   </span>
                 </div>
               {/each}
