@@ -2041,6 +2041,7 @@ export const zhCN = {
       connectivityResultTitle: "连接结果",
       connectivityTestPending: "测试中",
       credentialRequired: "请先选择 SSH agent、已保存凭据，或提供私钥。",
+      credentialPrivateKeyRequired: "请先选择已保存凭据，或提供 SSH 私钥。",
       hostRequired: "请先填写服务器地址。",
       identitySectionDescription: "填写服务器名称、主机地址和 SSH 端口。",
       identitySectionTitle: "服务器信息",
@@ -2068,6 +2069,8 @@ export const zhCN = {
       selectCredential: "选择凭据",
       sshCredentialDescription:
         "只需要选择一种认证来源：本机 SSH agent、已保存凭据、导入 .pem/OpenSSH 私钥文件，或粘贴私钥内容。公钥只用于记录或核对，可以不填。",
+      sshCredentialDescriptionWithoutLocalAgent:
+        "只需要选择一种认证来源：已保存凭据、导入 .pem/OpenSSH 私钥文件，或粘贴私钥内容。公钥只用于记录或核对，可以不填。",
       sshCredentialName: "凭据名称",
       sshCredentialNameHint: "创建服务器时会把这把私钥保存到凭据库，后续服务器可以复用。",
       sshCredentialTitle: "SSH 登录凭据",
