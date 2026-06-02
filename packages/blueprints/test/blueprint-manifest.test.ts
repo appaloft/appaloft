@@ -42,6 +42,59 @@ describe("Blueprint manifest schema", () => {
     }
   });
 
+  test("[CLOUD-BLUEPRINT-PUBLIC-HEALTH-026] validates component HTTP health checks", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "health-service",
+      name: "Health Service",
+      version: "1.0.0",
+      summary: "A service with an explicit HTTP health check.",
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/appaloft/health:latest",
+          },
+          ports: [{ name: "http", containerPort: 3000 }],
+          healthCheck: {
+            enabled: true,
+            type: "http",
+            http: {
+              path: "/api/health",
+            },
+          },
+        },
+      ],
+      profiles: {
+        production: {
+          replicas: 1,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.components[0]?.healthCheck).toMatchObject({
+        enabled: true,
+        type: "http",
+        intervalSeconds: 5,
+        timeoutSeconds: 5,
+        retries: 10,
+        startPeriodSeconds: 5,
+        http: {
+          method: "GET",
+          scheme: "http",
+          host: "localhost",
+          path: "/api/health",
+          expectedStatusCode: 200,
+        },
+      });
+    }
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-011] reports structured validation issues", () => {
     const result = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,

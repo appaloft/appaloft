@@ -196,6 +196,38 @@ const blueprintComponentRelationSchema = z
   })
   .strict();
 
+const blueprintComponentHealthCheckSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    type: z.literal("http").default("http"),
+    intervalSeconds: z.number().int().positive().default(5),
+    timeoutSeconds: z.number().int().positive().default(5),
+    retries: z.number().int().positive().default(10),
+    startPeriodSeconds: z.number().int().nonnegative().default(5),
+    http: z
+      .object({
+        method: z.enum(["GET", "HEAD", "POST", "OPTIONS"]).default("GET"),
+        scheme: z.enum(["http", "https"]).default("http"),
+        host: nonEmptyString.default("localhost"),
+        port: z.number().int().positive().max(65535).optional(),
+        path: nonEmptyString.default("/"),
+        expectedStatusCode: z.number().int().min(100).max(599).default(200),
+        expectedResponseText: nonEmptyString.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.enabled && value.type === "http" && !value.http) {
+      context.addIssue({
+        code: "custom",
+        path: ["http"],
+        message: "HTTP health checks require http configuration",
+      });
+    }
+  });
+
 const blueprintComponentSchema = z
   .object({
     id: slugSchema,
@@ -204,6 +236,7 @@ const blueprintComponentSchema = z
     runtime: blueprintRuntimeSchema,
     ports: z.array(blueprintPortSchema).default([]),
     routes: z.array(blueprintRouteSchema).default([]),
+    healthCheck: blueprintComponentHealthCheckSchema.optional(),
     variables: z.array(blueprintVariableSchema).default([]),
     usesSecrets: z.array(envKeySchema).default([]),
     usesResources: z.array(slugSchema).default([]),
