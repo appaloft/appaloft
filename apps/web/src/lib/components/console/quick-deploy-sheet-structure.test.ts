@@ -63,8 +63,14 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("data-github-app-install-panel");
     expect(quickDeploySheetSource).toContain("data-github-app-install-action");
     expect(quickDeploySheetSource).toContain("githubUsesHostedProviderApp && !githubAppConnected");
+    expect(quickDeploySheetSource).toContain(
+      "githubAppConnectionQuery.isError && !githubAppInstallUrl",
+    );
     expect(quickDeploySheetSource).not.toContain(
       "githubUsesHostedProviderApp && !githubProvider?.connected",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      "{readErrorMessage(githubAppConnectionQuery.error)}",
     );
   });
 
