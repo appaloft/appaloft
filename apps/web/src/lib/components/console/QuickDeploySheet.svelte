@@ -245,6 +245,7 @@
     };
     ports: readonly { name: string; containerPort: number; protocol: string; public?: boolean }[];
     routes: readonly { port: string; pathPrefix: string }[];
+    healthCheck?: ResourceHealthCheckInput;
     variables: readonly { key: string; value: string; description?: string }[];
     usesSecrets: readonly string[];
     usesResources: readonly string[];
@@ -1538,8 +1539,13 @@
       return $t(i18nKeys.console.quickDeploy.healthCheckExistingResource);
     }
 
-    return resourceHealthCheckEnabled
-      ? `${resourceHealthCheckMethod} ${resourceHealthCheckPath.trim() || "/"} · ${resourceHealthCheckIntervalSeconds.trim() || "5"}s/${resourceHealthCheckTimeoutSeconds.trim() || "5"}s · ${resourceHealthCheckRetries.trim() || "10"}x`
+    const blueprintHealthCheck =
+      sourceKind === "blueprint" ? selectedBlueprintPrimaryComponent?.healthCheck : undefined;
+    const healthCheck =
+      resourceHealthCheckEnabled ? healthCheckPolicyForResource() : blueprintHealthCheck;
+
+    return healthCheck
+      ? `${healthCheck.http?.method ?? "GET"} ${healthCheck.http?.path ?? "/"} · ${healthCheck.intervalSeconds}s/${healthCheck.timeoutSeconds}s · ${healthCheck.retries}x`
       : $t(i18nKeys.common.status.notConfigured);
   });
   const variableSummary = $derived.by(() => {
@@ -2698,8 +2704,21 @@
     };
   }
 
+  function healthCheckPolicyForSource(): ResourceHealthCheckInput | undefined {
+    const configuredHealthCheck = healthCheckPolicyForResource();
+    if (configuredHealthCheck) {
+      return configuredHealthCheck;
+    }
+
+    if (sourceKind !== "blueprint") {
+      return undefined;
+    }
+
+    return blueprintComponentForQuickDeploy().healthCheck;
+  }
+
   function runtimeProfileForSource(): ResourceRuntimeProfileInput {
-    const healthCheck = healthCheckPolicyForResource();
+    const healthCheck = healthCheckPolicyForSource();
     const requestedRuntimeName = resourceRuntimeName.trim();
     const withHealthCheckPath = (
       input: ResourceRuntimeProfileInput,
