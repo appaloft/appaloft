@@ -13,6 +13,10 @@ For deployment work, use this Appaloft deploy protocol:
 7. Observe deployment detail, logs, resource health, diagnostics, and recovery readiness.
 8. Return URL/access state first, then ids and next safe actions.
 
+For Cloud deployments to a registered SSH server, run `appaloft server test <serverId>` before
+starting deployment. A failure that says `Executable not found in $PATH: "ssh"` is a control-plane
+runtime packaging blocker: report it and stop rather than bypassing Appaloft with direct SSH.
+
 ## GitHub Action Deployment Modes
 
 When a user asks for a GitHub Action deploy, choose the mode from state ownership:
@@ -132,6 +136,9 @@ Use this order:
 5. Built static output: `appaloft deploy ./dist --as static-site`.
 6. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
 7. Workspace commands: use explicit install, build, start, and port options.
+8. Cloud Blueprint Marketplace: use the Web quick-deploy URL with
+   `source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=<slug>` for
+   official Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint deploy command.
 
 ## Follow-Up Commands
 

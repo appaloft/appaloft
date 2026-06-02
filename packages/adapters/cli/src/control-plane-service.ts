@@ -4,6 +4,7 @@ import {
   type CliRemoteProjectOperationKey,
   cancelCliAuthSession,
   createCliAuthSession,
+  defaultControlPlaneFetch,
   exchangeCliAuthSession,
   performControlPlaneHandshake,
   pollCliAuthSession,
@@ -32,6 +33,7 @@ export interface CliControlPlaneDependencies {
   readonly fetch?: AppaloftSdkFetch;
   readonly monotonicNow?: () => number;
   readonly now?: () => string;
+  readonly onLoginSession?: (session: CliControlPlaneLoginSessionView) => Promise<void> | void;
   readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly store?: CliControlPlaneProfileStore;
@@ -76,9 +78,10 @@ function dependencies(input?: CliControlPlaneDependencies): Required<CliControlP
   const env = input?.env ?? process.env;
   return {
     env,
-    fetch: input?.fetch ?? ((request: Request) => fetch(request)),
+    fetch: input?.fetch ?? defaultControlPlaneFetch,
     monotonicNow: input?.monotonicNow ?? (() => Date.now()),
     now: input?.now ?? (() => new Date().toISOString()),
+    onLoginSession: input?.onLoginSession ?? (() => undefined),
     openBrowser: input?.openBrowser ?? ((url: string) => openBrowser(url, env)),
     sleep: input?.sleep ?? ((milliseconds: number) => Bun.sleep(milliseconds)),
     store: input?.store ?? defaultCliControlPlaneProfileStore(env),
@@ -97,17 +100,13 @@ function openBrowser(url: string, env: CliControlPlaneEnvironment): boolean {
         ? ["cmd", "/c", "start", "", url]
         : ["xdg-open", url];
 
-  try {
-    const subprocess = Bun.spawn(command, {
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-    subprocess.unref();
-    return true;
-  } catch (error) {
-    throw error;
-  }
+  const subprocess = Bun.spawn(command, {
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  subprocess.unref();
+  return true;
 }
 
 function validateProfileName(value: string): Result<string> {
@@ -255,6 +254,7 @@ async function acquireBrowserAuth(input: {
   readonly baseUrl: string;
   readonly fetch: AppaloftSdkFetch;
   readonly openBrowser: (url: string) => Promise<boolean> | boolean;
+  readonly onLoginSession: (session: CliControlPlaneLoginSessionView) => Promise<void> | void;
   readonly monotonicNow: () => number;
   readonly shouldOpenBrowser: boolean;
   readonly signal?: AbortSignal;
@@ -296,6 +296,7 @@ async function acquireBrowserAuth(input: {
     userCode: session.value.userCode,
     verificationUriComplete: session.value.verificationUriComplete,
   });
+  await input.onLoginSession(output);
   const startedAt = input.monotonicNow();
   let intervalMs = Math.max(0, session.value.interval) * 1000;
 
@@ -409,6 +410,7 @@ export async function loginControlPlane(
         baseUrl: normalizedUrl.value,
         fetch: resolved.fetch,
         monotonicNow: resolved.monotonicNow,
+        onLoginSession: resolved.onLoginSession,
         openBrowser: resolved.openBrowser,
         shouldOpenBrowser,
         ...(input.signal ? { signal: input.signal } : {}),

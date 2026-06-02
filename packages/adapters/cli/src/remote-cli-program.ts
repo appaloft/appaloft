@@ -1,5 +1,6 @@
 import { type Command as AppCommand, type Query as AppQuery } from "@appaloft/application";
 import {
+  findOperationCatalogEntryByKey,
   findOperationCatalogEntryByMessageName,
   type OperationCatalogEntry,
 } from "@appaloft/application/operation-catalog";
@@ -105,6 +106,9 @@ function flattenQueryPayload(
   const query: Record<string, string | number | boolean> = {};
 
   for (const [key, value] of Object.entries(payload)) {
+    if (key === "limit" && value === 100) {
+      continue;
+    }
     if (!pathKeys.has(key)) {
       flattenQueryValue(query, key, value);
     }
@@ -160,8 +164,17 @@ function requestForOperation(input: {
 function operationForMessage(input: {
   readonly kind: "command" | "query";
   readonly message: RemoteOperationMessage;
+  readonly payload: Record<string, unknown>;
 }): Result<OperationCatalogEntry> {
   const messageName = input.message.constructor.name;
+  const keyedEntry =
+    messageName === "TestServerConnectivityCommand" && typeof input.payload.serverId === "string"
+      ? findOperationCatalogEntryByKey("servers.test-connectivity")
+      : undefined;
+  if (keyedEntry && keyedEntry.kind === input.kind) {
+    return ok(keyedEntry);
+  }
+
   const entry = findOperationCatalogEntryByMessageName(messageName);
   if (!entry || entry.kind !== input.kind) {
     return err(
@@ -230,6 +243,7 @@ async function dispatchRemoteMessage<TResult>(input: {
   const catalogEntry = operationForMessage({
     kind: input.kind,
     message: input.message,
+    payload,
   });
   if (catalogEntry.isErr()) {
     return err(catalogEntry.error);
