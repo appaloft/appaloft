@@ -6,6 +6,7 @@ import * as DropdownMenu from "@appaloft/ui/dropdown-menu";
 import * as Empty from "@appaloft/ui/empty";
 import { Icon, type IconProps } from "@appaloft/ui/icon";
 import { Input } from "@appaloft/ui/input";
+import { Progress, type ProgressProps } from "@appaloft/ui/progress";
 import * as Select from "@appaloft/ui/select";
 import * as Tabs from "@appaloft/ui/tabs";
 import { Textarea } from "@appaloft/ui/textarea";
@@ -24,6 +25,7 @@ describe("@appaloft/ui public exports", () => {
     expect(uiPackage.primitiveEntrypoints.button).toBe("@appaloft/ui/button");
     expect(uiPackage.primitiveEntrypoints.empty).toBe("@appaloft/ui/empty");
     expect(uiPackage.primitiveEntrypoints.dropdownMenu).toBe("@appaloft/ui/dropdown-menu");
+    expect(uiPackage.primitiveEntrypoints.progress).toBe("@appaloft/ui/progress");
     expect(uiPackage.shellEntrypoints.appShell).toBe("@appaloft/ui/app-shell");
     expect(uiPackage.shellEntrypoints.icon).toBe("@appaloft/ui/icon");
     expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
@@ -43,6 +45,7 @@ describe("@appaloft/ui public exports", () => {
     expect(Tabs.TabsList).toBeDefined();
     expect(Select.SelectTrigger).toBeDefined();
     expect(Input).toBeDefined();
+    expect(Progress).toBeDefined();
     expect(Textarea).toBeDefined();
     expect(AppShell).toBeDefined();
     expect(AppShellRegion).toBeDefined();
@@ -60,6 +63,9 @@ describe("@appaloft/ui public exports", () => {
       .toHaveProperty("variant")
       .toEqualTypeOf<ButtonVariant | undefined>();
     expectTypeOf<IconProps>().toHaveProperty("label").toEqualTypeOf<string | undefined>();
+    expectTypeOf<ProgressProps>()
+      .toHaveProperty("value")
+      .toEqualTypeOf<number | null | undefined>();
     expect(true).toBe(true);
   });
 });

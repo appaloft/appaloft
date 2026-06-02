@@ -27,6 +27,7 @@ describe("Static artifact upload web component", () => {
     expect(component).toContain("@appaloft/ui/button");
     expect(component).toContain("@appaloft/ui/input");
     expect(component).toContain("@appaloft/ui/badge");
+    expect(component).toContain("@appaloft/ui/progress");
     expect(component).toContain("@lucide/svelte/icons/upload-cloud");
     expect(component).toContain('viewBox="0 0 24 24"');
     expect(component).toContain("data-static-artifact-upload-panel");
@@ -43,7 +44,8 @@ describe("Static artifact upload web component", () => {
     expect(component).toContain("adapter.publish({");
     expect(component).toContain("onProgress(nextProgress)");
     expect(component).toContain("data-static-artifact-upload-result");
-    expect(component).toContain("<progress");
+    expect(component).toContain("<Progress");
+    expect(component).not.toContain("<progress");
     expect(component).not.toContain("<style");
     expect(component).not.toContain("style=");
     expect(component).not.toContain("[#");

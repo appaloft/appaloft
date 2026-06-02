@@ -17,6 +17,7 @@
     DialogTitle,
   } from "@appaloft/ui/dialog";
   import { Input } from "@appaloft/ui/input";
+  import { Progress } from "@appaloft/ui/progress";
   import { cn } from "@appaloft/ui/utils";
   import CheckIcon from "@lucide/svelte/icons/check";
   import CopyIcon from "@lucide/svelte/icons/copy";
@@ -391,13 +392,7 @@
           <span>{progress.label}</span>
           <span>{Math.round(progressPercent)}%</span>
         </div>
-        <progress
-          class="h-2 w-full overflow-hidden rounded-full accent-primary"
-          max="100"
-          value={progressPercent}
-        >
-          {Math.round(progressPercent)}%
-        </progress>
+        <Progress value={progressPercent} max={100} class="h-2 bg-primary/10" />
       </div>
     {/if}
 

@@ -82,6 +82,11 @@
       "types": "./src/popover/index.ts",
       "default": "./src/popover/index.ts"
     },
+    "./progress": {
+      "svelte": "./src/progress/index.ts",
+      "types": "./src/progress/index.ts",
+      "default": "./src/progress/index.ts"
+    },
     "./select": {
       "svelte": "./src/select/index.ts",
       "types": "./src/select/index.ts",
