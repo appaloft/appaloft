@@ -49,6 +49,23 @@
     runtime: BlueprintRuntime;
     ports: readonly { name: string; containerPort: number; protocol: string; public?: boolean }[];
     routes: readonly { port: string; pathPrefix: string }[];
+    healthCheck?: {
+      enabled: boolean;
+      type: "http";
+      intervalSeconds: number;
+      timeoutSeconds: number;
+      retries: number;
+      startPeriodSeconds: number;
+      http?: {
+        method: "GET" | "HEAD" | "POST" | "OPTIONS";
+        scheme: "http" | "https";
+        host: string;
+        port?: number;
+        path: string;
+        expectedStatusCode: number;
+        expectedResponseText?: string;
+      };
+    };
     variables: readonly { key: string; value: string; description?: string }[];
     usesSecrets: readonly string[];
     usesResources: readonly string[];

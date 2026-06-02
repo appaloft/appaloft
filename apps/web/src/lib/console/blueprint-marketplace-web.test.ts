@@ -131,6 +131,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("data-blueprint-dependency-provisioning");
     expect(quickDeploySource).toContain("blueprintDependencyProvisioningPayload");
     expect(quickDeploySource).toContain("blueprintQuickDeployDependencyProvisioningInput");
+    expect(quickDeploySource).toContain("healthCheckPolicyForSource");
+    expect(quickDeploySource).toContain("blueprintComponentForQuickDeploy().healthCheck");
     expect(quickDeploySource).toContain('case "dependencyResources.provision"');
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.plan");
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.accept");
