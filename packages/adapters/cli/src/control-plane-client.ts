@@ -123,6 +123,10 @@ function errorFromUnknown(error: unknown, phase: string): DomainError {
   );
 }
 
+export async function defaultControlPlaneFetch(request: Request): Promise<Response> {
+  return fetch(request);
+}
+
 function authForProfile(auth: CliControlPlaneAuth) {
   if (auth.kind === "product-session") {
     return {
@@ -367,7 +371,7 @@ export async function performControlPlaneHandshake(input: {
   readonly checkedAt: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliControlPlaneHandshakeResult>> {
-  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   let versionResponse: Response;
 
   try {
@@ -431,7 +435,7 @@ export async function createCliAuthSession(input: {
   readonly baseUrl: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSession>> {
-  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   let response: Response;
 
   try {
@@ -504,7 +508,7 @@ export async function pollCliAuthSession(input: {
   readonly deviceCode: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSessionPollResult>> {
-  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   let response: Response;
 
   try {
@@ -553,7 +557,7 @@ export async function exchangeCliAuthSession(input: {
   readonly deviceCode: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSessionExchangeResult>> {
-  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   let response: Response;
 
   try {
@@ -588,7 +592,7 @@ export async function cancelCliAuthSession(input: {
   readonly deviceCode: string;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<void>> {
-  const fetchImplementation = input.fetch ?? ((request: Request) => fetch(request));
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   try {
     await fetchImplementation(
       new Request(

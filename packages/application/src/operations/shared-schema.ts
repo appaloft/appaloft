@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const emptyOperationInputSchema = z.object({});
 
-export const listLimitSchema = z.number().int().positive().max(500).optional();
+export const listLimitSchema = z.coerce.number().int().positive().max(500).optional();
 export const defaultListLimit = 100;
 
 export function boundedListLimit(limit?: number): number {

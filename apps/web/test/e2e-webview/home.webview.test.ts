@@ -3665,7 +3665,7 @@ describe("console e2e with Bun.WebView", () => {
     const renderedStateJson = await waitFor(
       () =>
         view.evaluate<string>(`JSON.stringify({
-        sourcePickerCount: document.querySelectorAll('[role="radiogroup"][aria-label="来源"]').length,
+        sourcePickerCount: document.querySelectorAll('[data-quick-deploy-source-picker]').length,
         blueprintCatalogSourceVisible: document.body.innerText.includes('蓝图目录来源'),
         blueprintSourceAddressVisible: document.body.innerText.includes('/marketplace?surface=quick-deploy'),
         sourceExtensionDisplayNameVisible: document.body.innerText.includes('Server Configured Extensions'),
@@ -3740,14 +3740,24 @@ describe("console e2e with Bun.WebView", () => {
     await clickButtonByAnyText(view, ["Select Blueprint", "选择蓝图"]);
     await expectText(view, "Baserow");
 
-    const renderedState = JSON.parse(
-      await view.evaluate<string>(`JSON.stringify({
-        sourcePickerCount: document.querySelectorAll('[role="radiogroup"][aria-label="来源"]').length,
+    const renderedStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`JSON.stringify({
+        sourcePickerCount: document.querySelectorAll('[data-quick-deploy-source-picker]').length,
         lockedIntroVisible: document.body.innerText.includes('已从蓝图市场选择应用'),
         blueprintCatalogSourceVisible: document.body.innerText.includes('蓝图目录来源'),
         sourceExtensionDisplayNameVisible: document.body.innerText.includes('Server Configured Extensions'),
       })`),
-    ) as {
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          sourcePickerCount: number;
+          blueprintCatalogSourceVisible: boolean;
+        };
+        return state.sourcePickerCount === 1 && state.blueprintCatalogSourceVisible;
+      },
+      "Expected quick deploy source picker to remain visible after selecting a Blueprint in the source step",
+    );
+    const renderedState = JSON.parse(renderedStateJson) as {
       sourcePickerCount: number;
       lockedIntroVisible: boolean;
       blueprintCatalogSourceVisible: boolean;
