@@ -549,6 +549,9 @@
 
   const initialSourceKind = parseSourceKind(browser ? page.url.searchParams.get("source") : null);
   const initialStep = parseDeploymentStep(browser ? page.url.searchParams.get("step") : null);
+  const initialBlueprintSourceLocked = browser
+    ? isLockedBlueprintSourceEntry(page.url.searchParams)
+    : false;
 
   let githubRepositorySearch = $state(browser ? (page.url.searchParams.get("repository") ?? "") : "");
   let githubSourceMode = $state<GithubSourceMode>(
@@ -685,6 +688,7 @@
   let selectedBlueprintVariant = $state(
     browser ? (page.url.searchParams.get("blueprintVariant") ?? "") : "",
   );
+  let blueprintSourceLockedByEntry = $state(initialBlueprintSourceLocked);
   let blueprintDependencyProvisioningDrafts = $state<
     Record<string, BlueprintDependencyProvisioningDraft>
   >({});
@@ -1163,7 +1167,7 @@
   );
   const selectedSourceGroupKey = $derived(sourceGroupForSourceKind(sourceKind));
   const selectedBlueprintSourceLocked = $derived(
-    sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()),
+    blueprintSourceLockedByEntry && sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()),
   );
   const selectedBlueprintDisplayTitle = $derived.by(
     () =>
@@ -1836,6 +1840,14 @@
     return sourceKindKeys.includes(value as SourceKind) ? (value as SourceKind) : "github";
   }
 
+  function isLockedBlueprintSourceEntry(params: URLSearchParams): boolean {
+    return (
+      params.get("source") === "blueprint" &&
+      Boolean(params.get("blueprintSlug")?.trim()) &&
+      params.get("step") !== "source"
+    );
+  }
+
   function parseDeploymentStep(value: string | null): DeploymentStepKey {
     return deploymentStepKeys.includes(value as DeploymentStepKey)
       ? (value as DeploymentStepKey)
@@ -2361,6 +2373,7 @@
     const nextSourceKind = parseSourceKind(params.get("source"));
     const nextSourceLocator = params.get("sourceLocator") ?? "";
 
+    blueprintSourceLockedByEntry = isLockedBlueprintSourceEntry(params);
     sourceKind = nextSourceKind;
     activeStep = parseDeploymentStep(params.get("step"));
     projectMode = parseDraftMode(params.get("projectMode"));
@@ -2471,6 +2484,9 @@
 
   function selectSourceKind(kind: SourceKind): void {
     sourceKind = kind;
+    if (kind !== "blueprint") {
+      blueprintSourceLockedByEntry = false;
+    }
     if (kind === "static-site") {
       resourceKind = "static-site";
       if (!resourceInternalPort.trim() || resourceInternalPort === "3000") {
@@ -4110,7 +4126,7 @@
                                     class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
                                   >
                                     <span
-                                      class="dependency-kind-logo"
+                                      class="flex size-6 items-center justify-center [&_svg]:size-full [&_svg]:max-h-full [&_svg]:max-w-full"
                                       role="img"
                                       aria-label={icon.title}
                                     >
@@ -5262,23 +5278,6 @@
     </div>
   </Dialog.Content>
 </Dialog.Root>
-
-<style>
-  .dependency-kind-logo {
-    display: flex;
-    width: 1.5rem;
-    height: 1.5rem;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .dependency-kind-logo :global(svg) {
-    width: 100%;
-    height: 100%;
-    max-width: 100%;
-    max-height: 100%;
-  }
-</style>
 
 <Dialog.Root bind:open={blueprintDetailDialogOpen}>
   <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">

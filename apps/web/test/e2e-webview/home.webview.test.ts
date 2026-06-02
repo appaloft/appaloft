@@ -978,6 +978,45 @@ function dependencyResourceProvisioningPlanFixture(input: DependencyProvisioning
   };
 }
 
+const baserowBlueprintListing = {
+  slug: "baserow",
+  title: "Baserow",
+  subtitle: "Open source no-code database",
+  categoryKey: "data",
+  category: "Data",
+  featured: true,
+  websiteUrl: "https://baserow.io",
+  documentationUrl: "https://baserow.io/docs",
+  icon: {
+    label: "Ba",
+    tone: "#0f766e",
+    url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 8h10a5 5 0 0 1 0 10H9z' fill='white'/%3E%3Cpath d='M9 16h12a5 5 0 0 1 0 10H9z' fill='%23d1fae5'/%3E%3C/svg%3E",
+    alt: "Baserow icon",
+  },
+  publisher: {
+    name: "Appaloft",
+    verified: true,
+  },
+  blueprint: {
+    id: "baserow",
+    version: "1.0.0",
+    summary: "Deploy Baserow with managed dependencies.",
+    tags: ["database", "nocode"],
+  },
+  overview: {
+    highlights: ["Managed Postgres dependency", "Container image runtime"],
+    useCases: ["Internal no-code database"],
+  },
+  defaultVariant: "standard",
+  variants: [
+    {
+      id: "standard",
+      label: "Standard",
+      summary: "Default Baserow deployment.",
+    },
+  ],
+};
+
 const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
@@ -1038,44 +1077,19 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       ],
     },
+    "/api/cloud/marketplace/blueprints": {
+      categories: [
+        {
+          key: "data",
+          label: "Data",
+          description: "Data applications",
+          count: 1,
+        },
+      ],
+      items: [baserowBlueprintListing],
+    },
     "/api/cloud/marketplace/blueprints/baserow": {
-      listing: {
-        slug: "baserow",
-        title: "Baserow",
-        subtitle: "Open source no-code database",
-        category: "Data",
-        featured: true,
-        websiteUrl: "https://baserow.io",
-        documentationUrl: "https://baserow.io/docs",
-        icon: {
-          label: "Ba",
-          tone: "#0f766e",
-          url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 8h10a5 5 0 0 1 0 10H9z' fill='white'/%3E%3Cpath d='M9 16h12a5 5 0 0 1 0 10H9z' fill='%23d1fae5'/%3E%3C/svg%3E",
-          alt: "Baserow icon",
-        },
-        publisher: {
-          name: "Appaloft",
-          verified: true,
-        },
-        blueprint: {
-          id: "baserow",
-          version: "1.0.0",
-          summary: "Deploy Baserow with managed dependencies.",
-          tags: ["database", "nocode"],
-        },
-        overview: {
-          highlights: ["Managed Postgres dependency", "Container image runtime"],
-          useCases: ["Internal no-code database"],
-        },
-        defaultVariant: "standard",
-        variants: [
-          {
-            id: "standard",
-            label: "Standard",
-            summary: "Default Baserow deployment.",
-          },
-        ],
-      },
+      listing: baserowBlueprintListing,
       manifest: {
         summary: "Baserow application",
         description: "Open source no-code database.",
@@ -3711,6 +3725,39 @@ describe("console e2e with Bun.WebView", () => {
     expect(renderedState.baserowIconImages[0]?.height).toBeGreaterThan(0);
     expect(renderedState.summaryBaserowIconImages[0]?.width).toBeGreaterThan(0);
     expect(renderedState.summaryBaserowIconImages[0]?.height).toBeGreaterThan(0);
+  }, 45_000);
+
+  test("[QUICK-DEPLOY-UX-004] keeps source choices visible when a Blueprint is selected inside quick deploy", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/deploy?source=blueprint&step=source`);
+
+    await expectAnyText(view, ["No Blueprint selected", "尚未选择蓝图"]);
+    await clickButtonByAnyText(view, ["Choose Blueprint", "选择蓝图"]);
+    await expectText(view, "Baserow");
+    await clickButtonByAnyText(view, ["Select Blueprint", "选择蓝图"]);
+    await expectText(view, "Baserow");
+
+    const renderedState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        sourcePickerCount: document.querySelectorAll('[role="radiogroup"][aria-label="来源"]').length,
+        lockedIntroVisible: document.body.innerText.includes('已从蓝图市场选择应用'),
+        blueprintCatalogSourceVisible: document.body.innerText.includes('蓝图目录来源'),
+        sourceExtensionDisplayNameVisible: document.body.innerText.includes('Server Configured Extensions'),
+      })`),
+    ) as {
+      sourcePickerCount: number;
+      lockedIntroVisible: boolean;
+      blueprintCatalogSourceVisible: boolean;
+      sourceExtensionDisplayNameVisible: boolean;
+    };
+
+    expect(renderedState.sourcePickerCount).toBe(1);
+    expect(renderedState.lockedIntroVisible).toBe(false);
+    expect(renderedState.blueprintCatalogSourceVisible).toBe(true);
+    expect(renderedState.sourceExtensionDisplayNameVisible).toBe(false);
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
