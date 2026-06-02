@@ -1,7 +1,12 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type GitHubAppInstallationRepository, type IntegrationRegistry } from "../../ports";
+import {
+  DefaultTenantContextResolver,
+  type GitHubAppInstallationRepository,
+  type IntegrationRegistry,
+  type TenantContextResolver,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { type GitHubAppConnectionStatus } from "./github-app-connection.schema";
 
@@ -12,10 +17,16 @@ export class GitHubAppConnectionQueryService {
     private readonly integrationRegistry: IntegrationRegistry,
     @inject(tokens.githubAppInstallationRepository)
     private readonly installationRepository: GitHubAppInstallationRepository,
+    @inject(tokens.tenantContextResolver)
+    private readonly tenantContextResolver?: TenantContextResolver,
   ) {}
 
   async execute(context: ExecutionContext): Promise<Result<GitHubAppConnectionStatus>> {
-    const tenantId = context.tenant?.tenantId;
+    const tenantContext = await (
+      this.tenantContextResolver ?? new DefaultTenantContextResolver()
+    ).resolveTenantContext(context);
+    const effectiveContext = { ...context, tenant: tenantContext };
+    const tenantId = tenantContext.tenantId;
     if (!tenantId) {
       return err(
         domainError.validation("GitHub App connection requires a tenant context", {
@@ -28,7 +39,7 @@ export class GitHubAppConnectionQueryService {
     const configurationStatus = integration?.configuration?.status ?? "unknown";
     const setup = integration?.setup?.providerApp;
     const installation = await this.installationRepository.findForTenant(
-      toRepositoryContext(context),
+      toRepositoryContext(effectiveContext),
       {
         providerKey: "github",
         tenantId,

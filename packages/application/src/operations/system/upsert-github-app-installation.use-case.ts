@@ -1,7 +1,12 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type GitHubAppInstallationRepository, type GitHubAppRuntime } from "../../ports";
+import {
+  DefaultTenantContextResolver,
+  type GitHubAppInstallationRepository,
+  type GitHubAppRuntime,
+  type TenantContextResolver,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { type GitHubAppConnectionStatus } from "./github-app-connection.schema";
 
@@ -12,13 +17,19 @@ export class UpsertGitHubAppInstallationUseCase {
     private readonly githubAppRuntime: GitHubAppRuntime,
     @inject(tokens.githubAppInstallationRepository)
     private readonly installationRepository: GitHubAppInstallationRepository,
+    @inject(tokens.tenantContextResolver)
+    private readonly tenantContextResolver?: TenantContextResolver,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: { installationId: string; setupAction?: "install" | "update" },
   ): Promise<Result<GitHubAppConnectionStatus>> {
-    const tenantId = context.tenant?.tenantId;
+    const tenantContext = await (
+      this.tenantContextResolver ?? new DefaultTenantContextResolver()
+    ).resolveTenantContext(context);
+    const effectiveContext = { ...context, tenant: tenantContext };
+    const tenantId = tenantContext.tenantId;
     if (!tenantId) {
       return err(
         domainError.validation("GitHub App installation requires a tenant context", {
@@ -27,7 +38,7 @@ export class UpsertGitHubAppInstallationUseCase {
       );
     }
 
-    const readback = await this.githubAppRuntime.readInstallation(context, {
+    const readback = await this.githubAppRuntime.readInstallation(effectiveContext, {
       installationId: input.installationId,
     });
     if (readback.isErr()) {
@@ -35,7 +46,7 @@ export class UpsertGitHubAppInstallationUseCase {
     }
 
     const now = new Date().toISOString();
-    const record = await this.installationRepository.upsert(toRepositoryContext(context), {
+    const record = await this.installationRepository.upsert(toRepositoryContext(effectiveContext), {
       ...(readback.value.accountId ? { accountId: readback.value.accountId } : {}),
       ...(readback.value.accountLogin ? { accountLogin: readback.value.accountLogin } : {}),
       ...(readback.value.accountType ? { accountType: readback.value.accountType } : {}),
