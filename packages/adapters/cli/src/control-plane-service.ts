@@ -29,6 +29,9 @@ import {
 } from "./control-plane-profile.js";
 
 export interface CliControlPlaneDependencies {
+  readonly confirmOpenBrowser?: (
+    session: CliControlPlaneLoginSessionView,
+  ) => Promise<boolean> | boolean;
   readonly env?: CliControlPlaneEnvironment;
   readonly fetch?: AppaloftSdkFetch;
   readonly monotonicNow?: () => number;
@@ -77,6 +80,7 @@ function controlPlaneError(
 function dependencies(input?: CliControlPlaneDependencies): Required<CliControlPlaneDependencies> {
   const env = input?.env ?? process.env;
   return {
+    confirmOpenBrowser: input?.confirmOpenBrowser ?? (() => true),
     env,
     fetch: input?.fetch ?? defaultControlPlaneFetch,
     monotonicNow: input?.monotonicNow ?? (() => Date.now()),
@@ -203,6 +207,7 @@ function authTimeoutError(): DomainError {
 }
 
 function authSessionOutput(input: {
+  readonly browserOpenRequiresConfirmation: boolean;
   readonly openedBrowser: boolean;
   readonly openBrowserFailed: boolean;
   readonly userCode: string;
@@ -212,6 +217,7 @@ function authSessionOutput(input: {
     schemaVersion: "appaloft-cli-auth-session/v1" as const,
     verificationUriComplete: input.verificationUriComplete,
     userCode: input.userCode,
+    browserOpenRequiresConfirmation: input.browserOpenRequiresConfirmation,
     openedBrowser: input.openedBrowser,
     openBrowserFailed: input.openBrowserFailed,
   };
@@ -252,6 +258,9 @@ async function sleepUntilNextPoll(input: {
 
 async function acquireBrowserAuth(input: {
   readonly baseUrl: string;
+  readonly confirmOpenBrowser: (
+    session: CliControlPlaneLoginSessionView,
+  ) => Promise<boolean> | boolean;
   readonly fetch: AppaloftSdkFetch;
   readonly openBrowser: (url: string) => Promise<boolean> | boolean;
   readonly onLoginSession: (session: CliControlPlaneLoginSessionView) => Promise<void> | void;
@@ -282,7 +291,24 @@ async function acquireBrowserAuth(input: {
 
   let openedBrowser = false;
   let openBrowserFailed = false;
-  if (input.shouldOpenBrowser) {
+  const initialOutput = authSessionOutput({
+    browserOpenRequiresConfirmation: input.shouldOpenBrowser,
+    openedBrowser,
+    openBrowserFailed,
+    userCode: session.value.userCode,
+    verificationUriComplete: session.value.verificationUriComplete,
+  });
+  await input.onLoginSession(initialOutput);
+
+  if (input.shouldOpenBrowser && (await input.confirmOpenBrowser(initialOutput))) {
+    if (input.signal?.aborted) {
+      await tryCancelAuthSession({
+        baseUrl: input.baseUrl,
+        deviceCode: session.value.deviceCode,
+        fetch: input.fetch,
+      });
+      return err(interruptedAuthError());
+    }
     try {
       openedBrowser = await input.openBrowser(session.value.verificationUriComplete);
     } catch {
@@ -291,12 +317,15 @@ async function acquireBrowserAuth(input: {
   }
 
   const output = authSessionOutput({
+    browserOpenRequiresConfirmation: false,
     openedBrowser,
     openBrowserFailed,
     userCode: session.value.userCode,
     verificationUriComplete: session.value.verificationUriComplete,
   });
-  await input.onLoginSession(output);
+  if (openBrowserFailed) {
+    await input.onLoginSession(output);
+  }
   const startedAt = input.monotonicNow();
   let intervalMs = Math.max(0, session.value.interval) * 1000;
 
@@ -408,6 +437,7 @@ export async function loginControlPlane(
       })
     : await acquireBrowserAuth({
         baseUrl: normalizedUrl.value,
+        confirmOpenBrowser: resolved.confirmOpenBrowser,
         fetch: resolved.fetch,
         monotonicNow: resolved.monotonicNow,
         onLoginSession: resolved.onLoginSession,

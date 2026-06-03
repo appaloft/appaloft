@@ -59,6 +59,7 @@ export interface CliControlPlaneLoginSessionView {
   readonly schemaVersion: "appaloft-cli-auth-session/v1";
   readonly verificationUriComplete: string;
   readonly userCode: string;
+  readonly browserOpenRequiresConfirmation: boolean;
   readonly openedBrowser: boolean;
   readonly openBrowserFailed: boolean;
 }

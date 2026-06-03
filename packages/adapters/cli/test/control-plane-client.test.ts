@@ -474,6 +474,42 @@ describe("CLI remote control-plane client", () => {
     expect((await store.read())._unsafeUnwrap().activeProfile).toBe("cloud");
   });
 
+  test("[CONTROL-PLANE-CLI-012] default browser auth waits for enter before opening the browser", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+    const events: string[] = [];
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "login"],
+      confirmOpenBrowser: (session) => {
+        events.push(`confirm:${session.userCode}`);
+        const rendered = output.read();
+        expect(rendered.stderr).toContain("Press Enter to open the Appaloft CLI login page");
+        expect(rendered.stderr).toContain("confirm that the page shows the same code");
+        expect(rendered.stderr).toContain("Code: \u001b[1mABCD-EFGH\u001b[22m");
+        return true;
+      },
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      openBrowser: (url) => {
+        events.push(`open:${url}`);
+        return true;
+      },
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(events).toEqual([
+      "confirm:ABCD-EFGH",
+      "open:https://app.appaloft.com/cli-auth/authorize?user_code=ABCD-EFGH",
+    ]);
+    expect((await store.read())._unsafeUnwrap().activeProfile).toBe("cloud");
+  });
+
   test("[CONTROL-PLANE-CLI-013] denied browser auth exchange writes no profile", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
