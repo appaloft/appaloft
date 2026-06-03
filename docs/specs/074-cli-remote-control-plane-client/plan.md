@@ -233,8 +233,8 @@ The CLI auth exchange is a transport/auth contract, not a new product business o
 1. `POST /api/cli-auth/sessions` creates a short-lived authorization session and returns
    `verificationUri`, `verificationUriComplete`, `userCode`, `deviceCode`, `expiresIn`, and
    `interval`.
-2. The CLI prints `verificationUriComplete` and the user code, then opens the browser unless
-   disabled by `--no-browser`, `APPALOFT_CLI_OPEN_BROWSER=false`, or CI.
+2. The CLI prints `verificationUriComplete` and the user code, then waits for explicit Enter before
+   opening the browser unless disabled by `--no-browser`, `APPALOFT_CLI_OPEN_BROWSER=false`, or CI.
 3. `GET /api/cli-auth/sessions/{deviceCode}` returns `pending`, `authorized`, `denied`, or
    `expired`. The CLI continues polling while pending.
 4. `POST /api/cli-auth/sessions/{deviceCode}/exchange` is called only after `authorized` and
