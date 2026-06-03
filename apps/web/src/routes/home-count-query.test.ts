@@ -60,11 +60,15 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("i18nKeys.common.actions.quickDeploy");
   });
 
-  test("[HOME-LAYOUT-001] keeps the home empty and list states centered in the console canvas", () => {
+  test("[HOME-LAYOUT-001] lets project rows use the available console width", () => {
     expect(homePageSource).toContain(
       'import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";',
     );
-    expect(homePageSource).toContain('<ConsoleResourceCanvas class="max-w-6xl">');
+    expect(homePageSource).toContain('<ConsoleResourceCanvas class="max-w-none">');
+    expect(homePageSource).toContain("container-type: inline-size");
+    expect(homePageSource).toContain("@container (min-width: 42rem)");
+    expect(homePageSource).not.toContain("@media (min-width: 1320px)");
+    expect(homePageSource).not.toContain("@media (min-width: 980px)");
     expect(homePageSource).toContain('<section class="nothing-home-heading">');
     expect(homePageSource).toContain('<div>\n          <p class="nothing-label">');
   });

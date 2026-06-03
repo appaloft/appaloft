@@ -217,7 +217,7 @@
   title={$t(i18nKeys.console.home.pageTitle)}
   description={$t(i18nKeys.console.home.pageDescription)}
 >
-  <ConsoleResourceCanvas class="max-w-6xl">
+  <ConsoleResourceCanvas class="max-w-none">
   <div class="nothing-console-home">
     {#if pageLoading}
       <section class="nothing-home-heading" aria-hidden="true">
@@ -515,6 +515,7 @@
   }
 
   .nothing-project-list {
+    container-type: inline-size;
     display: grid;
     overflow: hidden;
     border: 1px solid var(--input);
@@ -526,7 +527,13 @@
   .nothing-project-row {
     display: grid;
     min-width: 0;
+    grid-template-areas:
+      "project"
+      "resource"
+      "status"
+      "action";
     gap: 16px;
+    align-items: start;
     border-bottom: 1px solid var(--border);
     padding: 18px;
   }
@@ -535,20 +542,13 @@
     border-bottom: 0;
   }
 
-  @media (min-width: 980px) {
+  @container (min-width: 42rem) {
     .nothing-project-row {
-      grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 0.8fr);
-      align-items: center;
-    }
-  }
-
-  @media (min-width: 1920px) {
-    .nothing-project-row {
-      grid-template-columns:
-        minmax(17rem, 1.15fr)
-        minmax(15rem, 0.8fr)
-        minmax(15rem, 0.72fr)
-        auto;
+      grid-template-areas:
+        "project status"
+        "resource status"
+        "resource action";
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
     }
   }
 
@@ -567,6 +567,7 @@
   .nothing-project-main {
     display: grid;
     min-width: 0;
+    grid-area: project;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 12px;
   }
@@ -650,6 +651,7 @@
 
   .nothing-resource-preview {
     display: grid;
+    grid-area: resource;
     gap: 8px;
   }
 
@@ -714,6 +716,7 @@
 
   .nothing-project-status {
     display: grid;
+    grid-area: status;
     gap: 12px;
   }
 
@@ -764,6 +767,7 @@
     display: inline-flex;
     align-items: center;
     justify-self: start;
+    grid-area: action;
     gap: 6px;
     color: var(--text-secondary);
     font-size: 13px;
@@ -773,9 +777,9 @@
       transform var(--nothing-motion-duration) var(--nothing-motion-ease);
   }
 
-  @media (min-width: 1920px) {
+  @container (min-width: 42rem) {
     .nothing-project-open {
-      justify-self: end;
+      align-self: end;
     }
   }
 
