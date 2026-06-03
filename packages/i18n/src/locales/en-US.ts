@@ -751,6 +751,9 @@ export const enUS = {
       supabaseBranchLabel: "Supabase branch",
       targetVersionLabel: "Target version",
       unknownUpdateBadge: "Unknown",
+      updateCheckUnavailableBody:
+        "The instance is running, but this environment cannot authorize the update check. Sign in or retry after the control plane is ready.",
+      updateCheckUnavailableTitle: "Update check unavailable",
       updateAvailableBadge: "Update available",
       updatesBody:
         "Check this instance version and run the installer directly when a host-side executor is enabled.",
@@ -1304,6 +1307,8 @@ export const enUS = {
       openEvents: "Events",
       openLogs: "Logs",
       partial: "Partial",
+      resourceServerFallbackNotice:
+        "This resource does not have attributable runtime samples yet, so this panel is showing metrics from the server that ran the latest deployment.",
       retainedSampleCount: "{{count}} retained samples",
       retainedSamplesLoading: "Loading retained samples",
       rollupBucket: "{{bucket}} buckets",
