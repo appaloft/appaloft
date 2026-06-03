@@ -884,8 +884,8 @@
           {/each}
         </Tabs.List>
 
-        <Tabs.Content value="overview" class="mt-0 space-y-6">
-          <section class="console-panel space-y-5 p-5">
+        <Tabs.Content value="overview" class="mt-0 flex flex-col gap-6">
+          <section class="console-panel order-2 space-y-5 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -1028,30 +1028,34 @@
             </div>
           </section>
 
-          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <section class="order-1 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 class="text-lg font-semibold">
-                    {$t(i18nKeys.console.projects.recentDeploymentsTitle)}
+                    {$t(i18nKeys.console.projects.resourcesTitle)}
                   </h2>
                   <p class="mt-1 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.projects.recentDeploymentsDescription)}
+                    {$t(i18nKeys.console.projects.resourcesDescription)}
                   </p>
                 </div>
-                <Button href={projectTabHref("deployments")} variant="outline">
+                <Button href={projectTabHref("resources")} variant="outline">
                   {$t(i18nKeys.common.actions.viewAll)}
                   <ArrowRight class="size-4" />
                 </Button>
               </div>
 
-              {#if projectDeployments.length > 0}
-                <DeploymentTable
-                  deployments={projectDeployments.slice(0, 6)}
+              {#if projectResources.length > 0}
+                <ResourceListTable
+                  resources={projectResources}
+                  deployments={projectDeployments}
                   {environments}
-                  {resources}
-                  showProject={false}
-                  showServer={false}
+                  emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
+                  emptyDescription={$t(i18nKeys.console.projects.noResources)}
+                  createHref={projectCreateResourceHref(project.id)}
+                  createLabel={$t(i18nKeys.common.actions.createResource)}
+                  createDisabled={isProjectArchived}
+                  showEnvironment
                 />
               {:else}
                 <div class="console-subtle-panel px-4 py-6">

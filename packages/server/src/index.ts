@@ -138,11 +138,13 @@ type AppaloftHttpServerHandle = ReturnType<typeof Bun.serve>;
 function startAppaloftHttpServer(input: {
   readonly fetch: (request: Request) => Response | Promise<Response>;
   readonly hostname: string;
+  readonly idleTimeoutSeconds?: number;
   readonly port: number;
 }): AppaloftHttpServerHandle {
   return Bun.serve({
     hostname: input.hostname,
     port: input.port,
+    ...(input.idleTimeoutSeconds ? { idleTimeout: input.idleTimeoutSeconds } : {}),
     fetch: input.fetch,
   });
 }
@@ -946,6 +948,9 @@ export async function createAppaloftServer(
 
     serverHandle = startAppaloftHttpServer({
       hostname: config.httpHost,
+      ...(config.httpIdleTimeoutSeconds
+        ? { idleTimeoutSeconds: config.httpIdleTimeoutSeconds }
+        : {}),
       port: config.httpPort,
       fetch: (request) => httpApp.handle(request),
     });

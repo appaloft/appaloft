@@ -42,6 +42,10 @@ function readAuthError(body: unknown): string {
 }
 
 export async function startGitHubSignIn(callbackURL: string): Promise<void> {
+  const resolvedCallbackURL =
+    typeof window === "undefined"
+      ? callbackURL
+      : new URL(callbackURL, window.location.origin).toString();
   const response = await fetch(buildApiUrl("/api/auth/sign-in/social"), {
     method: "POST",
     headers: {
@@ -50,7 +54,7 @@ export async function startGitHubSignIn(callbackURL: string): Promise<void> {
     },
     body: JSON.stringify({
       provider: "github",
-      callbackURL,
+      callbackURL: resolvedCallbackURL,
       scopes: ["read:user", "user:email"],
       disableRedirect: true,
     }),

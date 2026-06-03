@@ -687,7 +687,10 @@ export const zhCN = {
       applyingUpgrade: "正在更新",
       checkForUpdates: "检查更新",
       checkingForUpdates: "正在检查",
+      cloudCommitShaLabel: "Cloud 仓 commit SHA",
+      cloudDatabaseUrlLabel: "Cloud DB URL",
       commitShaLabel: "Git commit SHA",
+      databaseTitle: "数据库连接",
       guidanceBody:
         "安装、重新绑定 console 域名和 GitHub Actions 连接信息集中在这里，避免干扰 instance 日常状态判断。",
       guidanceTitle: "安装与连接指引",
@@ -710,10 +713,15 @@ export const zhCN = {
       pageTitle: "实例",
       proxyTitle: "托管代理",
       proxyBody: "安装器创建常驻 Traefik edge，console bootstrap route 和后续项目 route 共用它。",
+      publicAppaloftCommitShaLabel: "Public Appaloft commit SHA",
+      publicDatabaseUrlLabel: "Public DB URL",
       rerunBody:
         "要修改 console 域名，使用新域名重新运行安装器；操作是幂等的，会保留已有数据库卷。",
       rerunTitle: "修改 console 域名",
       refreshDoctor: "刷新 doctor",
+      runtimeStatusGeneratedAtLabel: "状态生成时间",
+      sourceTitle: "源码版本",
+      supabaseBranchLabel: "Supabase branch",
       targetVersionLabel: "目标版本",
       unknownUpdateBadge: "无法确认",
       updateAvailableBadge: "有可用更新",
@@ -997,6 +1005,8 @@ export const zhCN = {
       startHint: "打开会话后即可发送命令。",
       title: "终端",
       workspace: "工作目录",
+      workspaceUnavailable:
+        "资源终端需要一个记录了工作目录元数据的成功部署。请选择带工作目录的部署、重新部署这个资源，或者改用服务器终端。",
     },
     projects: {
       activeProjects: "有部署",
@@ -2160,6 +2170,8 @@ export const zhCN = {
       edgeProxyConfigured: "边缘代理意图已保存",
       edgeProxyDescription:
         "未来生成访问和自定义域名路由会使用这个期望代理类型；已有 route snapshot 不会被改写。",
+      edgeProxyFailedHint:
+        "这里展示的是控制面保存的代理就绪状态。失败通常表示最近一次代理安装、启动或探测没有通过；可以先测试连接，确认后在代理访问页重新保存配置。",
       edgeProxyKindLabel: "边缘代理类型",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",
