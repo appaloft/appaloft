@@ -182,7 +182,10 @@
   const rerunCommand =
     "curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain new-console.example.com";
   const fallbackUpgradeCommand = "curl -fsSL https://appaloft.com/install.sh | sudo sh";
-  const upgradeStatus = $derived(instanceUpgradeQuery.data?.checkStatus ?? "unknown");
+  const upgradeStatus = $derived(instanceUpgradeQuery.data?.checkStatus ?? null);
+  const visibleUpgradeStatus = $derived(
+    upgradeStatus === "available" || upgradeStatus === "current" ? upgradeStatus : null,
+  );
   const doctor = $derived(doctorQuery.data ?? null);
   const terminalSessions = $derived(terminalSessionsQuery.data?.items ?? []);
   const maintenanceWorkers = $derived(doctor?.maintenanceWorkers ?? []);
@@ -351,8 +354,8 @@ server-config-deploy: true`);
   ]}
 >
   <ConsoleResourceCanvas class="max-w-6xl">
-    <div class="grid gap-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-start">
-      <aside class="console-subnav md:sticky md:top-20">
+    <div class="console-subnav-layout">
+      <aside class="console-subnav">
         <p class="console-subnav-kicker">{$t(i18nKeys.console.instance.pageTitle)}</p>
         <nav class="console-subnav-list" aria-label={$t(i18nKeys.console.instance.pageTitle)}>
           <a
@@ -405,15 +408,17 @@ server-config-deploy: true`);
         </nav>
       </aside>
 
-      <div class="min-w-0 space-y-4">
+      <div class="console-subnav-content space-y-4">
         {#if activeSection === "overview"}
           <section class="console-panel p-5">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant={upgradeStatus === "available" ? "default" : "outline"}>
-                    {$t(statusLabelKey(upgradeStatus))}
-                  </Badge>
+                  {#if visibleUpgradeStatus}
+                    <Badge variant={visibleUpgradeStatus === "available" ? "default" : "outline"}>
+                      {$t(statusLabelKey(visibleUpgradeStatus))}
+                    </Badge>
+                  {/if}
                   <h2 class="text-lg font-semibold">
                     {$t(i18nKeys.console.instance.overviewTitle)}
                   </h2>
@@ -588,7 +593,12 @@ server-config-deploy: true`);
               <p
                 class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
               >
-                {readErrorMessage(instanceUpgradeQuery.error)}
+                <span class="font-medium">
+                  {$t(i18nKeys.console.instance.updateCheckUnavailableTitle)}
+                </span>
+                <span class="ml-2">
+                  {$t(i18nKeys.console.instance.updateCheckUnavailableBody)}
+                </span>
               </p>
             {/if}
 

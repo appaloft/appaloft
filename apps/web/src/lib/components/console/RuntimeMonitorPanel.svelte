@@ -49,6 +49,7 @@
 
   type Props = {
     scope: RuntimeUsageScope;
+    observationScope?: RuntimeUsageScope;
     usage: InspectRuntimeUsageResponse | null;
     loading: boolean;
     error?: string;
@@ -70,6 +71,7 @@
 
   let {
     scope,
+    observationScope = scope,
     usage,
     loading,
     error = "",
@@ -123,27 +125,27 @@
   const thresholdSummary = $derived(runtimeMonitoringThresholdSummary(thresholds));
   const observationLinks = $derived.by(() => ({
     logs: runtimeMonitoringObservationHref(logsHref, {
-      scope,
+      scope: observationScope,
       retainedSamples,
       rollup,
     }),
     events: runtimeMonitoringObservationHref(eventsHref, {
-      scope,
+      scope: observationScope,
       retainedSamples,
       rollup,
     }),
     diagnostics: runtimeMonitoringObservationHref(diagnosticsHref, {
-      scope,
+      scope: observationScope,
       retainedSamples,
       rollup,
     }),
     capacity: runtimeMonitoringObservationHref(capacityHref, {
-      scope,
+      scope: observationScope,
       retainedSamples,
       rollup,
     }),
     cleanup: runtimeMonitoringObservationHref(cleanupHref, {
-      scope,
+      scope: observationScope,
       retainedSamples,
       rollup,
     }),

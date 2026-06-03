@@ -101,6 +101,7 @@ describe("Blueprint install plan", () => {
       summary: "A deployable service with mainstream dependency kinds.",
       resources: [
         { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "mongodb", kind: "mongodb", label: "MongoDB" },
         { id: "mysql", kind: "mysql", label: "MySQL" },
         { id: "redis", kind: "redis", label: "Redis" },
         { id: "storage", kind: "object-storage", label: "Object storage" },
@@ -116,7 +117,15 @@ describe("Blueprint install plan", () => {
             strategy: "container-image",
             image: "ghcr.io/appaloft/api:latest",
           },
-          usesResources: ["postgres", "mysql", "redis", "storage", "clickhouse", "opensearch"],
+          usesResources: [
+            "postgres",
+            "mongodb",
+            "mysql",
+            "redis",
+            "storage",
+            "clickhouse",
+            "opensearch",
+          ],
         },
       ],
       profiles: {
@@ -149,6 +158,7 @@ describe("Blueprint install plan", () => {
 
       expect(dependencyKinds).toEqual([
         "postgres",
+        "mongodb",
         "mysql",
         "redis",
         "object-storage",

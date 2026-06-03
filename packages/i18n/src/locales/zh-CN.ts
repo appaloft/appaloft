@@ -724,6 +724,9 @@ export const zhCN = {
       supabaseBranchLabel: "Supabase branch",
       targetVersionLabel: "目标版本",
       unknownUpdateBadge: "无法确认",
+      updateCheckUnavailableBody:
+        "实例正在运行，但当前环境无法授权更新检查。请登录后重试，或等控制平面就绪后再检查。",
+      updateCheckUnavailableTitle: "更新检查不可用",
       updateAvailableBadge: "有可用更新",
       updatesBody: "检查当前 instance 版本，并在支持宿主执行器时直接触发安装器更新。",
       updatesTitle: "Appaloft 更新",
@@ -1240,6 +1243,8 @@ export const zhCN = {
       openEvents: "事件",
       openLogs: "日志",
       partial: "部分数据",
+      resourceServerFallbackNotice:
+        "当前资源还没有可归因的运行时样本，暂时展示最近部署所在服务器的监控数据。",
       retainedSampleCount: "{{count}} 个保留样本",
       retainedSamplesLoading: "正在读取保留样本",
       rollupBucket: "{{bucket}} 粒度",

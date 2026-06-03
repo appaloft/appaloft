@@ -30,7 +30,7 @@ between deployable components and external or managed dependency resources.
   one Appaloft Resource and one or more deployment attempts.
 - A `BlueprintResourceRequirement` is an external, managed, imported, or otherwise separately
   bound dependency resource such as Postgres, Redis, MySQL, ClickHouse, object storage, OpenSearch,
-  volume, or a shared tracing backend capability. It continues to be connected through
+  volume, MongoDB, or a shared tracing backend capability. It continues to be connected through
   component-to-dependency binding.
 - A `BlueprintComponentRelation` expresses only a relationship between two components inside the
   same Blueprint installation. It may describe endpoint consumption, lifecycle ordering, private

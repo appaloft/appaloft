@@ -48,6 +48,7 @@
     DetachResourceStorageInput,
     DomainBindingSummary,
     ImportCertificateInput,
+    InspectRuntimeUsageResponse,
     ProxyConfigurationView,
     PreviewEnvironmentSummary,
     ResourceConfigEntry,
@@ -59,6 +60,7 @@
     ResourceDependencyBindingSummary,
     ResourceStorageAttachmentSummary,
     ResourceSummary,
+    RuntimeUsageScope,
     ScheduledTaskDefinitionSummary,
     ScheduledTaskRunLogEntry,
     ScheduledTaskRunStatus,
@@ -116,6 +118,7 @@
     runtimeMonitoringDeploymentInObservationWindow,
     runtimeMonitoringObservationHandoffFromSearchParams,
     runtimeMonitoringObservationHandoffMatchesScope,
+    runtimeMonitoringSampleFromUsage,
     runtimeMonitoringTimestampInObservationWindow,
   } from "$lib/console/runtime-usage";
   import {
@@ -139,6 +142,17 @@
   type AppaloftDesktopBridge = {
     copyText?: (text: string) => Promise<void>;
   };
+
+  function runtimeUsageHasMonitorSignals(usage: InspectRuntimeUsageResponse | null): boolean {
+    const sample = runtimeMonitoringSampleFromUsage(usage);
+
+    return Boolean(
+      sample &&
+        (sample.cpuLoadPercent !== null ||
+          sample.memoryPercent !== null ||
+          sample.diskPercent !== null),
+    );
+  }
   type WindowWithAppaloftDesktopBridge = Window &
     typeof globalThis & {
       appaloftDesktop?: AppaloftDesktopBridge;
@@ -348,6 +362,10 @@
   const resourceRuntimeUsageQuery = createQuery(() =>
     runtimeUsageQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
   );
+  const resourceRuntimeUsage = $derived(resourceRuntimeUsageQuery.data ?? null);
+  const resourceRuntimeUsageHasMonitorValues = $derived(
+    runtimeUsageHasMonitorSignals(resourceRuntimeUsage),
+  );
   const resourceRuntimeMonitoringSamplesQuery = createQuery(() =>
     runtimeMonitoringSamplesQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
   );
@@ -519,6 +537,39 @@
   const latestDeployment = $derived(
     resource ? deployments.find((deployment) => deployment.resourceId === resource.id) : null,
   );
+  const resourceFallbackServerScope = $derived<RuntimeUsageScope | null>(
+    latestDeployment?.serverId
+      ? {
+          kind: "server",
+          serverId: latestDeployment.serverId,
+        }
+      : null,
+  );
+  const shouldLoadResourceFallbackServerRuntime = $derived(
+    browser &&
+      resourceId.length > 0 &&
+      resourceFallbackServerScope !== null &&
+      !resourceRuntimeUsageQuery.isPending &&
+      !resourceRuntimeUsageHasMonitorValues,
+  );
+  const resourceFallbackServerRuntimeUsageQuery = createQuery(() =>
+    runtimeUsageQueryOptions(
+      resourceFallbackServerScope ?? resourceRuntimeScope,
+      shouldLoadResourceFallbackServerRuntime,
+    ),
+  );
+  const resourceFallbackServerRuntimeMonitoringSamplesQuery = createQuery(() =>
+    runtimeMonitoringSamplesQueryOptions(
+      resourceFallbackServerScope ?? resourceRuntimeScope,
+      shouldLoadResourceFallbackServerRuntime,
+    ),
+  );
+  const resourceFallbackServerRuntimeMonitoringRollupQuery = createQuery(() =>
+    runtimeMonitoringRollupQueryOptions(
+      resourceFallbackServerScope ?? resourceRuntimeScope,
+      shouldLoadResourceFallbackServerRuntime,
+    ),
+  );
   const resourceDeployments = $derived(
     resource ? deployments.filter((deployment) => deployment.resourceId === resource.id) : [],
   );
@@ -619,23 +670,82 @@
   );
   const scheduledTasks = $derived(scheduledTasksQuery.data?.items ?? []);
   const scheduledTaskRuns = $derived(scheduledTaskRunsQuery.data?.items ?? []);
-  const resourceRuntimeUsage = $derived(resourceRuntimeUsageQuery.data ?? null);
   const resourceRuntimeUsageError = $derived(
     resourceRuntimeUsageQuery.error ? readErrorMessage(resourceRuntimeUsageQuery.error) : "",
   );
+  const resourceFallbackServerRuntimeUsage = $derived(
+    resourceFallbackServerRuntimeUsageQuery.data ?? null,
+  );
+  const resourceFallbackServerRuntimeUsageHasMonitorValues = $derived(
+    runtimeUsageHasMonitorSignals(resourceFallbackServerRuntimeUsage),
+  );
+  const showResourceServerRuntimeFallback = $derived(
+    !resourceRuntimeUsageHasMonitorValues && resourceFallbackServerRuntimeUsageHasMonitorValues,
+  );
+  const effectiveResourceRuntimeUsage = $derived(
+    showResourceServerRuntimeFallback ? resourceFallbackServerRuntimeUsage : resourceRuntimeUsage,
+  );
+  const effectiveResourceRuntimeUsageLoading = $derived(
+    resourceRuntimeUsageQuery.isPending ||
+      (!resourceRuntimeUsageHasMonitorValues &&
+        resourceFallbackServerScope !== null &&
+        resourceFallbackServerRuntimeUsageQuery.isPending),
+  );
+  const effectiveResourceRuntimeUsageError = $derived(
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeUsageQuery.error
+        ? readErrorMessage(resourceFallbackServerRuntimeUsageQuery.error)
+        : ""
+      : resourceRuntimeUsageError,
+  );
   const resourceRuntimeMonitoringSamples = $derived(
     resourceRuntimeMonitoringSamplesQuery.data ?? null,
+  );
+  const resourceFallbackServerRuntimeMonitoringSamples = $derived(
+    resourceFallbackServerRuntimeMonitoringSamplesQuery.data ?? null,
+  );
+  const effectiveResourceRuntimeMonitoringSamples = $derived(
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeMonitoringSamples
+      : resourceRuntimeMonitoringSamples,
   );
   const resourceRuntimeMonitoringSamplesError = $derived(
     resourceRuntimeMonitoringSamplesQuery.error
       ? readErrorMessage(resourceRuntimeMonitoringSamplesQuery.error)
       : "",
   );
+  const effectiveResourceRuntimeMonitoringSamplesError = $derived(
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeMonitoringSamplesQuery.error
+        ? readErrorMessage(resourceFallbackServerRuntimeMonitoringSamplesQuery.error)
+        : ""
+      : resourceRuntimeMonitoringSamplesError,
+  );
   const resourceRuntimeMonitoringRollup = $derived(resourceRuntimeMonitoringRollupQuery.data ?? null);
+  const resourceFallbackServerRuntimeMonitoringRollup = $derived(
+    resourceFallbackServerRuntimeMonitoringRollupQuery.data ?? null,
+  );
+  const effectiveResourceRuntimeMonitoringRollup = $derived(
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeMonitoringRollup
+      : resourceRuntimeMonitoringRollup,
+  );
   const resourceRuntimeMonitoringRollupError = $derived(
     resourceRuntimeMonitoringRollupQuery.error
       ? readErrorMessage(resourceRuntimeMonitoringRollupQuery.error)
       : "",
+  );
+  const effectiveResourceRuntimeMonitoringRollupError = $derived(
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeMonitoringRollupQuery.error
+        ? readErrorMessage(resourceFallbackServerRuntimeMonitoringRollupQuery.error)
+        : ""
+      : resourceRuntimeMonitoringRollupError,
+  );
+  const effectiveResourceRuntimeMonitoringObservationScope = $derived(
+    showResourceServerRuntimeFallback
+      ? (resourceFallbackServerScope ?? resourceRuntimeScope)
+      : resourceRuntimeScope,
   );
   const resourceRuntimeMonitoringThresholds = $derived(
     resourceRuntimeMonitoringThresholdsQuery.data ?? null,
@@ -9620,17 +9730,27 @@
         </Tabs.Content>
 
         <Tabs.Content value="monitor" class="mt-0">
+          {#if showResourceServerRuntimeFallback}
+            <p class="mb-3 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.runtimeUsage.resourceServerFallbackNotice)}
+            </p>
+          {/if}
           <RuntimeMonitorPanel
             scope={resourceRuntimeScope}
-            usage={resourceRuntimeUsage}
-            loading={resourceRuntimeUsageQuery.isPending}
-            error={resourceRuntimeUsageError}
-            retainedSamples={resourceRuntimeMonitoringSamples}
-            retainedSamplesLoading={resourceRuntimeMonitoringSamplesQuery.isPending}
-            retainedSamplesError={resourceRuntimeMonitoringSamplesError}
-            rollup={resourceRuntimeMonitoringRollup}
-            rollupLoading={resourceRuntimeMonitoringRollupQuery.isPending}
-            rollupError={resourceRuntimeMonitoringRollupError}
+            observationScope={effectiveResourceRuntimeMonitoringObservationScope}
+            usage={effectiveResourceRuntimeUsage}
+            loading={effectiveResourceRuntimeUsageLoading}
+            error={effectiveResourceRuntimeUsageError}
+            retainedSamples={effectiveResourceRuntimeMonitoringSamples}
+            retainedSamplesLoading={showResourceServerRuntimeFallback
+              ? resourceFallbackServerRuntimeMonitoringSamplesQuery.isPending
+              : resourceRuntimeMonitoringSamplesQuery.isPending}
+            retainedSamplesError={effectiveResourceRuntimeMonitoringSamplesError}
+            rollup={effectiveResourceRuntimeMonitoringRollup}
+            rollupLoading={showResourceServerRuntimeFallback
+              ? resourceFallbackServerRuntimeMonitoringRollupQuery.isPending
+              : resourceRuntimeMonitoringRollupQuery.isPending}
+            rollupError={effectiveResourceRuntimeMonitoringRollupError}
             thresholds={resourceRuntimeMonitoringThresholds}
             thresholdsLoading={resourceRuntimeMonitoringThresholdsQuery.isPending}
             thresholdsError={resourceRuntimeMonitoringThresholdsError}
