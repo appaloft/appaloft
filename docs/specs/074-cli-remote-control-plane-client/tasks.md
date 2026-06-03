@@ -83,8 +83,8 @@ Implemented bridge:
 - [x] Ensure docs explain that login is not adoption, state upload, or `deployments.create`
   enrichment.
 - [x] Ensure docs explain that `appaloft login` defaults to `https://app.appaloft.com`, prints
-  `verificationUriComplete` and the user code, and writes the profile only after browser
-  authorization, exchange, and current-context verification.
+  `verificationUriComplete` and the user code, waits for explicit Enter before browser opening, and
+  writes the profile only after browser authorization, exchange, and current-context verification.
 - [ ] Update release-note input when the Code Round ships.
 
 Docs Round outcome for this Code Round: public docs coverage is active under

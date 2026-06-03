@@ -1,3 +1,4 @@
+import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
@@ -15,6 +16,7 @@ import {
 
 export interface StandaloneControlPlaneCliInput {
   readonly argv?: readonly string[];
+  readonly confirmOpenBrowser?: CliControlPlaneDependencies["confirmOpenBrowser"];
   readonly env?: CliControlPlaneEnvironment;
   readonly fetch?: AppaloftSdkFetch;
   readonly monotonicNow?: () => number;
@@ -137,6 +139,7 @@ function renderError(stderr: Pick<NodeJS.WriteStream, "write">, error: DomainErr
 function deps(input: StandaloneControlPlaneCliInput): CliControlPlaneDependencies {
   return {
     ...(input.env ? { env: input.env } : {}),
+    ...(input.confirmOpenBrowser ? { confirmOpenBrowser: input.confirmOpenBrowser } : {}),
     ...(input.fetch ? { fetch: input.fetch } : {}),
     ...(input.monotonicNow ? { monotonicNow: input.monotonicNow } : {}),
     ...(input.store ? { store: input.store } : {}),
@@ -145,6 +148,23 @@ function deps(input: StandaloneControlPlaneCliInput): CliControlPlaneDependencie
     ...(input.openBrowser ? { openBrowser: input.openBrowser } : {}),
     ...(input.sleep ? { sleep: input.sleep } : {}),
   };
+}
+
+async function confirmBrowserOpen(): Promise<boolean> {
+  const readline = createInterface({
+    input: process.stdin,
+    output: process.stderr,
+  });
+  try {
+    await readline.question("");
+    return true;
+  } finally {
+    readline.close();
+  }
+}
+
+function bold(value: string): string {
+  return `\u001b[1m${value}\u001b[22m`;
 }
 
 function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
@@ -174,15 +194,21 @@ function renderLoginSession(
   stderr: Pick<NodeJS.WriteStream, "write">,
   session: Parameters<NonNullable<CliControlPlaneDependencies["onLoginSession"]>>[0],
 ): void {
-  const browserLine = session.openedBrowser
-    ? "Opened the Appaloft CLI login page in your browser."
-    : "Open this Appaloft CLI login URL in a signed-in browser.";
+  const browserLine = session.browserOpenRequiresConfirmation
+    ? "Press Enter to open the Appaloft CLI login page in your browser."
+    : session.openedBrowser
+      ? "Opened the Appaloft CLI login page in your browser."
+      : "Open this Appaloft CLI login URL in a signed-in browser.";
   const fallbackLine = session.openBrowserFailed
     ? "\nBrowser launch failed, use this URL manually."
     : "";
+  const codeLine = `Code: ${bold(session.userCode)}`;
+  const matchLine = session.browserOpenRequiresConfirmation
+    ? "\nAfter the browser opens, confirm that the page shows the same code."
+    : "";
 
   stderr.write(
-    `${browserLine}${fallbackLine}\nURL: ${session.verificationUriComplete}\nCode: ${session.userCode}\n`,
+    `${browserLine}${fallbackLine}\nURL: ${session.verificationUriComplete}\n${codeLine}${matchLine}\n`,
   );
 }
 
@@ -246,6 +272,7 @@ async function handleLogin(
           ...input,
           onLoginSession:
             input.onLoginSession ?? ((session) => renderLoginSession(stderr, session)),
+          confirmOpenBrowser: input.confirmOpenBrowser ?? confirmBrowserOpen,
         }),
       ),
       input,

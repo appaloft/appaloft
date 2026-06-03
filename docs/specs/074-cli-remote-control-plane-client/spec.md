@@ -82,8 +82,8 @@ Login must:
 - make the new profile active only after profile write succeeds;
 - print sanitized profile, URL origin, API version, selected mode, and current organization/user
   summary when available.
-- open the browser to the selected Cloud login URL for interactive Cloud login unless `--no-browser`,
-  `APPALOFT_CLI_OPEN_BROWSER=false`, or CI disables browser opening.
+- print the selected Cloud login URL and user code, then wait for explicit Enter before opening the
+  browser unless `--no-browser`, `APPALOFT_CLI_OPEN_BROWSER=false`, or CI disables browser opening.
 
 Login must not:
 
@@ -100,10 +100,11 @@ The implemented auth acquisition mechanisms are:
 - neutral CLI browser auth-session exchange against the selected control plane for human login.
 
 Browser auth-session exchange creates a short-lived session, prints `verificationUriComplete` and
-the user code, opens the browser when allowed, polls until the session is authorized, exchanges the
-authorized session for control-plane credential material, verifies current organization context,
-and writes the profile only after that verification succeeds. If the selected control plane does
-not support the exchange contract, login fails with structured `control_plane_auth_unsupported`.
+the user code, waits for explicit Enter before opening the browser when browser opening is allowed,
+polls until the session is authorized, exchanges the authorized session for control-plane credential
+material, verifies current organization context, and writes the profile only after that verification
+succeeds. If the selected control plane does not support the exchange contract, login fails with
+structured `control_plane_auth_unsupported`.
 
 ### Logout
 
@@ -312,7 +313,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-009 | Profile store secrets stay local | A command is run from a repository with `appaloft.yml` | The CLI reads/writes profile data | No token, database URL, SSH key, credential id, tenant/org secret identity, or raw secret value is written to committed config or diagnostics. |
 | CLI-RCPC-SPEC-010 | Cloud login has a default endpoint | No explicit `--url` is supplied | The operator runs `appaloft login` or `appaloft auth login` | The CLI selects `https://app.appaloft.com`, derives the `cloud` profile name, and uses either trusted env credentials for noninteractive automation or the neutral browser auth-session exchange for human login. |
 | CLI-RCPC-SPEC-011 | Explicit Cloud dispatch can use the default endpoint | No profile exists but trusted local Cloud credential input exists | The operator runs a remote-capable command with `--control-plane-mode cloud` and no URL | The CLI builds an ephemeral `cloud` target for `https://app.appaloft.com`, does not write a profile, and fails before local mutation if auth or handshake fails. |
-| CLI-RCPC-SPEC-012 | Browser auth session completes login | No local credential is present and the selected control plane supports CLI auth exchange | The operator runs `appaloft login` | The CLI creates an auth session, prints `verificationUriComplete` and the user code, opens the browser unless disabled, polls pending states, exchanges only after authorization, verifies current context, writes the active profile, and never prints raw credential material. |
+| CLI-RCPC-SPEC-012 | Browser auth session completes login | No local credential is present and the selected control plane supports CLI auth exchange | The operator runs `appaloft login` | The CLI creates an auth session, prints `verificationUriComplete` and the user code, waits for explicit Enter before opening the browser unless disabled, polls pending states, exchanges only after authorization, verifies current context, writes the active profile, and never prints raw credential material. |
 | CLI-RCPC-SPEC-013 | Browser auth session failure writes no profile | The auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current context verification fails | The operator runs login | The CLI returns a structured auth error, attempts cancellation on interruption, and does not create, update, or activate a profile. |
 | CLI-RCPC-SPEC-014 | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local credential is present | The operator runs `appaloft login --url <self-hosted-url>` | The CLI uses the same neutral auth-session contract against that endpoint, or returns `control_plane_auth_unsupported` when the endpoint does not support it. |
 
