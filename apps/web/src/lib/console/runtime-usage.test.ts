@@ -13,6 +13,7 @@ import {
   formatRuntimeMonitoringPercent,
   formatRuntimeUsageBytes,
   latestRuntimeMonitoringRollupValue,
+  mergeRuntimeMonitoringSamples,
   retainedRuntimeMonitoringSamples,
   runtimeMonitoringDeploymentInObservationWindow,
   runtimeMonitoringDeploymentMarkerItems,
@@ -389,6 +390,33 @@ describe("runtime usage console readback", () => {
       ),
     ).toEqual([sample]);
     expect(runtimeMonitoringSparklinePoints([0, 50, 100])).toBe("0.0,48.0 80.0,24.0 160.0,0.0");
+    expect(
+      mergeRuntimeMonitoringSamples(
+        [
+          {
+            observedAt: "2026-05-13T00:00:00.000Z",
+            cpuLoadPercent: 1,
+            memoryPercent: 2,
+            diskPercent: 3,
+          },
+          {
+            observedAt: "2026-05-13T00:00:01.000Z",
+            cpuLoadPercent: 4,
+            memoryPercent: 5,
+            diskPercent: 6,
+          },
+        ],
+        [sample],
+      ),
+    ).toEqual([
+      {
+        observedAt: "2026-05-13T00:00:00.000Z",
+        cpuLoadPercent: 1,
+        memoryPercent: 2,
+        diskPercent: 3,
+      },
+      sample,
+    ]);
   });
 
   test("[RT-MON-007][RT-MON-008] maps retained samples and threshold state for the monitor panel", () => {

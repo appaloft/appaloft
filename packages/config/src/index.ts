@@ -148,6 +148,7 @@ export interface AppConfig {
   githubWebhookSecret?: string;
   githubPreviewFeedbackToken?: string;
   httpHost: string;
+  httpIdleTimeoutSeconds?: number;
   httpPort: number;
   webOrigin: string;
   resourceAccessFailureRendererUrl?: string;
@@ -989,6 +990,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       : {}),
     httpHost:
       source.flags?.httpHost ?? env.APPALOFT_HTTP_HOST ?? fileConfig.httpHost ?? defaults.httpHost,
+    ...(source.flags?.httpIdleTimeoutSeconds ||
+    env.APPALOFT_HTTP_IDLE_TIMEOUT_SECONDS ||
+    fileConfig.httpIdleTimeoutSeconds
+      ? {
+          httpIdleTimeoutSeconds:
+            source.flags?.httpIdleTimeoutSeconds ??
+            parsePositiveInteger(env.APPALOFT_HTTP_IDLE_TIMEOUT_SECONDS) ??
+            fileConfig.httpIdleTimeoutSeconds,
+        }
+      : {}),
     httpPort: Number(
       source.flags?.httpPort ?? env.APPALOFT_HTTP_PORT ?? fileConfig.httpPort ?? defaults.httpPort,
     ),

@@ -29,12 +29,16 @@
     description,
     disabled = false,
     autoOpen = true,
+    fallbackHref = "",
+    fallbackLabel = "",
   }: {
     scope: TerminalScope;
     title?: string;
     description?: string;
     disabled?: boolean;
     autoOpen?: boolean;
+    fallbackHref?: string;
+    fallbackLabel?: string;
   } = $props();
 
   let terminalElement = $state<HTMLDivElement | null>(null);
@@ -99,6 +103,18 @@
     const url = new URL(attachPath, API_BASE);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     return url.toString();
+  }
+
+  function readTerminalErrorMessage(error: unknown): string {
+    const message = readErrorMessage(error);
+    if (
+      message.includes("Deployment workspace metadata is not available") ||
+      message.includes("Resource terminal session requires an observable deployment workspace")
+    ) {
+      return $t(i18nKeys.console.terminal.workspaceUnavailable);
+    }
+
+    return message;
   }
 
   function sendResize(): void {
@@ -255,7 +271,7 @@
       };
     } catch (error) {
       status = "failed";
-      errorMessage = readErrorMessage(error);
+      errorMessage = readTerminalErrorMessage(error);
     }
   }
 
@@ -381,9 +397,14 @@
   </div>
 
   {#if errorMessage}
-    <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-      {errorMessage}
-    </p>
+    <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+      <p class="text-destructive">{errorMessage}</p>
+      {#if fallbackHref}
+        <Button class="mt-2" href={fallbackHref} size="sm" variant="outline">
+          {fallbackLabel || $t(i18nKeys.common.actions.openTerminal)}
+        </Button>
+      {/if}
+    </div>
   {/if}
 
   {#if descriptor?.workingDirectory}

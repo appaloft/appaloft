@@ -10,6 +10,7 @@
   import * as Table from "$lib/components/ui/table";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
+    deploymentDetailHref,
     formatTime,
     latestResourceDeployment,
     resourceDetailHref,
@@ -48,6 +49,10 @@
   function accessUrl(resource: ResourceSummary): string {
     return selectCurrentResourceAccessRoute(resource.accessSummary)?.route.url ?? "";
   }
+
+  function resourceDeployments(resource: ResourceSummary): DeploymentSummary[] {
+    return deployments.filter((deployment) => deployment.resourceId === resource.id);
+  }
 </script>
 
 {#if resources.length === 0}
@@ -77,6 +82,7 @@
       <Table.Body>
         {#each resources as resource (resource.id)}
           {@const latestDeployment = latestResourceDeployment(resource, deployments)}
+          {@const childDeployments = resourceDeployments(resource)}
           {@const currentAccessUrl = accessUrl(resource)}
           <Table.Row class="group">
             <Table.Cell class="max-w-80">
@@ -101,8 +107,18 @@
             {/if}
             <Table.Cell class="max-w-48">
               {#if latestDeployment}
-                <a href={resourceDetailHref(resource)} class="block truncate text-sm underline-offset-4 hover:underline">
-                  {formatTime(latestDeployment.createdAt)}
+                <a
+                  href={deploymentDetailHref(latestDeployment)}
+                  class="block truncate text-sm underline-offset-4 hover:underline"
+                >
+                  {latestDeployment.runtimePlan.source.displayName}
+                </a>
+                <a
+                  href={`${resourceDetailHref(resource)}?tab=deployments`}
+                  class="mt-1 block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  {formatTime(latestDeployment.createdAt)} · {childDeployments.length}
+                  {$t(i18nKeys.common.domain.deployments)}
                 </a>
               {:else}
                 <span class="text-muted-foreground">

@@ -215,6 +215,7 @@
     | "health"
     | "proxy"
     | "diagnostics";
+  type ResourceSettingsNavigationSection = Exclude<ResourceSettingsSection, "domains">;
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = [
@@ -236,12 +237,11 @@
     "configuration",
     "storage",
     "dependencies",
-    "domains",
     "usage",
     "health",
     "proxy",
     "diagnostics",
-  ] as const;
+  ] as const satisfies readonly ResourceSettingsNavigationSection[];
 
   const {
     projectsQuery,
@@ -3827,6 +3827,10 @@
     return resourceNewDeploymentHref(resource);
   }
 
+  function serverTerminalHref(serverId: string): string {
+    return `/servers/${encodeURIComponent(serverId)}?tab=terminal`;
+  }
+
   function parseResourceDetailTab(value: string | null): ResourceDetailTab {
     return resourceDetailTabs.includes(value as ResourceDetailTab)
       ? (value as ResourceDetailTab)
@@ -3834,7 +3838,7 @@
   }
 
   function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
-    return resourceSettingsSections.includes(value as ResourceSettingsSection)
+    return resourceSettingsSections.includes(value as ResourceSettingsNavigationSection)
       ? (value as ResourceSettingsSection)
       : "profile";
   }
@@ -9835,6 +9839,8 @@
               title={$t(i18nKeys.console.terminal.resourceTitle)}
               description={$t(i18nKeys.console.terminal.resourceDescription)}
               disabled={resourceDeployments.length === 0}
+              fallbackHref={latestDeployment?.serverId ? serverTerminalHref(latestDeployment.serverId) : ""}
+              fallbackLabel={$t(i18nKeys.console.terminal.serverTitle)}
               scope={{
                 kind: "resource",
                 resourceId: resource.id,

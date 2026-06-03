@@ -39,6 +39,7 @@
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries, defaultConsoleListLimit } from "$lib/console/queries";
+  import { serverProviderDisplayLabel } from "$lib/console/server-registration";
   import {
     isSshCredentialDeleteConfirmationValid,
     resolveSshCredentialDeleteReadiness,
@@ -555,7 +556,9 @@
               <div class="min-w-0 space-y-1 text-sm text-muted-foreground">
                 <span class="inline-flex min-w-0 items-center gap-2">
                   <Network class="size-3.5 shrink-0" />
-                  {server.providerKey}
+                  <span class="truncate" title={server.providerKey}>
+                    {serverProviderDisplayLabel(server.providerKey, $t(i18nKeys.common.domain.server))}
+                  </span>
                 </span>
               </div>
 
@@ -571,12 +574,7 @@
                   <Terminal class="size-3.5" />
                   {$t(i18nKeys.common.actions.openTerminal)}
                 </Button>
-                <Button
-                  class="console-inline-action"
-                  href={serverDetailHref(server.id)}
-                  size="sm"
-                  variant="ghost"
-                >
+                <Button href={serverDetailHref(server.id)} size="sm" variant="outline">
                   {$t(i18nKeys.common.actions.viewDetails)}
                   <ArrowRight class="size-4" />
                 </Button>
