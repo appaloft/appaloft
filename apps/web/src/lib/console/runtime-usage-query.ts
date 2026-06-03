@@ -32,8 +32,8 @@ export function runtimeUsageQueryOptions(scope: RuntimeUsageScope, enabled: bool
         includeWarnings: true,
       }),
     enabled,
-    staleTime: 5_000,
-    refetchInterval: 10_000,
+    staleTime: 2_000,
+    refetchInterval: 5_000,
   });
 }
 
@@ -48,8 +48,8 @@ export function runtimeMonitoringSamplesQueryOptions(scope: RuntimeUsageScope, e
         limit: 60,
       }),
     enabled,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   });
 }
 
@@ -65,8 +65,8 @@ export function runtimeMonitoringRollupQueryOptions(scope: RuntimeUsageScope, en
         includeDeploymentMarkers: true,
       }),
     enabled,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   });
 }
 

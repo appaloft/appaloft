@@ -58,6 +58,7 @@
     runtimeMonitoringThresholdsQueryOptions,
     runtimeUsageQueryOptions,
   } from "$lib/console/runtime-usage-query";
+  import { serverProviderDisplayLabel } from "$lib/console/server-registration";
   import {
     formatRuntimeUsageBytes,
     runtimeMonitoringDeploymentInObservationWindow,
@@ -959,7 +960,9 @@
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
               <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
-              <Badge variant="secondary">{server.providerKey}</Badge>
+              <Badge variant="secondary" title={server.providerKey}>
+                {serverProviderDisplayLabel(server.providerKey, $t(i18nKeys.common.domain.server))}
+              </Badge>
               <Badge variant={serverLifecycleVariant(server.lifecycleStatus)}>
                 {serverLifecycleLabel(server.lifecycleStatus)}
               </Badge>
@@ -1021,7 +1024,9 @@
               <Network class="size-4" />
               {$t(i18nKeys.common.domain.provider)}
             </p>
-            <p class="mt-2 truncate font-semibold">{server.providerKey}</p>
+            <p class="mt-2 truncate font-semibold" title={server.providerKey}>
+              {serverProviderDisplayLabel(server.providerKey, $t(i18nKeys.common.domain.server))}
+            </p>
           </div>
           <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -1063,6 +1068,20 @@
                   : $t(i18nKeys.common.status.notConfigured)}
               </Badge>
             </div>
+            {#if server.edgeProxy?.status === "failed"}
+              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                {$t(i18nKeys.console.servers.edgeProxyFailedHint)}
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onclick={testConnectivity} disabled={connectivityMutation.isPending}>
+                  <Activity class="size-3.5" />
+                  {$t(i18nKeys.common.actions.testConnectivity)}
+                </Button>
+                <Button size="sm" variant="outline" href={serverTabHref("proxy-access")}>
+                  {$t(i18nKeys.console.servers.proxyAccessTab)}
+                </Button>
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -1494,7 +1513,10 @@
                           <span class="min-w-0">
                             <span class="block truncate font-medium">{usageServer.serverName}</span>
                             <span class="block truncate text-xs text-muted-foreground">
-                              {usageServer.providerKey} · {usageServer.host}
+                              {serverProviderDisplayLabel(
+                                usageServer.providerKey,
+                                $t(i18nKeys.common.domain.server),
+                              )} · {usageServer.host}
                               {#if usageServer.username}
                                 · {usageServer.username}
                               {/if}
@@ -1636,6 +1658,17 @@
               </Button>
             </div>
           </form>
+
+          {#if server.edgeProxy?.status === "failed"}
+            <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p class="font-medium text-destructive">
+                {server.edgeProxy.kind} · {edgeProxyStatusLabel(server.edgeProxy.status)}
+              </p>
+              <p class="mt-1 leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.edgeProxyFailedHint)}
+              </p>
+            </div>
+          {/if}
 
           {#if edgeProxyFeedback}
             <div

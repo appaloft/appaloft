@@ -711,7 +711,10 @@ export const enUS = {
       applyingUpgrade: "Updating",
       checkForUpdates: "Check updates",
       checkingForUpdates: "Checking",
+      cloudCommitShaLabel: "Cloud repo commit SHA",
+      cloudDatabaseUrlLabel: "Cloud DB URL",
       commitShaLabel: "Git commit SHA",
+      databaseTitle: "Database connection",
       guidanceBody:
         "Install, console-domain changes, and GitHub Actions connection details live here so they do not compete with day-to-day instance status.",
       guidanceTitle: "Install and connection guidance",
@@ -737,10 +740,15 @@ export const enUS = {
       proxyTitle: "Managed proxy",
       proxyBody:
         "The installer creates the resident Traefik edge used by the console bootstrap route and later project routes.",
+      publicAppaloftCommitShaLabel: "Public Appaloft commit SHA",
+      publicDatabaseUrlLabel: "Public DB URL",
       rerunBody:
         "Change the console domain by rerunning the installer with the new domain; the operation is idempotent and keeps the existing database volume.",
       rerunTitle: "Change the console domain",
       refreshDoctor: "Refresh doctor",
+      runtimeStatusGeneratedAtLabel: "Status generated at",
+      sourceTitle: "Source version",
+      supabaseBranchLabel: "Supabase branch",
       targetVersionLabel: "Target version",
       unknownUpdateBadge: "Unknown",
       updateAvailableBadge: "Update available",
@@ -1043,6 +1051,8 @@ export const enUS = {
       startHint: "Open a session to start sending commands.",
       title: "Terminal",
       workspace: "Workspace",
+      workspaceUnavailable:
+        "Resource terminal needs a successful deployment with workspace metadata. Pick a deployment that recorded its workspace, redeploy the resource, or use the server terminal.",
     },
     projects: {
       activeProjects: "With deployments",
@@ -2282,6 +2292,8 @@ export const enUS = {
       edgeProxyConfigured: "Edge proxy intent saved",
       edgeProxyDescription:
         "Future generated access and custom-domain routes use this desired proxy kind. Existing route snapshots stay unchanged.",
+      edgeProxyFailedHint:
+        "This is the proxy readiness state saved by the control plane. Failed usually means the last proxy install, startup, or probe did not pass; test connectivity first, then resave the proxy configuration if needed.",
       edgeProxyKindLabel: "Edge proxy kind",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",

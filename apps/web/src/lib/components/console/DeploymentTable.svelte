@@ -19,6 +19,7 @@
     findResource,
     findServer,
     formatTime,
+    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -110,7 +111,13 @@
           {/if}
           {#if showResource}
             <Table.Cell class="max-w-44 truncate">
-              {resource?.name ?? deployment.resourceId}
+              {#if resource}
+                <a href={resourceDetailHref(resource)} class="underline-offset-4 hover:underline">
+                  {resource.name}
+                </a>
+              {:else}
+                {deployment.resourceId}
+              {/if}
             </Table.Cell>
           {/if}
           {#if showServer}

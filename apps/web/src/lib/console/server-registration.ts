@@ -14,6 +14,10 @@ export const defaultServerCredentialKindOptions = [
   "local-ssh-agent",
 ] as const satisfies readonly ServerCredentialKind[];
 
+export function serverProviderDisplayLabel(providerKey: string, serverLabel: string): string {
+  return providerKey === sshServerProviderKey ? `SSH ${serverLabel}` : providerKey;
+}
+
 export type ServerRegistrationDraft = {
   name: string;
   host: string;

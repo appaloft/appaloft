@@ -26,6 +26,7 @@
     buildRuntimeMonitoringThresholdConfigureInput,
     formatRuntimeMonitoringPercent,
     latestRuntimeMonitoringRollupValue,
+    mergeRuntimeMonitoringSamples,
     retainedRuntimeMonitoringSamples,
     runtimeMonitoringDeploymentMarkerItems,
     runtimeMonitoringObservationHref,
@@ -114,7 +115,7 @@
 
   const latestSample = $derived(samples.at(-1) ?? null);
   const retainedChartSamples = $derived(retainedRuntimeMonitoringSamples(retainedSamples));
-  const chartSamples = $derived(retainedChartSamples.length > 0 ? retainedChartSamples : samples);
+  const chartSamples = $derived(mergeRuntimeMonitoringSamples(retainedChartSamples, samples));
   const latestChartSample = $derived(chartSamples.at(-1) ?? latestSample);
   const rollupSummary = $derived(runtimeMonitoringRollupSummary(rollup));
   const deploymentMarkerItems = $derived(runtimeMonitoringDeploymentMarkerItems(rollup));
@@ -167,19 +168,19 @@
       key: "cpu",
       label: $t(i18nKeys.console.runtimeUsage.cpu),
       value: formatRuntimeMonitoringPercent(latestSignalValue("cpu", latestChartSample?.cpuLoadPercent)),
-      points: runtimeMonitoringSparklinePoints(signalValues("cpu")),
+      points: runtimeMonitoringSparklinePoints(signalValues("cpu"), 240, 96),
     },
     {
       key: "memory",
       label: $t(i18nKeys.console.runtimeUsage.memory),
       value: formatRuntimeMonitoringPercent(latestSignalValue("memory", latestChartSample?.memoryPercent)),
-      points: runtimeMonitoringSparklinePoints(signalValues("memory")),
+      points: runtimeMonitoringSparklinePoints(signalValues("memory"), 240, 96),
     },
     {
       key: "disk",
       label: $t(i18nKeys.console.runtimeUsage.disk),
       value: formatRuntimeMonitoringPercent(latestSignalValue("disk", latestChartSample?.diskPercent)),
-      points: runtimeMonitoringSparklinePoints(signalValues("disk")),
+      points: runtimeMonitoringSparklinePoints(signalValues("disk"), 240, 96),
     },
   ]);
 
@@ -342,37 +343,45 @@
       </div>
     </div>
 
-    <div class="mt-4 grid gap-3 md:grid-cols-3">
+    <div class="mt-4 grid gap-3 lg:grid-cols-3">
       {#each liveSignals as signal (signal.key)}
-        <div class="rounded-md bg-muted/25 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {signal.label}
-            </p>
-            <p class="text-sm font-semibold">
+        <article class="rounded-md border bg-muted/20 p-3">
+          <div class="space-y-1">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{signal.label}</p>
+            <p class="text-xl font-semibold leading-none">
               {signal.value ?? $t(i18nKeys.console.runtimeUsage.unavailable)}
             </p>
           </div>
           <svg
-            class="mt-3 h-12 w-full overflow-visible"
-            viewBox="0 0 160 48"
+            class="mt-4 h-24 w-full overflow-visible"
+            viewBox="0 0 240 96"
             role="img"
             aria-label={signal.label}
+            preserveAspectRatio="none"
           >
-            <line x1="0" y1="48" x2="160" y2="48" class="stroke-border" stroke-width="1" />
+            <line x1="0" y1="96" x2="240" y2="96" class="stroke-border" stroke-width="1" />
+            <line x1="0" y1="48" x2="240" y2="48" class="stroke-border/70" stroke-width="1" stroke-dasharray="3 5" />
             {#if signal.points}
               <polyline
                 points={signal.points}
                 class="fill-none stroke-foreground"
-                stroke-width="2"
+                stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
               />
             {:else}
-              <line x1="0" y1="24" x2="160" y2="24" class="stroke-muted-foreground/40" stroke-dasharray="4 4" />
+              <line
+                x1="0"
+                y1="48"
+                x2="240"
+                y2="48"
+                class="stroke-muted-foreground/40"
+                stroke-dasharray="4 4"
+              />
             {/if}
           </svg>
-        </div>
+        </article>
       {/each}
     </div>
 

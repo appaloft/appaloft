@@ -175,6 +175,22 @@ export function appendRuntimeMonitoringSample(
   return [...withoutDuplicate, sample].slice(-limit);
 }
 
+export function mergeRuntimeMonitoringSamples(
+  retainedSamples: RuntimeMonitoringSample[],
+  liveSamples: RuntimeMonitoringSample[],
+  limit = 60,
+): RuntimeMonitoringSample[] {
+  const samplesByObservedAt = new Map<string, RuntimeMonitoringSample>();
+
+  for (const sample of [...retainedSamples, ...liveSamples]) {
+    samplesByObservedAt.set(sample.observedAt, sample);
+  }
+
+  return Array.from(samplesByObservedAt.values())
+    .sort((left, right) => Date.parse(left.observedAt) - Date.parse(right.observedAt))
+    .slice(-limit);
+}
+
 export function formatRuntimeMonitoringPercent(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) {
     return null;

@@ -542,9 +542,13 @@
     }
   }
 
-  @media (min-width: 1380px) {
+  @media (min-width: 1920px) {
     .nothing-project-row {
-      grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.8fr) minmax(17rem, 0.72fr) auto;
+      grid-template-columns:
+        minmax(17rem, 1.15fr)
+        minmax(15rem, 0.8fr)
+        minmax(15rem, 0.72fr)
+        auto;
     }
   }
 
@@ -769,7 +773,7 @@
       transform var(--nothing-motion-duration) var(--nothing-motion-ease);
   }
 
-  @media (min-width: 1380px) {
+  @media (min-width: 1920px) {
     .nothing-project-open {
       justify-self: end;
     }

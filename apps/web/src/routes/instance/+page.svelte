@@ -46,11 +46,37 @@
     detail: string;
   };
   type InstanceSection = "overview" | "maintenance" | "sessions" | "guidance";
+  type RuntimeStatusResponse = {
+    schemaVersion: "cloud-dev-runtime.status/v1";
+    generatedAt: string;
+    database: {
+      driver: string;
+      publicDatabaseUrl: string;
+      cloudDatabaseUrl: string;
+      supabaseBranchName?: string;
+      supabaseProjectRef?: string;
+    };
+    git: {
+      packageVersion?: string;
+      cloudCommitSha?: string;
+      publicAppaloftCommitSha?: string;
+    };
+  };
 
   const currentOrigin = $derived(page.url.origin);
   let upgradeFeedback = $state<UpgradeFeedback | null>(null);
   let terminalSessionFeedback = $state<TerminalSessionFeedback | null>(null);
   const activeSection = $derived(parseInstanceSection(page.url.searchParams.get("section")));
+  const runtimeStatusQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["bootstrap", "runtime-status"],
+      queryFn: () => request<RuntimeStatusResponse>("/api/bootstrap/runtime/status"),
+      enabled: browser && activeSection === "overview",
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      retry: 0,
+    }),
+  );
   const instanceUpgradeQuery = createQuery(() =>
     queryOptions({
       queryKey: ["instance-upgrade", "check"],
@@ -165,6 +191,14 @@
   );
   const upgradeCommand = $derived(
     instanceUpgradeQuery.data?.upgradeCommand ?? fallbackUpgradeCommand,
+  );
+  const currentVersion = $derived(
+    runtimeStatusQuery.data?.git.packageVersion ?? instanceUpgradeQuery.data?.currentVersion ?? "-",
+  );
+  const currentCommitSha = $derived(
+    runtimeStatusQuery.data?.git.cloudCommitSha ??
+      instanceUpgradeQuery.data?.currentCommitSha ??
+      $t(i18nKeys.console.instance.noCommitSha),
   );
   const canApplyUpgrade = $derived(
     Boolean(
@@ -422,7 +456,7 @@ server-config-deploy: true`);
                   {$t(i18nKeys.console.instance.currentVersionLabel)}
                 </p>
                 <p class="mt-1 break-all font-mono text-sm">
-                  {instanceUpgradeQuery.data?.currentVersion ?? "-"}
+                  {currentVersion}
                 </p>
               </div>
               <div class="rounded-md border bg-background p-4">
@@ -430,7 +464,7 @@ server-config-deploy: true`);
                   {$t(i18nKeys.console.instance.commitShaLabel)}
                 </p>
                 <p class="mt-1 break-all font-mono text-sm">
-                  {instanceUpgradeQuery.data?.currentCommitSha ?? $t(i18nKeys.console.instance.noCommitSha)}
+                  {currentCommitSha}
                 </p>
               </div>
               <div class="rounded-md border bg-background p-4">
@@ -456,6 +490,87 @@ server-config-deploy: true`);
                 <p class="mt-1 break-all font-mono text-sm">{currentOrigin}</p>
               </div>
             </div>
+
+            <div class="mt-5 grid gap-3 xl:grid-cols-2">
+              <div class="rounded-md border bg-background p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-sm font-medium">{$t(i18nKeys.console.instance.databaseTitle)}</p>
+                  <Badge variant="outline">
+                    {runtimeStatusQuery.data?.database.driver ?? $t(i18nKeys.common.status.loading)}
+                  </Badge>
+                </div>
+                <dl class="mt-4 space-y-3 text-sm">
+                  <div>
+                    <dt class="text-xs uppercase text-muted-foreground">
+                      {$t(i18nKeys.console.instance.publicDatabaseUrlLabel)}
+                    </dt>
+                    <dd class="mt-1 break-all font-mono">
+                      {runtimeStatusQuery.data?.database.publicDatabaseUrl ?? "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs uppercase text-muted-foreground">
+                      {$t(i18nKeys.console.instance.cloudDatabaseUrlLabel)}
+                    </dt>
+                    <dd class="mt-1 break-all font-mono">
+                      {runtimeStatusQuery.data?.database.cloudDatabaseUrl ?? "-"}
+                    </dd>
+                  </div>
+                  {#if runtimeStatusQuery.data?.database.supabaseBranchName || runtimeStatusQuery.data?.database.supabaseProjectRef}
+                    <div>
+                      <dt class="text-xs uppercase text-muted-foreground">
+                        {$t(i18nKeys.console.instance.supabaseBranchLabel)}
+                      </dt>
+                      <dd class="mt-1 break-all font-mono">
+                        {runtimeStatusQuery.data.database.supabaseBranchName ?? "-"}
+                        {#if runtimeStatusQuery.data.database.supabaseProjectRef}
+                          · {runtimeStatusQuery.data.database.supabaseProjectRef}
+                        {/if}
+                      </dd>
+                    </div>
+                  {/if}
+                </dl>
+              </div>
+
+              <div class="rounded-md border bg-background p-4">
+                <p class="text-sm font-medium">{$t(i18nKeys.console.instance.sourceTitle)}</p>
+                <dl class="mt-4 space-y-3 text-sm">
+                  <div>
+                    <dt class="text-xs uppercase text-muted-foreground">
+                      {$t(i18nKeys.console.instance.cloudCommitShaLabel)}
+                    </dt>
+                    <dd class="mt-1 break-all font-mono">
+                      {runtimeStatusQuery.data?.git.cloudCommitSha ?? $t(i18nKeys.console.instance.noCommitSha)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs uppercase text-muted-foreground">
+                      {$t(i18nKeys.console.instance.publicAppaloftCommitShaLabel)}
+                    </dt>
+                    <dd class="mt-1 break-all font-mono">
+                      {runtimeStatusQuery.data?.git.publicAppaloftCommitSha ??
+                        $t(i18nKeys.console.instance.noCommitSha)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs uppercase text-muted-foreground">
+                      {$t(i18nKeys.console.instance.runtimeStatusGeneratedAtLabel)}
+                    </dt>
+                    <dd class="mt-1 break-all font-mono">
+                      {runtimeStatusQuery.data?.generatedAt ?? "-"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            {#if runtimeStatusQuery.error}
+              <p
+                class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {readErrorMessage(runtimeStatusQuery.error)}
+              </p>
+            {/if}
 
             <div class="mt-5 rounded-md border bg-muted/20 p-4">
               <div class="flex items-start gap-3">
