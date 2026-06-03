@@ -129,6 +129,7 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("diagnosticsHref?: string");
     expect(monitorSource).toContain("capacityHref?: string");
     expect(monitorSource).toContain("cleanupHref?: string");
+    expect(monitorSource).toContain("observationScope?: RuntimeUsageScope");
     expect(monitorSource).toContain("runtimeMonitoringObservationHref");
     expect(monitorSource).toContain("href={observationLinks.logs}");
     expect(monitorSource).toContain("href={observationLinks.events}");
@@ -153,6 +154,9 @@ describe("runtime usage console readback", () => {
     expect(serverSource).toContain("serverRuntimeMonitoringObservationHandoff");
     expect(serverSource).toContain("serverDeploymentsInObservationWindow");
     expect(resourceSource).toContain("resourceRuntimeMonitoringObservationHandoff");
+    expect(resourceSource).toContain("showResourceServerRuntimeFallback");
+    expect(resourceSource).toContain("resourceFallbackServerRuntimeUsageQuery");
+    expect(resourceSource).toContain("resourceServerFallbackNotice");
     expect(resourceSource).toContain("resourceDeploymentsInObservationWindow");
     expect(resourceSource).toContain("runtimeLogsInObservationWindow");
     expect(resourceSource).toContain("storageRuntimeCleanupObservationHandoffKey");

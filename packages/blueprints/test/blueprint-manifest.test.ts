@@ -162,6 +162,7 @@ profiles:
       summary: "Blueprint dependency vocabulary smoke.",
       resources: [
         { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "mongodb", kind: "mongodb", label: "MongoDB" },
         { id: "mysql", kind: "mysql", label: "MySQL" },
         { id: "redis", kind: "redis", label: "Redis" },
         { id: "storage", kind: "object-storage", label: "Object storage" },
@@ -177,7 +178,15 @@ profiles:
             strategy: "container-image",
             image: "example/api:latest",
           },
-          usesResources: ["postgres", "mysql", "redis", "storage", "clickhouse", "opensearch"],
+          usesResources: [
+            "postgres",
+            "mongodb",
+            "mysql",
+            "redis",
+            "storage",
+            "clickhouse",
+            "opensearch",
+          ],
         },
       ],
       profiles: {

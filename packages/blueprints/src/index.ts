@@ -248,6 +248,7 @@ const blueprintResourceRequirementSchema = z
     id: slugSchema,
     kind: z.enum([
       "postgres",
+      "mongodb",
       "mysql",
       "redis",
       "volume",

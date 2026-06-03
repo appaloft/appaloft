@@ -22,7 +22,7 @@ second deployment engine.
 | Term | Meaning | Context | Compatibility aliases |
 | --- | --- | --- | --- |
 | BlueprintComponent | Deployable runtime unit inside a Blueprint. It usually maps to one Appaloft Resource and deployment path. | Blueprint format | component |
-| BlueprintResourceRequirement | External, managed, imported, or separately bound dependency requirement such as Postgres, Redis, MySQL, ClickHouse, object storage, OpenSearch, volume, or a shared capability. | Blueprint dependency resources | dependency resource |
+| BlueprintResourceRequirement | External, managed, imported, or separately bound dependency requirement such as Postgres, MongoDB, Redis, MySQL, ClickHouse, object storage, OpenSearch, volume, or a shared capability. | Blueprint dependency resources | dependency resource |
 | BlueprintComponentRelation | Directed relationship from one Blueprint component to another component in the same installation. | Blueprint component graph | component link |
 | Relation consumer | The `from` component. It consumes, depends on, waits for, or emits to the provider. | Component graph | dependent |
 | Relation provider | The `to` component. It provides the endpoint, readiness, service discovery target, or telemetry receiver. | Component graph | dependency |
@@ -142,7 +142,7 @@ Examples:
   telemetry relation to that component.
 - A shared tracing backend selected by the user is a dependency resource or capability binding, not
   a component relation target.
-- Postgres, Redis, MySQL, ClickHouse, object storage, OpenSearch, and ordinary volumes remain
+- Postgres, MongoDB, Redis, MySQL, ClickHouse, object storage, OpenSearch, and ordinary volumes remain
   dependency resources by default. They become components only when the Blueprint explicitly
   bundles a deployable database/cache/search service as part of the application topology.
 
