@@ -191,6 +191,43 @@ describe("Deployment", () => {
     });
   });
 
+  test("[DMBH-DEPLOY-002] fixes Docker image source version from runtime execution metadata", () => {
+    const digest = "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0";
+    const plan = runtimePlan().withSource(
+      SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("docker-image"),
+        locator: SourceLocator.rehydrate("ghcr.io/acme/api:latest"),
+        displayName: DisplayNameText.rehydrate("api"),
+        metadata: {
+          imageName: "ghcr.io/acme/api",
+          imageTag: "latest",
+        },
+      }),
+    );
+    const deployment = createDeployment({ runtimePlan: plan })._unsafeUnwrap();
+    deployment.markPlanning(StartedAt.rehydrate("2026-01-01T00:00:01.000Z"));
+    deployment.markPlanned(StartedAt.rehydrate("2026-01-01T00:00:02.000Z"));
+    deployment.start(StartedAt.rehydrate("2026-01-01T00:00:03.000Z"));
+
+    const result = ExecutionResult.rehydrate({
+      status: ExecutionStatusValue.rehydrate("succeeded"),
+      exitCode: ExitCode.rehydrate(0),
+      retryable: false,
+      logs: [],
+      metadata: { imageDigest: digest },
+    });
+    const applied = deployment.applyExecutionResult(
+      FinishedAt.rehydrate("2026-01-01T00:00:04.000Z"),
+      result,
+    );
+
+    expect(applied.isOk()).toBe(true);
+    const sourceVersion = deployment.toState().runtimePlan.source.version;
+    expect(sourceVersion?.isFixed()).toBe(true);
+    expect(sourceVersion?.reference.value).toBe("latest");
+    expect(sourceVersion?.fixedIdentifier?.value).toBe(digest);
+  });
+
   test("[CONTROL-PLANE-HANDSHAKE-017] answers whether a runtime plan realized an access route", () => {
     const plan = runtimePlan().withExecution(
       runtimePlan().execution.withAccessRoutes([

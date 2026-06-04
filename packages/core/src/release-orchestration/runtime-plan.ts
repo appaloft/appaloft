@@ -1269,6 +1269,13 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
     });
   }
 
+  withSource(source: SourceDescriptor): RuntimePlan {
+    return RuntimePlan.rehydrate({
+      ...this.state,
+      source,
+    });
+  }
+
   withExecutionMetadata(metadata: Record<string, string>): RuntimePlan {
     return this.withExecution(this.state.execution.withMetadata(metadata));
   }
