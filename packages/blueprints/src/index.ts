@@ -3170,6 +3170,7 @@ function fingerprint(value: unknown): string {
 function dependencyContractFingerprint(resource: BlueprintResourceRequirement): unknown {
   return {
     engine: { family: dependencyEngineFamily(resource), ...(resource.engine ?? {}) },
+    version: resource.version,
     outputs: defaultDependencyOutputs(resource),
     readiness: resource.readiness,
     provisioning: resource.provisioning,
