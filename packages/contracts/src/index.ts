@@ -15,6 +15,18 @@ export const dependencyResourceKinds = [
 
 export const dependencyResourceKindSchema = z.enum(dependencyResourceKinds);
 
+export const versionReferenceKinds = [
+  "branch",
+  "tag",
+  "commit-sha",
+  "image-tag",
+  "image-digest",
+  "content-digest",
+  "release",
+  "literal",
+  "unknown",
+] as const;
+
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),
   service: z.string(),
@@ -2458,6 +2470,8 @@ export const resourceDetailSourceProfileSchema = z.object({
   imageName: z.string().optional(),
   imageTag: z.string().optional(),
   imageDigest: z.string().optional(),
+  version: z.string().optional(),
+  versionKind: z.enum(versionReferenceKinds).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -2499,6 +2513,8 @@ export const resourceSourceBindingInputSchema = z.object({
   imageName: z.string().min(1).optional(),
   imageTag: z.string().min(1).optional(),
   imageDigest: z.string().min(1).optional(),
+  version: z.string().min(1).optional(),
+  versionKind: z.enum(versionReferenceKinds).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 

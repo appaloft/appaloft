@@ -17,6 +17,8 @@ The target domain vocabulary is:
 - `SourceDescriptor`: the normalized source fact used by runtime planning.
 - `ResourceSourceBinding`: durable reusable, source-kind-specific configuration owned by the
   resource lifecycle.
+- `VersionReference`: optional source-kind-specific version selection owned by
+  `ResourceSourceBinding`, governed by [ADR-081](./ADR-081-source-version-value-object-boundary.md).
 - `ResourceRuntimeProfile`: durable reusable build, start, and health defaults owned by the resource lifecycle.
 - `ResourceNetworkProfile`: durable reusable workload endpoint configuration, including the internal application listener port, governed by [ADR-015](./ADR-015-resource-network-profile.md).
 - `ResourceConfigOverrideSet`: durable reusable resource-scoped variable and secret overrides
@@ -24,6 +26,8 @@ The target domain vocabulary is:
 - `DefaultAccessDomainPolicy`: provider-neutral policy for generated default public access, governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md).
 - `RuntimePlanStrategy`: the planning strategy used to resolve a runtime plan from a source and runtime profile.
 - `RuntimePlanSnapshot`: the immutable resolved runtime plan persisted by the deployment attempt.
+- `Version`: the fixed or `unknown` source version captured by the runtime plan snapshot for one
+  deployment attempt, governed by [ADR-081](./ADR-081-source-version-value-object-boundary.md).
 - `RuntimeArtifactSnapshot`: the provider-neutral image or Compose artifact identity resolved for
   one v1 deployment attempt, governed by [ADR-021](./ADR-021-docker-oci-workload-substrate.md).
 

@@ -154,6 +154,8 @@ describe("Appaloft deployment config schema", () => {
         "source:",
         "  type: image",
         "  image: ghcr.io/acme/api:1.7.3",
+        "  version: 1.7.3",
+        "  versionKind: image-tag",
         "network:",
         "  internalPort: 8080",
       ].join("\n"),
@@ -165,6 +167,8 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.source).toEqual({
         type: "image",
         image: "ghcr.io/acme/api:1.7.3",
+        version: "1.7.3",
+        versionKind: "image-tag",
       });
     }
 
@@ -232,6 +236,17 @@ describe("Appaloft deployment config schema", () => {
       );
       expect(incompatibleStrategy.error.issues[0]?.path).toEqual(["runtime", "strategy"]);
     }
+
+    const incompatibleVersionKind = parseAppaloftDeploymentConfig({
+      source: {
+        type: "image",
+        image: "ghcr.io/acme/api:1.7.3",
+        version: "main",
+        versionKind: "branch",
+      },
+    });
+
+    expect(incompatibleVersionKind.success).toBe(false);
   });
 
   test("[CONFIG-FILE-PREVIEW-OVERLAY-001] accepts and applies PR preview profile overlays", () => {

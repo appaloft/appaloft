@@ -81,6 +81,7 @@ export * from "./operations/deployments/retry-deployment.use-case";
 export * from "./operations/deployments/rollback-deployment.use-case";
 export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/deployments/show-deployment.query-service";
+export * from "./operations/deployments/source-version-detector";
 export * from "./operations/deployments/stream-deployment-events.query-service";
 export * from "./operations/domain-bindings/check-domain-binding-delete-safety.query-service";
 export * from "./operations/domain-bindings/configure-domain-binding-route.use-case";

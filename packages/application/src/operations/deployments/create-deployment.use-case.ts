@@ -16,6 +16,7 @@ import {
   SourceDescriptor,
   safeTry,
   UpsertDeploymentSpec,
+  type VersionReference,
 } from "@appaloft/core";
 import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
@@ -49,6 +50,7 @@ import {
   type ServerAppliedRouteDesiredStateRecord,
   ServerAppliedRouteStateByTargetSpec,
   type SourceDetector,
+  type SourceVersionDetector,
 } from "../../ports";
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
@@ -73,10 +75,13 @@ import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolutio
 
 function createResourceSourceDescriptor(
   resource: Resource,
-): Result<{ source: SourceDescriptor; reasoning: string[] }> {
+): Result<{ source: SourceDescriptor; reasoning: string[]; requestedVersion?: VersionReference }> {
   return resource.createDeploymentSourceDescriptor().map((descriptor) => ({
     source: SourceDescriptor.rehydrate(descriptor.source),
     reasoning: descriptor.reasoning,
+    ...(descriptor.source.versionReference
+      ? { requestedVersion: descriptor.source.versionReference }
+      : {}),
   }));
 }
 
@@ -614,6 +619,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentOverlayPort?: DeploymentOverlayPort,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.sourceVersionDetector, { isOptional: true })
+    private readonly sourceVersionDetector?: SourceVersionDetector,
   ) {}
 
   private async persistDeployment(
@@ -769,6 +776,7 @@ export class CreateDeploymentUseCase {
       runtimePlanResolver,
       serverAppliedRouteStateRepository,
       sourceDetector,
+      sourceVersionDetector,
       operationGuardPort,
     } = this;
     const persistDeployment = this.persistDeployment.bind(this);
@@ -858,6 +866,32 @@ export class CreateDeploymentUseCase {
       if (shouldEnrichSourceFromDetector(resource)) {
         const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator);
         detected = yield* detectedResult;
+      }
+      if (sourceVersionDetector) {
+        const versionResult = await sourceVersionDetector.detect(context, {
+          source: detected.source,
+          ...(resourceSource.requestedVersion
+            ? { requestedVersion: resourceSource.requestedVersion }
+            : {}),
+        });
+        const sourceVersion = yield* versionResult;
+        if (resourceSource.requestedVersion && sourceVersion.version.isUnknown()) {
+          return err(
+            domainError.validation(
+              "Requested source version could not be resolved to a fixed version",
+              {
+                phase: "version-resolution",
+                sourceKind: detected.source.kind,
+                versionKind: resourceSource.requestedVersion.referenceKind,
+                version: resourceSource.requestedVersion.value,
+              },
+            ),
+          );
+        }
+        detected = {
+          source: detected.source.withVersion(sourceVersion.version),
+          reasoning: [...detected.reasoning, ...sourceVersion.reasoning],
+        };
       }
       reportDeploymentProgress(deploymentProgressReporter, context, {
         phase: "detect",

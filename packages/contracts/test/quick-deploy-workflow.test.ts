@@ -112,6 +112,8 @@ describe("quick deploy workflow", () => {
               displayName: "api",
               imageName: "ghcr.io/acme/api",
               imageDigest: "sha256:abc",
+              version: "1.2.3",
+              versionKind: "image-tag",
             },
           },
         },
@@ -124,6 +126,8 @@ describe("quick deploy workflow", () => {
             kind: "docker-image",
             locator: "ghcr.io/acme/api@sha256:abc",
             imageDigest: "sha256:abc",
+            version: "1.2.3",
+            versionKind: "image-tag",
           },
         });
         expect(findStep(steps, "deployments.create").input).toMatchObject({
@@ -173,6 +177,7 @@ describe("quick deploy workflow", () => {
             name: "Local",
             host: "127.0.0.1",
             providerKey: "local-shell",
+            targetKind: "single-server",
             proxyKind: "traefik",
           },
         },
@@ -1061,6 +1066,7 @@ describe("quick deploy workflow", () => {
             name: "Target",
             host: "127.0.0.1",
             providerKey: "local-shell",
+            targetKind: "single-server",
             proxyKind: "traefik",
           },
         },
@@ -1173,6 +1179,23 @@ describe("quick deploy workflow", () => {
       projectId: "proj_existing",
       environmentId: "env_existing",
       ...staticSiteResourceInput(),
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-016] source version reference validates through shared resources.create schema", () => {
+    const parsed = createResourceInputSchema.safeParse({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      ...resourceInput({
+        source: {
+          kind: "git-public",
+          locator: "https://example.com/app.git",
+          version: "main",
+          versionKind: "branch",
+        },
+      }),
     });
 
     expect(parsed.success).toBe(true);
@@ -1314,6 +1337,7 @@ describe("quick deploy workflow", () => {
             name: "Bad Target",
             host: "192.0.2.10",
             providerKey: "generic-ssh",
+            targetKind: "single-server",
             proxyKind: "traefik",
           },
         },
@@ -1332,6 +1356,7 @@ describe("quick deploy workflow", () => {
             name: "Target",
             host: "127.0.0.1",
             providerKey: "generic-ssh",
+            targetKind: "single-server",
             proxyKind: "traefik",
           },
           credential: {
@@ -1498,6 +1523,7 @@ function fullCreateInput(): QuickDeployWorkflowInput {
         name: "Local",
         host: "127.0.0.1",
         providerKey: "local-shell",
+        targetKind: "single-server",
         proxyKind: "traefik",
       },
       credential: {

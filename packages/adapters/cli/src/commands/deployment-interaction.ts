@@ -150,7 +150,9 @@ export interface DeploymentPromptSeed {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
-  sourceProfile?: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory">>;
+  sourceProfile?: Partial<
+    Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory" | "version" | "versionKind">
+  >;
   sourceFingerprint?: string;
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
@@ -415,7 +417,9 @@ export function sourceKindForDeploymentInput(
 export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
-  profile: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory">> = {},
+  profile: Partial<
+    Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory" | "version" | "versionKind">
+  > = {},
 ): ResourceSourceInput {
   return {
     kind: sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
@@ -424,6 +428,8 @@ export function sourceBindingForDeploymentInput(
     ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
     ...(profile.commitSha ? { commitSha: profile.commitSha } : {}),
     ...(profile.baseDirectory ? { baseDirectory: profile.baseDirectory } : {}),
+    ...(profile.version ? { version: profile.version } : {}),
+    ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
   };
 }
 
@@ -543,6 +549,8 @@ export function deploymentPromptSeedFromConfig(
       : {}),
     ...(!sourceIsImage && config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
     ...(!sourceIsImage && config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
+    ...(config.source?.version ? { version: config.source.version } : {}),
+    ...(config.source?.versionKind ? { versionKind: config.source.versionKind } : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
   const serverAppliedRoutes = config.access?.domains?.map((domain) => ({

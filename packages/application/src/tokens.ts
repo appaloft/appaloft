@@ -49,6 +49,7 @@ export const tokens = {
   runtimeTargetCapacityPruner: Symbol.for("appaloft.runtime_target_capacity_pruner"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
+  sourceVersionDetector: Symbol.for("appaloft.source_version_detector"),
   projectRepository: Symbol.for("appaloft.project_repository"),
   projectDeletionBlockerReader: Symbol.for("appaloft.project_deletion_blocker_reader"),
   serverRepository: Symbol.for("appaloft.server_repository"),

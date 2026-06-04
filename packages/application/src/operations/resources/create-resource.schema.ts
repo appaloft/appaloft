@@ -8,6 +8,7 @@ import {
   resourceServiceKinds,
   runtimePlanStrategies,
   sourceKinds,
+  versionReferenceKinds,
 } from "@appaloft/core";
 import { z } from "zod";
 
@@ -32,6 +33,8 @@ const createResourceSourceBindingInputBaseSchema = z.object({
   imageName: nonEmptyTrimmedString("Docker image name").optional(),
   imageTag: nonEmptyTrimmedString("Docker image tag").optional(),
   imageDigest: nonEmptyTrimmedString("Docker image digest").optional(),
+  version: nonEmptyTrimmedString("Source version").optional(),
+  versionKind: z.enum(versionReferenceKinds).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -50,6 +53,8 @@ export const remoteGitResourceSourceBindingExample = {
   locator: "https://github.com/acme/storefront.git",
   displayName: "Storefront",
   gitRef: "main",
+  version: "main",
+  versionKind: "branch",
   repositoryFullName: "acme/storefront",
   defaultBranch: "main",
 } satisfies z.input<typeof createResourceSourceBindingInputBaseSchema>;
@@ -61,6 +66,8 @@ export const dockerImageResourceSourceBindingExample = {
   imageName: "ghcr.io/acme/api",
   imageTag: "1.7.3",
   imageDigest: "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0",
+  version: "1.7.3",
+  versionKind: "image-tag",
 } satisfies z.input<typeof createResourceSourceBindingInputBaseSchema>;
 
 export const resourceSourceBindingExamples = [

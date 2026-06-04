@@ -6,6 +6,7 @@ import { type SshRemoteStateTarget } from "@appaloft/adapter-cli";
 import {
   FileSystemDeploymentConfigReader,
   FileSystemSourceDetector,
+  FileSystemSourceVersionDetector,
   FileSystemStaticArtifactPayloadReader,
   FileSystemStaticArtifactPublicationJournal,
   FileSystemStaticArtifactRouteProvider,
@@ -1511,6 +1512,9 @@ export function registerRuntimeDependencies(
 
   container.register(tokens.sourceDetector, {
     useFactory: instanceCachingFactory(() => new FileSystemSourceDetector()),
+  });
+  container.register(tokens.sourceVersionDetector, {
+    useFactory: instanceCachingFactory(() => new FileSystemSourceVersionDetector()),
   });
   container.register(tokens.deploymentConfigReader, {
     useFactory: instanceCachingFactory(() => new FileSystemDeploymentConfigReader()),

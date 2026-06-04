@@ -23,6 +23,8 @@ describe("Blueprint manifest schema", () => {
           runtime: {
             strategy: "container-image",
             image: "ghcr.io/appaloft/hello:latest",
+            version: "latest",
+            versionKind: "image-tag",
           },
           ports: [{ name: "http", containerPort: 3000 }],
           routes: [{ port: "http" }],
@@ -39,6 +41,8 @@ describe("Blueprint manifest schema", () => {
     if (result.ok) {
       expect(result.value.id).toBe("hello-service");
       expect(result.value.components[0]?.ports[0]?.protocol).toBe("http");
+      expect(result.value.components[0]?.runtime.version).toBe("latest");
+      expect(result.value.components[0]?.runtime.versionKind).toBe("image-tag");
     }
   });
 

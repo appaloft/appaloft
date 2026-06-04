@@ -52,6 +52,7 @@ import {
   sourceKinds,
   variableExposures,
   variableKinds,
+  versionReferenceKinds,
 } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
@@ -105,6 +106,10 @@ const sourceDefaultBranchOption = Options.text("default-branch").pipe(Options.op
 const sourceImageNameOption = Options.text("image-name").pipe(Options.optional);
 const sourceImageTagOption = Options.text("image-tag").pipe(Options.optional);
 const sourceImageDigestOption = Options.text("image-digest").pipe(Options.optional);
+const sourceVersionOption = Options.text("version").pipe(Options.optional);
+const sourceVersionKindOption = Options.choice("version-kind", versionReferenceKinds).pipe(
+  Options.optional,
+);
 const autoDeployModes = ["enable", "disable", "replace", "acknowledge-source-binding"] as const;
 const autoDeployTriggerKinds = ["git-push", "generic-signed-webhook"] as const;
 const autoDeployEventKinds = ["push", "tag"] as const;
@@ -1232,6 +1237,8 @@ const configureSourceCommand = EffectCommand.make(
     imageName: sourceImageNameOption,
     imageTag: sourceImageTagOption,
     imageDigest: sourceImageDigestOption,
+    version: sourceVersionOption,
+    versionKind: sourceVersionKindOption,
     json: jsonOption,
   },
   ({
@@ -1243,6 +1250,8 @@ const configureSourceCommand = EffectCommand.make(
     imageDigest,
     imageName,
     imageTag,
+    version,
+    versionKind,
     json,
     kind,
     locator,
@@ -1263,6 +1272,8 @@ const configureSourceCommand = EffectCommand.make(
     const imageNameValue = optionalValue(imageName);
     const imageTagValue = optionalValue(imageTag);
     const imageDigestValue = optionalValue(imageDigest);
+    const versionValue = optionalValue(version);
+    const versionKindValue = optionalValue(versionKind);
 
     return runCommand(
       ConfigureResourceSourceCommand.create({
@@ -1281,6 +1292,8 @@ const configureSourceCommand = EffectCommand.make(
           ...(imageNameValue ? { imageName: imageNameValue } : {}),
           ...(imageTagValue ? { imageTag: imageTagValue } : {}),
           ...(imageDigestValue ? { imageDigest: imageDigestValue } : {}),
+          ...(versionValue ? { version: versionValue } : {}),
+          ...(versionKindValue ? { versionKind: versionKindValue } : {}),
         },
       }),
     );

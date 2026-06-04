@@ -4,6 +4,7 @@ import { err, ok, type Result, safeTry } from "../shared/result";
 import { type SourceKindValue } from "../shared/state-machine";
 import { type DisplayNameText, type SourceLocator } from "../shared/text-values";
 import { ScalarValueObject, ValueObject } from "../shared/value-object";
+import { type VersionReference, type VersionSourceKind } from "../shared/version";
 
 const gitSourceKinds = [
   "remote-git",
@@ -163,6 +164,27 @@ function parseDockerImageReference(locator: string): {
     ...(imageTag ? { imageTag } : {}),
     ...(digest ? { imageDigest: digest } : {}),
   };
+}
+
+function versionSourceKindForSourceKind(kind: SourceKind): VersionSourceKind {
+  if (isGitSourceKind(kind)) {
+    return "git";
+  }
+
+  switch (kind) {
+    case "docker-image":
+      return "docker-image";
+    case "local-folder":
+    case "zip-artifact":
+      return "static-artifact";
+    case "dockerfile-inline":
+    case "docker-compose-inline":
+    case "compose":
+      return "generic";
+  }
+
+  const unhandled: never = kind;
+  return unhandled;
 }
 
 const sourceBaseDirectoryBrand: unique symbol = Symbol("SourceBaseDirectory");
@@ -377,6 +399,7 @@ export interface ResourceSourceBindingState {
   imageName?: DockerImageName;
   imageTag?: DockerImageTag;
   imageDigest?: DockerImageDigest;
+  versionReference?: VersionReference;
   metadata?: Record<string, string>;
 }
 
@@ -384,6 +407,7 @@ export interface DeploymentSourceDescriptorState {
   kind: SourceKindValue;
   locator: SourceLocator;
   displayName: DisplayNameText;
+  versionReference?: VersionReference;
   metadata?: Record<string, string>;
 }
 
@@ -404,6 +428,18 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
               sourceLocator: input.locator.value,
             },
           ),
+        );
+      }
+
+      if (
+        input.versionReference &&
+        input.versionReference.sourceKind !== versionSourceKindForSourceKind(kind)
+      ) {
+        return err(
+          sourceResolutionError("Source version kind must match source kind", {
+            sourceKind: kind,
+            versionSourceKind: input.versionReference.sourceKind,
+          }),
         );
       }
 
@@ -460,6 +496,13 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
       ...(state.imageName ? { imageName: state.imageName.value } : {}),
       ...(state.imageTag ? { imageTag: state.imageTag.value } : {}),
       ...(state.imageDigest ? { imageDigest: state.imageDigest.value } : {}),
+      ...(state.versionReference
+        ? {
+            versionSourceKind: state.versionReference.sourceKind,
+            versionReferenceKind: state.versionReference.referenceKind,
+            versionReference: state.versionReference.value,
+          }
+        : {}),
     };
 
     return Object.keys(metadata).length > 0 ? metadata : undefined;
@@ -484,6 +527,7 @@ export class ResourceSourceBinding extends ValueObject<ResourceSourceBindingStat
       kind: this.state.kind,
       locator: this.state.locator,
       displayName: this.state.displayName,
+      ...(this.state.versionReference ? { versionReference: this.state.versionReference } : {}),
       ...(metadata ? { metadata } : {}),
     };
   }
@@ -530,6 +574,7 @@ export function cloneResourceSourceBindingState(
     ...(state.imageName ? { imageName: state.imageName } : {}),
     ...(state.imageTag ? { imageTag: state.imageTag } : {}),
     ...(state.imageDigest ? { imageDigest: state.imageDigest } : {}),
+    ...(state.versionReference ? { versionReference: state.versionReference } : {}),
     ...(state.metadata ? { metadata: { ...state.metadata } } : {}),
   };
 }

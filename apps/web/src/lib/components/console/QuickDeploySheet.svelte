@@ -300,6 +300,7 @@
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
+  type SourceVersionKind = NonNullable<ResourceSourceInput["versionKind"]>;
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
   type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
@@ -499,6 +500,16 @@
 
   const sourceKindKeys = sourceOptions.map((option) => option.key);
   const deploymentStepKeys = deploymentSteps.map((step) => step.key);
+  const gitSourceVersionKinds = [
+    "branch",
+    "tag",
+    "commit-sha",
+    "release",
+  ] as const satisfies readonly SourceVersionKind[];
+  const dockerSourceVersionKinds = [
+    "image-tag",
+    "image-digest",
+  ] as const satisfies readonly SourceVersionKind[];
   const githubSourceModes = ["url", "browser"] as const satisfies readonly GithubSourceMode[];
   const draftModeKeys = ["existing", "new"] as const;
 
@@ -617,6 +628,10 @@
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
   let resourceRuntimeName = $state(browser ? (page.url.searchParams.get("resourceRuntimeName") ?? "") : "");
   let sourceBaseDirectory = $state(browser ? (page.url.searchParams.get("sourceBaseDirectory") ?? "") : "");
+  let sourceVersion = $state(browser ? (page.url.searchParams.get("sourceVersion") ?? "") : "");
+  let sourceVersionKind = $state<SourceVersionKind | "">(
+    parseSourceVersionKind(browser ? page.url.searchParams.get("sourceVersionKind") : null),
+  );
   let resourceInstallCommand = $state(browser ? (page.url.searchParams.get("resourceInstallCommand") ?? "") : "");
   let resourceBuildCommand = $state(browser ? (page.url.searchParams.get("resourceBuildCommand") ?? "") : "");
   let resourceStartCommand = $state(browser ? (page.url.searchParams.get("resourceStartCommand") ?? "") : "");
@@ -926,6 +941,38 @@
       ? $t(i18nKeys.console.quickDeploy.repositoryBaseDirectory)
       : $t(i18nKeys.console.quickDeploy.sourceBaseDirectory),
   );
+  const sourceVersionEditable = $derived(
+    sourceKind === "github" || sourceKind === "remote-git" || sourceKind === "docker-image",
+  );
+  const sourceVersionKindOptions = $derived.by((): SourceVersionKind[] => {
+    if (sourceKind === "docker-image") {
+      return [...dockerSourceVersionKinds];
+    }
+
+    if (sourceKind === "github" || sourceKind === "remote-git") {
+      return [...gitSourceVersionKinds];
+    }
+
+    return [];
+  });
+  const sourceVersionPlaceholder = $derived.by(() => {
+    if (sourceKind === "docker-image") {
+      return "latest";
+    }
+
+    if (sourceKind === "github" && githubSourceMode === "browser") {
+      return selectedGitHubRepository?.defaultBranch ?? "main";
+    }
+
+    return "main";
+  });
+  const sourceVersionHint = $derived.by(() => {
+    if (sourceKind === "docker-image") {
+      return "可填镜像 tag 或 sha256 digest；部署前会解析为固定 image digest。";
+    }
+
+    return "可填分支、tag、release 或 commit SHA；部署前会解析为固定 commit SHA。";
+  });
   const quickDeploySourceExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "quick-deploy-source")
@@ -1199,6 +1246,28 @@
 
     return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
   });
+  function sourceVersionRows(): SummaryRow[] {
+    const version = sourceVersion.trim();
+    if (!sourceVersionEditable || !version) {
+      return [];
+    }
+
+    return [
+      {
+        label: $t(i18nKeys.console.resources.sourceVersion),
+        value: version,
+        mono: true,
+      },
+      ...(sourceVersionKind
+        ? [
+            {
+              label: $t(i18nKeys.console.resources.sourceVersionKind),
+              value: sourceVersionKind,
+            },
+          ]
+        : []),
+    ];
+  }
   const sourceDetailRows = $derived.by((): SummaryRow[] => {
     if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
       return [
@@ -1219,6 +1288,7 @@
           value: selectedGitHubRepository.cloneUrl,
           mono: true,
         },
+        ...sourceVersionRows(),
       ];
     }
 
@@ -1268,9 +1338,10 @@
           value: $t(
             gitSourceKindForLocator(githubLocator.trim()) === "git-github-app"
               ? i18nKeys.console.quickDeploy.sourceAccessGithubApp
-              : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
+            : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
           ),
         },
+        ...sourceVersionRows(),
       ];
     }
 
@@ -1286,9 +1357,10 @@
           value: $t(
             gitSourceKindForLocator(sourceSummary) === "git-github-app"
               ? i18nKeys.console.quickDeploy.sourceAccessGithubApp
-              : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
+            : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
           ),
         },
+        ...sourceVersionRows(),
       ];
     }
 
@@ -1303,6 +1375,7 @@
           label: $t(i18nKeys.console.quickDeploy.sourceAccess),
           value: $t(i18nKeys.console.quickDeploy.sourceAccessDockerImage),
         },
+        ...sourceVersionRows(),
       ];
     }
 
@@ -2085,6 +2158,11 @@
     return value === "https" ? "https" : "http";
   }
 
+  function parseSourceVersionKind(value: string | null): SourceVersionKind | "" {
+    const allowedKinds: readonly string[] = [...gitSourceVersionKinds, ...dockerSourceVersionKinds];
+    return allowedKinds.includes(value ?? "") ? (value as SourceVersionKind) : "";
+  }
+
   function setSearchParam(
     params: URLSearchParams,
     key: string,
@@ -2346,6 +2424,8 @@
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
     setSearchParam(params, "sourceBaseDirectory", sourceBaseDirectory);
+    setSearchParam(params, "sourceVersion", sourceVersion);
+    setSearchParam(params, "sourceVersionKind", sourceVersionKind);
     setSearchParam(params, "resourceInstallCommand", resourceInstallCommand);
     setSearchParam(params, "resourceBuildCommand", resourceBuildCommand);
     setSearchParam(params, "resourceStartCommand", resourceStartCommand);
@@ -2415,6 +2495,8 @@
     resourceDescription = params.get("resourceDescription") ?? "";
     resourceRuntimeName = params.get("resourceRuntimeName") ?? "";
     sourceBaseDirectory = params.get("sourceBaseDirectory") ?? "";
+    sourceVersion = params.get("sourceVersion") ?? "";
+    sourceVersionKind = parseSourceVersionKind(params.get("sourceVersionKind"));
     resourceInstallCommand = params.get("resourceInstallCommand") ?? "";
     resourceBuildCommand = params.get("resourceBuildCommand") ?? "";
     resourceStartCommand = params.get("resourceStartCommand") ?? "";
@@ -2494,6 +2576,18 @@
 
   function selectSourceKind(kind: SourceKind): void {
     sourceKind = kind;
+    const nextSourceVersionKinds: readonly SourceVersionKind[] =
+      kind === "docker-image"
+        ? dockerSourceVersionKinds
+        : kind === "github" || kind === "remote-git"
+          ? gitSourceVersionKinds
+          : [];
+    if (!nextSourceVersionKinds.includes(sourceVersionKind as SourceVersionKind)) {
+      sourceVersionKind = "";
+    }
+    if (nextSourceVersionKinds.length === 0) {
+      sourceVersion = "";
+    }
     if (kind !== "blueprint") {
       blueprintSourceLockedByEntry = false;
     }
@@ -2584,11 +2678,24 @@
     return "local-folder";
   }
 
+  function requestedSourceVersionInput(): Pick<ResourceSourceInput, "version" | "versionKind"> {
+    const version = sourceVersion.trim();
+    if (!sourceVersionEditable || !version) {
+      return {};
+    }
+
+    return {
+      version,
+      ...(sourceVersionKind ? { versionKind: sourceVersionKind } : {}),
+    };
+  }
+
   function resourceSourceForSource(): ResourceSourceInput {
     const locator = sourceLocator.trim();
     const baseDirectory = sourceBaseDirectory.trim();
     const withBaseDirectory = (input: ResourceSourceInput): ResourceSourceInput =>
       baseDirectory && input.kind !== "docker-image" ? { ...input, baseDirectory } : input;
+    const requestedVersion = requestedSourceVersionInput();
 
     switch (sourceKind) {
       case "github":
@@ -2599,6 +2706,7 @@
           kind: selectedRepository ? "git-github-app" : gitSourceKindForLocator(locator),
           locator,
           ...(selectedRepository ? { displayName: selectedRepository.fullName } : {}),
+          ...requestedVersion,
           ...(selectedRepository
             ? {
                 metadata: {
@@ -2613,6 +2721,7 @@
         return withBaseDirectory({
           kind: gitSourceKindForLocator(locator),
           locator,
+          ...requestedVersion,
         });
       case "blueprint":
         return resourceSourceForBlueprintComponent(blueprintComponentForQuickDeploy());
@@ -2625,6 +2734,7 @@
         return {
           kind: "docker-image",
           locator,
+          ...requestedVersion,
         };
       case "compose":
         return withBaseDirectory({
@@ -4386,6 +4496,37 @@
                     placeholder={sourcePlaceholder}
                   />
                 {/if}
+              </div>
+            {/if}
+            {#if sourceVersionEditable}
+              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="source-version">
+                    {$t(i18nKeys.console.resources.sourceVersion)}
+                  </label>
+                  <Input
+                    id="source-version"
+                    class="font-mono text-xs"
+                    bind:value={sourceVersion}
+                    placeholder={sourceVersionPlaceholder}
+                  />
+                  <p class="text-xs leading-5 text-muted-foreground">{sourceVersionHint}</p>
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="source-version-kind">
+                    {$t(i18nKeys.console.resources.sourceVersionKind)}
+                  </label>
+                  <select
+                    id="source-version-kind"
+                    class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    bind:value={sourceVersionKind}
+                  >
+                    <option value="">infer</option>
+                    {#each sourceVersionKindOptions as versionKind (versionKind)}
+                      <option value={versionKind}>{versionKind}</option>
+                    {/each}
+                  </select>
+                </div>
               </div>
             {/if}
             {#if showSourceBuildSettings}

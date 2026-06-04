@@ -115,6 +115,8 @@ const sourceImageRuntimeStrategyError =
   "config_source_resolution: source.type image requires runtime.strategy prebuilt-image";
 const sourceImageRuntimeTypeError =
   "config_source_resolution: source.type image must not combine with runtime.type";
+const sourceImageVersionKindError =
+  "config_source_resolution: source.type image requires versionKind image-tag or image-digest when versionKind is supplied";
 const previewDomainTemplateError =
   "preview_config: preview.pullRequest.domainTemplate must be a host template using only {preview_id} and {pr_number}";
 const previewPolicyMaxActivePreviewsError =
@@ -454,6 +456,22 @@ export const appaloftDeploymentSourceConfigSchema = z
     commitSha: nonEmptyStringSchema
       .optional()
       .describe("Immutable git commit SHA to record with the source profile."),
+    version: nonEmptyStringSchema
+      .optional()
+      .describe("Version reference to record with the source profile."),
+    versionKind: z
+      .enum([
+        "branch",
+        "tag",
+        "commit-sha",
+        "image-tag",
+        "image-digest",
+        "content-digest",
+        "release",
+        "literal",
+      ])
+      .optional()
+      .describe("Version reference kind for source.version."),
   })
   .strict()
   .superRefine((value, context) => {
@@ -479,6 +497,17 @@ export const appaloftDeploymentSourceConfigSchema = z
           code: "custom",
           path: ["image"],
           message: sourceImageRejectsGitFieldsError,
+        });
+      }
+      if (
+        value.versionKind &&
+        value.versionKind !== "image-tag" &&
+        value.versionKind !== "image-digest"
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["versionKind"],
+          message: sourceImageVersionKindError,
         });
       }
     }

@@ -192,4 +192,19 @@ describe("QuickDeploySheet structure", () => {
       'sourceKind === "static-site" && !staticPublishDirectory.trim()',
     );
   });
+
+  test("[QD-SOURCE-VERSION-001] exposes optional Git and Docker source version inputs", () => {
+    expect(quickDeploySheetSource).toContain("gitSourceVersionKinds");
+    expect(quickDeploySheetSource).toContain('"commit-sha"');
+    expect(quickDeploySheetSource).toContain("dockerSourceVersionKinds");
+    expect(quickDeploySheetSource).toContain('"image-digest"');
+    expect(quickDeploySheetSource).toContain("sourceVersionEditable");
+    expect(quickDeploySheetSource).toContain('id="source-version"');
+    expect(quickDeploySheetSource).toContain('id="source-version-kind"');
+    expect(quickDeploySheetSource).toContain(
+      'setSearchParam(params, "sourceVersion", sourceVersion)',
+    );
+    expect(quickDeploySheetSource).toContain("requestedSourceVersionInput");
+    expect(quickDeploySheetSource).toContain("...requestedVersion");
+  });
 });

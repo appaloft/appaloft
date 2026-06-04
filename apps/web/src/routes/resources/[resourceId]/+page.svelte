@@ -186,6 +186,7 @@
   type GeneratedAccessMode = AccessProfileInput["generatedAccessMode"];
   type SourceProfileInput = ConfigureResourceSourceInput["source"];
   type SourceKind = SourceProfileInput["kind"];
+  type SourceVersionKind = NonNullable<SourceProfileInput["versionKind"]>;
   type AutoDeployPolicyInput = NonNullable<ConfigureResourceAutoDeployInput["policy"]>;
   type AutoDeployTriggerKind = AutoDeployPolicyInput["triggerKind"];
   type AutoDeployEventKind = AutoDeployPolicyInput["eventKinds"][number];
@@ -862,6 +863,8 @@
   let sourceImageName = $state("");
   let sourceImageTag = $state("");
   let sourceImageDigest = $state("");
+  let sourceVersion = $state("");
+  let sourceVersionKind = $state<SourceVersionKind | "">("");
   let sourceLinkFormResourceId = $state("");
   let sourceLinkFingerprint = $state("");
   let sourceLinkServerId = $state("");
@@ -1118,6 +1121,14 @@
   );
   const sourceKindIsGit = $derived(isGitSourceKind(sourceKind));
   const sourceKindIsDockerImage = $derived(sourceKind === "docker-image");
+  const sourceVersionKindOptions = $derived<SourceVersionKind[]>(
+    sourceKindIsGit
+      ? ["branch", "tag", "commit-sha", "release"]
+      : sourceKindIsDockerImage
+        ? ["image-tag", "image-digest"]
+        : ["literal", "tag", "release", "content-digest"],
+  );
+  const sourceVersionIsEditable = $derived(sourceKind !== "local-folder");
   const sourceSupportsAutoDeploy = $derived(
     Boolean(resourceDetail?.source && isGitSourceKind(resourceDetail.source.kind)),
   );
@@ -2645,6 +2656,8 @@
     sourceImageName = source?.imageName ?? "";
     sourceImageTag = source?.imageTag ?? "";
     sourceImageDigest = source?.imageDigest ?? "";
+    sourceVersion = source?.version ?? "";
+    sourceVersionKind = source?.versionKind ?? "";
     sourceFeedback = null;
   });
 
@@ -3189,6 +3202,7 @@
     const imageName = sourceImageName.trim();
     const imageTag = sourceImageTag.trim();
     const imageDigest = sourceImageDigest.trim();
+    const version = sourceVersion.trim();
     const source: SourceProfileInput = {
       kind: sourceKind,
       locator: sourceLocator.trim(),
@@ -3199,6 +3213,8 @@
       ...(imageName ? { imageName } : {}),
       ...(imageTag ? { imageTag } : {}),
       ...(imageDigest ? { imageDigest } : {}),
+      ...(sourceVersionIsEditable && version ? { version } : {}),
+      ...(sourceVersionIsEditable && sourceVersionKind ? { versionKind: sourceVersionKind } : {}),
     };
 
     sourceFeedback = null;
@@ -6020,6 +6036,32 @@
                         autocomplete="off"
                       />
                     </label>
+
+                    {#if sourceVersionIsEditable}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-version">
+                        <span>{$t(i18nKeys.console.resources.sourceVersion)}</span>
+                        <Input
+                          id="resource-source-version"
+                          bind:value={sourceVersion}
+                          autocomplete="off"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium">
+                        <span>{$t(i18nKeys.console.resources.sourceVersionKind)}</span>
+                        <Select.Root bind:value={sourceVersionKind} type="single">
+                          <Select.Trigger class="w-full">
+                            {sourceVersionKind || "infer"}
+                          </Select.Trigger>
+                          <Select.Content>
+                            <Select.Item value="">infer</Select.Item>
+                            {#each sourceVersionKindOptions as versionKind}
+                              <Select.Item value={versionKind}>{versionKind}</Select.Item>
+                            {/each}
+                          </Select.Content>
+                        </Select.Root>
+                      </label>
+                    {/if}
 
                     {#if sourceKindIsGit}
                       <label class="space-y-1.5 text-sm font-medium" for="resource-source-git-ref">
