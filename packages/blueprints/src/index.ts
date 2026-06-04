@@ -1725,6 +1725,45 @@ export interface CreateBlueprintComponentRuntimeProjectionInput {
   readonly networkName?: string;
 }
 
+export type BlueprintDependencyRuntimeOutputValue = string | number;
+
+export interface BlueprintDependencyRuntimeOutputBinding {
+  readonly requirementId: string;
+  readonly outputs: Readonly<
+    Partial<Record<BlueprintDependencyOutputName, BlueprintDependencyRuntimeOutputValue>>
+  >;
+}
+
+export interface MaterializeBlueprintComponentDependencyEnvInput {
+  readonly componentRuntimePlan: BlueprintComponentRuntimePlan;
+  readonly dependencyOutputs: readonly BlueprintDependencyRuntimeOutputBinding[];
+}
+
+export interface BlueprintMaterializedDependencyEnv {
+  readonly dependencyRequirementId: string;
+  readonly name: string;
+  readonly value: string;
+  readonly secret: boolean;
+}
+
+export interface BlueprintDependencyEnvMaterializationError {
+  readonly code: "missing_dependency_output";
+  readonly message: string;
+  readonly dependencyRequirementId: string;
+  readonly outputName: string;
+  readonly envName: string;
+}
+
+export type BlueprintDependencyEnvMaterializationResult =
+  | {
+      readonly ok: true;
+      readonly value: readonly BlueprintMaterializedDependencyEnv[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: BlueprintDependencyEnvMaterializationError;
+    };
+
 export type BlueprintUpgradeClassification = "non-breaking" | "potentially-breaking" | "breaking";
 
 export interface CreateBlueprintUpgradePlanInput {
@@ -2708,6 +2747,92 @@ export function blueprintComponentRuntimePlanFromMetadata(
   } catch {
     return undefined;
   }
+}
+
+export function materializeBlueprintComponentDependencyEnv(
+  input: MaterializeBlueprintComponentDependencyEnvInput,
+): BlueprintDependencyEnvMaterializationResult {
+  const outputsByRequirement = new Map(
+    input.dependencyOutputs.map((binding) => [binding.requirementId, binding.outputs]),
+  );
+  const materialized: BlueprintMaterializedDependencyEnv[] = [];
+
+  for (const env of input.componentRuntimePlan.dependencyEnv) {
+    const outputs = outputsByRequirement.get(env.dependencyRequirementId);
+    if (!outputs) {
+      return missingDependencyEnvOutput(env, env.outputNames[0] ?? env.valueFrom ?? "unknown");
+    }
+
+    const value = env.valueFrom
+      ? dependencyRuntimeOutputValue(outputs, env.valueFrom)
+      : materializeDependencyEnvTemplate(env, outputs);
+    if (!value.ok) {
+      return missingDependencyEnvOutput(env, value.outputName);
+    }
+
+    materialized.push({
+      dependencyRequirementId: env.dependencyRequirementId,
+      name: env.name,
+      value: value.value,
+      secret: env.secret,
+    });
+  }
+
+  return {
+    ok: true,
+    value: materialized,
+  };
+}
+
+function dependencyRuntimeOutputValue(
+  outputs: BlueprintDependencyRuntimeOutputBinding["outputs"],
+  outputName: BlueprintDependencyOutputName,
+):
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly outputName: string } {
+  const value = outputs[outputName];
+  if (value === undefined) {
+    return { ok: false, outputName };
+  }
+  return { ok: true, value: String(value) };
+}
+
+function materializeDependencyEnvTemplate(
+  env: BlueprintComponentRuntimeDependencyEnv,
+  outputs: BlueprintDependencyRuntimeOutputBinding["outputs"],
+):
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly outputName: string } {
+  let missingOutputName: string | undefined;
+  const value = (env.template ?? "").replace(dependencyTemplateReferencePattern, (_match, name) => {
+    const outputName = name as BlueprintDependencyOutputName;
+    const output = dependencyRuntimeOutputValue(outputs, outputName);
+    if (!output.ok) {
+      missingOutputName = name;
+      return "";
+    }
+    return output.value;
+  });
+  if (missingOutputName) {
+    return { ok: false, outputName: missingOutputName };
+  }
+  return { ok: true, value };
+}
+
+function missingDependencyEnvOutput(
+  env: BlueprintComponentRuntimeDependencyEnv,
+  outputName: string,
+): BlueprintDependencyEnvMaterializationResult {
+  return {
+    ok: false,
+    error: {
+      code: "missing_dependency_output",
+      message: `Dependency output ${outputName} is required to materialize env ${env.name}`,
+      dependencyRequirementId: env.dependencyRequirementId,
+      outputName,
+      envName: env.name,
+    },
+  };
 }
 
 function appendRuntimeRelationEffects(input: {
