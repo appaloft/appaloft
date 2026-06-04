@@ -1795,6 +1795,8 @@ export const zhCN = {
       sourceImageName: "镜像名",
       sourceImageTag: "镜像 tag",
       sourceKind: "来源类型",
+      sourceVersion: "版本",
+      sourceVersionKind: "版本类型",
       sourceKindCompose: "Compose",
       sourceKindDockerImage: "Docker 镜像",
       sourceKindGitPublic: "公开 Git",

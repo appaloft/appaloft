@@ -1893,6 +1893,8 @@ export const enUS = {
       sourceImageName: "Image name",
       sourceImageTag: "Image tag",
       sourceKind: "Source kind",
+      sourceVersion: "Version",
+      sourceVersionKind: "Version kind",
       sourceKindCompose: "Compose",
       sourceKindDockerImage: "Docker image",
       sourceKindGitPublic: "Public Git",

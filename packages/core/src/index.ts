@@ -16,5 +16,6 @@ export * from "./shared/state-machine";
 export * from "./shared/temporal";
 export * from "./shared/text-values";
 export * from "./shared/value-object";
+export * from "./shared/version";
 export * from "./workload-delivery";
 export * from "./workspace";

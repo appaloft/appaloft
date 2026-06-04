@@ -20,6 +20,8 @@ import {
   type RecordStaticArtifactPublicationInput,
   type SourceDetectionResult,
   type SourceDetector,
+  type SourceVersionDetectionResult,
+  type SourceVersionDetector,
   type StaticArtifactFilePayload,
   type StaticArtifactPayloadReaderPort,
   type StaticArtifactPayloadReadResult,
@@ -67,6 +69,8 @@ import {
   StaticArtifactRouteUrl,
   StaticArtifactStorageRef,
   StaticArtifactStoredManifest,
+  Version,
+  VersionReference,
 } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
@@ -1172,6 +1176,281 @@ export class FileSystemSourceDetector implements SourceDetector {
 
         return ok({ source, reasoning });
       },
+    );
+  }
+}
+
+export interface SourceVersionCommandResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export type SourceVersionCommandRunner = (
+  command: string[],
+  options?: { cwd?: string },
+) => Promise<SourceVersionCommandResult>;
+
+async function defaultSourceVersionCommandRunner(
+  command: string[],
+  options: { cwd?: string } = {},
+): Promise<SourceVersionCommandResult> {
+  const subprocess = Bun.spawn(command, {
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(subprocess.stdout).text(),
+    new Response(subprocess.stderr).text(),
+    subprocess.exited,
+  ]);
+
+  return { exitCode, stdout, stderr };
+}
+
+function commandSucceeded(result: SourceVersionCommandResult): boolean {
+  return result.exitCode === 0;
+}
+
+function firstGitSha(output: string): string | undefined {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim().match(/^([0-9a-f]{40})(?:\s|$)/i)?.[1])
+    .find((value): value is string => Boolean(value));
+}
+
+function gitRefPatterns(referenceKind: string | undefined, value: string): string[] {
+  const normalized = value.replace(/^refs\/heads\//, "").replace(/^refs\/tags\//, "");
+
+  if (referenceKind === "tag" || referenceKind === "release") {
+    return [`refs/tags/${normalized}^{}`, `refs/tags/${normalized}`, normalized];
+  }
+
+  if (referenceKind === "branch") {
+    return [`refs/heads/${normalized}`, normalized];
+  }
+
+  return [
+    `refs/heads/${normalized}`,
+    `refs/tags/${normalized}^{}`,
+    `refs/tags/${normalized}`,
+    normalized,
+  ];
+}
+
+function repoDigestFromDockerInspect(output: string): string | undefined {
+  const trimmed = output.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.match(/@(sha256:[0-9a-f]{64})$/i)?.[1])
+        .find((digest): digest is string => Boolean(digest));
+    }
+  } catch {
+    const digest = trimmed.match(/@(sha256:[0-9a-f]{64})/i)?.[1];
+    if (digest) {
+      return digest;
+    }
+  }
+
+  return undefined;
+}
+
+function imageReferenceForVersion(input: {
+  sourceLocator: string;
+  metadata?: Record<string, string>;
+  requestedVersion?: VersionReference;
+}): string {
+  if (input.requestedVersion?.referenceKind === "image-tag") {
+    return input.metadata?.imageName
+      ? `${input.metadata.imageName}:${input.requestedVersion.value}`
+      : input.sourceLocator;
+  }
+
+  return input.sourceLocator;
+}
+
+export class FileSystemSourceVersionDetector implements SourceVersionDetector {
+  constructor(
+    private readonly runCommand: SourceVersionCommandRunner = defaultSourceVersionCommandRunner,
+  ) {}
+
+  async detect(
+    context: ExecutionContext,
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+  ): Promise<Result<SourceVersionDetectionResult>> {
+    return context.tracer.startActiveSpan(
+      createAdapterSpanName("filesystem_source_version_detector", "detect"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.sourceLocator]: input.source.locator,
+        },
+      },
+      async () => {
+        if (input.source.kind === "git-public" || input.source.kind === "remote-git") {
+          return this.detectRemoteGit(input);
+        }
+
+        if (input.source.kind === "local-git") {
+          return this.detectLocalGit(input);
+        }
+
+        if (input.source.kind === "docker-image") {
+          return this.detectDockerImage(input);
+        }
+
+        return this.detectFromCore(input);
+      },
+    );
+  }
+
+  private detectFromCore(
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+  ): Result<SourceVersionDetectionResult> {
+    return input.source.resolveVersion({
+      ...(input.requestedVersion ? { requestedVersion: input.requestedVersion } : {}),
+    });
+  }
+
+  private async detectRemoteGit(
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+  ): Promise<Result<SourceVersionDetectionResult>> {
+    if (input.requestedVersion?.isImmutable()) {
+      return this.detectFromCore(input);
+    }
+
+    const metadata = input.source.metadata ?? {};
+    const ref = input.requestedVersion?.value ?? metadata.gitRef ?? metadata.defaultBranch;
+    if (!ref) {
+      return this.detectFromCore(input);
+    }
+
+    for (const pattern of gitRefPatterns(input.requestedVersion?.referenceKind, ref)) {
+      const result = await this.runCommand(["git", "ls-remote", input.source.locator, pattern]);
+      const commitSha = commandSucceeded(result) ? firstGitSha(result.stdout) : undefined;
+      if (commitSha) {
+        return this.fixedGitVersion(input, commitSha, ref);
+      }
+    }
+
+    return this.detectFromCore(input);
+  }
+
+  private async detectLocalGit(
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+  ): Promise<Result<SourceVersionDetectionResult>> {
+    if (input.requestedVersion?.isImmutable()) {
+      return this.detectFromCore(input);
+    }
+
+    const metadata = input.source.metadata ?? {};
+    const ref = input.requestedVersion?.value ?? metadata.gitRef ?? "HEAD";
+    const result = await this.runCommand([
+      "git",
+      "-C",
+      input.source.locator,
+      "rev-parse",
+      `${ref}^{commit}`,
+    ]);
+    const commitSha = commandSucceeded(result) ? firstGitSha(result.stdout) : undefined;
+
+    return commitSha ? this.fixedGitVersion(input, commitSha, ref) : this.detectFromCore(input);
+  }
+
+  private fixedGitVersion(
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+    commitSha: string,
+    ref: string,
+  ): Result<SourceVersionDetectionResult> {
+    const referenceResult = input.requestedVersion
+      ? ok(input.requestedVersion)
+      : VersionReference.createForSource({
+          sourceKind: "git",
+          value: ref,
+        });
+    if (referenceResult.isErr()) {
+      return err(referenceResult.error);
+    }
+
+    return VersionReference.createDetected({
+      sourceKind: "git",
+      referenceKind: "commit-sha",
+      value: commitSha,
+    }).andThen((fixedIdentifier) =>
+      Version.fixed({
+        reference: referenceResult.value,
+        fixedIdentifier,
+        aliases: input.requestedVersion ? [input.requestedVersion] : [],
+      }).map((version) => ({
+        version,
+        reasoning: ["Resolved fixed Git version with git command"],
+      })),
+    );
+  }
+
+  private async detectDockerImage(
+    input: Parameters<SourceVersionDetector["detect"]>[1],
+  ): Promise<Result<SourceVersionDetectionResult>> {
+    if (input.requestedVersion?.isImmutable()) {
+      return this.detectFromCore(input);
+    }
+
+    const image = imageReferenceForVersion({
+      sourceLocator: input.source.locator,
+      ...(input.source.metadata ? { metadata: input.source.metadata } : {}),
+      ...(input.requestedVersion ? { requestedVersion: input.requestedVersion } : {}),
+    });
+    const pull = await this.runCommand(["docker", "pull", image]);
+    const inspect = await this.runCommand([
+      "docker",
+      "image",
+      "inspect",
+      "--format",
+      "{{json .RepoDigests}}",
+      image,
+    ]);
+    let digest = commandSucceeded(inspect)
+      ? repoDigestFromDockerInspect(inspect.stdout)
+      : undefined;
+
+    if (!digest && !commandSucceeded(pull)) {
+      const localInspect = await this.runCommand([
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{{json .RepoDigests}}",
+        input.source.locator,
+      ]);
+      digest = commandSucceeded(localInspect)
+        ? repoDigestFromDockerInspect(localInspect.stdout)
+        : undefined;
+    }
+
+    if (!digest) {
+      return this.detectFromCore(input);
+    }
+
+    return VersionReference.createDetected({
+      sourceKind: "docker-image",
+      referenceKind: "image-digest",
+      value: digest,
+    }).andThen((fixedIdentifier) =>
+      Version.fixed({
+        reference: input.requestedVersion ?? fixedIdentifier,
+        fixedIdentifier,
+        aliases: input.requestedVersion ? [input.requestedVersion] : [],
+      }).map((version) => ({
+        version,
+        reasoning: ["Resolved fixed Docker image version with docker image inspect"],
+      })),
     );
   }
 }

@@ -17,6 +17,9 @@ import {
   SourceRepositoryFullName,
   SourceRepositoryId,
   safeTry,
+  VersionReference,
+  type VersionReferenceKind,
+  type VersionSourceKind,
 } from "@appaloft/core";
 import { type z } from "zod";
 
@@ -170,6 +173,8 @@ function validateSafeSourceInput(input: ResourceSourceBindingMapperInput): Resul
     ["source.imageName", input.imageName, false],
     ["source.imageTag", input.imageTag, false],
     ["source.imageDigest", input.imageDigest, false],
+    ["source.version", input.version, false],
+    ["source.versionKind", input.versionKind, false],
   ] as const) {
     const validation = validateSafeTextField(field, value, { rejectAbsoluteHostPath });
     if (validation.isErr()) {
@@ -266,6 +271,22 @@ function normalizeResourceSourceInput(
   });
 }
 
+function versionSourceKindForSourceKind(kind: string): VersionSourceKind {
+  if (isGitSourceInputKind(kind)) {
+    return "git";
+  }
+
+  if (kind === "docker-image") {
+    return "docker-image";
+  }
+
+  if (kind === "zip-artifact" || kind === "local-folder") {
+    return "static-artifact";
+  }
+
+  return "generic";
+}
+
 export function resourceSourceBindingFromInput(
   input: ResourceSourceBindingMapperInput,
   options?: { gitHubTreeMode?: GitHubTreeNormalizationMode },
@@ -295,6 +316,10 @@ export function resourceSourceBindingFromInput(
     const imageName = normalizedSourceInput.imageName ?? metadata?.imageName;
     const imageTag = normalizedSourceInput.imageTag ?? metadata?.imageTag;
     const imageDigest = normalizedSourceInput.imageDigest ?? metadata?.imageDigest;
+    const versionValue = normalizedSourceInput.version ?? metadata?.version;
+    const versionKind =
+      normalizedSourceInput.versionKind ??
+      (metadata?.versionKind as VersionReferenceKind | undefined);
 
     return ok({
       kind: sourceKind,
@@ -314,6 +339,15 @@ export function resourceSourceBindingFromInput(
       ...(imageName ? { imageName: yield* DockerImageName.create(imageName) } : {}),
       ...(imageTag ? { imageTag: yield* DockerImageTag.create(imageTag) } : {}),
       ...(imageDigest ? { imageDigest: yield* DockerImageDigest.create(imageDigest) } : {}),
+      ...(versionValue
+        ? {
+            versionReference: yield* VersionReference.createForSource({
+              sourceKind: versionSourceKindForSourceKind(normalizedSourceInput.kind),
+              ...(versionKind ? { referenceKind: versionKind } : {}),
+              value: versionValue,
+            }),
+          }
+        : {}),
       ...(metadata ? { metadata: { ...metadata } } : {}),
     });
   });
