@@ -46,6 +46,36 @@ describe("Blueprint manifest schema", () => {
     }
   });
 
+  test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-011] accepts underscore-prefixed environment keys", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "underscore-env-service",
+      name: "Underscore Env Service",
+      version: "1.0.0",
+      summary: "A service with upstream runtime variables that start with underscores.",
+      secrets: [{ key: "_APP_SECRET", label: "Application secret" }],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/web:latest",
+          },
+          variables: [{ key: "_APP_ENV", value: "production" }],
+          usesSecrets: ["_APP_SECRET"],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.components[0]?.variables[0]?.key).toBe("_APP_ENV");
+      expect(result.value.components[0]?.usesSecrets).toEqual(["_APP_SECRET"]);
+    }
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-HEALTH-026] validates component HTTP health checks", () => {
     const result = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,

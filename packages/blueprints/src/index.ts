@@ -14,7 +14,7 @@ export const blueprintComponentRuntimePlanMetadataKey =
 
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
 const dependencyCapabilityNamePattern = /^[a-z](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
-const envKeyPattern = /^[A-Z][A-Z0-9_]{0,127}$/;
+const envKeyPattern = /^[_A-Z][_A-Z0-9]{0,127}$/;
 
 const nonEmptyString = z.string().trim().min(1);
 const slugSchema = z.string().trim().regex(slugPattern);
