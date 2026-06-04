@@ -373,6 +373,41 @@ profiles:
           version: { range: ">=10 <12" },
           readiness: [{ type: "mysql", database: "app" }],
         },
+        {
+          id: "redis",
+          kind: "redis",
+          label: "Redis",
+          readiness: [{ type: "redis", command: "ping" }],
+        },
+        {
+          id: "clickhouse",
+          kind: "clickhouse",
+          label: "ClickHouse",
+          readiness: [
+            {
+              type: "http",
+              endpoint: { host: "clickhouse", port: 8123, path: "/ping" },
+              expectedStatus: 200,
+              expectedBody: "Ok.",
+            },
+            {
+              type: "tcp",
+              endpoint: { host: "clickhouse", port: 9000 },
+            },
+          ],
+        },
+        {
+          id: "clickhouse-native",
+          kind: "clickhouse",
+          label: "ClickHouse native",
+          readiness: [{ type: "clickhouse", protocol: "native", query: "SELECT 1" }],
+        },
+        {
+          id: "mongodb",
+          kind: "mongodb",
+          label: "MongoDB",
+          readiness: [{ type: "mongodb", command: "ping" }],
+        },
       ],
       components: [
         {
@@ -380,7 +415,14 @@ profiles:
           name: "API",
           kind: "service",
           runtime: { strategy: "container-image", image: "example/api:latest" },
-          usesResources: ["postgres", "mariadb"],
+          usesResources: [
+            "postgres",
+            "mariadb",
+            "redis",
+            "clickhouse",
+            "clickhouse-native",
+            "mongodb",
+          ],
           dependencyEnv: [
             { resource: "postgres", name: "DATABASE_URL", valueFrom: "url" },
             { resource: "postgres", name: "DB_HOST", valueFrom: "host" },
@@ -402,6 +444,30 @@ profiles:
         kind: "mysql",
         engine: { family: "mariadb" },
       });
+      expect(result.value.resources[2]?.readiness).toEqual([
+        { type: "redis", command: "ping", required: true },
+      ]);
+      expect(result.value.resources[3]?.readiness).toEqual([
+        {
+          type: "http",
+          endpoint: { scheme: "http", host: "clickhouse", port: 8123, path: "/ping" },
+          method: "GET",
+          expectedStatus: 200,
+          expectedBody: "Ok.",
+          required: true,
+        },
+        {
+          type: "tcp",
+          endpoint: { host: "clickhouse", port: 9000 },
+          required: true,
+        },
+      ]);
+      expect(result.value.resources[4]?.readiness).toEqual([
+        { type: "clickhouse", protocol: "native", query: "SELECT 1", required: true },
+      ]);
+      expect(result.value.resources[5]?.readiness).toEqual([
+        { type: "mongodb", command: "ping", required: true },
+      ]);
     }
   });
 
