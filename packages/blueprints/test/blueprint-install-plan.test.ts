@@ -319,6 +319,24 @@ describe("Blueprint install plan", () => {
       version: { range: ">=15 <17" },
       readiness: [{ type: "postgres", database: "app", required: true }],
     });
+    const waitReadinessIndex = plan.value.operations.findIndex(
+      (operation) =>
+        operation.kind === "wait-dependency-readiness" &&
+        operation.componentId === "api" &&
+        operation.requirementId === "postgres",
+    );
+    const deploymentIndex = plan.value.operations.findIndex(
+      (operation) => operation.kind === "create-deployment" && operation.componentId === "api",
+    );
+    expect(waitReadinessIndex).toBeGreaterThan(-1);
+    expect(deploymentIndex).toBeGreaterThan(waitReadinessIndex);
+    expect(plan.value.operations[waitReadinessIndex]).toMatchObject({
+      kind: "wait-dependency-readiness",
+      componentId: "api",
+      requirementId: "postgres",
+      readiness: { type: "postgres", database: "app", required: true },
+      required: true,
+    });
     expect(bind.env).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -356,6 +374,19 @@ describe("Blueprint install plan", () => {
       version: { range: ">=15 <17" },
       readiness: [{ type: "postgres", database: "app", required: true }],
     });
+    expect(bundle.value.relationships).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "component-waits-for-dependency-readiness",
+          componentId: "api",
+          requirementId: "postgres",
+          requirementKind: "postgres",
+          engine: { family: "postgres" },
+          readiness: { type: "postgres", database: "app", required: true },
+          required: true,
+        },
+      ]),
+    );
 
     const projection = createBlueprintComponentRuntimeProjection({
       applicationBundle: bundle.value,
