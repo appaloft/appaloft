@@ -226,26 +226,134 @@ const blueprintDependencyOutputRequirementSchema = z
   })
   .strict();
 
-const blueprintDependencyReadinessSchema = z
+const blueprintDependencyReadinessEndpointSchema = z
   .object({
-    type: z.enum([
-      "tcp",
-      "http",
-      "postgres",
-      "redis",
-      "mongodb",
-      "mysql",
-      "clickhouse-native",
-      "clickhouse-http",
-      "opensearch",
-      "object-storage",
-    ]),
-    database: nonEmptyString.optional(),
-    path: nonEmptyString.optional(),
-    port: z.number().int().min(1).max(65535).optional(),
+    host: nonEmptyString,
+    port: z.number().int().min(1).max(65535),
+  })
+  .strict();
+
+const blueprintDependencyHttpReadinessEndpointSchema = blueprintDependencyReadinessEndpointSchema
+  .extend({
+    scheme: z.enum(["http", "https"]).default("http"),
+    path: nonEmptyString.default("/"),
+  })
+  .strict();
+
+const blueprintTcpDependencyReadinessSchema = z
+  .object({
+    type: z.literal("tcp"),
+    endpoint: blueprintDependencyReadinessEndpointSchema,
     required: z.boolean().default(true),
   })
   .strict();
+
+const blueprintHttpDependencyReadinessSchema = z
+  .object({
+    type: z.literal("http"),
+    endpoint: blueprintDependencyHttpReadinessEndpointSchema,
+    method: z.enum(["GET", "HEAD", "POST", "OPTIONS"]).default("GET"),
+    expectedStatus: z.number().int().min(100).max(599).default(200),
+    expectedBody: z.string().optional(),
+    expectedBodyIncludes: z.string().optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintPostgresDependencyReadinessSchema = z
+  .object({
+    type: z.literal("postgres"),
+    endpoint: blueprintDependencyReadinessEndpointSchema.optional(),
+    database: nonEmptyString.optional(),
+    query: nonEmptyString.optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintRedisDependencyReadinessSchema = z
+  .object({
+    type: z.literal("redis"),
+    endpoint: blueprintDependencyReadinessEndpointSchema.optional(),
+    command: z.literal("ping").default("ping"),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintMongodbDependencyReadinessSchema = z
+  .object({
+    type: z.literal("mongodb"),
+    endpoint: blueprintDependencyReadinessEndpointSchema.optional(),
+    database: nonEmptyString.optional(),
+    command: z.literal("ping").default("ping"),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintMysqlDependencyReadinessSchema = z
+  .object({
+    type: z.literal("mysql"),
+    endpoint: blueprintDependencyReadinessEndpointSchema.optional(),
+    database: nonEmptyString.optional(),
+    query: nonEmptyString.optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintClickhouseDependencyReadinessSchema = z
+  .object({
+    type: z.literal("clickhouse"),
+    protocol: z.enum(["native", "http"]),
+    endpoint: blueprintDependencyHttpReadinessEndpointSchema.optional(),
+    query: nonEmptyString.optional(),
+    expectedStatus: z.number().int().min(100).max(599).optional(),
+    expectedBody: z.string().optional(),
+    expectedBodyIncludes: z.string().optional(),
+    required: z.boolean().default(true),
+  })
+  .strict()
+  .superRefine((readiness, context) => {
+    if (readiness.protocol === "http" && !readiness.endpoint) {
+      context.addIssue({
+        code: "custom",
+        message: "clickhouse HTTP readiness requires endpoint",
+        path: ["endpoint"],
+      });
+    }
+  });
+
+const blueprintOpensearchDependencyReadinessSchema = z
+  .object({
+    type: z.literal("opensearch"),
+    endpoint: blueprintDependencyHttpReadinessEndpointSchema.optional(),
+    expectedStatus: z.number().int().min(100).max(599).default(200),
+    expectedBody: z.string().optional(),
+    expectedBodyIncludes: z.string().optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintObjectStorageDependencyReadinessSchema = z
+  .object({
+    type: z.literal("object-storage"),
+    endpoint: blueprintDependencyHttpReadinessEndpointSchema.optional(),
+    expectedStatus: z.number().int().min(100).max(599).default(200),
+    expectedBody: z.string().optional(),
+    expectedBodyIncludes: z.string().optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintDependencyReadinessSchema = z.discriminatedUnion("type", [
+  blueprintTcpDependencyReadinessSchema,
+  blueprintHttpDependencyReadinessSchema,
+  blueprintPostgresDependencyReadinessSchema,
+  blueprintRedisDependencyReadinessSchema,
+  blueprintMongodbDependencyReadinessSchema,
+  blueprintMysqlDependencyReadinessSchema,
+  blueprintClickhouseDependencyReadinessSchema,
+  blueprintOpensearchDependencyReadinessSchema,
+  blueprintObjectStorageDependencyReadinessSchema,
+]);
 
 const blueprintDependencyProvisioningSchema = z
   .object({
@@ -976,7 +1084,7 @@ function isDependencyReadinessCompatible(
     return readinessType === "mysql";
   }
   if (engineFamily === "clickhouse") {
-    return readinessType === "clickhouse-native" || readinessType === "clickhouse-http";
+    return readinessType === "clickhouse";
   }
   return readinessType === engineFamily;
 }
@@ -1342,6 +1450,15 @@ export type BlueprintInstallOperation =
       readonly env: readonly BlueprintDependencyEnvPlan[];
     }
   | {
+      readonly kind: "wait-dependency-readiness";
+      readonly componentId: string;
+      readonly requirementId: string;
+      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly engine: BlueprintDependencyEngine;
+      readonly readiness: BlueprintDependencyReadinessRequirement;
+      readonly required: boolean;
+    }
+  | {
       readonly kind: "configure-component-link";
       readonly relationId: string;
       readonly relationType: BlueprintComponentRelationType;
@@ -1467,6 +1584,15 @@ export type BlueprintApplicationBundleRelationship =
       readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
       readonly provisioning?: BlueprintDependencyProvisioningConstraints;
       readonly env: readonly BlueprintDependencyEnvPlan[];
+    }
+  | {
+      readonly kind: "component-waits-for-dependency-readiness";
+      readonly componentId: string;
+      readonly requirementId: string;
+      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly engine: BlueprintDependencyEngine;
+      readonly readiness: BlueprintDependencyReadinessRequirement;
+      readonly required: boolean;
     }
   | {
       readonly kind: "component-links-component";
@@ -2055,9 +2181,11 @@ function appendComponentSetupOperations(
       });
     }
   }
+  const dependencyReadinessOperations: BlueprintInstallOperation[] = [];
   for (const requirementId of component.usesResources) {
     const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
     if (requirement) {
+      const engine = { family: dependencyEngineFamily(requirement), ...(requirement.engine ?? {}) };
       const env = component.dependencyEnv
         .filter((dependencyEnv) => dependencyEnv.resource === requirement.id)
         .map((dependencyEnv) => ({
@@ -2073,7 +2201,7 @@ function appendComponentSetupOperations(
         componentId: component.id,
         requirementId: requirement.id,
         requirementKind: requirement.kind,
-        engine: { family: dependencyEngineFamily(requirement), ...(requirement.engine ?? {}) },
+        engine,
         ...(requirement.version ? { version: requirement.version } : {}),
         capabilities: requirement.capabilities,
         outputs: defaultDependencyOutputs(requirement),
@@ -2081,8 +2209,20 @@ function appendComponentSetupOperations(
         ...(requirement.provisioning ? { provisioning: requirement.provisioning } : {}),
         env,
       });
+      for (const readiness of requirement.readiness) {
+        dependencyReadinessOperations.push({
+          kind: "wait-dependency-readiness",
+          componentId: component.id,
+          requirementId: requirement.id,
+          requirementKind: requirement.kind,
+          engine,
+          readiness,
+          required: readiness.required,
+        });
+      }
     }
   }
+  operations.push(...dependencyReadinessOperations);
 }
 
 type MutableBlueprintApplicationBundleComponentPlan = {
@@ -2225,6 +2365,21 @@ export function createBlueprintApplicationBundlePlan(
           readiness: operation.readiness,
           ...(operation.provisioning ? { provisioning: operation.provisioning } : {}),
           env: operation.env,
+        });
+        break;
+      }
+      case "wait-dependency-readiness": {
+        if (!components.has(operation.componentId)) {
+          return missingApplicationBundleComponentResource(operation.componentId);
+        }
+        relationships.push({
+          kind: "component-waits-for-dependency-readiness",
+          componentId: operation.componentId,
+          requirementId: operation.requirementId,
+          requirementKind: operation.requirementKind,
+          engine: operation.engine,
+          readiness: operation.readiness,
+          required: operation.required,
         });
         break;
       }
