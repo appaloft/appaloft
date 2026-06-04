@@ -59,6 +59,19 @@ const blueprintRuntimeSchema = z
     startCommand: nonEmptyString.optional(),
     outputDirectory: nonEmptyString.optional(),
     command: z.array(nonEmptyString).optional(),
+    version: nonEmptyString.optional(),
+    versionKind: z
+      .enum([
+        "branch",
+        "tag",
+        "commit-sha",
+        "image-tag",
+        "image-digest",
+        "content-digest",
+        "release",
+        "literal",
+      ])
+      .optional(),
   })
   .strict()
   .superRefine((runtime, context) => {

@@ -100,6 +100,9 @@ import {
   type TlsMode,
   type VariableExposure,
   type VariableKind,
+  type Version,
+  type VersionReference,
+  type VersionReferenceKind,
 } from "@appaloft/core";
 import {
   defaultExecutionTenantContext,
@@ -3078,6 +3081,8 @@ export interface ResourceDetailSourceProfile {
   imageName?: string;
   imageTag?: string;
   imageDigest?: string;
+  version?: string;
+  versionKind?: VersionReferenceKind;
   metadata?: Record<string, string>;
 }
 
@@ -8872,6 +8877,21 @@ export interface DeploymentContextDefaultsFactoryPort {
 
 export interface SourceDetector {
   detect(context: ExecutionContext, locator: string): Promise<Result<SourceDetectionResult>>;
+}
+
+export interface SourceVersionDetectionResult {
+  version: Version;
+  reasoning: string[];
+}
+
+export interface SourceVersionDetector {
+  detect(
+    context: ExecutionContext,
+    input: {
+      source: SourceDescriptor;
+      requestedVersion?: VersionReference;
+    },
+  ): Promise<Result<SourceVersionDetectionResult>>;
 }
 
 export interface RuntimePlanResolver {

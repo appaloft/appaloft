@@ -58,6 +58,8 @@ ownership and does not replace dependency-resource binding. See
 - aggregate boundaries follow invariants, not UI screens
 - cross-aggregate references use IDs, not deep object graphs
 - release and deployment are different concepts
+- source version is a core value-object concept, not a Cloud extension; source profiles carry
+  typed version references and deployment runtime plan snapshots carry fixed versions or `unknown`
 - environment is a first-class domain object
 - resource binding must remain an explicit domain concept
 - storage volumes and resource storage attachments are explicit domain concepts; provider-native

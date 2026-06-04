@@ -114,6 +114,12 @@ function sourceProfileFromState(
     ...(source.imageName ? { imageName: source.imageName.value } : {}),
     ...(source.imageTag ? { imageTag: source.imageTag.value } : {}),
     ...(source.imageDigest ? { imageDigest: source.imageDigest.value } : {}),
+    ...(source.versionReference
+      ? {
+          version: source.versionReference.value,
+          versionKind: source.versionReference.referenceKind,
+        }
+      : {}),
     ...(metadata ? { metadata } : {}),
   };
 }

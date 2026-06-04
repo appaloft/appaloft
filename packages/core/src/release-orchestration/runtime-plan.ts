@@ -59,6 +59,13 @@ import {
   type SourceLocator,
 } from "../shared/text-values";
 import { ValueObject } from "../shared/value-object";
+import {
+  type SourceVersionResolution,
+  sourceVersionResolverFor,
+  type Version,
+  type VersionReference,
+  type VersionSourceKind,
+} from "../shared/version";
 
 export const runtimeVerificationStepKinds = ["internal-http", "public-http"] as const;
 export const runtimeArtifactKinds = ["image", "compose-project"] as const;
@@ -199,6 +206,7 @@ export interface SourceDescriptorState {
   kind: SourceKindValue;
   locator: SourceLocator;
   displayName: DisplayNameText;
+  version?: Version;
   inspection?: SourceInspectionSnapshot;
   metadata?: Record<string, string>;
 }
@@ -350,6 +358,29 @@ export interface SourceDescriptorVisitor<TResult> {
   dockerComposeInline(source: SourceDescriptor): TResult;
   dockerImage(source: SourceDescriptor): TResult;
   compose(source: SourceDescriptor): TResult;
+}
+
+function versionSourceKindForSourceKind(sourceKind: SourceKindValue): VersionSourceKind {
+  switch (sourceKind.value) {
+    case "local-git":
+    case "remote-git":
+    case "git-public":
+    case "git-github-app":
+    case "git-deploy-key":
+      return "git";
+    case "docker-image":
+      return "docker-image";
+    case "local-folder":
+    case "zip-artifact":
+      return "static-artifact";
+    case "dockerfile-inline":
+    case "docker-compose-inline":
+    case "compose":
+      return "generic";
+  }
+
+  const unhandled: never = sourceKind.value;
+  return unhandled;
 }
 
 function createRuntimeEnumValue<TValue extends string>(
@@ -648,6 +679,25 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
     return this.state.metadata ? { ...this.state.metadata } : undefined;
   }
 
+  get version(): Version | undefined {
+    return this.state.version;
+  }
+
+  withVersion(version: Version): SourceDescriptor {
+    return new SourceDescriptor({
+      ...this.state,
+      version,
+      ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
+    });
+  }
+
+  resolveVersion(input?: { requestedVersion?: VersionReference }): Result<SourceVersionResolution> {
+    return sourceVersionResolverFor(versionSourceKindForSourceKind(this.state.kind)).resolve({
+      ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
+      ...(input?.requestedVersion ? { requestedVersion: input.requestedVersion } : {}),
+    });
+  }
+
   accept<TResult>(visitor: SourceDescriptorVisitor<TResult>): TResult {
     switch (this.kind) {
       case "local-folder":
@@ -683,6 +733,7 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
       kind: this.state.kind,
       locator: this.state.locator,
       displayName: this.state.displayName,
+      ...(this.state.version ? { version: this.state.version } : {}),
       ...(this.state.inspection ? { inspection: this.state.inspection } : {}),
       ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
     };
@@ -1148,6 +1199,16 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
   static create(input: RuntimePlanState): Result<RuntimePlan> {
     if (input.steps.length === 0) {
       return err(domainError.validation("Runtime plan must contain at least one step"));
+    }
+
+    if (input.source.version && !input.source.version.isFixedForDeployment()) {
+      return err(
+        domainError.validation("Runtime plan source version must be fixed or unknown", {
+          phase: "version-resolution",
+          referenceKind: input.source.version.reference.referenceKind,
+          referenceValue: input.source.version.reference.value,
+        }),
+      );
     }
 
     return ok(new RuntimePlan(input));

@@ -1741,6 +1741,8 @@ export const i18nKeys = {
       sourceImageName: "console:resources.sourceImageName",
       sourceImageTag: "console:resources.sourceImageTag",
       sourceKind: "console:resources.sourceKind",
+      sourceVersion: "console:resources.sourceVersion",
+      sourceVersionKind: "console:resources.sourceVersionKind",
       sourceKindCompose: "console:resources.sourceKindCompose",
       sourceKindDockerImage: "console:resources.sourceKindDockerImage",
       sourceKindGitPublic: "console:resources.sourceKindGitPublic",
