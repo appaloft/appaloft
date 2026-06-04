@@ -61,15 +61,11 @@ describe("FileSystemSourceVersionDetector", () => {
     }
   });
 
-  test("resolves a Docker tag to an immutable image digest", async () => {
+  test("leaves Docker tag resolution to the runtime target result", async () => {
     const commands: string[][] = [];
     const runner: SourceVersionCommandRunner = async (command) => {
       commands.push(command);
-      return command[2] === "inspect"
-        ? commandResult(
-            '["ghcr.io/acme/api@sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0"]',
-          )
-        : commandResult("");
+      return commandResult("");
     };
     const detector = new FileSystemSourceVersionDetector(runner);
     const requested = VersionReference.createForSource({
@@ -86,21 +82,12 @@ describe("FileSystemSourceVersionDetector", () => {
     const result = await detector.detect(context, { source, requestedVersion: requested });
 
     expect(result.isOk()).toBe(true);
-    expect(commands[0]).toEqual(["docker", "pull", "ghcr.io/acme/api:latest"]);
-    expect(commands[1]).toEqual([
-      "docker",
-      "image",
-      "inspect",
-      "--format",
-      "{{json .RepoDigests}}",
-      "ghcr.io/acme/api:latest",
-    ]);
+    expect(commands).toEqual([]);
     if (result.isOk()) {
-      expect(result.value.version.isFixed()).toBe(true);
-      expect(result.value.version.reference.value).toBe("latest");
-      expect(result.value.version.fixedIdentifier?.value).toBe(
-        "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0",
-      );
+      expect(result.value.version.isUnknown()).toBe(true);
+      expect(result.value.reasoning).toEqual([
+        "Docker image version could not be resolved to an immutable digest",
+      ]);
     }
   });
 });

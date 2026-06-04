@@ -6,6 +6,7 @@ import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
   buildRemotePreviewArtifactSweepCommand,
+  parseDockerRepoDigestFromInspect,
 } from "../src/ssh-execution";
 
 describe("SSH source upload", () => {
@@ -46,6 +47,17 @@ describe("SSH source upload", () => {
     expect(command).toContain("else tar -czf -");
     expect(command).toContain("'--exclude' '.turbo'");
     expect(command).toContain("ssh '-p' '22' 'deploy@example.test'");
+  });
+});
+
+describe("SSH Docker image version metadata", () => {
+  test("parses a repo digest returned by remote docker image inspect", () => {
+    const digest =
+      "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0";
+
+    expect(parseDockerRepoDigestFromInspect(`["ghcr.io/acme/api@${digest}"]`)).toBe(digest);
+    expect(parseDockerRepoDigestFromInspect(`ghcr.io/acme/api@${digest}`)).toBe(digest);
+    expect(parseDockerRepoDigestFromInspect("[]")).toBeUndefined();
   });
 });
 

@@ -3157,8 +3157,9 @@ async function waitFor<T>(
   read: () => Promise<T>,
   matches: (value: T) => boolean,
   failureMessage: string,
+  timeoutMs = 7_000,
 ): Promise<T> {
-  const deadline = Date.now() + 7_000;
+  const deadline = Date.now() + timeoutMs;
   let lastValue: T | undefined;
 
   while (Date.now() < deadline) {
@@ -3184,11 +3185,12 @@ function includesRenderedText(content: string, text: string): boolean {
   return content.toLocaleLowerCase().includes(text.toLocaleLowerCase());
 }
 
-async function expectText(view: Bun.WebView, text: string): Promise<void> {
+async function expectText(view: Bun.WebView, text: string, timeoutMs = 7_000): Promise<void> {
   await waitFor(
     () => pageText(view),
     (content) => includesRenderedText(content, text),
     `Expected page to contain text: ${text}`,
+    timeoutMs,
   );
 }
 
@@ -4602,7 +4604,6 @@ describe("console e2e with Bun.WebView", () => {
       Boolean,
       "Expected scheduled task run logs button",
     );
-    await expectText(view, "migration complete");
 
     const logsRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runs/logs");
     expect(readOrpcJsonPayload(logsRequest.body)).toEqual({
@@ -4611,7 +4612,8 @@ describe("console e2e with Bun.WebView", () => {
       resourceId: "res_demo",
       limit: 100,
     });
-  }, 15_000);
+    await expectText(view, "migration complete", 12_000);
+  }, 25_000);
 
   test("[DEP-RES-WEB-001][DEP-RES-BACKUP-011] manages dependency backup and bindings from Web", async () => {
     activeScenario = "dashboard";

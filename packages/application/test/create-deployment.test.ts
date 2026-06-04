@@ -114,6 +114,8 @@ import {
   UpsertResourceSpec,
   VariableExposureValue,
   VariableKindValue,
+  Version,
+  VersionReference,
 } from "@appaloft/core";
 import {
   CapturedEventBus,
@@ -175,6 +177,7 @@ import {
   type ServerAppliedRouteStateSelectionSpec,
   type ServerAppliedRouteStateSelectionSpecVisitor,
   type SourceDetector,
+  type SourceVersionDetector,
 } from "../src/ports";
 import {
   BindResourceDependencyUseCase,
@@ -204,6 +207,15 @@ class StaticSourceDetector implements SourceDetector {
     return ok({
       source,
       reasoning: ["detected local folder workspace"],
+    });
+  }
+}
+
+class StaticUnknownSourceVersionDetector implements SourceVersionDetector {
+  async detect(_context: ExecutionContext, _input: Parameters<SourceVersionDetector["detect"]>[1]) {
+    return ok({
+      version: Version.unknown(),
+      reasoning: ["runtime target will report Docker image digest"],
     });
   }
 }
@@ -750,6 +762,7 @@ async function createDeploymentFixture(
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
     processAttemptRecorder?: ProcessAttemptRecorder;
     operationGuardPort?: OperationGuardPort;
+    sourceVersionDetector?: SourceVersionDetector;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -891,6 +904,7 @@ async function createDeploymentFixture(
     options.processAttemptRecorder,
     undefined,
     options.operationGuardPort,
+    options.sourceVersionDetector,
   );
   const provisionDependency = new ProvisionDependencyResourceUseCase(
     projects,
@@ -1214,6 +1228,7 @@ function createRuntimeSmokeResource(input: {
   strategy: "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
+  versionReference?: VersionReference;
 }): Resource {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_demo"),
@@ -1228,6 +1243,7 @@ function createRuntimeSmokeResource(input: {
       kind: SourceKindValue.rehydrate(input.sourceKind ?? "local-folder"),
       locator: SourceLocator.rehydrate(input.sourceLocator ?? "."),
       displayName: DisplayNameText.rehydrate("workspace"),
+      ...(input.versionReference ? { versionReference: input.versionReference } : {}),
     },
     runtimeProfile: {
       strategy: RuntimePlanStrategyValue.rehydrate(input.strategy),
@@ -3399,6 +3415,46 @@ describe("CreateDeploymentUseCase", () => {
       environmentId: "env_demo",
       resourceId: "res_demo",
     });
+  });
+
+  test("[DEP-CREATE-SMOKE-007] admits Docker tag versions for runtime target digest resolution", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+      sourceVersionDetector: new StaticUnknownSourceVersionDetector(),
+    });
+    const requested = VersionReference.createForSource({
+      sourceKind: "docker-image",
+      value: "latest",
+      referenceKind: "image-tag",
+    })._unsafeUnwrap();
+    const imageResource = createRuntimeSmokeResource({
+      sourceKind: "docker-image",
+      sourceLocator: "ghcr.io/acme/api:latest",
+      strategy: "prebuilt-image",
+      versionReference: requested,
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      imageResource,
+      UpsertResourceSpec.fromResource(imageResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.source.kind).toBe("docker-image");
+    expect(runtimePlanResolver.input?.source.version?.isUnknown()).toBe(true);
+    expect(runtimePlanResolver.input?.detectedReasoning).toContain(
+      "runtime target will report Docker image digest",
+    );
   });
 
   test("[DEF-ACCESS-ROUTE-013][EDGE-PROXY-ROUTE-005] resolves server-applied config domains into deployment planning input", async () => {
