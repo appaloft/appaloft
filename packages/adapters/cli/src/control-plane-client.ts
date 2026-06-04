@@ -12,6 +12,7 @@ import {
   type AppaloftSdkOperationResult,
   createAppaloftSdkClient,
   generatedSdkOperations,
+  readAppaloftJsonApiResponse,
   type SdkOperationDescriptor,
 } from "@appaloft/sdk";
 import {
@@ -108,6 +109,24 @@ function errorFromSdkResult(
     result.error.retryable,
     details,
   );
+}
+
+function errorFromJsonApiResponse(
+  error: Extract<Awaited<ReturnType<typeof readAppaloftJsonApiResponse>>, { ok: false }>["error"],
+  phase: string,
+): DomainError {
+  const details: DomainErrorDetails = {
+    phase,
+  };
+
+  for (const [key, value] of Object.entries(error.details ?? {})) {
+    const safeValue = detailValue(value);
+    if (safeValue !== undefined) {
+      details[key] = safeValue;
+    }
+  }
+
+  return cliControlPlaneError(error.code, error.category, error.message, error.retryable, details);
 }
 
 function errorFromUnknown(error: unknown, phase: string): DomainError {
@@ -256,17 +275,21 @@ function readAuth(value: unknown, phase: string): Result<CliControlPlaneAuth> {
   );
 }
 
-async function readResponseJson(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) {
-    return null;
+async function readResponseJson(
+  response: Response,
+  phase: string,
+  request: Request,
+): Promise<Result<unknown>> {
+  const result = await readAppaloftJsonApiResponse(response, {
+    method: request.method,
+    url: request.url,
+  });
+
+  if (!result.ok) {
+    return err(errorFromJsonApiResponse(result.error, phase));
   }
 
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
+  return ok(result.data);
 }
 
 function safeAuthErrorDetails(value: unknown, phase: string, status: number): DomainErrorDetails {
@@ -372,15 +395,23 @@ export async function performControlPlaneHandshake(input: {
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliControlPlaneHandshakeResult>> {
   const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
+  const versionRequest = new Request(`${input.baseUrl}/api/version`);
   let versionResponse: Response;
 
   try {
-    versionResponse = await fetchImplementation(new Request(`${input.baseUrl}/api/version`));
+    versionResponse = await fetchImplementation(versionRequest);
   } catch (error) {
     return err(errorFromUnknown(error, "control-plane-handshake"));
   }
 
-  const versionJson = await readResponseJson(versionResponse);
+  const versionJson = await readResponseJson(
+    versionResponse,
+    "control-plane-handshake",
+    versionRequest,
+  );
+  if (versionJson.isErr()) {
+    return err(versionJson.error);
+  }
   if (!versionResponse.ok) {
     return err(
       cliControlPlaneError(
@@ -396,7 +427,7 @@ export async function performControlPlaneHandshake(input: {
     );
   }
 
-  const handshake = handshakeFromVersion(input.baseUrl, versionJson, input.checkedAt);
+  const handshake = handshakeFromVersion(input.baseUrl, versionJson.value, input.checkedAt);
   if (handshake.isErr()) {
     return err(handshake.error);
   }
@@ -436,30 +467,33 @@ export async function createCliAuthSession(input: {
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSession>> {
   const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
+  let request: Request;
   let response: Response;
 
   try {
-    response = await fetchImplementation(
-      new Request(`${input.baseUrl}/api/cli-auth/sessions`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          client: "appaloft-cli",
-        }),
+    request = new Request(`${input.baseUrl}/api/cli-auth/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        client: "appaloft-cli",
       }),
-    );
+    });
+    response = await fetchImplementation(request);
   } catch (error) {
     return err(errorFromUnknown(error, "control-plane-auth"));
   }
 
-  const json = await readResponseJson(response);
+  const json = await readResponseJson(response, "control-plane-auth", request);
+  if (json.isErr()) {
+    return err(json.error);
+  }
   if (!response.ok) {
-    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+    return err(errorFromAuthResponse(response, json.value, "control-plane-auth"));
   }
 
-  const record = readJsonObject(json);
+  const record = readJsonObject(json.value);
   if (!record) {
     return err(authContractError("control-plane-auth"));
   }
@@ -509,22 +543,27 @@ export async function pollCliAuthSession(input: {
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSessionPollResult>> {
   const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
+  let request: Request;
   let response: Response;
 
   try {
-    response = await fetchImplementation(
-      new Request(`${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}`),
+    request = new Request(
+      `${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}`,
     );
+    response = await fetchImplementation(request);
   } catch (error) {
     return err(errorFromUnknown(error, "control-plane-auth"));
   }
 
-  const json = await readResponseJson(response);
+  const json = await readResponseJson(response, "control-plane-auth", request);
+  if (json.isErr()) {
+    return err(json.error);
+  }
   if (!response.ok) {
-    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+    return err(errorFromAuthResponse(response, json.value, "control-plane-auth"));
   }
 
-  const record = readJsonObject(json);
+  const record = readJsonObject(json.value);
   const status = readOptionalString(record ?? {}, "status");
   if (
     status !== "pending" &&
@@ -558,27 +597,30 @@ export async function exchangeCliAuthSession(input: {
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<CliAuthSessionExchangeResult>> {
   const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
+  let request: Request;
   let response: Response;
 
   try {
-    response = await fetchImplementation(
-      new Request(
-        `${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}/exchange`,
-        {
-          method: "POST",
-        },
-      ),
+    request = new Request(
+      `${input.baseUrl}/api/cli-auth/sessions/${encodeURIComponent(input.deviceCode)}/exchange`,
+      {
+        method: "POST",
+      },
     );
+    response = await fetchImplementation(request);
   } catch (error) {
     return err(errorFromUnknown(error, "control-plane-auth"));
   }
 
-  const json = await readResponseJson(response);
+  const json = await readResponseJson(response, "control-plane-auth", request);
+  if (json.isErr()) {
+    return err(json.error);
+  }
   if (!response.ok) {
-    return err(errorFromAuthResponse(response, json, "control-plane-auth"));
+    return err(errorFromAuthResponse(response, json.value, "control-plane-auth"));
   }
 
-  const record = readJsonObject(json);
+  const record = readJsonObject(json.value);
   const auth = readAuth(record?.auth, "control-plane-auth");
   if (auth.isErr()) {
     return err(auth.error);
