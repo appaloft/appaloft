@@ -76,6 +76,121 @@ describe("Blueprint manifest schema", () => {
     }
   });
 
+  test("[BP-GENERATED-SECRET-001] validates generated secret policy without changing user-provided defaults", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "generated-secret-service",
+      name: "Generated Secret Service",
+      version: "1.0.0",
+      summary: "A service with platform-generated runtime secrets.",
+      secrets: [
+        {
+          key: "NEXTAUTH_SECRET",
+          label: "Auth signing secret",
+          source: "generated",
+          generation: {
+            bytes: 32,
+            encoding: "base64url",
+            description: "Generated during accepted deployment execution.",
+            rotation: { strategy: "manual" },
+          },
+        },
+        {
+          key: "STRIPE_SECRET_KEY",
+          label: "Stripe secret key",
+        },
+      ],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/web:latest",
+          },
+          usesSecrets: ["NEXTAUTH_SECRET", "STRIPE_SECRET_KEY"],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.secrets).toEqual([
+      expect.objectContaining({
+        key: "NEXTAUTH_SECRET",
+        required: true,
+        source: "generated",
+        generation: expect.objectContaining({
+          bytes: 32,
+          encoding: "base64url",
+          scope: "application",
+        }),
+      }),
+      expect.objectContaining({
+        key: "STRIPE_SECRET_KEY",
+        required: true,
+        source: "user-provided",
+      }),
+    ]);
+  });
+
+  test("[BP-GENERATED-SECRET-001] rejects implicit or misplaced generation metadata", () => {
+    const missingPolicy = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "missing-generated-policy",
+      name: "Missing Generated Policy",
+      version: "1.0.0",
+      summary: "A service with invalid generated secret metadata.",
+      secrets: [{ key: "JWT_SECRET", label: "JWT secret", source: "generated" }],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/web:latest" },
+          usesSecrets: ["JWT_SECRET"],
+        },
+      ],
+    });
+    const userProvidedGeneration = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "user-provided-generation-policy",
+      name: "User Provided Generation Policy",
+      version: "1.0.0",
+      summary: "A service with misplaced generation metadata.",
+      secrets: [
+        {
+          key: "GITHUB_CLIENT_SECRET",
+          label: "GitHub client secret",
+          generation: { bytes: 32, encoding: "base64url" },
+        },
+      ],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/web:latest" },
+          usesSecrets: ["GITHUB_CLIENT_SECRET"],
+        },
+      ],
+    });
+
+    expect(missingPolicy.ok).toBe(false);
+    expect(userProvidedGeneration.ok).toBe(false);
+    if (!missingPolicy.ok) {
+      expect(missingPolicy.issues.map((issue) => issue.message)).toContain(
+        "generated secrets require generation policy",
+      );
+    }
+    if (!userProvidedGeneration.ok) {
+      expect(userProvidedGeneration.issues.map((issue) => issue.message)).toContain(
+        "generation policy is only valid for generated secrets",
+      );
+    }
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-HEALTH-026] validates component HTTP health checks", () => {
     const result = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
