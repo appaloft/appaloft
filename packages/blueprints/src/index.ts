@@ -82,14 +82,57 @@ const blueprintParameterSchema = z
   })
   .strict();
 
+const blueprintGeneratedSecretPolicySchema = z
+  .object({
+    bytes: z.number().int().min(16).max(4096),
+    encoding: z.enum(["hex", "base64url", "base64"]).default("base64url"),
+    description: nonEmptyString.optional(),
+    scope: z.enum(["component", "application", "environment"]).default("application"),
+    rotation: z
+      .object({
+        strategy: z.enum(["manual", "periodic"]).default("manual"),
+        intervalDays: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    if (policy.rotation?.strategy === "periodic" && !policy.rotation.intervalDays) {
+      context.addIssue({
+        code: "custom",
+        message: "periodic generated secret rotation requires intervalDays",
+        path: ["rotation", "intervalDays"],
+      });
+    }
+  });
+
 const blueprintSecretSchema = z
   .object({
     key: envKeySchema,
     label: nonEmptyString,
     required: z.boolean().default(true),
+    source: z.enum(["user-provided", "generated"]).default("user-provided"),
+    generation: blueprintGeneratedSecretPolicySchema.optional(),
     description: nonEmptyString.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((secret, context) => {
+    if (secret.source === "generated" && !secret.generation) {
+      context.addIssue({
+        code: "custom",
+        message: "generated secrets require generation policy",
+        path: ["generation"],
+      });
+    }
+    if (secret.source !== "generated" && secret.generation) {
+      context.addIssue({
+        code: "custom",
+        message: "generation policy is only valid for generated secrets",
+        path: ["generation"],
+      });
+    }
+  });
 
 const blueprintPortSchema = z
   .object({
@@ -1137,6 +1180,8 @@ export type BlueprintComponent = BlueprintManifest["components"][number];
 export type BlueprintEnvironmentProfile = NonNullable<BlueprintManifest["profiles"]>[string];
 export type BlueprintParameter = BlueprintManifest["parameters"][number];
 export type BlueprintSecretPlaceholder = BlueprintManifest["secrets"][number];
+export type BlueprintSecretSource = BlueprintSecretPlaceholder["source"];
+export type BlueprintGeneratedSecretPolicy = NonNullable<BlueprintSecretPlaceholder["generation"]>;
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
 export type BlueprintDependencyKind = BlueprintResourceRequirement["kind"];
 export type BlueprintDependencyEngine = NonNullable<BlueprintResourceRequirement["engine"]>;
@@ -1435,6 +1480,8 @@ export type BlueprintInstallOperation =
       readonly componentId: string;
       readonly key: string;
       readonly required: boolean;
+      readonly source: BlueprintSecretSource;
+      readonly generation?: BlueprintGeneratedSecretPolicy;
     }
   | {
       readonly kind: "bind-dependency";
@@ -1534,6 +1581,8 @@ export interface BlueprintApplicationBundleComponentPlan {
   readonly secretReferences: readonly {
     readonly key: string;
     readonly required: boolean;
+    readonly source: BlueprintSecretSource;
+    readonly generation?: BlueprintGeneratedSecretPolicy;
   }[];
   readonly dependencyBindings: readonly {
     readonly requirementId: string;
@@ -1691,6 +1740,17 @@ export interface BlueprintComponentRuntimeDependencyEnv {
   };
 }
 
+export interface BlueprintComponentRuntimeSecretEnv {
+  readonly name: string;
+  readonly required: boolean;
+  readonly source: BlueprintSecretSource;
+  readonly generation?: BlueprintGeneratedSecretPolicy;
+  readonly bindingRef: {
+    readonly kind: "secret-reference";
+    readonly key: string;
+  };
+}
+
 export interface BlueprintComponentRuntimeDependencyReadinessGate {
   readonly dependencyRequirementId: string;
   readonly kind: BlueprintDependencyKind;
@@ -1703,6 +1763,7 @@ export interface BlueprintComponentRuntimePlan {
   readonly componentId: string;
   readonly serviceName: string;
   readonly networkName: string;
+  readonly secretEnv: readonly BlueprintComponentRuntimeSecretEnv[];
   readonly dependencyEnv: readonly BlueprintComponentRuntimeDependencyEnv[];
   readonly dependencyReadinessGates: readonly BlueprintComponentRuntimeDependencyReadinessGate[];
   readonly injectedEnv: readonly BlueprintComponentRuntimeInjectedEnv[];
@@ -1850,6 +1911,8 @@ export type BlueprintUpgradeOperation =
       readonly kind: "add-secret" | "remove-secret";
       readonly key: string;
       readonly required: boolean;
+      readonly source: BlueprintSecretSource;
+      readonly generation?: BlueprintGeneratedSecretPolicy;
       readonly classification: BlueprintUpgradeClassification;
     }
   | {
@@ -2217,6 +2280,8 @@ function appendComponentSetupOperations(
         componentId: component.id,
         key: secret.key,
         required: secret.required,
+        source: secret.source,
+        ...(secret.generation ? { generation: secret.generation } : {}),
       });
     }
   }
@@ -2277,7 +2342,12 @@ type MutableBlueprintApplicationBundleComponentPlan = {
     readonly valueSource: "literal" | "parameter";
     readonly value: string | number | boolean;
   }[];
-  secretReferences: { readonly key: string; readonly required: boolean }[];
+  secretReferences: {
+    readonly key: string;
+    readonly required: boolean;
+    readonly source: BlueprintSecretSource;
+    readonly generation?: BlueprintGeneratedSecretPolicy;
+  }[];
   dependencyBindings: {
     readonly requirementId: string;
     readonly requirementKind: BlueprintResourceRequirement["kind"];
@@ -2363,6 +2433,8 @@ export function createBlueprintApplicationBundlePlan(
         component.value.secretReferences.push({
           key: operation.key,
           required: operation.required,
+          source: operation.source,
+          ...(operation.generation ? { generation: operation.generation } : {}),
         });
         break;
       }
@@ -2502,6 +2574,7 @@ type MutableBlueprintComponentRuntimePlan = {
   componentId: string;
   serviceName: string;
   networkName: string;
+  secretEnv: BlueprintComponentRuntimeSecretEnv[];
   dependencyEnv: BlueprintComponentRuntimeDependencyEnv[];
   dependencyReadinessGates: BlueprintComponentRuntimeDependencyReadinessGate[];
   injectedEnv: BlueprintComponentRuntimeInjectedEnv[];
@@ -2587,6 +2660,21 @@ const blueprintComponentRuntimeDependencyEnvSchema = z
   })
   .strict();
 
+const blueprintComponentRuntimeSecretEnvSchema = z
+  .object({
+    name: z.string(),
+    required: z.boolean(),
+    source: z.enum(["user-provided", "generated"]),
+    generation: blueprintGeneratedSecretPolicySchema.optional(),
+    bindingRef: z
+      .object({
+        kind: z.literal("secret-reference"),
+        key: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
+
 const blueprintComponentRuntimeDependencyReadinessGateSchema = z
   .object({
     dependencyRequirementId: z.string(),
@@ -2608,6 +2696,7 @@ const blueprintComponentRuntimePlanSchema = z
     componentId: z.string(),
     serviceName: z.string(),
     networkName: z.string(),
+    secretEnv: z.array(blueprintComponentRuntimeSecretEnvSchema).default([]),
     dependencyEnv: z.array(blueprintComponentRuntimeDependencyEnvSchema).default([]),
     dependencyReadinessGates: z
       .array(blueprintComponentRuntimeDependencyReadinessGateSchema)
@@ -2638,6 +2727,7 @@ export function createBlueprintComponentRuntimeProjection(
         component.resourceSlug ??
         component.componentId,
       networkName,
+      secretEnv: [],
       dependencyEnv: [],
       dependencyReadinessGates: [],
       injectedEnv: [],
@@ -2678,6 +2768,18 @@ export function createBlueprintComponentRuntimeProjection(
     if (!plan) {
       continue;
     }
+    for (const secret of component.secretReferences) {
+      plan.secretEnv.push({
+        name: secret.key,
+        required: secret.required,
+        source: secret.source,
+        ...(secret.generation ? { generation: secret.generation } : {}),
+        bindingRef: {
+          kind: "secret-reference",
+          key: secret.key,
+        },
+      });
+    }
     for (const binding of component.dependencyBindings) {
       for (const env of binding.env ?? []) {
         plan.dependencyEnv.push({
@@ -2712,6 +2814,7 @@ export function createBlueprintComponentRuntimeProjection(
       componentId: plan.componentId,
       serviceName: plan.serviceName,
       networkName: plan.networkName,
+      secretEnv: sortByName(plan.secretEnv),
       dependencyEnv: sortByDependencyAndName(plan.dependencyEnv),
       dependencyReadinessGates: sortByDependencyAndReadiness(plan.dependencyReadinessGates),
       injectedEnv: sortByRelationAndName(plan.injectedEnv),
@@ -2967,6 +3070,10 @@ function sortByRelationAndName<T extends { readonly relationId: string; readonly
     const relationOrder = left.relationId.localeCompare(right.relationId);
     return relationOrder === 0 ? left.name.localeCompare(right.name) : relationOrder;
   });
+}
+
+function sortByName<T extends { readonly name: string }>(values: readonly T[]): readonly T[] {
+  return [...values].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function sortByRelationAndProvider<
@@ -3383,6 +3490,8 @@ function diffSecrets(
         kind: "add-secret",
         key: secret.key,
         required: secret.required,
+        source: secret.source,
+        ...(secret.generation ? { generation: secret.generation } : {}),
         classification: secret.required ? "potentially-breaking" : "non-breaking",
       });
     }
@@ -3394,6 +3503,8 @@ function diffSecrets(
         kind: "remove-secret",
         key: secret.key,
         required: secret.required,
+        source: secret.source,
+        ...(secret.generation ? { generation: secret.generation } : {}),
         classification: "breaking",
       });
     }
