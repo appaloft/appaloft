@@ -4,6 +4,7 @@ import {
   blueprintSchemaVersion,
   blueprintUpgradePlanSchemaVersion,
   createBlueprintApplicationBundlePlan,
+  createBlueprintComponentRuntimeProjection,
   createBlueprintInstallPlan,
   createBlueprintUpgradePlan,
   resolveBlueprintVariantManifest,
@@ -244,12 +245,142 @@ describe("Blueprint install plan", () => {
       }),
     ]);
     expect(bundle.value.components[0]?.dependencyBindings).toEqual([
-      {
+      expect.objectContaining({
         requirementId: "postgres",
         requirementKind: "postgres",
+        engine: { family: "postgres" },
         capabilities: [{ type: "postgres-extension", name: "vector", required: true }],
+        readiness: [],
+        env: [],
+      }),
+    ]);
+  });
+
+  test("[BP-DEP-CONTRACT-003] carries dependency env, output, readiness, and secret metadata into plans and runtime projections", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-env-service",
+      name: "Dependency Env Service",
+      version: "1.0.0",
+      summary: "A service with structured dependency env injection.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          version: { range: ">=15 <17" },
+          readiness: [{ type: "postgres", database: "app" }],
+        },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/appaloft/api:latest",
+          },
+          usesResources: ["postgres"],
+          dependencyEnv: [
+            { resource: "postgres", name: "DATABASE_URL", valueFrom: "url", secret: false },
+            { resource: "postgres", name: "DB_HOST", valueFrom: "host" },
+            { resource: "postgres", name: "DB_PASSWORD", valueFrom: "password" },
+            {
+              resource: "postgres",
+              name: "JDBC_URL",
+              template: "jdbc:postgresql://${host}:${port}/${database}",
+            },
+          ],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: { projectName: "Dependency Env", environmentName: "production" },
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    const bind = plan.value.operations.find((operation) => operation.kind === "bind-dependency");
+    expect(bind?.kind).toBe("bind-dependency");
+    if (bind?.kind !== "bind-dependency") return;
+    expect(bind).toMatchObject({
+      requirementId: "postgres",
+      engine: { family: "postgres" },
+      version: { range: ">=15 <17" },
+      readiness: [{ type: "postgres", database: "app", required: true }],
+    });
+    expect(bind.env).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "DATABASE_URL",
+          valueFrom: "url",
+          secret: true,
+          outputNames: ["url"],
+        }),
+        expect.objectContaining({
+          name: "DB_HOST",
+          valueFrom: "host",
+          secret: false,
+        }),
+        expect.objectContaining({
+          name: "DB_PASSWORD",
+          valueFrom: "password",
+          secret: true,
+        }),
+        expect.objectContaining({
+          name: "JDBC_URL",
+          template: "jdbc:postgresql://${host}:${port}/${database}",
+          secret: false,
+          outputNames: ["host", "port", "database"],
+        }),
+      ]),
+    );
+    expect(JSON.stringify(plan.value)).not.toContain("postgres://appaloft:");
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: plan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) return;
+    expect(bundle.value.dependencies[0]).toMatchObject({
+      requirementId: "postgres",
+      kind: "postgres",
+      version: { range: ">=15 <17" },
+      readiness: [{ type: "postgres", database: "app", required: true }],
+    });
+
+    const projection = createBlueprintComponentRuntimeProjection({
+      applicationBundle: bundle.value,
+    });
+    expect(projection.components[0]?.dependencyEnv).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dependencyRequirementId: "postgres",
+          name: "DATABASE_URL",
+          valueFrom: "url",
+          secret: true,
+          bindingRef: { kind: "dependency-output", requirementId: "postgres" },
+        }),
+      ]),
+    );
+    expect(projection.components[0]?.dependencyReadinessGates).toEqual([
+      {
+        dependencyRequirementId: "postgres",
+        kind: "postgres",
+        engine: { family: "postgres" },
+        readiness: { type: "postgres", database: "app", required: true },
+        required: true,
       },
     ]);
+    expect(JSON.stringify(projection)).not.toContain("postgres://appaloft:");
   });
 
   test("[CLOUD-BLUEPRINT-PUBLIC-VARIANT-033] compiles the selected variant into the install plan", () => {
@@ -434,13 +565,13 @@ describe("Blueprint install plan", () => {
           componentId: "web",
           resourceSlug: "bundle-web",
         },
-        {
+        expect.objectContaining({
           kind: "component-binds-dependency",
           componentId: "worker",
           requirementId: "redis",
           requirementKind: "redis",
           capabilities: [],
-        },
+        }),
       ]),
     );
     expect(bundlePlan.value.execution).toEqual({

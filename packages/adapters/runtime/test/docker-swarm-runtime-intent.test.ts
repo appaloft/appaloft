@@ -119,6 +119,8 @@ function workerComponentRuntimePlan(): BlueprintComponentRuntimePlan {
     componentId: "worker",
     serviceName: "worker.internal",
     networkName: "appaloft-blueprint-private",
+    dependencyEnv: [],
+    dependencyReadinessGates: [],
     injectedEnv: [
       {
         relationId: "worker-uses-api",
