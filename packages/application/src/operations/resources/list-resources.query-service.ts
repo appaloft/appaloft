@@ -130,16 +130,30 @@ export class ListResourcesQueryService {
     }
 
     const generated = generatedResult.value.domain;
+    const pathPrefix = resource.accessProfile?.pathPrefix ?? "/";
     return {
       plannedGeneratedAccessRoute: {
-        url: `${generated.scheme}://${generated.hostname}`,
+        url: routeUrl({
+          hostname: generated.hostname,
+          scheme: generated.scheme,
+          pathPrefix,
+        }),
         hostname: generated.hostname,
         scheme: generated.scheme,
         providerKey: generated.providerKey,
-        pathPrefix: resource.accessProfile?.pathPrefix ?? "/",
+        pathPrefix,
         proxyKind: edgeProxy.kind.value,
         targetPort: resource.networkProfile.internalPort,
       },
     };
   }
+}
+
+function routeUrl(input: {
+  hostname: string;
+  scheme: "http" | "https";
+  pathPrefix: string;
+}): string {
+  const path = input.pathPrefix === "/" ? "" : input.pathPrefix;
+  return `${input.scheme}://${input.hostname}${path}`;
 }

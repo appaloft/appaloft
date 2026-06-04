@@ -728,6 +728,70 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-WF-010C]",
+      name: "shared workflow configures resource access profile before deployment",
+      input: workflowInput({
+        resource: {
+          mode: "existing",
+          id: "res_existing",
+          configureAccess: {
+            accessProfile: {
+              generatedAccessMode: "inherit",
+              pathPrefix: "/_/",
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.configureAccess", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureAccess").input).toEqual({
+          resourceId: "res_existing",
+          accessProfile: {
+            generatedAccessMode: "inherit",
+            pathPrefix: "/_/",
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+        });
+      },
+    },
+    {
+      id: "[QUICK-DEPLOY-WF-010D]",
+      name: "shared workflow configures created resource access profile before deployment",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: resourceInput(),
+          configureAccess: {
+            accessProfile: {
+              generatedAccessMode: "inherit",
+              pathPrefix: "/admin",
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.create", "resources.configureAccess", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureAccess").input).toEqual({
+          resourceId: "res_1",
+          accessProfile: {
+            generatedAccessMode: "inherit",
+            pathPrefix: "/admin",
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_1",
+        });
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-WF-010B]",
       name: "shared workflow configures existing resource network profile before ids-only deployment",
       input: workflowInput({
@@ -1615,6 +1679,8 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
     case "resources.create":
       return { id: "res_1" };
     case "resources.configureSource":
+      return { id: "res_1" };
+    case "resources.configureAccess":
       return { id: "res_1" };
     case "resources.configureNetwork":
       return { id: "res_1" };

@@ -45,6 +45,7 @@
   import { onDestroy, type Component } from "svelte";
   import type {
     AuthSessionResponse,
+    ConfigureResourceAccessInput,
     ConfigureResourceNetworkInput,
     ConfigureResourceRuntimeInput,
     ConfigureResourceSourceInput,
@@ -763,6 +764,10 @@
     mutationFn: (input: ConfigureResourceSourceInput) =>
       orpcClient.resources.configureSource(input),
   }));
+  const configureResourceAccessMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceAccessInput) =>
+      orpcClient.resources.configureAccess(input),
+  }));
   const configureResourceRuntimeMutation = createMutation(() => ({
     mutationFn: (input: ConfigureResourceRuntimeInput) =>
       orpcClient.resources.configureRuntime(input),
@@ -1046,6 +1051,16 @@
 
     return port ? String(port.containerPort) : "3000";
   });
+  const selectedBlueprintDefaultAccessPath = $derived.by(() => {
+    const component = selectedBlueprintPrimaryComponent;
+    const route =
+      component?.routes.find((candidate) => {
+        const port = component.ports.find((portCandidate) => portCandidate.name === candidate.port);
+        return port?.public && port.protocol === "http";
+      }) ?? component?.routes[0];
+
+    return route?.pathPrefix ?? "/";
+  });
   const selectedBlueprintProvisionableDependencies = $derived(
     selectedBlueprintEffectiveManifest?.resources.flatMap(
       (resource): BlueprintDependencyRequirement[] =>
@@ -1159,6 +1174,7 @@
       createEnvironmentMutation.isPending ||
       createResourceMutation.isPending ||
       configureResourceSourceMutation.isPending ||
+      configureResourceAccessMutation.isPending ||
       configureResourceRuntimeMutation.isPending ||
       configureResourceNetworkMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
@@ -3628,6 +3644,11 @@
         await resourcesQuery.refetch();
         return configuredResource;
       }
+      case "resources.configureAccess": {
+        const configuredResource = await configureResourceAccessMutation.mutateAsync(step.input);
+        await resourcesQuery.refetch();
+        return configuredResource;
+      }
       case "resources.configureRuntime": {
         const configuredResource = await configureResourceRuntimeMutation.mutateAsync(step.input);
         await resourcesQuery.refetch();
@@ -3859,6 +3880,15 @@
       }
 
       let workflowResource: QuickDeployWorkflowInput["resource"];
+      const blueprintConfigureAccess =
+        sourceKind === "blueprint"
+          ? {
+              accessProfile: {
+                generatedAccessMode: "inherit" as const,
+                pathPrefix: selectedBlueprintDefaultAccessPath,
+              },
+            }
+          : null;
       if (resourceContextEnabled) {
         if (resourceMode === "existing") {
           if (!selectedResourceId) {
@@ -3868,6 +3898,7 @@
           workflowResource = {
             mode: "existing",
             id: selectedResourceId,
+            ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
           };
         } else {
           if (!editedResourceInput.name.trim()) {
@@ -3876,6 +3907,7 @@
 
           workflowResource = {
             mode: "create",
+            ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
             input: {
               name: editedResourceInput.name.trim(),
               kind: editedResourceInput.kind ?? "application",
@@ -3894,6 +3926,7 @@
       } else {
         workflowResource = {
           mode: "create",
+          ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
           input: {
             name: inferredResourceInput.name.trim(),
             kind: inferredResourceInput.kind ?? "application",

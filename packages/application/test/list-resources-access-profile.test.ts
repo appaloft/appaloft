@@ -180,6 +180,7 @@ describe("ListResourcesQueryService access profile projection", () => {
     );
 
     expect(result.items[0]?.accessSummary?.plannedGeneratedAccessRoute).toMatchObject({
+      url: "http://web.203-0-113-10.sslip.io/docs",
       pathPrefix: "/docs",
       targetPort: 3000,
       proxyKind: "traefik",

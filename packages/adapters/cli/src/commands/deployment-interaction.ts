@@ -4482,6 +4482,8 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return createResource(step.input);
     case "resources.configureSource":
       return configureResourceSource(step.input);
+    case "resources.configureAccess":
+      return configureResourceAccess(step.input);
     case "resources.configureRuntime":
       return configureResourceRuntime(step.input);
     case "resources.configureHealth":

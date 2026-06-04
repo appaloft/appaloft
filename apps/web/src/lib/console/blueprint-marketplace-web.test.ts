@@ -133,6 +133,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("blueprintQuickDeployDependencyProvisioningInput");
     expect(quickDeploySource).toContain("healthCheckPolicyForSource");
     expect(quickDeploySource).toContain("blueprintComponentForQuickDeploy().healthCheck");
+    expect(quickDeploySource).toContain("selectedBlueprintDefaultAccessPath");
+    expect(quickDeploySource).toContain("configureResourceAccessMutation");
+    expect(quickDeploySource).toContain("orpcClient.resources.configureAccess");
     expect(quickDeploySource).toContain('case "dependencyResources.provision"');
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.plan");
     expect(quickDeploySource).toContain("orpcClient.dependencyResources.provisioning.accept");

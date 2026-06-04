@@ -1,6 +1,8 @@
 import { customAlphabet } from "nanoid";
 
 import {
+  type ConfigureResourceAccessInput,
+  type ConfigureResourceAccessResponse,
   type ConfigureResourceHealthInput,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkInput,
@@ -132,6 +134,7 @@ export type QuickDeployResourceReference =
       mode: "existing";
       id: string;
       configureSource?: Omit<ConfigureResourceSourceInput, "resourceId">;
+      configureAccess?: Omit<ConfigureResourceAccessInput, "resourceId">;
       configureNetwork?: Omit<ConfigureResourceNetworkInput, "resourceId">;
       configureRuntime?: Omit<ConfigureResourceRuntimeInput, "resourceId">;
       configureHealth?: Omit<ConfigureResourceHealthInput, "resourceId">;
@@ -139,6 +142,7 @@ export type QuickDeployResourceReference =
   | {
       mode: "create";
       input: QuickDeployCreateResourceInput;
+      configureAccess?: Omit<ConfigureResourceAccessInput, "resourceId">;
     };
 
 export type QuickDeployWorkflowInput = {
@@ -233,6 +237,10 @@ export type QuickDeployWorkflowStep =
       input: ConfigureResourceSourceInput;
     }
   | {
+      kind: "resources.configureAccess";
+      input: ConfigureResourceAccessInput;
+    }
+  | {
       kind: "resources.configureNetwork";
       input: ConfigureResourceNetworkInput;
     }
@@ -263,6 +271,7 @@ export type QuickDeployWorkflowStepOutput =
   | CreateSshCredentialResponse
   | CreateEnvironmentResponse
   | CreateResourceResponse
+  | ConfigureResourceAccessResponse
   | ConfigureResourceSourceResponse
   | ConfigureResourceHealthResponse
   | CreateDeploymentResponse
@@ -387,6 +396,16 @@ export function* quickDeployWorkflow(
       input: {
         resourceId,
         ...input.resource.configureSource,
+      },
+    };
+  }
+
+  if (input.resource.configureAccess) {
+    yield {
+      kind: "resources.configureAccess",
+      input: {
+        resourceId,
+        ...input.resource.configureAccess,
       },
     };
   }
