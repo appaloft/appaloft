@@ -461,6 +461,30 @@ profiles:
         },
       ],
     });
+    const versionBounds = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "version-bounds",
+      name: "Version Bounds",
+      version: "1.0.0",
+      summary: "Valid version bounds.",
+      resources: [
+        {
+          id: "redis",
+          kind: "redis",
+          label: "Redis",
+          version: { preferred: "7.2", minimum: "7", maximum: "7.4" },
+        },
+      ],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/app:latest" },
+          usesResources: ["redis"],
+        },
+      ],
+    });
     const invalidVersion = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
       id: "invalid-version",
@@ -481,6 +505,7 @@ profiles:
       ],
     });
 
+    expect(versionBounds.ok).toBe(true);
     expect(invalidOutput.ok).toBe(false);
     expect(invalidResource.ok).toBe(false);
     expect(readinessMismatch.ok).toBe(false);

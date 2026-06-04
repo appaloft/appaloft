@@ -205,13 +205,15 @@ const blueprintDependencyVersionRequirementSchema = z
   .object({
     preferred: versionLiteralSchema.optional(),
     range: versionRangeSchema.optional(),
+    minimum: versionLiteralSchema.optional(),
+    maximum: versionLiteralSchema.optional(),
   })
   .strict()
   .superRefine((version, context) => {
-    if (!version.preferred && !version.range) {
+    if (!version.preferred && !version.range && !version.minimum && !version.maximum) {
       context.addIssue({
         code: "custom",
-        message: "dependency version requires preferred or range",
+        message: "dependency version requires preferred, range, minimum, or maximum",
         path: [],
       });
     }
@@ -1657,11 +1659,14 @@ export type BlueprintUpgradeOperation =
         | "add-dependency"
         | "remove-dependency"
         | "change-dependency-kind"
+        | "change-dependency-compatibility"
         | "change-dependency-capabilities"
         | "change-dependency-contract";
       readonly requirementId: string;
       readonly fromKind?: BlueprintResourceRequirement["kind"];
       readonly toKind?: BlueprintResourceRequirement["kind"];
+      readonly fromVersion?: BlueprintDependencyVersionRequirement;
+      readonly toVersion?: BlueprintDependencyVersionRequirement;
       readonly fromCapabilities?: readonly BlueprintDependencyCapability[];
       readonly toCapabilities?: readonly BlueprintDependencyCapability[];
       readonly fromDependency?: BlueprintResourceRequirement;
@@ -3038,6 +3043,15 @@ function diffResources(
       });
       continue;
     }
+    if (fingerprint(current.version) !== fingerprint(resource.version)) {
+      operations.push({
+        kind: "change-dependency-compatibility",
+        requirementId: resource.id,
+        ...(current.version ? { fromVersion: current.version } : {}),
+        ...(resource.version ? { toVersion: resource.version } : {}),
+        classification: "potentially-breaking",
+      });
+    }
     if (fingerprint(current.capabilities) !== fingerprint(resource.capabilities)) {
       operations.push({
         kind: "change-dependency-capabilities",
@@ -3156,7 +3170,6 @@ function fingerprint(value: unknown): string {
 function dependencyContractFingerprint(resource: BlueprintResourceRequirement): unknown {
   return {
     engine: { family: dependencyEngineFamily(resource), ...(resource.engine ?? {}) },
-    version: resource.version,
     outputs: defaultDependencyOutputs(resource),
     readiness: resource.readiness,
     provisioning: resource.provisioning,
