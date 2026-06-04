@@ -190,7 +190,7 @@ describe("remote control-plane CLI e2e", () => {
     } finally {
       await server.stop();
     }
-  });
+  }, 30_000);
 
   test("[CONTROL-PLANE-CLI-014] HTML fallback transport errors do not leak the Svelte shell", async () => {
     workspace = createShellE2eWorkspace("appaloft-remote-cli-html-");

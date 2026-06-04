@@ -64,6 +64,56 @@ variable names, output field names or templates, and whether the result is secre
 raw passwords or connection strings. If an output or template includes a password-bearing URL, the
 result is secret even when the author omits or weakens the `secret` flag.
 
+Use `valueFrom: url` when the application accepts the provider's standard connection URL:
+
+```yaml title="URL dependency env"
+resources:
+  - id: postgres
+    kind: postgres
+    label: App Postgres
+components:
+  - id: app
+    usesResources:
+      - postgres
+    dependencyEnv:
+      - resource: postgres
+        name: DATABASE_URL
+        valueFrom: url
+```
+
+Use split field mappings when an application expects separate host, port, user, and password
+variables:
+
+```yaml title="Split field dependency env"
+dependencyEnv:
+  - resource: postgres
+    name: DB_HOST
+    valueFrom: host
+  - resource: postgres
+    name: DB_PORT
+    valueFrom: port
+  - resource: postgres
+    name: DB_NAME
+    valueFrom: database
+  - resource: postgres
+    name: DB_USER
+    valueFrom: username
+    secret: true
+  - resource: postgres
+    name: DB_PASSWORD
+    valueFrom: password
+```
+
+Use `template` when the runtime needs a product-specific URL shape. Template placeholders can only
+reference supported dependency outputs:
+
+```yaml title="Template dependency env"
+dependencyEnv:
+  - resource: redis
+    name: REDIS_URL
+    template: "redis://${username}:${password}@${host}:${port}/0"
+```
+
 Use `kind: mysql` with `engine.family: mariadb` for MariaDB. The dependency remains a
 MySQL-compatible provisioning and binding primitive, while the engine family drives provider
 selection, readiness, version matching, and generated output semantics.
