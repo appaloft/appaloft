@@ -1239,44 +1239,6 @@ function gitRefPatterns(referenceKind: string | undefined, value: string): strin
   ];
 }
 
-function repoDigestFromDockerInspect(output: string): string | undefined {
-  const trimmed = output.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.match(/@(sha256:[0-9a-f]{64})$/i)?.[1])
-        .find((digest): digest is string => Boolean(digest));
-    }
-  } catch {
-    const digest = trimmed.match(/@(sha256:[0-9a-f]{64})/i)?.[1];
-    if (digest) {
-      return digest;
-    }
-  }
-
-  return undefined;
-}
-
-function imageReferenceForVersion(input: {
-  sourceLocator: string;
-  metadata?: Record<string, string>;
-  requestedVersion?: VersionReference;
-}): string {
-  if (input.requestedVersion?.referenceKind === "image-tag") {
-    return input.metadata?.imageName
-      ? `${input.metadata.imageName}:${input.requestedVersion.value}`
-      : input.sourceLocator;
-  }
-
-  return input.sourceLocator;
-}
-
 export class FileSystemSourceVersionDetector implements SourceVersionDetector {
   constructor(
     private readonly runCommand: SourceVersionCommandRunner = defaultSourceVersionCommandRunner,
@@ -1398,60 +1360,7 @@ export class FileSystemSourceVersionDetector implements SourceVersionDetector {
   private async detectDockerImage(
     input: Parameters<SourceVersionDetector["detect"]>[1],
   ): Promise<Result<SourceVersionDetectionResult>> {
-    if (input.requestedVersion?.isImmutable()) {
-      return this.detectFromCore(input);
-    }
-
-    const image = imageReferenceForVersion({
-      sourceLocator: input.source.locator,
-      ...(input.source.metadata ? { metadata: input.source.metadata } : {}),
-      ...(input.requestedVersion ? { requestedVersion: input.requestedVersion } : {}),
-    });
-    const pull = await this.runCommand(["docker", "pull", image]);
-    const inspect = await this.runCommand([
-      "docker",
-      "image",
-      "inspect",
-      "--format",
-      "{{json .RepoDigests}}",
-      image,
-    ]);
-    let digest = commandSucceeded(inspect)
-      ? repoDigestFromDockerInspect(inspect.stdout)
-      : undefined;
-
-    if (!digest && !commandSucceeded(pull)) {
-      const localInspect = await this.runCommand([
-        "docker",
-        "image",
-        "inspect",
-        "--format",
-        "{{json .RepoDigests}}",
-        input.source.locator,
-      ]);
-      digest = commandSucceeded(localInspect)
-        ? repoDigestFromDockerInspect(localInspect.stdout)
-        : undefined;
-    }
-
-    if (!digest) {
-      return this.detectFromCore(input);
-    }
-
-    return VersionReference.createDetected({
-      sourceKind: "docker-image",
-      referenceKind: "image-digest",
-      value: digest,
-    }).andThen((fixedIdentifier) =>
-      Version.fixed({
-        reference: input.requestedVersion ?? fixedIdentifier,
-        fixedIdentifier,
-        aliases: input.requestedVersion ? [input.requestedVersion] : [],
-      }).map((version) => ({
-        version,
-        reasoning: ["Resolved fixed Docker image version with docker image inspect"],
-      })),
-    );
+    return this.detectFromCore(input);
   }
 }
 

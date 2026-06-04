@@ -21,6 +21,7 @@ import {
 } from "../shared/temporal";
 import { PlanStepText } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
+import { Version, VersionReference } from "../shared/version";
 import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
   type AccessRouteExpectation,
@@ -31,6 +32,58 @@ import {
 } from "./runtime-plan";
 
 export type DeploymentTriggerKind = "create" | "retry" | "redeploy" | "rollback";
+
+function dockerImageSourceVersionFromExecutionMetadata(
+  runtimePlan: RuntimePlan,
+  metadata: Record<string, string> | undefined,
+): Result<Version | undefined> {
+  const source = runtimePlan.source;
+  if (source.kind !== "docker-image") {
+    return ok(undefined);
+  }
+
+  const digest = metadata?.imageDigest ?? metadata?.["source.imageDigest"];
+  if (!digest) {
+    return ok(undefined);
+  }
+
+  const fixedIdentifier = VersionReference.createDetected({
+    sourceKind: "docker-image",
+    referenceKind: "image-digest",
+    value: digest,
+  });
+  if (fixedIdentifier.isErr()) {
+    return err(fixedIdentifier.error);
+  }
+
+  const tagValue =
+    source.version?.reference.referenceKind === "image-tag"
+      ? source.version.reference.value
+      : source.metadata?.versionReferenceKind === "image-tag"
+        ? source.metadata.versionReference
+        : source.metadata?.imageTag;
+  if (!tagValue) {
+    return Version.fixed({
+      reference: fixedIdentifier.value,
+      fixedIdentifier: fixedIdentifier.value,
+    }).map((version) => version);
+  }
+
+  const tag = VersionReference.create({
+    sourceKind: "docker-image",
+    referenceKind: "image-tag",
+    value: tagValue,
+  });
+  if (tag.isErr()) {
+    return err(tag.error);
+  }
+
+  return Version.fixed({
+    reference: tag.value,
+    fixedIdentifier: fixedIdentifier.value,
+    aliases: [tag.value],
+  }).map((version) => version);
+}
 
 const deploymentTriggerKindBrand: unique symbol = Symbol("DeploymentTriggerKindValue");
 export class DeploymentTriggerKindValue extends ScalarValueObject<DeploymentTriggerKind> {
@@ -269,7 +322,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     const resultState = result.toState();
     this.appendLogs(resultState.logs);
     this.state.finishedAt = at;
-    return this.state.status.applyExecutionResult(resultState.status).map((nextStatus) => {
+    return this.state.status.applyExecutionResult(resultState.status).andThen((nextStatus) => {
       this.state.status = nextStatus;
 
       const executionMetadata = {
@@ -279,6 +332,19 @@ export class Deployment extends AggregateRoot<DeploymentState> {
 
       if (Object.keys(executionMetadata).length > 0) {
         this.state.runtimePlan = this.state.runtimePlan.withExecutionMetadata(executionMetadata);
+      }
+
+      const sourceVersion = dockerImageSourceVersionFromExecutionMetadata(
+        this.state.runtimePlan,
+        resultState.metadata,
+      );
+      if (sourceVersion.isErr()) {
+        return err(sourceVersion.error);
+      }
+      if (sourceVersion.value) {
+        this.state.runtimePlan = this.state.runtimePlan.withSource(
+          this.state.runtimePlan.source.withVersion(sourceVersion.value),
+        );
       }
 
       const failurePhase = resultState.metadata?.phase;
@@ -293,7 +359,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         ...(failurePhase ? { failurePhase } : {}),
         ...(errorMessage ? { errorMessage } : {}),
       });
-      return undefined;
+      return ok(undefined);
     });
   }
 
