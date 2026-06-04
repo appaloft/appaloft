@@ -204,4 +204,40 @@ describe("Appaloft SDK auth and structured errors", () => {
       expect(isAppaloftSdkErrorCode(result.error, "action_auth_invalid")).toBe(true);
     }
   });
+
+  test("[TS-SDK-ERROR-002] classifies HTML shell fallback responses before JSON parsing", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        new Response("<!doctype html><html><body>Svelte shell</body></html>", {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+          status: 200,
+        }),
+    });
+
+    const result = await client.request({
+      operation: productSessionOperation,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 200,
+      error: {
+        code: "control_plane_unexpected_html_response",
+        category: "infra",
+        message:
+          "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+        retryable: false,
+        details: {
+          method: "GET",
+          url: "https://appaloft.example/api/organizations/current-context",
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          bodyKind: "html",
+        },
+      },
+    });
+  });
 });

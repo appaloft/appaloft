@@ -50,6 +50,21 @@ export type AppaloftSdkAuth =
 
 export type AppaloftSdkFetch = (request: Request) => Promise<Response>;
 
+export interface AppaloftJsonApiResponseContext {
+  readonly method: string;
+  readonly url: string;
+}
+
+export type AppaloftJsonApiReadResult =
+  | {
+      readonly ok: true;
+      readonly data: unknown;
+    }
+  | {
+      readonly ok: false;
+      readonly error: DomainErrorResponse;
+    };
+
 export interface AppaloftSdkClientOptions {
   readonly baseUrl: string;
   readonly auth?: AppaloftSdkAuth | (() => AppaloftSdkAuth | undefined);
@@ -112,28 +127,37 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
       input: AppaloftSdkOperationRequest,
     ): Promise<AppaloftSdkOperationResult<T>> => {
       const url = buildOperationUrl(options.baseUrl, input);
-      const response = await fetchImplementation(
-        buildRequest(url, input, {
-          auth: resolveAuth(options.auth),
-          configuredHeaders: options.headers,
-          userAgent: options.userAgent,
-        }),
-      );
+      const request = buildRequest(url, input, {
+        auth: resolveAuth(options.auth),
+        configuredHeaders: options.headers,
+        userAgent: options.userAgent,
+      });
+      const response = await fetchImplementation(request);
+      const data = await readAppaloftJsonApiResponse(response, {
+        method: request.method,
+        url: request.url,
+      });
 
-      const data = await readJson(response);
+      if (!data.ok) {
+        return {
+          ok: false,
+          status: response.status,
+          error: data.error,
+        };
+      }
 
       if (!response.ok) {
         return {
           ok: false,
           status: response.status,
-          error: parseDomainError(data),
+          error: parseDomainError(data.data),
         };
       }
 
       return {
         ok: true,
         status: response.status,
-        data: data as T,
+        data: data.data as T,
       };
     },
     stream: <TEnvelope = unknown>(
@@ -148,23 +172,36 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
   };
 }
 
+async function fetchSdkOperation(
+  fetchImplementation: AppaloftSdkFetch,
+  options: AppaloftSdkClientOptions,
+  input: AppaloftSdkOperationRequest,
+): Promise<{ readonly request: Request; readonly response: Response }> {
+  const url = buildOperationUrl(options.baseUrl, input);
+  const request = buildRequest(url, input, {
+    auth: resolveAuth(options.auth),
+    configuredHeaders: options.headers,
+    userAgent: options.userAgent,
+  });
+  return {
+    request,
+    response: await fetchImplementation(request),
+  };
+}
+
 async function* streamOperation<TEnvelope>(
   fetchImplementation: AppaloftSdkFetch,
   options: AppaloftSdkClientOptions,
   input: AppaloftSdkStreamRequest<TEnvelope>,
 ): AsyncIterable<TEnvelope> {
-  const url = buildOperationUrl(options.baseUrl, input);
-  const response = await fetchImplementation(
-    buildRequest(url, input, {
-      auth: resolveAuth(options.auth),
-      configuredHeaders: options.headers,
-      userAgent: options.userAgent,
-    }),
-  );
+  const { request, response } = await fetchSdkOperation(fetchImplementation, options, input);
 
   if (!response.ok) {
-    const data = await readJson(response);
-    const error = parseDomainError(data);
+    const data = await readAppaloftJsonApiResponse(response, {
+      method: request.method,
+      url: request.url,
+    });
+    const error = data.ok ? parseDomainError(data.data) : data.error;
     throw new AppaloftSdkStreamError(
       `SDK stream request failed with ${error.code}`,
       response.status,
@@ -271,18 +308,93 @@ function applyAuthHeaders(headers: Headers, auth: AppaloftSdkAuth | undefined): 
   headers.set("authorization", `Bearer ${auth.token}`);
 }
 
-async function readJson(response: Response): Promise<unknown> {
+export async function readAppaloftJsonApiResponse(
+  response: Response,
+  context: AppaloftJsonApiResponseContext,
+): Promise<AppaloftJsonApiReadResult> {
   const text = await response.text();
+  const contentType = response.headers.get("content-type") ?? "";
 
   if (text.length === 0) {
-    return null;
+    return { ok: true, data: null };
+  }
+
+  if (isHtmlResponse(contentType, text)) {
+    return {
+      ok: false,
+      error: unexpectedResponseError(
+        "control_plane_unexpected_html_response",
+        "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+        response,
+        context,
+        contentType,
+        "html",
+      ),
+    };
   }
 
   try {
-    return JSON.parse(text) as unknown;
+    return { ok: true, data: JSON.parse(text) as unknown };
   } catch {
-    return text;
+    return {
+      ok: false,
+      error: unexpectedResponseError(
+        hasJsonContentType(contentType)
+          ? "control_plane_invalid_json_response"
+          : "control_plane_unexpected_non_json_response",
+        hasJsonContentType(contentType)
+          ? "Control plane returned invalid JSON."
+          : "Control plane returned a non-JSON response.",
+        response,
+        context,
+        contentType,
+        "non-json",
+      ),
+    };
   }
+}
+
+function hasJsonContentType(contentType: string): boolean {
+  const normalized = contentType.toLowerCase();
+  return normalized.includes("application/json") || normalized.includes("+json");
+}
+
+function isHtmlResponse(contentType: string, body: string): boolean {
+  if (contentType.toLowerCase().includes("text/html")) {
+    return true;
+  }
+
+  const prefix = body.slice(0, 512).trimStart().toLowerCase();
+  return (
+    prefix.startsWith("<!doctype html") ||
+    prefix.startsWith("<html") ||
+    prefix.startsWith("<head") ||
+    prefix.startsWith("<body") ||
+    /<div\s+id=["']svelte["']/.test(prefix)
+  );
+}
+
+function unexpectedResponseError(
+  code: string,
+  message: string,
+  response: Response,
+  context: AppaloftJsonApiResponseContext,
+  contentType: string,
+  bodyKind: string,
+): DomainErrorResponse {
+  return {
+    code,
+    category: "infra",
+    message,
+    retryable: false,
+    details: {
+      method: context.method,
+      url: context.url,
+      status: response.status,
+      contentType,
+      bodyKind,
+    },
+  };
 }
 
 async function* parseStreamResponse(response: Response): AsyncIterable<unknown> {
@@ -302,24 +414,35 @@ async function* parseStreamResponse(response: Response): AsyncIterable<unknown> 
     return;
   }
 
-  const value = await readJson(response);
+  const value = await readAppaloftJsonApiResponse(response, {
+    method: "GET",
+    url: response.url,
+  });
 
-  if (Array.isArray(value)) {
-    for (const item of value) {
+  if (!value.ok) {
+    throw new AppaloftSdkStreamError(
+      `SDK stream request failed with ${value.error.code}`,
+      response.status,
+      value.error,
+    );
+  }
+
+  if (Array.isArray(value.data)) {
+    for (const item of value.data) {
       yield item;
     }
     return;
   }
 
-  if (isObject(value) && Array.isArray(value.envelopes)) {
-    for (const item of value.envelopes) {
+  if (isObject(value.data) && Array.isArray(value.data.envelopes)) {
+    for (const item of value.data.envelopes) {
       yield item;
     }
     return;
   }
 
-  if (value !== null) {
-    yield value;
+  if (value.data !== null) {
+    yield value.data;
   }
 }
 
