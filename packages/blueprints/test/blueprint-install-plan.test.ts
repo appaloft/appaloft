@@ -910,4 +910,88 @@ describe("Blueprint install plan", () => {
       );
     }
   });
+
+  test("[BP-DEP-VERSION-UPGRADE-001] reports dependency compatibility changes without executing dependency upgrades", () => {
+    const current = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-version-app",
+      name: "Dependency Version App",
+      version: "1.0.0",
+      summary: "An app with dependency compatibility metadata.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          version: { preferred: "15.4", range: ">=15 <17" },
+        },
+      ],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/app:1",
+          },
+          usesResources: ["postgres"],
+        },
+      ],
+    });
+    const target = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-version-app",
+      name: "Dependency Version App",
+      version: "1.1.0",
+      summary: "An app with newer dependency compatibility metadata.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          version: { preferred: "16", range: ">=16 <17", minimum: "16" },
+        },
+      ],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/app:1",
+          },
+          usesResources: ["postgres"],
+        },
+      ],
+    });
+
+    expect(current.ok).toBe(true);
+    expect(target.ok).toBe(true);
+    if (!current.ok || !target.ok) return;
+
+    const plan = createBlueprintUpgradePlan({
+      currentManifest: current.value,
+      targetManifest: target.value,
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.value.createsExternalResources).toBe(false);
+    expect(plan.value.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "change-dependency-compatibility",
+          requirementId: "postgres",
+          fromVersion: { preferred: "15.4", range: ">=15 <17" },
+          toVersion: { preferred: "16", range: ">=16 <17", minimum: "16" },
+          classification: "potentially-breaking",
+        }),
+      ]),
+    );
+    expect(plan.value.operations.map((operation) => operation.kind)).not.toContain(
+      "execute-upgrade",
+    );
+  });
 });
