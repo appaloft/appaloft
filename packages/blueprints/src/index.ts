@@ -15,11 +15,61 @@ export const blueprintComponentRuntimePlanMetadataKey =
 const slugPattern = /^[a-z][a-z0-9-]{1,62}[a-z0-9]$/;
 const dependencyCapabilityNamePattern = /^[a-z](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const envKeyPattern = /^[_A-Z][_A-Z0-9]{0,127}$/;
+const dependencyTemplateReferencePattern = /\$\{([a-zA-Z][a-zA-Z0-9_-]*)\}/g;
 
 const nonEmptyString = z.string().trim().min(1);
 const slugSchema = z.string().trim().regex(slugPattern);
 const dependencyCapabilityNameSchema = z.string().trim().regex(dependencyCapabilityNamePattern);
 const envKeySchema = z.string().trim().regex(envKeyPattern);
+const versionLiteralSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?$/);
+const versionRangeSchema = z
+  .string()
+  .trim()
+  .refine(isValidVersionRange, "version range must use comparator clauses such as >=15 <17");
+
+export const blueprintDependencyKinds = [
+  "postgres",
+  "mongodb",
+  "mysql",
+  "redis",
+  "volume",
+  "object-storage",
+  "clickhouse",
+  "opensearch",
+] as const;
+
+export const blueprintDependencyEngineFamilies = [
+  "postgres",
+  "mongodb",
+  "mysql",
+  "mariadb",
+  "redis",
+  "volume",
+  "object-storage",
+  "clickhouse",
+  "opensearch",
+] as const;
+
+export const blueprintDependencyOutputNames = [
+  "host",
+  "port",
+  "database",
+  "username",
+  "password",
+  "url",
+  "endpoint",
+  "bucket",
+  "accessKeyId",
+  "secretAccessKey",
+  "mountPath",
+] as const;
+
+const blueprintDependencyKindSchema = z.enum(blueprintDependencyKinds);
+const blueprintDependencyEngineFamilySchema = z.enum(blueprintDependencyEngineFamilies);
+const blueprintDependencyOutputNameSchema = z.enum(blueprintDependencyOutputNames);
 
 const blueprintParameterSchema = z
   .object({
@@ -143,6 +193,88 @@ const blueprintDependencyCapabilitySchema = z.discriminatedUnion("type", [
   blueprintRedisModuleCapabilitySchema,
 ]);
 
+const blueprintDependencyEngineSchema = z
+  .object({
+    family: blueprintDependencyEngineFamilySchema.optional(),
+    name: nonEmptyString.optional(),
+    edition: nonEmptyString.optional(),
+  })
+  .strict();
+
+const blueprintDependencyVersionRequirementSchema = z
+  .object({
+    preferred: versionLiteralSchema.optional(),
+    range: versionRangeSchema.optional(),
+  })
+  .strict()
+  .superRefine((version, context) => {
+    if (!version.preferred && !version.range) {
+      context.addIssue({
+        code: "custom",
+        message: "dependency version requires preferred or range",
+        path: [],
+      });
+    }
+  });
+
+const blueprintDependencyOutputRequirementSchema = z
+  .object({
+    name: blueprintDependencyOutputNameSchema,
+    secret: z.boolean().optional(),
+  })
+  .strict();
+
+const blueprintDependencyReadinessSchema = z
+  .object({
+    type: z.enum([
+      "tcp",
+      "http",
+      "postgres",
+      "redis",
+      "mongodb",
+      "mysql",
+      "clickhouse-native",
+      "clickhouse-http",
+      "opensearch",
+      "object-storage",
+    ]),
+    database: nonEmptyString.optional(),
+    path: nonEmptyString.optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    required: z.boolean().default(true),
+  })
+  .strict();
+
+const blueprintDependencyProvisioningSchema = z
+  .object({
+    modes: z
+      .array(z.enum(["bind-existing", "provision"]))
+      .min(1)
+      .optional(),
+    providerKeys: z.array(nonEmptyString).min(1).optional(),
+    dedicatedInstance: z.boolean().optional(),
+  })
+  .strict();
+
+const blueprintDependencyEnvSchema = z
+  .object({
+    resource: slugSchema,
+    name: envKeySchema,
+    valueFrom: blueprintDependencyOutputNameSchema.optional(),
+    template: nonEmptyString.optional(),
+    secret: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((env, context) => {
+    if ((env.valueFrom ? 1 : 0) + (env.template ? 1 : 0) !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "dependencyEnv requires exactly one of valueFrom or template",
+        path: [],
+      });
+    }
+  });
+
 const blueprintComponentRelationInjectEnvEffectSchema = z
   .object({
     kind: z.literal("inject-env"),
@@ -253,28 +385,33 @@ const blueprintComponentSchema = z
     variables: z.array(blueprintVariableSchema).default([]),
     usesSecrets: z.array(envKeySchema).default([]),
     usesResources: z.array(slugSchema).default([]),
+    dependencyEnv: z.array(blueprintDependencyEnvSchema).default([]),
   })
   .strict();
 
 const blueprintResourceRequirementSchema = z
   .object({
     id: slugSchema,
-    kind: z.enum([
-      "postgres",
-      "mongodb",
-      "mysql",
-      "redis",
-      "volume",
-      "object-storage",
-      "clickhouse",
-      "opensearch",
-    ]),
+    kind: blueprintDependencyKindSchema,
     label: nonEmptyString,
     optional: z.boolean().default(false),
+    engine: blueprintDependencyEngineSchema.optional(),
+    version: blueprintDependencyVersionRequirementSchema.optional(),
     capabilities: z.array(blueprintDependencyCapabilitySchema).default([]),
+    outputs: z.array(blueprintDependencyOutputRequirementSchema).default([]),
+    readiness: z.array(blueprintDependencyReadinessSchema).default([]),
+    provisioning: blueprintDependencyProvisioningSchema.optional(),
   })
   .strict()
   .superRefine((resource, context) => {
+    const engineFamily = dependencyEngineFamily(resource);
+    if (!isDependencyEngineCompatible(resource.kind, engineFamily)) {
+      context.addIssue({
+        code: "custom",
+        message: `dependency engine family ${engineFamily} is not compatible with kind ${resource.kind}`,
+        path: ["engine", "family"],
+      });
+    }
     for (const [index, capability] of resource.capabilities.entries()) {
       if (capability.type === "postgres-extension" && resource.kind !== "postgres") {
         context.addIssue({
@@ -288,6 +425,31 @@ const blueprintResourceRequirementSchema = z
           code: "custom",
           message: "redis-module capability requires a redis dependency resource",
           path: ["capabilities", index, "type"],
+        });
+      }
+    }
+    for (const [index, output] of resource.outputs.entries()) {
+      if (!dependencySupportedOutputNames(resource).has(output.name)) {
+        context.addIssue({
+          code: "custom",
+          message: `dependency output ${output.name} is not supported by kind ${resource.kind}`,
+          path: ["outputs", index, "name"],
+        });
+      }
+      if (output.secret === false && isDependencyOutputSecret(resource, output.name)) {
+        context.addIssue({
+          code: "custom",
+          message: `dependency output ${output.name} is secret and cannot be marked non-secret`,
+          path: ["outputs", index, "secret"],
+        });
+      }
+    }
+    for (const [index, readiness] of resource.readiness.entries()) {
+      if (!isDependencyReadinessCompatible(resource, readiness.type)) {
+        context.addIssue({
+          code: "custom",
+          message: `dependency readiness ${readiness.type} is not compatible with kind ${resource.kind}`,
+          path: ["readiness", index, "type"],
         });
       }
     }
@@ -422,6 +584,7 @@ function validateTopologyReferences(input: {
   const componentIds = new Set(input.components.map((component) => component.id));
   const secretKeys = new Set(input.secrets.map((secret) => secret.key));
   const resourceIds = new Set(input.resources.map((resource) => resource.id));
+  const resourcesById = new Map(input.resources.map((resource) => [resource.id, resource]));
   const parameterKeys = new Set(input.parameters.map((parameter) => parameter.key));
   const relationIds = new Set(input.relations.map((relation) => relation.id));
 
@@ -488,6 +651,48 @@ function validateTopologyReferences(input: {
           message: `component references unknown resource ${resourceId}`,
           path: [...input.path, "components", input.components.indexOf(component), "usesResources"],
         });
+      }
+    }
+    for (const [envIndex, dependencyEnv] of component.dependencyEnv.entries()) {
+      const resource = resourcesById.get(dependencyEnv.resource);
+      const envPath = [
+        ...input.path,
+        "components",
+        input.components.indexOf(component),
+        "dependencyEnv",
+        envIndex,
+      ];
+      if (!resource) {
+        input.context.addIssue({
+          code: "custom",
+          message: `dependencyEnv references unknown resource ${dependencyEnv.resource}`,
+          path: [...envPath, "resource"],
+        });
+        continue;
+      }
+      if (!component.usesResources.includes(dependencyEnv.resource)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `dependencyEnv resource ${dependencyEnv.resource} must also be listed in usesResources`,
+          path: [...envPath, "resource"],
+        });
+      }
+      const supportedOutputs = dependencySupportedOutputNames(resource);
+      if (dependencyEnv.valueFrom && !supportedOutputs.has(dependencyEnv.valueFrom)) {
+        input.context.addIssue({
+          code: "custom",
+          message: `dependencyEnv valueFrom references unavailable output ${dependencyEnv.valueFrom}`,
+          path: [...envPath, "valueFrom"],
+        });
+      }
+      for (const outputName of dependencyTemplateOutputNames(dependencyEnv.template)) {
+        if (!supportedOutputs.has(outputName)) {
+          input.context.addIssue({
+            code: "custom",
+            message: `dependencyEnv template references unavailable output ${outputName}`,
+            path: [...envPath, "template"],
+          });
+        }
       }
     }
   }
@@ -682,13 +887,162 @@ function componentRelationOutputs(
   return [...outputs];
 }
 
+function isValidVersionRange(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const tokenPattern = /^(?:>=|<=|>|<|=|\^|~)?\d+(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?$/;
+  return trimmed.split(/\s+/).every((token) => tokenPattern.test(token));
+}
+
+function dependencyEngineFamily(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine">,
+): BlueprintDependencyEngineFamily {
+  return resource.engine?.family ?? resource.kind;
+}
+
+function isDependencyEngineCompatible(
+  kind: BlueprintDependencyKind,
+  family: BlueprintDependencyEngineFamily,
+): boolean {
+  if (kind === "mysql") {
+    return family === "mysql" || family === "mariadb";
+  }
+  return kind === family;
+}
+
+function dependencySupportedOutputNames(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine">,
+): ReadonlySet<BlueprintDependencyOutputName> {
+  const engineFamily = dependencyEngineFamily(resource);
+  switch (engineFamily) {
+    case "postgres":
+    case "mongodb":
+    case "mysql":
+    case "mariadb":
+    case "clickhouse":
+      return new Set(["host", "port", "database", "username", "password", "url"]);
+    case "redis":
+    case "opensearch":
+      return new Set(["host", "port", "username", "password", "url"]);
+    case "object-storage":
+      return new Set(["endpoint", "bucket", "accessKeyId", "secretAccessKey", "url"]);
+    case "volume":
+      return new Set(["mountPath"]);
+  }
+}
+
+function defaultDependencyOutputs(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine" | "outputs">,
+): readonly BlueprintDependencyOutputRequirement[] {
+  if (resource.outputs.length > 0) {
+    return resource.outputs.map((output) => ({
+      name: output.name,
+      secret: output.secret ?? isDependencyOutputSecret(resource, output.name),
+    }));
+  }
+  return [...dependencySupportedOutputNames(resource)].map((name) => ({
+    name,
+    secret: isDependencyOutputSecret(resource, name),
+  }));
+}
+
+function isDependencyOutputSecret(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine">,
+  output: BlueprintDependencyOutputName,
+): boolean {
+  const engineFamily = dependencyEngineFamily(resource);
+  if (output === "password" || output === "secretAccessKey" || output === "accessKeyId") {
+    return true;
+  }
+  if (output === "username") {
+    return engineFamily !== "redis";
+  }
+  return output === "url" && engineFamily !== "volume";
+}
+
+function isDependencyReadinessCompatible(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine">,
+  readinessType: BlueprintDependencyReadinessRequirement["type"],
+): boolean {
+  const engineFamily = dependencyEngineFamily(resource);
+  if (readinessType === "tcp" || readinessType === "http") {
+    return engineFamily !== "volume";
+  }
+  if (engineFamily === "mysql" || engineFamily === "mariadb") {
+    return readinessType === "mysql";
+  }
+  if (engineFamily === "clickhouse") {
+    return readinessType === "clickhouse-native" || readinessType === "clickhouse-http";
+  }
+  return readinessType === engineFamily;
+}
+
+function dependencyTemplateOutputNames(
+  template: string | undefined,
+): readonly BlueprintDependencyOutputName[] {
+  if (!template) {
+    return [];
+  }
+  const outputs: BlueprintDependencyOutputName[] = [];
+  for (const match of template.matchAll(dependencyTemplateReferencePattern)) {
+    const name = match[1];
+    if (isDependencyOutputName(name)) {
+      outputs.push(name);
+    } else {
+      outputs.push(name as BlueprintDependencyOutputName);
+    }
+  }
+  return outputs;
+}
+
+function isDependencyOutputName(value: string | undefined): value is BlueprintDependencyOutputName {
+  return Boolean(
+    value && blueprintDependencyOutputNames.includes(value as BlueprintDependencyOutputName),
+  );
+}
+
+function dependencyEnvSecret(
+  resource: Pick<BlueprintResourceRequirement, "kind" | "engine">,
+  env: BlueprintDependencyEnvRequirement,
+): boolean {
+  if (env.secret === true) {
+    return true;
+  }
+  if (env.valueFrom) {
+    return isDependencyOutputSecret(resource, env.valueFrom);
+  }
+  return dependencyTemplateOutputNames(env.template).some((output) =>
+    isDependencyOutputSecret(resource, output),
+  );
+}
+
+function dependencyEnvOutputNames(env: BlueprintDependencyEnvRequirement): readonly string[] {
+  return env.valueFrom ? [env.valueFrom] : dependencyTemplateOutputNames(env.template);
+}
+
 export type BlueprintManifest = z.infer<typeof blueprintManifestSchema>;
 export type BlueprintComponent = BlueprintManifest["components"][number];
 export type BlueprintEnvironmentProfile = NonNullable<BlueprintManifest["profiles"]>[string];
 export type BlueprintParameter = BlueprintManifest["parameters"][number];
 export type BlueprintSecretPlaceholder = BlueprintManifest["secrets"][number];
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
+export type BlueprintDependencyKind = BlueprintResourceRequirement["kind"];
+export type BlueprintDependencyEngine = NonNullable<BlueprintResourceRequirement["engine"]>;
+export type BlueprintDependencyEngineFamily = (typeof blueprintDependencyEngineFamilies)[number];
+export type BlueprintDependencyVersionRequirement = NonNullable<
+  BlueprintResourceRequirement["version"]
+>;
 export type BlueprintDependencyCapability = BlueprintResourceRequirement["capabilities"][number];
+export type BlueprintDependencyOutputName = (typeof blueprintDependencyOutputNames)[number];
+export type BlueprintDependencyOutputRequirement = BlueprintResourceRequirement["outputs"][number];
+export type BlueprintDependencyReadinessRequirement =
+  BlueprintResourceRequirement["readiness"][number];
+export type BlueprintDependencyProvisioningConstraints = NonNullable<
+  BlueprintResourceRequirement["provisioning"]
+>;
+export type BlueprintDependencyEnvRequirement = BlueprintComponent["dependencyEnv"][number];
 export type BlueprintComponentRelation = BlueprintManifest["componentRelations"][number];
 export type BlueprintComponentRelationType = BlueprintComponentRelation["type"];
 export type BlueprintComponentRelationEffect = BlueprintComponentRelation["effects"][number];
@@ -977,7 +1331,13 @@ export type BlueprintInstallOperation =
       readonly componentId: string;
       readonly requirementId: string;
       readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly engine: BlueprintDependencyEngine;
+      readonly version?: BlueprintDependencyVersionRequirement;
       readonly capabilities: readonly BlueprintDependencyCapability[];
+      readonly outputs: readonly BlueprintDependencyOutputRequirement[];
+      readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
+      readonly provisioning?: BlueprintDependencyProvisioningConstraints;
+      readonly env: readonly BlueprintDependencyEnvPlan[];
     }
   | {
       readonly kind: "configure-component-link";
@@ -999,6 +1359,15 @@ export type BlueprintInstallOperation =
 export interface BlueprintRoutePlan {
   readonly port: string;
   readonly pathPrefix: string;
+}
+
+export interface BlueprintDependencyEnvPlan {
+  readonly resourceId: string;
+  readonly name: string;
+  readonly valueFrom?: BlueprintDependencyOutputName;
+  readonly template?: string;
+  readonly outputNames: readonly string[];
+  readonly secret: boolean;
 }
 
 export interface BlueprintInstallPlan {
@@ -1050,7 +1419,13 @@ export interface BlueprintApplicationBundleComponentPlan {
   readonly dependencyBindings: readonly {
     readonly requirementId: string;
     readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly engine: BlueprintDependencyEngine;
+    readonly version?: BlueprintDependencyVersionRequirement;
     readonly capabilities: readonly BlueprintDependencyCapability[];
+    readonly outputs: readonly BlueprintDependencyOutputRequirement[];
+    readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
+    readonly provisioning?: BlueprintDependencyProvisioningConstraints;
+    readonly env: readonly BlueprintDependencyEnvPlan[];
   }[];
   readonly deploymentReason?: "blueprint-install";
 }
@@ -1058,7 +1433,12 @@ export interface BlueprintApplicationBundleComponentPlan {
 export interface BlueprintApplicationBundleDependencyPlan {
   readonly requirementId: string;
   readonly kind: BlueprintResourceRequirement["kind"];
+  readonly engine: BlueprintDependencyEngine;
+  readonly version?: BlueprintDependencyVersionRequirement;
   readonly capabilities: readonly BlueprintDependencyCapability[];
+  readonly outputs: readonly BlueprintDependencyOutputRequirement[];
+  readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
+  readonly provisioning?: BlueprintDependencyProvisioningConstraints;
   readonly scope: "dependency-resource";
   readonly bindingMode: "bind-existing-or-provisioned";
 }
@@ -1078,7 +1458,13 @@ export type BlueprintApplicationBundleRelationship =
       readonly componentId: string;
       readonly requirementId: string;
       readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly engine: BlueprintDependencyEngine;
+      readonly version?: BlueprintDependencyVersionRequirement;
       readonly capabilities: readonly BlueprintDependencyCapability[];
+      readonly outputs: readonly BlueprintDependencyOutputRequirement[];
+      readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
+      readonly provisioning?: BlueprintDependencyProvisioningConstraints;
+      readonly env: readonly BlueprintDependencyEnvPlan[];
     }
   | {
       readonly kind: "component-links-component";
@@ -1164,10 +1550,33 @@ export interface BlueprintComponentRuntimeTelemetryAttachment {
   readonly required: boolean;
 }
 
+export interface BlueprintComponentRuntimeDependencyEnv {
+  readonly dependencyRequirementId: string;
+  readonly name: string;
+  readonly valueFrom?: BlueprintDependencyOutputName;
+  readonly template?: string;
+  readonly outputNames: readonly string[];
+  readonly secret: boolean;
+  readonly bindingRef: {
+    readonly kind: "dependency-output";
+    readonly requirementId: string;
+  };
+}
+
+export interface BlueprintComponentRuntimeDependencyReadinessGate {
+  readonly dependencyRequirementId: string;
+  readonly kind: BlueprintDependencyKind;
+  readonly engine: BlueprintDependencyEngine;
+  readonly readiness: BlueprintDependencyReadinessRequirement;
+  readonly required: boolean;
+}
+
 export interface BlueprintComponentRuntimePlan {
   readonly componentId: string;
   readonly serviceName: string;
   readonly networkName: string;
+  readonly dependencyEnv: readonly BlueprintComponentRuntimeDependencyEnv[];
+  readonly dependencyReadinessGates: readonly BlueprintComponentRuntimeDependencyReadinessGate[];
   readonly injectedEnv: readonly BlueprintComponentRuntimeInjectedEnv[];
   readonly serviceDiscovery: readonly BlueprintComponentRuntimeServiceDiscovery[];
   readonly networkAllows: readonly BlueprintComponentRuntimeNetworkAllow[];
@@ -1248,12 +1657,15 @@ export type BlueprintUpgradeOperation =
         | "add-dependency"
         | "remove-dependency"
         | "change-dependency-kind"
-        | "change-dependency-capabilities";
+        | "change-dependency-capabilities"
+        | "change-dependency-contract";
       readonly requirementId: string;
       readonly fromKind?: BlueprintResourceRequirement["kind"];
       readonly toKind?: BlueprintResourceRequirement["kind"];
       readonly fromCapabilities?: readonly BlueprintDependencyCapability[];
       readonly toCapabilities?: readonly BlueprintDependencyCapability[];
+      readonly fromDependency?: BlueprintResourceRequirement;
+      readonly toDependency?: BlueprintResourceRequirement;
       readonly classification: BlueprintUpgradeClassification;
     }
   | {
@@ -1641,12 +2053,28 @@ function appendComponentSetupOperations(
   for (const requirementId of component.usesResources) {
     const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
     if (requirement) {
+      const env = component.dependencyEnv
+        .filter((dependencyEnv) => dependencyEnv.resource === requirement.id)
+        .map((dependencyEnv) => ({
+          resourceId: requirement.id,
+          name: dependencyEnv.name,
+          ...(dependencyEnv.valueFrom ? { valueFrom: dependencyEnv.valueFrom } : {}),
+          ...(dependencyEnv.template ? { template: dependencyEnv.template } : {}),
+          outputNames: dependencyEnvOutputNames(dependencyEnv),
+          secret: dependencyEnvSecret(requirement, dependencyEnv),
+        }));
       operations.push({
         kind: "bind-dependency",
         componentId: component.id,
         requirementId: requirement.id,
         requirementKind: requirement.kind,
+        engine: { family: dependencyEngineFamily(requirement), ...(requirement.engine ?? {}) },
+        ...(requirement.version ? { version: requirement.version } : {}),
         capabilities: requirement.capabilities,
+        outputs: defaultDependencyOutputs(requirement),
+        readiness: requirement.readiness,
+        ...(requirement.provisioning ? { provisioning: requirement.provisioning } : {}),
+        env,
       });
     }
   }
@@ -1669,7 +2097,13 @@ type MutableBlueprintApplicationBundleComponentPlan = {
   dependencyBindings: {
     readonly requirementId: string;
     readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly engine: BlueprintDependencyEngine;
+    readonly version?: BlueprintDependencyVersionRequirement;
     readonly capabilities: readonly BlueprintDependencyCapability[];
+    readonly outputs: readonly BlueprintDependencyOutputRequirement[];
+    readonly readiness: readonly BlueprintDependencyReadinessRequirement[];
+    readonly provisioning?: BlueprintDependencyProvisioningConstraints;
+    readonly env: readonly BlueprintDependencyEnvPlan[];
   }[];
   deploymentReason?: "blueprint-install";
 };
@@ -1754,21 +2188,38 @@ export function createBlueprintApplicationBundlePlan(
         dependencies.set(operation.requirementId, {
           requirementId: operation.requirementId,
           kind: operation.requirementKind,
+          engine: operation.engine,
+          ...(operation.version ? { version: operation.version } : {}),
           capabilities: operation.capabilities,
+          outputs: operation.outputs,
+          readiness: operation.readiness,
+          ...(operation.provisioning ? { provisioning: operation.provisioning } : {}),
           scope: "dependency-resource",
           bindingMode: "bind-existing-or-provisioned",
         });
         component.value.dependencyBindings.push({
           requirementId: operation.requirementId,
           requirementKind: operation.requirementKind,
+          engine: operation.engine,
+          ...(operation.version ? { version: operation.version } : {}),
           capabilities: operation.capabilities,
+          outputs: operation.outputs,
+          readiness: operation.readiness,
+          ...(operation.provisioning ? { provisioning: operation.provisioning } : {}),
+          env: operation.env,
         });
         relationships.push({
           kind: "component-binds-dependency",
           componentId: operation.componentId,
           requirementId: operation.requirementId,
           requirementKind: operation.requirementKind,
+          engine: operation.engine,
+          ...(operation.version ? { version: operation.version } : {}),
           capabilities: operation.capabilities,
+          outputs: operation.outputs,
+          readiness: operation.readiness,
+          ...(operation.provisioning ? { provisioning: operation.provisioning } : {}),
+          env: operation.env,
         });
         break;
       }
@@ -1852,6 +2303,8 @@ type MutableBlueprintComponentRuntimePlan = {
   componentId: string;
   serviceName: string;
   networkName: string;
+  dependencyEnv: BlueprintComponentRuntimeDependencyEnv[];
+  dependencyReadinessGates: BlueprintComponentRuntimeDependencyReadinessGate[];
   injectedEnv: BlueprintComponentRuntimeInjectedEnv[];
   serviceDiscovery: BlueprintComponentRuntimeServiceDiscovery[];
   networkAllows: BlueprintComponentRuntimeNetworkAllow[];
@@ -1918,11 +2371,48 @@ const blueprintComponentRuntimeTelemetryAttachmentSchema = z
   })
   .strict();
 
+const blueprintComponentRuntimeDependencyEnvSchema = z
+  .object({
+    dependencyRequirementId: z.string(),
+    name: z.string(),
+    valueFrom: blueprintDependencyOutputNameSchema.optional(),
+    template: z.string().optional(),
+    outputNames: z.array(z.string()),
+    secret: z.boolean(),
+    bindingRef: z
+      .object({
+        kind: z.literal("dependency-output"),
+        requirementId: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const blueprintComponentRuntimeDependencyReadinessGateSchema = z
+  .object({
+    dependencyRequirementId: z.string(),
+    kind: blueprintDependencyKindSchema,
+    engine: z
+      .object({
+        family: blueprintDependencyEngineFamilySchema,
+        name: z.string().optional(),
+        edition: z.string().optional(),
+      })
+      .strict(),
+    readiness: blueprintDependencyReadinessSchema,
+    required: z.boolean(),
+  })
+  .strict();
+
 const blueprintComponentRuntimePlanSchema = z
   .object({
     componentId: z.string(),
     serviceName: z.string(),
     networkName: z.string(),
+    dependencyEnv: z.array(blueprintComponentRuntimeDependencyEnvSchema).default([]),
+    dependencyReadinessGates: z
+      .array(blueprintComponentRuntimeDependencyReadinessGateSchema)
+      .default([]),
     injectedEnv: z.array(blueprintComponentRuntimeInjectedEnvSchema),
     serviceDiscovery: z.array(blueprintComponentRuntimeServiceDiscoverySchema),
     networkAllows: z.array(blueprintComponentRuntimeNetworkAllowSchema),
@@ -1949,6 +2439,8 @@ export function createBlueprintComponentRuntimeProjection(
         component.resourceSlug ??
         component.componentId,
       networkName,
+      dependencyEnv: [],
+      dependencyReadinessGates: [],
       injectedEnv: [],
       serviceDiscovery: [],
       networkAllows: [],
@@ -1982,6 +2474,38 @@ export function createBlueprintComponentRuntimeProjection(
     });
   }
 
+  for (const component of input.applicationBundle.components) {
+    const plan = componentPlans.get(component.componentId);
+    if (!plan) {
+      continue;
+    }
+    for (const binding of component.dependencyBindings) {
+      for (const env of binding.env ?? []) {
+        plan.dependencyEnv.push({
+          dependencyRequirementId: binding.requirementId,
+          name: env.name,
+          ...(env.valueFrom ? { valueFrom: env.valueFrom } : {}),
+          ...(env.template ? { template: env.template } : {}),
+          outputNames: env.outputNames,
+          secret: env.secret,
+          bindingRef: {
+            kind: "dependency-output",
+            requirementId: binding.requirementId,
+          },
+        });
+      }
+      for (const readiness of binding.readiness ?? []) {
+        plan.dependencyReadinessGates.push({
+          dependencyRequirementId: binding.requirementId,
+          kind: binding.requirementKind,
+          engine: binding.engine,
+          readiness,
+          required: readiness.required,
+        });
+      }
+    }
+  }
+
   return {
     schemaVersion: blueprintComponentRuntimeProjectionSchemaVersion,
     application: input.applicationBundle.application,
@@ -1989,6 +2513,8 @@ export function createBlueprintComponentRuntimeProjection(
       componentId: plan.componentId,
       serviceName: plan.serviceName,
       networkName: plan.networkName,
+      dependencyEnv: sortByDependencyAndName(plan.dependencyEnv),
+      dependencyReadinessGates: sortByDependencyAndReadiness(plan.dependencyReadinessGates),
       injectedEnv: sortByRelationAndName(plan.injectedEnv),
       serviceDiscovery: sortByRelationAndProvider(plan.serviceDiscovery),
       networkAllows: sortByRelationAndProvider(plan.networkAllows),
@@ -2166,6 +2692,33 @@ function sortByRelationAndProvider<
     return relationOrder === 0
       ? left.providerComponentId.localeCompare(right.providerComponentId)
       : relationOrder;
+  });
+}
+
+function sortByDependencyAndName<
+  T extends { readonly dependencyRequirementId: string; readonly name: string },
+>(values: readonly T[]): readonly T[] {
+  return [...values].sort((left, right) => {
+    const dependencyOrder = left.dependencyRequirementId.localeCompare(
+      right.dependencyRequirementId,
+    );
+    return dependencyOrder === 0 ? left.name.localeCompare(right.name) : dependencyOrder;
+  });
+}
+
+function sortByDependencyAndReadiness<
+  T extends {
+    readonly dependencyRequirementId: string;
+    readonly readiness: { readonly type: string };
+  },
+>(values: readonly T[]): readonly T[] {
+  return [...values].sort((left, right) => {
+    const dependencyOrder = left.dependencyRequirementId.localeCompare(
+      right.dependencyRequirementId,
+    );
+    return dependencyOrder === 0
+      ? left.readiness.type.localeCompare(right.readiness.type)
+      : dependencyOrder;
   });
 }
 
@@ -2494,6 +3047,18 @@ function diffResources(
         classification: "potentially-breaking",
       });
     }
+    if (
+      fingerprint(dependencyContractFingerprint(current)) !==
+      fingerprint(dependencyContractFingerprint(resource))
+    ) {
+      operations.push({
+        kind: "change-dependency-contract",
+        requirementId: resource.id,
+        fromDependency: current,
+        toDependency: resource,
+        classification: "potentially-breaking",
+      });
+    }
   }
 
   for (const resource of currentManifest.resources) {
@@ -2586,6 +3151,16 @@ function byKey<T extends { readonly key: string }>(items: readonly T[]): Map<str
 
 function fingerprint(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function dependencyContractFingerprint(resource: BlueprintResourceRequirement): unknown {
+  return {
+    engine: { family: dependencyEngineFamily(resource), ...(resource.engine ?? {}) },
+    version: resource.version,
+    outputs: defaultDependencyOutputs(resource),
+    readiness: resource.readiness,
+    provisioning: resource.provisioning,
+  };
 }
 
 function toRegistryEntry(manifest: BlueprintManifest, sourcePath: string): BlueprintRegistryEntry {

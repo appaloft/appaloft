@@ -48,6 +48,20 @@ appaloft dependency import --kind redis --project prj_prod --environment env_pro
 
 List/show 输出必须屏蔽连接 secret、provider token、密码和原始连接字符串。
 
+<h2 id="blueprint-dependency-contract">Blueprint 依赖协议</h2>
+
+Blueprint `resources` 用中性的 dependency contract 描述依赖要求。`kind` 表示可移植的供给与绑定
+primitive，`engine.family` 表示具体引擎族，`version` 表示 preferred version 或 range，`capabilities`
+表示 Postgres extension 等能力要求，`outputs` 表示 `host`、`port`、`database`、`username`、
+`password`、`url` 等安全字段名，`readiness` 表示协议级 readiness gate。
+
+组件通过 `dependencyEnv` 消费依赖输出。Plan 只记录环境变量名、output 字段名或 template，以及结果是否为
+secret；不会保存真实密码或连接串。包含密码的 `url` 或 template 结果必须按 secret 处理，即使作者省略或弱化了
+`secret` 标记。
+
+MariaDB 使用 `kind: mysql` + `engine.family: mariadb`。这样 dependency 仍保持 MySQL-compatible 的供给和绑定
+primitive，同时由 engine family 决定 provider 选择、readiness、version matching 和输出语义。
+
 <h2 id="dependency-resource-binding">绑定到 Resource</h2>
 
 Resource dependency binding 让后续 deployment snapshot 引用一个依赖资源。绑定只保存 provider-neutral
