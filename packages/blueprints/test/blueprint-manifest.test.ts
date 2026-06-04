@@ -46,6 +46,36 @@ describe("Blueprint manifest schema", () => {
     }
   });
 
+  test("[CLOUD-BLUEPRINT-PUBLIC-SCHEMA-011] accepts underscore-prefixed environment keys", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "underscore-env-service",
+      name: "Underscore Env Service",
+      version: "1.0.0",
+      summary: "A service with upstream runtime variables that start with underscores.",
+      secrets: [{ key: "_APP_SECRET", label: "Application secret" }],
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/web:latest",
+          },
+          variables: [{ key: "_APP_ENV", value: "production" }],
+          usesSecrets: ["_APP_SECRET"],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.components[0]?.variables[0]?.key).toBe("_APP_ENV");
+      expect(result.value.components[0]?.usesSecrets).toEqual(["_APP_SECRET"]);
+    }
+  });
+
   test("[CLOUD-BLUEPRINT-PUBLIC-HEALTH-026] validates component HTTP health checks", () => {
     const result = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
@@ -307,6 +337,172 @@ profiles:
     if (!result.ok) {
       expect(result.issues.map((issue) => issue.message)).toContain(
         "postgres-extension capability requires a postgres dependency resource",
+      );
+    }
+  });
+
+  test("[BP-DEP-CONTRACT-001] validates dependency env, outputs, readiness, versions, and MariaDB engine metadata", () => {
+    const result = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "dependency-contract",
+      name: "Dependency Contract",
+      version: "1.0.0",
+      summary: "A service with structured dependency requirements.",
+      resources: [
+        {
+          id: "postgres",
+          kind: "postgres",
+          label: "Postgres",
+          engine: { family: "postgres" },
+          version: { preferred: "15.4", range: ">=15 <17" },
+          outputs: [
+            { name: "host", secret: false },
+            { name: "port", secret: false },
+            { name: "database", secret: false },
+            { name: "username", secret: true },
+            { name: "password", secret: true },
+            { name: "url", secret: true },
+          ],
+          readiness: [{ type: "postgres", database: "app" }],
+        },
+        {
+          id: "mariadb",
+          kind: "mysql",
+          label: "MariaDB",
+          engine: { family: "mariadb" },
+          version: { range: ">=10 <12" },
+          readiness: [{ type: "mysql", database: "app" }],
+        },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["postgres", "mariadb"],
+          dependencyEnv: [
+            { resource: "postgres", name: "DATABASE_URL", valueFrom: "url" },
+            { resource: "postgres", name: "DB_HOST", valueFrom: "host" },
+            { resource: "postgres", name: "DB_PASSWORD", valueFrom: "password" },
+            {
+              resource: "postgres",
+              name: "JDBC_URL",
+              template: "jdbc:postgresql://${host}:${port}/${database}",
+            },
+            { resource: "mariadb", name: "MYSQL_URL", valueFrom: "url" },
+          ],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.resources[1]).toMatchObject({
+        kind: "mysql",
+        engine: { family: "mariadb" },
+      });
+    }
+  });
+
+  test("[BP-DEP-CONTRACT-002] rejects invalid dependency contract references", () => {
+    const invalidOutput = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-dependency-output",
+      name: "Invalid Dependency Output",
+      version: "1.0.0",
+      summary: "Invalid output.",
+      resources: [{ id: "redis", kind: "redis", label: "Redis" }],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["redis"],
+          dependencyEnv: [{ resource: "redis", name: "REDIS_DB", valueFrom: "database" }],
+        },
+      ],
+    });
+    const invalidResource = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-dependency-resource",
+      name: "Invalid Dependency Resource",
+      version: "1.0.0",
+      summary: "Invalid resource.",
+      resources: [{ id: "postgres", kind: "postgres", label: "Postgres" }],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["postgres"],
+          dependencyEnv: [{ resource: "redis", name: "REDIS_URL", valueFrom: "url" }],
+        },
+      ],
+    });
+    const readinessMismatch = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-readiness",
+      name: "Invalid Readiness",
+      version: "1.0.0",
+      summary: "Invalid readiness.",
+      resources: [
+        { id: "redis", kind: "redis", label: "Redis", readiness: [{ type: "postgres" }] },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["redis"],
+        },
+      ],
+    });
+    const invalidVersion = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-version",
+      name: "Invalid Version",
+      version: "1.0.0",
+      summary: "Invalid version.",
+      resources: [
+        { id: "postgres", kind: "postgres", label: "Postgres", version: { range: "fifteen" } },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: { strategy: "container-image", image: "example/api:latest" },
+          usesResources: ["postgres"],
+        },
+      ],
+    });
+
+    expect(invalidOutput.ok).toBe(false);
+    expect(invalidResource.ok).toBe(false);
+    expect(readinessMismatch.ok).toBe(false);
+    expect(invalidVersion.ok).toBe(false);
+    if (!invalidOutput.ok) {
+      expect(invalidOutput.issues.map((issue) => issue.message).join("\n")).toContain(
+        "unavailable output database",
+      );
+    }
+    if (!invalidResource.ok) {
+      expect(invalidResource.issues.map((issue) => issue.message).join("\n")).toContain(
+        "unknown resource redis",
+      );
+    }
+    if (!readinessMismatch.ok) {
+      expect(readinessMismatch.issues.map((issue) => issue.message).join("\n")).toContain(
+        "readiness postgres is not compatible with kind redis",
+      );
+    }
+    if (!invalidVersion.ok) {
+      expect(invalidVersion.issues.map((issue) => issue.message).join("\n")).toContain(
+        "version range",
       );
     }
   });
@@ -641,6 +837,7 @@ profiles:
         variables: [],
         usesSecrets: [],
         usesResources: [],
+        dependencyEnv: [],
       },
       {
         id: "worker",
@@ -652,6 +849,7 @@ profiles:
         variables: [],
         usesSecrets: [],
         usesResources: [],
+        dependencyEnv: [],
       },
     ];
     const relations = [

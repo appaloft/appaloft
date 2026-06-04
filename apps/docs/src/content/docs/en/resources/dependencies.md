@@ -51,6 +51,23 @@ appaloft dependency import --kind redis --project prj_prod --environment env_pro
 
 List/show output must mask connection secrets, provider tokens, passwords, and raw connection URLs.
 
+<h2 id="blueprint-dependency-contract">Blueprint dependency contract</h2>
+
+Blueprint resources declare dependency requirements with a neutral contract. Use `kind` for the
+portable provisioning primitive, `engine.family` for the concrete engine family, `version` for a
+preferred version or range, `capabilities` for requirements such as Postgres extensions, `outputs`
+for safe field names such as `host`, `port`, `database`, `username`, `password`, and `url`, and
+`readiness` for protocol-specific gates.
+
+Components consume dependency outputs through `dependencyEnv`. The plan records only environment
+variable names, output field names or templates, and whether the result is secret. It does not store
+raw passwords or connection strings. If an output or template includes a password-bearing URL, the
+result is secret even when the author omits or weakens the `secret` flag.
+
+Use `kind: mysql` with `engine.family: mariadb` for MariaDB. The dependency remains a
+MySQL-compatible provisioning and binding primitive, while the engine family drives provider
+selection, readiness, version matching, and generated output semantics.
+
 <h2 id="dependency-resource-binding">Bind to a Resource</h2>
 
 A Resource dependency binding lets future deployment snapshots reference a dependency resource. The
