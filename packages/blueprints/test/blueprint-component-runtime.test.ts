@@ -7,8 +7,11 @@ import {
   createBlueprintApplicationBundlePlan,
   createBlueprintComponentRuntimeProjection,
   createBlueprintInstallPlan,
+  materializeBlueprintComponentDependencyEnv,
   validateBlueprintManifest,
 } from "../src";
+
+const templateRef = (name: string) => `$${`{${name}}`}`;
 
 describe("Blueprint component runtime projection", () => {
   test("[BP-COMP-REL-RUNTIME-001] lowers relation effects into neutral component runtime plans", () => {
@@ -213,5 +216,126 @@ describe("Blueprint component runtime projection", () => {
       ),
     ).toEqual(workerRuntime);
     expect(blueprintComponentRuntimePlanFromMetadata({})).toBeUndefined();
+  });
+
+  test("[BP-DEP-CONTRACT-004] materializes dependency env only from execution-time outputs", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "runtime-dependency-env",
+      name: "Runtime Dependency Env",
+      version: "1.0.0",
+      summary: "A service with runtime dependency env materialization.",
+      resources: [
+        { id: "postgres", kind: "postgres", label: "Postgres" },
+        { id: "redis", kind: "redis", label: "Redis" },
+      ],
+      components: [
+        {
+          id: "api",
+          name: "API",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/api:latest",
+          },
+          usesResources: ["postgres", "redis"],
+          dependencyEnv: [
+            { resource: "postgres", name: "DATABASE_URL", valueFrom: "url" },
+            {
+              resource: "redis",
+              name: "REDIS_URL",
+              template: [
+                "redis://",
+                templateRef("username"),
+                ":",
+                templateRef("password"),
+                "@",
+                templateRef("host"),
+                ":",
+                templateRef("port"),
+                "/0",
+              ].join(""),
+            },
+          ],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+
+    const installPlan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: { projectName: "Runtime Dependency Env", environmentName: "production" },
+    });
+    expect(installPlan.ok).toBe(true);
+    if (!installPlan.ok) return;
+    expect(JSON.stringify(installPlan.value)).not.toContain("pg-secret");
+    expect(JSON.stringify(installPlan.value)).not.toContain("redis-secret");
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: installPlan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) return;
+    const projection = createBlueprintComponentRuntimeProjection({
+      applicationBundle: bundle.value,
+    });
+    const apiRuntime = projection.components.find((component) => component.componentId === "api");
+    expect(apiRuntime).toBeDefined();
+    if (!apiRuntime) return;
+
+    const materialized = materializeBlueprintComponentDependencyEnv({
+      componentRuntimePlan: apiRuntime,
+      dependencyOutputs: [
+        {
+          requirementId: "postgres",
+          outputs: {
+            url: "postgresql://app:pg-secret@postgres:5432/app",
+          },
+        },
+        {
+          requirementId: "redis",
+          outputs: {
+            host: "redis",
+            port: 6379,
+            username: "default",
+            password: "redis-secret",
+          },
+        },
+      ],
+    });
+    expect(materialized.ok).toBe(true);
+    if (!materialized.ok) return;
+    expect(materialized.value).toEqual([
+      {
+        dependencyRequirementId: "postgres",
+        name: "DATABASE_URL",
+        value: "postgresql://app:pg-secret@postgres:5432/app",
+        secret: true,
+      },
+      {
+        dependencyRequirementId: "redis",
+        name: "REDIS_URL",
+        value: "redis://default:redis-secret@redis:6379/0",
+        secret: true,
+      },
+    ]);
+
+    const missing = materializeBlueprintComponentDependencyEnv({
+      componentRuntimePlan: apiRuntime,
+      dependencyOutputs: [{ requirementId: "postgres", outputs: {} }],
+    });
+    expect(missing).toEqual({
+      ok: false,
+      error: {
+        code: "missing_dependency_output",
+        message: "Dependency output url is required to materialize env DATABASE_URL",
+        dependencyRequirementId: "postgres",
+        outputName: "url",
+        envName: "DATABASE_URL",
+      },
+    });
   });
 });
