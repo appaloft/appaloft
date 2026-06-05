@@ -45,9 +45,18 @@ describe("createAppaloftServer", () => {
     });
 
     try {
-      const missing = operationCatalog.filter(
-        (entry) => !server.container.isRegistered(entry.serviceToken, true),
-      );
+      const missing = operationCatalog.filter((entry) => {
+        if (!server.container.isRegistered(entry.serviceToken, true)) {
+          return true;
+        }
+
+        try {
+          server.container.resolve(entry.serviceToken);
+          return false;
+        } catch {
+          return true;
+        }
+      });
 
       expect(missing).toEqual([]);
     } finally {

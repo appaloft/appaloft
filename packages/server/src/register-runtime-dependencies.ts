@@ -137,6 +137,7 @@ import {
   PgDependencyResourceReadModel,
   PgDependencyResourceRepository,
   PgDependencyResourceSecretStore,
+  PgDeploymentAttemptRetentionStore,
   PgDeploymentLogRetentionStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
@@ -170,6 +171,7 @@ import {
   PgResourceDeletionBlockerReader,
   PgResourceDependencyBindingReadModel,
   PgResourceDependencyBindingRepository,
+  PgResourceHealthObservationHistoryReadModel,
   PgResourceReadModel,
   PgResourceRepository,
   PgResourceRuntimeControlAttemptRecorder,
@@ -193,6 +195,7 @@ import {
   PgServerReadModel,
   PgServerRepository,
   PgSourceEventRepository,
+  PgSourceEventRetentionStore,
   PgSourceLinkReadModel,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
@@ -1316,8 +1319,16 @@ export function registerRuntimeDependencies(
   container.register(tokens.sourceEventPolicyReader, {
     useFactory: instanceCachingFactory(() => new PgSourceEventRepository(input.database.db)),
   });
+  container.register(tokens.sourceEventRetentionStore, {
+    useFactory: instanceCachingFactory(() => new PgSourceEventRetentionStore(input.database.db)),
+  });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),
+  });
+  container.register(tokens.deploymentAttemptRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgDeploymentAttemptRetentionStore(input.database.db),
+    ),
   });
   container.register(tokens.domainBindingRepository, {
     useFactory: instanceCachingFactory(() => new PgDomainBindingRepository(input.database.db)),
@@ -1415,6 +1426,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceReadModel, {
     useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
+  });
+  container.register(tokens.resourceHealthObservationHistoryReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceHealthObservationHistoryReadModel(input.database.db),
+    ),
   });
   container.register(tokens.previewPolicyReadModel, {
     useFactory: instanceCachingFactory(() => new PgPreviewPolicyRepository(input.database.db)),
