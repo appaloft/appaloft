@@ -30,6 +30,9 @@ export class CreateBlueprintInstallPlanQuery extends Query<CreateBlueprintInstal
           ...(parsed.variant ? { variant: parsed.variant } : {}),
           ...(parsed.profile ? { profile: parsed.profile } : {}),
           ...(parsed.parameters ? { parameters: parsed.parameters } : {}),
+          ...(parsed.dependencyProvisioning
+            ? { dependencyProvisioning: parsed.dependencyProvisioning }
+            : {}),
           ...(parsed.target ? { target: parsed.target } : {}),
         }),
     );
