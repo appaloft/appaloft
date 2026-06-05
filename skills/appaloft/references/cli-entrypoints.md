@@ -112,6 +112,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource log-archives list` - `resources.runtime-log-archives.list`
 - `appaloft resource log-archives show <archiveId>` - `resources.runtime-log-archives.show`
 - `appaloft resource log-archives prune --before <iso>` - `resources.runtime-log-archives.prune`
+- `appaloft resource runtime-control-attempts prune --before <iso>` - `resources.runtime-control-attempts.prune`
 - `appaloft server terminal <serverId>; appaloft resource terminal <resourceId>` - `terminal-sessions.open`
 - `appaloft terminal-session list` - `terminal-sessions.list`
 - `appaloft terminal-session show <sessionId>` - `terminal-sessions.show`

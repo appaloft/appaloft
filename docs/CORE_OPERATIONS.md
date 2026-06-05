@@ -1536,6 +1536,7 @@ Runtime log archive retention operations:
 | List resource runtime log archives | Query | `resources.runtime-log-archives.list` | `appaloft resource log-archives list` | `GET /api/resources/runtime-log-archives` |
 | Show resource runtime log archive | Query | `resources.runtime-log-archives.show` | `appaloft resource log-archives show <archiveId>` | `GET /api/resources/runtime-log-archives/{archiveId}` |
 | Prune resource runtime log archives | Command | `resources.runtime-log-archives.prune` | `appaloft resource log-archives prune --before <iso>` | `POST /api/resources/runtime-log-archives/prune` |
+| Prune resource runtime control attempts | Command | `resources.runtime-control-attempts.prune` | `appaloft resource runtime-control-attempts prune --before <iso>` | `POST /api/resources/runtime-control-attempts/prune` |
 - resource runtime log archive retention captures only bounded redacted archive snapshots from
   `resources.runtime-logs` into Appaloft-owned retained records, then list/show/prunes those
   records. It does not persist every live runtime line by default and does not mutate external

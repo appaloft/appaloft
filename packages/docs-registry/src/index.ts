@@ -3146,6 +3146,11 @@ export const publicDocsOperationCoverage = [
     topicId: "observability.runtime-logs",
   },
   {
+    operationKey: "resources.runtime-control-attempts.prune",
+    status: "documented",
+    topicId: "observability.runtime-logs",
+  },
+  {
     operationKey: "resources.runtime.stop",
     status: "documented",
     topicId: "resource.runtime-controls",
