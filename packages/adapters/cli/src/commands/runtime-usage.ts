@@ -1,11 +1,13 @@
 import { InspectRuntimeUsageQuery, type RuntimeUsageScope } from "@appaloft/application";
 import { domainError, err, type Result } from "@appaloft/core";
-import { Args, Command as EffectCommand } from "@effect/cli";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { runQuery } from "../runtime.js";
+import { runQuery, runWatchedQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const scopeArg = Args.text({ name: "scope" });
+const watchOption = Options.boolean("watch").pipe(Options.withDefault(false));
+const watchIntervalMs = 5_000;
 
 function parseScope(scope: string): Result<RuntimeUsageScope> {
   const [kind, id, extra] = scope.split(":");
@@ -53,15 +55,17 @@ const inspectCommand = EffectCommand.make(
   "inspect",
   {
     scope: scopeArg,
+    watch: watchOption,
   },
-  ({ scope }) =>
-    runQuery(
-      parseScope(scope).andThen((parsedScope) =>
-        InspectRuntimeUsageQuery.create({
-          scope: parsedScope,
-        }),
-      ),
-    ),
+  ({ scope, watch }) => {
+    const query = parseScope(scope).andThen((parsedScope) =>
+      InspectRuntimeUsageQuery.create({
+        scope: parsedScope,
+      }),
+    );
+
+    return watch ? runWatchedQuery(query, watchIntervalMs) : runQuery(query);
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.runtimeUsageInspect));
 
 export const runtimeUsageCommand = EffectCommand.make("runtime-usage").pipe(

@@ -210,6 +210,7 @@ import {
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
   InspectRuntimeUsageQuery,
+  type InspectRuntimeUsageQueryInput,
   InspectServerCapacityQuery,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
@@ -618,6 +619,7 @@ import {
   exportAuditEventsResponseSchema,
   exportGlobalAuditEventsResponseSchema,
   githubAppConnectionResponseSchema,
+  type InspectRuntimeUsageResponse,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
   inspectRuntimeUsageResponseSchema,
@@ -799,6 +801,9 @@ interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
   currentRequest?: Request;
   executionContext: ExecutionContext;
 }
+
+const runtimeUsageInspectStreamIntervalMs = 5_000;
+const runtimeUsageInspectStreamResponseSchema = z.object({});
 
 type DeploymentProgressStreamEvent = DeploymentProgressEvent & {
   step: NonNullable<DeploymentProgressEvent["step"]>;
@@ -2437,6 +2442,22 @@ async function assertFirstAdminBootstrapOpen(context: AppaloftOrpcRequestContext
   }
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createRuntimeUsageInspectStream(
+  context: AppaloftOrpcRequestContext,
+  input: InspectRuntimeUsageQueryInput,
+): AsyncGenerator<InspectRuntimeUsageResponse, Record<string, never>, void> {
+  return (async function* streamRuntimeUsageInspection() {
+    while (true) {
+      yield await executeQuery(context, InspectRuntimeUsageQuery.create(input));
+      await delay(runtimeUsageInspectStreamIntervalMs);
+    }
+  })();
+}
+
 function createDeploymentStream(
   context: AppaloftOrpcRequestContext,
   input: CreateDeploymentCommandInput,
@@ -3209,6 +3230,17 @@ export const inspectRuntimeUsageProcedure = base
   .handler(async ({ input, context }) =>
     executeQuery(context, InspectRuntimeUsageQuery.create(input)),
   );
+
+export const inspectRuntimeUsageStreamProcedure = base
+  .route({
+    method: "GET",
+    path: "/runtime-usage/inspect/stream",
+    description: apiRouteDescriptions.runtimeUsageInspect,
+    successStatus: 200,
+  })
+  .input(inspectRuntimeUsageQueryInputSchema)
+  .output(eventIterator(inspectRuntimeUsageResponseSchema, runtimeUsageInspectStreamResponseSchema))
+  .handler(({ input, context }) => createRuntimeUsageInspectStream(context, input));
 
 export const listRuntimeMonitoringSamplesProcedure = base
   .route({
@@ -5939,6 +5971,7 @@ export const appaloftOrpcRouter = {
   },
   runtimeUsage: {
     inspect: inspectRuntimeUsageProcedure,
+    inspectStream: inspectRuntimeUsageStreamProcedure,
   },
   runtimeMonitoring: {
     samples: listRuntimeMonitoringSamplesProcedure,

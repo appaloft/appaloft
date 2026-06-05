@@ -469,6 +469,22 @@ export const runQuery = <T>(
     yield* print(output);
   });
 
+export const runWatchedQuery = <T>(
+  message: Result<AppQuery<T>>,
+  intervalMs: number,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+
+    while (true) {
+      const result = yield* Effect.promise(() => cli.executeQuery(query));
+      const output = yield* resultToEffect(result);
+      yield* print(output);
+      yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, intervalMs)));
+    }
+  });
+
 function diagnosticRouteUrl(summary: ResourceDiagnosticSummary): string | undefined {
   const selectedRoute = summary.access.selectedRoute;
   if (selectedRoute) {

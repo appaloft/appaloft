@@ -69,7 +69,9 @@ describe("runtime usage console readback", () => {
       ]);
 
     expect(componentSource).toContain("i18nKeys.console.runtimeUsage");
-    expect(monitorSource).toContain("runtimeMonitoringSparklinePoints");
+    expect(monitorSource).toContain("AreaChart");
+    expect(monitorSource).toContain("Chart.Container");
+    expect(monitorSource).toContain("inspectStream");
     expect(monitorSource).toContain("retainedSamples");
     expect(monitorSource).toContain("rollup");
     expect(monitorSource).toContain("runtimeMonitoringDeploymentMarkerItems");

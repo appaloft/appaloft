@@ -22,6 +22,7 @@ export {
   buttonVariants,
 } from "./button/index.js";
 export * as CardPrimitives from "./card/index.js";
+export * as ChartPrimitives from "./chart/index.js";
 export * as CollapsiblePrimitives from "./collapsible/index.js";
 export * as DialogPrimitives from "./dialog/index.js";
 export * as DropdownMenuPrimitives from "./dropdown-menu/index.js";
