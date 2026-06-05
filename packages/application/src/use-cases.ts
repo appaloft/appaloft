@@ -173,6 +173,7 @@ export * from "./operations/resources/import-resource-variables.use-case";
 export * from "./operations/resources/list-resource-dependency-bindings.query-service";
 export * from "./operations/resources/list-resource-runtime-log-archives.query-service";
 export * from "./operations/resources/list-resources.query-service";
+export * from "./operations/resources/prune-resource-runtime-control-attempts.use-case";
 export * from "./operations/resources/prune-resource-runtime-log-archives.use-case";
 export * from "./operations/resources/reset-resource-health.use-case";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query-service";

@@ -1330,6 +1330,11 @@ export function registerRuntimeDependencies(
       () => new PgDeploymentAttemptRetentionStore(input.database.db),
     ),
   });
+  container.register(tokens.resourceRuntimeControlAttemptRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceRuntimeControlAttemptRecorder(input.database.db),
+    ),
+  });
   container.register(tokens.domainBindingRepository, {
     useFactory: instanceCachingFactory(() => new PgDomainBindingRepository(input.database.db)),
   });

@@ -24,6 +24,7 @@ export * from "./operations/resources/list-resource-dependency-bindings.handler"
 export * from "./operations/resources/list-resource-runtime-log-archives.handler";
 export * from "./operations/resources/list-resource-secret-references.handler";
 export * from "./operations/resources/list-resources.handler";
+export * from "./operations/resources/prune-resource-runtime-control-attempts.handler";
 export * from "./operations/resources/prune-resource-runtime-log-archives.handler";
 export * from "./operations/resources/reset-resource-health.handler";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.handler";

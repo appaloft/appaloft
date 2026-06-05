@@ -123,6 +123,95 @@ describe("resource runtime control attempt persistence", () => {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
   }, 15000);
+
+  test("[RUNTIME-CTRL-PRUNE-003] prunes terminal attempts without deleting running attempts", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-runtime-control-attempt-prune-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceRuntimeControlAttemptRecorder } =
+        await import("../src");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await seedRuntimeControlResource(database.db);
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          entrypoint: "system",
+          requestId: "req_runtime_control_attempt_prune_pglite_test",
+        }),
+      );
+      const recorder = new PgResourceRuntimeControlAttemptRecorder(database.db);
+
+      const failed = await recorder.record(context, {
+        runtimeControlAttemptId: "rtc_prune_failed",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        operation: "restart",
+        status: "failed",
+        startedAt: "2026-01-01T00:00:10.000Z",
+        completedAt: "2026-01-01T00:00:15.000Z",
+        runtimeState: "stopped",
+      });
+      const running = await recorder.record(context, {
+        runtimeControlAttemptId: "rtc_prune_running",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        operation: "restart",
+        status: "running",
+        startedAt: "2026-01-01T00:00:20.000Z",
+        runtimeState: "restarting",
+      });
+      expect(failed.isOk()).toBe(true);
+      expect(running.isOk()).toBe(true);
+
+      const dryRun = await recorder.prune(context, {
+        before: "2026-01-01T00:01:00.000Z",
+        deploymentId: "dep_web",
+        dryRun: true,
+      });
+      const destructive = await recorder.prune(context, {
+        before: "2026-01-01T00:01:00.000Z",
+        deploymentId: "dep_web",
+        dryRun: false,
+      });
+      const attempts = await database.db
+        .selectFrom("resource_runtime_control_attempts")
+        .select(["id", "status"])
+        .orderBy("id")
+        .execute();
+
+      expect(dryRun.isOk()).toBe(true);
+      expect(dryRun._unsafeUnwrap()).toEqual({
+        matchedCount: 1,
+        prunedCount: 0,
+        affectedResourceCount: 1,
+        affectedDeploymentCount: 1,
+      });
+      expect(destructive.isOk()).toBe(true);
+      expect(destructive._unsafeUnwrap()).toEqual({
+        matchedCount: 1,
+        prunedCount: 1,
+        affectedResourceCount: 1,
+        affectedDeploymentCount: 1,
+      });
+      expect(attempts).toEqual([{ id: "rtc_prune_running", status: "running" }]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
 });
 
 async function seedRuntimeControlResource(

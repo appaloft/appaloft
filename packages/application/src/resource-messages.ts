@@ -19,6 +19,7 @@ export * from "./operations/resources/list-resource-dependency-bindings.query";
 export * from "./operations/resources/list-resource-runtime-log-archives.query";
 export * from "./operations/resources/list-resource-secret-references.query";
 export * from "./operations/resources/list-resources.query";
+export * from "./operations/resources/prune-resource-runtime-control-attempts.command";
 export * from "./operations/resources/prune-resource-runtime-log-archives.command";
 export * from "./operations/resources/reset-resource-health.command";
 export * from "./operations/resources/resource-access-failure-evidence-lookup.query";

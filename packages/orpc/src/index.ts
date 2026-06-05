@@ -319,6 +319,7 @@ import {
   PruneDomainEventsCommand,
   PruneOperatorWorkCommand,
   PruneProviderJobLogsCommand,
+  PruneResourceRuntimeControlAttemptsCommand,
   PruneResourceRuntimeLogArchivesCommand,
   PruneServerCapacityCommand,
   PruneSourceEventsCommand,
@@ -334,6 +335,7 @@ import {
   pruneDomainEventsCommandInputSchema,
   pruneOperatorWorkCommandInputSchema,
   pruneProviderJobLogsCommandInputSchema,
+  pruneResourceRuntimeControlAttemptsCommandInputSchema,
   pruneResourceRuntimeLogArchivesCommandInputSchema,
   pruneServerCapacityCommandInputSchema,
   pruneSourceEventsCommandInputSchema,
@@ -670,6 +672,7 @@ import {
   pruneDomainEventsResponseSchema,
   pruneOperatorWorkResponseSchema,
   pruneProviderJobLogsResponseSchema,
+  pruneResourceRuntimeControlAttemptsResponseSchema,
   pruneResourceRuntimeLogArchivesResponseSchema,
   pruneServerCapacityResponseSchema,
   pruneSourceEventsResponseSchema,
@@ -1550,6 +1553,10 @@ export const apiRouteDescriptions = {
   pruneResourceRuntimeLogArchives: routeDescription(
     "Dry-runs or prunes retained resource runtime log archive snapshots.",
     "observability.runtime-logs",
+  ),
+  pruneResourceRuntimeControlAttempts: routeDescription(
+    "Dry-runs or prunes terminal resource runtime control attempt rows.",
+    "resource.runtime-controls",
   ),
   resourceDiagnosticSummary: routeDescription(
     "Returns a support-safe diagnostic summary.",
@@ -5109,6 +5116,19 @@ export const pruneResourceRuntimeLogArchivesProcedure = base
     executeCommand(context, PruneResourceRuntimeLogArchivesCommand.create(input)),
   );
 
+export const pruneResourceRuntimeControlAttemptsProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/runtime-control-attempts/prune",
+    description: apiRouteDescriptions.pruneResourceRuntimeControlAttempts,
+    successStatus: 200,
+  })
+  .input(pruneResourceRuntimeControlAttemptsCommandInputSchema)
+  .output(pruneResourceRuntimeControlAttemptsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneResourceRuntimeControlAttemptsCommand.create(input)),
+  );
+
 export const resourceRuntimeLogsStreamProcedure = base
   .route({
     method: "GET",
@@ -6000,6 +6020,9 @@ export const appaloftOrpcRouter = {
       list: listResourceRuntimeLogArchivesProcedure,
       show: showResourceRuntimeLogArchiveProcedure,
       prune: pruneResourceRuntimeLogArchivesProcedure,
+    },
+    runtimeControlAttempts: {
+      prune: pruneResourceRuntimeControlAttemptsProcedure,
     },
     runtime: {
       stop: stopResourceRuntimeProcedure,
@@ -8494,6 +8517,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/runtime-log-archives",
     "/api/resources/runtime-log-archives/:archiveId",
     "/api/resources/runtime-log-archives/prune",
+    "/api/resources/runtime-control-attempts/prune",
     "/api/resources/:resourceId/runtime/stop",
     "/api/resources/:resourceId/runtime/start",
     "/api/resources/:resourceId/runtime/restart",

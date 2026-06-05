@@ -152,6 +152,9 @@ export const tokens = {
   domainEventStreamRetentionStore: Symbol.for("appaloft.domain_event_stream_retention_store"),
   deploymentLogRetentionStore: Symbol.for("appaloft.deployment_log_retention_store"),
   deploymentAttemptRetentionStore: Symbol.for("appaloft.deployment_attempt_retention_store"),
+  resourceRuntimeControlAttemptRetentionStore: Symbol.for(
+    "appaloft.resource_runtime_control_attempt_retention_store",
+  ),
   resourceRuntimeLogArchiveStore: Symbol.for("appaloft.resource_runtime_log_archive_store"),
   retentionDefaultRepository: Symbol.for("appaloft.retention_default_repository"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
@@ -540,6 +543,9 @@ export const tokens = {
   cancelDeploymentUseCase: Symbol.for("appaloft.cancel_deployment_use_case"),
   archiveDeploymentUseCase: Symbol.for("appaloft.archive_deployment_use_case"),
   pruneDeploymentsUseCase: Symbol.for("appaloft.prune_deployments_use_case"),
+  pruneResourceRuntimeControlAttemptsUseCase: Symbol.for(
+    "appaloft.prune_resource_runtime_control_attempts_use_case",
+  ),
   cleanupPreviewUseCase: Symbol.for("appaloft.cleanup_preview_use_case"),
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
   configureDomainBindingRouteUseCase: Symbol.for(

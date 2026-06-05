@@ -443,6 +443,14 @@ export const cliCommandDescriptions = {
     "observability.runtime-logs",
   ),
   resourceRuntime: withDocs("Resource runtime control operations", "resource.runtime-controls"),
+  resourceRuntimeControlAttempts: withDocs(
+    "Resource runtime control attempt retention",
+    "resource.runtime-controls",
+  ),
+  resourceRuntimeControlAttemptsPrune: withDocs(
+    "Dry-run or prune terminal resource runtime control attempt rows",
+    "resource.runtime-controls",
+  ),
   resourceRuntimeStop: withDocs("Stop the current resource runtime", "resource.runtime-controls"),
   resourceRuntimeStart: withDocs(
     "Start the last stopped resource runtime",

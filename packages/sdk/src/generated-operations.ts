@@ -2748,6 +2748,23 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "resources.runtime-control-attempts.prune",
+    operationGroup: "resources",
+    operationMethod: "runtimeControlAttemptsPrune",
+    operationId: "resources.runtimeControlAttempts.prune",
+    kind: "command",
+    domain: "resources",
+    messageName: "PruneResourceRuntimeControlAttemptsCommand",
+    route: {
+      method: "POST",
+      path: "/resources/runtime-control-attempts/prune",
+    },
+    docsHref: "/docs/resources/runtime-controls/#resource-runtime-controls",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "resources.runtime-log-archives.show",
     operationGroup: "resources",
     operationMethod: "runtimeLogArchivesShow",

@@ -3895,6 +3895,32 @@ export interface ResourceRuntimeControlAttemptRecord extends ResourceRuntimeCont
   idempotencyKey?: string;
 }
 
+export interface ResourceRuntimeControlAttemptPruneInput {
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+}
+
+export interface ResourceRuntimeControlAttemptPruneStoreResult {
+  matchedCount: number;
+  prunedCount: number;
+  affectedResourceCount: number;
+  affectedDeploymentCount: number;
+}
+
+export interface ResourceRuntimeControlAttemptPruneResult
+  extends ResourceRuntimeControlAttemptPruneStoreResult {
+  schemaVersion: "resources.runtime-control-attempts.prune/v1";
+  before: string;
+  deploymentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  dryRun: boolean;
+  prunedAt: string;
+}
+
 export interface ResourceRuntimeControlTargetRequest {
   runtimeControlAttemptId: string;
   operation: ResourceRuntimeControlOperation;
@@ -3932,6 +3958,13 @@ export interface ResourceRuntimeControlAttemptRecorder {
     context: RepositoryContext,
     attempt: ResourceRuntimeControlAttemptRecord,
   ): Promise<Result<ResourceRuntimeControlAttemptRecord, DomainError>>;
+}
+
+export interface ResourceRuntimeControlAttemptRetentionStore {
+  prune(
+    context: RepositoryContext,
+    input: ResourceRuntimeControlAttemptPruneInput,
+  ): Promise<Result<ResourceRuntimeControlAttemptPruneStoreResult, DomainError>>;
 }
 
 export interface ResourceHealthProbeRequest {

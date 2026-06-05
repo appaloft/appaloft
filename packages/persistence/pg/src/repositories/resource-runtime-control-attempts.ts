@@ -2,8 +2,11 @@ import {
   appaloftTraceAttributes,
   createReadModelSpanName,
   type RepositoryContext,
+  type ResourceRuntimeControlAttemptPruneInput,
+  type ResourceRuntimeControlAttemptPruneStoreResult,
   type ResourceRuntimeControlAttemptRecord,
   type ResourceRuntimeControlAttemptRecorder,
+  type ResourceRuntimeControlAttemptRetentionStore,
   type ResourceRuntimeControlBlockedReason,
   type ResourceRuntimeControlOperation,
   type ResourceRuntimeControlPhaseSummary,
@@ -187,7 +190,7 @@ function persistenceError(message: string, error: unknown) {
 }
 
 export class PgResourceRuntimeControlAttemptRecorder
-  implements ResourceRuntimeControlAttemptRecorder
+  implements ResourceRuntimeControlAttemptRecorder, ResourceRuntimeControlAttemptRetentionStore
 {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -242,6 +245,61 @@ export class PgResourceRuntimeControlAttemptRecorder
       return ok(rowToRuntimeControlAttempt(row));
     } catch (error) {
       return err(persistenceError("Runtime control attempt could not be recorded", error));
+    }
+  }
+
+  async prune(
+    context: RepositoryContext,
+    input: ResourceRuntimeControlAttemptPruneInput,
+  ): Promise<Result<ResourceRuntimeControlAttemptPruneStoreResult>> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+
+    try {
+      let query = executor
+        .selectFrom("resource_runtime_control_attempts")
+        .select(["id", "resource_id", "deployment_id"])
+        .where("updated_at", "<", input.before)
+        .where("status", "in", ["succeeded", "failed", "blocked"]);
+
+      if (input.deploymentId) {
+        query = query.where("deployment_id", "=", input.deploymentId);
+      }
+
+      if (input.resourceId) {
+        query = query.where("resource_id", "=", input.resourceId);
+      }
+
+      if (input.serverId) {
+        query = query.where("server_id", "=", input.serverId);
+      }
+
+      const rows = await query.execute();
+      const affectedResourceCount = new Set(rows.map((row) => row.resource_id)).size;
+      const affectedDeploymentCount = new Set(
+        rows.flatMap((row) => (row.deployment_id ? [row.deployment_id] : [])),
+      ).size;
+
+      if (!input.dryRun && rows.length > 0) {
+        await executor
+          .deleteFrom("resource_runtime_control_attempts")
+          .where(
+            "id",
+            "in",
+            rows.map((row) => row.id),
+          )
+          .execute();
+      }
+
+      return ok({
+        matchedCount: rows.length,
+        prunedCount: input.dryRun ? 0 : rows.length,
+        affectedResourceCount,
+        affectedDeploymentCount,
+      });
+    } catch (error) {
+      return err(
+        persistenceError("Runtime control attempt retention prune could not be completed", error),
+      );
     }
   }
 }

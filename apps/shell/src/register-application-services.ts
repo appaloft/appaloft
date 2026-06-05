@@ -311,6 +311,8 @@ import {
   PruneOperatorWorkUseCase,
   PruneProviderJobLogsCommandHandler,
   PruneProviderJobLogsUseCase,
+  PruneResourceRuntimeControlAttemptsCommandHandler,
+  PruneResourceRuntimeControlAttemptsUseCase,
   PruneResourceRuntimeLogArchivesCommandHandler,
   PruneResourceRuntimeLogArchivesUseCase,
   PruneServerCapacityCommandHandler,
@@ -1644,6 +1646,7 @@ export function registerApplicationServices(
   container.registerSingleton(ListResourceRuntimeLogArchivesQueryHandler);
   container.registerSingleton(ShowResourceRuntimeLogArchiveQueryHandler);
   container.registerSingleton(PruneResourceRuntimeLogArchivesCommandHandler);
+  container.registerSingleton(PruneResourceRuntimeControlAttemptsCommandHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -2412,6 +2415,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.pruneResourceRuntimeLogArchivesUseCase,
     PruneResourceRuntimeLogArchivesUseCase,
+  );
+  container.registerSingleton(
+    tokens.pruneResourceRuntimeControlAttemptsUseCase,
+    PruneResourceRuntimeControlAttemptsUseCase,
   );
   container.registerSingleton(tokens.openTerminalSessionUseCase, OpenTerminalSessionUseCase);
   container.registerSingleton(
