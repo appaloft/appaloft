@@ -190,6 +190,8 @@ import {
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
+  type VersionReferenceKind,
+  type VersionSourceKind,
 } from "@appaloft/core";
 import { type Kysely, type Selectable, type Transaction } from "kysely";
 
@@ -261,6 +263,24 @@ export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
   locator: string;
   displayName: string;
+  version?: {
+    reference: {
+      sourceKind: VersionSourceKind;
+      referenceKind: VersionReferenceKind;
+      value: string;
+    };
+    fixedIdentifier?: {
+      sourceKind: VersionSourceKind;
+      referenceKind: VersionReferenceKind;
+      value: string;
+    };
+    aliases?: Array<{
+      sourceKind: VersionSourceKind;
+      referenceKind: VersionReferenceKind;
+      value: string;
+    }>;
+    detected?: boolean;
+  };
   inspection?: SerializedSourceInspectionSnapshot;
   metadata?: Record<string, string>;
 }

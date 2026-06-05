@@ -316,6 +316,68 @@ describe("project lifecycle HTTP routes", () => {
     expect(capturedQuery).toMatchObject({ projectId: "prj_demo" });
   });
 
+  test("[PROJ-LIFE-ENTRY-HTTP-005B] serializes project delete-check blockers through HTTP", async () => {
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({
+          schemaVersion: "projects.delete-check/v1",
+          projectId: "prj_demo",
+          lifecycleStatus: "archived",
+          eligible: false,
+          blockers: [
+            {
+              kind: "resource",
+              relatedEntityId: "res_demo",
+              relatedEntityType: "resource",
+              count: 1,
+            },
+            {
+              kind: "audit-retention",
+              relatedEntityId: "aud_demo",
+              relatedEntityType: "audit-log",
+              count: 2,
+            },
+          ],
+          checkedAt: "2026-01-01T00:00:00.000Z",
+        } as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/projects/prj_demo/delete-check"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      schemaVersion: "projects.delete-check/v1",
+      projectId: "prj_demo",
+      eligible: false,
+      blockers: [
+        {
+          kind: "resource",
+          relatedEntityId: "res_demo",
+          relatedEntityType: "resource",
+          count: 1,
+        },
+        {
+          kind: "audit-retention",
+          relatedEntityId: "aud_demo",
+          relatedEntityType: "audit-log",
+          count: 2,
+        },
+      ],
+    });
+  });
+
   test("[PROJ-LIFE-ENTRY-HTTP-006] dispatches DeleteProjectCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

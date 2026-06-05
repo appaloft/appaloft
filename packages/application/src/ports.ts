@@ -103,6 +103,7 @@ import {
   type Version,
   type VersionReference,
   type VersionReferenceKind,
+  type VersionSourceKind,
 } from "@appaloft/core";
 import {
   defaultExecutionTenantContext,
@@ -4572,6 +4573,24 @@ export interface DeploymentSummary {
       kind: SourceKind;
       locator: string;
       displayName: string;
+      version?: {
+        reference: {
+          sourceKind: VersionSourceKind;
+          referenceKind: VersionReferenceKind;
+          value: string;
+        };
+        fixedIdentifier?: {
+          sourceKind: VersionSourceKind;
+          referenceKind: VersionReferenceKind;
+          value: string;
+        };
+        aliases?: Array<{
+          sourceKind: VersionSourceKind;
+          referenceKind: VersionReferenceKind;
+          value: string;
+        }>;
+        detected?: boolean;
+      };
       inspection?: {
         runtimeFamily?:
           | "custom"

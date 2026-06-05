@@ -43,6 +43,8 @@ import {
   CheckDomainBindingDeleteSafetyQueryService,
   CheckInstanceUpgradeQueryHandler,
   CheckInstanceUpgradeQueryService,
+  CheckProjectDeleteSafetyQueryHandler,
+  CheckProjectDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
   CleanupPreviewCommandHandler,
@@ -136,6 +138,8 @@ import {
   DeleteOrganizationCommandHandler,
   DeleteOrganizationUseCase,
   DeletePreviewEnvironmentCommandHandler,
+  DeleteProjectCommandHandler,
+  DeleteProjectUseCase,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
   DeleteScheduledTaskCommandHandler,
@@ -373,6 +377,8 @@ import {
   RestartResourceRuntimeCommandHandler,
   RestoreDependencyResourceBackupCommandHandler,
   RestoreDependencyResourceBackupUseCase,
+  RestoreProjectCommandHandler,
+  RestoreProjectUseCase,
   RetryCertificateCommandHandler,
   RetryCertificateUseCase,
   RetryDeploymentCommandHandler,
@@ -2223,6 +2229,9 @@ export function registerApplicationServices(
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ArchiveProjectCommandHandler);
+  container.registerSingleton(RestoreProjectCommandHandler);
+  container.registerSingleton(CheckProjectDeleteSafetyQueryHandler);
+  container.registerSingleton(DeleteProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
   container.registerSingleton(RenameEnvironmentCommandHandler);
@@ -2446,6 +2455,12 @@ export function registerApplicationServices(
   });
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
+  container.registerSingleton(tokens.restoreProjectUseCase, RestoreProjectUseCase);
+  container.registerSingleton(
+    tokens.checkProjectDeleteSafetyQueryService,
+    CheckProjectDeleteSafetyQueryService,
+  );
+  container.registerSingleton(tokens.deleteProjectUseCase, DeleteProjectUseCase);
   container.registerSingleton(tokens.bootstrapFirstAdminUseCase, BootstrapFirstAdminUseCase);
   container.registerSingleton(
     tokens.getAuthBootstrapStatusQueryService,

@@ -162,6 +162,7 @@ import {
   PgPreviewPolicyDecisionProjection,
   PgPreviewPolicyRepository,
   PgProcessAttemptJournal,
+  PgProjectDeletionBlockerReader,
   PgProjectReadModel,
   PgProjectRepository,
   PgProviderJobLogRetentionStore,
@@ -1083,6 +1084,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
+  });
+  container.register(tokens.projectDeletionBlockerReader, {
+    useFactory: instanceCachingFactory(() => new PgProjectDeletionBlockerReader(input.database.db)),
   });
   container.register(tokens.serverRepository, {
     useFactory: instanceCachingFactory(() => new PgServerRepository(input.database.db)),

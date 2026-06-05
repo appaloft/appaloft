@@ -29,8 +29,7 @@
     type RedeployDeploymentInput,
     type RetryDeploymentInput,
     type RollbackDeploymentInput,
-    shortDeploymentSourceCommitSha,
-    sourceCommitShaForDeployment,
+    sourceVersionForDeployment,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -988,7 +987,7 @@
       </div>
     </section>
   {:else}
-    {@const sourceCommitSha = sourceCommitShaForDeployment(deployment)}
+    {@const sourceVersion = sourceVersionForDeployment(deployment)}
     <div class="space-y-8">
       <section class="space-y-6">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -1004,10 +1003,11 @@
               <p class="break-all text-sm leading-6 text-muted-foreground">
                 {deployment.runtimePlan.source.locator}
               </p>
-              {#if sourceCommitSha}
-                <p class="font-mono text-sm text-muted-foreground" title={sourceCommitSha}>
-                  {$t(i18nKeys.console.deployments.sourceCommitSha)}
-                  {shortDeploymentSourceCommitSha(sourceCommitSha)}
+              {#if sourceVersion}
+                <p class="break-all font-mono text-sm text-muted-foreground" title={sourceVersion.value}>
+                  {sourceVersion.label}
+                  {sourceVersion.requested ? `${sourceVersion.requested} -> ` : ""}
+                  {sourceVersion.shortValue}
                 </p>
               {/if}
             </div>
@@ -1383,16 +1383,16 @@
 
           <section class="console-panel p-4">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.common.domain.source)}</h2>
-            <div class={sourceCommitSha ? "mt-4 grid gap-3 md:grid-cols-[10rem_14rem_minmax(0,1fr)]" : "mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]"}>
+            <div class={sourceVersion ? "mt-4 grid gap-3 md:grid-cols-[10rem_14rem_minmax(0,1fr)]" : "mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]"}>
               <div class="console-subtle-panel px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.kind)}</p>
                 <p class="mt-1 truncate text-sm font-medium">{deployment.runtimePlan.source.kind}</p>
               </div>
-              {#if sourceCommitSha}
+              {#if sourceVersion}
                 <div class="console-subtle-panel px-3 py-2">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.sourceCommitSha)}</p>
-                  <p class="mt-1 truncate font-mono text-sm font-medium" title={sourceCommitSha}>
-                    {shortDeploymentSourceCommitSha(sourceCommitSha)}
+                  <p class="text-xs text-muted-foreground">{sourceVersion.label}</p>
+                  <p class="mt-1 truncate font-mono text-sm font-medium" title={sourceVersion.value}>
+                    {sourceVersion.requested ? `${sourceVersion.requested} -> ` : ""}{sourceVersion.shortValue}
                   </p>
                 </div>
               {/if}

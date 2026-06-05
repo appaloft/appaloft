@@ -33,6 +33,9 @@ type DependencyProvisioningPlanFixtureInput = {
   completedAt?: string;
 };
 
+const fixedDockerImageDigest =
+  "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0";
+
 const dependencyResourceFixtureKinds: Record<
   DependencyResourceFixtureKind,
   {
@@ -108,6 +111,18 @@ function deploymentDetailFixture(input: {
   destinationId: string;
   sourceDisplayName: string;
   sourceLocator: string;
+  sourceVersion?: {
+    reference: {
+      sourceKind: "docker-image";
+      referenceKind: "image-tag";
+      value: string;
+    };
+    fixedIdentifier: {
+      sourceKind: "docker-image";
+      referenceKind: "image-digest";
+      value: string;
+    };
+  };
   status?: "created" | "planning" | "planned" | "running" | "succeeded" | "failed";
   sectionErrors?: Array<{
     section: "related-context" | "timeline" | "snapshot" | "latest-failure";
@@ -136,6 +151,7 @@ function deploymentDetailFixture(input: {
           kind: "git-public",
           locator: input.sourceLocator,
           displayName: input.sourceDisplayName,
+          ...(input.sourceVersion ? { version: input.sourceVersion } : {}),
         },
         buildStrategy: "workspace-commands",
         packagingMode: "host-process-runtime",
@@ -218,6 +234,7 @@ function deploymentDetailFixture(input: {
           kind: "git-public",
           locator: input.sourceLocator,
           displayName: input.sourceDisplayName,
+          ...(input.sourceVersion ? { version: input.sourceVersion } : {}),
         },
         buildStrategy: "workspace-commands",
         packagingMode: "host-process-runtime",
@@ -2487,6 +2504,18 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
                 destinationId: "dst_demo",
                 sourceDisplayName: "workspace",
                 sourceLocator: "https://github.com/acme/platform.git",
+                sourceVersion: {
+                  reference: {
+                    sourceKind: "docker-image",
+                    referenceKind: "image-tag",
+                    value: "latest",
+                  },
+                  fixedIdentifier: {
+                    sourceKind: "docker-image",
+                    referenceKind: "image-digest",
+                    value: fixedDockerImageDigest,
+                  },
+                },
               }),
       };
     },
@@ -6172,6 +6201,8 @@ describe("console e2e with Bun.WebView", () => {
       })()`);
 
       await expectText(view, "workspace");
+      await expectText(view, "Image digest");
+      await expectText(view, "latest -> sha256:8b1a9953c461");
       await expectAnyText(view, ["Overview", "基本信息"]);
 
       const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");

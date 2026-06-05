@@ -133,6 +133,7 @@ export function translateDomainError(error: LocalizableDomainError, t: AppaloftT
     case "conflict":
     case "project_slug_conflict":
     case "project_archived":
+    case "project_delete_blocked":
     case "environment_archived":
     case "environment_locked":
     case "resource_slug_conflict":
