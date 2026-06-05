@@ -123,6 +123,8 @@ function deploymentDetailFixture(input: {
       value: string;
     };
   };
+  sourceMetadata?: Record<string, string>;
+  executionMetadata?: Record<string, string>;
   status?: "created" | "planning" | "planned" | "running" | "succeeded" | "failed";
   sectionErrors?: Array<{
     section: "related-context" | "timeline" | "snapshot" | "latest-failure";
@@ -151,6 +153,7 @@ function deploymentDetailFixture(input: {
           kind: "git-public",
           locator: input.sourceLocator,
           displayName: input.sourceDisplayName,
+          ...(input.sourceMetadata ? { metadata: input.sourceMetadata } : {}),
           ...(input.sourceVersion ? { version: input.sourceVersion } : {}),
         },
         buildStrategy: "workspace-commands",
@@ -169,6 +172,7 @@ function deploymentDetailFixture(input: {
           ],
           metadata: {
             publicUrl: "https://workspace-demo.example.test",
+            ...(input.executionMetadata ?? {}),
           },
         },
         target: {
@@ -2504,17 +2508,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
                 destinationId: "dst_demo",
                 sourceDisplayName: "workspace",
                 sourceLocator: "https://github.com/acme/platform.git",
-                sourceVersion: {
-                  reference: {
-                    sourceKind: "docker-image",
-                    referenceKind: "image-tag",
-                    value: "latest",
-                  },
-                  fixedIdentifier: {
-                    sourceKind: "docker-image",
-                    referenceKind: "image-digest",
-                    value: fixedDockerImageDigest,
-                  },
+                sourceMetadata: {
+                  imageTag: "latest",
+                  imageName: "ghcr.io/muchobien/pocketbase",
+                },
+                executionMetadata: {
+                  imageDigest: fixedDockerImageDigest,
+                  sourceVersion: fixedDockerImageDigest,
+                  sourceVersionKind: "image-digest",
                 },
               }),
       };

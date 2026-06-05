@@ -1335,6 +1335,54 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[RES-PROFILE-DELETE-007] production resources retain deployment-history delete blockers", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-deployment-delete-blocker-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "deployment_delete_blocker", {
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:01:00.000Z",
+      });
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_resource_delete_blocker",
+        createdAt: "2026-01-01T00:02:00.000Z",
+        routeSource: "generated-default",
+        hostname: "delete-blocker.production.example.test",
+      });
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: target.resourceId,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toContainEqual({
+        kind: "deployment-history",
+        relatedEntityId: "dep_resource_delete_blocker",
+        relatedEntityType: "deployment",
+        count: 1,
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SOURCE-LINK-STATE-015] pg source link store persists and reads mappings", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-links-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

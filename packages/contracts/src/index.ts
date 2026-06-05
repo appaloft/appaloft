@@ -6795,6 +6795,8 @@ export function sourceVersionForDeployment(
   deployment: DeploymentCommitMetadataInput,
 ): DeploymentSourceVersionDisplay | undefined {
   const version = deployment.runtimePlan.source.version;
+  const executionMetadata = deployment.runtimePlan.execution.metadata ?? {};
+  const sourceMetadata = deployment.runtimePlan.source.metadata ?? {};
   const fixedIdentifier = version?.fixedIdentifier;
   if (fixedIdentifier) {
     return {
@@ -6819,6 +6821,30 @@ export function sourceVersionForDeployment(
       label: "Commit",
       value: sourceCommitSha,
       shortValue: shortDeploymentSourceVersion(sourceCommitSha),
+      fixed: true,
+    };
+  }
+
+  const imageDigest =
+    executionMetadata.imageDigest ??
+    executionMetadata["source.imageDigest"] ??
+    (executionMetadata.sourceVersionKind === "image-digest"
+      ? executionMetadata.sourceVersion
+      : undefined) ??
+    sourceMetadata.imageDigest ??
+    sourceMetadata["source.imageDigest"];
+  if (imageDigest) {
+    const requested =
+      version?.reference.value ??
+      sourceMetadata.imageTag ??
+      executionMetadata["source.imageTag"] ??
+      sourceMetadata["source.imageTag"];
+
+    return {
+      label: "Image digest",
+      value: imageDigest,
+      shortValue: shortDeploymentSourceVersion(imageDigest),
+      ...(requested && requested !== imageDigest ? { requested } : {}),
       fixed: true,
     };
   }
