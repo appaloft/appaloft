@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
+  buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
   parseDockerRepoDigestFromInspect,
 } from "../src/ssh-execution";
@@ -51,6 +52,16 @@ describe("SSH source upload", () => {
 });
 
 describe("SSH Docker image version metadata", () => {
+  test("renders remote Docker pull before digest inspect", () => {
+    const command = buildRemoteDockerImageVersionMetadataCommand("ghcr.io/acme/api:latest");
+
+    const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
+
+    expect(syntaxCheck.status).toBe(0);
+    expect(command).toContain("docker pull 'ghcr.io/acme/api:latest'");
+    expect(command).toContain(" && docker image inspect --format '{{json .RepoDigests}}'");
+  });
+
   test("parses a repo digest returned by remote docker image inspect", () => {
     const digest =
       "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0";

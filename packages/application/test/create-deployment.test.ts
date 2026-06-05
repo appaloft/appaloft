@@ -212,7 +212,10 @@ class StaticSourceDetector implements SourceDetector {
 }
 
 class StaticUnknownSourceVersionDetector implements SourceVersionDetector {
+  calls = 0;
+
   async detect(_context: ExecutionContext, _input: Parameters<SourceVersionDetector["detect"]>[1]) {
+    this.calls += 1;
     return ok({
       version: Version.unknown(),
       reasoning: ["runtime target will report Docker image digest"],
@@ -3419,6 +3422,7 @@ describe("CreateDeploymentUseCase", () => {
 
   test("[DEP-CREATE-SMOKE-007] admits Docker tag versions for runtime target digest resolution", async () => {
     const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const sourceVersionDetector = new StaticUnknownSourceVersionDetector();
     const {
       context,
       createDeploymentInput,
@@ -3427,7 +3431,7 @@ describe("CreateDeploymentUseCase", () => {
       repositoryContext,
     } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
       runtimePlanResolver,
-      sourceVersionDetector: new StaticUnknownSourceVersionDetector(),
+      sourceVersionDetector,
     });
     const requested = VersionReference.createForSource({
       sourceKind: "docker-image",
@@ -3450,9 +3454,15 @@ describe("CreateDeploymentUseCase", () => {
     const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
 
     expect(result.isOk()).toBe(true);
+    expect(sourceVersionDetector.calls).toBe(0);
     expect(runtimePlanResolver.input?.source.kind).toBe("docker-image");
-    expect(runtimePlanResolver.input?.source.version?.isUnknown()).toBe(true);
-    expect(runtimePlanResolver.input?.detectedReasoning).toContain(
+    expect(runtimePlanResolver.input?.source.version).toBeUndefined();
+    expect(runtimePlanResolver.input?.source.metadata).toMatchObject({
+      versionReference: "latest",
+      versionReferenceKind: "image-tag",
+      imageTag: "latest",
+    });
+    expect(runtimePlanResolver.input?.detectedReasoning).not.toContain(
       "runtime target will report Docker image digest",
     );
   });

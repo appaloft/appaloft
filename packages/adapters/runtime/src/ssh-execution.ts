@@ -190,6 +190,13 @@ export function parseDockerRepoDigestFromInspect(output: string): string | undef
   return undefined;
 }
 
+export function buildRemoteDockerImageVersionMetadataCommand(image: string): string {
+  return [
+    `docker pull ${shellQuote(image)}`,
+    `docker image inspect --format ${shellQuote("{{json .RepoDigests}}")} ${shellQuote(image)}`,
+  ].join(" && ");
+}
+
 function requiresRemoteDockerImageDigest(state: DeploymentState): boolean {
   const source = state.runtimePlan.source;
   return source.kind === "docker-image" && (source.version?.isUnknown() ?? true);
@@ -1168,7 +1175,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return { status: "not-required", metadata: {} };
     }
 
-    const message = `Resolve SSH Docker image digest for ${input.image}`;
+    const message = `Pull and resolve SSH Docker image digest for ${input.image}`;
     input.logs.push(phaseLog("deploy", message));
     this.report(input.context, {
       deploymentId: input.deploymentId,
@@ -1179,7 +1186,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const inspect = await this.runRemoteCommand({
       target: input.target,
-      command: `docker image inspect --format ${shellQuote("{{json .RepoDigests}}")} ${shellQuote(input.image)}`,
+      command: buildRemoteDockerImageVersionMetadataCommand(input.image),
       cwd: input.runtimeDir,
       env: input.env,
       redactions: input.redactions,
@@ -1204,7 +1211,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     if (inspect.failed) {
       return {
         status: "failed",
-        message: `SSH Docker image digest could not be inspected for ${input.image}`,
+        message: `SSH Docker image digest could not be resolved for ${input.image}`,
         retryable: true,
       };
     }
@@ -2432,6 +2439,36 @@ export class SshExecutionBackend implements ExecutionBackend {
         }),
       ]);
       const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
+      const imageVersionMetadataResult = await this.resolveRemoteDockerImageVersionMetadata({
+        context,
+        deploymentId: state.id.value,
+        state,
+        target,
+        runtimeDir,
+        env: runtimeExecutionEnv,
+        redactions: runtimeRedactions,
+        image,
+        logs,
+      });
+      if (imageVersionMetadataResult.status === "failed") {
+        logs.push(phaseLog("deploy", imageVersionMetadataResult.message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_image_digest_resolution_failed",
+            retryable: imageVersionMetadataResult.retryable,
+            metadata: {
+              host: target.host,
+              image,
+              containerName,
+              message: imageVersionMetadataResult.message,
+              phase: "docker-image-version-resolution",
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+      const dockerImageVersionMetadata = imageVersionMetadataResult.metadata;
       if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
         logs.push(
           phaseLog(
@@ -2467,41 +2504,11 @@ export class SshExecutionBackend implements ExecutionBackend {
               image,
               containerName,
               ...prepared.source.metadata,
+              ...dockerImageVersionMetadata,
             },
           }),
         });
       }
-
-      const imageVersionMetadataResult = await this.resolveRemoteDockerImageVersionMetadata({
-        context,
-        deploymentId: state.id.value,
-        state,
-        target,
-        runtimeDir,
-        env: runtimeExecutionEnv,
-        redactions: runtimeRedactions,
-        image,
-        logs,
-      });
-      if (imageVersionMetadataResult.status === "failed") {
-        logs.push(phaseLog("deploy", imageVersionMetadataResult.message, "error"));
-        return ok({
-          deployment: this.applyFailure(deployment, {
-            logs,
-            errorCode: "ssh_docker_image_digest_resolution_failed",
-            retryable: imageVersionMetadataResult.retryable,
-            metadata: {
-              host: target.host,
-              image,
-              containerName,
-              message: imageVersionMetadataResult.message,
-              phase: "docker-image-version-resolution",
-              ...prepared.source.metadata,
-            },
-          }),
-        });
-      }
-      const dockerImageVersionMetadata = imageVersionMetadataResult.metadata;
 
       const proxyReloadPlanResult = this.edgeProxyProviderRegistry
         ? await createProxyReloadPlan({
@@ -2528,6 +2535,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               ...prepared.source.metadata,
               message: proxyReloadPlanResult.error.message,
               phase: "proxy-reload",
+              ...dockerImageVersionMetadata,
             },
           }),
         });
@@ -2595,6 +2603,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 proxyKind: proxyReloadPlan.proxyKind,
                 stepName: reload.stepName,
                 phase: "proxy-reload",
+                ...dockerImageVersionMetadata,
               },
             }),
           });
@@ -2648,6 +2657,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               containerName,
               port: String(port),
               ...prepared.source.metadata,
+              ...dockerImageVersionMetadata,
             },
           }),
         });
@@ -2773,6 +2783,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                   publishedPort: String(publishedHostPort),
                   url: internalUrl,
                   ...prepared.source.metadata,
+                  ...dockerImageVersionMetadata,
                 },
               }),
             });
@@ -2821,6 +2832,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                   internalUrl,
                   phase: "public-route-verification",
                   ...prepared.source.metadata,
+                  ...dockerImageVersionMetadata,
                 },
               }),
             });
@@ -2879,6 +2891,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                     message,
                     publicRouteFailureKind: publicHealth.failureKind,
                     ...prepared.source.metadata,
+                    ...dockerImageVersionMetadata,
                   },
                 }),
               });
