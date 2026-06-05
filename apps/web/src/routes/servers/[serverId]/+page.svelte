@@ -146,8 +146,9 @@
     kind: "server" as const,
     serverId,
   });
+  const activeTab = $derived(parseServerDetailTab(page.url.searchParams.get("tab")));
   const serverRuntimeUsageQuery = createQuery(() =>
-    runtimeUsageQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+    runtimeUsageQueryOptions(serverRuntimeScope, browser && serverId.length > 0 && activeTab !== "monitor"),
   );
   const serverRuntimeMonitoringSamplesQuery = createQuery(() =>
     runtimeMonitoringSamplesQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
@@ -268,7 +269,6 @@
       ? serverDeploymentsInObservationWindow.length
       : (serverRollups?.deployments.total ?? serverDeployments.length),
   );
-  const activeTab = $derived(parseServerDetailTab(page.url.searchParams.get("tab")));
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
   const edgeProxyKindOptions = configureServerEdgeProxyInputSchema.shape.proxyKind.options;
 

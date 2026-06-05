@@ -71,6 +71,12 @@ export type RuntimeMonitoringSample = {
 
 export type RuntimeMonitoringSignalKey = "cpu" | "memory" | "disk";
 
+export type RuntimeMonitoringChartPoint = {
+  observedAt: Date;
+  observedAtIso: string;
+  value: number;
+};
+
 export type RuntimeMonitoringContributorItem = {
   scope: RuntimeMonitoringContributor["scope"];
   scopeId: string;
@@ -120,7 +126,7 @@ function cpuPercent(totals: InspectRuntimeUsageResponse["totals"]): number | nul
   return null;
 }
 
-function signalPercent(
+export function runtimeMonitoringSignalPercent(
   totals: InspectRuntimeUsageResponse["totals"],
   signal: RuntimeMonitoringSignalKey,
 ): number | null {
@@ -227,7 +233,7 @@ export function runtimeMonitoringRollupValues(
   signal: RuntimeMonitoringSignalKey,
 ): Array<number | null> {
   const series = rollup?.series.find((candidate) => candidate.signal === signal);
-  return series?.points.map((point) => signalPercent(point.totals, signal)) ?? [];
+  return series?.points.map((point) => runtimeMonitoringSignalPercent(point.totals, signal)) ?? [];
 }
 
 export function latestRuntimeMonitoringRollupValue(
@@ -238,6 +244,59 @@ export function latestRuntimeMonitoringRollupValue(
     (value): value is number => value !== null,
   );
   return values.at(-1) ?? null;
+}
+
+function chartPointFromTimestamp(
+  timestamp: string,
+  value: number | null,
+): RuntimeMonitoringChartPoint | null {
+  if (value === null || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const observedAt = new Date(timestamp);
+  if (!Number.isFinite(observedAt.getTime())) {
+    return null;
+  }
+
+  return {
+    observedAt,
+    observedAtIso: timestamp,
+    value,
+  };
+}
+
+export function runtimeMonitoringSignalChartPoints(
+  rollup: RuntimeMonitoringRollupResponse | null,
+  samples: RuntimeMonitoringSample[],
+  signal: RuntimeMonitoringSignalKey,
+): RuntimeMonitoringChartPoint[] {
+  const rollupSeries = rollup?.series.find((candidate) => candidate.signal === signal);
+  const rollupPoints =
+    rollupSeries?.points
+      .map((point) =>
+        chartPointFromTimestamp(point.to, runtimeMonitoringSignalPercent(point.totals, signal)),
+      )
+      .filter((point): point is RuntimeMonitoringChartPoint => point !== null) ?? [];
+
+  if (rollupPoints.length > 0) {
+    return rollupPoints;
+  }
+
+  return samples
+    .map((sample) => {
+      switch (signal) {
+        case "cpu":
+          return chartPointFromTimestamp(sample.observedAt, sample.cpuLoadPercent);
+        case "memory":
+          return chartPointFromTimestamp(sample.observedAt, sample.memoryPercent);
+        case "disk":
+          return chartPointFromTimestamp(sample.observedAt, sample.diskPercent);
+      }
+
+      return null;
+    })
+    .filter((point): point is RuntimeMonitoringChartPoint => point !== null);
 }
 
 export function runtimeMonitoringRollupSummary(rollup: RuntimeMonitoringRollupResponse | null): {

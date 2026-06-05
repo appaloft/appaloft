@@ -1,6 +1,7 @@
 import { AppShell, AppShellRegion } from "@appaloft/ui/app-shell";
 import { Badge, badgeVariants } from "@appaloft/ui/badge";
 import { Button, type ButtonProps, type ButtonVariant, buttonVariants } from "@appaloft/ui/button";
+import { ChartContainer, type ChartContainerProps } from "@appaloft/ui/chart";
 import * as Dialog from "@appaloft/ui/dialog";
 import * as DropdownMenu from "@appaloft/ui/dropdown-menu";
 import * as Empty from "@appaloft/ui/empty";
@@ -25,6 +26,7 @@ describe("@appaloft/ui public exports", () => {
     expect(uiPackage.primitiveEntrypoints.button).toBe("@appaloft/ui/button");
     expect(uiPackage.primitiveEntrypoints.empty).toBe("@appaloft/ui/empty");
     expect(uiPackage.primitiveEntrypoints.dropdownMenu).toBe("@appaloft/ui/dropdown-menu");
+    expect(uiPackage.primitiveEntrypoints.chart).toBe("@appaloft/ui/chart");
     expect(uiPackage.primitiveEntrypoints.progress).toBe("@appaloft/ui/progress");
     expect(uiPackage.shellEntrypoints.appShell).toBe("@appaloft/ui/app-shell");
     expect(uiPackage.shellEntrypoints.icon).toBe("@appaloft/ui/icon");
@@ -38,6 +40,7 @@ describe("@appaloft/ui public exports", () => {
   test("resolves Svelte component exports through package subpaths", () => {
     expect(Button).toBeDefined();
     expect(Badge).toBeDefined();
+    expect(ChartContainer).toBeDefined();
     expect(Dialog.DialogContent).toBeDefined();
     expect(DropdownMenu.DropdownMenuContent).toBeDefined();
     expect(Empty.Empty).toBeDefined();
@@ -66,6 +69,7 @@ describe("@appaloft/ui public exports", () => {
     expectTypeOf<ProgressProps>()
       .toHaveProperty("value")
       .toEqualTypeOf<number | null | undefined>();
+    expectTypeOf<ChartContainerProps>().toHaveProperty("config");
     expect(true).toBe(true);
   });
 });
