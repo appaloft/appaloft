@@ -26,6 +26,7 @@ import {
   AutomaticRouteContextLookupService,
   BindResourceDependencyCommandHandler,
   BindResourceDependencyUseCase,
+  BlueprintCatalogQueryService,
   BootstrapFirstAdminCommandHandler,
   BootstrapFirstAdminUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
@@ -106,6 +107,7 @@ import {
   CreateActionSourceLinkDeploymentUseCase,
   CreateAuditEventArchiveCommandHandler,
   CreateAuditEventArchiveUseCase,
+  CreateBlueprintInstallPlanQueryHandler,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
   CreateDependencyResourceProvisioningPlanCommandHandler,
@@ -232,6 +234,7 @@ import {
   ListAuditEventLegalHoldsQueryService,
   ListAuditEventsQueryHandler,
   ListAuditEventsQueryService,
+  ListBlueprintsQueryHandler,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
@@ -465,6 +468,7 @@ import {
   ShowAuditEventLegalHoldQueryService,
   ShowAuditEventQueryHandler,
   ShowAuditEventQueryService,
+  ShowBlueprintQueryHandler,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
@@ -2308,6 +2312,9 @@ export function registerApplicationServices(
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(QueryCapabilitiesQueryHandler);
+  container.registerSingleton(ListBlueprintsQueryHandler);
+  container.registerSingleton(ShowBlueprintQueryHandler);
+  container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
   container.registerSingleton(QueryEntitlementsQueryHandler);
   container.registerSingleton(RecordUsageIntentCommandHandler);
   container.registerSingleton(ListUsageIntentRecordsQueryHandler);
@@ -3320,6 +3327,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
+  container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
   container.registerSingleton(
     tokens.githubAppConnectionQueryService,
     GitHubAppConnectionQueryService,

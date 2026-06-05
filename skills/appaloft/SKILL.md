@@ -49,9 +49,11 @@ surface available in the session.
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
   plan when useful, deploy, observe, and return URL plus diagnostics.
-- Cloud Blueprint deployment: use the Cloud Blueprint Marketplace quick-deploy entrypoint when the
-  source is an official Blueprint such as PocketBase. Do not invent a separate `blueprint deploy`
-  CLI command unless the operation catalog adds one. Before accepting a deployment target, run
+- Blueprint catalog deployment: use `appaloft blueprint list/show/plan-install` for neutral catalog
+  discovery and dry-run planning, then use the Blueprint quick-deploy entrypoint when the source is
+  an official or extension-provided Blueprint such as PocketBase. Do not invent a separate
+  `blueprint deploy` CLI command unless the operation catalog adds one. Before accepting a
+  deployment target, run
   `appaloft server test <serverId>`; if the control plane reports `Executable not found in $PATH:
   "ssh"`, treat that as a control-plane runtime packaging blocker rather than manually SSHing
   around the Appaloft operation.

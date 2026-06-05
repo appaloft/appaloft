@@ -23,6 +23,7 @@
     "@appaloft/ai-mcp": "workspace:*",
     "@appaloft/application": "workspace:*",
     "@appaloft/auth-better": "workspace:*",
+    "@appaloft/blueprints": "workspace:*",
     "@appaloft/config": "workspace:*",
     "@appaloft/contracts": "workspace:*",
     "@appaloft/core": "workspace:*",

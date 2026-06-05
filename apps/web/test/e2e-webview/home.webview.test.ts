@@ -1065,7 +1065,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/system-plugins/web-extensions": {
       items: [
         {
-          key: "cloud-blueprint-marketplace",
+          key: "blueprint-catalog",
           title: "应用市场",
           description: "官方蓝图应用市场。",
           path: "/marketplace",
@@ -1076,12 +1076,12 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           pluginDisplayName: "Server Configured Extensions",
           metadata: {
             renderer: "blueprint-catalog",
-            listEndpoint: "/api/cloud/marketplace/blueprints",
-            detailEndpointTemplate: "/api/cloud/marketplace/blueprints/{slug}",
+            listEndpoint: "/api/blueprint-catalog/blueprints",
+            detailEndpointTemplate: "/api/blueprint-catalog/blueprints/{slug}",
           },
         },
         {
-          key: "cloud-blueprint-marketplace.quick-deploy-source",
+          key: "blueprint-catalog.quick-deploy-source",
           title: "蓝图市场",
           description: "为快速部署选择官方应用蓝图。",
           path: "/marketplace?surface=quick-deploy",
@@ -1092,13 +1092,13 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           pluginDisplayName: "Server Configured Extensions",
           metadata: {
             renderer: "blueprint-catalog",
-            listEndpoint: "/api/cloud/marketplace/blueprints",
-            detailEndpointTemplate: "/api/cloud/marketplace/blueprints/{slug}",
+            listEndpoint: "/api/blueprint-catalog/blueprints",
+            detailEndpointTemplate: "/api/blueprint-catalog/blueprints/{slug}",
           },
         },
       ],
     },
-    "/api/cloud/marketplace/blueprints": {
+    "/api/blueprint-catalog/blueprints": {
       categories: [
         {
           key: "data",
@@ -1109,7 +1109,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       ],
       items: [baserowBlueprintListing],
     },
-    "/api/cloud/marketplace/blueprints/baserow": {
+    "/api/blueprint-catalog/blueprints/baserow": {
       listing: baserowBlueprintListing,
       manifest: {
         summary: "Baserow application",
@@ -3688,7 +3688,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
+      `${previewUrl}/deploy?source=blueprint&sourceExtension=blueprint-catalog.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
     );
 
     await expectText(view, "Baserow");

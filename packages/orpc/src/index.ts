@@ -67,6 +67,7 @@ import {
   CountServersQuery,
   CreateActionSourceLinkDeploymentCommand,
   CreateAuditEventArchiveCommand,
+  CreateBlueprintInstallPlanQuery,
   CreateDependencyResourceBackupCommand,
   CreateDependencyResourceProvisioningPlanCommand,
   CreateDeploymentCommand,
@@ -117,6 +118,7 @@ import {
   countResourcesQueryInputSchema,
   countServersQueryInputSchema,
   createAuditEventArchiveCommandInputSchema,
+  createBlueprintInstallPlanQueryInputSchema,
   createDependencyResourceBackupCommandInputSchema,
   createDependencyResourceProvisioningPlanInputSchema,
   createDeploymentCommandInputSchema,
@@ -225,6 +227,7 @@ import {
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
+  ListBlueprintsQuery,
   ListCertificatesQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupPoliciesQuery,
@@ -443,6 +446,7 @@ import {
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
   ShowAuditEventQuery,
+  ShowBlueprintQuery,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupPolicyQuery,
@@ -489,6 +493,7 @@ import {
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
   showAuditEventQueryInputSchema,
+  showBlueprintQueryInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupPolicyQueryInputSchema,
@@ -539,6 +544,11 @@ import {
   unsetResourceVariableCommandInputSchema,
   withExecutionAuthProviderAccessTokens,
 } from "@appaloft/application";
+import {
+  createBlueprintInstallPlanResponseSchema,
+  listBlueprintsResponseSchema,
+  showBlueprintResponseSchema,
+} from "@appaloft/application/schemas";
 import {
   accountProfileResponseSchema,
   archiveDeploymentResponseSchema,
@@ -3083,6 +3093,37 @@ export const createProjectProcedure = base
   .output(createProjectResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateProjectCommand.create(input)),
+  );
+
+export const listBlueprintsProcedure = base
+  .route({
+    method: "GET",
+    path: "/blueprints",
+    successStatus: 200,
+  })
+  .output(listBlueprintsResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListBlueprintsQuery.create()));
+
+export const showBlueprintProcedure = base
+  .route({
+    method: "GET",
+    path: "/blueprints/{slug}",
+    successStatus: 200,
+  })
+  .input(showBlueprintQueryInputSchema)
+  .output(showBlueprintResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowBlueprintQuery.create(input)));
+
+export const createBlueprintInstallPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/blueprints/{slug}/install-plan",
+    successStatus: 200,
+  })
+  .input(createBlueprintInstallPlanQueryInputSchema)
+  .output(createBlueprintInstallPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CreateBlueprintInstallPlanQuery.create(input)),
   );
 
 export const showProjectProcedure = base
@@ -5944,6 +5985,11 @@ export const appaloftOrpcRouter = {
     restore: restoreProjectProcedure,
     deleteCheck: checkProjectDeleteSafetyProcedure,
     delete: deleteProjectProcedure,
+  },
+  blueprints: {
+    list: listBlueprintsProcedure,
+    show: showBlueprintProcedure,
+    planInstall: createBlueprintInstallPlanProcedure,
   },
   servers: {
     count: countServersProcedure,

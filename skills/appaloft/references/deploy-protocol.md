@@ -136,9 +136,11 @@ Use this order:
 5. Built static output: `appaloft deploy ./dist --as static-site`.
 6. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
 7. Workspace commands: use explicit install, build, start, and port options.
-8. Cloud Blueprint Marketplace: use the Web quick-deploy URL with
-   `source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=<slug>` for
-   official Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint deploy command.
+8. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
+   and dry-run planning. For Web quick deploy, use
+   `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
+   extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint
+   deploy command.
 
 ## Follow-Up Commands
 

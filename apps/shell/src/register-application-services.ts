@@ -24,6 +24,7 @@ import {
   AutomaticRouteContextLookupService,
   BindResourceDependencyCommandHandler,
   BindResourceDependencyUseCase,
+  BlueprintCatalogQueryService,
   BootstrapFirstAdminCommandHandler,
   BootstrapFirstAdminUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
@@ -104,6 +105,7 @@ import {
   CreateActionSourceLinkDeploymentUseCase,
   CreateAuditEventArchiveCommandHandler,
   CreateAuditEventArchiveUseCase,
+  CreateBlueprintInstallPlanQueryHandler,
   CreateDependencyResourceBackupCommandHandler,
   CreateDependencyResourceBackupUseCase,
   CreateDependencyResourceProvisioningPlanCommandHandler,
@@ -216,6 +218,7 @@ import {
   ListAuditEventLegalHoldsQueryService,
   ListAuditEventsQueryHandler,
   ListAuditEventsQueryService,
+  ListBlueprintsQueryHandler,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
@@ -421,6 +424,7 @@ import {
   ShowAuditEventLegalHoldQueryService,
   ShowAuditEventQueryHandler,
   ShowAuditEventQueryService,
+  ShowBlueprintQueryHandler,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
@@ -1555,6 +1559,9 @@ export function registerApplicationServices(
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
+  container.registerSingleton(ListBlueprintsQueryHandler);
+  container.registerSingleton(ShowBlueprintQueryHandler);
+  container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
   container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(RestoreProjectCommandHandler);
   container.registerSingleton(CheckProjectDeleteSafetyQueryHandler);
@@ -2442,6 +2449,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
+  container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
   container.registerSingleton(
     tokens.listGitHubRepositoriesQueryService,
     ListGitHubRepositoriesQueryService,

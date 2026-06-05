@@ -39,6 +39,8 @@ import {
   type CountProjectsQueryInput,
   type CountResourcesQueryInput,
   type CountServersQueryInput,
+  type CreateBlueprintInstallPlanQueryInput,
+  type CreateBlueprintInstallPlanResponse,
   type CreateDependencyResourceBackupCommandInput,
   type CreateDependencyResourceProvisioningPlanInput,
   type CreateDeploymentCommandInput,
@@ -81,6 +83,8 @@ import {
   type InviteOrganizationMemberCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListAccountSessionsQueryInput,
+  type ListBlueprintsQueryInput,
+  type ListBlueprintsResponse,
   type ListCertificatesQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDependencyResourceBackupPoliciesQueryInput,
@@ -162,6 +166,8 @@ import {
   type SetProjectDescriptionCommandInput,
   type SetResourceVariableCommandInput,
   type ShowAccountProfileQueryInput,
+  type ShowBlueprintQueryInput,
+  type ShowBlueprintResponse,
   type ShowCertificateQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDependencyResourceBackupPolicyQueryInput,
@@ -712,6 +718,26 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       DeleteProjectCommandInput,
       DeleteProjectResponse,
+      AppaloftClientError
+    >;
+  };
+  blueprints: {
+    list: Client<
+      AppaloftClientContext,
+      ListBlueprintsQueryInput,
+      ListBlueprintsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowBlueprintQueryInput,
+      ShowBlueprintResponse,
+      AppaloftClientError
+    >;
+    planInstall: Client<
+      AppaloftClientContext,
+      CreateBlueprintInstallPlanQueryInput,
+      CreateBlueprintInstallPlanResponse,
       AppaloftClientError
     >;
   };

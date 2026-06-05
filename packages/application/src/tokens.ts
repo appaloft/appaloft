@@ -614,6 +614,8 @@ export const tokens = {
   terminalSessionGateway: Symbol.for("appaloft.terminal_session_gateway"),
   providerRegistry: Symbol.for("appaloft.provider_registry"),
   integrationRegistry: Symbol.for("appaloft.integration_registry"),
+  blueprintRegistry: Symbol.for("appaloft.blueprint_registry"),
+  blueprintCatalogQueryService: Symbol.for("appaloft.blueprint_catalog_query_service"),
   integrationAuthPort: Symbol.for("appaloft.integration_auth_port"),
   githubAppInstallationRepository: Symbol.for("appaloft.github_app_installation_repository"),
   githubAppRuntime: Symbol.for("appaloft.github_app_runtime"),

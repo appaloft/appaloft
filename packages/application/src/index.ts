@@ -4,6 +4,8 @@ export * from "./audit-event-handlers";
 export * from "./audit-event-messages";
 export * from "./auth-handlers";
 export * from "./auth-messages";
+export * from "./blueprint-handlers";
+export * from "./blueprint-messages";
 export * from "./capability-handlers";
 export * from "./capability-messages";
 export * from "./certificate-handlers";

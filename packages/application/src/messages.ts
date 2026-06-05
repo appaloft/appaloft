@@ -1,5 +1,6 @@
 export * from "./account-settings-messages";
 export * from "./audit-event-messages";
+export * from "./blueprint-messages";
 export * from "./certificate-messages";
 export * from "./default-access-domain-policy-messages";
 export * from "./dependency-resource-messages";

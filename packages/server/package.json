@@ -12,6 +12,7 @@
     "@appaloft/adapter-runtime": "workspace:*",
     "@appaloft/ai-mcp": "workspace:*",
     "@appaloft/application": "workspace:*",
+    "@appaloft/blueprints": "workspace:*",
     "@appaloft/auth-better": "workspace:*",
     "@appaloft/config": "workspace:*",
     "@appaloft/contracts": "workspace:*",

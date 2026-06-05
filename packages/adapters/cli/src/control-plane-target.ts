@@ -72,6 +72,7 @@ interface ControlPlaneConfigSelection {
 const remoteCapableTopLevelCommands = new Set([
   "auth",
   "audit-event",
+  "blueprint",
   "certificate",
   "default-access",
   "dependency",
