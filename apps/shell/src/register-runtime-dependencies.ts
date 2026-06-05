@@ -96,6 +96,7 @@ import {
   toRepositoryContext,
 } from "@appaloft/application";
 import { type AuthRuntime, BetterAuthDeployTokenMaterialIssuer } from "@appaloft/auth-better";
+import { LocalFileBlueprintRegistry } from "@appaloft/blueprints";
 import { type AppConfig } from "@appaloft/config";
 import {
   DeploymentTargetByIdSpec,
@@ -1688,6 +1689,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new InMemoryIntegrationRegistry([githubIntegration, gitlabIntegration]),
     ),
+  });
+  container.register(tokens.blueprintRegistry, {
+    useFactory: instanceCachingFactory(() => new LocalFileBlueprintRegistry({ files: [] })),
   });
   container.register(tokens.pluginRegistry, {
     useFactory: instanceCachingFactory(

@@ -167,6 +167,93 @@ function createControlPlaneFetch(
       });
     }
 
+    if (url.pathname === "/api/blueprints") {
+      return jsonResponse({
+        items: [
+          {
+            id: "pocketbase",
+            name: "PocketBase",
+            version: "0.22.0",
+            summary: "Portable PocketBase Blueprint",
+            sourcePath: "official:pocketbase",
+            tags: ["backend"],
+            variants: [],
+          },
+        ],
+      });
+    }
+
+    if (url.pathname === "/api/blueprints/pocketbase") {
+      return jsonResponse({
+        entry: {
+          id: "pocketbase",
+          name: "PocketBase",
+          version: "0.22.0",
+          summary: "Portable PocketBase Blueprint",
+          sourcePath: "official:pocketbase",
+          tags: ["backend"],
+          variants: [],
+        },
+        manifest: {
+          schemaVersion: "appaloft.blueprint/v1",
+          id: "pocketbase",
+          name: "PocketBase",
+          version: "0.22.0",
+        },
+      });
+    }
+
+    if (url.pathname === "/api/blueprints/pocketbase/install-plan") {
+      return jsonResponse({
+        entry: {
+          id: "pocketbase",
+          name: "PocketBase",
+          version: "0.22.0",
+          summary: "Portable PocketBase Blueprint",
+          sourcePath: "official:pocketbase",
+          tags: ["backend"],
+          variants: [],
+        },
+        plan: {
+          schemaVersion: "appaloft.blueprint.install-plan/v1",
+          createsExternalResources: false,
+          blueprint: {
+            id: "pocketbase",
+            name: "PocketBase",
+            version: "0.22.0",
+          },
+          profile: "production",
+          target: {
+            projectName: "PocketBase",
+            environmentName: "production",
+            resourceSlugPrefix: "pocketbase",
+          },
+          operations: [],
+          warnings: [],
+        },
+        applicationBundle: {
+          schemaVersion: "appaloft.blueprint.application-bundle-plan/v1",
+          createsExternalResources: false,
+          application: {
+            blueprintId: "pocketbase",
+            blueprintName: "PocketBase",
+            blueprintVersion: "0.22.0",
+            projectName: "PocketBase",
+            environmentName: "production",
+            profile: "production",
+          },
+          components: [],
+          dependencies: [],
+          relationships: [],
+          execution: {
+            mode: "dry-run-only",
+            requiredFollowUp: "accepted-install-command",
+          },
+          warnings: [],
+        },
+      });
+    }
+
     if (url.pathname === "/api/static-artifacts/publish-payload") {
       return jsonResponse(
         {
@@ -1002,6 +1089,58 @@ describe("CLI remote control-plane client", () => {
         effectiveMode: "none",
       },
     });
+  });
+
+  test("[CONTROL-PLANE-CLI-006][BP-CATALOG-API-001] blueprint catalog commands dispatch through public generated SDK routes", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const listed = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "blueprint", "list"]),
+    );
+    const shown = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "blueprint", "show", "pocketbase"]),
+    );
+    const planned = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "blueprint",
+        "plan-install",
+        "pocketbase",
+        "--project-name",
+        "PocketBase Smoke",
+        "--environment-name",
+        "production",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/blueprints",
+        "GET /api/blueprints/pocketbase",
+        "POST /api/blueprints/pocketbase/install-plan",
+      ],
+    );
+    expect(await requests[4]?.json()).toMatchObject({
+      slug: "pocketbase",
+      input: {
+        target: {
+          projectName: "PocketBase Smoke",
+          environmentName: "production",
+        },
+      },
+    });
+    expect(listed.stdout).toContain("PocketBase");
+    expect(shown.stdout).toContain("Portable PocketBase Blueprint");
+    expect(planned.stdout).toContain("appaloft.blueprint.install-plan/v1");
   });
 
   test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] project mutations dispatch through the generated SDK route when remote-capable", async () => {

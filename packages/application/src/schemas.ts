@@ -27,6 +27,7 @@ export {
   type GetAuthBootstrapStatusQueryInput,
   getAuthBootstrapStatusQueryInputSchema,
 } from "./operations/auth/get-auth-bootstrap-status.query";
+export * from "./operations/blueprints/blueprint-catalog.schema";
 export type {
   QueryCapabilitiesInput,
   QueryCapabilitiesResponse,

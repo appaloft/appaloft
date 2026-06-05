@@ -11,6 +11,7 @@
     "./operation-catalog": "./src/operation-catalog.ts"
   },
   "dependencies": {
+    "@appaloft/blueprints": "workspace:*",
     "@appaloft/core": "workspace:*",
     "@appaloft/i18n": "workspace:*",
     "reflect-metadata": "^0.2.2",

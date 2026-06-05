@@ -1,6 +1,6 @@
 import { type BlueprintMarketplaceDeployHandoffInput } from "./types";
 
-export const defaultBlueprintMarketplaceListEndpoint = "/cloud/marketplace/blueprints";
+export const defaultBlueprintMarketplaceListEndpoint = "/api/blueprints";
 
 export function createBlueprintMarketplaceEndpoint(baseUrl: string, endpoint: string): string {
   const trimmedEndpoint = endpoint.trim();

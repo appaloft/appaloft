@@ -16,6 +16,24 @@
   } from "./url";
   import { Skeleton } from "@appaloft/ui/skeleton";
 
+  type BlueprintRegistryEntry = {
+    readonly id: string;
+    readonly name: string;
+    readonly version: string;
+    readonly summary: string;
+    readonly tags?: readonly string[];
+    readonly defaultVariant?: string;
+    readonly variants?: readonly {
+      readonly id: string;
+      readonly label?: string;
+      readonly summary?: string;
+    }[];
+  };
+
+  type BlueprintRegistryListResponse = {
+    readonly items: readonly BlueprintRegistryEntry[];
+  };
+
   type Props = {
     readonly apiBaseUrl?: string;
     readonly listEndpoint?: string;
@@ -164,7 +182,7 @@
         throw new Error(`Blueprint 目录接口返回 ${response.status}`);
       }
 
-      const result = (await response.json()) as BlueprintMarketplaceListResponse;
+      const result = normalizeMarketplaceList(await response.json());
       if (requestId === loadRequestId) {
         marketplace = result;
       }
@@ -190,6 +208,73 @@
     }
 
     return createBlueprintDetailHref(detailBasePath, item.slug);
+  }
+
+  function normalizeMarketplaceList(value: unknown): BlueprintMarketplaceListResponse {
+    if (isMarketplaceListResponse(value)) {
+      return value;
+    }
+
+    if (isBlueprintRegistryListResponse(value)) {
+      const items = value.items.map(registryEntryToListing);
+      return {
+        categories: [
+          {
+            key: "blueprints",
+            label: "Blueprints",
+            description: "Blueprint catalog entries",
+            count: items.length,
+          },
+        ],
+        items,
+      };
+    }
+
+    return { categories: [], items: [] };
+  }
+
+  function registryEntryToListing(entry: BlueprintRegistryEntry): BlueprintMarketplaceListing {
+    return {
+      slug: entry.id,
+      title: entry.name,
+      subtitle: entry.summary,
+      categoryKey: "blueprints",
+      category: "Blueprints",
+      featured: false,
+      publisher: {
+        name: "Appaloft",
+        verified: false,
+      },
+      blueprint: {
+        id: entry.id,
+        version: entry.version,
+        summary: entry.summary,
+        tags: entry.tags ?? [],
+      },
+      ...(entry.defaultVariant ? { defaultVariant: entry.defaultVariant } : {}),
+      ...(entry.variants ? { variants: entry.variants } : {}),
+    };
+  }
+
+  function isMarketplaceListResponse(value: unknown): value is BlueprintMarketplaceListResponse {
+    const firstItem = (value as BlueprintMarketplaceListResponse | null)?.items?.[0];
+    return (
+      Boolean(value) &&
+      typeof value === "object" &&
+      Array.isArray((value as BlueprintMarketplaceListResponse).categories) &&
+      Array.isArray((value as BlueprintMarketplaceListResponse).items) &&
+      (firstItem === undefined || "slug" in firstItem)
+    );
+  }
+
+  function isBlueprintRegistryListResponse(value: unknown): value is BlueprintRegistryListResponse {
+    const firstItem = (value as BlueprintRegistryListResponse | null)?.items?.[0];
+    return (
+      Boolean(value) &&
+      typeof value === "object" &&
+      Array.isArray((value as BlueprintRegistryListResponse).items) &&
+      (firstItem === undefined || "id" in firstItem)
+    );
   }
 
   function categoryButtonLabel(category: BlueprintMarketplaceCategory): string {

@@ -10,16 +10,11 @@ import {
 
 describe("Blueprint marketplace web URLs", () => {
   test("builds catalog endpoints without owning catalog data", () => {
-    expect(defaultBlueprintMarketplaceListEndpoint).toBe("/cloud/marketplace/blueprints");
-    expect(createBlueprintMarketplaceEndpoint("", "/cloud/marketplace/blueprints")).toBe(
-      "/cloud/marketplace/blueprints",
+    expect(defaultBlueprintMarketplaceListEndpoint).toBe("/api/blueprints");
+    expect(createBlueprintMarketplaceEndpoint("", "/api/blueprints")).toBe("/api/blueprints");
+    expect(createBlueprintMarketplaceEndpoint("https://app.example.test/", "/api/blueprints")).toBe(
+      "https://app.example.test/api/blueprints",
     );
-    expect(
-      createBlueprintMarketplaceEndpoint(
-        "https://app.example.test/",
-        "/cloud/marketplace/blueprints",
-      ),
-    ).toBe("https://app.example.test/cloud/marketplace/blueprints");
   });
 
   test("builds deploy handoff and detail URLs", () => {

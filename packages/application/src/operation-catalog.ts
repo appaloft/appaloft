@@ -19,6 +19,11 @@ import { showAuditEventArchiveQueryInputSchema } from "./operations/audit-events
 import { showAuditEventLegalHoldQueryInputSchema } from "./operations/audit-events/show-audit-event-legal-hold.query";
 import { bootstrapFirstAdminCommandInputSchema } from "./operations/auth/bootstrap-first-admin.schema";
 import { getAuthBootstrapStatusQueryInputSchema } from "./operations/auth/get-auth-bootstrap-status.query";
+import {
+  createBlueprintInstallPlanQueryInputSchema,
+  listBlueprintsQueryInputSchema,
+  showBlueprintQueryInputSchema,
+} from "./operations/blueprints/blueprint-catalog.schema";
 import { queryCapabilitiesInputSchema } from "./operations/capabilities/query-capabilities.schema";
 import { deleteCertificateCommandInputSchema } from "./operations/certificates/delete-certificate.command";
 import { importCertificateCommandInputSchema } from "./operations/certificates/import-certificate.command";
@@ -258,6 +263,7 @@ type OperationDomain =
   | "storage-volumes"
   | "deploy-tokens"
   | "auth"
+  | "blueprints"
   | "capabilities"
   | "entitlements"
   | "audit-events"
@@ -860,6 +866,63 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project create",
       orpc: { method: "POST", path: "/api/projects" },
+    },
+  },
+  {
+    key: "blueprints.list",
+    kind: "query",
+    domain: "blueprints",
+    messageName: "ListBlueprintsQuery",
+    handlerName: "ListBlueprintsQueryHandler",
+    serviceName: "BlueprintCatalogQueryService",
+    inputSchema: listBlueprintsQueryInputSchema,
+    serviceToken: tokens.blueprintCatalogQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft blueprint list",
+      orpc: { method: "GET", path: "/api/blueprints" },
+    },
+  },
+  {
+    key: "blueprints.show",
+    kind: "query",
+    domain: "blueprints",
+    messageName: "ShowBlueprintQuery",
+    handlerName: "ShowBlueprintQueryHandler",
+    serviceName: "BlueprintCatalogQueryService",
+    inputSchema: showBlueprintQueryInputSchema,
+    serviceToken: tokens.blueprintCatalogQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft blueprint show",
+      orpc: { method: "GET", path: "/api/blueprints/{slug}" },
+    },
+  },
+  {
+    key: "blueprints.plan-install",
+    kind: "query",
+    domain: "blueprints",
+    messageName: "CreateBlueprintInstallPlanQuery",
+    handlerName: "CreateBlueprintInstallPlanQueryHandler",
+    serviceName: "BlueprintCatalogQueryService",
+    inputSchema: createBlueprintInstallPlanQueryInputSchema,
+    serviceToken: tokens.blueprintCatalogQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft blueprint plan-install",
+      orpc: { method: "POST", path: "/api/blueprints/{slug}/install-plan" },
     },
   },
   {

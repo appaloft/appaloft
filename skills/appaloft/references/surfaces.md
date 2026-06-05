@@ -36,9 +36,10 @@ the npm package is actually published and verified in the user's environment.
    Action must not SSH or run the CLI.
 3. Web: use when guiding a human through the console. Describe the next UI action and keep business
    behavior aligned with the same operation catalog.
-   Cloud Blueprint Marketplace quick deploy is currently a Web workflow. For an official Blueprint
-   such as PocketBase, enter Cloud through `/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=<slug>`;
-   then use CLI/API operations for auth, server readiness, deployment observation, and recovery.
+   Blueprint quick deploy is currently a Web workflow. For an official or extension-provided
+   Blueprint such as PocketBase, enter the deploy flow through
+   `/deploy?source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>`; then use
+   CLI/API operations for auth, server readiness, deployment observation, and recovery.
 4. Repository config: use Appaloft config files as deployment intent, not as a replacement for
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the
