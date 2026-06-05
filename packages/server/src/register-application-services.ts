@@ -2254,24 +2254,33 @@ export interface RegisterApplicationServicesInput {
   dataDir?: string;
 }
 
-function assertOperationServiceTokensRegistered(container: DependencyContainer): void {
-  const missing = operationCatalog.filter(
-    (entry) => !container.isRegistered(entry.serviceToken, true),
-  );
+function assertOperationServicesResolvable(container: DependencyContainer): void {
+  const failures: string[] = [];
 
-  if (missing.length === 0) {
+  for (const entry of operationCatalog) {
+    if (!container.isRegistered(entry.serviceToken, true)) {
+      failures.push(
+        `Missing service token for operation ${entry.key}: ${entry.serviceName} (${String(entry.serviceToken)})`,
+      );
+      continue;
+    }
+
+    try {
+      container.resolve(entry.serviceToken);
+    } catch (error) {
+      failures.push(
+        `Unresolvable service for operation ${entry.key}: ${entry.serviceName} (${String(entry.serviceToken)}) - ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  if (failures.length === 0) {
     return;
   }
 
-  throw new Error(
-    [
-      "Application service registration is incomplete.",
-      ...missing.map(
-        (entry) =>
-          `Missing service token for operation ${entry.key}: ${entry.serviceName} (${String(entry.serviceToken)})`,
-      ),
-    ].join("\n"),
-  );
+  throw new Error(["Application service registration is incomplete.", ...failures].join("\n"));
 }
 
 export function registerApplicationServices(
@@ -3325,5 +3334,5 @@ export function registerApplicationServices(
     CheckInstanceUpgradeQueryService,
   );
   container.registerSingleton(tokens.applyInstanceUpgradeUseCase, ApplyInstanceUpgradeUseCase);
-  assertOperationServiceTokensRegistered(container);
+  assertOperationServicesResolvable(container);
 }
