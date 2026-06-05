@@ -1878,6 +1878,18 @@ function errorCategoryFromStatus(status: number): ErrorCategory {
   return "user";
 }
 
+function domainCodeFromOrpcCode(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) {
+    return undefined;
+  }
+
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+}
+
 async function normalizeOpenApiErrorResponse(response: Response): Promise<Response> {
   if (response.status < 400) {
     return response;
@@ -1902,7 +1914,7 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
   const payload = readRecord(body?.json) ?? readRecord(body?.error) ?? body;
   const data = readRecord(payload?.data);
   const domainCode = typeof data?.domainCode === "string" ? data.domainCode : undefined;
-  if (!payload || !domainCode) {
+  if (!payload) {
     return response;
   }
 
@@ -1918,6 +1930,21 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
       ? payload.message
       : "Appaloft operation failed";
   const details = readRecord(data?.details);
+  const code = domainCode ?? domainCodeFromOrpcCode(payload.code);
+
+  if (!code) {
+    return response;
+  }
+
+  const fallbackDetails =
+    domainCode || typeof payload.code !== "string"
+      ? undefined
+      : {
+          phase: "orpc-error-normalization",
+          orpcCode: payload.code,
+          ...(typeof payload.status === "number" ? { status: payload.status } : {}),
+          ...(typeof payload.defined === "boolean" ? { defined: payload.defined } : {}),
+        };
 
   const headers = new Headers(response.headers);
   headers.set("content-type", "application/json");
@@ -1925,11 +1952,11 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
   return Response.json(
     {
       error: {
-        code: domainCode,
+        code,
         category,
         message,
         retryable,
-        ...(details ? { details } : {}),
+        ...((details ?? fallbackDetails) ? { details: details ?? fallbackDetails } : {}),
       },
     },
     {
@@ -1937,6 +1964,14 @@ async function normalizeOpenApiErrorResponse(response: Response): Promise<Respon
       status: response.status,
     },
   );
+}
+
+function domainErrorData(error: DomainError, context: ExecutionContext, details = error.details) {
+  return {
+    domainCode: error.code,
+    locale: context.locale,
+    ...(details ? { details } : {}),
+  };
 }
 
 function toOrpcError(error: DomainError, context: ExecutionContext) {
@@ -1949,10 +1984,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("NOT_FOUND", {
         message,
         status: 404,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     case "conflict":
     case "action_deployment_target_conflict":
@@ -1973,10 +2005,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("CONFLICT", {
         message,
         status: 409,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     case "domain_binding_proxy_required":
     case "domain_binding_context_mismatch":
@@ -1994,30 +2023,24 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     case "source_event_provider_webhook_not_configured":
       return new ORPCError("SERVICE_UNAVAILABLE", {
         message,
         status: 503,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     case "action_auth_missing":
     case "action_auth_invalid":
       return new ORPCError("UNAUTHORIZED", {
         message,
         status: 401,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
-        },
+        data: domainErrorData(
+          error,
+          context,
+          error.details ? actionAuthDetails(error.details) : undefined,
+        ),
       });
     case "first_admin_bootstrap_required":
     case "product_auth_invalid":
@@ -2025,20 +2048,17 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("UNAUTHORIZED", {
         message,
         status: 401,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     case "action_auth_forbidden":
       return new ORPCError("FORBIDDEN", {
         message,
         status: 403,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
-        },
+        data: domainErrorData(
+          error,
+          context,
+          error.details ? actionAuthDetails(error.details) : undefined,
+        ),
       });
     case "product_auth_forbidden":
     case "operation_authorization_denied":
@@ -2046,11 +2066,11 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("FORBIDDEN", {
         message,
         status: 403,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-          ...(error.details ? { details: actionAuthDetails(error.details) } : {}),
-        },
+        data: domainErrorData(
+          error,
+          context,
+          error.details ? actionAuthDetails(error.details) : undefined,
+        ),
       });
     case "validation_error":
     case "action_deployment_target_unresolved":
@@ -2058,20 +2078,14 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
     default:
       if (error.category === "provider") {
         return new ORPCError("BAD_GATEWAY", {
           message,
           status: 502,
-          data: {
-            domainCode: error.code,
-            locale: context.locale,
-          },
+          data: domainErrorData(error, context),
         });
       }
 
@@ -2079,10 +2093,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         return new ORPCError("SERVICE_UNAVAILABLE", {
           message,
           status: 503,
-          data: {
-            domainCode: error.code,
-            locale: context.locale,
-          },
+          data: domainErrorData(error, context),
         });
       }
 
@@ -2090,20 +2101,14 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         return new ORPCError("GATEWAY_TIMEOUT", {
           message,
           status: 504,
-          data: {
-            domainCode: error.code,
-            locale: context.locale,
-          },
+          data: domainErrorData(error, context),
         });
       }
 
       return new ORPCError("INTERNAL_SERVER_ERROR", {
         message,
         status: 500,
-        data: {
-          domainCode: error.code,
-          locale: context.locale,
-        },
+        data: domainErrorData(error, context),
       });
   }
 }

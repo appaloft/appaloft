@@ -1,17 +1,21 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { NoopLogger } from "@appaloft/testkit";
 
 import {
   AllowAllOperationGuardPort,
   AllowAllOperationScopePort,
+  CommandBus,
   CompositeOperationGuardPort,
+  CreateProjectCommand,
   checkOperationGuards,
   constraintsByKind,
   createExecutionContext,
   createOperationCheckRequest,
   findOperationCatalogEntryByKey,
   type OperationCheckPort,
+  type OperationGuardPort,
   type OperationScopePort,
   scopeOperation,
 } from "../src";
@@ -94,6 +98,38 @@ describe("operation guard extension boundary", () => {
         projectId: "prj_demo",
         reason: "test-role-denied",
         role: "viewer",
+      },
+    });
+  });
+
+  test("[OP-GUARD-006] command bus returns domain infra error when operation guard throws", async () => {
+    const context = createExecutionContext({
+      entrypoint: "http",
+      requestId: "req_operation_guard_throw",
+    });
+    const throwingGuard: OperationGuardPort = {
+      checkOperation: async () => {
+        throw new Error("guard adapter exploded");
+      },
+    };
+    const command = CreateProjectCommand.create({
+      name: "Guard Throw Project",
+    })._unsafeUnwrap();
+    const commandBus = new CommandBus(
+      { resolve: () => undefined } as never,
+      new NoopLogger(),
+      throwingGuard,
+    );
+
+    const result = await commandBus.execute(context, command);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "infra_error",
+      details: {
+        command: "CreateProjectCommand",
+        message: "guard adapter exploded",
+        phase: "operation-guard-dispatch",
       },
     });
   });

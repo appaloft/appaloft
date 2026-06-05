@@ -35,12 +35,27 @@ function expectCliDomainBlocker(result: CliResult, label: string, code: string):
   expect(output, label).not.toContain("<html");
 }
 
+function expectCliOutputContains(result: CliResult, label: string, text: string): void {
+  const output = `${result.stdout}\n${result.stderr}`;
+  expect(output, label).toContain(text);
+}
+
 function runRemoteCli(
   remotePrefix: readonly string[],
   args: readonly string[],
   options: ShellCliOptions,
 ): CliResult {
   return runShellCli([...remotePrefix, ...args], options);
+}
+
+async function expectJsonResponse<T>(
+  response: Response,
+  label: string,
+  expectedStatus = 200,
+): Promise<T> {
+  const body = await response.text();
+  expect(response.status, `${label}\n${body}`).toBe(expectedStatus);
+  return JSON.parse(body) as T;
 }
 
 function pruneRetainedRows(
@@ -160,6 +175,151 @@ describe("archive and delete lifecycle CLI e2e", () => {
         ),
         "active server delete",
         "server_delete_blocked",
+      );
+
+      const historyProject = runRemoteCli(
+        remotePrefix,
+        ["project", "create", "--name", "Delete Lifecycle Server History CLI"],
+        cliOptions,
+      );
+      expectCliSuccess(historyProject, "create server history project");
+      const historyProjectId = parseJson<{ id: string }>(historyProject.stdout).id;
+
+      const historyEnvironment = runRemoteCli(
+        remotePrefix,
+        [
+          "env",
+          "create",
+          "--project",
+          historyProjectId,
+          "--name",
+          "Production",
+          "--kind",
+          "production",
+        ],
+        cliOptions,
+      );
+      expectCliSuccess(historyEnvironment, "create server history environment");
+      const historyEnvironmentId = parseJson<{ id: string }>(historyEnvironment.stdout).id;
+
+      const historyResource = runRemoteCli(
+        remotePrefix,
+        [
+          "resource",
+          "create",
+          "--project",
+          historyProjectId,
+          "--environment",
+          historyEnvironmentId,
+          "--name",
+          "PocketBase Server History",
+          "--kind",
+          "application",
+          "--internal-port",
+          "8090",
+        ],
+        cliOptions,
+      );
+      expectCliSuccess(historyResource, "create server history resource");
+      const historyResourceId = parseJson<{ id: string }>(historyResource.stdout).id;
+
+      const historyServer = runRemoteCli(
+        remotePrefix,
+        [
+          "server",
+          "register",
+          "--name",
+          "deployment-history-blocker-server",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "22",
+          "--provider",
+          "generic-ssh",
+          "--proxy-kind",
+          "none",
+        ],
+        cliOptions,
+      );
+      expectCliSuccess(historyServer, "register server history blocker server");
+      const historyServerId = parseJson<{ id: string }>(historyServer.stdout).id;
+
+      await expectJsonResponse<{ id: string }>(
+        await fetch(`${server.baseUrl}/api/resources/${historyResourceId}/source`, {
+          method: "POST",
+          headers: {
+            cookie: admin.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            resourceId: historyResourceId,
+            source: {
+              kind: "docker-image",
+              locator: "ghcr.io/muchobien/pocketbase:latest",
+              displayName: "PocketBase",
+              imageName: "ghcr.io/muchobien/pocketbase",
+              imageTag: "latest",
+              version: "latest",
+              versionKind: "image-tag",
+            },
+          }),
+        }),
+        "configure server history resource source",
+      );
+
+      const historyDeployment = await expectJsonResponse<{ id: string }>(
+        await fetch(`${server.baseUrl}/api/deployments`, {
+          method: "POST",
+          headers: {
+            cookie: admin.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId: historyProjectId,
+            serverId: historyServerId,
+            environmentId: historyEnvironmentId,
+            resourceId: historyResourceId,
+            executionMode: "detached",
+          }),
+        }),
+        "create deployment history for server blocker",
+        201,
+      );
+      expect(historyDeployment.id).toMatch(/^dep_/);
+
+      const deactivatedHistoryServer = runRemoteCli(
+        remotePrefix,
+        ["server", "deactivate", historyServerId, "--reason", "delete lifecycle e2e"],
+        cliOptions,
+      );
+      expectCliSuccess(deactivatedHistoryServer, "deactivate server history blocker server");
+
+      const historyServerDeleteCheck = runRemoteCli(
+        remotePrefix,
+        ["server", "delete-check", historyServerId],
+        cliOptions,
+      );
+      expectCliSuccess(historyServerDeleteCheck, "server delete-check deployment history blocker");
+      expectCliOutputContains(
+        historyServerDeleteCheck,
+        "server delete-check deployment history blocker",
+        "deployment-history",
+      );
+
+      const historyServerDelete = runRemoteCli(
+        remotePrefix,
+        ["server", "delete", historyServerId, "--confirm", historyServerId],
+        cliOptions,
+      );
+      expectCliDomainBlocker(
+        historyServerDelete,
+        "inactive server with deployment history delete",
+        "server_delete_blocked",
+      );
+      expectCliOutputContains(
+        historyServerDelete,
+        "inactive server with deployment history delete",
+        "deployment-history",
       );
 
       const archivedProject = runRemoteCli(

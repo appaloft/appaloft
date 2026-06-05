@@ -1,5 +1,6 @@
 import {
   ArchivedAt,
+  type Deployment,
   DeploymentByIdSpec,
   DeploymentId,
   domainError,
@@ -18,6 +19,27 @@ import {
   type ArchiveDeploymentCommandInput,
   type ArchiveDeploymentResponse,
 } from "./archive-deployment.command";
+
+function archiveInfraError(
+  message: string,
+  input: {
+    deploymentId: string;
+    phase: string;
+    error?: unknown;
+  },
+) {
+  return domainError.infra(message, {
+    commandName: "deployments.archive",
+    deploymentId: input.deploymentId,
+    phase: input.phase,
+    ...(input.error instanceof Error && input.error.message
+      ? { message: input.error.message }
+      : {}),
+    ...(!(input.error instanceof Error) && input.error !== undefined
+      ? { message: String(input.error) }
+      : {}),
+  });
+}
 
 @injectable()
 export class ArchiveDeploymentUseCase {
@@ -54,10 +76,21 @@ export class ArchiveDeploymentUseCase {
       return err(idResult.error);
     }
 
-    const deployment = await this.deploymentRepository.findOne(
-      repositoryContext,
-      DeploymentByIdSpec.create(idResult.value),
-    );
+    let deployment: Deployment | null;
+    try {
+      deployment = await this.deploymentRepository.findOne(
+        repositoryContext,
+        DeploymentByIdSpec.create(idResult.value),
+      );
+    } catch (error) {
+      return err(
+        archiveInfraError("Deployment could not be read for archive", {
+          deploymentId,
+          phase: "deployment-archive-read",
+          error,
+        }),
+      );
+    }
 
     if (!deployment) {
       return err(domainError.notFound("deployment", deploymentId));
@@ -89,20 +122,41 @@ export class ArchiveDeploymentUseCase {
       return err(archiveResult.error);
     }
 
-    const persistResult = await this.deploymentRepository.updateOne(
-      repositoryContext,
-      deployment,
-      UpsertDeploymentSpec.fromDeployment(deployment),
-    );
+    let persistResult: Result<void>;
+    try {
+      persistResult = await this.deploymentRepository.updateOne(
+        repositoryContext,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      );
+    } catch (error) {
+      return err(
+        archiveInfraError("Deployment archive could not be persisted", {
+          deploymentId,
+          phase: "deployment-archive-persist",
+          error,
+        }),
+      );
+    }
     if (persistResult.isErr()) {
       return err(persistResult.error);
     }
 
-    return ok(
-      await publishDomainEventsAndReturn(context, this.eventBus, this.logger, deployment, {
-        id: deploymentId,
-        archivedAt: archivedAtResult.value.value,
-      }),
-    );
+    try {
+      return ok(
+        await publishDomainEventsAndReturn(context, this.eventBus, this.logger, deployment, {
+          id: deploymentId,
+          archivedAt: archivedAtResult.value.value,
+        }),
+      );
+    } catch (error) {
+      return err(
+        archiveInfraError("Deployment archive event publication failed", {
+          deploymentId,
+          phase: "deployment-archive-events",
+          error,
+        }),
+      );
+    }
   }
 }
