@@ -20,6 +20,38 @@ export const blueprintInstallTargetSchema = z
   })
   .strict();
 
+export const blueprintDependencyProvisioningSchema = z
+  .object({
+    requirementId: nonEmptyTrimmedString("Dependency requirement id"),
+    kind: nonEmptyTrimmedString("Dependency kind").optional(),
+    label: nonEmptyTrimmedString("Dependency label").optional(),
+    mode: z.enum(["create", "reuse"]),
+    providerKey: nonEmptyTrimmedString("Dependency provider key").optional(),
+    target: z
+      .object({
+        serverId: nonEmptyTrimmedString("Target server id").optional(),
+      })
+      .strict()
+      .optional(),
+    reuse: z
+      .object({
+        maskedConnection: nonEmptyTrimmedString("Masked connection").optional(),
+        actualVersion: nonEmptyTrimmedString("Actual version").optional(),
+        secretRef: nonEmptyTrimmedString("Reuse secret ref").optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const blueprintInstallSecretValueSchema = z
+  .object({
+    componentId: nonEmptyTrimmedString("Component id"),
+    key: nonEmptyTrimmedString("Secret key"),
+    value: z.string().min(1, "Secret value is required"),
+  })
+  .strict();
+
 export const listBlueprintsQueryInputSchema = z.object({});
 
 export const showBlueprintQueryInputSchema = z.object({
@@ -32,6 +64,7 @@ export const createBlueprintInstallPlanQueryInputSchema = z
     variant: nonEmptyTrimmedString("Blueprint variant").optional(),
     profile: nonEmptyTrimmedString("Blueprint profile").optional(),
     parameters: z.record(z.string(), primitiveParameterValueSchema).optional(),
+    dependencyProvisioning: z.array(blueprintDependencyProvisioningSchema).optional(),
     target: blueprintInstallTargetSchema.optional(),
   })
   .strict();
@@ -42,6 +75,7 @@ export const acceptBlueprintInstallCommandInputSchema = createBlueprintInstallPl
     acceptedBy: nonEmptyTrimmedString("Accepted by").optional(),
     idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
     acknowledgements: z.array(nonEmptyTrimmedString("Acknowledgement")).optional(),
+    secretValues: z.array(blueprintInstallSecretValueSchema).optional(),
   })
   .strict();
 

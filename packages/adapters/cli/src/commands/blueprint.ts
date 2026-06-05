@@ -16,6 +16,10 @@ const projectNameOption = Options.text("project-name").pipe(Options.optional);
 const environmentNameOption = Options.text("environment-name").pipe(Options.optional);
 const resourceSlugPrefixOption = Options.text("resource-slug-prefix").pipe(Options.optional);
 const parameterOption = Options.text("parameter").pipe(Options.repeated);
+const dependencyCreateOption = Options.text("dependency-create").pipe(Options.repeated);
+const dependencyProviderOption = Options.text("dependency-provider").pipe(Options.optional);
+const targetServerOption = Options.text("target-server").pipe(Options.optional);
+const secretOption = Options.text("secret").pipe(Options.repeated);
 const applicationIdOption = Options.text("application-id").pipe(Options.optional);
 const acceptedByOption = Options.text("accepted-by").pipe(Options.optional);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
@@ -45,6 +49,52 @@ function parameterRecord(values: readonly string[]): Record<string, string | num
   );
 }
 
+function dependencyProvisioningInput(input: {
+  readonly dependencyCreate: readonly string[];
+  readonly dependencyProvider?: string;
+  readonly targetServer?: string;
+}) {
+  return input.dependencyCreate.flatMap((entry) => {
+    const [requirementId, kind = requirementId] = entry.split(":").map((part) => part.trim());
+    if (!requirementId) return [];
+    return [
+      {
+        requirementId,
+        kind,
+        mode: "create" as const,
+        ...(input.dependencyProvider ? { providerKey: input.dependencyProvider } : {}),
+        ...(input.targetServer ? { target: { serverId: input.targetServer } } : {}),
+      },
+    ];
+  });
+}
+
+function dependencyProvisioningOptions(input: {
+  readonly dependencyCreate: readonly string[];
+  readonly dependencyProvider: Option.Option<string>;
+  readonly targetServer: Option.Option<string>;
+}) {
+  const dependencyProvider = nonEmptyOptional(input.dependencyProvider);
+  const targetServer = nonEmptyOptional(input.targetServer);
+  return dependencyProvisioningInput({
+    dependencyCreate: input.dependencyCreate,
+    ...(dependencyProvider ? { dependencyProvider } : {}),
+    ...(targetServer ? { targetServer } : {}),
+  });
+}
+
+function secretValuesInput(values: readonly string[]) {
+  return values.flatMap((entry) => {
+    const separator = entry.indexOf("=");
+    const componentSeparator = entry.indexOf(":");
+    if (componentSeparator <= 0 || separator <= componentSeparator + 1) return [];
+    const componentId = entry.slice(0, componentSeparator).trim();
+    const key = entry.slice(componentSeparator + 1, separator).trim();
+    const value = entry.slice(separator + 1);
+    return componentId && key ? [{ componentId, key, value }] : [];
+  });
+}
+
 const listCommand = EffectCommand.make("list", {}, () =>
   runQuery(ListBlueprintsQuery.create()),
 ).pipe(EffectCommand.withDescription("List Blueprint catalog entries"));
@@ -63,14 +113,33 @@ const planInstallCommand = EffectCommand.make(
     environmentName: environmentNameOption,
     resourceSlugPrefix: resourceSlugPrefixOption,
     parameter: parameterOption,
+    dependencyCreate: dependencyCreateOption,
+    dependencyProvider: dependencyProviderOption,
+    targetServer: targetServerOption,
   },
-  ({ environmentName, parameter, profile, projectName, resourceSlugPrefix, slug, variant }) =>
+  ({
+    dependencyCreate,
+    dependencyProvider,
+    environmentName,
+    parameter,
+    profile,
+    projectName,
+    resourceSlugPrefix,
+    slug,
+    targetServer,
+    variant,
+  }) =>
     runQuery(
       CreateBlueprintInstallPlanQuery.create({
         slug,
         variant: nonEmptyOptional(variant),
         profile: nonEmptyOptional(profile),
         parameters: parameterRecord(parameter),
+        dependencyProvisioning: dependencyProvisioningOptions({
+          dependencyCreate,
+          dependencyProvider,
+          targetServer,
+        }),
         target: {
           projectName: nonEmptyOptional(projectName),
           environmentName: nonEmptyOptional(environmentName),
@@ -90,6 +159,10 @@ const installCommand = EffectCommand.make(
     environmentName: environmentNameOption,
     resourceSlugPrefix: resourceSlugPrefixOption,
     parameter: parameterOption,
+    dependencyCreate: dependencyCreateOption,
+    dependencyProvider: dependencyProviderOption,
+    targetServer: targetServerOption,
+    secret: secretOption,
     applicationId: applicationIdOption,
     acceptedBy: acceptedByOption,
     idempotencyKey: idempotencyKeyOption,
@@ -99,13 +172,17 @@ const installCommand = EffectCommand.make(
     acceptedBy,
     acknowledgement,
     applicationId,
+    dependencyCreate,
+    dependencyProvider,
     environmentName,
     idempotencyKey,
     parameter,
     profile,
     projectName,
     resourceSlugPrefix,
+    secret,
     slug,
+    targetServer,
     variant,
   }) =>
     runCommand(
@@ -114,6 +191,11 @@ const installCommand = EffectCommand.make(
         variant: nonEmptyOptional(variant),
         profile: nonEmptyOptional(profile),
         parameters: parameterRecord(parameter),
+        dependencyProvisioning: dependencyProvisioningOptions({
+          dependencyCreate,
+          dependencyProvider,
+          targetServer,
+        }),
         target: {
           projectName: nonEmptyOptional(projectName),
           environmentName: nonEmptyOptional(environmentName),
@@ -123,6 +205,7 @@ const installCommand = EffectCommand.make(
         acceptedBy: nonEmptyOptional(acceptedBy),
         idempotencyKey: nonEmptyOptional(idempotencyKey),
         acknowledgements: acknowledgement,
+        secretValues: secretValuesInput(secret),
       }),
     ),
 ).pipe(EffectCommand.withDescription("Accept and run a Blueprint install command"));

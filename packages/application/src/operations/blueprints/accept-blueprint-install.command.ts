@@ -29,11 +29,15 @@ export class AcceptBlueprintInstallCommand extends Command<AcceptBlueprintInstal
           ...(parsed.variant ? { variant: parsed.variant } : {}),
           ...(parsed.profile ? { profile: parsed.profile } : {}),
           ...(parsed.parameters ? { parameters: parsed.parameters } : {}),
+          ...(parsed.dependencyProvisioning
+            ? { dependencyProvisioning: parsed.dependencyProvisioning }
+            : {}),
           ...(parsed.target ? { target: parsed.target } : {}),
           ...(parsed.applicationId ? { applicationId: parsed.applicationId } : {}),
           ...(parsed.acceptedBy ? { acceptedBy: parsed.acceptedBy } : {}),
           ...(parsed.idempotencyKey ? { idempotencyKey: parsed.idempotencyKey } : {}),
           ...(parsed.acknowledgements ? { acknowledgements: parsed.acknowledgements } : {}),
+          ...(parsed.secretValues ? { secretValues: parsed.secretValues } : {}),
         }),
     );
   }
