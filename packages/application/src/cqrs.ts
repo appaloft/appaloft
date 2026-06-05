@@ -85,6 +85,23 @@ export function eventHandlerTypesFor(
   return eventHandlerRegistry.get(eventType) ?? [];
 }
 
+function unhandledOperationGuardError(input: {
+  messageName: string;
+  messageKind: "command" | "query";
+  error: unknown;
+}) {
+  return domainError.infra("Operation guard failed before dispatch", {
+    phase: "operation-guard-dispatch",
+    [input.messageKind]: input.messageName,
+    ...(input.error instanceof Error && input.error.message
+      ? { message: input.error.message }
+      : {}),
+    ...(!(input.error instanceof Error) && input.error !== undefined
+      ? { message: String(input.error) }
+      : {}),
+  });
+}
+
 export class CommandBus {
   constructor(
     private readonly container: DependencyContainer,
@@ -114,20 +131,30 @@ export class CommandBus {
     });
 
     if (this.operationGuardPort) {
-      const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
-        "./operation-guard"
-      );
-      const operationEntry = operationCatalogEntryForMessage(command);
-      if (operationEntry) {
-        const checked = await checkOperationGuards({
-          context,
-          entry: operationEntry,
-          message: command,
-          operationGuardPort: this.operationGuardPort,
-        });
-        if (checked.isErr()) {
-          return err(checked.error);
+      try {
+        const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
+          "./operation-guard"
+        );
+        const operationEntry = operationCatalogEntryForMessage(command);
+        if (operationEntry) {
+          const checked = await checkOperationGuards({
+            context,
+            entry: operationEntry,
+            message: command,
+            operationGuardPort: this.operationGuardPort,
+          });
+          if (checked.isErr()) {
+            return err(checked.error);
+          }
         }
+      } catch (error) {
+        return err(
+          unhandledOperationGuardError({
+            messageName: command.constructor.name,
+            messageKind: "command",
+            error,
+          }),
+        );
       }
     }
 
@@ -202,20 +229,30 @@ export class QueryBus {
     });
 
     if (this.operationGuardPort) {
-      const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
-        "./operation-guard"
-      );
-      const operationEntry = operationCatalogEntryForMessage(query);
-      if (operationEntry) {
-        const checked = await checkOperationGuards({
-          context,
-          entry: operationEntry,
-          message: query,
-          operationGuardPort: this.operationGuardPort,
-        });
-        if (checked.isErr()) {
-          return err(checked.error);
+      try {
+        const { checkOperationGuards, operationCatalogEntryForMessage } = await import(
+          "./operation-guard"
+        );
+        const operationEntry = operationCatalogEntryForMessage(query);
+        if (operationEntry) {
+          const checked = await checkOperationGuards({
+            context,
+            entry: operationEntry,
+            message: query,
+            operationGuardPort: this.operationGuardPort,
+          });
+          if (checked.isErr()) {
+            return err(checked.error);
+          }
         }
+      } catch (error) {
+        return err(
+          unhandledOperationGuardError({
+            messageName: query.constructor.name,
+            messageKind: "query",
+            error,
+          }),
+        );
       }
     }
 

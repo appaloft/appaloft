@@ -2876,6 +2876,54 @@ describe("deployment create HTTP route", () => {
     });
   });
 
+  test("[DEP-ARCHIVE-ENTRY-003] normalizes oRPC archive output validation failures", async () => {
+    const commandBus = {
+      execute: async <T>(): Promise<Result<T>> =>
+        ok({
+          id: "dep_archive",
+        } as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments/dep_archive/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirm: "dep_archive",
+          resourceId: "res_demo",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "internal_server_error",
+        category: "infra",
+        message: "Output validation failed",
+        retryable: false,
+        details: {
+          phase: "orpc-error-normalization",
+          orpcCode: "INTERNAL_SERVER_ERROR",
+          status: 500,
+          defined: false,
+        },
+      },
+    });
+  });
+
   test("[DEP-PRUNE-ENTRY-002] dispatches PruneDeploymentsCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

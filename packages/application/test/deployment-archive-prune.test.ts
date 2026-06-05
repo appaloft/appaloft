@@ -7,6 +7,8 @@ import {
   CreatedAt,
   Deployment,
   DeploymentId,
+  type DeploymentMutationSpec,
+  type DeploymentSelectionSpec,
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
@@ -65,6 +67,33 @@ class RecordingDeploymentAttemptRetentionStore implements DeploymentAttemptReten
   ): Promise<Result<DeploymentAttemptPruneStoreResult>> {
     this.inputs.push(input);
     return ok(this.result);
+  }
+}
+
+class ThrowingDeploymentRepository extends MemoryDeploymentRepository {
+  constructor(private readonly failingOperation: "findOne" | "updateOne") {
+    super();
+  }
+
+  override async findOne(
+    context: RepositoryContext,
+    spec: DeploymentSelectionSpec,
+  ): Promise<Deployment | null> {
+    if (this.failingOperation === "findOne") {
+      throw new Error("repository read exploded");
+    }
+    return super.findOne(context, spec);
+  }
+
+  override async updateOne(
+    context: RepositoryContext,
+    deployment: Deployment,
+    spec: DeploymentMutationSpec,
+  ): Promise<Result<void>> {
+    if (this.failingOperation === "updateOne") {
+      throw new Error("repository update exploded");
+    }
+    return super.updateOne(context, deployment, spec);
   }
 }
 
@@ -193,6 +222,62 @@ describe("deployment archive and prune", () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().code).toBe("deployment_archive_not_allowed");
     expect(repository.items.get("dep_archive")?.toState().archivedAt).toBeUndefined();
+  });
+
+  test("[DEP-ARCHIVE-003] returns domain infra errors for repository archive failures", async () => {
+    const context = createExecutionContext({
+      requestId: "req_archive_deployment_repository_failure_test",
+      entrypoint: "system",
+    });
+    const readRepository = new ThrowingDeploymentRepository("findOne");
+    readRepository.items.set("dep_archive", deployment());
+    const readUseCase = new ArchiveDeploymentUseCase(
+      readRepository,
+      new FixedClock("2026-01-01T00:01:00.000Z"),
+      new CapturedEventBus(),
+      new NoopLogger(),
+    );
+
+    const readResult = await readUseCase.execute(context, {
+      deploymentId: "dep_archive",
+      confirm: "dep_archive",
+    });
+
+    expect(readResult.isErr()).toBe(true);
+    expect(readResult._unsafeUnwrapErr()).toMatchObject({
+      code: "infra_error",
+      details: {
+        commandName: "deployments.archive",
+        deploymentId: "dep_archive",
+        message: "repository read exploded",
+        phase: "deployment-archive-read",
+      },
+    });
+
+    const updateRepository = new ThrowingDeploymentRepository("updateOne");
+    updateRepository.items.set("dep_archive", deployment());
+    const updateUseCase = new ArchiveDeploymentUseCase(
+      updateRepository,
+      new FixedClock("2026-01-01T00:01:00.000Z"),
+      new CapturedEventBus(),
+      new NoopLogger(),
+    );
+
+    const updateResult = await updateUseCase.execute(context, {
+      deploymentId: "dep_archive",
+      confirm: "dep_archive",
+    });
+
+    expect(updateResult.isErr()).toBe(true);
+    expect(updateResult._unsafeUnwrapErr()).toMatchObject({
+      code: "infra_error",
+      details: {
+        commandName: "deployments.archive",
+        deploymentId: "dep_archive",
+        message: "repository update exploded",
+        phase: "deployment-archive-persist",
+      },
+    });
   });
 
   test("[DEP-PRUNE-001] dry-runs archived deployment attempt prune by default", async () => {

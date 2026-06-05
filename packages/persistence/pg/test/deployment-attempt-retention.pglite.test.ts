@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExecutionContext, toRepositoryContext } from "@appaloft/application";
+import { ArchivedAt, DeploymentByIdSpec, DeploymentId, UpsertDeploymentSpec } from "@appaloft/core";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../src";
@@ -101,6 +102,27 @@ async function seedBaseRows(db: Kysely<Database>): Promise<void> {
     .execute();
 }
 
+async function archiveBaseRows(db: Kysely<Database>): Promise<void> {
+  await db
+    .updateTable("projects")
+    .set({
+      lifecycle_status: "archived",
+      archived_at: "2026-01-01T00:00:10.000Z",
+      archive_reason: "cleanup",
+    })
+    .where("id", "=", "prj_demo")
+    .execute();
+  await db
+    .updateTable("resources")
+    .set({
+      lifecycle_status: "archived",
+      archived_at: "2026-01-01T00:00:11.000Z",
+      archive_reason: "cleanup",
+    })
+    .where("id", "=", "res_web")
+    .execute();
+}
+
 async function seedDeployment(
   db: Kysely<Database>,
   input: {
@@ -172,6 +194,57 @@ function repositoryContext() {
 }
 
 describe("deployment attempt retention persistence", () => {
+  test("[DEP-ARCHIVE-004] archives terminal deployments after parent project and resource archive", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-deployment-archive-parent-"));
+    const { createDatabase, createMigrator, PgDeploymentRepository } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await seedBaseRows(database.db);
+      await seedDeployment(database.db, {
+        id: "dep_archive_parent",
+      });
+      await archiveBaseRows(database.db);
+
+      const context = repositoryContext();
+      const repository = new PgDeploymentRepository(database.db);
+      const deployment = await repository.findOne(
+        context,
+        DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_archive_parent")),
+      );
+      expect(deployment).not.toBeNull();
+      if (!deployment) {
+        throw new Error("deployment fixture was not persisted");
+      }
+
+      const archiveResult = deployment.archive(ArchivedAt.rehydrate("2026-01-01T00:01:00.000Z"));
+      expect(archiveResult.isOk()).toBe(true);
+
+      const updateResult = await repository.updateOne(
+        context,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      );
+      expect(updateResult.isOk()).toBe(true);
+
+      const row = await database.db
+        .selectFrom("deployments")
+        .select(["id", "archived_at"])
+        .where("id", "=", "dep_archive_parent")
+        .executeTakeFirstOrThrow();
+      expect(new Date(row.archived_at ?? "").toISOString()).toBe("2026-01-01T00:01:00.000Z");
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[DEP-PRUNE-002] destructively prunes only unreferenced archived terminal deployments", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-deployment-attempt-retention-"));
     const { createDatabase, createMigrator, PgDeploymentAttemptRetentionStore } = await import(
