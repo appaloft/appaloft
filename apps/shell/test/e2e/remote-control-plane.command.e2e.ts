@@ -40,6 +40,17 @@ function expectJsonStdout(result: ReturnType<typeof runShellCli>, label: string)
   return parseJson(result.stdout);
 }
 
+function expectStructuredCliFailure(result: ReturnType<typeof runShellCli>, label: string): void {
+  expect(
+    result.exitCode,
+    `${label}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  ).not.toBe(0);
+  expect(result.stdout, label).not.toContain("<!doctype html>");
+  expect(result.stdout, label).not.toContain("<html");
+  expect(result.stderr, label).not.toContain("<!doctype html>");
+  expect(result.stderr, label).not.toContain("<html");
+}
+
 async function runShellCliAsync(args: string[], options: ShellCliOptions): Promise<CliResult> {
   const child = Bun.spawn([process.execPath, "run", "src/index.ts", ...args], {
     cwd: shellRoot,
@@ -149,6 +160,44 @@ describe("remote control-plane CLI e2e", () => {
         runShellCli([...remotePrefix, "project", "create", "--name", "Remote CLI E2E"], cliOptions),
         "project create",
       ) as { id: string };
+      const createdEnvironment = expectJsonStdout(
+        runShellCli(
+          [
+            ...remotePrefix,
+            "env",
+            "create",
+            "--project",
+            createdProject.id,
+            "--name",
+            "Production",
+            "--kind",
+            "production",
+          ],
+          cliOptions,
+        ),
+        "environment create",
+      ) as { id: string };
+      const createdResource = expectJsonStdout(
+        runShellCli(
+          [
+            ...remotePrefix,
+            "resource",
+            "create",
+            "--project",
+            createdProject.id,
+            "--environment",
+            createdEnvironment.id,
+            "--name",
+            "Remote CLI Resource",
+            "--kind",
+            "application",
+            "--internal-port",
+            "8090",
+          ],
+          cliOptions,
+        ),
+        "resource create",
+      ) as { id: string };
 
       const readOnlyCases = [
         {
@@ -158,6 +207,14 @@ describe("remote control-plane CLI e2e", () => {
         {
           label: "project list",
           args: ["project", "list"],
+        },
+        {
+          label: "project show",
+          args: ["project", "show", createdProject.id],
+        },
+        {
+          label: "resource show",
+          args: ["resource", "show", createdResource.id],
         },
         {
           label: "default access list",
@@ -187,6 +244,14 @@ describe("remote control-plane CLI e2e", () => {
           remoteCase.label,
         );
       }
+
+      const missingDeployment = runShellCli(
+        [...remotePrefix, "deployments", "show", "dep_missing_remote_cli_route"],
+        cliOptions,
+      );
+      expectStructuredCliFailure(missingDeployment, "deployment show missing id");
+      expect(missingDeployment.stderr).toContain("not_found");
+      expect(missingDeployment.stderr).toContain("dep_missing_remote_cli_route");
     } finally {
       await server.stop();
     }

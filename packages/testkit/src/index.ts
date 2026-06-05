@@ -2577,6 +2577,9 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
               kind: deployment.runtimePlan.source.kind,
               locator: deployment.runtimePlan.source.locator,
               displayName: deployment.runtimePlan.source.displayName,
+              ...(deployment.runtimePlan.source.version
+                ? { version: deployment.runtimePlan.source.version.toState() }
+                : {}),
               ...(deployment.runtimePlan.source.inspection
                 ? {
                     inspection: {

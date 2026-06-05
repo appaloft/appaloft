@@ -27,6 +27,27 @@ export const versionReferenceKinds = [
   "unknown",
 ] as const;
 
+export const versionReferenceSchema = z.object({
+  sourceKind: z.enum([
+    "git",
+    "docker-image",
+    "static-artifact",
+    "blueprint",
+    "dependency-resource",
+    "generic",
+    "unknown",
+  ]),
+  referenceKind: z.enum(versionReferenceKinds),
+  value: z.string(),
+});
+
+export const sourceVersionSchema = z.object({
+  reference: versionReferenceSchema,
+  fixedIdentifier: versionReferenceSchema.optional(),
+  aliases: z.array(versionReferenceSchema).optional(),
+  detected: z.boolean().optional(),
+});
+
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),
   service: z.string(),
@@ -4534,6 +4555,7 @@ export const runtimePlanSchema = z.object({
       })
       .optional(),
     metadata: z.record(z.string(), z.string()).optional(),
+    version: sourceVersionSchema.optional(),
   }),
   buildStrategy: z.enum([
     "dockerfile",
@@ -6585,6 +6607,7 @@ export type EnvironmentEffectivePrecedenceResponse = z.infer<
 >;
 export type DiffEnvironmentResponse = z.infer<typeof diffEnvironmentResponseSchema>;
 export type DeploymentSummary = z.infer<typeof deploymentSummarySchema>;
+export type SourceVersion = z.infer<typeof sourceVersionSchema>;
 export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSchema>;
 export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSchema>;
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
@@ -6732,6 +6755,7 @@ type DeploymentCommitMetadataInput = {
   sourceCommitSha?: string;
   runtimePlan: {
     source: {
+      version?: SourceVersion;
       metadata?: Record<string, string>;
     };
     execution: {
@@ -6757,4 +6781,60 @@ export function sourceCommitShaForDeployment(
 
 export function shortDeploymentSourceCommitSha(commitSha: string): string {
   return commitSha.slice(0, 12);
+}
+
+export type DeploymentSourceVersionDisplay = {
+  label: "Commit" | "Image digest" | "Source version";
+  value: string;
+  shortValue: string;
+  requested?: string;
+  fixed: boolean;
+};
+
+export function sourceVersionForDeployment(
+  deployment: DeploymentCommitMetadataInput,
+): DeploymentSourceVersionDisplay | undefined {
+  const version = deployment.runtimePlan.source.version;
+  const fixedIdentifier = version?.fixedIdentifier;
+  if (fixedIdentifier) {
+    return {
+      label:
+        fixedIdentifier.referenceKind === "commit-sha"
+          ? "Commit"
+          : fixedIdentifier.referenceKind === "image-digest"
+            ? "Image digest"
+            : "Source version",
+      value: fixedIdentifier.value,
+      shortValue: shortDeploymentSourceVersion(fixedIdentifier.value),
+      ...(version.reference.value !== fixedIdentifier.value
+        ? { requested: version.reference.value }
+        : {}),
+      fixed: true,
+    };
+  }
+
+  const sourceCommitSha = sourceCommitShaForDeployment(deployment);
+  if (sourceCommitSha) {
+    return {
+      label: "Commit",
+      value: sourceCommitSha,
+      shortValue: shortDeploymentSourceVersion(sourceCommitSha),
+      fixed: true,
+    };
+  }
+
+  if (version?.reference.value && version.reference.referenceKind !== "unknown") {
+    return {
+      label: "Source version",
+      value: version.reference.value,
+      shortValue: shortDeploymentSourceVersion(version.reference.value),
+      fixed: false,
+    };
+  }
+
+  return undefined;
+}
+
+export function shortDeploymentSourceVersion(value: string): string {
+  return value.length > 19 ? value.slice(0, 19) : value;
 }

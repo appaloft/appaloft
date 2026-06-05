@@ -754,6 +754,7 @@ import {
 import {
   type DomainError,
   domainError,
+  type ErrorCategory,
   err,
   ok,
   type Result,
@@ -1847,6 +1848,97 @@ async function logOrpcErrorResponse(
   });
 }
 
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function isErrorCategory(value: unknown): value is ErrorCategory {
+  return (
+    value === "user" ||
+    value === "infra" ||
+    value === "provider" ||
+    value === "retryable" ||
+    value === "timeout"
+  );
+}
+
+function errorCategoryFromStatus(status: number): ErrorCategory {
+  if (status === 502) {
+    return "provider";
+  }
+  if (status === 503) {
+    return "retryable";
+  }
+  if (status === 504) {
+    return "timeout";
+  }
+  if (status >= 500) {
+    return "infra";
+  }
+  return "user";
+}
+
+async function normalizeOpenApiErrorResponse(response: Response): Promise<Response> {
+  if (response.status < 400) {
+    return response;
+  }
+
+  const bodyText = await response
+    .clone()
+    .text()
+    .catch(() => "");
+  if (!bodyText) {
+    return response;
+  }
+
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(bodyText);
+  } catch {
+    return response;
+  }
+
+  const body = readRecord(parsedBody);
+  const payload = readRecord(body?.json) ?? readRecord(body?.error) ?? body;
+  const data = readRecord(payload?.data);
+  const domainCode = typeof data?.domainCode === "string" ? data.domainCode : undefined;
+  if (!payload || !domainCode) {
+    return response;
+  }
+
+  const category = isErrorCategory(data?.category)
+    ? data.category
+    : errorCategoryFromStatus(response.status);
+  const retryable =
+    typeof data?.retryable === "boolean"
+      ? data.retryable
+      : category === "provider" || category === "retryable" || category === "timeout";
+  const message =
+    typeof payload.message === "string" && payload.message.length > 0
+      ? payload.message
+      : "Appaloft operation failed";
+  const details = readRecord(data?.details);
+
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "application/json");
+
+  return Response.json(
+    {
+      error: {
+        code: domainCode,
+        category,
+        message,
+        retryable,
+        ...(details ? { details } : {}),
+      },
+    },
+    {
+      headers,
+      status: response.status,
+    },
+  );
+}
+
 function toOrpcError(error: DomainError, context: ExecutionContext) {
   const message = translateDomainError(error, context.t);
 
@@ -1870,6 +1962,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "environment_locked":
     case "resource_slug_conflict":
     case "resource_archived":
+    case "project_delete_blocked":
     case "resource_delete_blocked":
     case "dependency_resource_delete_blocked":
     case "server_delete_blocked":
@@ -8094,8 +8187,14 @@ export function mountAppaloftOrpcRoutes(
         });
       }
 
-      await logOrpcErrorResponse(context.logger, "orpc_http_handler_error", request, response);
-      return response;
+      const normalizedResponse = await normalizeOpenApiErrorResponse(response);
+      await logOrpcErrorResponse(
+        context.logger,
+        "orpc_http_handler_error",
+        request,
+        normalizedResponse,
+      );
+      return normalizedResponse;
     } catch (error) {
       context.logger.error("orpc_http_handler_unhandled_error", {
         method: request.method,
@@ -8533,6 +8632,9 @@ export function mountAppaloftOrpcRoutes(
   }) as unknown as Elysia;
 
   for (const route of routes) {
+    mounted = mounted.get(route, openApiRouteHandler, {
+      parse: "none",
+    }) as unknown as Elysia;
     mounted = mounted.all(route, openApiRouteHandler, {
       parse: "none",
     }) as unknown as Elysia;

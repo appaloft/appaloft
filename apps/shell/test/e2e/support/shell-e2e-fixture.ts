@@ -182,6 +182,8 @@ export async function waitForHttpHealth(url: string): Promise<void> {
 
 export async function startShellHttpServer(options: ShellCliOptions): Promise<{
   baseUrl: string;
+  stdout: () => string;
+  stderr: () => string;
   stop: () => Promise<void>;
 }> {
   if (!options.httpPort) {
@@ -202,8 +204,30 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
       APPALOFT_WEB_STATIC_DIR: "",
       ...options.env,
     },
-    stderr: "ignore",
-    stdout: "ignore",
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  let stdout = "";
+  let stderr = "";
+  const captureStream = (stream: ReadableStream<Uint8Array>, append: (chunk: string) => void) => {
+    void (async () => {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          append(decoder.decode());
+          return;
+        }
+        append(decoder.decode(chunk.value, { stream: true }));
+      }
+    })();
+  };
+  captureStream(serverProcess.stdout, (chunk) => {
+    stdout += chunk;
+  });
+  captureStream(serverProcess.stderr, (chunk) => {
+    stderr += chunk;
   });
   const baseUrl = `http://127.0.0.1:${options.httpPort}`;
 
@@ -211,6 +235,8 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
 
   return {
     baseUrl,
+    stdout: () => stdout,
+    stderr: () => stderr,
     async stop() {
       serverProcess.kill();
       await serverProcess.exited;

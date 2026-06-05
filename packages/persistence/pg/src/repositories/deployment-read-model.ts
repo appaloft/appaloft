@@ -117,6 +117,7 @@ function toDeploymentSummary(
         kind: runtimePlan.source.kind,
         locator: runtimePlan.source.locator,
         displayName: runtimePlan.source.displayName,
+        ...(runtimePlan.source.version ? { version: runtimePlan.source.version } : {}),
         ...(runtimePlan.source.inspection
           ? {
               inspection: {
