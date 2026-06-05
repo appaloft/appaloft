@@ -90,4 +90,33 @@ describe("deployment metadata helpers", () => {
       fixed: true,
     });
   });
+
+  test("falls back to SSH execution metadata for remotely resolved Docker image digests", () => {
+    const digest = "sha256:27d249c0d849b2581eb5d303cfa0bec89a815702651426ce8ea23b2fc43c2de6";
+    const deployment = {
+      runtimePlan: {
+        source: {
+          metadata: {
+            imageTag: "latest",
+            imageName: "ghcr.io/muchobien/pocketbase",
+          },
+        },
+        execution: {
+          metadata: {
+            imageDigest: digest,
+            sourceVersion: digest,
+            sourceVersionKind: "image-digest",
+          },
+        },
+      },
+    };
+
+    expect(sourceVersionForDeployment(deployment)).toEqual({
+      label: "Image digest",
+      value: digest,
+      shortValue: "sha256:27d249c0d849",
+      requested: "latest",
+      fixed: true,
+    });
+  });
 });
