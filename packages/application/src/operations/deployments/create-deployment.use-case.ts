@@ -867,7 +867,7 @@ export class CreateDeploymentUseCase {
         const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator);
         detected = yield* detectedResult;
       }
-      if (sourceVersionDetector) {
+      if (sourceVersionDetector && detected.source.kind !== "docker-image") {
         const versionResult = await sourceVersionDetector.detect(context, {
           source: detected.source,
           ...(resourceSource.requestedVersion
@@ -875,11 +875,7 @@ export class CreateDeploymentUseCase {
             : {}),
         });
         const sourceVersion = yield* versionResult;
-        if (
-          resourceSource.requestedVersion &&
-          sourceVersion.version.isUnknown() &&
-          detected.source.kind !== "docker-image"
-        ) {
+        if (resourceSource.requestedVersion && sourceVersion.version.isUnknown()) {
           return err(
             domainError.validation(
               "Requested source version could not be resolved to a fixed version",
