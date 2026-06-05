@@ -72,6 +72,7 @@ export const uiPackage = {
     breadcrumb: "@appaloft/ui/breadcrumb",
     button: "@appaloft/ui/button",
     card: "@appaloft/ui/card",
+    chart: "@appaloft/ui/chart",
     collapsible: "@appaloft/ui/collapsible",
     dialog: "@appaloft/ui/dialog",
     dropdownMenu: "@appaloft/ui/dropdown-menu",

@@ -1682,6 +1682,12 @@ export type AppaloftOrpcClientContract = {
       InspectRuntimeUsageResponse,
       AppaloftClientError
     >;
+    inspectStream: Client<
+      AppaloftClientContext,
+      InspectRuntimeUsageQueryInput,
+      AsyncIteratorClass<InspectRuntimeUsageResponse, Record<string, never>, void>,
+      AppaloftClientError
+    >;
   };
   runtimeMonitoring: {
     samples: Client<

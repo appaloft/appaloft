@@ -377,7 +377,7 @@ export const cliCommandDescriptions = {
   ),
   runtimeUsage: withDocs("Runtime usage attribution diagnostics", "diagnostics.runtime-usage"),
   runtimeUsageInspect: withDocs(
-    "Inspect runtime usage attribution for a scope without cleanup",
+    "Inspect or watch runtime usage attribution for a scope without cleanup",
     "diagnostics.runtime-usage",
   ),
   runtimeMonitoring: withDocs(
