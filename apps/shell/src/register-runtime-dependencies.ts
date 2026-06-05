@@ -1286,6 +1286,11 @@ export function registerRuntimeDependencies(
       () => new PgDeploymentAttemptRetentionStore(input.database.db),
     ),
   });
+  container.register(tokens.resourceRuntimeControlAttemptRetentionStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceRuntimeControlAttemptRecorder(input.database.db),
+    ),
+  });
   container.register(tokens.resourceRuntimeLogArchiveStore, {
     useFactory: instanceCachingFactory(
       () => new PgResourceRuntimeLogArchiveStore(input.database.db),

@@ -146,6 +146,7 @@ import { importResourceVariablesCommandInputSchema } from "./operations/resource
 import { listResourceDependencyBindingsQueryInputSchema } from "./operations/resources/list-resource-dependency-bindings.query";
 import { listResourceSecretReferencesQueryInputSchema } from "./operations/resources/list-resource-secret-references.query";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { pruneResourceRuntimeControlAttemptsCommandInputSchema } from "./operations/resources/prune-resource-runtime-control-attempts.command";
 import { resetResourceHealthCommandInputSchema } from "./operations/resources/reset-resource-health.command";
 import { resourceAccessFailureEvidenceLookupQueryInputSchema } from "./operations/resources/resource-access-failure-evidence-lookup.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
@@ -1811,6 +1812,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource log-archives prune --before <iso>",
       orpc: { method: "POST", path: "/api/resources/runtime-log-archives/prune" },
+    },
+  },
+  {
+    key: "resources.runtime-control-attempts.prune",
+    kind: "command",
+    domain: "resources",
+    messageName: "PruneResourceRuntimeControlAttemptsCommand",
+    handlerName: "PruneResourceRuntimeControlAttemptsCommandHandler",
+    serviceName: "PruneResourceRuntimeControlAttemptsUseCase",
+    inputSchema: pruneResourceRuntimeControlAttemptsCommandInputSchema,
+    serviceToken: tokens.pruneResourceRuntimeControlAttemptsUseCase,
+    transports: {
+      cli: "appaloft resource runtime-control-attempts prune --before <iso>",
+      orpc: { method: "POST", path: "/api/resources/runtime-control-attempts/prune" },
     },
   },
   {

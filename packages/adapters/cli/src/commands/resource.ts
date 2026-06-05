@@ -21,6 +21,7 @@ import {
   ListResourceSecretReferencesQuery,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
+  PruneResourceRuntimeControlAttemptsCommand,
   PruneResourceRuntimeLogArchivesCommand,
   ResetResourceHealthCommand,
   ResourceAccessFailureEvidenceLookupQuery,
@@ -575,6 +576,32 @@ const runtimeRestartCommand = EffectCommand.make(
 const runtimeCommand = EffectCommand.make("runtime").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.resourceRuntime),
   EffectCommand.withSubcommands([runtimeStopCommand, runtimeStartCommand, runtimeRestartCommand]),
+);
+
+const pruneRuntimeControlAttemptsCommand = EffectCommand.make(
+  "prune",
+  {
+    before: logArchiveBeforeOption,
+    resource: Options.text("resource").pipe(Options.optional),
+    deployment: deploymentOption,
+    server: logArchiveServerOption,
+    dryRun: logArchiveDryRunOption,
+  },
+  ({ before, deployment, dryRun, resource, server }) =>
+    runCommand(
+      PruneResourceRuntimeControlAttemptsCommand.create({
+        before,
+        deploymentId: optionalValue(deployment),
+        resourceId: optionalValue(resource),
+        serverId: optionalValue(server),
+        dryRun,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeControlAttemptsPrune));
+
+const runtimeControlAttemptsCommand = EffectCommand.make("runtime-control-attempts").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.resourceRuntimeControlAttempts),
+  EffectCommand.withSubcommands([pruneRuntimeControlAttemptsCommand]),
 );
 
 const archiveCommand = EffectCommand.make(
@@ -1317,6 +1344,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     logsCommand,
     logArchivesCommand,
     runtimeCommand,
+    runtimeControlAttemptsCommand,
     accessFailureCommand,
     healthCommand,
     healthHistoryCommand,

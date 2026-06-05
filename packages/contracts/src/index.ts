@@ -5665,6 +5665,20 @@ export const pruneResourceRuntimeLogArchivesResponseSchema = z.object({
   prunedAt: z.string(),
 });
 
+export const pruneResourceRuntimeControlAttemptsResponseSchema = z.object({
+  schemaVersion: z.literal("resources.runtime-control-attempts.prune/v1"),
+  before: z.string(),
+  deploymentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  serverId: z.string().optional(),
+  dryRun: z.boolean(),
+  matchedCount: z.number(),
+  prunedCount: z.number(),
+  affectedResourceCount: z.number(),
+  affectedDeploymentCount: z.number(),
+  prunedAt: z.string(),
+});
+
 export const deploymentEventStreamResponseSchema = z.object({
   deploymentId: z.string(),
   envelopes: z.array(deploymentEventStreamEnvelopeSchema),
@@ -6733,6 +6747,9 @@ export type ShowResourceRuntimeLogArchiveResponse = z.infer<
 >;
 export type PruneResourceRuntimeLogArchivesResponse = z.infer<
   typeof pruneResourceRuntimeLogArchivesResponseSchema
+>;
+export type PruneResourceRuntimeControlAttemptsResponse = z.infer<
+  typeof pruneResourceRuntimeControlAttemptsResponseSchema
 >;
 export type TerminalSessionDescriptor = z.infer<typeof terminalSessionDescriptorSchema>;
 export type TerminalSessionSummary = z.infer<typeof terminalSessionSummarySchema>;

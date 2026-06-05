@@ -239,6 +239,7 @@ export * from "./operations/resources/resource-health.schema";
 export * from "./operations/resources/resource-health.schema";
 export * from "./operations/resources/resource-proxy-configuration-preview.schema";
 export * from "./operations/resources/resource-runtime-control.schema";
+export * from "./operations/resources/resource-runtime-control-attempt-retention.schema";
 export * from "./operations/resources/resource-runtime-log-archives.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/resource-secret-reference.schema";

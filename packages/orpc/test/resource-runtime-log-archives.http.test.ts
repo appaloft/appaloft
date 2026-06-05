@@ -10,6 +10,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   ListResourceRuntimeLogArchivesQuery,
+  PruneResourceRuntimeControlAttemptsCommand,
   PruneResourceRuntimeLogArchivesCommand,
   type Query,
   type QueryBus,
@@ -74,6 +75,21 @@ describe("resource runtime log archive HTTP routes", () => {
           return ok({
             schemaVersion: "resources.runtime-logs.archive/v1",
             archive: archiveDetail,
+          } as T);
+        }
+
+        if (command instanceof PruneResourceRuntimeControlAttemptsCommand) {
+          return ok({
+            schemaVersion: "resources.runtime-control-attempts.prune/v1",
+            before: "2026-01-01T00:00:00.000Z",
+            deploymentId: "dep_primary",
+            resourceId: "res_web",
+            dryRun: false,
+            matchedCount: 1,
+            prunedCount: 1,
+            affectedResourceCount: 1,
+            affectedDeploymentCount: 1,
+            prunedAt: "2026-01-01T00:10:00.000Z",
           } as T);
         }
 
@@ -146,6 +162,18 @@ describe("resource runtime log archive HTTP routes", () => {
         }),
       }),
     );
+    const pruneRuntimeControlAttemptsResponse = await app.handle(
+      new Request("http://localhost/api/resources/runtime-control-attempts/prune", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          before: "2026-01-01T00:00:00.000Z",
+          deploymentId: "dep_primary",
+          resourceId: "res_web",
+          dryRun: false,
+        }),
+      }),
+    );
 
     expect(archiveResponse.status).toBe(201);
     expect(await archiveResponse.json()).toEqual({
@@ -155,6 +183,7 @@ describe("resource runtime log archive HTTP routes", () => {
     expect(listResponse.status).toBe(200);
     expect(showResponse.status).toBe(200);
     expect(pruneResponse.status).toBe(200);
+    expect(pruneRuntimeControlAttemptsResponse.status).toBe(200);
     expect(capturedCommands[0]).toBeInstanceOf(ArchiveResourceRuntimeLogsCommand);
     expect(capturedCommands[0]).toMatchObject({
       resourceId: "res_web",
@@ -172,6 +201,13 @@ describe("resource runtime log archive HTTP routes", () => {
       before: "2026-01-01T00:00:00.000Z",
       resourceId: "res_web",
       serviceName: "web",
+      dryRun: false,
+    });
+    expect(capturedCommands[2]).toBeInstanceOf(PruneResourceRuntimeControlAttemptsCommand);
+    expect(capturedCommands[2]).toMatchObject({
+      before: "2026-01-01T00:00:00.000Z",
+      deploymentId: "dep_primary",
+      resourceId: "res_web",
       dryRun: false,
     });
   });
