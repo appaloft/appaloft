@@ -409,6 +409,24 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "blueprints.install",
+    operationGroup: "blueprints",
+    operationMethod: "install",
+    operationId: "blueprints.install",
+    kind: "command",
+    domain: "blueprints",
+    messageName: "AcceptBlueprintInstallCommand",
+    route: {
+      method: "POST",
+      path: "/blueprints/{slug}/install",
+    },
+    docsHref:
+      "/docs/implementation/ai-native-resource-template-roadmap/#track-2-blueprint-instantiation-and-deployment-planning",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "certificates.delete",
     operationGroup: "certificates",
     operationMethod: "delete",

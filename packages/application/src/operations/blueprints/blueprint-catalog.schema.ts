@@ -36,11 +36,21 @@ export const createBlueprintInstallPlanQueryInputSchema = z
   })
   .strict();
 
+export const acceptBlueprintInstallCommandInputSchema = createBlueprintInstallPlanQueryInputSchema
+  .extend({
+    applicationId: nonEmptyTrimmedString("Installed application id").optional(),
+    acceptedBy: nonEmptyTrimmedString("Accepted by").optional(),
+    idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
+    acknowledgements: z.array(nonEmptyTrimmedString("Acknowledgement")).optional(),
+  })
+  .strict();
+
 export const blueprintRegistryEntryResponseSchema = z.custom<BlueprintRegistryEntry>();
 export const blueprintManifestResponseSchema = z.custom<BlueprintManifest>();
 export const blueprintInstallPlanResponseSchema = z.custom<BlueprintInstallPlan>();
 export const blueprintApplicationBundlePlanResponseSchema =
   z.custom<BlueprintApplicationBundlePlan>();
+export const acceptBlueprintInstallResponseSchema = z.custom<unknown>();
 
 export const listBlueprintsResponseSchema = z.object({
   items: z.array(blueprintRegistryEntryResponseSchema),
@@ -66,4 +76,10 @@ export type CreateBlueprintInstallPlanQueryInput = z.input<
 >;
 export type CreateBlueprintInstallPlanResponse = z.output<
   typeof createBlueprintInstallPlanResponseSchema
+>;
+export type AcceptBlueprintInstallCommandInput = z.input<
+  typeof acceptBlueprintInstallCommandInputSchema
+>;
+export type AcceptBlueprintInstallCommandResponse = z.output<
+  typeof acceptBlueprintInstallResponseSchema
 >;

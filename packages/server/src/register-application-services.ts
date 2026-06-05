@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  AcceptBlueprintInstallCommandHandler,
   AcceptDependencyResourceProvisioningPlanCommandHandler,
   AcceptDependencyResourceProvisioningPlanUseCase,
   ApplyActionPreviewRouteCommandHandler,
@@ -133,6 +134,7 @@ import {
   DeactivateServerUseCase,
   DeadLetterOperatorWorkCommandHandler,
   DeadLetterOperatorWorkUseCase,
+  DefaultBlueprintInstallCommandService,
   DefaultDeploymentOverlayPort,
   DefaultEntitlementPort,
   DefaultOperationCapabilityPort,
@@ -2315,6 +2317,7 @@ export function registerApplicationServices(
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
+  container.registerSingleton(AcceptBlueprintInstallCommandHandler);
   container.registerSingleton(QueryEntitlementsQueryHandler);
   container.registerSingleton(RecordUsageIntentCommandHandler);
   container.registerSingleton(ListUsageIntentRecordsQueryHandler);
@@ -3328,6 +3331,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
+  container.registerSingleton(
+    tokens.blueprintInstallCommandService,
+    DefaultBlueprintInstallCommandService,
+  );
   container.registerSingleton(
     tokens.githubAppConnectionQueryService,
     GitHubAppConnectionQueryService,

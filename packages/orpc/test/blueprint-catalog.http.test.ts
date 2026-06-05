@@ -2,6 +2,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcceptBlueprintInstallCommand,
   type AppLogger,
   type Command,
   type CommandBus,
@@ -39,14 +40,14 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
   }
 }
 
-function createApp(queryBus: QueryBus) {
-  const commandBus = {
+function createApp(queryBus: QueryBus, commandBus?: CommandBus) {
+  const fallbackCommandBus = {
     execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
       ok({} as T),
   } as CommandBus;
 
   return mountAppaloftOrpcRoutes(new Elysia(), {
-    commandBus,
+    commandBus: commandBus ?? fallbackCommandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
     queryBus,
@@ -55,10 +56,10 @@ function createApp(queryBus: QueryBus) {
 
 describe("blueprint catalog HTTP routes", () => {
   test("[BP-CATALOG-API-001] mounts Blueprint catalog REST paths through oRPC", async () => {
-    const capturedQueries: Query<unknown>[] = [];
+    const capturedMessages: Array<Query<unknown> | Command<unknown>> = [];
     const queryBus = {
       execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
-        capturedQueries.push(query as Query<unknown>);
+        capturedMessages.push(query as Query<unknown>);
         if (query instanceof ListBlueprintsQuery) {
           return ok({
             items: [
@@ -104,7 +105,19 @@ describe("blueprint catalog HTTP routes", () => {
         throw new Error("Unexpected query");
       },
     } as QueryBus;
-    const app = createApp(queryBus);
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedMessages.push(command as Command<unknown>);
+        if (command instanceof AcceptBlueprintInstallCommand) {
+          return ok({
+            schemaVersion: "appaloft.blueprint.install-result/v1",
+            slug: command.slug,
+          } as T);
+        }
+        throw new Error("Unexpected command");
+      },
+    } as CommandBus;
+    const app = createApp(queryBus, commandBus);
 
     const listResponse = await app.handle(new Request("http://localhost/api/blueprints"));
     expect(listResponse.status).toBe(200);
@@ -139,10 +152,31 @@ describe("blueprint catalog HTTP routes", () => {
       entry: { slug: "pocketbase" },
       plan: { manifestSlug: "pocketbase" },
     });
-    expect(capturedQueries).toEqual([
+    const installResponse = await app.handle(
+      new Request("http://localhost/api/blueprints/pocketbase/install", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          target: {
+            projectName: "Smoke",
+          },
+          idempotencyKey: "install:pocketbase:smoke",
+          acknowledgements: ["accepts-blueprint-application-bundle"],
+        }),
+      }),
+    );
+    expect(installResponse.status).toBe(202);
+    expect(await installResponse.json()).toMatchObject({
+      schemaVersion: "appaloft.blueprint.install-result/v1",
+      slug: "pocketbase",
+    });
+    expect(capturedMessages).toEqual([
       expect.any(ListBlueprintsQuery),
       expect.any(ShowBlueprintQuery),
       expect.any(CreateBlueprintInstallPlanQuery),
+      expect.any(AcceptBlueprintInstallCommand),
     ]);
   });
 });

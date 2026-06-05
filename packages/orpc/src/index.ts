@@ -1,4 +1,5 @@
 import {
+  AcceptBlueprintInstallCommand,
   AcceptDependencyResourceProvisioningPlanCommand,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
@@ -13,6 +14,7 @@ import {
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
   type AuthBootstrapStatus,
+  acceptBlueprintInstallCommandInputSchema,
   acceptDependencyResourceProvisioningPlanInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
@@ -545,6 +547,7 @@ import {
   withExecutionAuthProviderAccessTokens,
 } from "@appaloft/application";
 import {
+  acceptBlueprintInstallResponseSchema,
   createBlueprintInstallPlanResponseSchema,
   listBlueprintsResponseSchema,
   showBlueprintResponseSchema,
@@ -3124,6 +3127,18 @@ export const createBlueprintInstallPlanProcedure = base
   .output(createBlueprintInstallPlanResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, CreateBlueprintInstallPlanQuery.create(input)),
+  );
+
+export const acceptBlueprintInstallProcedure = base
+  .route({
+    method: "POST",
+    path: "/blueprints/{slug}/install",
+    successStatus: 202,
+  })
+  .input(acceptBlueprintInstallCommandInputSchema)
+  .output(acceptBlueprintInstallResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AcceptBlueprintInstallCommand.create(input)),
   );
 
 export const showProjectProcedure = base
@@ -5990,6 +6005,7 @@ export const appaloftOrpcRouter = {
     list: listBlueprintsProcedure,
     show: showBlueprintProcedure,
     planInstall: createBlueprintInstallPlanProcedure,
+    install: acceptBlueprintInstallProcedure,
   },
   servers: {
     count: countServersProcedure,
@@ -8533,6 +8549,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints",
     "/api/blueprints/:slug",
     "/api/blueprints/:slug/install-plan",
+    "/api/blueprints/:slug/install",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
