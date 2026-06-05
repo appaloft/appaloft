@@ -20,6 +20,7 @@ import { showAuditEventLegalHoldQueryInputSchema } from "./operations/audit-even
 import { bootstrapFirstAdminCommandInputSchema } from "./operations/auth/bootstrap-first-admin.schema";
 import { getAuthBootstrapStatusQueryInputSchema } from "./operations/auth/get-auth-bootstrap-status.query";
 import {
+  acceptBlueprintInstallCommandInputSchema,
   createBlueprintInstallPlanQueryInputSchema,
   listBlueprintsQueryInputSchema,
   showBlueprintQueryInputSchema,
@@ -923,6 +924,25 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft blueprint plan-install",
       orpc: { method: "POST", path: "/api/blueprints/{slug}/install-plan" },
+    },
+  },
+  {
+    key: "blueprints.install",
+    kind: "command",
+    domain: "blueprints",
+    messageName: "AcceptBlueprintInstallCommand",
+    handlerName: "AcceptBlueprintInstallCommandHandler",
+    serviceName: "BlueprintInstallCommandService",
+    inputSchema: acceptBlueprintInstallCommandInputSchema,
+    serviceToken: tokens.blueprintInstallCommandService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft blueprint install",
+      orpc: { method: "POST", path: "/api/blueprints/{slug}/install" },
     },
   },
   {

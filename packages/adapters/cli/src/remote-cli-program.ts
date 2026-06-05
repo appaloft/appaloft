@@ -73,7 +73,12 @@ function readMessagePayload(message: RemoteOperationMessage): Record<string, unk
     Object.entries(message as Record<string, unknown>).filter(([, value]) => value !== undefined),
   );
 
-  return Object.keys(payload).length === 1 && isRecord(payload.input) ? payload.input : payload;
+  if (isRecord(payload.input)) {
+    const { input, ...outer } = payload;
+    return { ...input, ...outer };
+  }
+
+  return payload;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
