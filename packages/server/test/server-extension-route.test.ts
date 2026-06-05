@@ -5,7 +5,12 @@ import { Buffer } from "node:buffer";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type CommandBus, PublishStaticArtifactCommand, tokens } from "@appaloft/application";
+import {
+  type CommandBus,
+  operationCatalog,
+  PublishStaticArtifactCommand,
+  tokens,
+} from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
 import { ok } from "@appaloft/core";
 import { createAppaloftServer } from "@appaloft/server";
@@ -23,6 +28,33 @@ async function createTempDataDir(): Promise<string> {
 }
 
 describe("createAppaloftServer", () => {
+  test("[SERVER-DI-001] fails startup registration drift before operations execute", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpHost: "localhost",
+        httpPort: 3001,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+      authRuntime: createTestAuthRuntime(),
+    });
+
+    try {
+      const missing = operationCatalog.filter(
+        (entry) => !server.container.isRegistered(entry.serviceToken, true),
+      );
+
+      expect(missing).toEqual([]);
+    } finally {
+      await server.shutdown();
+    }
+  }, 15_000);
+
   test("[STATIC-ARTIFACT-EXT-010][STATIC-ARTIFACT-EXT-012] wires static artifact publishing to the local filesystem runtime and HTTP route", async () => {
     const dataDir = await createTempDataDir();
     const distDir = join(dataDir, "dist");
