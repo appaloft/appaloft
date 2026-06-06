@@ -24,6 +24,12 @@ import {
 import { tokens } from "../../tokens";
 import { type ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 
+type ResourceRuntimeLogsQueryServiceOptions = {
+  boundedOpenTimeoutMs?: number;
+};
+
+const defaultBoundedOpenTimeoutMs = 10_000;
+
 class MaskingResourceRuntimeLogStream implements ResourceRuntimeLogStream {
   constructor(
     private readonly inner: ResourceRuntimeLogStream,
@@ -161,14 +167,60 @@ function createRuntimeLogsTraceAttributes(input: {
   };
 }
 
+function createTimeout(ms: number): {
+  cancel(): void;
+  promise: Promise<"timeout">;
+} {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  return {
+    promise: new Promise<"timeout">((resolve) => {
+      timeout = setTimeout(() => resolve("timeout"), ms);
+    }),
+    cancel() {
+      if (!timeout) {
+        return;
+      }
+
+      clearTimeout(timeout);
+      timeout = undefined;
+    },
+  };
+}
+
+function createRuntimeLogOpenTimeoutError(input: {
+  deployment: DeploymentSummary;
+  request: ResourceRuntimeLogRequest;
+  resource: ResourceSummary;
+  timeoutMs: number;
+}): DomainError {
+  return domainError.timeout("Runtime log open timed out", {
+    phase: "runtime-log-open",
+    step: "open-timeout",
+    resourceId: input.resource.id,
+    deploymentId: input.deployment.id,
+    runtimeKind: input.deployment.runtimePlan.execution.kind,
+    targetProviderKey: input.deployment.runtimePlan.target.providerKey,
+    follow: input.request.follow,
+    tailLines: input.request.tailLines,
+    timeoutMs: input.timeoutMs,
+    ...(input.request.serviceName ? { serviceName: input.request.serviceName } : {}),
+  });
+}
+
 @injectable()
 export class ResourceRuntimeLogsQueryService {
+  private readonly boundedOpenTimeoutMs: number;
+
   constructor(
     @inject(tokens.resourceReadModel) private readonly resourceReadModel: ResourceReadModel,
     @inject(tokens.deploymentReadModel) private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.resourceRuntimeLogReader)
     private readonly runtimeLogReader: ResourceRuntimeLogReader,
-  ) {}
+    options: ResourceRuntimeLogsQueryServiceOptions = {},
+  ) {
+    this.boundedOpenTimeoutMs = options.boundedOpenTimeoutMs ?? defaultBoundedOpenTimeoutMs;
+  }
 
   async execute(
     context: ExecutionContext,
@@ -216,7 +268,10 @@ export class ResourceRuntimeLogsQueryService {
       ...(query.since ? { since: query.since } : {}),
       ...(query.cursor ? { cursor: query.cursor } : {}),
     };
-    const signal = query.signal ?? new AbortController().signal;
+    const abortController = new AbortController();
+    const abortFromQuerySignal = () => abortController.abort();
+    query.signal?.addEventListener("abort", abortFromQuerySignal, { once: true });
+    const signal = abortController.signal;
     const redactions = redactionsFromDeployment(deployment);
     const traceAttributes = createRuntimeLogsTraceAttributes({
       resource,
@@ -230,7 +285,7 @@ export class ResourceRuntimeLogsQueryService {
       },
       async (span) => {
         try {
-          const result = await this.runtimeLogReader.open(
+          const openPromise = this.runtimeLogReader.open(
             context,
             {
               resource,
@@ -240,6 +295,33 @@ export class ResourceRuntimeLogsQueryService {
             request,
             signal,
           );
+          let openTimeout = query.follow ? undefined : createTimeout(this.boundedOpenTimeoutMs);
+          let resultOrTimeout: Result<ResourceRuntimeLogStream> | "timeout";
+          try {
+            resultOrTimeout = openTimeout
+              ? await Promise.race([openPromise, openTimeout.promise])
+              : await openPromise;
+          } finally {
+            openTimeout?.cancel();
+            openTimeout = undefined;
+          }
+
+          if (resultOrTimeout === "timeout") {
+            abortController.abort();
+            const error = createRuntimeLogOpenTimeoutError({
+              deployment,
+              request,
+              resource,
+              timeoutMs: this.boundedOpenTimeoutMs,
+            });
+
+            span.setStatus("error", error.message);
+            span.setAttributes(createDomainErrorTraceAttributes(error));
+            void openPromise.catch(() => undefined);
+            return err(error);
+          }
+
+          const result = resultOrTimeout;
 
           result.match(
             () => {
