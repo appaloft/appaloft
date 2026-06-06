@@ -2,6 +2,7 @@ import {
   AcceptBlueprintInstallCommand,
   CreateBlueprintInstallPlanQuery,
   ListBlueprintsQuery,
+  ShowBlueprintInstallationQuery,
   ShowBlueprintQuery,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -10,6 +11,7 @@ import { type Option } from "effect";
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 
 const slugArg = Args.text({ name: "slug" });
+const applicationIdArg = Args.text({ name: "application-id" });
 const variantOption = Options.text("variant").pipe(Options.optional);
 const profileOption = Options.text("profile").pipe(Options.optional);
 const projectNameOption = Options.text("project-name").pipe(Options.optional);
@@ -239,7 +241,31 @@ const installCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Accept and run a Blueprint install command"));
 
+const showInstallationCommand = EffectCommand.make(
+  "show",
+  {
+    applicationId: applicationIdArg,
+  },
+  ({ applicationId }) =>
+    runQuery(
+      ShowBlueprintInstallationQuery.create({
+        applicationId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Show an installed Blueprint application"));
+
+const installationCommand = EffectCommand.make("installation").pipe(
+  EffectCommand.withDescription("Blueprint installation readback operations"),
+  EffectCommand.withSubcommands([showInstallationCommand]),
+);
+
 export const blueprintCommand = EffectCommand.make("blueprint").pipe(
   EffectCommand.withDescription("Blueprint catalog operations"),
-  EffectCommand.withSubcommands([listCommand, showCommand, planInstallCommand, installCommand]),
+  EffectCommand.withSubcommands([
+    listCommand,
+    showCommand,
+    planInstallCommand,
+    installCommand,
+    installationCommand,
+  ]),
 );

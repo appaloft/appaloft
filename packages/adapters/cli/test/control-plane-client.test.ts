@@ -269,6 +269,30 @@ function createControlPlaneFetch(
       );
     }
 
+    if (url.pathname === "/api/blueprints/installations/app_pocketbase_remote") {
+      return jsonResponse({
+        applicationId: "app_pocketbase_remote",
+        marketplaceSlug: "pocketbase",
+        status: "ready",
+        components: [
+          {
+            componentId: "app",
+            resource: {
+              resourceId: "res_pocketbase_remote",
+            },
+            deployment: {
+              deploymentId: "dep_pocketbase_remote",
+            },
+            endpoints: [
+              {
+                url: "https://pocketbase.example.test",
+              },
+            ],
+          },
+        ],
+      });
+    }
+
     if (url.pathname === "/api/static-artifacts/publish-payload") {
       return jsonResponse(
         {
@@ -1151,6 +1175,16 @@ describe("CLI remote control-plane client", () => {
         "accepts-blueprint-application-bundle",
       ]),
     );
+    const installation = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "blueprint",
+        "installation",
+        "show",
+        "app_pocketbase_remote",
+      ]),
+    );
 
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       [
@@ -1160,6 +1194,7 @@ describe("CLI remote control-plane client", () => {
         "GET /api/blueprints/pocketbase",
         "POST /api/blueprints/pocketbase/install-plan",
         "POST /api/blueprints/pocketbase/install",
+        "GET /api/blueprints/installations/app_pocketbase_remote",
       ],
     );
     expect(await requests[4]?.json()).toMatchObject({
@@ -1182,6 +1217,8 @@ describe("CLI remote control-plane client", () => {
     expect(shown.stdout).toContain("Portable PocketBase Blueprint");
     expect(planned.stdout).toContain("appaloft.blueprint.install-plan/v1");
     expect(installed.stdout).toContain("app_pocketbase_remote");
+    expect(installation.stdout).toContain("https://pocketbase.example.test");
+    expect(installation.stdout).toContain("dep_pocketbase_remote");
   });
 
   test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] project mutations dispatch through the generated SDK route when remote-capable", async () => {

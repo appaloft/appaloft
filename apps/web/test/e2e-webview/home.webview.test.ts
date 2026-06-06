@@ -1290,6 +1290,27 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       entry: teableNeutralBlueprintEntry,
       manifest: teableNeutralBlueprintManifest,
     },
+    "/api/rpc/blueprints/install": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { slug?: string } | null;
+      return {
+        json: {
+          executionStatus: "ready",
+          installedApplication: {
+            applicationId: "cia_teable_web",
+            blueprintSlug: input?.slug ?? "teable",
+            status: "ready",
+            components: [
+              {
+                componentId: "teable",
+                resource: { resourceId: "res_teable_web" },
+                deployment: { deploymentId: "dep_teable_web" },
+                endpoints: [{ url: "http://teable.example.test" }],
+              },
+            ],
+          },
+        },
+      };
+    },
     "/api/instance-upgrade/check": {
       schemaVersion: "system.instance-upgrade.check/v1",
       currentVersion: "0.1.0-test",
@@ -3964,6 +3985,71 @@ describe("console e2e with Bun.WebView", () => {
     expect(renderedState.bodyText).toContain("Teable assets");
     expect(renderedState.secretKeys).toEqual(["SECRET_KEY"]);
     expect(renderedState.variableKeys).toEqual(["BACKEND_CACHE_PROVIDER"]);
+  }, 45_000);
+
+  test("[BLUEPRINT-WEB-002] submits Quick Deploy Blueprint source through the neutral install operation", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectId=prj_demo&serverId=srv_demo&step=source`,
+    );
+
+    await setInputValue(
+      view,
+      "[data-blueprint-secret-value='SECRET_KEY']",
+      "teable-web-secret-not-production",
+    );
+    await clickElementBySelector(view, "[data-quick-deploy-action-panel] button");
+
+    const installRequest = await waitForRecordedRequest("/api/rpc/blueprints/install");
+    const installInput = readOrpcJsonPayload(installRequest.body) as {
+      slug?: string;
+      profile?: string;
+      variant?: string;
+      dependencyProvisioning?: Array<{
+        requirementId?: string;
+        kind?: string;
+        providerKey?: string;
+        target?: { serverId?: string };
+      }>;
+      target?: { projectName?: string; environmentName?: string; serverId?: string };
+      secretValues?: Array<{ key?: string; value?: string }>;
+      acknowledgements?: string[];
+    };
+
+    expect(installRequest.method).toBe("POST");
+    expect(installInput.slug).toBe("teable");
+    expect(installInput.variant).toBe("community");
+    expect(installInput.profile).toBe("production");
+    expect(installInput.target).toMatchObject({
+      projectName: "Demo",
+      environmentName: "production",
+      serverId: "srv_demo",
+    });
+    expect(installInput.dependencyProvisioning?.map((item) => item.requirementId)).toEqual([
+      "postgres",
+      "redis",
+      "assets",
+    ]);
+    expect(
+      installInput.dependencyProvisioning?.every((item) => item.target?.serverId === "srv_demo"),
+    ).toBe(true);
+    expect(installInput.secretValues).toEqual([
+      { key: "SECRET_KEY", value: "teable-web-secret-not-production" },
+    ]);
+    expect(installInput.acknowledgements).toContain("accepts-blueprint-application-bundle");
+    expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
+      false,
+    );
+    expect(
+      recordedApiRequests.some((request) => request.pathname.includes("dependencyResources")),
+    ).toBe(false);
+    expect(recordedApiRequests.some((request) => request.pathname.startsWith("/cloud/"))).toBe(
+      false,
+    );
+    await expectText(view, "http://teable.example.test");
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {

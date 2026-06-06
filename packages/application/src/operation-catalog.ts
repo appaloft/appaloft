@@ -23,6 +23,7 @@ import {
   acceptBlueprintInstallCommandInputSchema,
   createBlueprintInstallPlanQueryInputSchema,
   listBlueprintsQueryInputSchema,
+  showBlueprintInstallationQueryInputSchema,
   showBlueprintQueryInputSchema,
 } from "./operations/blueprints/blueprint-catalog.schema";
 import { queryCapabilitiesInputSchema } from "./operations/capabilities/query-capabilities.schema";
@@ -943,6 +944,25 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft blueprint install",
       orpc: { method: "POST", path: "/api/blueprints/{slug}/install" },
+    },
+  },
+  {
+    key: "blueprints.installation.show",
+    kind: "query",
+    domain: "blueprints",
+    messageName: "ShowBlueprintInstallationQuery",
+    handlerName: "ShowBlueprintInstallationQueryHandler",
+    serviceName: "BlueprintInstallationQueryService",
+    inputSchema: showBlueprintInstallationQueryInputSchema,
+    serviceToken: tokens.blueprintInstallationQueryService,
+    transportAccess: {
+      productSession: {
+        minRole: "member",
+      },
+    },
+    transports: {
+      cli: "appaloft blueprint installation show",
+      orpc: { method: "GET", path: "/api/blueprints/installations/{applicationId}" },
     },
   },
   {
