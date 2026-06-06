@@ -10,7 +10,7 @@
     "@appaloft/docs-registry": "workspace:*",
     "@appaloft/orpc": "workspace:*",
     "@appaloft/plugin-sdk": "workspace:*",
-    "@orpc/openapi": "latest",
+    "@orpc/openapi": "1.14.5",
     "reflect-metadata": "^0.2.2",
     "zod": "^4.4.3"
   },
