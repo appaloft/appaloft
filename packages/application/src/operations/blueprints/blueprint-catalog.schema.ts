@@ -48,7 +48,7 @@ export const blueprintDependencyProvisioningSchema = z
 
 export const blueprintInstallSecretValueSchema = z
   .object({
-    componentId: nonEmptyTrimmedString("Component id"),
+    componentId: nonEmptyTrimmedString("Component id").optional(),
     key: nonEmptyTrimmedString("Secret key"),
     value: z.string().min(1, "Secret value is required"),
   })

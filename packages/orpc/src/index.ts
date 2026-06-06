@@ -2130,6 +2130,14 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         });
       }
 
+      if (error.category === "user") {
+        return new ORPCError("BAD_REQUEST", {
+          message,
+          status: 400,
+          data: domainErrorData(error, context),
+        });
+      }
+
       return new ORPCError("INTERNAL_SERVER_ERROR", {
         message,
         status: 500,
