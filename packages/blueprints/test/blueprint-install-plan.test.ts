@@ -256,6 +256,74 @@ describe("Blueprint install plan", () => {
     ]);
   });
 
+  test("[BP-APP-BUNDLE-HEALTH-001] carries component health checks into application bundle plans", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "health-bundle",
+      name: "Health Bundle",
+      version: "1.0.0",
+      summary: "Bundle health checks.",
+      components: [
+        {
+          id: "web",
+          name: "Web",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/appaloft/health-bundle:latest",
+          },
+          ports: [{ name: "http", containerPort: 3000, protocol: "http", public: true }],
+          healthCheck: {
+            enabled: true,
+            type: "http",
+            http: {
+              path: "/health",
+            },
+          },
+        },
+      ],
+      profiles: { production: { replicas: 1 } },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) throw new Error("Expected manifest to compile");
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      target: {
+        projectName: "health-bundle",
+        environmentName: "production",
+      },
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("Expected install plan to compile");
+    expect(
+      plan.value.operations.find((operation) => operation.kind === "configure-runtime"),
+    ).toMatchObject({
+      kind: "configure-runtime",
+      componentId: "web",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        http: {
+          path: "/health",
+          expectedStatusCode: 200,
+        },
+      },
+    });
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: plan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) throw new Error("Expected bundle plan to compile");
+    expect(bundle.value.components[0]?.healthCheck).toMatchObject({
+      enabled: true,
+      type: "http",
+      http: {
+        path: "/health",
+        expectedStatusCode: 200,
+      },
+    });
+  });
+
   test("[BP-DEP-CONTRACT-003] carries dependency env, output, readiness, and secret metadata into plans and runtime projections", () => {
     const manifest = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
