@@ -1,4 +1,6 @@
 import {
+  type AcceptBlueprintInstallCommandInput,
+  type AcceptBlueprintInstallCommandResponse,
   type AcceptDependencyResourceProvisioningPlanInput,
   type ArchiveDeploymentCommandInput,
   type ArchiveEnvironmentCommandInput,
@@ -738,6 +740,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateBlueprintInstallPlanQueryInput,
       CreateBlueprintInstallPlanResponse,
+      AppaloftClientError
+    >;
+    install: Client<
+      AppaloftClientContext,
+      AcceptBlueprintInstallCommandInput,
+      AcceptBlueprintInstallCommandResponse,
       AppaloftClientError
     >;
   };

@@ -7,6 +7,7 @@ export interface BlueprintCatalogExtensionMetadata {
   readonly listEndpoint: string;
   readonly detailEndpointTemplate?: string;
   readonly installPlanEndpointTemplate?: string;
+  readonly installEndpointTemplate?: string;
   readonly upgradePlanEndpointTemplate?: string;
 }
 
@@ -59,6 +60,9 @@ export function readBlueprintCatalogExtensionMetadata(
       : {}),
     ...(typeof metadata.installPlanEndpointTemplate === "string"
       ? { installPlanEndpointTemplate: metadata.installPlanEndpointTemplate }
+      : {}),
+    ...(typeof metadata.installEndpointTemplate === "string"
+      ? { installEndpointTemplate: metadata.installEndpointTemplate }
       : {}),
     ...(typeof metadata.upgradePlanEndpointTemplate === "string"
       ? { upgradePlanEndpointTemplate: metadata.upgradePlanEndpointTemplate }

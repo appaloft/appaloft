@@ -35,7 +35,6 @@
     createQuickDeployGeneratedResourceName,
     normalizeQuickDeployGeneratedNameBase,
     runQuickDeployWorkflow,
-    type QuickDeployDependencyProvisioningInput,
     type QuickDeployProvisionDependencyResourcesInput,
     type QuickDeployWorkflowInput,
     type QuickDeployWorkflowStep,
@@ -298,6 +297,36 @@
     };
   };
   type BlueprintComponent = BlueprintDetailResponse["manifest"]["components"][number];
+  type BlueprintPrimitiveParameterValue = string | number | boolean;
+  type BlueprintInstallInput = {
+    slug: string;
+    variant?: string;
+    profile?: string;
+    parameters?: Record<string, BlueprintPrimitiveParameterValue>;
+    dependencyProvisioning?: ReturnType<typeof blueprintDependencyProvisioningPayload>;
+    target?: {
+      projectName?: string;
+      environmentName?: string;
+      resourceSlugPrefix?: string;
+      serverId?: string;
+    };
+    acceptedBy?: string;
+    idempotencyKey?: string;
+    acknowledgements?: string[];
+    secretValues?: { key: string; value: string }[];
+  };
+  type BlueprintInstallResult = {
+    executionStatus?: string;
+    installedApplication?: {
+      applicationId?: string;
+      status?: string;
+      components?: readonly {
+        resource?: { resourceId?: string };
+        deployment?: { deploymentId?: string };
+        endpoints?: readonly { url?: string }[];
+      }[];
+    };
+  };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
@@ -713,6 +742,7 @@
   let blueprintDependencyProvisioningDrafts = $state<
     Record<string, BlueprintDependencyProvisioningDraft>
   >({});
+  let blueprintSecretValues = $state<Record<string, string>>({});
   let blueprintSelectorDialogOpen = $state(false);
   let blueprintDetailDialogOpen = $state(false);
   let blueprintDetailSlug = $state("");
@@ -1039,6 +1069,24 @@
     selectedBlueprintEffectiveManifest?.components.flatMap((component) => component.variables) ??
       [],
   );
+  const selectedBlueprintSecrets = $derived.by(() => {
+    const secrets = selectedBlueprintEffectiveManifest?.secrets ?? [];
+    const installSecrets = selectedBlueprintDetail?.install.secrets ?? [];
+    const byKey = new Map<string, (typeof secrets)[number]>();
+
+    for (const secret of installSecrets) {
+      byKey.set(secret.key, secret);
+    }
+
+    for (const secret of secrets) {
+      byKey.set(secret.key, {
+        ...byKey.get(secret.key),
+        ...secret,
+      });
+    }
+
+    return [...byKey.values()];
+  });
   const selectedBlueprintPrimaryComponent = $derived(
     selectedBlueprintEffectiveManifest?.components[0] ?? null,
   );
@@ -1050,16 +1098,6 @@
       component?.ports[0];
 
     return port ? String(port.containerPort) : "3000";
-  });
-  const selectedBlueprintDefaultAccessPath = $derived.by(() => {
-    const component = selectedBlueprintPrimaryComponent;
-    const route =
-      component?.routes.find((candidate) => {
-        const port = component.ports.find((portCandidate) => portCandidate.name === candidate.port);
-        return port?.public && port.protocol === "http";
-      }) ?? component?.routes[0];
-
-    return route?.pathPrefix ?? "/";
   });
   const selectedBlueprintProvisionableDependencies = $derived(
     selectedBlueprintEffectiveManifest?.resources.flatMap(
@@ -1649,6 +1687,12 @@
             kind: "plain-config",
           }))
         : []),
+      ...(sourceKind === "blueprint"
+        ? selectedBlueprintSecrets.map((secret) => ({
+            key: secret.key,
+            kind: "secret",
+          }))
+        : []),
       ...(variableContextEnabled && variableKey.trim()
         ? [
             {
@@ -2048,7 +2092,13 @@
     });
   }
 
-  function blueprintDependencyProvisioningPayload() {
+  function blueprintSecretValuesComplete(): boolean {
+    return selectedBlueprintSecrets.every(
+      (secret) => secret.required === false || Boolean(blueprintSecretValues[secret.key]?.trim()),
+    );
+  }
+
+  function blueprintDependencyProvisioningPayload(targetServerId = selectedServerId) {
     return selectedBlueprintProvisionableDependencies.map((requirement) => {
       const draft = blueprintDependencyDraft(requirement);
       const providerKey = draft.mode === "create" ? "cloud-local-docker" : "external";
@@ -2063,7 +2113,7 @@
         ...(draft.mode === "create"
           ? {
               target: {
-                ...(selectedServerId ? { serverId: selectedServerId } : {}),
+                ...(targetServerId ? { serverId: targetServerId } : {}),
               },
             }
           : {
@@ -2074,68 +2124,6 @@
           }),
       };
     });
-  }
-
-  function blueprintDependencyResourceName(requirement: BlueprintDependencyRequirement): string {
-    const blueprintName =
-      selectedBlueprintSlug.trim() ||
-      selectedBlueprintTitle.trim() ||
-      inferredResourceInput.name ||
-      "blueprint";
-
-    return normalizeQuickDeployGeneratedNameBase(
-      `${blueprintName}-${requirement.id}`,
-      requirement.kind,
-    );
-  }
-
-  function blueprintQuickDeployDependencyProvisioningInput(): QuickDeployDependencyProvisioningInput[] {
-    return selectedBlueprintProvisionableDependencies.map((requirement) => {
-      const draft = blueprintDependencyDraft(requirement);
-      const binding = {
-        targetName: requirement.id,
-        scope: "runtime-only",
-        injectionMode: "env",
-      } as const;
-
-      if (draft.mode === "create") {
-        return {
-          mode: "create",
-          requirementId: requirement.id,
-          kind: requirement.kind,
-          name: blueprintDependencyResourceName(requirement),
-          capabilities: [...requirement.capabilities],
-          binding,
-        };
-      }
-
-      return {
-        mode: "reuse",
-        requirementId: requirement.id,
-        kind: requirement.kind,
-        name: blueprintDependencyResourceName(requirement),
-        connectionUrl: draft.reuseConnectionUrl.trim(),
-        secretRef: draft.reuseSecretRef.trim(),
-        capabilities: [...requirement.capabilities],
-        binding,
-      };
-    });
-  }
-
-  function blueprintWorkflowEnvironmentVariables(): NonNullable<
-    QuickDeployWorkflowInput["environmentVariables"]
-  > {
-    if (sourceKind !== "blueprint") {
-      return [];
-    }
-
-    return selectedBlueprintVariables.map((variable) => ({
-      key: variable.key,
-      value: variable.value,
-      exposure: "runtime" as const,
-      kind: "plain-config" as const,
-      scope: "environment" as const,
-    }));
   }
 
   function blueprintComponentForQuickDeploy(): BlueprintComponent {
@@ -2233,20 +2221,6 @@
     return `/marketplace/${encodeURIComponent(slug)}${search ? `?${search}` : ""}`;
   }
 
-  function selectedBlueprintInstallPlanEndpoint(): string {
-    const slug = selectedBlueprintSlug.trim();
-    const metadata = readBlueprintCatalogExtensionMetadata(selectedBlueprintSourceExtension);
-    if (!slug || !metadata) {
-      return "";
-    }
-
-    if (metadata.installPlanEndpointTemplate) {
-      return endpointFromTemplate(metadata.installPlanEndpointTemplate, slug);
-    }
-
-    return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}/install-plan`;
-  }
-
   function resolveEffectiveBlueprintManifest(
     baseManifest: BlueprintDetailResponse["manifest"],
     variantId: string,
@@ -2327,12 +2301,14 @@
       selectedBlueprintTitle = "";
       selectedBlueprintVariant = "";
       blueprintDependencyProvisioningDrafts = {};
+      blueprintSecretValues = {};
     }
   }
 
   function applyBlueprintListing(item: BlueprintCatalogListing): void {
     if (selectedBlueprintSlug !== item.slug) {
       blueprintDependencyProvisioningDrafts = {};
+      blueprintSecretValues = {};
     }
     selectedBlueprintSlug = item.slug;
     selectedBlueprintTitle = item.title;
@@ -2948,7 +2924,8 @@
           return (
             Boolean(selectedBlueprintSlug.trim()) &&
             Boolean(selectedBlueprintManifest) &&
-            blueprintDependencySelectionsComplete()
+            blueprintDependencySelectionsComplete() &&
+            blueprintSecretValuesComplete()
           );
         }
 
@@ -3439,6 +3416,214 @@
     return createdServer.id;
   }
 
+  async function ensureBlueprintInstallServerId(): Promise<string> {
+    if (serverMode === "existing") {
+      if (!selectedServerId) {
+        throw new Error("请选择或创建一个服务器。");
+      }
+      return selectedServerId;
+    }
+
+    const registerInput = createRegisterServerInput(serverDraft);
+    if (!registerInput) {
+      throw new Error($t(i18nKeys.console.servers.createValidationError));
+    }
+
+    if (!isServerRegistrationDraftComplete(serverDraft, sshCredentials)) {
+      throw new Error($t(i18nKeys.console.servers.createCredentialValidationError));
+    }
+
+    const createdServer = await registerServerMutation.mutateAsync(registerInput);
+    selectedServerId = createdServer.id;
+    const credential = createQuickDeployServerCredential(serverDraft, sshCredentials);
+
+    if (credential?.mode === "create-ssh-and-configure") {
+      const createdCredential = await createSshCredentialMutation.mutateAsync(credential.input);
+      serverDraft.selectedSshCredentialId = createdCredential.id;
+      await sshCredentialsQuery.refetch();
+      await configureServerCredentialMutation.mutateAsync({
+        serverId: createdServer.id,
+        credential: {
+          kind: "stored-ssh-private-key",
+          credentialId: createdCredential.id,
+          ...(credential.input.username ? { username: credential.input.username } : {}),
+        },
+      });
+    } else if (credential?.mode === "configure") {
+      await configureServerCredentialMutation.mutateAsync({
+        serverId: createdServer.id,
+        credential: credential.credential,
+      });
+    }
+
+    await serversQuery.refetch();
+    return createdServer.id;
+  }
+
+  function isBlueprintPrimitiveParameterValue(
+    value: unknown,
+  ): value is BlueprintPrimitiveParameterValue {
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  }
+
+  function blueprintInstallParameters(): Record<string, BlueprintPrimitiveParameterValue> {
+    const parameters: Record<string, BlueprintPrimitiveParameterValue> = {};
+
+    for (const parameter of selectedBlueprintEffectiveManifest?.parameters ?? []) {
+      if (parameter.default !== undefined && isBlueprintPrimitiveParameterValue(parameter.default)) {
+        parameters[parameter.key] = parameter.default;
+      }
+    }
+
+    const appName = selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
+    if (appName && (!("APP_NAME" in parameters) || !String(parameters.APP_NAME).trim())) {
+      parameters.APP_NAME = appName;
+    }
+
+    return parameters;
+  }
+
+  function blueprintInstallSecretValueInput(): { key: string; value: string }[] {
+    return selectedBlueprintSecrets.flatMap((secret) => {
+      const value = blueprintSecretValues[secret.key]?.trim() ?? "";
+      if (!value) {
+        if (secret.required !== false) {
+          throw new Error(`请填写 Blueprint Secret：${secret.label || secret.key}`);
+        }
+        return [];
+      }
+
+      return [{ key: secret.key, value }];
+    });
+  }
+
+  function blueprintInstallTarget(serverId: string): NonNullable<BlueprintInstallInput["target"]> {
+    const projectTargetName =
+      projectMode === "existing"
+        ? selectedProject?.name
+        : projectName.trim() || selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
+    const environmentTargetName =
+      environmentContextEnabled && environmentMode === "existing"
+        ? selectedEnvironment?.name
+        : environmentName.trim() || "production";
+
+    if (!projectTargetName) {
+      throw new Error("请选择项目或填写项目名。");
+    }
+
+    if (!environmentTargetName) {
+      throw new Error("请选择环境或填写环境名。");
+    }
+
+    return {
+      projectName: projectTargetName,
+      environmentName: environmentTargetName,
+      resourceSlugPrefix: selectedBlueprintSlug.trim(),
+      serverId,
+    };
+  }
+
+  function blueprintInstallIdempotencyKey(slug: string): string {
+    const suffix =
+      browser && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `quick-deploy:${slug}:${suffix}`;
+  }
+
+  function readBlueprintInstallStatus(result: unknown): string {
+    return result && typeof result === "object" && "executionStatus" in result
+      ? String((result as BlueprintInstallResult).executionStatus ?? "")
+      : "";
+  }
+
+  function readBlueprintInstallAccessUrl(result: unknown): string {
+    const components =
+      result && typeof result === "object"
+        ? (result as BlueprintInstallResult).installedApplication?.components
+        : undefined;
+    return components?.flatMap((component) => component.endpoints ?? []).find((endpoint) => endpoint.url)
+      ?.url ?? "";
+  }
+
+  function readBlueprintInstallDeploymentId(result: unknown): string {
+    const components =
+      result && typeof result === "object"
+        ? (result as BlueprintInstallResult).installedApplication?.components
+        : undefined;
+    return components?.find((component) => component.deployment?.deploymentId)?.deployment
+      ?.deploymentId ?? "";
+  }
+
+  async function waitForBlueprintInstall(input: BlueprintInstallInput): Promise<unknown> {
+    let result = await orpcClient.blueprints.install(input);
+
+    for (let attempt = 0; attempt < 24 && readBlueprintInstallStatus(result) === "installing"; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      result = await orpcClient.blueprints.install(input);
+    }
+
+    return result;
+  }
+
+  async function installBlueprintFromQuickDeploy(): Promise<void> {
+    if (!selectedBlueprintSlug.trim()) {
+      const href = sourceExtensionHref(selectedBlueprintSourceExtension);
+      if (href !== "#") {
+        await goto(href);
+        return;
+      }
+      throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
+    }
+
+    if (!selectedBlueprintManifest) {
+      throw new Error("请等待 Blueprint 详情加载完成。");
+    }
+
+    if (!blueprintDependencySelectionsComplete()) {
+      throw new Error("请完成 Blueprint 依赖资源的 create/reuse 选择。");
+    }
+
+    const slug = selectedBlueprintSlug.trim();
+    const serverId = await ensureBlueprintInstallServerId();
+    const installInput: BlueprintInstallInput = {
+      slug,
+      ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
+      profile: "production",
+      parameters: blueprintInstallParameters(),
+      dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
+      target: blueprintInstallTarget(serverId),
+      ...(authIdentity ? { acceptedBy: authIdentity } : {}),
+      idempotencyKey: blueprintInstallIdempotencyKey(slug),
+      acknowledgements: [
+        "accepts-blueprint-application-bundle",
+        "reviews-dependency-resource-bindings",
+        "preserves-user-owned-configuration",
+      ],
+      secretValues: blueprintInstallSecretValueInput(),
+    };
+    const installResult = await waitForBlueprintInstall(installInput);
+    const status = readBlueprintInstallStatus(installResult);
+
+    await refreshWorkspaceData();
+    lastAccessUrl = readBlueprintInstallAccessUrl(installResult);
+    lastCreatedDeploymentId = readBlueprintInstallDeploymentId(installResult);
+    const installSucceeded = status !== "rollback-required";
+    deployFeedback = {
+      kind: installSucceeded ? "success" : "error",
+      title: installSucceeded
+        ? $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle)
+        : $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
+      detail:
+        lastAccessUrl ||
+        (lastCreatedDeploymentId
+          ? $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
+              deploymentId: lastCreatedDeploymentId,
+            })
+          : status || "Blueprint install accepted."),
+    };
+  }
+
   async function ensureStaticSiteResourceId(
     projectId: string,
     environmentId: string,
@@ -3716,49 +3901,11 @@
       }
 
       if (sourceKind === "blueprint") {
-        if (selectedBlueprintSlug.trim()) {
-          if (!selectedBlueprintManifest) {
-            throw new Error("请等待 Blueprint 详情加载完成。");
-          }
-
-          if (!blueprintDependencySelectionsComplete()) {
-            throw new Error("请完成 Blueprint 依赖资源的 create/reuse 选择。");
-          }
-
-          const endpoint = selectedBlueprintInstallPlanEndpoint();
-          if (endpoint) {
-            await request<unknown>(endpoint, {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-              },
-              body: JSON.stringify({
-                ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
-                profile: "production",
-                parameters: {
-                  APP_NAME: selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
-                },
-                dependencyProvisioning: blueprintDependencyProvisioningPayload(),
-                target: {
-                  projectName:
-                    projectName.trim() || selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim(),
-                  environmentName: environmentName.trim() || "production",
-                  resourceSlugPrefix: selectedBlueprintSlug.trim(),
-                },
-              }),
-            });
-          }
-        } else {
-          const href = sourceExtensionHref(selectedBlueprintSourceExtension);
-          if (href !== "#") {
-            await goto(href);
-            return;
-          }
-          throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
-        }
+        await installBlueprintFromQuickDeploy();
+        return;
       }
 
-      if (sourceKind !== "blueprint" && !sourceLocator) {
+      if (!sourceLocator) {
         throw new Error("请先填写来源地址。");
       }
 
@@ -3771,11 +3918,9 @@
       if (projectMode === "new") {
         const nextProjectName =
           projectName.trim() ||
-          (sourceKind === "blueprint"
-            ? selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim()
-            : projects.length === 0
-              ? "Local Workspace"
-              : "");
+          (projects.length === 0
+            ? "Local Workspace"
+            : "");
 
         if (!nextProjectName) {
           throw new Error("请填写项目名。");
@@ -3880,15 +4025,6 @@
       }
 
       let workflowResource: QuickDeployWorkflowInput["resource"];
-      const blueprintConfigureAccess =
-        sourceKind === "blueprint"
-          ? {
-              accessProfile: {
-                generatedAccessMode: "inherit" as const,
-                pathPrefix: selectedBlueprintDefaultAccessPath,
-              },
-            }
-          : null;
       if (resourceContextEnabled) {
         if (resourceMode === "existing") {
           if (!selectedResourceId) {
@@ -3898,7 +4034,6 @@
           workflowResource = {
             mode: "existing",
             id: selectedResourceId,
-            ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
           };
         } else {
           if (!editedResourceInput.name.trim()) {
@@ -3907,7 +4042,6 @@
 
           workflowResource = {
             mode: "create",
-            ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
             input: {
               name: editedResourceInput.name.trim(),
               kind: editedResourceInput.kind ?? "application",
@@ -3926,7 +4060,6 @@
       } else {
         workflowResource = {
           mode: "create",
-          ...(blueprintConfigureAccess ? { configureAccess: blueprintConfigureAccess } : {}),
           input: {
             name: inferredResourceInput.name.trim(),
             kind: inferredResourceInput.kind ?? "application",
@@ -3943,23 +4076,18 @@
         };
       }
 
-      const workflowEnvironmentVariables = [
-        ...blueprintWorkflowEnvironmentVariables(),
-        ...(variableContextEnabled && variableKey.trim()
-          ? [
-              {
-                key: variableKey.trim(),
-                value: variableValue,
-                exposure: "runtime" as const,
-                kind: variableIsSecret ? ("secret" as const) : ("plain-config" as const),
-                isSecret: variableIsSecret,
-                scope: "environment" as const,
-              },
-            ]
-          : []),
-      ];
-      const workflowDependencyProvisioning =
-        sourceKind === "blueprint" ? blueprintQuickDeployDependencyProvisioningInput() : [];
+      const workflowEnvironmentVariables = variableContextEnabled && variableKey.trim()
+        ? [
+            {
+              key: variableKey.trim(),
+              value: variableValue,
+              exposure: "runtime" as const,
+              kind: variableIsSecret ? ("secret" as const) : ("plain-config" as const),
+              isSecret: variableIsSecret,
+              scope: "environment" as const,
+            },
+          ]
+        : [];
       const workflowInput: QuickDeployWorkflowInput = {
         project: workflowProject,
         server: workflowServer,
@@ -3967,9 +4095,6 @@
         resource: workflowResource,
         ...(workflowEnvironmentVariables.length > 0
           ? { environmentVariables: workflowEnvironmentVariables }
-          : {}),
-        ...(workflowDependencyProvisioning.length > 0
-          ? { dependencyProvisioning: workflowDependencyProvisioning }
           : {}),
       };
       workflowProgressDialogOpen = true;
@@ -5179,6 +5304,38 @@
                       </div>
                       {#if variable.description}
                         <p class="text-xs text-muted-foreground">{variable.description}</p>
+                      {/if}
+                    {/each}
+                  </div>
+                  <Separator />
+                {/if}
+                {#if sourceKind === "blueprint" && selectedBlueprintSecrets.length > 0}
+                  <div class="space-y-2" data-blueprint-secret-list>
+                    {#each selectedBlueprintSecrets as secret (secret.key)}
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <Input
+                          value={secret.key}
+                          readonly
+                          data-blueprint-secret-key={secret.key}
+                          aria-label={`Blueprint secret ${secret.key}`}
+                        />
+                        <Input
+                          type="password"
+                          value={blueprintSecretValues[secret.key] ?? ""}
+                          required={secret.required !== false}
+                          data-blueprint-secret-value={secret.key}
+                          aria-label={`Blueprint secret value ${secret.key}`}
+                          placeholder={secret.label || secret.key}
+                          oninput={(event) => {
+                            blueprintSecretValues = {
+                              ...blueprintSecretValues,
+                              [secret.key]: event.currentTarget.value,
+                            };
+                          }}
+                        />
+                      </div>
+                      {#if secret.description}
+                        <p class="text-xs text-muted-foreground">{secret.description}</p>
                       {/if}
                     {/each}
                   </div>
