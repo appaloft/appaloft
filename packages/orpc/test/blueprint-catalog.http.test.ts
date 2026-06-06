@@ -11,6 +11,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   ListBlueprintsQuery,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   ShowBlueprintQuery,
@@ -45,14 +46,33 @@ function createApp(queryBus: QueryBus, commandBus?: CommandBus) {
     execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
       ok({} as T),
   } as CommandBus;
+  const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+    authorizeProductSession: async (_context, input) =>
+      ok({
+        actor: {
+          kind: "user",
+          id: "usr_blueprint",
+          label: "blueprint@example.test",
+        },
+        email: "blueprint@example.test",
+        organizationId: input.organizationId ?? "org_blueprint",
+        role: input.requiredRole,
+        userId: "usr_blueprint",
+      }),
+  };
 
   return mountAppaloftOrpcRoutes(new Elysia(), {
     commandBus: commandBus ?? fallbackCommandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
+    productSessionAuthorizationPort,
     queryBus,
   });
 }
+
+const authHeaders = {
+  cookie: "better-auth.session_token=test-session",
+};
 
 describe("blueprint catalog HTTP routes", () => {
   test("[BP-CATALOG-API-001] mounts Blueprint catalog REST paths through oRPC", async () => {
@@ -119,14 +139,20 @@ describe("blueprint catalog HTTP routes", () => {
     } as CommandBus;
     const app = createApp(queryBus, commandBus);
 
-    const listResponse = await app.handle(new Request("http://localhost/api/blueprints"));
+    const listResponse = await app.handle(
+      new Request("http://localhost/api/blueprints", {
+        headers: authHeaders,
+      }),
+    );
     expect(listResponse.status).toBe(200);
     expect(await listResponse.json()).toMatchObject({
       items: [{ slug: "pocketbase" }],
     });
 
     const showResponse = await app.handle(
-      new Request("http://localhost/api/blueprints/pocketbase"),
+      new Request("http://localhost/api/blueprints/pocketbase", {
+        headers: authHeaders,
+      }),
     );
     expect(showResponse.status).toBe(200);
     expect(await showResponse.json()).toMatchObject({
@@ -138,6 +164,7 @@ describe("blueprint catalog HTTP routes", () => {
       new Request("http://localhost/api/blueprints/pocketbase/install-plan", {
         method: "POST",
         headers: {
+          ...authHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -156,6 +183,7 @@ describe("blueprint catalog HTTP routes", () => {
       new Request("http://localhost/api/blueprints/pocketbase/install", {
         method: "POST",
         headers: {
+          ...authHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -208,6 +236,7 @@ describe("blueprint catalog HTTP routes", () => {
       new Request("http://localhost/api/blueprints/pocketbase/install", {
         method: "POST",
         headers: {
+          ...authHeaders,
           "content-type": "application/json",
         },
         body: JSON.stringify({

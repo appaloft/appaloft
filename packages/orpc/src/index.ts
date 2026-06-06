@@ -314,6 +314,7 @@ import {
   markOperatorWorkRecoveredCommandInputSchema,
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
+  operationCatalog,
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
   PromoteEnvironmentCommand,
@@ -6434,6 +6435,126 @@ function collectOrpcRoutePaths(contributions: readonly AppaloftOrpcRouterContrib
   return Array.from(paths);
 }
 
+interface ProductSessionOrpcRoute {
+  method: string;
+  path: string;
+  requiredRole: ProductOrganizationRole;
+}
+
+type OperationCatalogTransportAccess = {
+  productSession?:
+    | {
+        minRole: ProductOrganizationRole;
+      }
+    | "public";
+};
+
+type OperationCatalogOrpcTransports = {
+  orpc?: {
+    method: "GET" | "POST" | "DELETE";
+    path: string;
+  };
+  orpcAdditional?: readonly {
+    method: "GET" | "POST" | "DELETE";
+    path: string;
+  }[];
+  orpcStream?: {
+    method: "GET" | "POST";
+    path: string;
+  };
+};
+
+const productSessionOrpcRoutes: readonly ProductSessionOrpcRoute[] = operationCatalog.flatMap(
+  (entry) => {
+    const transportAccess = (entry as { transportAccess?: OperationCatalogTransportAccess })
+      .transportAccess;
+    const productSession = transportAccess?.productSession;
+    const requiredRole =
+      productSession === "public"
+        ? null
+        : productSession
+          ? productSession.minRole
+          : entry.kind === "query"
+            ? "member"
+            : productMutationRequiredRole;
+    if (!requiredRole) {
+      return [];
+    }
+
+    const transports = entry.transports as OperationCatalogOrpcTransports;
+    const routes = [
+      transports.orpc,
+      ...(transports.orpcAdditional ?? []),
+      transports.orpcStream,
+    ].filter((route) => route !== undefined);
+
+    return routes.map((route) => ({
+      method: route.method,
+      path: route.path,
+      requiredRole,
+    }));
+  },
+);
+
+function routePathSegments(path: string): string[] {
+  return path
+    .replace(/^\/api(?=\/|$)/, "")
+    .split("/")
+    .filter((segment) => segment.length > 0);
+}
+
+function matchesOperationRoute(template: string, pathname: string): boolean {
+  const templateSegments = routePathSegments(template);
+  const pathnameSegments = routePathSegments(pathname);
+
+  if (templateSegments.length !== pathnameSegments.length) {
+    return false;
+  }
+
+  return templateSegments.every((segment, index) => {
+    if (/^\{[^}]+\}$/.test(segment) || segment.startsWith(":")) {
+      return pathnameSegments[index] !== "";
+    }
+    return segment === pathnameSegments[index];
+  });
+}
+
+function productSessionRouteForRequest(request: Request): ProductSessionOrpcRoute | undefined {
+  const pathname = new URL(request.url).pathname;
+  return productSessionOrpcRoutes.find(
+    (route) => route.method === request.method && matchesOperationRoute(route.path, pathname),
+  );
+}
+
+function missingProductSessionPreflightResponse(
+  request: Request,
+  route: ProductSessionOrpcRoute,
+): Response | null {
+  if (request.headers.get("authorization")?.trim() || request.headers.get("cookie")?.trim()) {
+    return null;
+  }
+
+  const pathname = new URL(request.url).pathname;
+  return Response.json(
+    {
+      error: {
+        code: "product_auth_missing",
+        category: "user",
+        message: "Product operation requires a valid session",
+        retryable: false,
+        details: {
+          endpoint: pathname,
+          method: request.method,
+          phase: "product-authentication",
+          reasonCode: "session-missing",
+          requiredRole: route.requiredRole,
+        },
+      },
+    },
+    { status: 401 },
+  );
+}
+
 function createRequestRunner(
   request: Request,
   executionContext: ExecutionContext,
@@ -8301,6 +8422,19 @@ export function mountAppaloftOrpcRoutes(
     const run = createRequestRunner(request, executionContext, context.requestContextRunner);
     try {
       const pathname = new URL(request.url).pathname;
+      const productSessionRoute = productSessionRouteForRequest(request);
+      const authPreflightResponse = productSessionRoute
+        ? missingProductSessionPreflightResponse(request, productSessionRoute)
+        : null;
+      if (authPreflightResponse) {
+        await logOrpcErrorResponse(
+          context.logger,
+          "orpc_http_handler_error",
+          request,
+          authPreflightResponse,
+        );
+        return authPreflightResponse;
+      }
       const { matched, response } = await run(() =>
         openApiHandler.handle(request, {
           ...(pathname.startsWith("/api") ? { prefix: "/api" as const } : {}),
