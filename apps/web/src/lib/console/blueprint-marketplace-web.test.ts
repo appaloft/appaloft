@@ -23,6 +23,7 @@ const marketplaceExtension: SystemPluginWebExtension = {
     listEndpoint: "/example/blueprints",
     detailEndpointTemplate: "/example/blueprints/{slug}",
     installPlanEndpointTemplate: "/example/blueprints/{slug}/install-plan",
+    installEndpointTemplate: "/example/blueprints/{slug}/install",
     upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
   },
 };
@@ -56,6 +57,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(readBlueprintCatalogExtensionMetadata(marketplaceExtension)).toMatchObject({
       renderer: "blueprint-catalog",
       listEndpoint: "/example/blueprints",
+      installEndpointTemplate: "/example/blueprints/{slug}/install",
       upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
     });
     expect(endpointFromTemplate("/example/blueprints/{slug}/install-plan", "n8n")).toBe(
@@ -130,10 +132,15 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("selectedBlueprintDetailHref");
     expect(quickDeploySource).toContain("data-blueprint-dependency-provisioning");
     expect(quickDeploySource).toContain("blueprintDependencyProvisioningPayload");
-    expect(quickDeploySource).toContain("blueprintQuickDeployDependencyProvisioningInput");
+    expect(quickDeploySource).toContain("installBlueprintFromQuickDeploy");
+    expect(quickDeploySource).toContain("orpcClient.blueprints.install");
+    expect(quickDeploySource).toContain("data-blueprint-secret-list");
+    expect(quickDeploySource).toContain("secretValues: blueprintInstallSecretValueInput()");
+    expect(quickDeploySource).toContain('if (sourceKind === "blueprint")');
+    expect(quickDeploySource).toContain("await installBlueprintFromQuickDeploy();");
+    expect(quickDeploySource).not.toContain("selectedBlueprintInstallPlanEndpoint");
     expect(quickDeploySource).toContain("healthCheckPolicyForSource");
     expect(quickDeploySource).toContain("blueprintComponentForQuickDeploy().healthCheck");
-    expect(quickDeploySource).toContain("selectedBlueprintDefaultAccessPath");
     expect(quickDeploySource).toContain("configureResourceAccessMutation");
     expect(quickDeploySource).toContain("orpcClient.resources.configureAccess");
     expect(quickDeploySource).toContain('case "dependencyResources.provision"');
