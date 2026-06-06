@@ -10,6 +10,8 @@ import { nonEmptyTrimmedString } from "../shared-schema";
 
 const primitiveParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
+const unknownResponseSchema = <T>() => z.unknown() as z.ZodType<T>;
+
 export const blueprintSlugSchema = nonEmptyTrimmedString("Blueprint slug");
 
 export const blueprintInstallTargetSchema = z
@@ -79,12 +81,12 @@ export const acceptBlueprintInstallCommandInputSchema = createBlueprintInstallPl
   })
   .strict();
 
-export const blueprintRegistryEntryResponseSchema = z.custom<BlueprintRegistryEntry>();
-export const blueprintManifestResponseSchema = z.custom<BlueprintManifest>();
-export const blueprintInstallPlanResponseSchema = z.custom<BlueprintInstallPlan>();
+export const blueprintRegistryEntryResponseSchema = unknownResponseSchema<BlueprintRegistryEntry>();
+export const blueprintManifestResponseSchema = unknownResponseSchema<BlueprintManifest>();
+export const blueprintInstallPlanResponseSchema = unknownResponseSchema<BlueprintInstallPlan>();
 export const blueprintApplicationBundlePlanResponseSchema =
-  z.custom<BlueprintApplicationBundlePlan>();
-export const acceptBlueprintInstallResponseSchema = z.custom<unknown>();
+  unknownResponseSchema<BlueprintApplicationBundlePlan>();
+export const acceptBlueprintInstallResponseSchema = z.unknown();
 
 export const listBlueprintsResponseSchema = z.object({
   items: z.array(blueprintRegistryEntryResponseSchema),

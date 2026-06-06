@@ -154,6 +154,29 @@ describe("Appaloft OpenAPI reference package", () => {
     });
   });
 
+  test("[BLUEPRINT-OPENAPI-001] generates blueprint catalog operations with custom response payloads", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+    const listBlueprints = spec.paths?.["/blueprints"]?.get;
+    const showBlueprint = spec.paths?.["/blueprints/{slug}"]?.get;
+    const planInstall = spec.paths?.["/blueprints/{slug}/install-plan"]?.post;
+
+    expect(listBlueprints).toMatchObject({
+      "x-appaloft-operation-key": "blueprints.list",
+      "x-appaloft-operation-kind": "query",
+      "x-appaloft-operation-domain": "blueprints",
+    });
+    expect(showBlueprint).toMatchObject({
+      "x-appaloft-operation-key": "blueprints.show",
+      "x-appaloft-operation-kind": "query",
+      "x-appaloft-operation-domain": "blueprints",
+    });
+    expect(planInstall).toMatchObject({
+      "x-appaloft-operation-key": "blueprints.plan-install",
+      "x-appaloft-operation-kind": "query",
+      "x-appaloft-operation-domain": "blueprints",
+    });
+  });
+
   test("[TS-SDK-OPENAPI-002][TS-SDK-OPENAPI-003] keeps OpenAPI SDK operations synchronized with the operation catalog", async () => {
     const spec = await createAppaloftOpenApiSpec();
     const openApiOperations = collectAppaloftOpenApiOperations(spec);
