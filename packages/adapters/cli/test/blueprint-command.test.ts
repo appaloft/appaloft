@@ -19,7 +19,21 @@ function ensureReflectMetadata(): void {
 describe("Blueprint CLI command input mapping", () => {
   test("[CLOUD-INSTALLED-APP-EXEC-053] accepts component-qualified and unqualified secret values", async () => {
     ensureReflectMetadata();
-    const { secretValuesInput } = await import("../src/commands/blueprint");
+    const { installTargetInput, secretValuesInput } = await import("../src/commands/blueprint");
+
+    expect(
+      installTargetInput({
+        projectName: "PocketBase Smoke",
+        environmentName: "production",
+        resourceSlugPrefix: "pocketbase-smoke",
+        serverId: "srv_yundu",
+      }),
+    ).toEqual({
+      projectName: "PocketBase Smoke",
+      environmentName: "production",
+      resourceSlugPrefix: "pocketbase-smoke",
+      serverId: "srv_yundu",
+    });
 
     expect(
       secretValuesInput([
