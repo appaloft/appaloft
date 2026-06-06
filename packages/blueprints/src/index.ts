@@ -1469,6 +1469,7 @@ export interface BlueprintInstallTarget {
   readonly projectName: string;
   readonly environmentName: string;
   readonly resourceSlugPrefix?: string;
+  readonly serverId?: string;
 }
 
 export interface CreateBlueprintInstallPlanInput {
@@ -1613,6 +1614,7 @@ export interface BlueprintApplicationBundleIdentity {
   readonly blueprintVariant?: string;
   readonly projectName: string;
   readonly environmentName: string;
+  readonly targetServerId?: string;
   readonly profile: string;
 }
 
@@ -2654,6 +2656,7 @@ export function createBlueprintApplicationBundlePlan(
         ...(input.plan.blueprint.variant ? { blueprintVariant: input.plan.blueprint.variant } : {}),
         projectName: input.plan.target.projectName,
         environmentName: input.plan.target.environmentName,
+        ...(input.plan.target.serverId ? { targetServerId: input.plan.target.serverId } : {}),
         profile: input.plan.profile,
       },
       components: [...components.values()].map((component) => ({

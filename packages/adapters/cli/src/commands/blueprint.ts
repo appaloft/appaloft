@@ -83,6 +83,20 @@ function dependencyProvisioningOptions(input: {
   });
 }
 
+export function installTargetInput(input: {
+  readonly projectName?: string | undefined;
+  readonly environmentName?: string | undefined;
+  readonly resourceSlugPrefix?: string | undefined;
+  readonly serverId?: string | undefined;
+}) {
+  return {
+    ...(input.projectName ? { projectName: input.projectName } : {}),
+    ...(input.environmentName ? { environmentName: input.environmentName } : {}),
+    ...(input.resourceSlugPrefix ? { resourceSlugPrefix: input.resourceSlugPrefix } : {}),
+    ...(input.serverId ? { serverId: input.serverId } : {}),
+  };
+}
+
 export function secretValuesInput(values: readonly string[]) {
   return values.map((entry) => {
     const separator = entry.indexOf("=");
@@ -153,11 +167,12 @@ const planInstallCommand = EffectCommand.make(
           dependencyProvider,
           targetServer,
         }),
-        target: {
+        target: installTargetInput({
           projectName: nonEmptyOptional(projectName),
           environmentName: nonEmptyOptional(environmentName),
           resourceSlugPrefix: nonEmptyOptional(resourceSlugPrefix),
-        },
+          serverId: nonEmptyOptional(targetServer),
+        }),
       }),
     ),
 ).pipe(EffectCommand.withDescription("Create a dry-run Blueprint install plan"));
@@ -209,11 +224,12 @@ const installCommand = EffectCommand.make(
           dependencyProvider,
           targetServer,
         }),
-        target: {
+        target: installTargetInput({
           projectName: nonEmptyOptional(projectName),
           environmentName: nonEmptyOptional(environmentName),
           resourceSlugPrefix: nonEmptyOptional(resourceSlugPrefix),
-        },
+          serverId: nonEmptyOptional(targetServer),
+        }),
         applicationId: nonEmptyOptional(applicationId),
         acceptedBy: nonEmptyOptional(acceptedBy),
         idempotencyKey: nonEmptyOptional(idempotencyKey),

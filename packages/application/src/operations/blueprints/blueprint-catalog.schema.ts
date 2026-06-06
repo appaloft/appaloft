@@ -19,6 +19,7 @@ export const blueprintInstallTargetSchema = z
     projectName: nonEmptyTrimmedString("Project name").optional(),
     environmentName: nonEmptyTrimmedString("Environment name").optional(),
     resourceSlugPrefix: nonEmptyTrimmedString("Resource slug prefix").optional(),
+    serverId: nonEmptyTrimmedString("Target server id").optional(),
   })
   .strict();
 
