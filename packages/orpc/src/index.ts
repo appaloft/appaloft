@@ -8596,6 +8596,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
     "/api/resources/:resourceId",
+    "/api/resources/:resourceId/effective-config",
     "/api/resources/:resourceId/archive",
     "/api/resources/:resourceId/redeploy",
     "/api/resources/:resourceId/source",

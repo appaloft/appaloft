@@ -1236,6 +1236,142 @@ describe("CLI remote control-plane client", () => {
     expect(listed.stdout).toContain("srv_remote");
   });
 
+  test("[CONTROL-PLANE-CLI-013] remote bounded deployment events adapt the SDK response for CLI rendering", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/deployments/dep_remote/events": jsonResponse({
+          deploymentId: "dep_remote",
+          envelopes: [
+            {
+              schemaVersion: "deployments.stream-events/v1",
+              kind: "closed",
+              reason: "terminal-status",
+              cursor: "dep_remote:1",
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "deployments",
+        "events",
+        "dep_remote",
+        "--include-history",
+        "--until-terminal",
+        "--json",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/deployments/dep_remote/events",
+      ],
+    );
+    expect(output.stdout).toContain("dep_remote");
+    expect(output.stdout).toContain("terminal-status");
+  });
+
+  test("[CONTROL-PLANE-CLI-014] remote bounded runtime logs adapt the SDK response for CLI rendering", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/resources/res_remote/runtime-logs": jsonResponse({
+          resourceId: "res_remote",
+          deploymentId: "dep_remote",
+          logs: [
+            {
+              timestamp: "2026-05-17T00:00:00.000Z",
+              stream: "stdout",
+              message: "runtime log line",
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "resource", "logs", "res_remote"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/resources/res_remote/runtime-logs",
+      ],
+    );
+    expect(output.stdout).toContain("runtime log line");
+  });
+
+  test("[CONTROL-PLANE-CLI-015] remote GET diagnostics keep boolean query parameters explicit", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/resources/res_remote/proxy-configuration": jsonResponse({
+          schemaVersion: "proxy-configuration/v1",
+          resourceId: "res_remote",
+          routeScope: "latest",
+          routes: [],
+          diagnostics: [],
+        }),
+        "/api/runtime-usage/inspect": jsonResponse({
+          schemaVersion: "runtime-usage.inspect/v1",
+          scope: { kind: "server", serverId: "srv_remote" },
+          totals: {},
+          byServer: [],
+          byProject: [],
+          byEnvironment: [],
+          byResource: [],
+          byDeployment: [],
+          artifacts: [],
+          warnings: [],
+          sourceErrors: [],
+          generatedAt: "2026-05-17T00:00:00.000Z",
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "resource",
+        "proxy-config",
+        "--diagnostics",
+        "res_remote",
+      ]),
+    );
+    await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "runtime-usage", "inspect", "server:srv_remote"]),
+    );
+
+    const proxyUrl = new URL(requests[2]?.url ?? "http://localhost");
+    const usageUrl = new URL(requests[3]?.url ?? "http://localhost");
+    expect(proxyUrl.pathname).toBe("/api/resources/res_remote/proxy-configuration");
+    expect(proxyUrl.searchParams.get("includeDiagnostics")).toBe("true");
+    expect(usageUrl.pathname).toBe("/api/runtime-usage/inspect");
+    expect(usageUrl.searchParams.get("scope.kind")).toBe("server");
+    expect(usageUrl.searchParams.get("scope.serverId")).toBe("srv_remote");
+    expect(usageUrl.searchParams.get("includeArtifacts")).toBe("true");
+    expect(usageUrl.searchParams.get("includeWarnings")).toBe("true");
+  });
+
   test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] server test dispatches to the persisted server endpoint", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({

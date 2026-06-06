@@ -238,6 +238,38 @@ function assertRemoteCapable(
   return ok(undefined);
 }
 
+function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function adaptBoundedStreamResult(operationKey: string, value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  if (operationKey === "deployments.stream-events" && Array.isArray(value.envelopes)) {
+    return {
+      mode: "bounded",
+      deploymentId: readOptionalString(value, "deploymentId") ?? "",
+      envelopes: value.envelopes,
+    };
+  }
+
+  if (operationKey === "resources.runtime-logs" && Array.isArray(value.logs)) {
+    return {
+      mode: "bounded",
+      resourceId: readOptionalString(value, "resourceId") ?? "",
+      ...(readOptionalString(value, "deploymentId")
+        ? { deploymentId: readOptionalString(value, "deploymentId") }
+        : {}),
+      logs: value.logs,
+    };
+  }
+
+  return value;
+}
+
 async function dispatchRemoteMessage<TResult>(input: {
   readonly kind: "command" | "query";
   readonly message: RemoteOperationMessage;
@@ -282,7 +314,9 @@ async function dispatchRemoteMessage<TResult>(input: {
     phase: "remote-operation-dispatch",
   });
 
-  return result.map((value) => value as TResult);
+  return result.map(
+    (value) => adaptBoundedStreamResult(operation.value.operationKey, value) as TResult,
+  );
 }
 
 function unsupportedLocalRemoteError(message: string): DomainError {

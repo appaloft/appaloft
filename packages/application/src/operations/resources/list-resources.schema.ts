@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-import { listLimitSchema } from "../shared-schema";
+import { booleanQueryParamSchema, listLimitSchema } from "../shared-schema";
 
 export const listResourcesQueryInputSchema = z.object({
   projectId: z.string().optional(),
   environmentId: z.string().optional(),
-  includePreviewResources: z.boolean().optional(),
+  includePreviewResources: booleanQueryParamSchema.optional(),
   limit: listLimitSchema,
 });
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { booleanQueryParam } from "../shared-schema";
+
 const runtimeUsageScopeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("server"),
@@ -25,8 +27,8 @@ const runtimeUsageScopeSchema = z.discriminatedUnion("kind", [
 
 const inspectRuntimeUsageOptionsSchema = {
   mode: z.literal("current").default("current"),
-  includeArtifacts: z.boolean().default(true),
-  includeWarnings: z.boolean().default(true),
+  includeArtifacts: booleanQueryParam(true),
+  includeWarnings: booleanQueryParam(true),
 };
 
 const canonicalInspectRuntimeUsageQueryInputSchema = z.object({

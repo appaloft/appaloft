@@ -90,7 +90,7 @@ describe("runtime usage HTTP route", () => {
 
     const response = await app.handle(
       new Request(
-        "http://localhost/api/runtime-usage/inspect?scope.kind=server&scope.serverId=srv_primary",
+        "http://localhost/api/runtime-usage/inspect?scope.kind=server&scope.serverId=srv_primary&includeArtifacts=true&includeWarnings=false",
         {
           method: "GET",
         },
@@ -119,7 +119,7 @@ describe("runtime usage HTTP route", () => {
         },
         mode: "current",
         includeArtifacts: true,
-        includeWarnings: true,
+        includeWarnings: false,
       },
     });
   });

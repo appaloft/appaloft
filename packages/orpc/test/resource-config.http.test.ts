@@ -278,6 +278,59 @@ describe("resource config HTTP routes", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-018] dispatches ResourceEffectiveConfigQuery through the direct API path", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "resources.effective-config/v1",
+          resourceId: "res_web",
+          environmentId: "env_demo",
+          ownedEntries: [],
+          effectiveEntries: [],
+          overrides: [],
+          precedence: [
+            "defaults",
+            "system",
+            "organization",
+            "project",
+            "environment",
+            "resource",
+            "deployment",
+          ],
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/resources/res_web/effective-config", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      schemaVersion: "resources.effective-config/v1",
+      resourceId: "res_web",
+    });
+    expect(capturedQuery).toBeInstanceOf(ResourceEffectiveConfigQuery);
+    expect(capturedQuery).toMatchObject({
+      resourceId: "res_web",
+    });
+  });
+
   test("[RES-SECRET-CRUD-006] dispatches resource secret CRUD commands through oRPC", async () => {
     const capturedCommands: Command<unknown>[] = [];
     const commandBus = {

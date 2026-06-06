@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { booleanQueryParam } from "../shared-schema";
+
 const maxSamplesWindowMs = 24 * 60 * 60 * 1000;
 const maxRollupWindowMs = 14 * 24 * 60 * 60 * 1000;
 const maxRollupBuckets = 720;
@@ -217,8 +219,8 @@ const runtimeMonitoringRollupCanonicalInputSchema = z
     window: runtimeMonitoringWindowSchema,
     bucket: runtimeMonitoringBucketSchema,
     signals: z.array(runtimeMonitoringSignalSchema).optional(),
-    includeDeploymentMarkers: z.boolean().default(true),
-    includeTopContributors: z.boolean().default(true),
+    includeDeploymentMarkers: booleanQueryParam(true),
+    includeTopContributors: booleanQueryParam(true),
   })
   .superRefine((input, context) => {
     const duration = windowDurationMs(input.window);
@@ -255,8 +257,8 @@ const runtimeMonitoringRollupDottedInputSchema = z
       "window.from": z.string().datetime(),
       "window.to": z.string().datetime(),
       bucket: runtimeMonitoringBucketSchema,
-      includeDeploymentMarkers: z.boolean().default(true),
-      includeTopContributors: z.boolean().default(true),
+      includeDeploymentMarkers: booleanQueryParam(true),
+      includeTopContributors: booleanQueryParam(true),
     }),
     z.object({
       "scope.kind": z.literal("project"),
@@ -264,8 +266,8 @@ const runtimeMonitoringRollupDottedInputSchema = z
       "window.from": z.string().datetime(),
       "window.to": z.string().datetime(),
       bucket: runtimeMonitoringBucketSchema,
-      includeDeploymentMarkers: z.boolean().default(true),
-      includeTopContributors: z.boolean().default(true),
+      includeDeploymentMarkers: booleanQueryParam(true),
+      includeTopContributors: booleanQueryParam(true),
     }),
     z.object({
       "scope.kind": z.literal("environment"),
@@ -273,8 +275,8 @@ const runtimeMonitoringRollupDottedInputSchema = z
       "window.from": z.string().datetime(),
       "window.to": z.string().datetime(),
       bucket: runtimeMonitoringBucketSchema,
-      includeDeploymentMarkers: z.boolean().default(true),
-      includeTopContributors: z.boolean().default(true),
+      includeDeploymentMarkers: booleanQueryParam(true),
+      includeTopContributors: booleanQueryParam(true),
     }),
     z.object({
       "scope.kind": z.literal("resource"),
@@ -282,8 +284,8 @@ const runtimeMonitoringRollupDottedInputSchema = z
       "window.from": z.string().datetime(),
       "window.to": z.string().datetime(),
       bucket: runtimeMonitoringBucketSchema,
-      includeDeploymentMarkers: z.boolean().default(true),
-      includeTopContributors: z.boolean().default(true),
+      includeDeploymentMarkers: booleanQueryParam(true),
+      includeTopContributors: booleanQueryParam(true),
     }),
     z.object({
       "scope.kind": z.literal("deployment"),
@@ -291,8 +293,8 @@ const runtimeMonitoringRollupDottedInputSchema = z
       "window.from": z.string().datetime(),
       "window.to": z.string().datetime(),
       bucket: runtimeMonitoringBucketSchema,
-      includeDeploymentMarkers: z.boolean().default(true),
-      includeTopContributors: z.boolean().default(true),
+      includeDeploymentMarkers: booleanQueryParam(true),
+      includeTopContributors: booleanQueryParam(true),
     }),
   ])
   .transform((input) => {
