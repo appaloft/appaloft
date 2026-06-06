@@ -955,6 +955,55 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[RES-HEALTH-QRY-022] reports latest stopped runtime control without probing stopped runtime", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner();
+    const service = createService({
+      resources: [
+        resourceSummary({
+          latestRuntimeControl: {
+            runtimeControlAttemptId: "rtc_stop",
+            operation: "stop",
+            status: "succeeded",
+            startedAt: "2026-01-01T00:00:06.000Z",
+            completedAt: "2026-01-01T00:00:07.000Z",
+            runtimeState: "stopped",
+          },
+        }),
+      ],
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({ mode: "live", includeChecks: true }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("stopped");
+    expect(summary.runtime).toMatchObject({
+      lifecycle: "stopped",
+      health: "unknown",
+      observedAt: "2026-01-01T00:00:07.000Z",
+      reasonCode: "resource_runtime_stopped_by_control",
+    });
+    expect(summary.latestRuntimeControl).toMatchObject({
+      runtimeControlAttemptId: "rtc_stop",
+      operation: "stop",
+      status: "succeeded",
+      runtimeState: "stopped",
+    });
+    expect(probeRunner.requests).toHaveLength(0);
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "runtime-lifecycle",
+        status: "failed",
+        reasonCode: "resource_runtime_stopped_by_control",
+      }),
+    );
+  });
+
   test("[SWARM-TARGET-OBS-002] merges Swarm runtime inspection into normalized resource health", async () => {
     const baseDeployment = deploymentSummary();
     const probeRunner = new StaticResourceHealthProbeRunner(undefined, {

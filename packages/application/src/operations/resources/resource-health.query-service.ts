@@ -31,6 +31,7 @@ import {
   type ResourceProxyHealthSection,
   type ResourcePublicAccessHealthSection,
   type ResourceRepository,
+  type ResourceRuntimeControlSummary,
   type ResourceRuntimeHealth,
   type ResourceRuntimeHealthProbeRequest,
   type ResourceRuntimeHealthSection,
@@ -213,6 +214,62 @@ function runtimeSection(
       ? "runtime_probe_not_available"
       : "resource_health_policy_not_configured",
   };
+}
+
+function runtimeSectionWithLatestControl(
+  runtime: ResourceRuntimeHealthSection,
+  latestRuntimeControl: ResourceRuntimeControlSummary | undefined,
+): ResourceRuntimeHealthSection {
+  if (!latestRuntimeControl) {
+    return runtime;
+  }
+
+  if (
+    latestRuntimeControl.status !== "accepted" &&
+    latestRuntimeControl.status !== "running" &&
+    latestRuntimeControl.status !== "succeeded"
+  ) {
+    return runtime;
+  }
+
+  switch (latestRuntimeControl.runtimeState) {
+    case "stopped":
+      return {
+        ...runtime,
+        lifecycle: "stopped",
+        health: "unknown",
+        observedAt: latestRuntimeControl.completedAt ?? latestRuntimeControl.startedAt,
+        reasonCode: "resource_runtime_stopped_by_control",
+      };
+    case "starting":
+    case "restarting":
+      return {
+        ...runtime,
+        lifecycle: latestRuntimeControl.runtimeState,
+        health: "unknown",
+        observedAt: latestRuntimeControl.completedAt ?? latestRuntimeControl.startedAt,
+        reasonCode: "resource_runtime_control_in_progress",
+      };
+    case "stopping":
+      return {
+        ...runtime,
+        lifecycle: "stopped",
+        health: "unknown",
+        observedAt: latestRuntimeControl.completedAt ?? latestRuntimeControl.startedAt,
+        reasonCode: "resource_runtime_control_in_progress",
+      };
+    case "running":
+      return runtime.lifecycle === "running"
+        ? runtime
+        : {
+            ...runtime,
+            lifecycle: "running",
+            observedAt: latestRuntimeControl.completedAt ?? latestRuntimeControl.startedAt,
+            reasonCode: "resource_runtime_started_by_control",
+          };
+    case "unknown":
+      return runtime;
+  }
 }
 
 interface ResolvedHttpHealthPolicy {
@@ -927,6 +984,7 @@ export class ResourceHealthQueryService {
       latestDeployment,
       healthPolicy.status === "configured",
     );
+    runtime = runtimeSectionWithLatestControl(runtime, latestRuntimeControl);
     let publicAccess = publicAccessSection(resource, domainBindings, sourceErrors);
     const proxy = proxySection(resource, sourceErrors);
     const liveChecks: ResourceHealthCheck[] = [];
