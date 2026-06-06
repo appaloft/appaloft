@@ -24,6 +24,7 @@ import {
   toRepositoryContext,
   appaloftTraceAttributes,
 } from "@appaloft/application";
+import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 
 type RuntimeLogCloseReason = "completed" | "cancelled" | "source-ended";
 type RuntimeLogCommandKind =
@@ -938,7 +939,12 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
           );
         }
 
-        const containerName = metadataValue(logContext, "containerName");
+        const containerName =
+          metadataValue(logContext, "containerName") ??
+          deriveRuntimeInstanceNames({
+            deploymentId: logContext.deployment.id,
+            metadata: logContext.deployment.runtimePlan.execution.metadata,
+          }).containerName;
         if (!containerName) {
           return err(
             domainError.resourceRuntimeLogsUnavailable("Docker container name is not available", {
