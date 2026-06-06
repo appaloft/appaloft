@@ -222,6 +222,19 @@
       summary?: string;
     }[];
   };
+  type BlueprintRegistryEntry = {
+    id: string;
+    name: string;
+    version: string;
+    summary: string;
+    tags?: readonly string[];
+    defaultVariant?: string;
+    variants?: readonly {
+      id: string;
+      label?: string;
+      summary?: string;
+    }[];
+  };
   type BlueprintUpgradePolicy = {
     strategy: string;
     destructive?: boolean;
@@ -252,10 +265,15 @@
     usesResources: readonly string[];
   };
   type BlueprintDetailResponse = {
-    listing: BlueprintCatalogListing;
+    entry?: BlueprintRegistryEntry;
+    listing?: BlueprintCatalogListing;
     manifest: {
+      id?: string;
+      name?: string;
+      version?: string;
       summary: string;
       description?: string;
+      tags?: readonly string[];
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
       secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
       resources: readonly {
@@ -284,9 +302,10 @@
         components?: readonly BlueprintManifestComponent[];
         upgrade?: BlueprintUpgradePolicy;
       }>;
+      profiles?: Record<string, { label?: string }>;
       upgrade?: BlueprintUpgradePolicy;
     };
-    install: {
+    install?: {
       profiles: readonly string[];
       defaultProfile: string;
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
@@ -1036,7 +1055,10 @@
   const selectedBlueprintDetailQuery = createQuery(() =>
     queryOptions({
       queryKey: ["blueprint-catalog-detail", selectedBlueprintDetailEndpointValue],
-      queryFn: () => request<BlueprintDetailResponse>(selectedBlueprintDetailEndpointValue),
+      queryFn: async () =>
+        normalizeBlueprintDetailResponse(
+          await request<BlueprintDetailResponse>(selectedBlueprintDetailEndpointValue),
+        ),
       enabled:
         browser &&
         enabled &&
@@ -1049,7 +1071,7 @@
   const selectedBlueprintDetail = $derived(selectedBlueprintDetailQuery.data ?? null);
   const selectedBlueprintListing = $derived(selectedBlueprintDetail?.listing ?? null);
   const selectedBlueprintManifest = $derived(selectedBlueprintDetail?.manifest ?? null);
-  const selectedBlueprintVariantOptions = $derived(selectedBlueprintDetail?.install.variants ?? []);
+  const selectedBlueprintVariantOptions = $derived(selectedBlueprintDetail?.install?.variants ?? []);
   const selectedBlueprintVariantDefinition = $derived(
     selectedBlueprintManifest && selectedBlueprintVariant
       ? selectedBlueprintManifest.variants?.[selectedBlueprintVariant]
@@ -1062,7 +1084,7 @@
   );
   const selectedBlueprintUpgrade = $derived(
     selectedBlueprintVariantDefinition?.upgrade ??
-      selectedBlueprintDetail?.install.upgrade ??
+      selectedBlueprintDetail?.install?.upgrade ??
       selectedBlueprintManifest?.upgrade,
   );
   const selectedBlueprintVariables = $derived(
@@ -1071,7 +1093,7 @@
   );
   const selectedBlueprintSecrets = $derived.by(() => {
     const secrets = selectedBlueprintEffectiveManifest?.secrets ?? [];
-    const installSecrets = selectedBlueprintDetail?.install.secrets ?? [];
+    const installSecrets = selectedBlueprintDetail?.install?.secrets ?? [];
     const byKey = new Map<string, (typeof secrets)[number]>();
 
     for (const secret of installSecrets) {
@@ -1127,7 +1149,7 @@
     }
 
     const fallbackVariant =
-      selectedBlueprintDetail.install.defaultVariant ??
+      selectedBlueprintDetail.install?.defaultVariant ??
       selectedBlueprintVariantOptions[0]?.id ??
       "";
     const variantIsValid = selectedBlueprintVariantOptions.some(
@@ -3464,6 +3486,127 @@
     value: unknown,
   ): value is BlueprintPrimitiveParameterValue {
     return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  }
+
+  function blueprintRegistryEntryToListing(
+    entry: BlueprintRegistryEntry,
+    manifest?: BlueprintDetailResponse["manifest"],
+  ): BlueprintCatalogListing {
+    return {
+      slug: entry.id,
+      title: entry.name,
+      subtitle: entry.summary,
+      category: "Blueprints",
+      featured: false,
+      publisher: {
+        name: "Appaloft",
+        verified: false,
+      },
+      blueprint: {
+        id: manifest?.id ?? entry.id,
+        version: manifest?.version ?? entry.version,
+        summary: manifest?.summary ?? entry.summary,
+        tags: manifest?.variants
+          ? [...new Set([...(entry.tags ?? []), ...(manifest.tags ?? [])])]
+          : (entry.tags ?? []),
+      },
+      requirementsSummary: {
+        components: manifest?.components.length ?? 0,
+        dependencies: [...new Set(manifest?.resources.map((resource) => resource.kind) ?? [])].sort(),
+        ports:
+          manifest?.components.flatMap((component) =>
+            component.ports.map(
+              (port) =>
+                `${component.id}:${port.name}:${port.containerPort}/${port.protocol}`,
+            ),
+          ) ?? [],
+      },
+      ...(entry.defaultVariant ? { defaultVariant: entry.defaultVariant } : {}),
+      ...(entry.variants ? { variants: entry.variants } : {}),
+    };
+  }
+
+  function normalizeBlueprintManifest(
+    manifest: BlueprintDetailResponse["manifest"],
+  ): BlueprintDetailResponse["manifest"] {
+    return {
+      ...manifest,
+      parameters: manifest.parameters ?? [],
+      secrets: manifest.secrets ?? [],
+      resources: manifest.resources ?? [],
+      components: manifest.components ?? [],
+      variants: Object.fromEntries(
+        Object.entries(manifest.variants ?? {}).map(([id, variant]) => [
+          id,
+          {
+            ...variant,
+            parameters: variant.parameters ?? manifest.parameters ?? [],
+            secrets: variant.secrets ?? manifest.secrets ?? [],
+            resources: variant.resources ?? manifest.resources ?? [],
+            components: variant.components ?? manifest.components ?? [],
+          },
+        ]),
+      ),
+    };
+  }
+
+  function normalizeBlueprintDetailResponse(
+    response: BlueprintDetailResponse,
+  ): BlueprintDetailResponse {
+    const manifest = normalizeBlueprintManifest(response.manifest);
+    const listing =
+      response.listing ??
+      (response.entry
+        ? blueprintRegistryEntryToListing(response.entry, manifest)
+        : {
+            slug: manifest.id ?? selectedBlueprintSlug.trim(),
+            title: manifest.name ?? selectedBlueprintTitle.trim() ?? manifest.id ?? "",
+            subtitle: manifest.summary,
+            category: "Blueprints",
+            featured: false,
+            publisher: {
+              name: "Appaloft",
+              verified: false,
+            },
+            blueprint: {
+              id: manifest.id ?? selectedBlueprintSlug.trim(),
+              version: manifest.version ?? "1.0.0",
+              summary: manifest.summary,
+              tags: [],
+            },
+          });
+    const variantEntries = response.entry?.variants ??
+      Object.entries(manifest.variants ?? {}).map(([id, variant]) => ({
+        id,
+        label: variant.label,
+        summary: variant.summary,
+      }));
+    const profileKeys = Object.keys(manifest.profiles ?? {});
+    const defaultVariant =
+      response.install?.defaultVariant ??
+      response.entry?.defaultVariant ??
+      manifest.defaultVariant ??
+      variantEntries[0]?.id;
+    const defaultProfile =
+      response.install?.defaultProfile ??
+      (defaultVariant ? manifest.variants?.[defaultVariant]?.defaultProfile : undefined) ??
+      profileKeys[0] ??
+      "production";
+
+    return {
+      ...response,
+      listing,
+      manifest,
+      install: {
+        profiles: response.install?.profiles ?? profileKeys,
+        defaultProfile,
+        parameters: response.install?.parameters ?? manifest.parameters,
+        secrets: response.install?.secrets ?? manifest.secrets,
+        ...(defaultVariant ? { defaultVariant } : {}),
+        variants: response.install?.variants ?? variantEntries,
+        upgrade: response.install?.upgrade ?? manifest.upgrade,
+      },
+    };
   }
 
   function blueprintInstallParameters(): Record<string, BlueprintPrimitiveParameterValue> {

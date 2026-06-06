@@ -1038,6 +1038,99 @@ const baserowBlueprintListing = {
   ],
 };
 
+const teableNeutralBlueprintEntry = {
+  id: "teable",
+  name: "Teable",
+  version: "1.0.0",
+  summary: "Official Teable Blueprint.",
+  tags: ["data-app", "collaboration", "postgres", "official"],
+  defaultVariant: "community",
+  variants: [
+    {
+      id: "community",
+      label: "Community",
+      summary: "AGPL community image for open-source self-hosted Teable.",
+    },
+  ],
+};
+
+const teableNeutralBlueprintManifest = {
+  schemaVersion: "appaloft.blueprint/v1",
+  id: "cloud-teable",
+  name: "Teable",
+  version: "1.0.0",
+  summary: "Official Teable Blueprint.",
+  tags: ["data-app", "collaboration", "postgres", "official"],
+  parameters: [
+    {
+      key: "APP_NAME",
+      label: "App name",
+      type: "string",
+      required: true,
+      default: "teable",
+    },
+  ],
+  secrets: [
+    {
+      key: "SECRET_KEY",
+      label: "Secret key",
+      required: true,
+    },
+  ],
+  resources: [
+    {
+      id: "postgres",
+      kind: "postgres",
+      label: "Teable Postgres",
+      optional: false,
+      capabilities: [],
+    },
+    {
+      id: "redis",
+      kind: "redis",
+      label: "Teable Redis",
+      optional: false,
+      capabilities: [],
+    },
+    {
+      id: "assets",
+      kind: "volume",
+      label: "Teable assets",
+      optional: false,
+      capabilities: [],
+    },
+  ],
+  components: [
+    {
+      id: "teable",
+      name: "Teable",
+      kind: "service",
+      runtime: {
+        strategy: "container-image",
+        image: "ghcr.io/teableio/teable-community:latest",
+      },
+      ports: [{ name: "http", containerPort: 3003, protocol: "http", public: true }],
+      routes: [{ port: "http", pathPrefix: "/" }],
+      variables: [{ key: "BACKEND_CACHE_PROVIDER", value: "redis" }],
+      usesSecrets: ["SECRET_KEY"],
+      usesResources: ["postgres", "redis", "assets"],
+    },
+  ],
+  profiles: {
+    production: {
+      label: "Production",
+    },
+  },
+  defaultVariant: "community",
+  variants: {
+    community: {
+      label: "Community",
+      summary: "AGPL community image for open-source self-hosted Teable.",
+      defaultProfile: "production",
+    },
+  },
+};
+
 const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
@@ -1094,6 +1187,22 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             renderer: "blueprint-catalog",
             listEndpoint: "/api/blueprint-catalog/blueprints",
             detailEndpointTemplate: "/api/blueprint-catalog/blueprints/{slug}",
+          },
+        },
+        {
+          key: "public-blueprints.quick-deploy-source",
+          title: "Public Blueprints",
+          description: "Public neutral Blueprint catalog.",
+          path: "/marketplace?surface=quick-deploy",
+          placement: "quick-deploy-source",
+          target: "console-route",
+          requiresAuth: false,
+          pluginName: "server-configured-extensions",
+          pluginDisplayName: "Server Configured Extensions",
+          metadata: {
+            renderer: "blueprint-catalog",
+            listEndpoint: "/api/blueprints",
+            detailEndpointTemplate: "/api/blueprints/{slug}",
           },
         },
       ],
@@ -1173,6 +1282,13 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           },
         ],
       },
+    },
+    "/api/blueprints": {
+      items: [teableNeutralBlueprintEntry],
+    },
+    "/api/blueprints/teable": {
+      entry: teableNeutralBlueprintEntry,
+      manifest: teableNeutralBlueprintManifest,
     },
     "/api/instance-upgrade/check": {
       schemaVersion: "system.instance-upgrade.check/v1",
@@ -3800,6 +3916,54 @@ describe("console e2e with Bun.WebView", () => {
     expect(renderedState.lockedIntroVisible).toBe(false);
     expect(renderedState.blueprintCatalogSourceVisible).toBe(true);
     expect(renderedState.sourceExtensionDisplayNameVisible).toBe(false);
+  }, 45_000);
+
+  test("[BLUEPRINT-WEB-001] hydrates Quick Deploy from public neutral Blueprint detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&step=source`,
+    );
+
+    const renderedStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`JSON.stringify({
+          bodyText: document.body.innerText,
+          dependencyKinds: Array.from(document.querySelectorAll('[data-blueprint-dependency-kind]'))
+            .map((node) => node.textContent),
+          secretKeys: Array.from(document.querySelectorAll('[data-blueprint-secret-key]'))
+            .map((input) => input.getAttribute('data-blueprint-secret-key')),
+          variableKeys: Array.from(document.querySelectorAll('[data-blueprint-variable-key]'))
+            .map((input) => input.getAttribute('data-blueprint-variable-key')),
+        })`),
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          bodyText: string;
+          secretKeys: string[];
+        };
+        return (
+          state.bodyText.includes("Teable Postgres") &&
+          state.bodyText.includes("Teable Redis") &&
+          state.secretKeys.includes("SECRET_KEY")
+        );
+      },
+      "Expected public neutral Blueprint detail to hydrate Quick Deploy dependencies",
+    );
+    const renderedState = JSON.parse(renderedStateJson) as {
+      bodyText: string;
+      dependencyKinds: string[];
+      secretKeys: string[];
+      variableKeys: string[];
+    };
+
+    expect(renderedState.bodyText).toContain("Teable");
+    expect(renderedState.bodyText).toContain("Postgres");
+    expect(renderedState.bodyText).toContain("Redis");
+    expect(renderedState.bodyText).toContain("Teable assets");
+    expect(renderedState.secretKeys).toEqual(["SECRET_KEY"]);
+    expect(renderedState.variableKeys).toEqual(["BACKEND_CACHE_PROVIDER"]);
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
