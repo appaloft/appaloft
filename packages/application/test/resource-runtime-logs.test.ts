@@ -114,6 +114,28 @@ class RecordingRuntimeLogReader implements ResourceRuntimeLogReader {
   }
 }
 
+class HangingRuntimeLogReader implements ResourceRuntimeLogReader {
+  calls: Array<{
+    context: ResourceRuntimeLogContext;
+    request: ResourceRuntimeLogRequest;
+    signal: AbortSignal;
+  }> = [];
+
+  async open(
+    _context: ExecutionContext,
+    logContext: ResourceRuntimeLogContext,
+    request: ResourceRuntimeLogRequest,
+    signal: AbortSignal,
+  ): Promise<Result<ResourceRuntimeLogStream>> {
+    this.calls.push({
+      context: logContext,
+      request,
+      signal,
+    });
+    return new Promise<Result<ResourceRuntimeLogStream>>(() => {});
+  }
+}
+
 interface RecordedSpan {
   attributes: Record<string, boolean | number | string | undefined>;
   errors: Array<Error | { message: string; name?: string; stack?: string }>;
@@ -296,6 +318,8 @@ function createService(input?: {
   resources?: ResourceSummary[];
   deployments?: DeploymentSummary[];
   stream?: ResourceRuntimeLogStream;
+  reader?: ResourceRuntimeLogReader;
+  boundedOpenTimeoutMs?: number;
 }) {
   const reader = new RecordingRuntimeLogReader(
     input?.stream ??
@@ -307,10 +331,14 @@ function createService(input?: {
         },
       ]),
   );
+  const runtimeLogReader = input?.reader ?? reader;
   const service = new ResourceRuntimeLogsQueryService(
     new StaticResourceReadModel(input?.resources ?? [resourceSummary()]),
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
-    reader,
+    runtimeLogReader,
+    {
+      ...(input?.boundedOpenTimeoutMs ? { boundedOpenTimeoutMs: input.boundedOpenTimeoutMs } : {}),
+    },
   );
 
   return {
@@ -379,6 +407,39 @@ describe("ResourceRuntimeLogsQueryService", () => {
       "appaloft.runtime_logs.line_count": 1,
     });
     expect(tracer.spans[1]?.status).toEqual({ status: "ok" });
+  });
+
+  test("returns a structured timeout when bounded runtime log open hangs", async () => {
+    const tracer = new RecordingAppTracer();
+    const context = createTestContext({ tracer });
+    const reader = new HangingRuntimeLogReader();
+    const { service } = createService({
+      reader,
+      boundedOpenTimeoutMs: 1,
+    });
+    const query = ResourceRuntimeLogsQuery.create({
+      resourceId: "res_web",
+      tailLines: 50,
+      follow: false,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("timeout");
+    expect(error.details).toMatchObject({
+      phase: "runtime-log-open",
+      step: "open-timeout",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      timeoutMs: 1,
+    });
+    expect(reader.calls[0]?.signal.aborted).toBe(true);
+    expect(tracer.spans[0]?.status).toEqual({
+      status: "error",
+      message: "Runtime log open timed out",
+    });
   });
 
   test("returns a stream result for follow requests", async () => {
