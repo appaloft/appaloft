@@ -10,6 +10,7 @@
     Copy,
     FolderOpen,
     Gauge,
+    GitPullRequestArrow,
     Lock,
     Play,
     Plus,
@@ -24,6 +25,7 @@
     CloneEnvironmentInput,
     DeleteProjectInput,
     LockEnvironmentInput,
+    PreviewEnvironmentStatus,
     RenameEnvironmentInput,
     RenameProjectInput,
     RestoreProjectInput,
@@ -55,18 +57,29 @@
   } from "$lib/console/runtime-usage";
   import {
     deploymentDetailHref,
+    findEnvironment,
     findProject,
+    findResource,
     formatTime,
+    previewEnvironmentDetailHref,
     projectCreateResourceHref,
+    resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
-  type ProjectDetailTab = "overview" | "resources" | "environments" | "deployments" | "settings";
+  type ProjectDetailTab =
+    | "overview"
+    | "resources"
+    | "preview"
+    | "environments"
+    | "deployments"
+    | "settings";
   const projectDetailTabs = [
     "overview",
     "resources",
+    "preview",
     "environments",
     "deployments",
     "settings",
@@ -88,6 +101,36 @@
     queryOptions({
       queryKey: ["projects", "delete-check", projectId],
       queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const projectPreviewEnvironmentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["preview-environments", "project", projectId, { limit: 50 }],
+      queryFn: () =>
+        orpcClient.previewEnvironments.list({
+          projectId,
+          limit: 50,
+        }),
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const projectPreviewResourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "resources",
+        "project-preview",
+        projectId,
+        { includePreviewResources: true, limit: 100 },
+      ],
+      queryFn: () =>
+        orpcClient.resources.list({
+          projectId,
+          includePreviewResources: true,
+          limit: 100,
+        }),
       enabled: browser && projectId.length > 0,
       staleTime: 5_000,
     }),
@@ -176,6 +219,20 @@
   });
   const projectResources = $derived(
     project ? resources.filter((resource) => resource.projectId === project.id) : [],
+  );
+  const projectPreviewEnvironments = $derived(projectPreviewEnvironmentsQuery.data?.items ?? []);
+  const projectPreviewEnvironmentIds = $derived(
+    new Set([
+      ...projectEnvironments
+        .filter((environment) => environment.kind === "preview")
+        .map((environment) => environment.id),
+      ...projectPreviewEnvironments.map((previewEnvironment) => previewEnvironment.environmentId),
+    ]),
+  );
+  const projectPreviewResources = $derived(
+    (projectPreviewResourcesQuery.data?.items ?? []).filter((resource) =>
+      projectPreviewEnvironmentIds.has(resource.environmentId),
+    ),
   );
   const projectDeployments = $derived(
     project ? deployments.filter((deployment) => deployment.projectId === project.id) : [],
@@ -743,6 +800,8 @@
         return $t(i18nKeys.console.deployments.overviewTab);
       case "resources":
         return $t(i18nKeys.common.domain.resources);
+      case "preview":
+        return $t(i18nKeys.console.projects.previewTitle);
       case "environments":
         return $t(i18nKeys.common.domain.environments);
       case "deployments":
@@ -750,6 +809,20 @@
       case "settings":
         return $t(i18nKeys.console.projects.settingsTitle);
     }
+  }
+
+  function previewEnvironmentStatusLabelKey(status: PreviewEnvironmentStatus) {
+    if (status === "cleanup-requested") {
+      return i18nKeys.console.previewEnvironments.statusCleanupRequested;
+    }
+
+    return i18nKeys.console.previewEnvironments.statusActive;
+  }
+
+  function previewEnvironmentStatusVariant(
+    status: PreviewEnvironmentStatus,
+  ): "default" | "secondary" {
+    return status === "cleanup-requested" ? "secondary" : "default";
   }
 
 </script>
@@ -1195,6 +1268,176 @@
               createDisabled={isProjectArchived}
               showEnvironment
             />
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="preview" class="mt-0">
+          <section class="space-y-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.projects.previewTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.productGradePreviews}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
+                  />
+                </div>
+                <p class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.projects.previewDescription)}
+                </p>
+              </div>
+              <Badge variant="outline">
+                {projectPreviewEnvironments.length + projectPreviewResources.length}
+              </Badge>
+            </div>
+
+            <dl class="console-metric-strip sm:grid-cols-3">
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.projects.previewEnvironmentsTitle)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{projectPreviewEnvironments.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.projects.previewResourcesTitle)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{projectPreviewResources.length}</dd>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.projects.previewEnvironmentCountTitle)}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold">{projectPreviewEnvironmentIds.size}</dd>
+              </div>
+            </dl>
+
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+              <section class="space-y-3">
+                <div>
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.projects.previewEnvironmentsTitle)}
+                  </h3>
+                  <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.previewEnvironmentsDescription)}
+                  </p>
+                </div>
+
+                {#if projectPreviewEnvironmentsQuery.isPending}
+                  <div class="space-y-3">
+                    {#each Array.from({ length: 3 }) as _, index (index)}
+                      <Skeleton class="h-20 w-full" />
+                    {/each}
+                  </div>
+                {:else if projectPreviewEnvironments.length > 0}
+                  <div class="console-record-list">
+                    {#each projectPreviewEnvironments as previewEnvironment (previewEnvironment.previewEnvironmentId)}
+                      {@const previewResource = findResource(
+                        projectPreviewResources,
+                        previewEnvironment.resourceId,
+                      )}
+                      {@const previewEnvironmentRecord = findEnvironment(
+                        projectEnvironments,
+                        previewEnvironment.environmentId,
+                      )}
+                      <a
+                        href={previewResource
+                          ? resourcePreviewEnvironmentDetailHref(
+                              previewResource,
+                              previewEnvironment.previewEnvironmentId,
+                            )
+                          : previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
+                        class="console-record-row block"
+                      >
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="truncate text-sm font-medium">
+                              {previewEnvironment.source.repositoryFullName}
+                              <span class="text-muted-foreground">
+                                #{previewEnvironment.source.pullRequestNumber}
+                              </span>
+                            </p>
+                            <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                              {previewEnvironment.previewEnvironmentId}
+                            </p>
+                            <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                              {previewEnvironment.source.sourceBindingFingerprint}
+                            </p>
+                          </div>
+                          <Badge variant={previewEnvironmentStatusVariant(previewEnvironment.status)}>
+                            {$t(previewEnvironmentStatusLabelKey(previewEnvironment.status))}
+                          </Badge>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {$t(i18nKeys.common.domain.environment)} · {previewEnvironmentRecord?.name ??
+                              previewEnvironment.environmentId}
+                          </span>
+                          <span>
+                            {$t(i18nKeys.common.domain.resource)} · {previewResource?.name ??
+                              previewEnvironment.resourceId}
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.previewEnvironments.updatedAt)} · {formatTime(
+                              previewEnvironment.updatedAt,
+                            )}
+                          </span>
+                          <span>
+                            {$t(i18nKeys.console.previewEnvironments.expiresAt)} · {previewEnvironment.expiresAt
+                              ? formatTime(previewEnvironment.expiresAt)
+                              : $t(i18nKeys.console.previewEnvironments.noExpiry)}
+                          </span>
+                        </div>
+                      </a>
+                    {/each}
+                  </div>
+                {:else}
+                  <div class="console-subtle-panel px-4 py-6">
+                    <div class="flex items-start gap-3">
+                      <GitPullRequestArrow class="mt-0.5 size-4 text-muted-foreground" />
+                      <div class="space-y-1">
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.projects.noPreviewEnvironmentsTitle)}
+                        </p>
+                        <p class="text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.projects.noPreviewEnvironments)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </section>
+
+              <section class="space-y-3">
+                <div>
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.projects.previewResourcesTitle)}
+                  </h3>
+                  <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.previewResourcesDescription)}
+                  </p>
+                </div>
+
+                {#if projectPreviewResourcesQuery.isPending}
+                  <div class="space-y-3">
+                    {#each Array.from({ length: 3 }) as _, index (index)}
+                      <Skeleton class="h-20 w-full" />
+                    {/each}
+                  </div>
+                {:else}
+                  <ResourceListTable
+                    resources={projectPreviewResources}
+                    deployments={deployments}
+                    environments={projectEnvironments}
+                    emptyTitle={$t(i18nKeys.console.projects.noPreviewResourcesTitle)}
+                    emptyDescription={$t(i18nKeys.console.projects.noPreviewResources)}
+                    showEnvironment
+                  />
+                {/if}
+              </section>
+            </div>
           </section>
         </Tabs.Content>
 
