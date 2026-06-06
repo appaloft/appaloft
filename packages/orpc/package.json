@@ -7,10 +7,10 @@
     "./client": "./src/client.ts"
   },
   "dependencies": {
-    "@orpc/client": "latest",
-    "@orpc/openapi": "latest",
-    "@orpc/server": "latest",
-    "@orpc/tanstack-query": "latest",
+    "@orpc/client": "1.14.5",
+    "@orpc/openapi": "1.14.5",
+    "@orpc/server": "1.14.5",
+    "@orpc/tanstack-query": "1.14.5",
     "@appaloft/application": "workspace:*",
     "@appaloft/contracts": "workspace:*",
     "@appaloft/core": "workspace:*",
