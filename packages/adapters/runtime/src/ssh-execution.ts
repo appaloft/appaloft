@@ -172,6 +172,28 @@ export function parseDockerRepoDigestFromInspect(output: string): string | undef
     return undefined;
   }
 
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line) as unknown;
+      if (Array.isArray(parsed)) {
+        const digest = parsed
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.match(/@(sha256:[0-9a-f]{64})$/i)?.[1])
+          .find((candidate): candidate is string => Boolean(candidate));
+        if (digest) {
+          return digest;
+        }
+      }
+    } catch {
+      // Fall through to regex extraction below.
+    }
+  }
+
   try {
     const parsed = JSON.parse(trimmed) as unknown;
     if (Array.isArray(parsed)) {
@@ -187,13 +209,25 @@ export function parseDockerRepoDigestFromInspect(output: string): string | undef
     }
   }
 
-  return undefined;
+  return trimmed.match(/\b(sha256:[0-9a-f]{64})\b/i)?.[1];
+}
+
+function dockerPullWithStderrCommand(image: string): string {
+  return `docker pull ${shellQuote(image)} >&2`;
+}
+
+function dockerRepoDigestsInspectCommand(image: string): string {
+  return `docker image inspect --format ${shellQuote("{{json .RepoDigests}}")} ${shellQuote(image)}`;
+}
+
+function dockerImageIdInspectCommand(image: string): string {
+  return `docker image inspect --format ${shellQuote("{{.Id}}")} ${shellQuote(image)}`;
 }
 
 export function buildRemoteDockerImageVersionMetadataCommand(image: string): string {
   return [
-    `docker pull ${shellQuote(image)}`,
-    `docker image inspect --format ${shellQuote("{{json .RepoDigests}}")} ${shellQuote(image)}`,
+    dockerPullWithStderrCommand(image),
+    [dockerRepoDigestsInspectCommand(image), dockerImageIdInspectCommand(image)].join(" && "),
   ].join(" && ");
 }
 

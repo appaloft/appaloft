@@ -58,8 +58,9 @@ describe("SSH Docker image version metadata", () => {
     const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
 
     expect(syntaxCheck.status).toBe(0);
-    expect(command).toContain("docker pull 'ghcr.io/acme/api:latest'");
+    expect(command).toContain("docker pull 'ghcr.io/acme/api:latest' >&2");
     expect(command).toContain(" && docker image inspect --format '{{json .RepoDigests}}'");
+    expect(command).toContain(" && docker image inspect --format '{{.Id}}'");
   });
 
   test("parses a repo digest returned by remote docker image inspect", () => {
@@ -68,6 +69,7 @@ describe("SSH Docker image version metadata", () => {
 
     expect(parseDockerRepoDigestFromInspect(`["ghcr.io/acme/api@${digest}"]`)).toBe(digest);
     expect(parseDockerRepoDigestFromInspect(`ghcr.io/acme/api@${digest}`)).toBe(digest);
+    expect(parseDockerRepoDigestFromInspect(`[]\n${digest}`)).toBe(digest);
     expect(parseDockerRepoDigestFromInspect("[]")).toBeUndefined();
   });
 });
