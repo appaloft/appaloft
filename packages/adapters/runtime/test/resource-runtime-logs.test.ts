@@ -402,6 +402,26 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     );
   });
 
+  test("derives Docker container name for in-flight deployments before terminal metadata is recorded", async () => {
+    const calls: SpawnCall[] = [];
+    const context = logContext();
+    if (context.deployment.runtimePlan.execution.kind !== "docker-container") {
+      throw new Error("Expected docker-container fixture");
+    }
+    context.deployment.runtimePlan.execution.metadata = {};
+    const reader = await createReader(undefined, createSpawn(calls, ["booting\n"]));
+    const result = await reader.open(
+      createTestExecutionContext(),
+      context,
+      request(),
+      new AbortController().signal,
+    );
+
+    expect(result.isOk()).toBe(true);
+    await collectEvents(result._unsafeUnwrap());
+    expect(calls[0]?.args).toEqual(["docker", "logs", "--tail", "25", "appaloft-dep_web"]);
+  });
+
   test("[SWARM-TARGET-OBS-001][SWARM-TARGET-SECRET-001] opens Docker Swarm service logs as normalized redacted runtime log lines", async () => {
     const calls: SpawnCall[] = [];
     const reader = await createReader(
