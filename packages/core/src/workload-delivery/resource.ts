@@ -1320,9 +1320,8 @@ export class Resource extends AggregateRoot<ResourceState> {
     attachmentId: ResourceStorageAttachmentId;
     detachedAt: UpdatedAt;
   }): Result<{ changed: boolean }> {
-    const lifecycleGuard = this.rejectInactiveResource("resources.detach-storage");
-    if (lifecycleGuard.isErr()) {
-      return err(lifecycleGuard.error);
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return err(resourceDeletedNotFoundError({ resourceId: this.state.id }));
     }
 
     const attachment = this.state.storageAttachments.find((candidate) =>
