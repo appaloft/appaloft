@@ -19,9 +19,13 @@ surface available in the session.
    BYOS Action deploys, HTTP/API for selected control planes, Web when guiding a human through the
    console, and MCP when tools are configured.
    In shell-capable sessions, first run `appaloft auth status` or `appaloft context show` when a
-   Cloud/control-plane task needs product context. If no active profile exists and the user has not
-   selected another endpoint, run `appaloft login`; the public CLI defaults to
-   `https://app.appaloft.com` and stores the verified `cloud` profile locally.
+   Cloud/control-plane task needs product context. If no active authenticated profile exists and the
+   user has not selected another endpoint, run `appaloft login`; the public CLI defaults to
+   `https://app.appaloft.com` and stores the verified `cloud` profile locally. Use the normal
+   browser login for user-facing sessions. Use `appaloft login --no-browser` only for headless,
+   terminal-only, CI, or agent verification sessions where browser auth is unavailable. This Cloud
+   identity gate applies to hosted Cloud/control-plane operations; local-only CLI workflows do not
+   require Cloud login.
    If `appaloft` is not on PATH, do not assume `npx skills add appaloft/appaloft` installed it:
    that command installs only this skill. Install the CLI from the Appaloft GitHub Release archive
    for the current platform, then rerun `appaloft --version`, `appaloft auth status`, and the
