@@ -56,14 +56,16 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
 
 function mountOrganizationTeamRoutes(input: {
   commandBus: CommandBus;
-  productSessionAuthorizationPort: ProductSessionAuthorizationPort;
+  productSessionAuthorizationPort?: ProductSessionAuthorizationPort;
   queryBus: QueryBus;
 }) {
   return mountAppaloftOrpcRoutes(new Elysia(), {
     commandBus: input.commandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
-    productSessionAuthorizationPort: input.productSessionAuthorizationPort,
+    ...(input.productSessionAuthorizationPort
+      ? { productSessionAuthorizationPort: input.productSessionAuthorizationPort }
+      : {}),
     queryBus: input.queryBus,
   });
 }
@@ -374,6 +376,38 @@ describe("organization/team HTTP/oRPC routes", () => {
 
     expect(response.status).toBe(401);
     expect(text).toContain("product_auth_missing");
+  });
+
+  test("[ORG-TEAM-AUTH-001] current context missing-session preflight does not depend on ORPCError mapping", async () => {
+    const app = mountOrganizationTeamRoutes({
+      commandBus: {
+        execute: async () => ok({} as never),
+      } as CommandBus,
+      queryBus: {
+        execute: async () => {
+          throw new Error("query bus must not dispatch without product auth");
+        },
+      } as unknown as QueryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/organizations/current-context"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toMatchObject({
+      error: {
+        code: "product_auth_missing",
+        details: {
+          endpoint: "/api/organizations/current-context",
+          method: "GET",
+          phase: "product-authentication",
+          reasonCode: "session-missing",
+          requiredRole: "member",
+        },
+      },
+    });
   });
 
   test("[ORG-TEAM-CONTEXT-001] current context dispatches through QueryBus with session auth context", async () => {
