@@ -1457,6 +1457,7 @@ export type BlueprintInstallOperation =
       readonly kind: "configure-runtime";
       readonly componentId: string;
       readonly runtime: BlueprintComponent["runtime"];
+      readonly healthCheck?: BlueprintComponent["healthCheck"];
     }
   | {
       readonly kind: "configure-network";
@@ -1571,6 +1572,7 @@ export interface BlueprintApplicationBundleComponentPlan {
   readonly kind: BlueprintComponent["kind"];
   readonly resourceSlug: string;
   readonly runtime?: BlueprintComponent["runtime"];
+  readonly healthCheck?: BlueprintComponent["healthCheck"];
   readonly ports: readonly BlueprintComponent["ports"][number][];
   readonly routes: readonly BlueprintRoutePlan[];
   readonly variables: readonly {
@@ -2237,6 +2239,7 @@ function appendComponentSetupOperations(
     kind: "configure-runtime",
     componentId: component.id,
     runtime: component.runtime,
+    ...(component.healthCheck ? { healthCheck: component.healthCheck } : {}),
   });
   if (component.ports.length > 0) {
     operations.push({
@@ -2335,6 +2338,7 @@ type MutableBlueprintApplicationBundleComponentPlan = {
   kind: BlueprintComponent["kind"];
   resourceSlug: string;
   runtime?: BlueprintComponent["runtime"];
+  healthCheck?: BlueprintComponent["healthCheck"];
   ports: BlueprintComponent["ports"][number][];
   routes: BlueprintRoutePlan[];
   variables: {
@@ -2403,6 +2407,9 @@ export function createBlueprintApplicationBundlePlan(
         const component = requireApplicationBundleComponent(operation, components);
         if (!component.ok) return component;
         component.value.runtime = operation.runtime;
+        if (operation.healthCheck) {
+          component.value.healthCheck = operation.healthCheck;
+        }
         break;
       }
       case "configure-network": {
