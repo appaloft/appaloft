@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CreatedAt,
   EnvironmentId,
   ProjectId,
   Resource,
   ResourceId,
   ResourceKindValue,
+  ResourceLifecycleStatusValue,
   ResourceName,
   ResourceStorageAttachmentId,
   ResourceStorageMountModeValue,
@@ -24,6 +26,25 @@ function resourceFixture(): Resource {
     kind: ResourceKindValue.rehydrate("application"),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
+}
+
+function archivedResourceFixture(): Resource {
+  const resource = resourceFixture();
+  resource
+    .attachStorage({
+      attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
+      storageVolumeId: StorageVolumeId.rehydrate("stv_demo"),
+      storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
+      destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
+      mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+      attachedAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+    })
+    ._unsafeUnwrap();
+  return Resource.rehydrate({
+    ...resource.toState(),
+    lifecycleStatus: ResourceLifecycleStatusValue.rehydrate("archived"),
+    archivedAt: ArchivedAt.rehydrate("2026-01-01T00:01:30.000Z"),
+  });
 }
 
 describe("Resource storage attachments", () => {
@@ -98,6 +119,20 @@ describe("Resource storage attachments", () => {
     });
 
     expect(result.isOk()).toBe(true);
+    expect(resource.toState().storageAttachments).toHaveLength(0);
+  });
+
+  test("[STOR-DETACH-002] detaches storage from an archived resource for cleanup", () => {
+    const resource = archivedResourceFixture();
+    const attachmentId = ResourceStorageAttachmentId.rehydrate("rsa_demo");
+
+    const result = resource.detachStorage({
+      attachmentId,
+      detachedAt: UpdatedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(resource.toState().lifecycleStatus.value).toBe("archived");
     expect(resource.toState().storageAttachments).toHaveLength(0);
   });
 });

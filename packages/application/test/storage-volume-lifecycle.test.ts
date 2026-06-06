@@ -465,6 +465,57 @@ describe("Storage volume lifecycle use cases", () => {
     expect(resource?.toState().storageAttachments).toHaveLength(0);
   });
 
+  test("[STOR-DETACH-002] detaches storage from an archived resource during cleanup", async () => {
+    const { attachStorage, context, createStorage, detachStorage, repositoryContext, resources } =
+      await createHarness();
+    const volume = (
+      await createStorage.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Data",
+        kind: "named-volume",
+      })
+    )._unsafeUnwrap();
+    const attachment = (
+      await attachStorage.execute(context, {
+        resourceId: "res_web",
+        storageVolumeId: volume.id,
+        destinationPath: "/data",
+        mountMode: "read-write",
+      })
+    )._unsafeUnwrap();
+    const resourceBeforeArchive = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    resourceBeforeArchive
+      ?.archive({
+        archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    if (!resourceBeforeArchive) {
+      throw new Error("resource fixture was not persisted");
+    }
+    await resources.upsert(
+      repositoryContext,
+      resourceBeforeArchive,
+      UpsertResourceSpec.fromResource(resourceBeforeArchive),
+    );
+
+    const result = await detachStorage.execute(context, {
+      resourceId: "res_web",
+      attachmentId: attachment.id,
+    });
+
+    expect(result.isOk()).toBe(true);
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(resource?.toState().lifecycleStatus.value).toBe("archived");
+    expect(resource?.toState().storageAttachments).toHaveLength(0);
+  });
+
   test("[STOR-DELETE-001] blocks attached volume deletion by default", async () => {
     const { attachStorage, context, createStorage, deleteStorage } = await createHarness();
     const volume = (
