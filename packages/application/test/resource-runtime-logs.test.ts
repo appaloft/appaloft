@@ -336,10 +336,14 @@ function createService(input?: {
     new StaticResourceReadModel(input?.resources ?? [resourceSummary()]),
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
     runtimeLogReader,
-    {
-      ...(input?.boundedOpenTimeoutMs ? { boundedOpenTimeoutMs: input.boundedOpenTimeoutMs } : {}),
-    },
   );
+  if (input?.boundedOpenTimeoutMs) {
+    (
+      service as unknown as {
+        boundedOpenTimeoutMs: number;
+      }
+    ).boundedOpenTimeoutMs = input.boundedOpenTimeoutMs;
+  }
 
   return {
     reader,

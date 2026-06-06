@@ -24,10 +24,6 @@ import {
 import { tokens } from "../../tokens";
 import { type ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 
-type ResourceRuntimeLogsQueryServiceOptions = {
-  boundedOpenTimeoutMs?: number;
-};
-
 const defaultBoundedOpenTimeoutMs = 10_000;
 
 class MaskingResourceRuntimeLogStream implements ResourceRuntimeLogStream {
@@ -210,17 +206,14 @@ function createRuntimeLogOpenTimeoutError(input: {
 
 @injectable()
 export class ResourceRuntimeLogsQueryService {
-  private readonly boundedOpenTimeoutMs: number;
+  private boundedOpenTimeoutMs = defaultBoundedOpenTimeoutMs;
 
   constructor(
     @inject(tokens.resourceReadModel) private readonly resourceReadModel: ResourceReadModel,
     @inject(tokens.deploymentReadModel) private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.resourceRuntimeLogReader)
     private readonly runtimeLogReader: ResourceRuntimeLogReader,
-    options: ResourceRuntimeLogsQueryServiceOptions = {},
-  ) {
-    this.boundedOpenTimeoutMs = options.boundedOpenTimeoutMs ?? defaultBoundedOpenTimeoutMs;
-  }
+  ) {}
 
   async execute(
     context: ExecutionContext,
