@@ -1043,6 +1043,7 @@ profiles:
         variables: [],
         usesSecrets: [],
         usesResources: [],
+        storageMounts: [],
         dependencyEnv: [],
       },
       {
@@ -1055,6 +1056,7 @@ profiles:
         variables: [],
         usesSecrets: [],
         usesResources: [],
+        storageMounts: [],
         dependencyEnv: [],
       },
     ];

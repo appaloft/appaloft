@@ -1002,6 +1002,148 @@ describe("Blueprint install plan", () => {
     );
   });
 
+  test("[BLUEPRINT-STORAGE-MOUNT-001] projects volume mounts into install, bundle, and runtime plans", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "volume-app",
+      name: "Volume App",
+      version: "1.0.0",
+      summary: "A container app with durable storage.",
+      resources: [{ id: "data", kind: "volume", label: "Durable data" }],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/app:latest",
+          },
+          usesResources: ["data"],
+          storageMounts: [
+            {
+              resource: "data",
+              mountPath: "/app/data",
+              mountMode: "read-write",
+            },
+          ],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) {
+      throw new Error("Expected manifest to validate");
+    }
+
+    const installPlan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectName: "Volume App",
+        environmentName: "production",
+      },
+    });
+    expect(installPlan.ok).toBe(true);
+    if (!installPlan.ok) {
+      throw new Error("Expected install plan to compile");
+    }
+
+    expect(installPlan.value.operations).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "attach-storage",
+          componentId: "app",
+          requirementId: "data",
+          mountPath: "/app/data",
+          mountMode: "read-write",
+        },
+      ]),
+    );
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: installPlan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) {
+      throw new Error("Expected bundle plan to compile");
+    }
+
+    expect(bundle.value.components[0]?.storageMounts).toEqual([
+      {
+        requirementId: "data",
+        mountPath: "/app/data",
+        mountMode: "read-write",
+      },
+    ]);
+    expect(bundle.value.relationships).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "component-attaches-storage",
+          componentId: "app",
+          requirementId: "data",
+          mountPath: "/app/data",
+          mountMode: "read-write",
+        },
+      ]),
+    );
+
+    const projection = createBlueprintComponentRuntimeProjection({
+      applicationBundle: bundle.value,
+    });
+    expect(projection.components[0]?.storageMounts).toEqual([
+      {
+        dependencyRequirementId: "data",
+        mountPath: "/app/data",
+        mountMode: "read-write",
+        bindingRef: {
+          kind: "dependency-output",
+          requirementId: "data",
+          output: "mountPath",
+        },
+      },
+    ]);
+  });
+
+  test("[BLUEPRINT-STORAGE-MOUNT-002] rejects storage mounts that do not target volume resources", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "invalid-volume-app",
+      name: "Invalid Volume App",
+      version: "1.0.0",
+      summary: "A container app with invalid storage metadata.",
+      resources: [{ id: "database", kind: "postgres", label: "Postgres" }],
+      components: [
+        {
+          id: "app",
+          name: "App",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "example/app:latest",
+          },
+          usesResources: ["database"],
+          storageMounts: [
+            {
+              resource: "database",
+              mountPath: "/app/data",
+            },
+          ],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+
+    expect(manifest.ok).toBe(false);
+    if (manifest.ok) return;
+    expect(manifest.issues.map((issue) => issue.message)).toContain(
+      "storageMount resource database must be a volume resource",
+    );
+  });
+
   test("[CLOUD-BLUEPRINT-UPGRADE-PLAN-038] creates a dry-run upgrade plan without executing updates", () => {
     const current = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
