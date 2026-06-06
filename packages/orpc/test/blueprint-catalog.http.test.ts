@@ -15,7 +15,7 @@ import {
   type QueryBus,
   ShowBlueprintQuery,
 } from "@appaloft/application";
-import { ok, type Result } from "@appaloft/core";
+import { err, ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
 import { mountAppaloftOrpcRoutes } from "../src";
@@ -178,5 +178,60 @@ describe("blueprint catalog HTTP routes", () => {
       expect.any(CreateBlueprintInstallPlanQuery),
       expect.any(AcceptBlueprintInstallCommand),
     ]);
+  });
+
+  test("[BP-CATALOG-API-002] maps extension user errors to HTTP 400 without requiring public code enumeration", async () => {
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        if (command instanceof AcceptBlueprintInstallCommand) {
+          return err({
+            code: "user_provided_secret_missing",
+            category: "user",
+            message: "User-provided secret is required.",
+            retryable: false,
+            details: {
+              componentId: "pocketbase",
+              key: "POCKETBASE_ADMIN_PASSWORD",
+            },
+          });
+        }
+        throw new Error("Unexpected command");
+      },
+    } as CommandBus;
+    const app = createApp(queryBus, commandBus);
+
+    const response = await app.handle(
+      new Request("http://localhost/api/blueprints/pocketbase/install", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          target: {
+            projectName: "Smoke",
+          },
+          idempotencyKey: "install:pocketbase:missing-secret",
+          acknowledgements: ["accepts-blueprint-application-bundle"],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "user_provided_secret_missing",
+        category: "user",
+        message: "User-provided secret is required.",
+        retryable: false,
+        details: {
+          componentId: "pocketbase",
+          key: "POCKETBASE_ADMIN_PASSWORD",
+        },
+      },
+    });
   });
 });

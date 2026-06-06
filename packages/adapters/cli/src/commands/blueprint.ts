@@ -83,15 +83,28 @@ function dependencyProvisioningOptions(input: {
   });
 }
 
-function secretValuesInput(values: readonly string[]) {
-  return values.flatMap((entry) => {
+export function secretValuesInput(values: readonly string[]) {
+  return values.map((entry) => {
     const separator = entry.indexOf("=");
-    const componentSeparator = entry.indexOf(":");
-    if (componentSeparator <= 0 || separator <= componentSeparator + 1) return [];
-    const componentId = entry.slice(0, componentSeparator).trim();
-    const key = entry.slice(componentSeparator + 1, separator).trim();
+    if (separator <= 0) {
+      throw new Error("Blueprint secret values must use KEY=value or component:KEY=value.");
+    }
+    const componentSeparator = entry.slice(0, separator).indexOf(":");
+    const componentId =
+      componentSeparator > 0 ? entry.slice(0, componentSeparator).trim() : undefined;
+    const key =
+      componentSeparator > 0
+        ? entry.slice(componentSeparator + 1, separator).trim()
+        : entry.slice(0, separator).trim();
     const value = entry.slice(separator + 1);
-    return componentId && key ? [{ componentId, key, value }] : [];
+    if (!key || value === "") {
+      throw new Error("Blueprint secret values must include a secret key and non-empty value.");
+    }
+    return {
+      ...(componentId ? { componentId } : {}),
+      key,
+      value,
+    };
   });
 }
 
