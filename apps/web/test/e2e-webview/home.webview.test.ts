@@ -3339,7 +3339,7 @@ async function clickElementBySelector(view: Bun.WebView, selector: string): Prom
   expect(found).toBe(true);
 }
 
-async function pressElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+async function _pressElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
       view.evaluate<boolean>(
@@ -3384,7 +3384,7 @@ async function pressElementBySelector(view: Bun.WebView, selector: string): Prom
   expect(found).toBe(true);
 }
 
-async function clickAnyElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
+async function _clickAnyElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
       view.evaluate<boolean>(
@@ -5472,6 +5472,179 @@ describe("console e2e with Bun.WebView", () => {
         delete apiResponses.dashboard["/api/rpc/previewEnvironments/delete"];
       } else {
         apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = previousPreviewDeleteRoute;
+      }
+    }
+  }, 20_000);
+
+  test("[PG-PREVIEW-SURFACE-002] shows project-scoped preview environments and preview resources", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousPreviewListRoute = apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+    const previousEnvironmentListRoute = apiResponses.dashboard["/api/rpc/environments/list"];
+    const previousResourceListRoute = apiResponses.dashboard["/api/rpc/resources/list"];
+    const previewSourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A41";
+
+    apiResponses.dashboard["/api/rpc/environments/list"] = {
+      json: {
+        items: [
+          {
+            id: "env_demo",
+            projectId: "prj_demo",
+            name: "production",
+            kind: "production",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+          {
+            id: "env_preview_project",
+            projectId: "prj_demo",
+            name: "Preview",
+            kind: "preview",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+        ],
+      },
+    };
+    apiResponses.dashboard["/api/rpc/resources/list"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        includePreviewResources?: boolean;
+        projectId?: string;
+      } | null;
+      const previewResource = {
+        id: "res_preview_project_web",
+        projectId: "prj_demo",
+        environmentId: "env_preview_project",
+        destinationId: "dst_demo",
+        name: "preview-web",
+        slug: "preview-web",
+        kind: "static-site",
+        services: [{ name: "web", kind: "web" }],
+        deploymentCount: 0,
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+        accessProfile: {
+          generatedAccessMode: "inherit",
+          pathPrefix: "/",
+        },
+        createdAt: "2026-01-01T00:02:00.000Z",
+      };
+
+      return {
+        json: {
+          items:
+            input?.projectId === "prj_demo" && input.includePreviewResources
+              ? [previewResource]
+              : [],
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "preview-environments.list/v1",
+          items:
+            input?.projectId === "prj_demo"
+              ? [
+                  {
+                    previewEnvironmentId: "prenv_project_41",
+                    projectId: "prj_demo",
+                    environmentId: "env_preview_project",
+                    resourceId: "res_preview_project_web",
+                    serverId: "srv_demo",
+                    destinationId: "dst_demo",
+                    source: {
+                      provider: "github",
+                      repositoryFullName: "acme/platform",
+                      headRepositoryFullName: "acme/platform",
+                      pullRequestNumber: 41,
+                      baseRef: "main",
+                      headSha: "abc4141",
+                      sourceBindingFingerprint: previewSourceFingerprint,
+                    },
+                    status: "active",
+                    createdAt: "2026-01-01T00:00:00.000Z",
+                    updatedAt: "2026-01-01T00:05:00.000Z",
+                    expiresAt: "2026-01-08T00:00:00.000Z",
+                  },
+                ]
+              : [],
+          generatedAt: "2026-01-01T00:05:01.000Z",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=preview`);
+
+      await expectText(view, "Preview");
+      await expectText(view, "prenv_project_41");
+      await expectText(view, "preview-web");
+      await expectText(view, "acme/platform");
+      await expectText(view, previewSourceFingerprint);
+
+      const previewListInputs = await waitFor(
+        async () =>
+          recordedApiRequests
+            .filter((request) => request.pathname === "/api/rpc/previewEnvironments/list")
+            .map((request) => readOrpcJsonPayload(request.body)),
+        (inputs) =>
+          inputs.some(
+            (input) => isRecord(input) && input.projectId === "prj_demo" && input.limit === 50,
+          ),
+        "Expected Project-scoped preview environment list request",
+      );
+      expect(previewListInputs).toContainEqual({
+        projectId: "prj_demo",
+        limit: 50,
+      });
+
+      const resourceListInputs = await waitFor(
+        async () =>
+          recordedApiRequests
+            .filter((request) => request.pathname === "/api/rpc/resources/list")
+            .map((request) => readOrpcJsonPayload(request.body)),
+        (inputs) =>
+          inputs.some(
+            (input) =>
+              isRecord(input) &&
+              input.projectId === "prj_demo" &&
+              input.includePreviewResources === true &&
+              input.limit === 100,
+          ),
+        "Expected Project-scoped preview resource list request",
+      );
+      expect(resourceListInputs).toContainEqual({
+        projectId: "prj_demo",
+        includePreviewResources: true,
+        limit: 100,
+      });
+    } finally {
+      if (previousPreviewListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/previewEnvironments/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/previewEnvironments/list"] = previousPreviewListRoute;
+      }
+      if (previousEnvironmentListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/environments/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/environments/list"] = previousEnvironmentListRoute;
+      }
+      if (previousResourceListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/resources/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/resources/list"] = previousResourceListRoute;
       }
     }
   }, 20_000);

@@ -1153,11 +1153,26 @@ export const enUS = {
       noProjectDeploymentTitle: "This project has no deployments.",
       noProjectSelected: "No project selected",
       noProjectSelectedDescription: "Environments and deployment records are grouped by project.",
+      noPreviewEnvironments:
+        "No pull request or source-driven preview environments are recorded for this project yet.",
+      noPreviewEnvironmentsTitle: "No preview environments yet.",
+      noPreviewResources: "No resources are attached to preview environments for this project yet.",
+      noPreviewResourcesTitle: "No preview resources yet.",
       noPublicAccess: "No public access URL yet.",
       noFilteredResources: "No resources match the current filters.",
       noResources:
         "This project has no resources yet. Resources appear after deployment context resolution.",
       noResourcesShort: "No resources yet",
+      previewDescription:
+        "Preview keeps short-lived environments and resources discoverable without mixing them into the default production resource list.",
+      previewEnvironmentCountTitle: "Preview environments",
+      previewEnvironmentsDescription:
+        "Source-driven previews such as pull request deployments. Open one for cleanup and detailed lifecycle state.",
+      previewEnvironmentsTitle: "Preview environments",
+      previewResourcesDescription:
+        "Resources whose environment kind is preview. These include previews without a source-driven preview record.",
+      previewResourcesTitle: "Preview resources",
+      previewTitle: "Preview",
       allEnvironments: "All environments",
       dangerZoneDescription:
         "Archive and deletion are separated from normal settings because they change whether future project-scoped operations are allowed.",
