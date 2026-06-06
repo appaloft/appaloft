@@ -2,6 +2,8 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
+  ArchiveReason,
   CommandText,
   CreatedAt,
   domainError,
@@ -316,6 +318,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
 async function createHarness(input?: {
   resource?: ResourceSummary;
   deployments?: DeploymentSummary[];
+  repositoryResource?: Resource;
   targetPort?: RecordingRuntimeControlTargetPort;
   coordinator?: CapturingMutationCoordinator;
 }) {
@@ -324,7 +327,7 @@ async function createHarness(input?: {
     requestId: "req_resource_runtime_control_test",
     entrypoint: "system",
   });
-  const resource = applicationResourceFixture();
+  const resource = input?.repositoryResource ?? applicationResourceFixture();
   await resourceRepository.upsert(
     toRepositoryContext(context),
     resource,
@@ -494,6 +497,78 @@ describe("ResourceRuntimeControlUseCase", () => {
         providerKey: "local-shell",
       }),
     ]);
+  });
+
+  test("[RUNTIME-CTRL-STOP-002] permits stop for archived resources with retained runtime placement", async () => {
+    const archivedResource = applicationResourceFixture();
+    const archived = archivedResource.archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      reason: ArchiveReason.rehydrate("cleanup smoke resource"),
+    });
+    expect(archived.isOk()).toBe(true);
+
+    const { context, targetPort, useCase } = await createHarness({
+      repositoryResource: archivedResource,
+    });
+
+    const result = await useCase.execute(context, {
+      operation: "stop",
+      resourceId: "res_web",
+      reason: "cleanup archived runtime",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      operation: "stop",
+      status: "succeeded",
+      runtimeState: "stopped",
+    });
+    expect(targetPort.requests).toEqual([
+      expect.objectContaining({
+        operation: "stop",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+      }),
+    ]);
+  });
+
+  test("[RUNTIME-CTRL-START-002] still blocks start for archived resources", async () => {
+    const archivedResource = applicationResourceFixture();
+    const archived = archivedResource.archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      reason: ArchiveReason.rehydrate("cleanup smoke resource"),
+    });
+    expect(archived.isOk()).toBe(true);
+
+    const { context, targetPort, useCase } = await createHarness({
+      repositoryResource: archivedResource,
+      resource: resourceSummary({
+        latestRuntimeControl: {
+          runtimeControlAttemptId: "rtc_previous",
+          operation: "stop",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:05.000Z",
+          completedAt: "2026-01-01T00:00:06.000Z",
+          runtimeState: "stopped",
+        },
+      }),
+    });
+
+    const result = await useCase.execute(context, {
+      operation: "start",
+      resourceId: "res_web",
+      acknowledgeRetainedRuntimeMetadata: true,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_runtime_control_blocked",
+      details: expect.objectContaining({
+        operation: "start",
+        blockedReason: "resource-archived",
+      }),
+    });
+    expect(targetPort.requests).toHaveLength(0);
   });
 
   test("[RUNTIME-CTRL-STOP-001] records safe process-attempt failure visibility when adapter execution fails", async () => {

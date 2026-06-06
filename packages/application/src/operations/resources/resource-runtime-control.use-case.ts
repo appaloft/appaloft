@@ -336,7 +336,7 @@ export class ResourceRuntimeControlUseCase {
         );
       }
 
-      if (resourceState.lifecycleStatus.isArchived()) {
+      if (resourceState.lifecycleStatus.isArchived() && input.operation !== "stop") {
         return err(
           blockedError({
             message: "Resource runtime control is blocked for archived resources",
