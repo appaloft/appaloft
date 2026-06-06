@@ -662,6 +662,25 @@ function defaultVerificationSteps(accessRoutes: AccessRoute[]): Array<RuntimeVer
   return accessRoutes.length > 0 ? ["internal-http", "public-http"] : ["internal-http"];
 }
 
+export function dockerContainerNetworkIpCommand(input: {
+  containerName: string;
+  networkName: string;
+}): string {
+  const format = `{{with index .NetworkSettings.Networks ${JSON.stringify(input.networkName)}}}{{.IPAddress}}{{end}}`;
+  return `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`;
+}
+
+export function parseDockerContainerNetworkIp(output: string): string | undefined {
+  const ip = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  if (!ip) {
+    return undefined;
+  }
+  return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || /^[a-f0-9:]+$/i.test(ip) ? ip : undefined;
+}
+
 function remoteInternalHealthCheckCommand(url: string, options: HttpHealthCheckOptions): string {
   const timeoutSeconds = Math.max(1, Math.ceil(options.timeoutMs / 1000));
   const curlScript = [
@@ -2705,7 +2724,37 @@ export class SshExecutionBackend implements ExecutionBackend {
         state.runtimePlan.execution.verificationSteps.length > 0
           ? state.runtimePlan.execution.verificationSteps.map((step) => step.kind)
           : defaultVerificationSteps(accessRoutes);
-      const internalUrl = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
+      const proxyNetworkName = proxyRoutePlanResult.value?.networkName;
+      let internalUrl = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
+      if (proxyNetworkName) {
+        const networkIp = await this.runRemoteCommand({
+          target,
+          command: dockerContainerNetworkIpCommand({
+            containerName,
+            networkName: proxyNetworkName,
+          }),
+          cwd: runtimeDir,
+          env,
+        });
+        const containerNetworkIp = parseDockerContainerNetworkIp(networkIp.stdout);
+        if (!networkIp.failed && containerNetworkIp) {
+          internalUrl = `http://${containerNetworkIp}:${port}${healthPath}`;
+          logs.push(
+            phaseLog(
+              "verify",
+              `Use SSH Docker network ${proxyNetworkName} address for internal health check`,
+            ),
+          );
+        } else {
+          logs.push(
+            phaseLog(
+              "verify",
+              `SSH Docker network address was not available; falling back to published port ${publishedHostPort}`,
+              "warn",
+            ),
+          );
+        }
+      }
       const publicRouteHealthChecks = accessRoutes.map((route) => ({
         route,
         url: publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
