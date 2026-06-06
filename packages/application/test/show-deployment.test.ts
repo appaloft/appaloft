@@ -550,6 +550,66 @@ describe("ShowDeploymentQueryService", () => {
     expect(JSON.stringify(detail.snapshot?.dependencyBindings)).not.toContain("super-secret");
   });
 
+  test("[DEP-SHOW-SECRET-001] masks secret values on deployment detail readback", async () => {
+    const result = await createService({
+      deployments: [
+        deploymentSummary({
+          environmentSnapshot: {
+            id: "snap_demo",
+            environmentId: "env_demo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            precedence: ["defaults", "project", "environment", "deployment"],
+            variables: [
+              {
+                key: "PUBLIC_ORIGIN",
+                value: "https://web.demo.example.com",
+                kind: "plain-config",
+                exposure: "runtime",
+                scope: "resource",
+                isSecret: false,
+              },
+              {
+                key: "SECRET_KEY",
+                value: "raw-secret-value-that-must-not-leak",
+                kind: "secret",
+                exposure: "runtime",
+                scope: "resource",
+                isSecret: true,
+              },
+            ],
+          },
+        }),
+      ],
+    }).service.execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    const serialized = JSON.stringify(detail);
+    expect(serialized).not.toContain("raw-secret-value-that-must-not-leak");
+    expect(detail.deployment.environmentSnapshot.variables).toEqual([
+      {
+        key: "PUBLIC_ORIGIN",
+        value: "https://web.demo.example.com",
+        kind: "plain-config",
+        exposure: "runtime",
+        scope: "resource",
+        isSecret: false,
+      },
+      {
+        key: "SECRET_KEY",
+        value: "********",
+        kind: "secret",
+        exposure: "runtime",
+        scope: "resource",
+        isSecret: true,
+      },
+    ]);
+    expect(detail.snapshot?.environmentSnapshot.variables.at(1)).toMatchObject({
+      key: "SECRET_KEY",
+      value: "********",
+      isSecret: true,
+    });
+  });
+
   test("[DEP-SHOW-QRY-002] returns not_found without querying related readers when deployment is missing", async () => {
     const harness = createService({
       deployments: [],
