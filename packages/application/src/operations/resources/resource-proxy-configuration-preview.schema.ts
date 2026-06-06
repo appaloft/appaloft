@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { booleanQueryParam } from "../shared-schema";
+
 export const resourceProxyConfigurationRouteScopes = [
   "planned",
   "latest",
@@ -11,7 +13,7 @@ export const resourceProxyConfigurationPreviewQueryInputSchema = z
     resourceId: z.string().min(1),
     deploymentId: z.string().min(1).optional(),
     routeScope: z.enum(resourceProxyConfigurationRouteScopes).default("latest"),
-    includeDiagnostics: z.boolean().default(false),
+    includeDiagnostics: booleanQueryParam(false),
   })
   .superRefine((value, context) => {
     if (value.routeScope === "deployment-snapshot" && !value.deploymentId) {

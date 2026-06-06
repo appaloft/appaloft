@@ -8,6 +8,7 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ListDeploymentsQuery,
   type Query,
   type QueryBus,
   ShowDeploymentQuery,
@@ -205,6 +206,39 @@ describe("deployment show HTTP route", () => {
       includeSnapshot: true,
       includeRelatedContext: true,
       includeLatestFailure: true,
+    });
+  });
+
+  test("[DEP-LIST-ENTRY-006] dispatches ListDeploymentsQuery through HTTP with boolean query parameters", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({ items: [] } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/deployments?includeArchived=false", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: [] });
+    expect(capturedQuery).toBeInstanceOf(ListDeploymentsQuery);
+    expect(capturedQuery).toMatchObject({
+      includeArchived: false,
     });
   });
 });

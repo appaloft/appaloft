@@ -554,7 +554,9 @@ describe("access/proxy/health/diagnostic HTTP regression harness", () => {
       ),
     );
     const proxyResponse = await app.handle(
-      new Request("http://localhost/api/resources/res_web/proxy-configuration"),
+      new Request(
+        "http://localhost/api/resources/res_web/proxy-configuration?includeDiagnostics=true",
+      ),
     );
     const diagnosticResponse = await app.handle(
       new Request(
@@ -619,9 +621,13 @@ describe("access/proxy/health/diagnostic HTTP regression harness", () => {
     expect(capturedQueries.some((query) => query instanceof ShowResourceQuery)).toBe(true);
     expect(capturedQueries.some((query) => query instanceof ResourceHealthQuery)).toBe(true);
     expect(capturedQueries.some((query) => query instanceof ResourceHealthHistoryQuery)).toBe(true);
-    expect(
-      capturedQueries.some((query) => query instanceof ResourceProxyConfigurationPreviewQuery),
-    ).toBe(true);
+    const proxyQuery = capturedQueries.find(
+      (query) => query instanceof ResourceProxyConfigurationPreviewQuery,
+    );
+    expect(proxyQuery).toBeInstanceOf(ResourceProxyConfigurationPreviewQuery);
+    expect(proxyQuery).toMatchObject({
+      includeDiagnostics: true,
+    });
     expect(capturedQueries.some((query) => query instanceof ResourceDiagnosticSummaryQuery)).toBe(
       true,
     );

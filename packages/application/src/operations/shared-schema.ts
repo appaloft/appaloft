@@ -5,6 +5,15 @@ export const emptyOperationInputSchema = z.object({});
 
 export const listLimitSchema = z.coerce.number().int().positive().max(500).optional();
 export const defaultListLimit = 100;
+export const booleanQueryParamSchema = z.union([
+  z.boolean(),
+  z.literal("true").transform(() => true),
+  z.literal("false").transform(() => false),
+]);
+
+export function booleanQueryParam(defaultValue: boolean) {
+  return booleanQueryParamSchema.default(defaultValue);
+}
 
 export function boundedListLimit(limit?: number): number {
   return Math.min(limit ?? defaultListLimit, 500);
