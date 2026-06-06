@@ -108,4 +108,69 @@ describe("ShellManagedDependencyProvider", () => {
       process.env.PATH = previousPath;
     }
   });
+
+  test("[DEP-RES-REDIS-NATIVE-005] realizes targeted Redis as Docker-backed runtime secret", async () => {
+    const root = await createTempRoot();
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      ["#!/bin/sh", `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`, "exit 0", ""].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const provider = new ShellManagedDependencyProvider(join(root, "data"));
+      const realized = await provider.realize(
+        { requestId: "req_redis_dependency_provider_test", entrypoint: "test" },
+        {
+          dependencyResourceId: "rsi_cache",
+          projectId: "prj_preview",
+          environmentId: "env_preview",
+          kind: "redis",
+          providerKey: "appaloft-managed-redis",
+          name: "preview cache",
+          slug: "preview-cache",
+          attemptId: "dpr_preview_cache",
+          requestedAt: "2026-05-25T00:00:00.000Z",
+          target: {
+            serverId: "srv_preview",
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+            host: "127.0.0.1",
+            port: 22,
+          },
+        },
+      );
+
+      if (realized.isErr()) {
+        throw new Error(JSON.stringify(realized._unsafeUnwrapErr()));
+      }
+      expect(realized.isOk()).toBe(true);
+      const state = realized._unsafeUnwrap();
+      expect(state.providerResourceHandle).toMatch(
+        /^docker-single-server:v1:redis:srv_preview:appaloft-redis-rsi_cache$/,
+      );
+      expect(state.secretRef).toBeUndefined();
+      expect(state.connectionSecretValue).toMatch(
+        /^redis:\/\/:[a-f0-9]{48}@appaloft-redis-rsi_cache:6379\/0$/,
+      );
+      expect(state.endpoint).toMatchObject({
+        host: "appaloft-redis-rsi_cache",
+        port: 6379,
+        maskedConnection: "redis://:********@appaloft-redis-rsi_cache:6379/0",
+      });
+
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("network inspect 'appaloft-edge'");
+      expect(log).toContain("run -d --name 'appaloft-redis-rsi_cache'");
+      expect(log).toContain("redis:7-alpine");
+      expect(log).toContain("redis-cli -a");
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
 });

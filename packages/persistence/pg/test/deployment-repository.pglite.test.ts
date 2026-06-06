@@ -175,6 +175,18 @@ function createDeploymentRecord(input: {
               ),
               snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
             },
+            {
+              bindingId: ResourceBindingId.rehydrate("rbd_redis"),
+              dependencyResourceId: ResourceInstanceId.rehydrate("rsi_redis"),
+              kind: ResourceInstanceKindValue.rehydrate("redis"),
+              targetName: ResourceBindingTargetName.rehydrate("REDIS_URL"),
+              scope: ResourceBindingScopeValue.rehydrate("runtime-only"),
+              injectionMode: ResourceInjectionModeValue.rehydrate("env"),
+              runtimeSecretRef: DeploymentDependencyRuntimeSecretRef.rehydrate(
+                "appaloft://dependency-resources/rsi_redis/connection",
+              ),
+              snapshotReadiness: DeploymentDependencyBindingSnapshotReadinessValue.ready(),
+            },
           ],
         }
       : {}),
@@ -399,6 +411,17 @@ describe("pglite deployment repository", () => {
         dependencyResourceId: "rsi_pg",
         kind: "postgres",
         targetName: "DATABASE_URL",
+        scope: "runtime-only",
+        injectionMode: "env",
+        snapshotReadiness: {
+          status: "ready",
+        },
+      },
+      {
+        bindingId: "rbd_redis",
+        dependencyResourceId: "rsi_redis",
+        kind: "redis",
+        targetName: "REDIS_URL",
         scope: "runtime-only",
         injectionMode: "env",
         snapshotReadiness: {

@@ -949,17 +949,20 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
     input: ManagedDependencyRealizationInput,
   ): Promise<Result<ManagedDependencyRealizationResult, DomainError>> {
     void context;
-    if (input.target && input.kind === "postgres") {
+    if (input.target && (input.kind === "postgres" || input.kind === "redis")) {
       const container = dockerManagedDependencyContainerName(
         input.kind,
         input.dependencyResourceId,
       );
       const volume = dockerManagedDependencyVolumeName(container);
-      const spec = dockerManagedPostgresRealizationSpec(input, container, volume);
+      const spec =
+        input.kind === "postgres"
+          ? dockerManagedPostgresRealizationSpec(input, container, volume)
+          : dockerManagedRedisRealizationSpec(input, container, volume);
       const result = await runManagedDependencyTargetCommand(input.target, spec.command);
       if (result.exitCode !== 0) {
         return managedDependencyDockerCommandFailure({
-          message: "Docker-backed managed postgres realization failed",
+          message: `Docker-backed managed ${input.kind} realization failed`,
           providerKey: input.providerKey,
           operation: "dependency-resources.provision",
           exitCode: result.exitCode,
@@ -1328,6 +1331,53 @@ function dockerManagedPostgresRealizationSpec(
         `  if PGPASSWORD=${shellQuote(password)} docker exec -e PGPASSWORD ${shellQuote(
           containerName,
         )} pg_isready -U ${shellQuote(user)} -d ${shellQuote(databaseName)} >/dev/null 2>&1; then`,
+        "    exit 0",
+        "  fi",
+        "  sleep 1",
+        "done",
+        "exit 1",
+      ].join("\n"),
+    ].join("\n"),
+  };
+}
+
+function dockerManagedRedisRealizationSpec(
+  input: ManagedDependencyRealizationInput,
+  containerName: string,
+  volumeName: string,
+): DockerManagedDependencyRealizationSpec {
+  const password = randomManagedDependencyPassword();
+  const connectionSecretValue = `redis://:${password}@${containerName}:6379/0`;
+
+  return {
+    endpoint: {
+      host: containerName,
+      port: 6379,
+      maskedConnection: `redis://:********@${containerName}:6379/0`,
+    },
+    connectionSecretValue,
+    command: [
+      "set -eu",
+      dockerNetworkEnsureCommand(),
+      dockerManagedDependencyVolumeCreateCommand(volumeName, input.dependencyResourceId),
+      dockerManagedDependencyRemoveContainerCommand(containerName),
+      [
+        "docker run -d",
+        `--name ${shellQuote(containerName)}`,
+        `--network ${shellQuote(dockerManagedDependencyNetworkName)}`,
+        "--restart unless-stopped",
+        dockerManagedDependencyLabels(input.dependencyResourceId),
+        `-v ${shellQuote(`${volumeName}:/data`)}`,
+        "redis:7-alpine",
+        "redis-server",
+        "--appendonly yes",
+        `--requirepass ${shellQuote(password)}`,
+      ].join(" "),
+      [
+        "for attempt in $(seq 1 60); do",
+        `  if docker exec ${shellQuote(containerName)} redis-cli -a ${shellQuote(
+          password,
+        )} ping 2>/dev/null | grep -q PONG; then`,
         "    exit 0",
         "  fi",
         "  sleep 1",

@@ -1,7 +1,9 @@
 import {
   appaloftTraceAttributes,
   createReadModelSpanName,
+  type DeploymentDependencyBindingSnapshotReferenceSummary,
   type DeploymentReadModel,
+  dependencyResourceKinds,
   type RepositoryContext,
 } from "@appaloft/application";
 import {
@@ -81,6 +83,18 @@ function sourceCommitShaFromRuntimePlan(runtimePlan: SerializedRuntimePlan): str
 
 function deploymentLogSource(source: unknown): "appaloft" | "application" {
   return source === "application" ? "application" : "appaloft";
+}
+
+function dependencyBindingReferenceKind(
+  reference: SerializedDeploymentDependencyBindingReference,
+): DeploymentDependencyBindingSnapshotReferenceSummary["kind"] {
+  const dependencyKind = dependencyResourceKinds.find((candidate) => candidate === reference.kind);
+  if (!dependencyKind) {
+    throw new Error(
+      `Deployment dependency binding reference kind ${reference.kind} is not supported`,
+    );
+  }
+  return dependencyKind;
 }
 
 function toDeploymentSummary(
@@ -246,7 +260,7 @@ function toDeploymentSummary(
     dependencyBindingReferences: dependencyBindingReferences.map((reference) => ({
       bindingId: reference.bindingId,
       dependencyResourceId: reference.dependencyResourceId,
-      kind: "postgres",
+      kind: dependencyBindingReferenceKind(reference),
       targetName: reference.targetName,
       scope: reference.scope,
       injectionMode: reference.injectionMode,
