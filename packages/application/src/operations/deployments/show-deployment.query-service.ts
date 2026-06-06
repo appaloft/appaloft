@@ -69,9 +69,24 @@ function deploymentReadInfraError(deploymentId: string, error: unknown): DomainE
   });
 }
 
+function maskedEnvironmentSnapshot(
+  snapshot: DeploymentSummary["environmentSnapshot"],
+): DeploymentSummary["environmentSnapshot"] {
+  return {
+    ...snapshot,
+    variables: snapshot.variables.map((variable) => ({
+      ...variable,
+      value: variable.isSecret || variable.kind === "secret" ? "********" : variable.value,
+    })),
+  };
+}
+
 function toDeploymentDetailSummary(deployment: DeploymentSummary): DeploymentDetailSummary {
   const { logs: _logs, ...summary } = deployment;
-  return summary;
+  return {
+    ...summary,
+    environmentSnapshot: maskedEnvironmentSnapshot(summary.environmentSnapshot),
+  };
 }
 
 function latestFailureFromLogs(
