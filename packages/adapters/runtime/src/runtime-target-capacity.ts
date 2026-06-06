@@ -15,6 +15,8 @@ import { runBufferedProcess, shellCommand } from "./buffered-process";
 
 const kib = 1024;
 const defaultRemoteRuntimeRoot = "/var/lib/appaloft/runtime";
+export const runtimeTargetCapacitySshConnectTimeoutSeconds = 5;
+export const runtimeTargetCapacitySshProcessTimeoutMs = 8_000;
 
 interface PreparedSshArgs {
   args: string[];
@@ -63,7 +65,7 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
       "-o",
       "BatchMode=yes",
       "-o",
-      "ConnectTimeout=8",
+      `ConnectTimeout=${runtimeTargetCapacitySshConnectTimeoutSeconds}`,
       "-o",
       "StrictHostKeyChecking=accept-new",
       hostWithUsername(server.host.value, credential?.username?.value),
@@ -971,7 +973,7 @@ async function runSshCapacityScript(
   try {
     const result = await runBufferedProcess({
       command: ["ssh", ...prepared.args],
-      timeoutMs: 20_000,
+      timeoutMs: runtimeTargetCapacitySshProcessTimeoutMs,
       timeoutMessage: "Capacity diagnostic timed out",
     });
 

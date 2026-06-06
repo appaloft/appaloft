@@ -14,6 +14,8 @@ import {
   parseDockerSizeToBytes,
   parseRuntimeTargetCapacityOutput,
   renderRuntimeTargetCapacityScript,
+  runtimeTargetCapacitySshConnectTimeoutSeconds,
+  runtimeTargetCapacitySshProcessTimeoutMs,
 } from "../src/runtime-target-capacity";
 
 function server(): DeploymentTargetState {
@@ -149,5 +151,10 @@ describe("runtime target capacity diagnostics", () => {
     const result = await command;
     expect(result.failed).toBe(false);
     expect(result.stdout).toContain("APPALOFT_CAPACITY_V1");
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-004] SSH capacity diagnostics stay below HTTP gateway timeouts", () => {
+    expect(runtimeTargetCapacitySshConnectTimeoutSeconds).toBeLessThanOrEqual(5);
+    expect(runtimeTargetCapacitySshProcessTimeoutMs).toBeLessThanOrEqual(8_000);
   });
 });
