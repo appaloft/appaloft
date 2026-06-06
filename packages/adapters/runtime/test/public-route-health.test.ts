@@ -1,7 +1,13 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { waitForHealth, type HealthFetch, type HttpHealthCheckOptions } from "../src/ssh-execution";
+import {
+  dockerContainerNetworkIpCommand,
+  parseDockerContainerNetworkIp,
+  waitForHealth,
+  type HealthFetch,
+  type HttpHealthCheckOptions,
+} from "../src/ssh-execution";
 
 const baseOptions: HttpHealthCheckOptions = {
   method: "GET",
@@ -13,6 +19,23 @@ const baseOptions: HttpHealthCheckOptions = {
 };
 
 describe("public route health checks", () => {
+  test("[SSH-DOCKER-HEALTH-001] renders Docker network IP lookup for SSH internal health", () => {
+    expect(
+      dockerContainerNetworkIpCommand({
+        containerName: "appaloft-dep_live",
+        networkName: "appaloft-edge",
+      }),
+    ).toBe(
+      'docker inspect --format \'{{with index .NetworkSettings.Networks "appaloft-edge"}}{{.IPAddress}}{{end}}\' \'appaloft-dep_live\'',
+    );
+  });
+
+  test("[SSH-DOCKER-HEALTH-001] parses Docker network IP lookup output", () => {
+    expect(parseDockerContainerNetworkIp("\n172.19.0.7\n")).toBe("172.19.0.7");
+    expect(parseDockerContainerNetworkIp("\nnot an ip\n")).toBeUndefined();
+    expect(parseDockerContainerNetworkIp("\n\n")).toBeUndefined();
+  });
+
   test("[DEP-CREATE-ASYNC-016] classifies TLS certificate verification failures", async () => {
     const result = await waitForHealth("https://preview.example.test/api/health", baseOptions, {
       fetchImpl: async () => {
