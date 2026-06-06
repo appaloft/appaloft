@@ -186,6 +186,18 @@ function runningRuntimeState(
   }
 }
 
+function terminalRuntimeState(
+  operation: ResourceRuntimeControlOperation,
+): ResourceRuntimeControlRuntimeState {
+  switch (operation) {
+    case "stop":
+      return "stopped";
+    case "start":
+    case "restart":
+      return "running";
+  }
+}
+
 function toCommandResult(
   record: ResourceRuntimeControlAttemptRecord,
 ): ResourceRuntimeControlCommandResult {
@@ -376,6 +388,7 @@ export class ResourceRuntimeControlUseCase {
 
       const attemptId = idGenerator.next("rtc");
       const startedAt = clock.now();
+      const isNoopStop = input.operation === "stop" && runtimeState === "stopped";
       const runningAttempt: ResourceRuntimeControlAttemptRecord = {
         runtimeControlAttemptId: attemptId,
         resourceId: input.resourceId,
@@ -420,6 +433,29 @@ export class ResourceRuntimeControlUseCase {
               runtimeKind: deployment.runtimePlan.execution.kind,
               targetKind: deployment.runtimePlan.target.kind,
             });
+
+            if (isNoopStop) {
+              const terminalAttempt: ResourceRuntimeControlAttemptRecord = {
+                ...runningAttempt,
+                status: "succeeded",
+                runtimeState: terminalRuntimeState(input.operation),
+                completedAt: clock.now(),
+              };
+              const persisted = yield* await attemptRecorder.record(
+                repositoryContext,
+                terminalAttempt,
+              );
+              await recordRuntimeControlProcessAttempt({
+                recorder: processAttemptRecorder,
+                repositoryContext,
+                context,
+                attempt: terminalAttempt,
+                providerKey: deployment.runtimePlan.target.providerKey,
+                runtimeKind: deployment.runtimePlan.execution.kind,
+                targetKind: deployment.runtimePlan.target.kind,
+              });
+              return ok(persisted);
+            }
 
             const targetResult = await targetPort.control(context, {
               runtimeControlAttemptId: attemptId,
@@ -553,16 +589,6 @@ export class ResourceRuntimeControlUseCase {
           resourceId: input.resourceId,
           operation: input.operation,
           blockedReason: "runtime-control-in-progress",
-        }),
-      );
-    }
-
-    if (input.operation === "stop" && runtimeState === "stopped") {
-      return err(
-        alreadyInStateError({
-          resourceId: input.resourceId,
-          operation: input.operation,
-          runtimeState,
         }),
       );
     }

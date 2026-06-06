@@ -532,6 +532,67 @@ describe("ResourceRuntimeControlUseCase", () => {
     ]);
   });
 
+  test("[RUNTIME-CTRL-STOP-003] treats already stopped runtime stop as idempotent cleanup", async () => {
+    const { attemptRecorder, context, processAttemptRecorder, targetPort, useCase } =
+      await createHarness({
+        resource: resourceSummary({
+          latestRuntimeControl: {
+            runtimeControlAttemptId: "rtc_previous",
+            operation: "stop",
+            status: "succeeded",
+            startedAt: "2026-01-01T00:00:05.000Z",
+            completedAt: "2026-01-01T00:00:06.000Z",
+            runtimeState: "stopped",
+          },
+        }),
+      });
+
+    const result = await useCase.execute(context, {
+      operation: "stop",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      reason: "cleanup idempotent stop",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      runtimeControlAttemptId: "rtc_0001",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      operation: "stop",
+      status: "succeeded",
+      runtimeState: "stopped",
+    });
+    expect(targetPort.requests).toHaveLength(0);
+    expect(attemptRecorder.records).toHaveLength(2);
+    expect(attemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "succeeded",
+    ]);
+    expect(processAttemptRecorder.records.map((record) => record.status)).toEqual([
+      "running",
+      "succeeded",
+    ]);
+    expect(processAttemptRecorder.records[1]).toMatchObject({
+      id: "rtc_0001",
+      kind: "runtime-maintenance",
+      status: "succeeded",
+      operationKey: "resources.runtime.stop",
+      step: "stop-succeeded",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      serverId: "srv_demo",
+      safeDetails: {
+        operation: "stop",
+        runtimeState: "stopped",
+        providerKey: "local-shell",
+        runtimeKind: "docker-container",
+        targetKind: "single-server",
+        reason: "cleanup idempotent stop",
+      },
+    });
+  });
+
   test("[RUNTIME-CTRL-START-002] still blocks start for archived resources", async () => {
     const archivedResource = applicationResourceFixture();
     const archived = archivedResource.archive({
