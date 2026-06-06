@@ -14,6 +14,7 @@ import {
   type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
+  ShowBlueprintInstallationQuery,
   ShowBlueprintQuery,
 } from "@appaloft/application";
 import { err, ok, type Result } from "@appaloft/core";
@@ -122,6 +123,19 @@ describe("blueprint catalog HTTP routes", () => {
             },
           } as T);
         }
+        if (query instanceof ShowBlueprintInstallationQuery) {
+          return ok({
+            applicationId: query.applicationId,
+            status: "ready",
+            components: [
+              {
+                resource: { resourceId: "res_pocketbase" },
+                deployment: { deploymentId: "dep_pocketbase" },
+                endpoints: [{ url: "https://pocketbase.example.test" }],
+              },
+            ],
+          } as T);
+        }
         throw new Error("Unexpected query");
       },
     } as QueryBus;
@@ -200,11 +214,27 @@ describe("blueprint catalog HTTP routes", () => {
       schemaVersion: "appaloft.blueprint.install-result/v1",
       slug: "pocketbase",
     });
+    const installationResponse = await app.handle(
+      new Request("http://localhost/api/blueprints/installations/app_pocketbase", {
+        headers: authHeaders,
+      }),
+    );
+    expect(installationResponse.status).toBe(200);
+    expect(await installationResponse.json()).toMatchObject({
+      applicationId: "app_pocketbase",
+      components: [
+        {
+          deployment: { deploymentId: "dep_pocketbase" },
+          endpoints: [{ url: "https://pocketbase.example.test" }],
+        },
+      ],
+    });
     expect(capturedMessages).toEqual([
       expect.any(ListBlueprintsQuery),
       expect.any(ShowBlueprintQuery),
       expect.any(CreateBlueprintInstallPlanQuery),
       expect.any(AcceptBlueprintInstallCommand),
+      expect.any(ShowBlueprintInstallationQuery),
     ]);
   });
 

@@ -17,6 +17,7 @@ export * from "./operations/auth/bootstrap-first-admin.use-case";
 export * from "./operations/auth/get-auth-bootstrap-status.query-service";
 export * from "./operations/blueprints/blueprint-catalog.query-service";
 export * from "./operations/blueprints/blueprint-install-command-service";
+export * from "./operations/blueprints/blueprint-installation.query-service";
 export * from "./operations/capabilities/query-capabilities.query-service";
 export * from "./operations/certificates/certificate-retry-scheduler";
 export * from "./operations/certificates/delete-certificate.use-case";

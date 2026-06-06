@@ -131,6 +131,7 @@ import {
   DeactivateServerUseCase,
   DeadLetterOperatorWorkCommandHandler,
   DeadLetterOperatorWorkUseCase,
+  DefaultBlueprintInstallationQueryService,
   DeleteAccountCommandHandler,
   DeleteAccountUseCase,
   DeleteCertificateCommandHandler,
@@ -424,6 +425,7 @@ import {
   ShowAuditEventLegalHoldQueryService,
   ShowAuditEventQueryHandler,
   ShowAuditEventQueryService,
+  ShowBlueprintInstallationQueryHandler,
   ShowBlueprintQueryHandler,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
@@ -1562,6 +1564,7 @@ export function registerApplicationServices(
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
+  container.registerSingleton(ShowBlueprintInstallationQueryHandler);
   container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(RestoreProjectCommandHandler);
   container.registerSingleton(CheckProjectDeleteSafetyQueryHandler);
@@ -2450,6 +2453,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
+  container.registerSingleton(
+    tokens.blueprintInstallationQueryService,
+    DefaultBlueprintInstallationQueryService,
+  );
   container.registerSingleton(
     tokens.listGitHubRepositoriesQueryService,
     ListGitHubRepositoriesQueryService,

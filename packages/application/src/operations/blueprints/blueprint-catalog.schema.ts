@@ -61,6 +61,12 @@ export const showBlueprintQueryInputSchema = z.object({
   slug: blueprintSlugSchema,
 });
 
+export const showBlueprintInstallationQueryInputSchema = z
+  .object({
+    applicationId: nonEmptyTrimmedString("Installed application id"),
+  })
+  .strict();
+
 export const createBlueprintInstallPlanQueryInputSchema = z
   .object({
     slug: blueprintSlugSchema,
@@ -88,6 +94,7 @@ export const blueprintInstallPlanResponseSchema = unknownResponseSchema<Blueprin
 export const blueprintApplicationBundlePlanResponseSchema =
   unknownResponseSchema<BlueprintApplicationBundlePlan>();
 export const acceptBlueprintInstallResponseSchema = z.unknown();
+export const showBlueprintInstallationResponseSchema = z.unknown();
 
 export const listBlueprintsResponseSchema = z.object({
   items: z.array(blueprintRegistryEntryResponseSchema),
@@ -108,6 +115,12 @@ export type ListBlueprintsQueryInput = z.input<typeof listBlueprintsQueryInputSc
 export type ListBlueprintsResponse = z.output<typeof listBlueprintsResponseSchema>;
 export type ShowBlueprintQueryInput = z.input<typeof showBlueprintQueryInputSchema>;
 export type ShowBlueprintResponse = z.output<typeof showBlueprintResponseSchema>;
+export type ShowBlueprintInstallationQueryInput = z.input<
+  typeof showBlueprintInstallationQueryInputSchema
+>;
+export type ShowBlueprintInstallationResponse = z.output<
+  typeof showBlueprintInstallationResponseSchema
+>;
 export type CreateBlueprintInstallPlanQueryInput = z.input<
   typeof createBlueprintInstallPlanQueryInputSchema
 >;

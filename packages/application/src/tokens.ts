@@ -617,6 +617,7 @@ export const tokens = {
   blueprintRegistry: Symbol.for("appaloft.blueprint_registry"),
   blueprintCatalogQueryService: Symbol.for("appaloft.blueprint_catalog_query_service"),
   blueprintInstallCommandService: Symbol.for("appaloft.blueprint_install_command_service"),
+  blueprintInstallationQueryService: Symbol.for("appaloft.blueprint_installation_query_service"),
   integrationAuthPort: Symbol.for("appaloft.integration_auth_port"),
   githubAppInstallationRepository: Symbol.for("appaloft.github_app_installation_repository"),
   githubAppRuntime: Symbol.for("appaloft.github_app_runtime"),

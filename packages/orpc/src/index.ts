@@ -449,6 +449,7 @@ import {
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
   ShowAuditEventQuery,
+  ShowBlueprintInstallationQuery,
   ShowBlueprintQuery,
   ShowCertificateQuery,
   ShowDefaultAccessDomainPolicyQuery,
@@ -496,6 +497,7 @@ import {
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
   showAuditEventQueryInputSchema,
+  showBlueprintInstallationQueryInputSchema,
   showBlueprintQueryInputSchema,
   showCertificateQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
@@ -551,6 +553,7 @@ import {
   acceptBlueprintInstallResponseSchema,
   createBlueprintInstallPlanResponseSchema,
   listBlueprintsResponseSchema,
+  showBlueprintInstallationResponseSchema,
   showBlueprintResponseSchema,
 } from "@appaloft/application/schemas";
 import {
@@ -3148,6 +3151,18 @@ export const acceptBlueprintInstallProcedure = base
   .output(acceptBlueprintInstallResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, AcceptBlueprintInstallCommand.create(input)),
+  );
+
+export const showBlueprintInstallationProcedure = base
+  .route({
+    method: "GET",
+    path: "/blueprints/installations/{applicationId}",
+    successStatus: 200,
+  })
+  .input(showBlueprintInstallationQueryInputSchema)
+  .output(showBlueprintInstallationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowBlueprintInstallationQuery.create(input)),
   );
 
 export const showProjectProcedure = base
@@ -6015,6 +6030,9 @@ export const appaloftOrpcRouter = {
     show: showBlueprintProcedure,
     planInstall: createBlueprintInstallPlanProcedure,
     install: acceptBlueprintInstallProcedure,
+    installation: {
+      show: showBlueprintInstallationProcedure,
+    },
   },
   servers: {
     count: countServersProcedure,
@@ -8692,6 +8710,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints/:slug",
     "/api/blueprints/:slug/install-plan",
     "/api/blueprints/:slug/install",
+    "/api/blueprints/installations/:applicationId",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

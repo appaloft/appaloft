@@ -23,11 +23,13 @@
     Waypoints,
   } from "@lucide/svelte";
   import type { IconModule as BrandIconModule } from "@thesvg/icons";
-  import clickhouseIcon from "@thesvg/icons/clickhouse";
-  import minioIcon from "@thesvg/icons/minio";
-  import mysqlIcon from "@thesvg/icons/mysql";
-  import opensearchIcon from "@thesvg/icons/opensearch";
-  import postgresqlIcon from "@thesvg/icons/postgresql";
+import clickhouseIcon from "@thesvg/icons/clickhouse";
+import k8sVolumeIcon from "@thesvg/icons/k8s-volume";
+import minioIcon from "@thesvg/icons/minio";
+import mongodbIcon from "@thesvg/icons/mongodb";
+import mysqlIcon from "@thesvg/icons/mysql";
+import opensearchIcon from "@thesvg/icons/opensearch";
+import postgresqlIcon from "@thesvg/icons/postgresql";
   import redisIcon from "@thesvg/icons/redis";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
@@ -126,6 +128,7 @@
   type DraftMode = "existing" | "new";
   type ResourceKind = ResourceSummary["kind"];
   type DependencyKind = DependencyResourceSummary["kind"];
+  type BlueprintDependencyKind = DependencyKind | "mongodb" | "volume";
   type GitHubAppConfigurationDiagnostic = NonNullable<
     IntegrationDescriptor["configuration"]
   >["diagnostics"][number];
@@ -136,14 +139,14 @@
   type BlueprintDependencyProvisioningMode = "create" | "reuse";
   type BlueprintDependencyProvisioningDraft = {
     requirementId: string;
-    kind: DependencyKind;
+    kind: BlueprintDependencyKind;
     mode: BlueprintDependencyProvisioningMode;
     reuseConnectionUrl: string;
     reuseSecretRef: string;
   };
   type BlueprintDependencyRequirement = {
     id: string;
-    kind: DependencyKind;
+    kind: BlueprintDependencyKind;
     label: string;
     capabilities: readonly DependencyResourceCapabilityRequirement[];
     optional?: boolean;
@@ -377,12 +380,16 @@
     "external",
   ] as const satisfies readonly ResourceKind[];
   const dependencyKindOptions: Record<
-    DependencyKind,
+    BlueprintDependencyKind,
     { label: string; icon: DependencyKindIcon }
   > = {
     postgres: {
       label: "Postgres",
       icon: brandIcon(postgresqlIcon),
+    },
+    mongodb: {
+      label: "MongoDB",
+      icon: brandIcon(mongodbIcon),
     },
     redis: {
       label: "Redis",
@@ -404,15 +411,21 @@
       label: "OpenSearch",
       icon: brandIcon(opensearchIcon),
     },
+    volume: {
+      label: "Volume",
+      icon: brandIcon(k8sVolumeIcon),
+    },
   };
   const dependencyKindOrder = [
     "postgres",
+    "mongodb",
     "redis",
     "mysql",
     "clickhouse",
     "object-storage",
     "opensearch",
-  ] as const satisfies readonly DependencyKind[];
+    "volume",
+  ] as const satisfies readonly BlueprintDependencyKind[];
   const blueprintDependencyProvisioningModes = [
     "create",
     "reuse",
@@ -666,9 +679,16 @@
   let dependencyProvisioningInFlight = $state(false);
   let deploymentCreateInFlight = $state(false);
   let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
-  let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
+  let environmentName = $state(
+    browser
+      ? (page.url.searchParams.get("environmentName") ??
+        defaultEnvironmentNameForSource(initialSourceKind))
+      : "local",
+  );
   let environmentKind = $state<EnvironmentKind>(
-    parseEnvironmentKind(browser ? page.url.searchParams.get("environmentKind") : null),
+    browser && page.url.searchParams.has("environmentKind")
+      ? parseEnvironmentKind(page.url.searchParams.get("environmentKind"))
+      : defaultEnvironmentKindForSource(initialSourceKind),
   );
   let resourceName = $state(browser ? (page.url.searchParams.get("resourceName") ?? "") : "");
   let generatedResourceName = $state(browser ? (page.url.searchParams.get("generatedResourceName") ?? "") : "");
@@ -2005,6 +2025,14 @@
     return sourceKindKeys.includes(value as SourceKind) ? (value as SourceKind) : "github";
   }
 
+  function defaultEnvironmentNameForSource(kind: SourceKind): string {
+    return kind === "blueprint" ? "production" : "local";
+  }
+
+  function defaultEnvironmentKindForSource(kind: SourceKind): EnvironmentKind {
+    return kind === "blueprint" ? "production" : "local";
+  }
+
   function isLockedBlueprintSourceEntry(params: URLSearchParams): boolean {
     return (
       params.get("source") === "blueprint" &&
@@ -2035,15 +2063,15 @@
     return resourceKinds.includes(value as ResourceKind) ? (value as ResourceKind) : "application";
   }
 
-  function isProvisionableDependencyKind(value: string): value is DependencyKind {
-    return dependencyKindOrder.includes(value as DependencyKind);
+  function isProvisionableDependencyKind(value: string): value is BlueprintDependencyKind {
+    return dependencyKindOrder.includes(value as BlueprintDependencyKind);
   }
 
-  function dependencyKindLabel(kind: DependencyKind): string {
+  function dependencyKindLabel(kind: BlueprintDependencyKind): string {
     return dependencyKindOptions[kind].label;
   }
 
-  function dependencyKindIcon(kind: DependencyKind): DependencyKindIcon {
+  function dependencyKindIcon(kind: BlueprintDependencyKind): DependencyKindIcon {
     return dependencyKindOptions[kind].icon;
   }
 
@@ -2062,7 +2090,7 @@
 
   function createDefaultBlueprintDependencyDraft(
     requirementId: string,
-    kind: DependencyKind,
+    kind: BlueprintDependencyKind,
   ): BlueprintDependencyProvisioningDraft {
     return {
       requirementId,
@@ -2416,8 +2444,8 @@
     if (environmentContextEnabled) {
       setSearchParam(params, "environmentMode", environmentMode, "new");
       setSearchParam(params, "environmentId", selectedEnvironmentId);
-      setSearchParam(params, "environmentName", environmentName, "local");
-      setSearchParam(params, "environmentKind", environmentKind, "local");
+      setSearchParam(params, "environmentName", environmentName, defaultEnvironmentNameForSource(sourceKind));
+      setSearchParam(params, "environmentKind", environmentKind, defaultEnvironmentKindForSource(sourceKind));
     }
 
     setSearchParam(params, "editResource", resourceContextEnabled ? "true" : "false", "false");
@@ -2500,8 +2528,10 @@
     serverDraft.host = params.get("serverHost") ?? "";
     serverDraft.port = params.get("serverPort") ?? "";
     serverDraft.providerKey = sshServerProviderKey;
-    environmentName = params.get("environmentName") ?? "local";
-    environmentKind = parseEnvironmentKind(params.get("environmentKind"));
+    environmentName = params.get("environmentName") ?? defaultEnvironmentNameForSource(nextSourceKind);
+    environmentKind = params.has("environmentKind")
+      ? parseEnvironmentKind(params.get("environmentKind"))
+      : defaultEnvironmentKindForSource(nextSourceKind);
     resourceName = params.get("resourceName") ?? "";
     generatedResourceName = params.get("generatedResourceName") ?? "";
     generatedResourceNameBase = "";
@@ -5648,7 +5678,7 @@
             {$t(i18nKeys.console.quickDeploy.submitPending)}
           {:else if sourceKind === "blueprint"}
             <Play class="size-4" />
-            查看安装计划
+            安装蓝图
           {:else if sourceKind === "static-site"}
             <Upload class="size-4" />
             {$t(i18nKeys.console.quickDeploy.staticPublishAction)}
