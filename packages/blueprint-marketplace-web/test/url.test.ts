@@ -38,9 +38,13 @@ describe("Blueprint marketplace web URLs", () => {
     ]);
 
     expect(pageSource).toContain("BlueprintMarketplaceCard");
+    expect(pageSource).toContain("isBlueprintRegistryListResponse(value)");
+    expect(pageSource).toContain("registryEntryToListing");
+    expect(pageSource).not.toContain('name: "Appaloft"');
     expect(cardSource).toContain("@appaloft/ui/card");
     expect(cardSource).toContain("@appaloft/ui/button");
     expect(cardSource).toContain("@appaloft/ui/badge");
+    expect(cardSource).toContain("item.featured");
     expect(cardSource).toContain("iconFailed = true");
     expect(cardSource).toContain("bg-card");
     expect(cardSource).toContain("data-blueprint-marketplace-card");

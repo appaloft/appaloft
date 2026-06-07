@@ -73,6 +73,7 @@ describe("Blueprint marketplace console surface", () => {
       sharedPackageSource,
       quickDeploySource,
       viteConfigSource,
+      blueprintCatalogSchemaSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url), "utf8"),
@@ -89,12 +90,23 @@ describe("Blueprint marketplace console surface", () => {
       ),
       readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../../vite.config.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../../../../../packages/application/src/operations/blueprints/blueprint-catalog.schema.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
     ]);
 
     expect(listPageSource).toContain("ConsoleShell");
     expect(listPageSource).toContain('title="应用市场"');
     expect(detailPageSource).toContain("ConsoleShell");
     expect(detailPageSource).toContain('title={listing?.title ?? "蓝图详情"}');
+    expect(detailPageSource).toContain("normalizeBlueprintDetailResponse");
+    expect(detailPageSource).toContain("response.entry");
+    expect(detailPageSource).toContain("blueprintRegistryEntryToListing");
+    expect(detailPageSource).toContain('return "";');
     expect(selectorSource).toContain("data-blueprint-marketplace-selector");
     expect(selectorSource).toContain("@appaloft/blueprint-marketplace-web");
     expect(selectorSource).toContain("BlueprintMarketplacePage");
@@ -118,6 +130,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("generateUpgradePlan");
     expect(detailPageSource).toContain("生成升级 dry-run");
     expect(detailPageSource).toContain("data-blueprint-upgrade-from-installed-application");
+    expect(detailPageSource).toContain("{#if upgradePlanEndpoint}");
     expect(detailPageSource).toContain("applicationId");
     expect(detailPageSource).toContain("preservedUserConfigurationWarnings");
     expect(detailPageSource).toContain("nonExecution?.marker");
@@ -159,5 +172,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(viteConfigSource).toContain("APPALOFT_WEB_DEV_FS_ALLOW");
     expect(viteConfigSource).toContain("createFsAllow");
     expect(viteConfigSource).toContain("createRuntimeExtensionProxyPrefixes");
+    expect(blueprintCatalogSchemaSource).toContain("BlueprintRegistryDisplayMetadataResponse");
+    expect(blueprintCatalogSchemaSource).not.toContain("@appaloft/blueprints");
   });
 });

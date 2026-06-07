@@ -3987,6 +3987,53 @@ describe("console e2e with Bun.WebView", () => {
     expect(renderedState.variableKeys).toEqual(["BACKEND_CACHE_PROVIDER"]);
   }, 45_000);
 
+  test("[BLUEPRINT-WEB-003] renders Marketplace detail from public neutral Blueprint detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/marketplace/teable?returnTo=${encodeURIComponent("/deploy?sourceExtension=public-blueprints.quick-deploy-source")}`,
+    );
+
+    const renderedStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`JSON.stringify({
+          bodyText: document.body.innerText,
+          heading: document.querySelector('h1')?.textContent ?? '',
+          unavailableVisible: document.body.innerText.includes('蓝图暂不可用'),
+          upgradeDryRunVisible: document.body.innerText.includes('升级 dry-run'),
+          installedApplicationInputVisible: Boolean(document.querySelector('[data-blueprint-upgrade-from-installed-application]')),
+        })`),
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          bodyText: string;
+          unavailableVisible: boolean;
+        };
+        return (
+          state.bodyText.includes("Teable") &&
+          state.bodyText.includes("Teable Postgres") &&
+          !state.unavailableVisible
+        );
+      },
+      "Expected public neutral Blueprint detail to render the Marketplace detail page",
+    );
+    const renderedState = JSON.parse(renderedStateJson) as {
+      bodyText: string;
+      heading: string;
+      unavailableVisible: boolean;
+      upgradeDryRunVisible: boolean;
+      installedApplicationInputVisible: boolean;
+    };
+
+    expect(renderedState.heading).toContain("Teable");
+    expect(renderedState.bodyText).toContain("Postgres");
+    expect(renderedState.bodyText).toContain("Redis");
+    expect(renderedState.unavailableVisible).toBe(false);
+    expect(renderedState.upgradeDryRunVisible).toBe(false);
+    expect(renderedState.installedApplicationInputVisible).toBe(false);
+  }, 45_000);
+
   test("[BLUEPRINT-WEB-002] submits Quick Deploy Blueprint source through the neutral install operation", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
