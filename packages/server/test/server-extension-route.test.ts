@@ -121,6 +121,7 @@ describe("createAppaloftServer", () => {
 
   test("[STATIC-ARTIFACT-EXT-017] publishes a zipped static artifact through the API and serves it locally", async () => {
     const dataDir = await createTempDataDir();
+    const authorizationRequests: Parameters<AuthRuntime["authorizeProductSession"]>[1][] = [];
     const server = await createAppaloftServer({
       flags: {
         appVersion: "0.1.0-test",
@@ -132,7 +133,7 @@ describe("createAppaloftServer", () => {
         pgliteDataDir: join(dataDir, "pglite"),
         webStaticDir: "",
       },
-      authRuntime: createTestAuthRuntime(),
+      authRuntime: createTestAuthRuntime(authorizationRequests),
     });
 
     try {
@@ -146,6 +147,7 @@ describe("createAppaloftServer", () => {
         new Request("http://localhost/api/static-artifacts/publish-archive", {
           method: "POST",
           headers: {
+            cookie: "better-auth.session_token=test-static-archive-session",
             "content-type": "application/json",
           },
           body: JSON.stringify({
@@ -159,6 +161,12 @@ describe("createAppaloftServer", () => {
       );
 
       expect(publishResponse.status).toBe(201);
+      expect(authorizationRequests).toContainEqual({
+        cookieHeader: "better-auth.session_token=test-static-archive-session",
+        method: "POST",
+        path: "/api/static-artifacts/publish-archive",
+        requiredRole: "admin",
+      });
       const publication = (await publishResponse.json()) as {
         readonly routeUrl: string;
       };
@@ -261,9 +269,12 @@ describe("createAppaloftServer", () => {
   });
 });
 
-function createTestAuthRuntime(): AuthRuntime {
+function createTestAuthRuntime(
+  authorizationRequests: Parameters<AuthRuntime["authorizeProductSession"]>[1][] = [],
+): AuthRuntime {
   return {
     async authorizeProductSession(_context, input) {
+      authorizationRequests.push(input);
       return ok({
         actor: {
           kind: "user",

@@ -116,11 +116,16 @@
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const serverTotal = $derived(serverCountQuery.data?.count ?? 0);
   const deploymentTotal = $derived(deploymentCountQuery.data?.count ?? deployments.length);
-  const pageLoading = $derived(
+  const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
+  const resourcesLoading = $derived(resourcesQuery.isPending);
+  const environmentsLoading = $derived(environmentsQuery.isPending);
+  const deploymentsLoading = $derived(deploymentsQuery.isPending);
+  const workStateLoading = $derived(
     projectsQuery.isPending ||
       resourcesQuery.isPending ||
       deploymentsQuery.isPending ||
-      environmentsQuery.isPending,
+      environmentsQuery.isPending ||
+      deploymentCountQuery.isPending,
   );
   const hasWork = $derived(projects.length > 0 || resources.length > 0 || deploymentTotal > 0);
   const activeDeployments = $derived(
@@ -219,31 +224,7 @@
 >
   <ConsoleResourceCanvas class="max-w-none">
   <div class="nothing-console-home">
-    {#if pageLoading}
-      <section class="nothing-home-heading" aria-hidden="true">
-        <div class="w-full max-w-2xl">
-          <Skeleton class="h-5 w-28" />
-          <Skeleton class="mt-3 h-8 w-64" />
-          <Skeleton class="mt-3 h-4 w-full max-w-xl" />
-        </div>
-      </section>
-      <section class="nothing-project-list" aria-hidden="true">
-        {#each Array.from({ length: 4 }) as _, index (index)}
-          <div class="nothing-project-row">
-            <Skeleton class="size-11 shrink-0 rounded-md" />
-            <div class="min-w-0 flex-1 space-y-3">
-              <Skeleton class="h-5 w-48" />
-              <Skeleton class="h-4 w-full max-w-2xl" />
-              <div class="flex gap-2">
-                <Skeleton class="h-7 w-24" />
-                <Skeleton class="h-7 w-28" />
-                <Skeleton class="h-7 w-20" />
-              </div>
-            </div>
-          </div>
-        {/each}
-      </section>
-    {:else if !hasWork}
+    {#if !workStateLoading && !hasWork}
       <section class="nothing-home-heading">
         <div>
           <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
@@ -278,6 +259,41 @@
 
       <section class="nothing-home-layout">
         <div class="nothing-project-list" data-home-project-list>
+          {#if projectsLoading || (projects.length === 0 && workStateLoading)}
+            {#each Array.from({ length: 4 }) as _, index (index)}
+              <article class="nothing-project-row" aria-hidden="true">
+                <div class="nothing-project-main">
+                  <Skeleton class="size-11 shrink-0 rounded-md" />
+                  <span class="nothing-project-copy">
+                    <Skeleton class="h-5 w-full max-w-72" />
+                    <Skeleton class="h-4 w-full max-w-xl" />
+                    <span class="nothing-project-meta">
+                      <Skeleton class="h-[22px] w-16" />
+                      <Skeleton class="h-[22px] w-20" />
+                      <Skeleton class="h-[22px] w-24" />
+                    </span>
+                  </span>
+                </div>
+                <div class="nothing-resource-preview">
+                  <Skeleton class="h-11 w-full" />
+                  <Skeleton class="h-11 w-full" />
+                </div>
+                <div class="nothing-project-status">
+                  <span class="nothing-status-block">
+                    <Skeleton class="h-3 w-20" />
+                    <Skeleton class="h-6 w-36" />
+                  </span>
+                  <span class="nothing-status-block">
+                    <Skeleton class="h-3 w-16" />
+                    <Skeleton class="h-5 w-48" />
+                  </span>
+                </div>
+                <span class="nothing-project-open">
+                  <Skeleton class="h-5 w-20" />
+                </span>
+              </article>
+            {/each}
+          {/if}
           {#each projects as project (project.id)}
             {@const resourcesForProject = projectResources(project)}
             {@const visibleResources = visibleProjectResources(project)}
@@ -298,21 +314,33 @@
                     {project.description ?? $t(i18nKeys.console.home.noProjectDescription)}
                   </span>
                   <span class="nothing-project-meta">
-                    <span>
-                      {resourcesForProject.length}
-                      {$t(i18nKeys.common.domain.resources)}
-                    </span>
-                    <span>
-                      {countProjectEnvironments(project, environments)}
-                      {$t(i18nKeys.common.domain.environments)}
-                    </span>
-                    <span>{projectEnvironmentNames(project)}</span>
+                    {#if resourcesLoading}
+                      <Skeleton class="h-[22px] w-16" />
+                    {:else}
+                      <span>
+                        {resourcesForProject.length}
+                        {$t(i18nKeys.common.domain.resources)}
+                      </span>
+                    {/if}
+                    {#if environmentsLoading}
+                      <Skeleton class="h-[22px] w-20" />
+                      <Skeleton class="h-[22px] w-24" />
+                    {:else}
+                      <span>
+                        {countProjectEnvironments(project, environments)}
+                        {$t(i18nKeys.common.domain.environments)}
+                      </span>
+                      <span>{projectEnvironmentNames(project)}</span>
+                    {/if}
                   </span>
                 </span>
               </a>
 
               <div class="nothing-resource-preview" aria-label={$t(i18nKeys.console.home.resourcePreviewLabel)}>
-                {#if visibleResources.length > 0}
+                {#if resourcesLoading}
+                  <Skeleton class="h-11 w-full" />
+                  <Skeleton class="h-11 w-full" />
+                {:else if visibleResources.length > 0}
                   {#each visibleResources as resource (resource.id)}
                     {@const Icon = resourceIcon(resource)}
                     {@const resourceAccessUrl = accessUrl(resource)}
@@ -348,18 +376,24 @@
               <div class="nothing-project-status">
                 <span class="nothing-status-block">
                   <small>{$t(i18nKeys.console.home.latestDeploymentTitle)}</small>
-                  <span>
-                    <DeploymentStatusBadge status={latestDeployment?.status} />
-                    {#if latestDeployment}
-                      <em>{formatTime(latestDeployment.createdAt)}</em>
-                    {:else}
-                      <em>{$t(i18nKeys.console.home.noDeploymentsShort)}</em>
-                    {/if}
-                  </span>
+                  {#if deploymentsLoading}
+                    <Skeleton class="h-6 w-36" />
+                  {:else}
+                    <span>
+                      <DeploymentStatusBadge status={latestDeployment?.status} />
+                      {#if latestDeployment}
+                        <em>{formatTime(latestDeployment.createdAt)}</em>
+                      {:else}
+                        <em>{$t(i18nKeys.console.home.noDeploymentsShort)}</em>
+                      {/if}
+                    </span>
+                  {/if}
                 </span>
                 <span class="nothing-status-block">
                   <small>{$t(i18nKeys.console.home.accessRouteTitle)}</small>
-                  {#if primaryAccessUrl && primaryAccessResource}
+                  {#if resourcesLoading}
+                    <Skeleton class="h-5 w-48" />
+                  {:else if primaryAccessUrl && primaryAccessResource}
                     <a href={primaryAccessUrl} target="_blank" rel="noreferrer">
                       <Globe2 class="size-3.5" />
                       <span>{primaryAccessUrl}</span>
@@ -389,15 +423,27 @@
             <div class="nothing-context-grid">
               <a href="/deployments" class="nothing-context-cell">
                 <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
-                <strong>{activeDeployments.length}</strong>
+                {#if deploymentsLoading}
+                  <Skeleton class="h-[22px] w-8" />
+                {:else}
+                  <strong>{activeDeployments.length}</strong>
+                {/if}
               </a>
               <a href="/deployments" class="nothing-context-cell">
                 <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
-                <strong>{failedDeployments.length}</strong>
+                {#if deploymentsLoading}
+                  <Skeleton class="h-[22px] w-8" />
+                {:else}
+                  <strong>{failedDeployments.length}</strong>
+                {/if}
               </a>
               <a href="/servers" class="nothing-context-cell">
                 <span>{$t(i18nKeys.common.domain.servers)}</span>
-                <strong>{serverTotal}</strong>
+                {#if serverCountQuery.isPending}
+                  <Skeleton class="h-[22px] w-8" />
+                {:else}
+                  <strong>{serverTotal}</strong>
+                {/if}
               </a>
             </div>
           </section>
@@ -407,7 +453,22 @@
               <p class="nothing-label">{$t(i18nKeys.console.home.recentDeploymentsTitle)}</p>
               <p>{$t(i18nKeys.console.home.recentDeploymentsDescription)}</p>
             </div>
-            {#if deployments.length > 0}
+            {#if deploymentsLoading}
+              <div class="nothing-activity-list" aria-hidden="true">
+                {#each Array.from({ length: 3 }) as _, index (index)}
+                  <div class="nothing-activity-row">
+                    <span>
+                      <Skeleton class="h-4 w-36" />
+                      <Skeleton class="mt-2 h-3 w-28" />
+                    </span>
+                    <span>
+                      <Skeleton class="h-5 w-20" />
+                      <Skeleton class="h-3 w-16" />
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            {:else if deployments.length > 0}
               <div class="nothing-activity-list">
                 {#each deployments.slice(0, 5) as deployment (deployment.id)}
                   <a href="/deployments" class="nothing-activity-row">

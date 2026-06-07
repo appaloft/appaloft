@@ -1,0 +1,22 @@
+import { readFile } from "node:fs/promises";
+import { describe, expect, test } from "vitest";
+
+describe("console sidebar project loading state", () => {
+  test("[SIDEBAR-PROJECT-LOADING-001] keeps the project group in loading state before rendering empty", async () => {
+    const shellSource = await readFile(
+      new URL("../components/console/ConsoleShell.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(shellSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
+    expect(shellSource).toContain(
+      "const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);",
+    );
+    expect(shellSource.indexOf("{#if projectsLoading}")).toBeLessThan(
+      shellSource.indexOf("{:else if filteredProjects.length > 0}"),
+    );
+    expect(shellSource.indexOf("{:else if filteredProjects.length > 0}")).toBeLessThan(
+      shellSource.indexOf("i18nKeys.console.shell.noProjects"),
+    );
+  });
+});
