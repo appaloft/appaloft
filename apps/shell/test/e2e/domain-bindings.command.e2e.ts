@@ -27,7 +27,6 @@ describe("domain-bindings command e2e", () => {
     fixture = createRoutingDomainTlsFixture({
       appVersion: "0.1.0-domain-bindings-command-e2e",
       prefix: "appaloft-domain-bindings-command-",
-      proxyKind: "traefik",
     });
   }, 60000);
 

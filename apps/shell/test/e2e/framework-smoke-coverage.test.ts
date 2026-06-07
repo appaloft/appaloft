@@ -280,8 +280,6 @@ describe("framework fixture real smoke coverage", () => {
     expect(localDockerSubstrateSmokeSource).toContain("QUICK-DEPLOY-WF-057");
     expect(localDockerSubstrateSmokeSource).toContain("QUICK-DEPLOY-WF-058");
     expect(localDockerSubstrateSmokeSource).toContain("QUICK-DEPLOY-WF-059");
-    expect(localDockerSubstrateSmokeSource).toContain('"--proxy-kind"');
-    expect(localDockerSubstrateSmokeSource).toContain('"none"');
     expect(genericSshSmokeSource).toContain("frameworkDockerSmokeFixtures");
     expect(genericSshSmokeSource).toContain("APPALOFT_E2E_SSH_FRAMEWORK_DOCKER");
     expect(genericSshSmokeSource).toContain("APPALOFT_E2E_FRAMEWORK_FIXTURE");

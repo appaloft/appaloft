@@ -99,8 +99,7 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
-  --target-kind single-server \
-  --proxy-kind traefik
+  --target-kind single-server
 ```
 
 `--target-kind orchestrator-cluster` 会记录一个集群形态的部署目标，用于未来的 Docker Swarm

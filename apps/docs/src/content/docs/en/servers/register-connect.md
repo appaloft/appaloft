@@ -98,8 +98,7 @@ appaloft server register \
   --host 203.0.113.10 \
   --port 22 \
   --provider generic-ssh \
-  --target-kind single-server \
-  --proxy-kind traefik
+  --target-kind single-server
 ```
 
 `--target-kind orchestrator-cluster` records a cluster-shaped deployment target for future

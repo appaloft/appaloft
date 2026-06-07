@@ -159,8 +159,6 @@ describe("archive and delete lifecycle CLI e2e", () => {
           "22",
           "--provider",
           "generic-ssh",
-          "--proxy-kind",
-          "none",
         ],
         cliOptions,
       );
@@ -236,8 +234,6 @@ describe("archive and delete lifecycle CLI e2e", () => {
           "22",
           "--provider",
           "generic-ssh",
-          "--proxy-kind",
-          "none",
         ],
         cliOptions,
       );

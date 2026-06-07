@@ -120,8 +120,6 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
-          "--proxy-kind",
-          "none",
         ],
         workspace.cliOptions,
       );
