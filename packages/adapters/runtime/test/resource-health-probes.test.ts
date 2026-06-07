@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import { createExecutionContext, type ServerRepository } from "@appaloft/application";
 import {
@@ -53,6 +55,21 @@ function probeRequest(input: { targetServerId?: string } = {}) {
     providerKey: "docker-swarm",
     runtimeMetadata: {
       "swarm.serviceName": "appaloft-res-web-dst-demo-dep-web_web",
+    },
+    timeoutSeconds: 5,
+  };
+}
+
+function containerProbeRequest(input: { targetServerId?: string } = {}) {
+  return {
+    resourceId: "res_web",
+    deploymentId: "dep_web",
+    ...(input.targetServerId ? { targetServerId: input.targetServerId } : {}),
+    runtimeKind: "docker-container" as const,
+    targetKind: "single-server" as const,
+    providerKey: "generic-ssh",
+    runtimeMetadata: {
+      containerName: "appaloft-dep_web",
     },
     timeoutSeconds: 5,
   };
@@ -175,5 +192,123 @@ describe("RuntimeResourceHealthProbeRunner", () => {
     expect(JSON.stringify(summary)).not.toContain("No such image");
     expect(JSON.stringify(summary)).not.toContain("DesiredState");
     expect(JSON.stringify(summary)).not.toContain("CurrentState");
+  });
+
+  test("[RES-HEALTH-QRY-010] probes Docker container state on an SSH target", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(
+      async (input) => {
+        expect(input.args[0]).toBe("ssh");
+        expect(input.args).toContain("2222");
+        expect(input.args).toContain("IdentitiesOnly=yes");
+        expect(input.args).toContain("deployer@203.0.113.10");
+        expect(input.args.at(-1)).toBe(
+          "docker inspect --format '{{json .State}}' 'appaloft-dep_web'",
+        );
+        return ok({
+          exitCode: 0,
+          stdout: JSON.stringify({
+            Status: "running",
+            Running: true,
+            ExitCode: 0,
+            Error: "",
+            Health: {
+              Status: "healthy",
+            },
+          }),
+        });
+      },
+      new StaticServerRepository(sshServer()),
+    );
+
+    const result = await runner.probeRuntime(
+      context,
+      containerProbeRequest({ targetServerId: "srv_ssh" }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      lifecycle: "running",
+      health: "healthy",
+      reasonCode: "docker_container_running",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        reasonCode: "docker_container_running",
+        phase: "runtime-live-probe",
+        metadata: {
+          providerKey: "generic-ssh",
+          runtimeKind: "docker-container",
+          containerName: "appaloft-dep_web",
+          containerStatus: "running",
+          containerHealth: "healthy",
+          exitCode: "0",
+        },
+      },
+    });
+  });
+
+  test("[RES-HEALTH-QRY-010] reports unhealthy Docker container state without raw inspect payloads", async () => {
+    const runner = new RuntimeResourceHealthProbeRunner(async () =>
+      ok({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          Status: "exited",
+          Running: false,
+          ExitCode: 137,
+          Error: "application secret leaked here",
+          OOMKilled: true,
+        }),
+      }),
+    );
+
+    const result = await runner.probeRuntime(context, containerProbeRequest());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary).toMatchObject({
+      lifecycle: "exited",
+      health: "unhealthy",
+      reasonCode: "docker_container_not_running",
+      check: {
+        status: "failed",
+        target: "container",
+        reasonCode: "docker_container_not_running",
+        retriable: true,
+        metadata: {
+          providerKey: "generic-ssh",
+          runtimeKind: "docker-container",
+          containerName: "appaloft-dep_web",
+          containerStatus: "exited",
+          exitCode: "137",
+        },
+      },
+    });
+    expect(JSON.stringify(summary)).not.toContain("application secret");
+    expect(JSON.stringify(summary)).not.toContain("OOMKilled");
+  });
+
+  test("[RES-HEALTH-QRY-010] does not fall back to local Docker when SSH target resolution is unavailable", async () => {
+    let commandCalled = false;
+    const runner = new RuntimeResourceHealthProbeRunner(async () => {
+      commandCalled = true;
+      return ok({ exitCode: 0, stdout: "{}" });
+    });
+
+    const result = await runner.probeRuntime(
+      context,
+      containerProbeRequest({ targetServerId: "srv_missing" }),
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_health_unavailable",
+      details: {
+        phase: "runtime-live-probe",
+        step: "ssh-target-repository",
+        targetServerId: "srv_missing",
+      },
+    });
+    expect(commandCalled).toBe(false);
   });
 });

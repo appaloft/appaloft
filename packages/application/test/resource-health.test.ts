@@ -1096,6 +1096,101 @@ describe("ResourceHealthQueryService", () => {
     expect(JSON.stringify(summary)).not.toContain("CurrentState");
   });
 
+  test("[RES-HEALTH-QRY-010] creates live runtime inspection request for SSH Docker container deployments", async () => {
+    const baseDeployment = deploymentSummary();
+    const probeRunner = new StaticResourceHealthProbeRunner(undefined, {
+      lifecycle: "running",
+      health: "healthy",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      reasonCode: "docker_container_running",
+      check: {
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 18,
+        reasonCode: "docker_container_running",
+        phase: "runtime-live-probe",
+        metadata: {
+          providerKey: "generic-ssh",
+          runtimeKind: "docker-container",
+          containerName: "appaloft-dep_web",
+          containerStatus: "running",
+        },
+      },
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...baseDeployment.runtimePlan,
+            execution: {
+              ...baseDeployment.runtimePlan.execution,
+              kind: "docker-container",
+              healthCheckPath: "/health",
+              metadata: {
+                containerName: "appaloft-dep_web",
+              },
+            },
+            target: {
+              kind: "single-server",
+              providerKey: "generic-ssh",
+              serverIds: ["srv_demo"],
+            },
+          },
+        }),
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeRuntimeProbe: true,
+        includeChecks: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("healthy");
+    expect(summary.runtime).toMatchObject({
+      lifecycle: "running",
+      health: "healthy",
+      runtimeKind: "docker-container",
+    });
+    expect(summary.sourceErrors).not.toContainEqual(
+      expect.objectContaining({
+        code: "resource_runtime_live_probe_unavailable",
+      }),
+    );
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "runtime-service",
+        target: "container",
+        status: "passed",
+        reasonCode: "docker_container_running",
+        metadata: expect.objectContaining({
+          providerKey: "generic-ssh",
+          containerName: "appaloft-dep_web",
+        }),
+      }),
+    );
+    expect(probeRunner.runtimeRequests[0]).toMatchObject({
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      targetServerId: "srv_demo",
+      providerKey: "generic-ssh",
+      targetKind: "single-server",
+      runtimeKind: "docker-container",
+      runtimeMetadata: {
+        containerName: "appaloft-dep_web",
+      },
+    });
+  });
+
   test("[RES-HEALTH-QRY-009] marks live HTTP policy pass as healthy", async () => {
     const probeRunner = new StaticResourceHealthProbeRunner({
       name: "health-policy",

@@ -45,6 +45,16 @@ interface DockerSwarmServiceTask {
   error?: string;
 }
 
+interface DockerContainerState {
+  dead?: boolean;
+  error?: string;
+  exitCode?: number;
+  healthStatus?: string;
+  oomKilled?: boolean;
+  running?: boolean;
+  status?: string;
+}
+
 interface SshRuntimeHealthTarget {
   cleanup: () => Promise<void>;
   host: string;
@@ -109,6 +119,16 @@ function dockerSwarmServicePsCommand(service: string): string {
     "--format",
     shellQuote("{{json .}}"),
     shellQuote(service),
+  ].join(" ");
+}
+
+function dockerContainerInspectCommand(container: string): string {
+  return [
+    "docker",
+    "inspect",
+    "--format",
+    shellQuote("{{json .State}}"),
+    shellQuote(container),
   ].join(" ");
 }
 
@@ -189,6 +209,16 @@ function stringField(record: Record<string, unknown>, key: string): string | und
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+function booleanField(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function numberField(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function parseDockerSwarmServiceTasks(stdout: string): Result<DockerSwarmServiceTask[], DomainError> {
   const tasks: DockerSwarmServiceTask[] = [];
 
@@ -237,6 +267,62 @@ function parseDockerSwarmServiceTasks(stdout: string): Result<DockerSwarmService
   }
 
   return ok(tasks);
+}
+
+function parseDockerContainerState(stdout: string): Result<DockerContainerState, DomainError> {
+  const line = stdout
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .find((entry) => entry.length > 0);
+  if (!line) {
+    return err(
+      domainError.resourceHealthUnavailable("Docker container health output is empty", {
+        phase: "runtime-live-probe",
+      }),
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return err(
+      domainError.resourceHealthUnavailable("Docker container health output is invalid", {
+        phase: "runtime-live-probe",
+      }),
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return err(
+      domainError.resourceHealthUnavailable("Docker container health output is invalid", {
+        phase: "runtime-live-probe",
+      }),
+    );
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const health = record.Health;
+  const healthStatus =
+    health && typeof health === "object" && !Array.isArray(health)
+      ? stringField(health as Record<string, unknown>, "Status")
+      : undefined;
+  const dead = booleanField(record, "Dead");
+  const error = stringField(record, "Error");
+  const exitCode = numberField(record, "ExitCode");
+  const oomKilled = booleanField(record, "OOMKilled");
+  const running = booleanField(record, "Running");
+  const status = stringField(record, "Status");
+
+  return ok({
+    ...(typeof dead === "boolean" ? { dead } : {}),
+    ...(error ? { error } : {}),
+    ...(typeof exitCode === "number" ? { exitCode } : {}),
+    ...(healthStatus ? { healthStatus } : {}),
+    ...(typeof oomKilled === "boolean" ? { oomKilled } : {}),
+    ...(typeof running === "boolean" ? { running } : {}),
+    ...(status ? { status } : {}),
+  });
 }
 
 function normalizedState(value: string): string {
@@ -290,8 +376,25 @@ function serviceName(request: ResourceRuntimeHealthProbeRequest): Result<string,
   );
 }
 
+function containerName(request: ResourceRuntimeHealthProbeRequest): Result<string, DomainError> {
+  const name = request.runtimeMetadata?.containerName ?? request.runtimeMetadata?.dockerContainerName;
+  if (name && name.trim().length > 0) {
+    return ok(name);
+  }
+
+  return err(
+    domainError.resourceHealthUnavailable("Docker container name is not available", {
+      phase: "runtime-live-probe",
+      step: "docker-container-name",
+      resourceId: request.resourceId,
+      deploymentId: request.deploymentId,
+    }),
+  );
+}
+
 function failedRuntimeProbe(input: {
   request: ResourceRuntimeHealthProbeRequest;
+  containerName?: string;
   serviceName?: string;
   observedAt: string;
   durationMs: number;
@@ -320,6 +423,7 @@ function failedRuntimeProbe(input: {
       metadata: {
         providerKey: input.request.providerKey,
         runtimeKind: input.request.runtimeKind,
+        ...(input.containerName ? { containerName: input.containerName } : {}),
         ...(input.serviceName ? { serviceName: input.serviceName } : {}),
       },
     },
@@ -387,6 +491,72 @@ function dockerSwarmRuntimeProbeResult(input: {
         taskCount: String(taskCount),
         runningTasks: String(runningTasks),
         failedTasks: String(failedTasks),
+      },
+    },
+  };
+}
+
+function dockerContainerRuntimeProbeResult(input: {
+  request: ResourceRuntimeHealthProbeRequest;
+  containerName: string;
+  observedAt: string;
+  durationMs: number;
+  state: DockerContainerState;
+}): ResourceRuntimeHealthProbeResult {
+  const status = normalizedState(input.state.status ?? "");
+  const healthStatus = normalizedState(input.state.healthStatus ?? "");
+  const isRunning = input.state.running === true && status !== "dead" && !input.state.dead;
+  const isUnhealthy = healthStatus === "unhealthy";
+  const isStarting = isRunning && healthStatus === "starting";
+  const isHealthy = isRunning && (healthStatus === "healthy" || healthStatus === "");
+  const isFailed =
+    !isRunning ||
+    isUnhealthy ||
+    Boolean(input.state.dead) ||
+    Boolean(input.state.oomKilled) ||
+    Boolean(input.state.error);
+
+  const lifecycle = isFailed
+    ? isRunning
+      ? "degraded"
+      : "exited"
+    : isStarting
+      ? "starting"
+      : "running";
+  const runtimeHealth = isFailed ? "unhealthy" : isHealthy ? "healthy" : "unknown";
+  const checkStatus = isFailed ? "failed" : isHealthy ? "passed" : "unknown";
+  const reasonCode = isFailed
+    ? isUnhealthy
+      ? "docker_container_unhealthy"
+      : "docker_container_not_running"
+    : isStarting
+      ? "docker_container_starting"
+      : "docker_container_running";
+
+  return {
+    lifecycle,
+    health: runtimeHealth,
+    observedAt: input.observedAt,
+    reasonCode,
+    ...(isStarting ? { message: "Docker container health check is still starting." } : {}),
+    check: {
+      name: "runtime-service",
+      target: "container",
+      status: checkStatus,
+      observedAt: input.observedAt,
+      durationMs: input.durationMs,
+      reasonCode,
+      phase: "runtime-live-probe",
+      retriable: checkStatus !== "passed",
+      metadata: {
+        providerKey: input.request.providerKey,
+        runtimeKind: input.request.runtimeKind,
+        containerName: input.containerName,
+        ...(input.state.status ? { containerStatus: input.state.status } : {}),
+        ...(input.state.healthStatus ? { containerHealth: input.state.healthStatus } : {}),
+        ...(typeof input.state.exitCode === "number"
+          ? { exitCode: String(input.state.exitCode) }
+          : {}),
       },
     },
   };
@@ -536,15 +706,27 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     context: ExecutionContext,
     request: ResourceRuntimeHealthProbeRequest,
   ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
-    if (request.providerKey !== "docker-swarm") {
-      return err(
-        domainError.resourceHealthUnavailable("Runtime health probe target is unsupported", {
-          phase: "runtime-live-probe",
-          providerKey: request.providerKey,
-        }),
-      );
+    if (request.providerKey === "docker-swarm") {
+      return this.probeDockerSwarmRuntime(context, request);
     }
 
+    const containerNameResult = containerName(request);
+    if (containerNameResult.isOk()) {
+      return this.probeDockerContainerRuntime(context, request, containerNameResult.value);
+    }
+
+    return err(
+      domainError.resourceHealthUnavailable("Runtime health probe target is unsupported", {
+        phase: "runtime-live-probe",
+        providerKey: request.providerKey,
+      }),
+    );
+  }
+
+  private async probeDockerSwarmRuntime(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
     const serviceNameResult = serviceName(request);
     if (serviceNameResult.isErr()) {
       return err(serviceNameResult.error);
@@ -611,12 +793,96 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     );
   }
 
+  private async probeDockerContainerRuntime(
+    context: ExecutionContext,
+    request: ResourceRuntimeHealthProbeRequest,
+    container: string,
+  ): Promise<Result<ResourceRuntimeHealthProbeResult, DomainError>> {
+    if (request.runtimeKind !== "docker-container") {
+      return err(
+        domainError.resourceHealthUnavailable("Runtime health probe target is unsupported", {
+          phase: "runtime-live-probe",
+          providerKey: request.providerKey,
+        }),
+      );
+    }
+
+    const startedAt = Date.now();
+    const sshTargetResult = await this.resolveSshTarget(context, request);
+    if (sshTargetResult.isErr()) {
+      return err(sshTargetResult.error);
+    }
+
+    const sshTarget = sshTargetResult.value;
+    let commandResult: Result<RuntimeHealthCommandRunnerResult, DomainError>;
+    try {
+      commandResult = await this.runRuntimeHealthCommand({
+        args: sshTarget
+          ? ["ssh", ...sshArgs(sshTarget), dockerContainerInspectCommand(container)]
+          : ["docker", "inspect", "--format", "{{json .State}}", container],
+        timeoutMs: Math.max(1, request.timeoutSeconds) * 1000,
+      });
+    } finally {
+      await sshTarget?.cleanup();
+    }
+    const observedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedAt;
+
+    if (commandResult.isErr()) {
+      return err(commandResult.error);
+    }
+
+    if (commandResult.value.exitCode !== 0) {
+      return ok(
+        failedRuntimeProbe({
+          request,
+          containerName: container,
+          observedAt,
+          durationMs,
+          exitCode: commandResult.value.exitCode,
+          reasonCode:
+            commandResult.value.exitCode === dockerSwarmHealthProbeTimeoutExitCode
+              ? "docker_container_probe_timeout"
+              : "docker_container_probe_failed",
+          message:
+            commandResult.value.stderr?.trim() ||
+            "Docker container health probe could not inspect the container.",
+        }),
+      );
+    }
+
+    const stateResult = parseDockerContainerState(commandResult.value.stdout ?? "");
+    if (stateResult.isErr()) {
+      return err(stateResult.error);
+    }
+
+    return ok(
+      dockerContainerRuntimeProbeResult({
+        request,
+        containerName: container,
+        observedAt,
+        durationMs,
+        state: stateResult.value,
+      }),
+    );
+  }
+
   private async resolveSshTarget(
     context: ExecutionContext,
     request: ResourceRuntimeHealthProbeRequest,
   ): Promise<Result<SshRuntimeHealthTarget | null, DomainError>> {
-    if (!request.targetServerId || !this.serverRepository) {
+    if (!request.targetServerId) {
       return ok(null);
+    }
+
+    if (!this.serverRepository) {
+      return err(
+        domainError.resourceHealthUnavailable("Runtime health probe SSH target is unavailable", {
+          phase: "runtime-live-probe",
+          step: "ssh-target-repository",
+          targetServerId: request.targetServerId,
+        }),
+      );
     }
 
     const server = await this.serverRepository.findOne(
@@ -625,7 +891,13 @@ export class RuntimeResourceHealthProbeRunner implements ResourceHealthProbeRunn
     );
     const serverState = server?.toState();
     if (!serverState) {
-      return ok(null);
+      return err(
+        domainError.resourceHealthUnavailable("Runtime health probe SSH target was not found", {
+          phase: "runtime-live-probe",
+          step: "ssh-target-resolution",
+          targetServerId: request.targetServerId,
+        }),
+      );
     }
 
     const username = serverState.credential?.username?.value;
