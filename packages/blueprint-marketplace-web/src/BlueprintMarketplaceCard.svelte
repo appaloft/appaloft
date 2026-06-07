@@ -65,7 +65,7 @@
     item.subtitle,
     item.category,
     item.blueprint.summary,
-    item.publisher.name,
+    item.publisher?.name ?? "",
     ...tags,
     ...dependencies,
     ...ports,
@@ -182,8 +182,8 @@
         </div>
       </div>
       <div class="flex shrink-0 flex-wrap justify-end gap-1.5">
-        {#if showCategory && !isMini}
-          <Badge variant="outline" class="h-6 normal-case tracking-normal">{item.featured ? labels.featured : labels.official}</Badge>
+        {#if showCategory && !isMini && item.featured}
+          <Badge variant="outline" class="h-6 normal-case tracking-normal">{labels.featured}</Badge>
         {/if}
         {#if selected}
           <Badge variant="secondary" class="h-6 normal-case tracking-normal">{labels.selected}</Badge>

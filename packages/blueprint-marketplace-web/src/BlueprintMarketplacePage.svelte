@@ -114,7 +114,7 @@
         item.subtitle,
         item.category,
         item.blueprint.summary,
-        item.publisher.name,
+        item.publisher?.name ?? "",
         ...item.blueprint.tags,
         ...(item.requirementsSummary?.dependencies ?? []),
       ].some((value) => value.toLowerCase().includes(query));
@@ -240,11 +240,6 @@
       subtitle: entry.summary,
       categoryKey: "blueprints",
       category: "Blueprints",
-      featured: false,
-      publisher: {
-        name: "Appaloft",
-        verified: false,
-      },
       blueprint: {
         id: entry.id,
         version: entry.version,
