@@ -18,6 +18,11 @@ const projectIdArg = Args.text({ name: "projectId" });
 const nameOption = Options.text("name");
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const lifecycleStatusOption = Options.choice("lifecycle-status", [
+  "active",
+  "archived",
+  "all",
+]).pipe(Options.optional);
 
 const createCommand = EffectCommand.make(
   "create",
@@ -34,9 +39,18 @@ const createCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectCreate));
 
-const listCommand = EffectCommand.make("list", {}, () => runQuery(ListProjectsQuery.create())).pipe(
-  EffectCommand.withDescription(cliCommandDescriptions.projectList),
-);
+const listCommand = EffectCommand.make(
+  "list",
+  {
+    lifecycleStatus: lifecycleStatusOption,
+  },
+  ({ lifecycleStatus }) =>
+    runQuery(
+      ListProjectsQuery.create({
+        lifecycleStatus: optionalValue(lifecycleStatus),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectList));
 
 const showCommand = EffectCommand.make("show", { projectId: projectIdArg }, ({ projectId }) =>
   runQuery(ShowProjectQuery.create({ projectId })),

@@ -33,6 +33,7 @@ import {
 
 import {
   createExecutionContext,
+  ListProjectsQuery,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
@@ -172,6 +173,84 @@ async function createHarness(projectsInput: Project[] = [projectFixture()]) {
 }
 
 describe("project lifecycle operations", () => {
+  test("[PROJ-LIFE-LIST-DEFAULT-001] list projects defaults to active lifecycle rows", async () => {
+    const { context, projectReadModel } = await createHarness([
+      projectFixture({
+        id: "prj_active",
+        name: "Active",
+        slug: "active",
+      }),
+      projectFixture({
+        id: "prj_archived",
+        name: "Archived",
+        slug: "archived",
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const service = new ListProjectsQueryService(projectReadModel);
+
+    const result = await service.execute(context, ListProjectsQuery.create()._unsafeUnwrap());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().items.map((project) => project.id)).toEqual(["prj_active"]);
+  });
+
+  test("[PROJ-LIFE-LIST-ARCHIVED-001] list projects returns archived lifecycle rows on explicit request", async () => {
+    const { context, projectReadModel } = await createHarness([
+      projectFixture({
+        id: "prj_active",
+        name: "Active",
+        slug: "active",
+      }),
+      projectFixture({
+        id: "prj_archived",
+        name: "Archived",
+        slug: "archived",
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const service = new ListProjectsQueryService(projectReadModel);
+
+    const result = await service.execute(
+      context,
+      ListProjectsQuery.create({ lifecycleStatus: "archived" })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().items.map((project) => project.id)).toEqual(["prj_archived"]);
+  });
+
+  test("[PROJ-LIFE-LIST-ALL-001] list projects returns active and archived rows on all lifecycle request", async () => {
+    const { context, projectReadModel } = await createHarness([
+      projectFixture({
+        id: "prj_active",
+        name: "Active",
+        slug: "active",
+      }),
+      projectFixture({
+        id: "prj_archived",
+        name: "Archived",
+        slug: "archived",
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const service = new ListProjectsQueryService(projectReadModel);
+
+    const result = await service.execute(
+      context,
+      ListProjectsQuery.create({ lifecycleStatus: "all" })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().items.map((project) => project.id)).toEqual([
+      "prj_active",
+      "prj_archived",
+    ]);
+  });
+
   test("[PROJ-LIFE-SHOW-001] shows a project by id with lifecycle metadata", async () => {
     const { context, projectReadModel } = await createHarness([
       projectFixture({

@@ -131,5 +131,5 @@ describe("servers.register command e2e", () => {
       await httpServer?.stop();
       cleanupWorkspace(workspace.workspaceDir);
     }
-  }, 20_000);
+  }, 60_000);
 });

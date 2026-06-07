@@ -75,6 +75,57 @@ describe("CLI project commands", () => {
     });
   });
 
+  test("[PROJ-LIFE-ENTRY-CLI-007] project list passes explicit lifecycle status", async () => {
+    ensureReflectMetadata();
+    const { ListProjectsQuery, createExecutionContext } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({ items: [] } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_project_list_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "project",
+        "list",
+        "--lifecycle-status",
+        "archived",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ListProjectsQuery);
+    expect(queries[0]).toMatchObject({
+      lifecycleStatus: "archived",
+    });
+  });
+
   test("[PROJ-LIFE-ENTRY-CLI-002] project rename dispatches the application command", async () => {
     ensureReflectMetadata();
     const { RenameProjectCommand, createExecutionContext } = await import("@appaloft/application");

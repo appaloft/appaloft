@@ -207,7 +207,7 @@ async function loadAttachments(
 
   return executor
     .selectFrom("resource_storage_attachments")
-    .leftJoin("resources", "resources.id", "resource_storage_attachments.resource_id")
+    .innerJoin("resources", "resources.id", "resource_storage_attachments.resource_id")
     .select([
       "resource_storage_attachments.id as attachment_id",
       "resource_storage_attachments.resource_id",
@@ -219,6 +219,7 @@ async function loadAttachments(
       "resource_storage_attachments.attached_at",
     ])
     .where("resource_storage_attachments.storage_volume_id", "in", storageVolumeIds)
+    .where("resources.lifecycle_status", "!=", "deleted")
     .orderBy("resource_storage_attachments.attached_at", "asc")
     .execute();
 }
@@ -406,12 +407,14 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
         "storage_volumes.id",
         "resource_storage_attachments.storage_volume_id",
       )
+      .innerJoin("resources", "resources.id", "resource_storage_attachments.resource_id")
       .select((expressionBuilder) =>
         expressionBuilder.fn
           .count<number>("resource_storage_attachments.id")
           .as("attachment_count"),
       )
-      .where("resource_storage_attachments.storage_volume_id", "=", storageVolumeId);
+      .where("resource_storage_attachments.storage_volume_id", "=", storageVolumeId)
+      .where("resources.lifecycle_status", "!=", "deleted");
     if (organizationId) {
       query = query.where(
         "storage_volumes.project_id",

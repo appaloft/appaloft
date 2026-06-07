@@ -60,6 +60,13 @@ describe("project delete persistence", () => {
       blockedProject.archive({ archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:10.000Z") });
       await projects.upsert(context, blockedProject, UpsertProjectSpec.fromProject(blockedProject));
 
+      const activeProject = Project.create({
+        id: ProjectId.rehydrate("prj_active"),
+        name: ProjectName.rehydrate("Active"),
+        createdAt: CreatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })._unsafeUnwrap();
+      await projects.upsert(context, activeProject, UpsertProjectSpec.fromProject(activeProject));
+
       const environment = EnvironmentProfile.create({
         id: EnvironmentId.rehydrate("env_blocker"),
         projectId: ProjectId.rehydrate("prj_blocked"),
@@ -101,6 +108,20 @@ describe("project delete persistence", () => {
       );
       expect(persisted?.toState().lifecycleStatus.value).toBe("deleted");
       expect(persisted?.toState().deletedAt?.value).toBe("2026-01-01T00:00:20.000Z");
+
+      const activeProjectIds = (await readModel.list(context, { lifecycleStatus: "active" })).map(
+        (project) => project.id,
+      );
+      const archivedProjectIds = (
+        await readModel.list(context, { lifecycleStatus: "archived" })
+      ).map((project) => project.id);
+      const allProjectIds = (await readModel.list(context, { lifecycleStatus: "all" }))
+        .map((project) => project.id)
+        .sort();
+
+      expect(activeProjectIds).toEqual(["prj_active"]);
+      expect(archivedProjectIds).toEqual(["prj_blocked"]);
+      expect(allProjectIds).toEqual(["prj_active", "prj_blocked"]);
 
       await expect(
         readModel.findOne(context, ProjectByIdSpec.create(ProjectId.rehydrate("prj_deletable"))),

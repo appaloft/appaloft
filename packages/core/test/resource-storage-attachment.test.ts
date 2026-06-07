@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   ArchivedAt,
   CreatedAt,
+  DeletedAt,
   EnvironmentId,
   ProjectId,
   Resource,
@@ -133,6 +134,18 @@ describe("Resource storage attachments", () => {
 
     expect(result.isOk()).toBe(true);
     expect(resource.toState().lifecycleStatus.value).toBe("archived");
+    expect(resource.toState().storageAttachments).toHaveLength(0);
+  });
+
+  test("[STOR-DELETE-001] clears storage attachments when deleting an archived resource", () => {
+    const resource = archivedResourceFixture();
+
+    const result = resource.delete({
+      deletedAt: DeletedAt.rehydrate("2026-01-01T00:02:00.000Z"),
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(resource.toState().lifecycleStatus.value).toBe("deleted");
     expect(resource.toState().storageAttachments).toHaveLength(0);
   });
 });

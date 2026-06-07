@@ -804,6 +804,12 @@ export const enUS = {
       workspace: "Workspace",
     },
     organization: {
+      archivedProjectsDescription:
+        "Review archived projects. They stay out of Home, Projects, and the sidebar project list.",
+      archivedProjectsEmptyDescription:
+        "Archived projects will appear here without crowding the daily workspace.",
+      archivedProjectsEmptyTitle: "No archived projects yet.",
+      archivedProjectsTitle: "Archived projects",
       createdAt: "Created",
       createToken: "Create token",
       creatingToken: "Creating token",

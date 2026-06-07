@@ -776,6 +776,10 @@ export const zhCN = {
       workspace: "工作台",
     },
     organization: {
+      archivedProjectsDescription: "查看已归档项目。它们不会出现在首页、项目页或侧栏项目列表。",
+      archivedProjectsEmptyDescription: "归档项目会集中显示在这里，不会干扰日常工作台。",
+      archivedProjectsEmptyTitle: "还没有已归档项目。",
+      archivedProjectsTitle: "已归档项目",
       createdAt: "创建时间",
       createToken: "创建部署令牌",
       creatingToken: "正在创建部署令牌",
