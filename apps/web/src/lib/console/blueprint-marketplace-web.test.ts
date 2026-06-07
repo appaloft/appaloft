@@ -151,6 +151,12 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("secretValues: blueprintInstallSecretValueInput()");
     expect(quickDeploySource).toContain('if (sourceKind === "blueprint")');
     expect(quickDeploySource).toContain("await installBlueprintFromQuickDeploy();");
+    expect(quickDeploySource).toMatch(
+      /if \(sourceKind === "blueprint"\) \{\s+await installBlueprintFromQuickDeploy\(\);\s+return;\s+\}/,
+    );
+    expect(quickDeploySource.indexOf('if (sourceKind === "blueprint")')).toBeLessThan(
+      quickDeploySource.indexOf("runQuickDeployWorkflow("),
+    );
     expect(quickDeploySource).not.toContain("selectedBlueprintInstallPlanEndpoint");
     expect(quickDeploySource).toContain("healthCheckPolicyForSource");
     expect(quickDeploySource).toContain("blueprintComponentForQuickDeploy().healthCheck");
