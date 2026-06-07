@@ -3,7 +3,6 @@ import {
   CheckServerDeleteSafetyQuery,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureServerCredentialCommand,
-  ConfigureServerEdgeProxyCommand,
   CreateSshCredentialCommand,
   DeactivateServerCommand,
   DeleteServerCommand,
@@ -24,7 +23,7 @@ import {
   scheduledRuntimePrunePolicyScopeSchema,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
-import { deploymentTargetCredentialKinds, edgeProxyKinds, targetKinds } from "@appaloft/core";
+import { deploymentTargetCredentialKinds, targetKinds } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
@@ -38,10 +37,6 @@ const providerOption = Options.text("provider").pipe(Options.withDefault("generi
 const targetKindOption = Options.choice("target-kind", targetKinds).pipe(
   Options.withDefault("single-server"),
 );
-const proxyKindOption = Options.choice("proxy-kind", edgeProxyKinds).pipe(
-  Options.withDefault("traefik"),
-);
-const proxyConfigureKindOption = Options.choice("kind", edgeProxyKinds);
 const credentialKindOption = Options.choice("kind", deploymentTargetCredentialKinds).pipe(
   Options.withDefault("local-ssh-agent"),
 );
@@ -79,9 +74,8 @@ const registerCommand = EffectCommand.make(
     port: portOption,
     provider: providerOption,
     targetKind: targetKindOption,
-    proxyKind: proxyKindOption,
   },
-  ({ host, name, port, provider, proxyKind, targetKind }) =>
+  ({ host, name, port, provider, targetKind }) =>
     runCommand(
       RegisterServerCommand.create({
         name,
@@ -89,7 +83,6 @@ const registerCommand = EffectCommand.make(
         port: Number(port),
         providerKey: provider,
         targetKind,
-        proxyKind,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRegister));
@@ -467,24 +460,9 @@ const proxyRepairCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverProxyRepair));
 
-const proxyConfigureCommand = EffectCommand.make(
-  "configure",
-  {
-    serverId: serverIdArg,
-    kind: proxyConfigureKindOption,
-  },
-  ({ kind, serverId }) =>
-    runCommand(
-      ConfigureServerEdgeProxyCommand.create({
-        serverId,
-        proxyKind: kind,
-      }),
-    ),
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverProxyConfigure));
-
 const proxyCommand = EffectCommand.make("proxy").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.serverProxy),
-  EffectCommand.withSubcommands([proxyRepairCommand, proxyConfigureCommand]),
+  EffectCommand.withSubcommands([proxyRepairCommand]),
 );
 
 const terminalCommand = EffectCommand.make(

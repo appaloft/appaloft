@@ -23,8 +23,6 @@
     XCircle,
   } from "@lucide/svelte";
   import type {
-    ConfigureDefaultAccessDomainPolicyInput,
-    ConfigureServerEdgeProxyInput,
     DeactivateServerInput,
     DeleteServerInput,
     InspectServerCapacityResponse,
@@ -35,7 +33,6 @@
     SshCredentialUsageServer,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
-  import { configureServerEdgeProxyInputSchema } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -47,10 +44,8 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
-  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
-  import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
     runtimeMonitoringRollupQueryOptions,
@@ -77,7 +72,6 @@
     | "capacity"
     | "connectivity"
     | "credentials"
-    | "proxy-access"
     | "deployments"
     | "terminal"
     | "danger";
@@ -87,7 +81,6 @@
     "capacity",
     "connectivity",
     "credentials",
-    "proxy-access",
     "deployments",
     "terminal",
     "danger",
@@ -130,18 +123,6 @@
       staleTime: 5_000,
     }),
   );
-  const defaultAccessOverridePolicyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["default-access-domain-policies", "show", "deployment-target", serverId],
-      queryFn: () =>
-        orpcClient.defaultAccessDomainPolicies.show({
-          scopeKind: "deployment-target",
-          serverId,
-        }),
-      enabled: browser && serverId.length > 0,
-      staleTime: 5_000,
-    }),
-  );
   const serverRuntimeScope = $derived({
     kind: "server" as const,
     serverId,
@@ -175,8 +156,7 @@
   const pageLoading = $derived(
     projectsQuery.isPending ||
       deploymentsQuery.isPending ||
-      serverDetailQuery.isPending ||
-      defaultAccessOverridePolicyQuery.isPending,
+      serverDetailQuery.isPending,
   );
   const serverDetail = $derived(serverDetailQuery.data ?? null);
   const server = $derived(serverDetail?.server ?? null);
@@ -269,28 +249,15 @@
       ? serverDeploymentsInObservationWindow.length
       : (serverRollups?.deployments.total ?? serverDeployments.length),
   );
-  const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
-  const edgeProxyKindOptions = configureServerEdgeProxyInputSchema.shape.proxyKind.options;
-
   let connectivityResult = $state<TestServerConnectivityResponse | null>(null);
   let connectivityError = $state("");
-  let overrideMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
-  let overrideProviderKey = $state("sslip");
-  let overrideTemplateRef = $state("");
-  let overridePolicyReadbackSource = $state("");
   let serverFormServerId = $state("");
   let serverName = $state("");
   let serverDeactivateDialogOpen = $state(false);
   let serverDeactivateConfirmation = $state("");
   let serverDeleteDialogOpen = $state(false);
   let serverDeleteConfirmation = $state("");
-  let edgeProxyKind = $state<ConfigureServerEdgeProxyInput["proxyKind"]>("none");
   let settingsFeedback = $state<{
-    kind: "success" | "error";
-    title: string;
-    detail: string;
-  } | null>(null);
-  let edgeProxyFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -320,11 +287,6 @@
     title: string;
     detail: string;
   } | null>(null);
-  let overrideFeedback = $state<{
-    kind: "success" | "error";
-    title: string;
-    detail: string;
-  } | null>(null);
   let serverDeleteFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -337,11 +299,6 @@
   } | null>(null);
   const canRenameServer = $derived(
     Boolean(server) && serverName.trim().length > 0 && serverName.trim() !== server?.name,
-  );
-  const canConfigureEdgeProxy = $derived(
-    Boolean(server) &&
-      server?.lifecycleStatus === "active" &&
-      edgeProxyKind !== (server?.edgeProxy?.kind ?? "none"),
   );
   const canOpenServerDeleteDialog = $derived(
     Boolean(server) && Boolean(serverDeleteSafety?.eligible) && !serverDeleteSafetyQuery.isPending,
@@ -379,26 +336,6 @@
       connectivityError = readErrorMessage(error);
     },
   }));
-  const configureDefaultAccessOverrideMutation = createMutation(() => ({
-    mutationFn: (input: ConfigureDefaultAccessDomainPolicyInput) =>
-      orpcClient.defaultAccessDomainPolicies.configure(input),
-    onSuccess: (result) => {
-      overrideFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.servers.defaultAccessSaveSuccessTitle),
-        detail: result.id,
-      };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["default-access-domain-policies"] });
-    },
-    onError: (error) => {
-      overrideFeedback = {
-        kind: "error",
-        title: $t(i18nKeys.console.servers.defaultAccessSaveErrorTitle),
-        detail: readErrorMessage(error),
-      };
-    },
-  }));
   const renameServerMutation = createMutation(() => ({
     mutationFn: (input: RenameServerInput) => orpcClient.servers.rename(input),
     onSuccess: (result) => {
@@ -415,27 +352,6 @@
       settingsFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.servers.renameFailed),
-        detail: readErrorMessage(error),
-      };
-    },
-  }));
-  const configureEdgeProxyMutation = createMutation(() => ({
-    mutationFn: (input: ConfigureServerEdgeProxyInput) =>
-      orpcClient.servers.configureEdgeProxy(input),
-    onSuccess: (result) => {
-      edgeProxyKind = result.edgeProxy.kind;
-      edgeProxyFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.servers.edgeProxyConfigured),
-        detail: `${result.edgeProxy.kind} · ${edgeProxyStatusLabel(result.edgeProxy.status)}`,
-      };
-      void queryClient.invalidateQueries({ queryKey: ["servers"] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
-    },
-    onError: (error) => {
-      edgeProxyFeedback = {
-        kind: "error",
-        title: $t(i18nKeys.console.servers.edgeProxyConfigureFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -519,9 +435,7 @@
 
     serverFormServerId = server.id;
     serverName = server.name;
-    edgeProxyKind = server.edgeProxy?.kind ?? "none";
     settingsFeedback = null;
-    edgeProxyFeedback = null;
     serverDeactivateFeedback = null;
     serverDeactivateConfirmation = "";
     serverDeactivateDialogOpen = false;
@@ -552,25 +466,6 @@
     capacityPruneFeedback = null;
   });
 
-  $effect(() => {
-    const readback = defaultAccessOverridePolicyQuery.data;
-    if (!readback || !serverId) {
-      return;
-    }
-
-    const policy = readback.policy;
-    const source = policy ? `${serverId}:${policy.id}:${policy.updatedAt}` : `${serverId}:none`;
-    if (overridePolicyReadbackSource === source) {
-      return;
-    }
-
-    const formState = toDefaultAccessPolicyFormState(policy);
-    overrideMode = formState.mode;
-    overrideProviderKey = formState.providerKey;
-    overrideTemplateRef = formState.templateRef;
-    overridePolicyReadbackSource = source;
-  });
-
   function testConnectivity(): void {
     if (!server) {
       return;
@@ -591,42 +486,6 @@
     renameServerMutation.mutate({
       serverId: server.id,
       name: serverName.trim(),
-    });
-  }
-
-  function configureEdgeProxy(event: SubmitEvent): void {
-    event.preventDefault();
-
-    if (!server || !canConfigureEdgeProxy || configureEdgeProxyMutation.isPending) {
-      return;
-    }
-
-    edgeProxyFeedback = null;
-    configureEdgeProxyMutation.mutate({
-      serverId: server.id,
-      proxyKind: edgeProxyKind,
-    });
-  }
-
-  function saveDefaultAccessOverride(event: SubmitEvent): void {
-    event.preventDefault();
-
-    if (!server) {
-      return;
-    }
-
-    configureDefaultAccessOverrideMutation.mutate({
-      scope: {
-        kind: "deployment-target",
-        serverId: server.id,
-      },
-      mode: overrideMode,
-      ...(overrideMode !== "disabled" && overrideProviderKey.trim()
-        ? { providerKey: overrideProviderKey.trim() }
-        : {}),
-      ...(overrideMode === "custom-template" && overrideTemplateRef.trim()
-        ? { templateRef: overrideTemplateRef.trim() }
-        : {}),
     });
   }
 
@@ -911,8 +770,6 @@
         return $t(i18nKeys.console.runtimeUsage.monitorTab);
       case "overview":
         return $t(i18nKeys.console.servers.overviewTab);
-      case "proxy-access":
-        return $t(i18nKeys.console.servers.proxyAccessTab);
       case "terminal":
         return $t(i18nKeys.console.terminal.title);
     }
@@ -1076,9 +933,6 @@
                 <Button size="sm" variant="outline" onclick={testConnectivity} disabled={connectivityMutation.isPending}>
                   <Activity class="size-3.5" />
                   {$t(i18nKeys.common.actions.testConnectivity)}
-                </Button>
-                <Button size="sm" variant="outline" href={serverTabHref("proxy-access")}>
-                  {$t(i18nKeys.console.servers.proxyAccessTab)}
                 </Button>
               </div>
             {/if}
@@ -1598,202 +1452,6 @@
             </div>
           {/if}
         </div>
-          </Tabs.Content>
-
-          <Tabs.Content value="proxy-access" class="mt-0 space-y-5">
-        <div class="console-panel p-4">
-          <form
-            id="server-edge-proxy-form"
-            class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
-            onsubmit={configureEdgeProxy}
-          >
-            <div class="min-w-0 space-y-1">
-              <div class="flex items-center gap-2">
-                <h2 class="text-sm font-semibold">
-                  {$t(i18nKeys.console.servers.edgeProxyKindLabel)}
-                </h2>
-                <DocsHelpLink
-                  href={webDocsHrefs.serverProxyReadiness}
-                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                />
-              </div>
-              <p class="text-sm text-muted-foreground">
-                {$t(i18nKeys.console.servers.edgeProxyDescription)}
-              </p>
-            </div>
-
-            <fieldset class="space-y-1.5 text-sm font-medium">
-              <span>{$t(i18nKeys.console.servers.edgeProxyKindLabel)}</span>
-              <div
-                class="grid min-h-8 grid-cols-3 overflow-hidden rounded-lg border bg-background"
-                aria-label={$t(i18nKeys.console.servers.edgeProxyKindLabel)}
-              >
-                {#each edgeProxyKindOptions as kind (kind)}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={edgeProxyKind === kind ? "selected" : "ghost"}
-                    class="h-8 rounded-none border-0"
-                    disabled={server.lifecycleStatus !== "active" || configureEdgeProxyMutation.isPending}
-                    onclick={() => {
-                      edgeProxyKind = kind;
-                    }}
-                  >
-                    {kind}
-                  </Button>
-                {/each}
-              </div>
-            </fieldset>
-
-            <div class="flex items-end">
-              <Button
-                type="submit"
-                class="w-full sm:w-auto"
-                disabled={!canConfigureEdgeProxy || configureEdgeProxyMutation.isPending}
-              >
-                <Save class="size-4" />
-                {configureEdgeProxyMutation.isPending
-                  ? $t(i18nKeys.common.actions.saving)
-                  : $t(i18nKeys.common.actions.save)}
-              </Button>
-            </div>
-          </form>
-
-          {#if server.edgeProxy?.status === "failed"}
-            <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-              <p class="font-medium text-destructive">
-                {server.edgeProxy.kind} · {edgeProxyStatusLabel(server.edgeProxy.status)}
-              </p>
-              <p class="mt-1 leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.servers.edgeProxyFailedHint)}
-              </p>
-            </div>
-          {/if}
-
-          {#if edgeProxyFeedback}
-            <div
-              class={`mt-4 rounded-md border p-3 text-sm ${edgeProxyFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
-            >
-              <p class="font-medium">{edgeProxyFeedback.title}</p>
-              <p class="mt-1 text-muted-foreground">{edgeProxyFeedback.detail}</p>
-            </div>
-          {/if}
-        </div>
-
-      <section class="console-panel space-y-4 p-5">
-        <div class="max-w-3xl space-y-1">
-          <div class="flex items-center gap-2">
-            <h2 class="text-lg font-semibold">
-              {$t(i18nKeys.console.servers.defaultAccessOverrideTitle)}
-            </h2>
-            <DocsHelpLink
-              href={webDocsHrefs.defaultAccessPolicy}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm text-muted-foreground">
-            {$t(i18nKeys.console.servers.defaultAccessOverrideDescription)}
-          </p>
-        </div>
-
-        <form
-          id="server-default-access-override-form"
-          class="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
-          onsubmit={saveDefaultAccessOverride}
-        >
-          <label class="space-y-1.5 text-sm font-medium">
-            <span class="inline-flex items-center gap-1.5">
-              {$t(i18nKeys.console.servers.defaultAccessModeLabel)}
-              <DocsHelpLink
-                href={webDocsHrefs.defaultAccessPolicy}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                className="size-5"
-              />
-            </span>
-            <Select.Root bind:value={overrideMode} type="single">
-              <Select.Trigger class="w-full">
-                {overrideMode === "disabled"
-                  ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
-                  : overrideMode === "custom-template"
-                    ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
-                    : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
-              </Select.Trigger>
-              <Select.Content>
-                {#each defaultAccessModes as mode (mode)}
-                  <Select.Item value={mode}>
-                    {mode === "disabled"
-                      ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
-                      : mode === "custom-template"
-                        ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
-                        : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
-                  </Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </label>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            {#if overrideMode !== "disabled"}
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.defaultAccessPolicy}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Input
-                  id="server-default-access-provider-key-input"
-                  bind:value={overrideProviderKey}
-                  autocomplete="off"
-                  placeholder={$t(i18nKeys.console.servers.defaultAccessProviderKeyPlaceholder)}
-                />
-              </label>
-            {/if}
-
-            {#if overrideMode === "custom-template"}
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.defaultAccessPolicy}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Input
-                  id="server-default-access-template-ref-input"
-                  bind:value={overrideTemplateRef}
-                  autocomplete="off"
-                  placeholder={$t(i18nKeys.console.servers.defaultAccessTemplateRefPlaceholder)}
-                />
-              </label>
-            {/if}
-          </div>
-
-          <div class="flex items-end">
-            <Button
-              class="w-full sm:w-auto"
-              disabled={configureDefaultAccessOverrideMutation.isPending}
-              type="submit"
-            >
-              {configureDefaultAccessOverrideMutation.isPending
-                ? $t(i18nKeys.common.actions.saving)
-                : $t(i18nKeys.common.actions.save)}
-            </Button>
-          </div>
-        </form>
-
-        {#if overrideFeedback}
-          <div
-            class={`rounded-md border p-3 text-sm ${overrideFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
-          >
-            <p class="font-medium">{overrideFeedback.title}</p>
-            <p class="mt-1 text-muted-foreground">{overrideFeedback.detail}</p>
-          </div>
-        {/if}
-      </section>
           </Tabs.Content>
 
           <Tabs.Content value="danger" class="mt-0">

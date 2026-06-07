@@ -98,17 +98,16 @@
             {$t(i18nKeys.console.projects.focusDescription)}
           </p>
         </div>
+        {#if projects.length > 0}
+          <Button class="shrink-0 self-start" type="button" onclick={openProjectCreateDialog}>
+            <Plus class="size-4" />
+            {$t(i18nKeys.console.projects.createProjectAction)}
+          </Button>
+        {/if}
       </section>
 
       <section class="space-y-3">
         {#if projects.length > 0}
-          <div class="flex justify-end">
-            <Button type="button" onclick={openProjectCreateDialog}>
-              <Plus class="size-4" />
-              {$t(i18nKeys.console.projects.createProjectAction)}
-            </Button>
-          </div>
-
           <div>
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.projectListTitle)}</h2>
             <p class="mt-1 text-sm text-muted-foreground">

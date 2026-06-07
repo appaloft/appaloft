@@ -6722,23 +6722,38 @@ describe("console e2e with Bun.WebView", () => {
     }
   }, 15_000);
 
-  test("[DEF-ACCESS-ENTRY-007] server list reads persisted system default access policy", async () => {
+  test("[DEF-ACCESS-ENTRY-007] server list hides persisted system default access policy", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}/servers`);
 
-    await expectAnyText(view, ["System default access policy", "系统默认访问策略"]);
-    await expectInputValue(view, "#servers-default-access-provider-key-input", "sslip");
-
-    const readbackRequest = await waitForRecordedRequest(
-      "/api/rpc/defaultAccessDomainPolicies/show",
+    await expectAnyText(view, ["Server targets", "服务器目标"]);
+    const content = await pageText(view);
+    const hasSystemPolicyInput = await view.evaluate<boolean>(
+      'Boolean(document.querySelector("#servers-default-access-provider-key-input"))',
     );
-    expect(readbackRequest.method).toBe("POST");
-    expect(readOrpcJsonPayload(readbackRequest.body)).toEqual({
-      scopeKind: "system",
-    });
+
+    expect(content).not.toContain("System default access policy");
+    expect(content).not.toContain("系统默认访问策略");
+    expect(hasSystemPolicyInput).toBe(false);
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/show",
+      ),
+    ).toBe(false);
+
+    await view.evaluate<void>(
+      `(() => {
+        const row = document.querySelector("[data-server-row='srv_demo']");
+        if (!(row instanceof HTMLElement)) {
+          throw new Error("Expected demo server row to be clickable");
+        }
+        row.click();
+      })()`,
+    );
+    await expectLocation(view, "/servers/srv_demo");
   }, 15_000);
 
   test("[SRV-LIFE-ENTRY-004] loads server detail through servers.show", async () => {
@@ -6895,49 +6910,32 @@ describe("console e2e with Bun.WebView", () => {
     );
   }, 20_000);
 
-  test("[DEF-ACCESS-ENTRY-007] server detail reads and refreshes deployment-target default access override", async () => {
+  test("[DEF-ACCESS-ENTRY-007] server detail hides deployment-target default access override", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/servers/srv_demo`);
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=proxy-access`);
 
-    await expectInputValue(view, "#server-default-access-provider-key-input", "internal-dns");
-    await expectInputValue(
-      view,
-      "#server-default-access-template-ref-input",
-      "apps/{{resourceSlug}}",
+    await expectText(view, "traefik");
+    const content = await pageText(view);
+    const hasOverrideForm = await view.evaluate<boolean>(
+      'Boolean(document.querySelector("#server-default-access-override-form"))',
     );
 
-    const readbackRequest = await waitForRecordedRequest(
-      "/api/rpc/defaultAccessDomainPolicies/show",
-    );
-    expect(readbackRequest.method).toBe("POST");
-    expect(readOrpcJsonPayload(readbackRequest.body)).toEqual({
-      scopeKind: "deployment-target",
-      serverId: "srv_demo",
-    });
-
-    await clickFormSubmit(view, "#server-default-access-override-form");
-
-    const configureRequest = await waitForRecordedRequest(
-      "/api/rpc/defaultAccessDomainPolicies/configure",
-    );
-    expect(configureRequest.method).toBe("POST");
-    expect(readOrpcJsonPayload(configureRequest.body)).toEqual({
-      scope: { kind: "deployment-target", serverId: "srv_demo" },
-      mode: "custom-template",
-      providerKey: "internal-dns",
-      templateRef: "apps/{{resourceSlug}}",
-    });
-    await waitFor(
-      async () =>
-        recordedApiRequests.filter(
-          (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/show",
-        ).length,
-      (count) => count >= 2,
-      "Expected default access policy readback to refresh after save",
-    );
+    expect(content).not.toContain("Server default access override");
+    expect(content).not.toContain("服务器默认访问覆盖策略");
+    expect(hasOverrideForm).toBe(false);
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/show",
+      ),
+    ).toBe(false);
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/configure",
+      ),
+    ).toBe(false);
   }, 15_000);
 
   test("[SSH-CRED-ENTRY-004] server detail reads credential usage and separates zero usage from unavailable usage", async () => {
@@ -7197,14 +7195,13 @@ describe("console e2e with Bun.WebView", () => {
     }
   }, 15_000);
 
-  test("[SRV-LIFE-ENTRY-020] configures edge proxy intent from server detail", async () => {
+  test("[SRV-LIFE-ENTRY-020] hides edge proxy intent configuration from server detail", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
-    const previousConfigureRoute = apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"];
-    let currentProxyKind: "none" | "traefik" | "caddy" = "traefik";
-    let currentProxyStatus: "pending" | "starting" | "ready" | "failed" | "disabled" = "ready";
+    const currentProxyKind: "none" | "traefik" | "caddy" = "traefik";
+    const currentProxyStatus: "pending" | "starting" | "ready" | "failed" | "disabled" = "ready";
 
     apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
@@ -7215,46 +7212,27 @@ describe("console e2e with Bun.WebView", () => {
         }),
       };
     };
-    apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"] = (
-      _request: Request,
-      body: unknown,
-    ) => {
-      const input = readOrpcJsonPayload(body) as {
-        proxyKind?: "none" | "traefik" | "caddy";
-        serverId?: string;
-      } | null;
-      currentProxyKind = input?.proxyKind ?? currentProxyKind;
-      currentProxyStatus = currentProxyKind === "none" ? "disabled" : "pending";
-
-      return {
-        json: {
-          id: input?.serverId ?? "srv_demo",
-          edgeProxy: {
-            kind: currentProxyKind,
-            status: currentProxyStatus,
-          },
-        },
-      };
-    };
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_demo`);
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=proxy-access`);
 
       await expectText(view, "traefik");
-      await clickButtonByText(view, "caddy");
-      await clickFormSubmit(view, "#server-edge-proxy-form");
+      const content = await pageText(view);
+      const hasEdgeProxyForm = await view.evaluate<boolean>(
+        'Boolean(document.querySelector("#server-edge-proxy-form"))',
+      );
 
-      const configureRequest = await waitForRecordedRequest("/api/rpc/servers/configureEdgeProxy");
-      expect(configureRequest.method).toBe("POST");
-      expect(readOrpcJsonPayload(configureRequest.body)).toEqual({
-        serverId: "srv_demo",
-        proxyKind: "caddy",
-      });
-      await expectText(view, "caddy");
+      expect(content).not.toContain("代理与访问");
+      expect(content).not.toContain("Proxy & access");
+      expect(hasEdgeProxyForm).toBe(false);
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/servers/configureEdgeProxy",
+        ),
+      ).toBe(false);
     } finally {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
-      apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"] = previousConfigureRoute;
     }
   }, 15_000);
 
