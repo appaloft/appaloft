@@ -241,7 +241,17 @@ function accessStatus(
     access?.latestDurableDomainRoute ||
     access?.latestServerAppliedDomainRoute
   ) {
-    return "available";
+    switch (access.proxyRouteStatus) {
+      case "failed":
+        return "failed";
+      case "not-ready":
+        return "unavailable";
+      case "unknown":
+        return "unknown";
+      case "ready":
+      case undefined:
+        return "available";
+    }
   }
 
   if (
@@ -569,6 +579,14 @@ export class ResourceDiagnosticSummaryQueryService {
     const blockingDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
     const status = accessStatus(resource, domainBindings);
     const latestAccessFailure = access?.latestAccessFailureDiagnostic;
+    const selectedRoute = selectedRouteIntentStatus({
+      resourceId: resource.id,
+      accessSummary: access,
+      domainBindings: blockingDurableBinding ? [blockingDurableBinding] : [],
+    });
+    const selectedRouteBlockingReason = selectedRoute?.blockingReason;
+    const selectedRouteBlockingPhase =
+      selectedRoute?.copySafeSummary.phase ?? "route-status-observation";
 
     if (latestAccessFailure) {
       sourceErrors.push(
@@ -590,6 +608,20 @@ export class ResourceDiagnosticSummaryQueryService {
           message: durableDomainBindingNotReadyMessage(blockingDurableBinding),
         }),
       );
+    } else if (selectedRouteBlockingReason) {
+      sourceErrors.push(
+        sourceError({
+          source: "access",
+          code: selectedRouteBlockingReason,
+          category: "infra",
+          phase: selectedRouteBlockingPhase,
+          retryable: true,
+          redactions,
+          relatedEntityId: resource.id,
+          relatedState: selectedRoute.proxy.applied,
+          message: selectedRoute.copySafeSummary.message,
+        }),
+      );
     } else if (status === "unavailable") {
       sourceErrors.push(
         sourceError({
@@ -605,11 +637,6 @@ export class ResourceDiagnosticSummaryQueryService {
       );
     }
 
-    const selectedRoute = selectedRouteIntentStatus({
-      resourceId: resource.id,
-      accessSummary: access,
-      domainBindings: blockingDurableBinding ? [blockingDurableBinding] : [],
-    });
     const routeIntentStatuses = routeIntentStatusDescriptors({
       resourceId: resource.id,
       accessSummary: access,
@@ -640,9 +667,14 @@ export class ResourceDiagnosticSummaryQueryService {
         ? { reasonCode: "resource_domain_binding_not_ready", phase: "access-summary" }
         : latestAccessFailure
           ? { reasonCode: latestAccessFailure.code, phase: latestAccessFailure.phase }
-          : status === "unavailable"
-            ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
-            : {}),
+          : selectedRouteBlockingReason
+            ? {
+                reasonCode: selectedRouteBlockingReason,
+                phase: selectedRouteBlockingPhase,
+              }
+            : status === "unavailable"
+              ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
+              : {}),
     };
   }
 
