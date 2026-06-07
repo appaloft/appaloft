@@ -756,6 +756,10 @@ export const i18nKeys = {
       workspace: "console:nav.workspace",
     },
     organization: {
+      archivedProjectsDescription: "console:organization.archivedProjectsDescription",
+      archivedProjectsEmptyDescription: "console:organization.archivedProjectsEmptyDescription",
+      archivedProjectsEmptyTitle: "console:organization.archivedProjectsEmptyTitle",
+      archivedProjectsTitle: "console:organization.archivedProjectsTitle",
       createdAt: "console:organization.createdAt",
       createToken: "console:organization.createToken",
       creatingToken: "console:organization.creatingToken",

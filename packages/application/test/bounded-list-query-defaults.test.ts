@@ -14,6 +14,7 @@ import {
 describe("bounded list query defaults", () => {
   test("[CQRS-LIST-BOUND-001] omitted list limits materialize a bounded backend default", () => {
     expect(ListProjectsQuery.create()._unsafeUnwrap().limit).toBe(100);
+    expect(ListProjectsQuery.create()._unsafeUnwrap().lifecycleStatus).toBe("active");
     expect(ListServersQuery.create()._unsafeUnwrap().limit).toBe(100);
     expect(ListEnvironmentsQuery.create({})._unsafeUnwrap().limit).toBe(100);
     expect(ListResourcesQuery.create({})._unsafeUnwrap().limit).toBe(100);

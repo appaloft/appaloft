@@ -25,6 +25,7 @@ type ProjectSelectionQuery = SelectQueryBuilder<
   "projects",
   Selectable<Database["projects"]>
 >;
+type ProjectReadModelListInput = NonNullable<Parameters<ProjectReadModel["list"]>[1]>;
 
 class KyselyProjectSelectionVisitor implements ProjectSelectionSpecVisitor<ProjectSelectionQuery> {
   visitProjectById(query: ProjectSelectionQuery, spec: ProjectByIdSpec): ProjectSelectionQuery {
@@ -63,6 +64,7 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      lifecycleStatus?: ProjectReadModelListInput["lifecycleStatus"];
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -91,6 +93,9 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
         if (input?.projectIds?.length) {
           query = query.where("id", "in", [...input.projectIds]);
         }
+        if (input?.lifecycleStatus && input.lifecycleStatus !== "all") {
+          query = query.where("lifecycle_status", "=", input.lifecycleStatus);
+        }
 
         const row = await query.executeTakeFirst();
         return Number(row?.count ?? 0);
@@ -105,6 +110,7 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      lifecycleStatus?: ProjectReadModelListInput["lifecycleStatus"];
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -132,6 +138,9 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
         }
         if (input?.projectIds?.length) {
           query = query.where("id", "in", [...input.projectIds]);
+        }
+        if (input?.lifecycleStatus && input.lifecycleStatus !== "all") {
+          query = query.where("lifecycle_status", "=", input.lifecycleStatus);
         }
         query = query.limit(input?.limit ?? defaultReadModelListLimit);
 

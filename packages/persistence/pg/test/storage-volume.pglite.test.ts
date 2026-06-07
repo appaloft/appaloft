@@ -148,6 +148,26 @@ describe("storage volume persistence", () => {
         ],
       });
       await expect(storageReadModel.countAttachments(context, "stv_demo")).resolves.toBe(1);
+
+      await database.db
+        .updateTable("resources")
+        .set({
+          lifecycle_status: "deleted",
+          deleted_at: "2026-01-01T00:02:00.000Z",
+        })
+        .where("id", "=", "res_web")
+        .execute();
+
+      const summaryAfterResourceDelete = await storageReadModel.findOne(
+        context,
+        StorageVolumeByIdSpec.create(StorageVolumeId.rehydrate("stv_demo")),
+      );
+      expect(summaryAfterResourceDelete).toMatchObject({
+        id: "stv_demo",
+        attachmentCount: 0,
+        attachments: [],
+      });
+      await expect(storageReadModel.countAttachments(context, "stv_demo")).resolves.toBe(0);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });

@@ -665,6 +665,7 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      lifecycleStatus?: NonNullable<Parameters<ProjectReadModel["count"]>[1]>["lifecycleStatus"];
     },
   ): Promise<number> {
     void context;
@@ -683,6 +684,11 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
         organizationIds ? organizationIds.has(project.toState().organizationId?.value ?? "") : true,
       )
       .filter((project) => (projectIds ? projectIds.has(project.toState().id.value) : true))
+      .filter((project) =>
+        input?.lifecycleStatus && input.lifecycleStatus !== "all"
+          ? project.toState().lifecycleStatus.value === input.lifecycleStatus
+          : true,
+      )
       .filter((project) => Boolean(projectSummaryFromState(project))).length;
   }
 
@@ -693,6 +699,7 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      lifecycleStatus?: NonNullable<Parameters<ProjectReadModel["list"]>[1]>["lifecycleStatus"];
     },
   ): Promise<ProjectSummary[]> {
     void context;
@@ -711,6 +718,11 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
         organizationIds ? organizationIds.has(project.toState().organizationId?.value ?? "") : true,
       )
       .filter((project) => (projectIds ? projectIds.has(project.toState().id.value) : true))
+      .filter((project) =>
+        input?.lifecycleStatus && input.lifecycleStatus !== "all"
+          ? project.toState().lifecycleStatus.value === input.lifecycleStatus
+          : true,
+      )
       .flatMap((project) => {
         const summary = projectSummaryFromState(project);
         if (!summary) {
