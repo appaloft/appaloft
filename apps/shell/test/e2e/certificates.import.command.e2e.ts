@@ -38,7 +38,6 @@ describe("certificates.import command e2e", () => {
     fixture = createRoutingDomainTlsFixture({
       appVersion: "0.1.0-certificates-import-command-e2e",
       prefix: "appaloft-certificates-import-command-",
-      proxyKind: "traefik",
     });
   }, 60000);
 

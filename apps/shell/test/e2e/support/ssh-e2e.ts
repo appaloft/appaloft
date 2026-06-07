@@ -100,7 +100,6 @@ export function remoteCleanup(config: SshConfig, deploymentId: string): void {
 
 export function bootstrapSshContext(input: {
   config: SshConfig;
-  proxyKind: "none" | "traefik";
   suffix: string;
   workspace: ShellE2eWorkspace;
 }): QuickDeploySshContext {
@@ -123,8 +122,6 @@ export function bootstrapSshContext(input: {
       input.config.port,
       "--provider",
       "generic-ssh",
-      "--proxy-kind",
-      input.proxyKind,
     ],
     input.workspace.cliOptions,
   );
