@@ -1441,6 +1441,8 @@ export interface ProjectSummary {
   createdAt: string;
 }
 
+export type ProjectListLifecycleStatus = ProjectSummary["lifecycleStatus"] | "all";
+
 export interface ProjectDeleteSafety {
   schemaVersion: "projects.delete-check/v1";
   projectId: string;
@@ -8087,6 +8089,7 @@ export interface ProjectReadModel {
       organizationId?: string;
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
+      lifecycleStatus?: ProjectListLifecycleStatus;
     },
   ): Promise<number>;
   list(
@@ -8096,6 +8099,7 @@ export interface ProjectReadModel {
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      lifecycleStatus?: ProjectListLifecycleStatus;
     },
   ): Promise<ProjectSummary[]>;
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;

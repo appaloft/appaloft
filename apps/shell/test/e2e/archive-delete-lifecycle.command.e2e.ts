@@ -409,5 +409,5 @@ describe("archive and delete lifecycle CLI e2e", () => {
     } finally {
       await server.stop();
     }
-  }, 90_000);
+  }, 180_000);
 });

@@ -1,5 +1,6 @@
 import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import {
+  Archive,
   Building2,
   KeyRound,
   MailPlus,
@@ -58,6 +59,11 @@ export function organizationSettingsItems(extensions: readonly SystemPluginWebEx
       href: "/organization/deploy-tokens",
       labelKey: i18nKeys.console.organization.deployTokensTitle,
       icon: KeyRound,
+    },
+    {
+      href: "/organization/archived-projects",
+      labelKey: i18nKeys.console.organization.archivedProjectsTitle,
+      icon: Archive,
     },
     ...settingsExtensionItems(extensions, "/organization"),
     {

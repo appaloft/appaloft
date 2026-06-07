@@ -30,6 +30,7 @@ export class ListProjectsQueryService {
   ): Promise<Result<{ items: ProjectSummary[] }>> {
     const organizationId = context.principal?.activeOrganization?.organizationId;
     const limit = boundedListLimit(query?.limit);
+    const lifecycleStatus = query?.lifecycleStatus ?? "active";
     const operationScopePort = this.operationScopePort ?? defaultOperationScopePort;
     if (listProjectsOperation) {
       const scoped = await scopeOperation({
@@ -56,6 +57,7 @@ export class ListProjectsQueryService {
             ...(organizationIds ? { organizationIds } : {}),
             ...(projectIds ? { projectIds } : {}),
             limit,
+            lifecycleStatus,
           }),
         });
       }
@@ -65,6 +67,7 @@ export class ListProjectsQueryService {
       items: await this.readModel.list(toRepositoryContext(context), {
         ...(organizationId ? { organizationId } : {}),
         limit,
+        lifecycleStatus,
       }),
     });
   }

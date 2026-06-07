@@ -1607,6 +1607,7 @@ export class Resource extends AggregateRoot<ResourceState> {
 
     this.state.lifecycleStatus = lifecycleStatus.value;
     this.state.deletedAt = input.deletedAt;
+    this.state.storageAttachments = [];
 
     this.recordDomainEvent("resource-deleted", input.deletedAt, {
       resourceId: this.state.id.value,

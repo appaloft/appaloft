@@ -3,8 +3,10 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
+    ArrowRight,
     Building2,
     BookOpen,
+    FolderOpen,
     KeyRound,
     RotateCw,
     ShieldCheck,
@@ -35,7 +37,7 @@
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { organizationSettingsItems } from "$lib/console/settings-nav";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
-  import { formatTime } from "$lib/console/utils";
+  import { formatTime, projectDetailHref } from "$lib/console/utils";
   import { readErrorMessage, request } from "$lib/api/client";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -47,6 +49,7 @@
     | "members"
     | "invitations"
     | "deploy-tokens"
+    | "archived-projects"
     | "danger-zone";
   type Props = {
     section?: OrganizationManagementSection | null;
@@ -117,6 +120,9 @@
     if (page.url.pathname.endsWith("/deploy-tokens")) {
       return "deploy-tokens";
     }
+    if (page.url.pathname.endsWith("/archived-projects")) {
+      return "archived-projects";
+    }
     if (page.url.pathname.endsWith("/danger-zone")) {
       return "danger-zone";
     }
@@ -126,6 +132,7 @@
       querySection === "members" ||
       querySection === "invitations" ||
       querySection === "deploy-tokens" ||
+      querySection === "archived-projects" ||
       querySection === "danger-zone" ||
       querySection === "profile" ||
       querySection === "overview"
@@ -156,6 +163,7 @@
   const shouldLoadDeployTokens = $derived(
     activeSection === "profile" || activeSection === "deploy-tokens",
   );
+  const shouldLoadArchivedProjects = $derived(activeSection === "archived-projects");
 
   const membersQuery = createQuery(() =>
     queryOptions({
@@ -199,6 +207,13 @@
       queryFn: () =>
         orpcClient.organizations.showProfile({ organizationId: currentOrganizationId }),
       enabled: browser && Boolean(currentOrganizationId) && shouldLoadOrganizationProfile,
+    }),
+  );
+  const archivedProjectsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects", { lifecycleStatus: "archived", limit: 100 }],
+      queryFn: () => orpcClient.projects.list({ lifecycleStatus: "archived", limit: 100 }),
+      enabled: browser && Boolean(currentOrganizationId) && shouldLoadArchivedProjects,
     }),
   );
 
@@ -419,6 +434,7 @@
   const removedMembers = $derived(members.filter((member) => member.status === "deactivated"));
   const invitations = $derived(invitationsQuery.data?.items ?? []);
   const deployTokens = $derived(deployTokensQuery.data?.items ?? []);
+  const archivedProjects = $derived(archivedProjectsQuery.data?.items ?? []);
   const organizationProfile = $derived(profileQuery.data ?? null);
   const organizationProfileLoading = $derived(
     Boolean(currentOrganizationId) &&
@@ -449,6 +465,11 @@
       activeSection === "deploy-tokens" &&
       canManageDeployTokens &&
       deployTokensQuery.isPending,
+  );
+  const archivedProjectsSectionLoading = $derived(
+    Boolean(currentOrganizationId) &&
+      activeSection === "archived-projects" &&
+      archivedProjectsQuery.isPending,
   );
   const canSubmitInvite = $derived(
     Boolean(currentOrganizationId) &&
@@ -721,7 +742,8 @@
   function centeredOrganizationSectionClass(baseClass: string): string {
     return activeSection === "members" ||
       activeSection === "invitations" ||
-      activeSection === "deploy-tokens"
+      activeSection === "deploy-tokens" ||
+      activeSection === "archived-projects"
       ? `mx-auto w-full max-w-6xl ${baseClass}`
       : baseClass;
   }
@@ -1287,6 +1309,66 @@
                   </Button>
                 </div>
               </div>
+            {/each}
+          </div>
+        {/if}
+      </section>
+      {/if}
+
+      {#if activeSection === "archived-projects"}
+      <section class={centeredOrganizationSectionClass("space-y-5")}>
+        <div class="max-w-2xl">
+          <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.archivedProjectsTitle)}</h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {$t(i18nKeys.console.organization.archivedProjectsDescription)}
+          </p>
+        </div>
+        {#if archivedProjectsSectionLoading}
+          <div class="console-record-list">
+            <div class="console-record-row">
+              <Skeleton class="h-14 w-full" />
+            </div>
+            <div class="console-record-row">
+              <Skeleton class="h-14 w-full" />
+            </div>
+          </div>
+        {:else if archivedProjects.length === 0}
+          <ConsoleEmptyState
+            tone="project"
+            title={$t(i18nKeys.console.organization.archivedProjectsEmptyTitle)}
+            description={$t(i18nKeys.console.organization.archivedProjectsEmptyDescription)}
+            learnMoreHref={webDocsHrefs.projectLifecycle}
+          />
+        {:else}
+          <div class="console-record-list">
+            {#each archivedProjects as project (project.id)}
+              <a
+                href={projectDetailHref(project.id)}
+                class="console-record-row group gap-4 lg:grid-cols-[minmax(0,1fr)_14rem_auto] lg:items-center"
+              >
+                <div class="min-w-0 space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <FolderOpen class="size-4 text-primary" />
+                    <h3 class="truncate text-base font-semibold">{project.name}</h3>
+                    <Badge variant="outline">{project.slug}</Badge>
+                  </div>
+                  <p class="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    {project.description ?? $t(i18nKeys.console.projects.noDescription)}
+                  </p>
+                </div>
+                <div class="text-sm text-muted-foreground">
+                  <p>{$t(i18nKeys.console.organization.createdAt)} · {formatTime(project.createdAt)}</p>
+                  {#if project.archivedAt}
+                    <p>{$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}</p>
+                  {/if}
+                </div>
+                <span
+                  class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+                >
+                  {$t(i18nKeys.common.actions.viewDetails)}
+                  <ArrowRight class="size-4" />
+                </span>
+              </a>
             {/each}
           </div>
         {/if}
