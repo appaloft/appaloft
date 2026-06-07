@@ -2841,7 +2841,7 @@ const blueprintComponentRuntimePlanSchema = z
     networkAllows: z.array(blueprintComponentRuntimeNetworkAllowSchema),
     readinessGates: z.array(blueprintComponentRuntimeReadinessGateSchema),
     telemetryAttachments: z.array(blueprintComponentRuntimeTelemetryAttachmentSchema),
-    storageMounts: z.array(blueprintComponentRuntimeStorageMountSchema),
+    storageMounts: z.array(blueprintComponentRuntimeStorageMountSchema).default([]),
   })
   .strict();
 

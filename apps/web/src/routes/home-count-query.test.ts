@@ -86,6 +86,16 @@ describe("project-first home", () => {
   test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {
     expect(homePageSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
     expect(homePageSource).toContain("<Skeleton class=");
+    expect(homePageSource).toContain("const workStateLoading = $derived(");
+    expect(homePageSource).toContain("{#if !workStateLoading && !hasWork}");
+    expect(homePageSource).toContain("resourcesLoading");
+    expect(homePageSource).toContain("environmentsLoading");
+    expect(homePageSource).toContain("deploymentsLoading");
+    expect(homePageSource).toContain("serverCountQuery.isPending");
+    expect(homePageSource).not.toContain("pageLoading");
+    expect(homePageSource).not.toContain(
+      '<section class="nothing-home-heading" aria-hidden="true">',
+    );
     expect(homePageSource).not.toContain("nothing-skeleton");
     expect(homePageSource).not.toContain("@keyframes nothing-skeleton");
   });

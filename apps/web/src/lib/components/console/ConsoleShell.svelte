@@ -23,6 +23,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import ConsoleUserMenu from "$lib/components/console/ConsoleUserMenu.svelte";
   import {
@@ -144,6 +145,7 @@
   const currentOrganization = $derived(organizationContext?.currentOrganization ?? null);
   const organizations = $derived(organizationContext?.organizations ?? []);
   const projects = $derived(projectsQuery.data?.items ?? []);
+  const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
@@ -340,7 +342,19 @@
         <SidebarGroupLabel>{$t(i18nKeys.common.domain.projects)}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            {#if filteredProjects.length > 0}
+            {#if projectsLoading}
+              {#each Array.from({ length: 3 }) as _, index (index)}
+                <SidebarMenuItem>
+                  <div
+                    class="flex h-8 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center"
+                    aria-hidden="true"
+                  >
+                    <Skeleton class="size-4 shrink-0 rounded-sm" />
+                    <Skeleton class="h-4 min-w-0 flex-1 group-data-[collapsible=icon]:hidden" />
+                  </div>
+                </SidebarMenuItem>
+              {/each}
+            {:else if filteredProjects.length > 0}
               {#each filteredProjects.slice(0, 8) as project (project.id)}
                 {@const projectIsActive = activeProjectId === project.id}
                 <SidebarMenuItem>
