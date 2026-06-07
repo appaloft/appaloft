@@ -90,6 +90,18 @@ class StaticRuntimeLogStream implements ResourceRuntimeLogStream {
   }
 }
 
+class HangingRuntimeLogStream implements ResourceRuntimeLogStream {
+  closed = false;
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<ResourceRuntimeLogEvent> {
+    await new Promise<void>(() => {});
+  }
+}
+
 class RecordingRuntimeLogReader implements ResourceRuntimeLogReader {
   calls: Array<{
     context: ResourceRuntimeLogContext;
@@ -320,6 +332,7 @@ function createService(input?: {
   stream?: ResourceRuntimeLogStream;
   reader?: ResourceRuntimeLogReader;
   boundedOpenTimeoutMs?: number;
+  boundedCollectTimeoutMs?: number;
 }) {
   const reader = new RecordingRuntimeLogReader(
     input?.stream ??
@@ -343,6 +356,13 @@ function createService(input?: {
         boundedOpenTimeoutMs: number;
       }
     ).boundedOpenTimeoutMs = input.boundedOpenTimeoutMs;
+  }
+  if (input?.boundedCollectTimeoutMs) {
+    (
+      service as unknown as {
+        boundedCollectTimeoutMs: number;
+      }
+    ).boundedCollectTimeoutMs = input.boundedCollectTimeoutMs;
   }
 
   return {
@@ -443,6 +463,47 @@ describe("ResourceRuntimeLogsQueryService", () => {
     expect(tracer.spans[0]?.status).toEqual({
       status: "error",
       message: "Runtime log open timed out",
+    });
+  });
+
+  test("returns a structured timeout when bounded runtime log collection hangs", async () => {
+    const tracer = new RecordingAppTracer();
+    const context = createTestContext({ tracer });
+    const stream = new HangingRuntimeLogStream();
+    const { reader, service } = createService({
+      stream,
+      boundedCollectTimeoutMs: 1,
+    });
+    const query = ResourceRuntimeLogsQuery.create({
+      resourceId: "res_web",
+      tailLines: 50,
+      follow: false,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("timeout");
+    expect(error.details).toMatchObject({
+      phase: "runtime-log-collection",
+      step: "collection-timeout",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      timeoutMs: 1,
+    });
+    expect(reader.calls[0]?.signal.aborted).toBe(true);
+    expect(stream.closed).toBe(true);
+    expect(tracer.spans.map((span) => span.name)).toEqual([
+      "appaloft.runtime_logs.open",
+      "appaloft.runtime_logs.collect_bounded",
+    ]);
+    expect(tracer.spans[1]?.status).toEqual({
+      status: "error",
+      message: "Runtime log collection timed out",
+    });
+    expect(tracer.spans[1]?.attributes).toMatchObject({
+      "appaloft.runtime_logs.line_count": 0,
     });
   });
 

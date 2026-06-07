@@ -25,6 +25,7 @@ import { tokens } from "../../tokens";
 import { type ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 
 const defaultBoundedOpenTimeoutMs = 10_000;
+const defaultBoundedCollectTimeoutMs = 8_000;
 
 class MaskingResourceRuntimeLogStream implements ResourceRuntimeLogStream {
   constructor(
@@ -204,9 +205,30 @@ function createRuntimeLogOpenTimeoutError(input: {
   });
 }
 
+function createRuntimeLogCollectTimeoutError(input: {
+  deployment: DeploymentSummary;
+  request: ResourceRuntimeLogRequest;
+  resource: ResourceSummary;
+  timeoutMs: number;
+}): DomainError {
+  return domainError.timeout("Runtime log collection timed out", {
+    phase: "runtime-log-collection",
+    step: "collection-timeout",
+    resourceId: input.resource.id,
+    deploymentId: input.deployment.id,
+    runtimeKind: input.deployment.runtimePlan.execution.kind,
+    targetProviderKey: input.deployment.runtimePlan.target.providerKey,
+    follow: input.request.follow,
+    tailLines: input.request.tailLines,
+    timeoutMs: input.timeoutMs,
+    ...(input.request.serviceName ? { serviceName: input.request.serviceName } : {}),
+  });
+}
+
 @injectable()
 export class ResourceRuntimeLogsQueryService {
   private boundedOpenTimeoutMs = defaultBoundedOpenTimeoutMs;
+  private boundedCollectTimeoutMs = defaultBoundedCollectTimeoutMs;
 
   constructor(
     @inject(tokens.resourceReadModel) private readonly resourceReadModel: ResourceReadModel,
@@ -362,41 +384,67 @@ export class ResourceRuntimeLogsQueryService {
       },
       async (span) => {
         let closeReason: string | undefined;
+        let collectTimeout: ReturnType<typeof createTimeout> | undefined = createTimeout(
+          this.boundedCollectTimeoutMs,
+        );
 
         try {
-          for await (const event of stream) {
-            if (event.kind === "line") {
-              logs.push(event.line);
-              continue;
+          const collectPromise = (async (): Promise<Result<ResourceRuntimeLogsResult>> => {
+            for await (const event of stream) {
+              if (event.kind === "line") {
+                logs.push(event.line);
+                continue;
+              }
+
+              if (event.kind === "closed") {
+                closeReason = event.reason;
+                continue;
+              }
+
+              if (event.kind === "error") {
+                span.setStatus("error", event.error.message);
+                span.setAttributes({
+                  ...createDomainErrorTraceAttributes(event.error),
+                  [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
+                });
+                return err(event.error);
+              }
             }
 
-            if (event.kind === "closed") {
-              closeReason = event.reason;
-              continue;
-            }
+            span.setAttributes({
+              [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
+              [appaloftTraceAttributes.runtimeLogCloseReason]: closeReason,
+            });
+            span.setStatus("ok");
 
-            if (event.kind === "error") {
-              span.setStatus("error", event.error.message);
-              span.setAttributes({
-                ...createDomainErrorTraceAttributes(event.error),
-                [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
-              });
-              return err(event.error);
-            }
+            return ok({
+              mode: "bounded",
+              resourceId: resource.id,
+              deploymentId: deployment.id,
+              logs,
+            });
+          })();
+          const resultOrTimeout = await Promise.race([collectPromise, collectTimeout.promise]);
+
+          if (resultOrTimeout === "timeout") {
+            abortController.abort();
+            const error = createRuntimeLogCollectTimeoutError({
+              deployment,
+              request,
+              resource,
+              timeoutMs: this.boundedCollectTimeoutMs,
+            });
+
+            span.setStatus("error", error.message);
+            span.setAttributes({
+              ...createDomainErrorTraceAttributes(error),
+              [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
+            });
+            void collectPromise.catch(() => undefined);
+            return err(error);
           }
 
-          span.setAttributes({
-            [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
-            [appaloftTraceAttributes.runtimeLogCloseReason]: closeReason,
-          });
-          span.setStatus("ok");
-
-          return ok({
-            mode: "bounded",
-            resourceId: resource.id,
-            deploymentId: deployment.id,
-            logs,
-          });
+          return resultOrTimeout;
         } catch (error) {
           span.setStatus(
             "error",
@@ -406,6 +454,8 @@ export class ResourceRuntimeLogsQueryService {
           span.recordError(error instanceof Error ? error : { message: String(error) });
           throw error;
         } finally {
+          collectTimeout?.cancel();
+          collectTimeout = undefined;
           await stream.close();
         }
       },

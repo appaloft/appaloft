@@ -718,6 +718,76 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
   });
 
+  test("[ACCESS-DIAG-006] reports generated access as unavailable when proxy route is not ready", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "http://web.203.0.113.10.sslip.io",
+              hostname: "web.203.0.113.10.sslip.io",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "running",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "not-ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: false,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.access).toMatchObject({
+      status: "unavailable",
+      generatedUrl: "http://web.203.0.113.10.sslip.io",
+      proxyRouteStatus: "not-ready",
+      reasonCode: "proxy_route_missing",
+      phase: "route-status-observation",
+      selectedRoute: {
+        source: "generated-default-access",
+        blockingReason: "proxy_route_missing",
+        recommendedAction: "inspect-proxy-preview",
+        proxy: {
+          applied: "not-ready",
+        },
+      },
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "access",
+        code: "proxy_route_missing",
+        phase: "route-status-observation",
+        relatedEntityId: "res_web",
+        relatedState: "not-ready",
+      }),
+    );
+    expect(summary.sourceErrors).not.toContainEqual(
+      expect.objectContaining({
+        source: "access",
+        code: "default_access_route_unavailable",
+      }),
+    );
+    expect(summary.copy.json).toContain('"status": "unavailable"');
+    expect(summary.copy.json).toContain('"reasonCode": "proxy_route_missing"');
+  });
+
   test("[RES-ACCESS-DIAG-OBS-001][RES-ACCESS-DIAG-OBS-004] includes latest edge access failure in copy-safe diagnostics", async () => {
     const context = createTestContext();
     const { service } = createService({
