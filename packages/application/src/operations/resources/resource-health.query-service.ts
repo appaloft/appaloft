@@ -900,6 +900,11 @@ function isDockerSwarmDeployment(deployment: DeploymentSummary): boolean {
   );
 }
 
+function dockerContainerName(metadata?: Record<string, string>): string | undefined {
+  const name = metadata?.containerName ?? metadata?.dockerContainerName;
+  return name && name.trim().length > 0 ? name : undefined;
+}
+
 @injectable()
 export class ResourceHealthQueryService {
   constructor(
@@ -1379,12 +1384,18 @@ export class ResourceHealthQueryService {
     resource: ResourceSummary,
     deployment: DeploymentSummary,
   ): ResourceRuntimeHealthProbeRequest | undefined {
-    if (!isDockerSwarmDeployment(deployment)) {
+    const metadata = deployment.runtimePlan.execution.metadata;
+    const supportsDockerSwarmProbe = isDockerSwarmDeployment(deployment);
+    const supportsDockerContainerProbe =
+      deployment.runtimePlan.execution.kind === "docker-container" &&
+      Boolean(dockerContainerName(metadata));
+
+    if (!supportsDockerSwarmProbe && !supportsDockerContainerProbe) {
       return undefined;
     }
 
-    const serviceName = deployment.runtimePlan.execution.metadata?.["swarm.serviceName"];
-    if (!serviceName || serviceName.trim().length === 0) {
+    const serviceName = metadata?.["swarm.serviceName"];
+    if (supportsDockerSwarmProbe && (!serviceName || serviceName.trim().length === 0)) {
       return undefined;
     }
 
@@ -1395,9 +1406,7 @@ export class ResourceHealthQueryService {
       runtimeKind: deployment.runtimePlan.execution.kind,
       targetKind: deployment.runtimePlan.target.kind,
       providerKey: deployment.runtimePlan.target.providerKey,
-      ...(deployment.runtimePlan.execution.metadata
-        ? { runtimeMetadata: deployment.runtimePlan.execution.metadata }
-        : {}),
+      ...(metadata ? { runtimeMetadata: metadata } : {}),
       timeoutSeconds: 5,
     };
   }
