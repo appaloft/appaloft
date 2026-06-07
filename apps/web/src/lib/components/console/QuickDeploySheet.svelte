@@ -190,7 +190,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     title: string;
     subtitle: string;
     category: string;
-    featured: boolean;
+    featured?: boolean;
     websiteUrl?: string;
     documentationUrl?: string;
     icon?: {
@@ -199,7 +199,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       url?: string;
       alt?: string;
     };
-    publisher: {
+    publisher?: {
       name: string;
       verified: boolean;
     };
@@ -3527,11 +3527,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       title: entry.name,
       subtitle: entry.summary,
       category: "Blueprints",
-      featured: false,
-      publisher: {
-        name: "Appaloft",
-        verified: false,
-      },
       blueprint: {
         id: manifest?.id ?? entry.id,
         version: manifest?.version ?? entry.version,
@@ -3593,11 +3588,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             title: manifest.name ?? selectedBlueprintTitle.trim() ?? manifest.id ?? "",
             subtitle: manifest.summary,
             category: "Blueprints",
-            featured: false,
-            publisher: {
-              name: "Appaloft",
-              verified: false,
-            },
             blueprint: {
               id: manifest.id ?? selectedBlueprintSlug.trim(),
               version: manifest.version ?? "1.0.0",
@@ -5840,10 +5830,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap gap-2">
                   <Badge variant="outline">{selectedBlueprintListing.category}</Badge>
-                  <Badge variant="outline">
-                    {selectedBlueprintListing.featured ? "Featured" : "Official"}
-                  </Badge>
-                  <Badge variant="outline">{selectedBlueprintListing.publisher.name}</Badge>
+                  {#if selectedBlueprintListing.featured}
+                    <Badge variant="outline">Featured</Badge>
+                  {/if}
+                  {#if selectedBlueprintListing.publisher}
+                    <Badge variant="outline">{selectedBlueprintListing.publisher.name}</Badge>
+                  {/if}
                   {#if selectedBlueprintVariantOptions.length > 0}
                     <Badge variant="outline">方案：{selectedBlueprintVariantLabel()}</Badge>
                   {/if}

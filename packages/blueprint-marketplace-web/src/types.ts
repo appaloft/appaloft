@@ -15,7 +15,7 @@ export interface BlueprintMarketplaceListing {
   readonly subtitle: string;
   readonly categoryKey: string;
   readonly category: string;
-  readonly featured: boolean;
+  readonly featured?: boolean;
   readonly websiteUrl?: string;
   readonly documentationUrl?: string;
   readonly icon?: {
@@ -24,7 +24,7 @@ export interface BlueprintMarketplaceListing {
     readonly url?: string;
     readonly alt?: string;
   };
-  readonly publisher: {
+  readonly publisher?: {
     readonly name: string;
     readonly verified: boolean;
   };
