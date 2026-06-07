@@ -17,6 +17,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Table from "$lib/components/ui/table";
   import {
@@ -186,7 +187,18 @@
     tone?: ConsolePageTone;
   };
 
-  type ConsolePageTableRow = Record<string, string | number | ConsolePageTableCell>;
+  type ConsolePageTableDetails = {
+    label: string;
+    title: string;
+    description?: string;
+    rows: ConsolePageKeyValue[];
+  };
+
+  type ConsolePageTableCellValue = string | number | ConsolePageTableCell;
+  type ConsolePageTableRow = {
+    details?: ConsolePageTableDetails;
+    [key: string]: ConsolePageTableCellValue | ConsolePageTableDetails | undefined;
+  };
 
   type ConsolePageCalloutSection = {
     kind: "callouts";
@@ -213,6 +225,8 @@
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
   let panelFieldValues = $state<Record<string, number>>({});
+  let selectedTableDetails = $state<ConsolePageTableDetails | null>(null);
+  let tableDetailsOpen = $state(false);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -311,11 +325,17 @@
 
   function readTableCell(row: ConsolePageTableRow, key: string): ConsolePageTableCell {
     const value = row[key];
-    if (value && typeof value === "object") {
+    if (value && typeof value === "object" && "text" in value) {
       return value;
     }
 
     return { text: String(value ?? "") };
+  }
+
+  function openTableDetails(details: ConsolePageTableDetails | undefined): void {
+    if (!details) return;
+    selectedTableDetails = details;
+    tableDetailsOpen = true;
   }
 
   function tableSectionClass(section: ConsolePageTableSection): string {
@@ -765,6 +785,9 @@
                           {column.label}
                         </Table.Head>
                       {/each}
+                      {#if section.rows.some((row) => row.details)}
+                        <Table.Head class="text-right"></Table.Head>
+                      {/if}
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -781,6 +804,20 @@
                             {cell.text}
                           </Table.Cell>
                         {/each}
+                        {#if section.rows.some((candidate) => candidate.details)}
+                          <Table.Cell class="text-right">
+                            {#if row.details}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={() => openTableDetails(row.details)}
+                              >
+                                {row.details.label}
+                              </Button>
+                            {/if}
+                          </Table.Cell>
+                        {/if}
                       </Table.Row>
                     {/each}
                   </Table.Body>
@@ -843,6 +880,27 @@
     {/if}
   </ConsoleResourceCanvas>
 {/snippet}
+
+<Dialog.Root bind:open={tableDetailsOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
+    {#if selectedTableDetails}
+      <Dialog.Header>
+        <Dialog.Title>{selectedTableDetails.title}</Dialog.Title>
+        {#if selectedTableDetails.description}
+          <Dialog.Description>{selectedTableDetails.description}</Dialog.Description>
+        {/if}
+      </Dialog.Header>
+      <dl class="mt-5 divide-y rounded-lg border">
+        {#each selectedTableDetails.rows as row (row.label)}
+          <div class="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[12rem_1fr] sm:gap-4">
+            <dt class="text-muted-foreground">{row.label}</dt>
+            <dd class={["break-words font-medium", toneClass(row.tone)]}>{row.value}</dd>
+          </div>
+        {/each}
+      </dl>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
 
 {#if settingsScope === "organization"}
   <SettingsShell
