@@ -18,7 +18,6 @@ describe("routing/domain/TLS workflow e2e", () => {
     fixture = createRoutingDomainTlsFixture({
       appVersion: "0.1.0-routing-domain-tls-workflow-e2e",
       prefix: "appaloft-routing-domain-tls-workflow-",
-      proxyKind: "traefik",
     });
   }, 60000);
 

@@ -90,7 +90,6 @@ describe("quick deploy framework fixture SSH workflow e2e", () => {
     });
     runtimeContext = bootstrapSshContext({
       config,
-      proxyKind: "none",
       suffix: crypto.randomUUID().slice(0, 8),
       workspace,
     });

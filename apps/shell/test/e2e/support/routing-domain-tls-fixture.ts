@@ -103,14 +103,12 @@ export interface RoutingDomainTlsFixture {
 export function createRoutingDomainTlsFixture(input: {
   appVersion?: string;
   prefix: string;
-  proxyKind?: "none" | "traefik";
 }): RoutingDomainTlsFixture {
   const workspace = createShellE2eWorkspace(input.prefix, {
     appVersion: input.appVersion ?? "0.1.0-routing-domain-tls-e2e",
   });
   const suffix = crypto.randomUUID().slice(0, 8);
   const deploymentIds: string[] = [];
-  const proxyKind = input.proxyKind ?? "traefik";
 
   const project = runShellCli(
     ["project", "create", "--name", `Routing Domain ${suffix}`],
@@ -129,8 +127,6 @@ export function createRoutingDomainTlsFixture(input: {
       "127.0.0.1",
       "--provider",
       "local-shell",
-      "--proxy-kind",
-      proxyKind,
     ],
     workspace.cliOptions,
   );

@@ -56,13 +56,11 @@ describe("quick deploy SSH workflow e2e", () => {
 
     successfulRuntimeContext = bootstrapSshContext({
       config,
-      proxyKind: "traefik",
       suffix: `${suffix}-proxy`,
       workspace,
     });
     failedRuntimeContext = bootstrapSshContext({
       config,
-      proxyKind: "none",
       suffix: `${suffix}-plain`,
       workspace,
     });

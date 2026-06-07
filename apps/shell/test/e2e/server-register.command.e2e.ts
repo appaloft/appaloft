@@ -23,11 +23,15 @@ type ServerListResponse = {
   }>;
 };
 
-function serverSummary(input: { id: string; name: string }) {
+function serverSummary(input: {
+  edgeProxy?: { kind: string; status?: string };
+  id: string;
+  name: string;
+}) {
   return expect.objectContaining({
     edgeProxy: expect.objectContaining({
-      kind: "none",
-      status: "disabled",
+      kind: input.edgeProxy?.kind ?? "none",
+      ...(input.edgeProxy?.status ? { status: input.edgeProxy.status } : {}),
     }),
     host: "127.0.0.1",
     id: input.id,
@@ -57,8 +61,6 @@ describe("servers.register command e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
-          "--proxy-kind",
-          "none",
         ],
         workspace.cliOptions,
       );
@@ -68,7 +70,13 @@ describe("servers.register command e2e", () => {
       const cliList = runShellCli(["server", "list"], workspace.cliOptions);
       expect(cliList.exitCode).toBe(0);
       expect(parseJson<ServerListResponse>(cliList.stdout).items).toEqual(
-        expect.arrayContaining([serverSummary({ id: serverId, name: serverName })]),
+        expect.arrayContaining([
+          serverSummary({
+            edgeProxy: { kind: "traefik" },
+            id: serverId,
+            name: serverName,
+          }),
+        ]),
       );
     } finally {
       cleanupWorkspace(workspace.workspaceDir);
@@ -111,7 +119,13 @@ describe("servers.register command e2e", () => {
       });
       expect(apiList.ok).toBe(true);
       expect(((await apiList.json()) as ServerListResponse).items).toEqual(
-        expect.arrayContaining([serverSummary({ id: serverId, name: serverName })]),
+        expect.arrayContaining([
+          serverSummary({
+            edgeProxy: { kind: "none", status: "disabled" },
+            id: serverId,
+            name: serverName,
+          }),
+        ]),
       );
     } finally {
       await httpServer?.stop();

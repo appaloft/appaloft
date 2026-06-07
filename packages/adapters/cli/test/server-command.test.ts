@@ -73,8 +73,6 @@ describe("CLI server commands", () => {
         "docker-swarm",
         "--target-kind",
         "orchestrator-cluster",
-        "--proxy-kind",
-        "none",
       ]);
     } finally {
       process.stdout.write = writeStdout;
@@ -87,7 +85,7 @@ describe("CLI server commands", () => {
       host: "swarm-manager.internal",
       providerKey: "docker-swarm",
       targetKind: "orchestrator-cluster",
-      proxyKind: "none",
+      proxyKind: "traefik",
     });
   });
 
@@ -653,9 +651,9 @@ describe("CLI server commands", () => {
     });
   });
 
-  test("[SRV-LIFE-ENTRY-017] server proxy configure dispatches the application command", async () => {
+  test("[SRV-LIFE-ENTRY-017] server proxy repair dispatches the application command", async () => {
     ensureReflectMetadata();
-    const { ConfigureServerEdgeProxyCommand, createExecutionContext } = await import(
+    const { BootstrapServerProxyCommand, createExecutionContext } = await import(
       "@appaloft/application"
     );
     const { createCliProgram } = await import("../src");
@@ -665,10 +663,7 @@ describe("CLI server commands", () => {
         commands.push(command as AppCommand<unknown>);
         return ok({
           id: "srv_primary",
-          edgeProxy: {
-            kind: "none",
-            status: "disabled",
-          },
+          accepted: true,
         } as T);
       },
     } as unknown as CommandBus;
@@ -679,7 +674,7 @@ describe("CLI server commands", () => {
       create: (input) =>
         createExecutionContext({
           ...input,
-          requestId: "req_cli_server_proxy_configure_test",
+          requestId: "req_cli_server_proxy_repair_test",
         }),
     };
     const program = createCliProgram({
@@ -693,25 +688,18 @@ describe("CLI server commands", () => {
     const writeStdout = process.stdout.write;
     try {
       process.stdout.write = (() => true) as typeof process.stdout.write;
-      await program.parseAsync([
-        "node",
-        "appaloft",
-        "server",
-        "proxy",
-        "configure",
-        "srv_primary",
-        "--kind",
-        "none",
-      ]);
+      await program.parseAsync(["node", "appaloft", "server", "proxy", "repair", "srv_primary"]);
     } finally {
       process.stdout.write = writeStdout;
     }
 
     expect(commands).toHaveLength(1);
-    expect(commands[0]).toBeInstanceOf(ConfigureServerEdgeProxyCommand);
+    expect(commands[0]).toBeInstanceOf(BootstrapServerProxyCommand);
     expect(commands[0]).toMatchObject({
-      serverId: "srv_primary",
-      proxyKind: "none",
+      input: {
+        serverId: "srv_primary",
+        reason: "repair",
+      },
     });
   });
 

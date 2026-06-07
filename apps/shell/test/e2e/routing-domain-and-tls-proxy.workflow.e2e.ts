@@ -186,8 +186,6 @@ describe("routing/domain/TLS proxy workflow e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
-          "--proxy-kind",
-          "traefik",
         ],
         workspace.cliOptions,
       );
