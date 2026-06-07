@@ -1,6 +1,7 @@
 import {
   type BlueprintApplicationBundlePlanError,
   type BlueprintIssue,
+  type BlueprintManifest,
   type BlueprintRegistry,
   createBlueprintApplicationBundlePlan,
   createBlueprintInstallPlan,
@@ -11,6 +12,8 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext } from "../../execution-context";
 import { tokens } from "../../tokens";
 import {
+  type BlueprintManifestResponse,
+  type BlueprintRegistryEntryResponse,
   type CreateBlueprintInstallPlanResponse,
   type ListBlueprintsResponse,
   type ShowBlueprintResponse,
@@ -77,7 +80,7 @@ export class BlueprintCatalogQueryService {
           ...(variant.summary ? { summary: variant.summary } : {}),
         })),
       },
-      manifest: resolved.value,
+      manifest: resolved.value as unknown as BlueprintManifestResponse,
     });
   }
 
@@ -91,7 +94,10 @@ export class BlueprintCatalogQueryService {
       return err(shown.error);
     }
 
-    const { entry, manifest } = shown.value;
+    const { entry, manifest } = shown.value as unknown as {
+      readonly entry: BlueprintRegistryEntryResponse;
+      readonly manifest: BlueprintManifest;
+    };
     const plan = createBlueprintInstallPlan({
       manifest,
       ...(query.input.variant ? { variant: query.input.variant } : {}),

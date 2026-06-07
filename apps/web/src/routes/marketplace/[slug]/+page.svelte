@@ -89,6 +89,19 @@
       changes?: readonly string[];
     }[];
   };
+  type BlueprintRegistryEntry = {
+    id: string;
+    name: string;
+    version: string;
+    summary: string;
+    tags?: readonly string[];
+    defaultVariant?: string;
+    variants?: readonly {
+      id: string;
+      label?: string;
+      summary?: string;
+    }[];
+  };
   type BlueprintVariant = {
     label?: string;
     summary?: string;
@@ -103,12 +116,13 @@
     upgrade?: BlueprintUpgradePolicy;
   };
   type BlueprintDetailResponse = {
-    listing: {
+    entry?: BlueprintRegistryEntry;
+    listing?: {
       slug: string;
       title: string;
       subtitle: string;
       category: string;
-      featured: boolean;
+      featured?: boolean;
       websiteUrl?: string;
       documentationUrl?: string;
       icon?: {
@@ -117,7 +131,7 @@
         url?: string;
         alt?: string;
       };
-      publisher: {
+      publisher?: {
         name: string;
         verified: boolean;
       };
@@ -138,18 +152,22 @@
       };
     };
     manifest: {
+      id?: string;
+      name?: string;
+      version?: string;
       summary: string;
       description?: string;
+      tags?: readonly string[];
       parameters: readonly BlueprintParameter[];
       secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
       resources: readonly { id: string; kind: string; label: string; optional?: boolean }[];
       components: readonly BlueprintComponent[];
-      profiles: Record<string, { label?: string; replicas?: number; variables?: readonly { key: string; value: string }[] }>;
+      profiles?: Record<string, { label?: string; replicas?: number; variables?: readonly { key: string; value: string }[] }>;
       defaultVariant?: string;
       variants?: Record<string, BlueprintVariant>;
       upgrade?: BlueprintUpgradePolicy;
     };
-    install: {
+    install?: {
       profiles: readonly string[];
       defaultProfile: string;
       parameters: readonly BlueprintParameter[];
@@ -298,13 +316,14 @@
     if (catalogMetadata.upgradePlanEndpointTemplate) {
       return endpointFromTemplate(catalogMetadata.upgradePlanEndpointTemplate, slug);
     }
-    return `${detailEndpoint}/upgrade-plan`;
+    return "";
   });
 
   const detailQuery = createQuery(() =>
     queryOptions({
       queryKey: ["blueprint-catalog-detail", detailEndpoint],
-      queryFn: () => request<BlueprintDetailResponse>(detailEndpoint),
+      queryFn: async () =>
+        normalizeBlueprintDetailResponse(await request<BlueprintDetailResponse>(detailEndpoint)),
       enabled: browser && Boolean(detailEndpoint),
       staleTime: 30_000,
     }),
@@ -313,25 +332,156 @@
   const detail = $derived(detailQuery.data ?? null);
   const listing = $derived(detail?.listing ?? null);
   const manifest = $derived(detail?.manifest ?? null);
-  const variantOptions = $derived(detail?.install.variants ?? []);
+  const variantOptions = $derived(detail?.install?.variants ?? []);
   const selectedVariantDefinition = $derived(
     manifest && selectedVariant ? manifest.variants?.[selectedVariant] : undefined,
   );
   const effectiveManifest = $derived.by(() =>
     manifest ? resolveEffectiveBlueprintManifest(manifest, selectedVariant) : null,
   );
-  const selectedUpgrade = $derived(selectedVariantDefinition?.upgrade ?? detail?.install.upgrade ?? manifest?.upgrade);
+  const selectedUpgrade = $derived(selectedVariantDefinition?.upgrade ?? detail?.install?.upgrade ?? manifest?.upgrade);
   const profileNames = $derived(
-    effectiveManifest ? Object.keys(effectiveManifest.profiles).sort() : (detail?.install.profiles ?? []),
+    effectiveManifest ? Object.keys(effectiveManifest.profiles ?? {}).sort() : (detail?.install?.profiles ?? []),
   );
   const selectedProfileDefinition = $derived(
-    effectiveManifest && profile ? effectiveManifest.profiles[profile] : undefined,
+    effectiveManifest && profile ? effectiveManifest.profiles?.[profile] : undefined,
   );
   const allVariables = $derived.by(() => {
     const componentVariables = effectiveManifest?.components.flatMap((component) => component.variables) ?? [];
     const profileVariables = selectedProfileDefinition?.variables ?? [];
     return [...componentVariables, ...profileVariables];
   });
+
+  function blueprintRegistryEntryToListing(
+    entry: BlueprintRegistryEntry,
+    normalizedManifest: BlueprintDetailResponse["manifest"],
+  ): NonNullable<BlueprintDetailResponse["listing"]> {
+    return {
+      slug: entry.id,
+      title: entry.name,
+      subtitle: entry.summary,
+      category: "Blueprints",
+      blueprint: {
+        id: normalizedManifest.id ?? entry.id,
+        version: normalizedManifest.version ?? entry.version,
+        summary: normalizedManifest.summary ?? entry.summary,
+        tags: [...new Set([...(entry.tags ?? []), ...(normalizedManifest.tags ?? [])])],
+      },
+      requirementsSummary: {
+        components: normalizedManifest.components.length,
+        dependencies: [
+          ...new Set(normalizedManifest.resources.map((resource) => resource.kind)),
+        ].sort(),
+        ports: normalizedManifest.components.flatMap((component) =>
+          component.ports.map(
+            (port) => `${component.id}:${port.name}:${port.containerPort}/${port.protocol}`,
+          ),
+        ),
+      },
+      ...(entry.defaultVariant ? { defaultVariant: entry.defaultVariant } : {}),
+      ...(entry.variants ? { variants: entry.variants } : {}),
+    };
+  }
+
+  function manifestFallbackListing(
+    normalizedManifest: BlueprintDetailResponse["manifest"],
+  ): NonNullable<BlueprintDetailResponse["listing"]> {
+    const fallbackSlug = normalizedManifest.id ?? slug;
+    return {
+      slug: fallbackSlug,
+      title: normalizedManifest.name ?? fallbackSlug,
+      subtitle: normalizedManifest.summary,
+      category: "Blueprints",
+      blueprint: {
+        id: normalizedManifest.id ?? fallbackSlug,
+        version: normalizedManifest.version ?? "1.0.0",
+        summary: normalizedManifest.summary,
+        tags: normalizedManifest.tags ?? [],
+      },
+      requirementsSummary: {
+        components: normalizedManifest.components.length,
+        dependencies: [
+          ...new Set(normalizedManifest.resources.map((resource) => resource.kind)),
+        ].sort(),
+        ports: normalizedManifest.components.flatMap((component) =>
+          component.ports.map(
+            (port) => `${component.id}:${port.name}:${port.containerPort}/${port.protocol}`,
+          ),
+        ),
+      },
+    };
+  }
+
+  function normalizeBlueprintManifest(
+    manifest: BlueprintDetailResponse["manifest"],
+  ): BlueprintDetailResponse["manifest"] {
+    return {
+      ...manifest,
+      parameters: manifest.parameters ?? [],
+      secrets: manifest.secrets ?? [],
+      resources: manifest.resources ?? [],
+      components: manifest.components ?? [],
+      profiles: manifest.profiles ?? {},
+      variants: Object.fromEntries(
+        Object.entries(manifest.variants ?? {}).map(([id, variant]) => [
+          id,
+          {
+            ...variant,
+            parameters: variant.parameters ?? manifest.parameters ?? [],
+            secrets: variant.secrets ?? manifest.secrets ?? [],
+            resources: variant.resources ?? manifest.resources ?? [],
+            components: variant.components ?? manifest.components ?? [],
+            profiles: variant.profiles ?? manifest.profiles ?? {},
+          },
+        ]),
+      ),
+    };
+  }
+
+  function normalizeBlueprintDetailResponse(
+    response: BlueprintDetailResponse,
+  ): BlueprintDetailResponse {
+    const normalizedManifest = normalizeBlueprintManifest(response.manifest);
+    const listing =
+      response.listing ??
+      (response.entry
+        ? blueprintRegistryEntryToListing(response.entry, normalizedManifest)
+        : manifestFallbackListing(normalizedManifest));
+    const variantEntries =
+      response.install?.variants ??
+      response.entry?.variants ??
+      Object.entries(normalizedManifest.variants ?? {}).map(([id, variant]) => ({
+        id,
+        ...(variant.label ? { label: variant.label } : {}),
+        ...(variant.summary ? { summary: variant.summary } : {}),
+      }));
+    const profileKeys = Object.keys(normalizedManifest.profiles ?? {}).sort();
+    const defaultVariant =
+      response.install?.defaultVariant ??
+      response.entry?.defaultVariant ??
+      normalizedManifest.defaultVariant ??
+      variantEntries[0]?.id;
+    const defaultProfile =
+      response.install?.defaultProfile ??
+      (defaultVariant ? normalizedManifest.variants?.[defaultVariant]?.defaultProfile : undefined) ??
+      profileKeys[0] ??
+      "production";
+
+    return {
+      ...response,
+      listing,
+      manifest: normalizedManifest,
+      install: {
+        profiles: response.install?.profiles ?? profileKeys,
+        defaultProfile,
+        parameters: response.install?.parameters ?? normalizedManifest.parameters,
+        secrets: response.install?.secrets ?? normalizedManifest.secrets,
+        ...(defaultVariant ? { defaultVariant } : {}),
+        variants: variantEntries,
+        upgrade: response.install?.upgrade ?? normalizedManifest.upgrade,
+      },
+    };
+  }
 
   $effect(() => {
     if (!detail) {
@@ -343,7 +493,7 @@
       variantOptions.length > 0 &&
       (!requestedVariant || !variantOptions.some((variant) => variant.id === requestedVariant))
     ) {
-      selectedVariant = detail.install.defaultVariant ?? variantOptions[0]?.id ?? "";
+      selectedVariant = detail.install?.defaultVariant ?? variantOptions[0]?.id ?? "";
       return;
     }
     if (requestedVariant !== selectedVariant) {
@@ -356,12 +506,12 @@
     }
 
     if (!profile || !profileNames.includes(profile)) {
-      profile = selectedVariantDefinition?.defaultProfile ?? detail.install.defaultProfile;
+      profile = selectedVariantDefinition?.defaultProfile ?? detail.install?.defaultProfile ?? "production";
     }
 
     const nextValues = { ...parameterValues };
     let valuesChanged = false;
-    for (const parameter of effectiveManifest?.parameters ?? detail.install.parameters) {
+    for (const parameter of effectiveManifest?.parameters ?? detail.install?.parameters ?? []) {
       if (nextValues[parameter.key] === undefined) {
         nextValues[parameter.key] = String(parameter.default ?? "");
         valuesChanged = true;
@@ -482,7 +632,7 @@
       secrets: variant.secrets ?? baseManifest.secrets,
       resources: variant.resources ?? baseManifest.resources,
       components: variant.components ?? baseManifest.components,
-      profiles: variant.profiles ?? baseManifest.profiles,
+      profiles: variant.profiles ?? baseManifest.profiles ?? {},
       defaultVariant: variantId,
       upgrade: variant.upgrade ?? baseManifest.upgrade,
     };
@@ -572,8 +722,12 @@
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{listing.category}</Badge>
-                    <Badge variant="outline">{listing.featured ? "精选" : "官方"}</Badge>
-                    <Badge variant="outline">{listing.publisher.name}</Badge>
+                    {#if listing.featured}
+                      <Badge variant="outline">精选</Badge>
+                    {/if}
+                    {#if listing.publisher}
+                      <Badge variant="outline">{listing.publisher.name}</Badge>
+                    {/if}
                     {#if variantOptions.length > 0}
                       <Badge variant="outline">方案：{selectedVariantLabel()}</Badge>
                     {/if}
@@ -942,7 +1096,8 @@
           {/if}
         </section>
 
-        <section class="console-side-panel space-y-4">
+        {#if upgradePlanEndpoint}
+          <section class="console-side-panel space-y-4">
           <div>
             <h2 class="text-lg font-semibold">升级 dry-run</h2>
             <p class="text-sm text-muted-foreground">从已安装应用读取当前状态，预览更新到目标方案的风险和差异。</p>
@@ -1059,7 +1214,8 @@
               <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(upgradePlanOutput, null, 2)}</pre>
             </details>
           {/if}
-        </section>
+          </section>
+        {/if}
 
         <Button href="/marketplace" variant="outline" class="w-full">
           <ArrowLeft class="size-4" />

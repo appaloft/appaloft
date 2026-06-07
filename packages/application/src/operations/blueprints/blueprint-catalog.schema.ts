@@ -1,12 +1,174 @@
-import {
-  type BlueprintApplicationBundlePlan,
-  type BlueprintInstallPlan,
-  type BlueprintManifest,
-  type BlueprintRegistryEntry,
-} from "@appaloft/blueprints";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";
+
+export interface BlueprintRegistryDisplayIconResponse {
+  readonly url?: string;
+  readonly alt?: string;
+  readonly initials?: string;
+  readonly backgroundColor?: string;
+  readonly foregroundColor?: string;
+}
+
+export interface BlueprintRegistryDisplayMetadataResponse {
+  readonly category?: string;
+  readonly categoryKey?: string;
+  readonly icon?: BlueprintRegistryDisplayIconResponse | string;
+  readonly websiteUrl?: string;
+  readonly documentationUrl?: string;
+}
+
+export interface BlueprintRegistryEntryResponse extends BlueprintRegistryDisplayMetadataResponse {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly summary: string;
+  readonly sourcePath?: string;
+  readonly tags: readonly string[];
+  readonly defaultVariant?: string;
+  readonly variants: readonly {
+    readonly id: string;
+    readonly label?: string;
+    readonly summary?: string;
+  }[];
+}
+
+export type BlueprintPrimitiveParameterValueResponse = string | number | boolean;
+
+export interface BlueprintParameterResponse {
+  readonly key: string;
+  readonly label: string;
+  readonly type: "string" | "number" | "boolean";
+  readonly required?: boolean;
+  readonly default?: BlueprintPrimitiveParameterValueResponse;
+  readonly description?: string | undefined;
+}
+
+export interface BlueprintSecretResponse {
+  readonly key: string;
+  readonly label: string;
+  readonly required?: boolean;
+  readonly source?: string;
+  readonly description?: string | undefined;
+}
+
+export interface BlueprintResourceRequirementResponse {
+  readonly id: string;
+  readonly kind: string;
+  readonly label: string;
+  readonly optional?: boolean;
+  readonly capabilities?: readonly string[];
+  readonly outputs?: readonly string[];
+  readonly readiness?: readonly string[];
+}
+
+export interface BlueprintComponentResponse {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly runtime: {
+    readonly strategy: string;
+    readonly image?: string;
+    readonly buildCommand?: string;
+    readonly startCommand?: string;
+    readonly outputDirectory?: string;
+    readonly command?: readonly string[];
+  };
+  readonly ports: readonly {
+    readonly name: string;
+    readonly containerPort: number;
+    readonly protocol: string;
+    readonly public?: boolean;
+  }[];
+  readonly routes: readonly {
+    readonly port: string;
+    readonly pathPrefix: string;
+  }[];
+  readonly variables: readonly {
+    readonly key: string;
+    readonly value: string;
+    readonly description?: string | undefined;
+  }[];
+  readonly usesSecrets: readonly string[];
+  readonly usesResources: readonly string[];
+  readonly storageMounts?: readonly {
+    readonly volumeId: string;
+    readonly mountPath: string;
+  }[];
+  readonly dependencyEnv?: readonly {
+    readonly resourceId: string;
+    readonly outputName: string;
+    readonly envKey: string;
+  }[];
+}
+
+export interface BlueprintProfileResponse {
+  readonly label?: string;
+  readonly replicas?: number;
+  readonly variables?: readonly {
+    readonly key: string;
+    readonly value: string;
+  }[];
+  readonly routes?: readonly {
+    readonly componentId?: string;
+    readonly port?: string;
+    readonly pathPrefix?: string;
+  }[];
+}
+
+export interface BlueprintUpgradePolicyResponse {
+  readonly strategy: string;
+  readonly destructive?: boolean;
+  readonly instructions?: string;
+  readonly steps?: readonly {
+    readonly classification: "non-breaking" | "potentially-breaking" | "breaking";
+    readonly requiresManualReview?: boolean;
+    readonly notes?: string;
+    readonly changes?: readonly string[];
+  }[];
+}
+
+export interface BlueprintVariantResponse {
+  readonly label?: string;
+  readonly summary?: string;
+  readonly description?: string | undefined;
+  readonly tags?: readonly string[];
+  readonly defaultProfile?: string;
+  readonly parameters?: readonly BlueprintParameterResponse[];
+  readonly secrets?: readonly BlueprintSecretResponse[];
+  readonly resources?: readonly BlueprintResourceRequirementResponse[];
+  readonly components?: readonly BlueprintComponentResponse[];
+  readonly profiles?: {
+    readonly [profile: string]: BlueprintProfileResponse;
+  };
+  readonly upgrade?: BlueprintUpgradePolicyResponse;
+}
+
+export interface BlueprintManifestResponse {
+  readonly schemaVersion: string;
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly summary: string;
+  readonly description?: string | undefined;
+  readonly tags: readonly string[];
+  readonly parameters: readonly BlueprintParameterResponse[];
+  readonly secrets: readonly BlueprintSecretResponse[];
+  readonly resources: readonly BlueprintResourceRequirementResponse[];
+  readonly components: readonly BlueprintComponentResponse[];
+  readonly componentRelations: readonly unknown[];
+  readonly profiles?: {
+    readonly [profile: string]: BlueprintProfileResponse;
+  };
+  readonly defaultVariant?: string;
+  readonly variants?: {
+    readonly [variant: string]: BlueprintVariantResponse;
+  };
+  readonly upgrade?: BlueprintUpgradePolicyResponse;
+}
+
+export type BlueprintInstallPlanResponse = unknown;
+export type BlueprintApplicationBundlePlanResponse = unknown;
 
 const primitiveParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
@@ -88,11 +250,13 @@ export const acceptBlueprintInstallCommandInputSchema = createBlueprintInstallPl
   })
   .strict();
 
-export const blueprintRegistryEntryResponseSchema = unknownResponseSchema<BlueprintRegistryEntry>();
-export const blueprintManifestResponseSchema = unknownResponseSchema<BlueprintManifest>();
-export const blueprintInstallPlanResponseSchema = unknownResponseSchema<BlueprintInstallPlan>();
+export const blueprintRegistryEntryResponseSchema =
+  unknownResponseSchema<BlueprintRegistryEntryResponse>();
+export const blueprintManifestResponseSchema = unknownResponseSchema<BlueprintManifestResponse>();
+export const blueprintInstallPlanResponseSchema =
+  unknownResponseSchema<BlueprintInstallPlanResponse>();
 export const blueprintApplicationBundlePlanResponseSchema =
-  unknownResponseSchema<BlueprintApplicationBundlePlan>();
+  unknownResponseSchema<BlueprintApplicationBundlePlanResponse>();
 export const acceptBlueprintInstallResponseSchema = z.unknown();
 export const showBlueprintInstallationResponseSchema = z.unknown();
 
