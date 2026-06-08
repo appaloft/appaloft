@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import * as AlertDialog from "@appaloft/ui/alert-dialog";
 import { AppShell, AppShellRegion } from "@appaloft/ui/app-shell";
 import { Badge, badgeVariants } from "@appaloft/ui/badge";
@@ -75,5 +76,15 @@ describe("@appaloft/ui public exports", () => {
       .toEqualTypeOf<number | null | undefined>();
     expectTypeOf<ChartContainerProps>().toHaveProperty("config");
     expect(true).toBe(true);
+  });
+
+  test("keeps alert dialog layout slots rendering children", async () => {
+    const [headerSource, footerSource] = await Promise.all([
+      readFile(new URL("../src/alert-dialog/alert-dialog-header.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../src/alert-dialog/alert-dialog-footer.svelte", import.meta.url), "utf8"),
+    ]);
+
+    expect(headerSource).toContain("{@render children?.()}");
+    expect(footerSource).toContain("{@render children?.()}");
   });
 });
