@@ -32,11 +32,24 @@ describe("console header switcher", () => {
       ]);
 
     expect(shellSource).toContain("data-console-header-switcher-trigger");
+    expect(shellSource).toContain("data-console-header-switcher-link");
     expect(shellSource).toContain("DropdownMenuTrigger");
     expect(shellSource).toContain("switcherItems(item).length > 0");
+    expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
+      shellSource.indexOf("data-console-header-switcher-trigger"),
+    );
     expect(projectPageSource).toContain("projectHeaderSwitchItems");
+    expect(projectPageSource).toContain(
+      "href: project ? projectDetailHref(project.id) : undefined",
+    );
     expect(resourcePageSource).toContain("resourceHeaderSwitchItems");
+    expect(resourcePageSource).toContain(
+      "href: resource ? resourceDetailHref(resource) : undefined",
+    );
     expect(deploymentPageSource).toContain("deploymentHeaderSwitchItems");
     expect(deploymentPageSource).toContain("createConsoleQueries(browser");
+    expect(deploymentPageSource).toContain(
+      "href: headerDeployment ? deploymentDetailHref(headerDeployment) : undefined",
+    );
   });
 });
