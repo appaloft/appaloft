@@ -492,6 +492,12 @@ describe("resolveConfig", () => {
       intervalSeconds: 300,
       batchSize: 25,
     });
+    expect(config.workerRuntime).toEqual({
+      mode: "embedded",
+      queueBackend: "database",
+      workerCount: 1,
+      workerGroup: "appaloft-worker",
+    });
   });
 
   test("allows enabling ACME certificate provider through environment", () => {
@@ -552,6 +558,60 @@ describe("resolveConfig", () => {
       enabled: true,
       intervalSeconds: 15,
       batchSize: 3,
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-009] allows configuring durable worker topology through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+        APPALOFT_WORKER_QUEUE_BACKEND: "database",
+        APPALOFT_WORKER_COUNT: "4",
+        APPALOFT_WORKER_GROUP: "cloud-deployment-worker",
+      },
+    });
+
+    expect(config.workerRuntime).toEqual({
+      mode: "standalone",
+      queueBackend: "database",
+      workerCount: 4,
+      workerGroup: "cloud-deployment-worker",
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-010] keeps external workflow backend selectable by adapter", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+        APPALOFT_WORKER_QUEUE_BACKEND: "external",
+        APPALOFT_WORKER_EXTERNAL_BACKEND_KIND: "temporal",
+        APPALOFT_WORKER_COUNT: "2",
+      },
+    });
+
+    expect(config.workerRuntime).toEqual({
+      mode: "standalone",
+      queueBackend: "external",
+      workerCount: 2,
+      workerGroup: "appaloft-worker",
+      externalBackendKind: "temporal",
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-011] allows disabling the durable worker runtime", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WORKER_RUNTIME_MODE: " DISABLED ",
+        APPALOFT_WORKER_QUEUE_BACKEND: " DATABASE ",
+        APPALOFT_WORKER_COUNT: "0",
+      },
+    });
+
+    expect(config.workerRuntime).toEqual({
+      mode: "disabled",
+      queueBackend: "database",
+      workerCount: 0,
+      workerGroup: "appaloft-worker",
     });
   });
 
