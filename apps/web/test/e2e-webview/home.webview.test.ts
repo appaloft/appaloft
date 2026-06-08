@@ -4076,6 +4076,84 @@ describe("console e2e with Bun.WebView", () => {
     expect(renderedState.sourceExtensionDisplayNameVisible).toBe(false);
   }, 45_000);
 
+  test("[QUICK-DEPLOY-UX-005] keeps focus while typing a new project name", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectMode=new&serverId=srv_demo`,
+    );
+
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          "document.querySelector('#project-name') instanceof HTMLInputElement",
+        ),
+      Boolean,
+      "Expected project name input to render",
+    );
+
+    const focusStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`new Promise((resolve) => {
+          const input = document.querySelector("#project-name");
+          if (!(input instanceof HTMLInputElement)) {
+            resolve(JSON.stringify({ ready: false }));
+            return;
+          }
+
+          input.focus();
+          input.dispatchEvent(new KeyboardEvent("keydown", { key: "t", bubbles: true }));
+          input.value = "t";
+          input.dispatchEvent(new InputEvent("input", {
+            bubbles: true,
+            data: "t",
+            inputType: "insertText",
+          }));
+          input.dispatchEvent(new KeyboardEvent("keyup", { key: "t", bubbles: true }));
+
+          setTimeout(() => {
+            const active = document.activeElement;
+            const projectDetails = input.closest("details");
+            resolve(JSON.stringify({
+              ready: true,
+              activeId: active instanceof HTMLElement ? active.id : "",
+              inputValue: input.value,
+              projectDetailsOpen: projectDetails instanceof HTMLDetailsElement ? projectDetails.open : false,
+              urlProjectName: new URL(window.location.href).searchParams.get("projectName"),
+            }));
+          }, 0);
+        })`),
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          activeId?: string;
+          inputValue?: string;
+          projectDetailsOpen?: boolean;
+          urlProjectName?: string | null;
+        };
+        return (
+          state.activeId === "project-name" &&
+          state.inputValue === "t" &&
+          state.projectDetailsOpen === true &&
+          state.urlProjectName === "t"
+        );
+      },
+      "Expected project name input to keep focus after typing",
+    );
+    const focusState = JSON.parse(focusStateJson) as {
+      activeId: string;
+      inputValue: string;
+      projectDetailsOpen: boolean;
+      urlProjectName: string | null;
+    };
+
+    expect(focusState.activeId).toBe("project-name");
+    expect(focusState.inputValue).toBe("t");
+    expect(focusState.projectDetailsOpen).toBe(true);
+    expect(focusState.urlProjectName).toBe("t");
+  }, 45_000);
+
   test("[BLUEPRINT-WEB-001] hydrates Quick Deploy from public neutral Blueprint detail", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();

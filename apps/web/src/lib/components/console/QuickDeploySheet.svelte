@@ -803,6 +803,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let lastBlueprintVariantForProvisioning = $state("");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
+  let projectSectionOpen = $state(true);
+  let serverSectionOpen = $state(true);
   let deployFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1916,6 +1918,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     if (projectContextEnabled && projectMode === "new") {
       environmentMode = "new";
       selectedEnvironmentId = "";
+    }
+  });
+
+  $effect(() => {
+    if (!stepIsComplete("project")) {
+      projectSectionOpen = true;
+    }
+
+    if (!stepIsComplete("server")) {
+      serverSectionOpen = true;
     }
   });
 
@@ -5245,7 +5257,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
           </section>
 
-          <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("project")}>
+          <details
+            class="group rounded-md border bg-card px-3 py-3"
+            bind:open={projectSectionOpen}
+          >
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
               <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.project)}</span>
@@ -5323,7 +5338,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           </details>
 
           {#if serverRequiredForQuickDeploy}
-          <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("server")}>
+          <details
+            class="group rounded-md border bg-card px-3 py-3"
+            bind:open={serverSectionOpen}
+          >
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
               <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.server)}</span>
