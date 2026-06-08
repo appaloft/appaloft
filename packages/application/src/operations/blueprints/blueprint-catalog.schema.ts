@@ -170,9 +170,46 @@ export interface BlueprintManifestResponse {
 export type BlueprintInstallPlanResponse = unknown;
 export type BlueprintApplicationBundlePlanResponse = unknown;
 
+export interface BlueprintInstallMonitoringResponse {
+  readonly workId?: string;
+  readonly workIds?: readonly string[];
+  readonly deploymentId?: string;
+  readonly deploymentIds?: readonly string[];
+  readonly commands?: {
+    readonly showWork?: string;
+    readonly listByDeployment?: string;
+    readonly followDeploymentEvents?: string;
+  };
+}
+
+export interface BlueprintInstallResponse {
+  readonly schemaVersion?: string;
+  readonly applicationId?: string;
+  readonly monitoring?: BlueprintInstallMonitoringResponse;
+}
+
 const primitiveParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 const unknownResponseSchema = <T>() => z.unknown() as z.ZodType<T>;
+
+const blueprintInstallMonitoringResponseSchema = z
+  .object({
+    workId: nonEmptyTrimmedString("Durable work id").optional(),
+    workIds: z.array(nonEmptyTrimmedString("Durable work id")).optional(),
+    deploymentId: nonEmptyTrimmedString("Deployment id").optional(),
+    deploymentIds: z.array(nonEmptyTrimmedString("Deployment id")).optional(),
+    commands: z
+      .object({
+        showWork: nonEmptyTrimmedString("Show operator work command").optional(),
+        listByDeployment: nonEmptyTrimmedString("List operator work command").optional(),
+        followDeploymentEvents: nonEmptyTrimmedString(
+          "Follow deployment events command",
+        ).optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 
 export const blueprintSlugSchema = nonEmptyTrimmedString("Blueprint slug");
 
@@ -259,7 +296,13 @@ export const blueprintInstallPlanResponseSchema =
   unknownResponseSchema<BlueprintInstallPlanResponse>();
 export const blueprintApplicationBundlePlanResponseSchema =
   unknownResponseSchema<BlueprintApplicationBundlePlanResponse>();
-export const acceptBlueprintInstallResponseSchema = z.unknown();
+export const acceptBlueprintInstallResponseSchema = z
+  .object({
+    schemaVersion: z.string().optional(),
+    applicationId: nonEmptyTrimmedString("Installed application id").optional(),
+    monitoring: blueprintInstallMonitoringResponseSchema.optional(),
+  })
+  .passthrough() as z.ZodType<BlueprintInstallResponse>;
 export const showBlueprintInstallationResponseSchema = z.unknown();
 
 export const listBlueprintsResponseSchema = z.object({

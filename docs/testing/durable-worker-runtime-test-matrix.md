@@ -29,9 +29,14 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-021 | Deployment worker drain claims accepted deployment work, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. | Application | `packages/application/test/create-deployment.test.ts` |
 | PROC-DELIVERY-WORKER-022 | Server runtime registers the PG durable queue adapter and starts database worker drain loops for declared worker slots. | Server composition | `packages/server` typecheck plus `packages/server/src/index.ts` composition review |
 | PROC-DELIVERY-WORKER-023 | Composed PGlite server accepts `deployments.create`, stores pending PG durable work, starts worker runtime, drains the item, and reaches succeeded deployment state. | Server composition | `packages/server/test/durable-work-runtime.test.ts` |
+| PROC-DELIVERY-WORKER-024 | Operator-work list reads durable work items by deployment id with sanitized details for post-restart monitoring. | Application | `packages/application/test/operator-work-query.test.ts` |
+| PROC-DELIVERY-WORKER-025 | Operator-work show returns ordered safe durable work events from the durable work ledger. | Application | `packages/application/test/operator-work-query.test.ts` |
+| PROC-DELIVERY-WORKER-026 | Quick Deploy outcome includes machine-readable deployment/operator-work monitoring commands. | Contracts | `packages/contracts/test/quick-deploy-workflow.test.ts` |
+| PROC-DELIVERY-WORKER-027 | Blueprint install responses can expose public-neutral monitoring references for component deployment work. | Cloud composition + public schema | `apps/cloud-runtime/test/cloud-blueprint-marketplace-api.test.ts` plus `packages/application` typecheck |
 
 ## Deferred Coverage
 
 - Deployment retry and rollback worker claim/completion.
 - Server `/api/system` worker topology readback.
-- Cloud Blueprint install acceptance composing public deployment worker attempts.
+- Full Blueprint install parent-workflow execution through the durable worker, beyond returning
+  deployment-work monitoring references for created component deployments.

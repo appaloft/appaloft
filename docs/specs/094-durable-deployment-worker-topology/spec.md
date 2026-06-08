@@ -57,6 +57,10 @@ query, or domain language.
 | PROC-DELIVERY-WORKER-021 | Deployment worker executes accepted work | a pending deployment work item has been accepted | a deployment worker drains due work | the worker claims the item, loads the deployment, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. |
 | PROC-DELIVERY-WORKER-022 | Server runtime composes PG durable queue | the public server starts with database queue backend | runtime dependencies are registered and worker runtime starts | `PgDurableWorkLedger` is registered as the durable queue adapter and the worker runtime starts database drain loops for declared worker slots. |
 | PROC-DELIVERY-WORKER-023 | Composed server drains deployment work end to end | a public server is created with PGlite, database queue backend, and hermetic runtime adapters | `deployments.create` is dispatched and `startWorkerRuntime` runs | the command returns before runtime execution, the PG durable queue stores pending work, the worker drain claims and completes the item, and the Deployment reaches `succeeded`. |
+| PROC-DELIVERY-WORKER-024 | Operator work lists durable work by deployment id | durable work exists after command acceptance or process restart | `operator-work.list` runs with `deploymentId` | the public operator-work read model returns the durable work item with safe status, phase, step, related ids, retry hints, and sanitized details. |
+| PROC-DELIVERY-WORKER-025 | Operator work shows durable work events | a durable work item has accepted, claimed, progress, or terminal events | `operator-work.show` runs with the durable work id | the public response includes ordered safe progress events from `durable_work_events` without exposing secrets or provider command lines. |
+| PROC-DELIVERY-WORKER-026 | Quick Deploy exposes monitoring references | Quick Deploy reaches `deployments.create` | the outcome packet is created | the result keeps `deploymentId` and includes machine-readable operator-work and deployment-event follow-up commands for later monitoring. |
+| PROC-DELIVERY-WORKER-027 | Blueprint install exposes monitoring references | Cloud or another adapter accepts a Blueprint install and creates component deployment attempts | the install command or route returns | the response may include public-neutral `monitoring` fields with deployment ids, durable work ids, and operator-work/deployment-event commands while installed application state remains adapter-owned. |
 
 ## Domain Ownership
 
@@ -71,6 +75,9 @@ query, or domain language.
 ## Public Surfaces
 
 - API/Web/SDK/MCP: existing command/query surfaces continue to dispatch through buses.
+- Operator visibility: `operator-work.list` can list durable work by `kind`, `status`,
+  `resourceId`, `serverId`, or `deploymentId`; `operator-work.show` can return ordered safe
+  durable work events when the work id is backed by `durable_work_items`.
 - CLI: `appaloft worker` starts the worker runtime without listening for HTTP; `appaloft serve`
   keeps the embedded default by starting the backend service and worker runtime together.
 - Config: `workerRuntime.mode`, `workerRuntime.queueBackend`, `workerRuntime.workerCount`,
@@ -85,7 +92,6 @@ query, or domain language.
 
 ## Non-Goals
 
-- Implementing a full deployment worker in this foundation slice.
 - Introducing Kafka, Temporal, or Redis adapters.
 - Making queue messages the source of truth.
 - Converting every inline workflow to background execution.
@@ -98,5 +104,7 @@ query, or domain language.
    accepted command records pending process attempt and returns a deployment id; worker claims and
    executes runtime/provider work.
 3. Promote `deployments.retry` and `deployments.rollback` to the same worker binding.
-4. Let Cloud Blueprint install acceptance compose public deployment worker attempts for each
-   component while Cloud `InstalledApplication` records install-specific business state.
+4. Let Blueprint install responses expose public deployment-work monitoring references for created
+   component deployments while Cloud `InstalledApplication` records install-specific business state.
+5. Later, promote Blueprint install itself to a parent durable work item when the public-neutral
+   workflow execution boundary is specified.

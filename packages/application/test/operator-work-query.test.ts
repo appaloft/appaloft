@@ -1,7 +1,14 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { ok, type Result } from "@appaloft/core";
 
+import {
+  type DurableWorkEventRecord,
+  type DurableWorkItemRecord,
+  type DurableWorkLedger,
+  type DurableWorkListFilter,
+} from "../src/durable-work";
 import { createExecutionContext, type RepositoryContext } from "../src/execution-context";
 import { ListOperatorWorkQuery } from "../src/operations/operator-work/list-operator-work.query";
 import { OperatorWorkQueryService } from "../src/operations/operator-work/operator-work.query-service";
@@ -171,6 +178,51 @@ class StaticRemoteStateWorkReadModel implements RemoteStateWorkReadModel {
   }
 }
 
+class StaticDurableWorkLedger implements DurableWorkLedger {
+  constructor(
+    private readonly items: DurableWorkItemRecord[],
+    private readonly events: DurableWorkEventRecord[] = [],
+  ) {}
+
+  async recordItem(): Promise<Result<DurableWorkItemRecord>> {
+    throw new Error("recordItem is not used by operator work query tests");
+  }
+
+  async appendEvent(): Promise<Result<DurableWorkEventRecord>> {
+    throw new Error("appendEvent is not used by operator work query tests");
+  }
+
+  async findItem(
+    _context: RepositoryContext,
+    id: string,
+  ): Promise<Result<DurableWorkItemRecord | null>> {
+    return ok(this.items.find((item) => item.id === id) ?? null);
+  }
+
+  async listItems(
+    _context: RepositoryContext,
+    filter?: DurableWorkListFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(
+      this.items.filter(
+        (item) =>
+          (!filter?.kind || item.kind === filter.kind) &&
+          (!filter?.status || item.status === filter.status) &&
+          (!filter?.resourceId || item.resourceId === filter.resourceId) &&
+          (!filter?.serverId || item.serverId === filter.serverId) &&
+          (!filter?.deploymentId || item.deploymentId === filter.deploymentId),
+      ),
+    );
+  }
+
+  async listEvents(
+    _context: RepositoryContext,
+    workItemId: string,
+  ): Promise<Result<DurableWorkEventRecord[]>> {
+    return ok(this.events.filter((event) => event.workItemId === workItemId));
+  }
+}
+
 function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): DeploymentSummary {
   return {
     id: "dep_failed",
@@ -305,6 +357,8 @@ function createService(input?: {
   bindings?: DomainBindingSummary[];
   certificates?: CertificateSummary[];
   processAttempts?: ProcessAttemptRecord[];
+  durableWorkItems?: DurableWorkItemRecord[];
+  durableWorkEvents?: DurableWorkEventRecord[];
   remoteStates?: RemoteStateWorkSummary[];
   sourceLinks?: SourceLinkRecord[];
   routeRealizations?: RouteRealizationWorkSummary[];
@@ -319,6 +373,7 @@ function createService(input?: {
     new StaticRemoteStateWorkReadModel(input?.remoteStates ?? []),
     new StaticSourceLinkReadModel(input?.sourceLinks ?? []),
     new StaticRouteRealizationWorkReadModel(input?.routeRealizations ?? []),
+    new StaticDurableWorkLedger(input?.durableWorkItems ?? [], input?.durableWorkEvents ?? []),
   );
 }
 
@@ -354,6 +409,161 @@ describe("operator work query service", () => {
       ],
     });
     expect(JSON.stringify(result)).not.toContain("SECRET_TOKEN");
+  });
+
+  test("[PROC-DELIVERY-WORKER-024] lists durable work by deployment id for post-restart monitoring", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      durableWorkItems: [
+        {
+          id: "dw_deployment_dep_async",
+          kind: "deployment",
+          status: "pending",
+          operationKey: "deployments.create",
+          queueBackend: "database",
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          deploymentId: "dep_async",
+          serverId: "srv_primary",
+          phase: "command-accepted",
+          step: "queued",
+          priority: 0,
+          attemptCount: 0,
+          maxAttempts: 3,
+          availableAt: "2026-01-01T00:00:01.000Z",
+          updatedAt: "2026-01-01T00:00:01.000Z",
+          safeDetails: {
+            workerCount: 2,
+            privateKey: "SECRET_KEY=raw",
+          },
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery("deployment", "pending", "res_web", "srv_primary", "dep_async", 10),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: "dw_deployment_dep_async",
+        kind: "deployment",
+        status: "pending",
+        operationKey: "deployments.create",
+        phase: "command-accepted",
+        step: "queued",
+        projectId: "prj_demo",
+        resourceId: "res_web",
+        deploymentId: "dep_async",
+        serverId: "srv_primary",
+        nextActions: ["no-action"],
+        safeDetails: {
+          workerCount: 2,
+        },
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("SECRET_KEY");
+  });
+
+  test("[PROC-DELIVERY-WORKER-025] shows durable work events as safe progress logs", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [],
+      certificates: [],
+      durableWorkItems: [
+        {
+          id: "dw_blueprint_install_cia_1",
+          kind: "blueprint-install",
+          status: "running",
+          operationKey: "blueprints.install",
+          queueBackend: "database",
+          projectId: "prj_demo",
+          resourceId: "res_web",
+          deploymentId: "dep_component",
+          serverId: "srv_primary",
+          subjectKind: "blueprint-installation",
+          subjectId: "cia_1",
+          phase: "component-deployment",
+          step: "deploying",
+          priority: 0,
+          attemptCount: 1,
+          maxAttempts: 3,
+          availableAt: "2026-01-01T00:00:01.000Z",
+          startedAt: "2026-01-01T00:00:02.000Z",
+          updatedAt: "2026-01-01T00:00:03.000Z",
+        },
+      ],
+      durableWorkEvents: [
+        {
+          id: "dwe_blueprint_install_cia_1_accepted",
+          workItemId: "dw_blueprint_install_cia_1",
+          sequence: 1,
+          kind: "accepted",
+          status: "pending",
+          phase: "install-accepted",
+          step: "queued",
+          message: "Blueprint install accepted",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          safeDetails: {
+            applicationId: "cia_1",
+            token: "SECRET_TOKEN=raw",
+          },
+        },
+        {
+          id: "dwe_blueprint_install_cia_1_claimed",
+          workItemId: "dw_blueprint_install_cia_1",
+          sequence: 2,
+          kind: "claimed",
+          status: "running",
+          phase: "worker-claim",
+          step: "claimed",
+          workerId: "worker-a",
+          workerGroup: "cloud",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+        },
+      ],
+    });
+
+    const result = await service.show(
+      context(),
+      new ShowOperatorWorkQuery("dw_blueprint_install_cia_1"),
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "operator-work.show/v1",
+      item: {
+        id: "dw_blueprint_install_cia_1",
+        kind: "blueprint-install",
+        status: "running",
+        operationKey: "blueprints.install",
+        deploymentId: "dep_component",
+      },
+      events: [
+        {
+          sequence: 1,
+          kind: "accepted",
+          status: "pending",
+          message: "Blueprint install accepted",
+          safeDetails: {
+            applicationId: "cia_1",
+          },
+        },
+        {
+          sequence: 2,
+          kind: "claimed",
+          status: "running",
+          workerId: "worker-a",
+          workerGroup: "cloud",
+        },
+      ],
+      generatedAt,
+    });
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("SECRET_TOKEN");
   });
 
   test("[OP-WORK-QRY-002] lists proxy bootstrap attempts from server read state", async () => {

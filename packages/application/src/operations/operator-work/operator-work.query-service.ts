@@ -1,6 +1,12 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
+import {
+  type DurableWorkEventRecord,
+  type DurableWorkItemRecord,
+  type DurableWorkItemStatus,
+  type DurableWorkLedger,
+} from "../../durable-work";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type CertificateReadModel,
@@ -11,6 +17,7 @@ import {
   type DomainBindingReadModel,
   type DomainBindingSummary,
   type OperatorWorkDetail,
+  type OperatorWorkEvent,
   type OperatorWorkItem,
   type OperatorWorkKind,
   type OperatorWorkList,
@@ -409,6 +416,86 @@ function processAttemptToWorkItem(attempt: ProcessAttemptRecord): OperatorWorkIt
   };
 }
 
+function durableKindToOperatorKind(kind: string): OperatorWorkKind {
+  switch (kind) {
+    case "deployment":
+    case "quick-deploy":
+    case "blueprint-install":
+    case "runtime-maintenance":
+    case "system":
+      return kind;
+    default:
+      return "system";
+  }
+}
+
+function isDurableWorkItemStatus(status?: OperatorWorkStatus): status is DurableWorkItemStatus {
+  return status !== undefined && status !== "unknown";
+}
+
+function durableStatusToOperatorStatus(
+  status: DurableWorkItemRecord["status"],
+): OperatorWorkStatus {
+  return status;
+}
+
+function durableNextActions(item: DurableWorkItemRecord): OperatorWorkNextAction[] {
+  if (item.status === "failed" || item.status === "dead-lettered") {
+    return item.retriable
+      ? ["diagnostic", "retry", "manual-review"]
+      : ["diagnostic", "manual-review"];
+  }
+
+  if (item.status === "retry-scheduled") {
+    return ["diagnostic", "retry", "manual-review"];
+  }
+
+  return ["no-action"];
+}
+
+function durableWorkToWorkItem(item: DurableWorkItemRecord): OperatorWorkItem {
+  const safeDetails = sanitizeSafeDetails(item.safeDetails);
+
+  return {
+    id: item.id,
+    kind: durableKindToOperatorKind(item.kind),
+    status: durableStatusToOperatorStatus(item.status),
+    operationKey: item.operationKey,
+    ...(item.phase ? { phase: item.phase } : {}),
+    ...(item.step ? { step: item.step } : {}),
+    ...(item.projectId ? { projectId: item.projectId } : {}),
+    ...(item.resourceId ? { resourceId: item.resourceId } : {}),
+    ...(item.deploymentId ? { deploymentId: item.deploymentId } : {}),
+    ...(item.serverId ? { serverId: item.serverId } : {}),
+    ...(item.startedAt ? { startedAt: item.startedAt } : {}),
+    updatedAt: item.updatedAt,
+    ...(item.finishedAt ? { finishedAt: item.finishedAt } : {}),
+    ...(item.errorCode ? { errorCode: item.errorCode } : {}),
+    ...(item.errorCategory ? { errorCategory: item.errorCategory } : {}),
+    ...(item.retriable === undefined ? {} : { retriable: item.retriable }),
+    nextActions: durableNextActions(item),
+    ...(safeDetails ? { safeDetails } : {}),
+  };
+}
+
+function durableEventToOperatorEvent(event: DurableWorkEventRecord): OperatorWorkEvent {
+  const safeDetails = sanitizeSafeDetails(event.safeDetails);
+
+  return {
+    id: event.id,
+    sequence: event.sequence,
+    kind: event.kind,
+    ...(event.status ? { status: durableStatusToOperatorStatus(event.status) } : {}),
+    ...(event.phase ? { phase: event.phase } : {}),
+    ...(event.step ? { step: event.step } : {}),
+    ...(event.message ? { message: event.message } : {}),
+    ...(event.workerId ? { workerId: event.workerId } : {}),
+    ...(event.workerGroup ? { workerGroup: event.workerGroup } : {}),
+    occurredAt: event.occurredAt,
+    ...(safeDetails ? { safeDetails } : {}),
+  };
+}
+
 function matchesFilter(item: OperatorWorkItem, filter: OperatorWorkFilter): boolean {
   return (
     (!filter.kind || item.kind === filter.kind) &&
@@ -459,6 +546,8 @@ export class OperatorWorkQueryService {
     private readonly sourceLinkReadModel: SourceLinkReadModel = new EmptySourceLinkReadModel(),
     @inject(tokens.routeRealizationWorkReadModel)
     private readonly routeRealizationWorkReadModel: RouteRealizationWorkReadModel = new EmptyRouteRealizationWorkReadModel(),
+    @inject(tokens.durableWorkQueueAdapter, { isOptional: true })
+    private readonly durableWorkLedger?: DurableWorkLedger,
   ) {}
 
   async list(context: ExecutionContext, query: ListOperatorWorkQuery): Promise<OperatorWorkList> {
@@ -476,6 +565,21 @@ export class OperatorWorkQueryService {
     });
     const bindingsById = new Map(bindings.map((binding) => [binding.id, binding]));
     const processAttempts = await this.processAttemptReadModel.list(repositoryContext, filter);
+    const durableWorkItems = this.durableWorkLedger
+      ? (
+          await this.durableWorkLedger.listItems(repositoryContext, {
+            ...(filter.kind ? { kind: filter.kind } : {}),
+            ...(isDurableWorkItemStatus(filter.status) ? { status: filter.status } : {}),
+            ...(filter.resourceId ? { resourceId: filter.resourceId } : {}),
+            ...(filter.serverId ? { serverId: filter.serverId } : {}),
+            ...(filter.deploymentId ? { deploymentId: filter.deploymentId } : {}),
+            ...(filter.limit ? { limit: filter.limit } : {}),
+          })
+        ).match(
+          (items) => items,
+          () => [],
+        )
+      : [];
     const deployments =
       filter.kind && filter.kind !== "deployment"
         ? []
@@ -527,10 +631,11 @@ export class OperatorWorkQueryService {
     const remoteStateItems = remoteStates.map(remoteStateToWorkItem);
     const sourceLinkItems = sourceLinks.map(sourceLinkToWorkItem);
     const routeRealizationItems = routeRealizations.map(routeRealizationToWorkItem);
-    const durableItems = processAttempts.map(processAttemptToWorkItem);
+    const processAttemptItems = processAttempts.map(processAttemptToWorkItem);
+    const durableItems = durableWorkItems.map(durableWorkToWorkItem);
 
     const itemsById = new Map<string, OperatorWorkItem>();
-    for (const item of durableItems) {
+    for (const item of [...processAttemptItems, ...durableItems]) {
       itemsById.set(item.id, item);
     }
     for (const item of [
@@ -541,7 +646,10 @@ export class OperatorWorkQueryService {
       ...sourceLinkItems,
       ...routeRealizationItems,
     ]) {
-      if (!itemsById.has(item.id) && !hasDurableSameProxyScope(durableItems, item)) {
+      if (
+        !itemsById.has(item.id) &&
+        !hasDurableSameProxyScope([...processAttemptItems, ...durableItems], item)
+      ) {
         itemsById.set(item.id, item);
       }
     }
@@ -574,6 +682,19 @@ export class OperatorWorkQueryService {
         item: processAttemptToWorkItem(processAttempt),
         generatedAt: this.clock.now(),
       });
+    }
+
+    if (this.durableWorkLedger) {
+      const durableWork = await this.durableWorkLedger.findItem(repositoryContext, query.workId);
+      if (durableWork.isOk() && durableWork.value) {
+        const events = await this.durableWorkLedger.listEvents(repositoryContext, query.workId);
+        return ok({
+          schemaVersion: "operator-work.show/v1",
+          item: durableWorkToWorkItem(durableWork.value),
+          ...(events.isOk() ? { events: events.value.map(durableEventToOperatorEvent) } : {}),
+          generatedAt: this.clock.now(),
+        });
+      }
     }
 
     const list = await this.list(

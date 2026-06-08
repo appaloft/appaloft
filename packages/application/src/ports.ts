@@ -5326,6 +5326,8 @@ export interface DeploymentDetail {
 
 export const operatorWorkKinds = [
   "deployment",
+  "quick-deploy",
+  "blueprint-install",
   "proxy-bootstrap",
   "certificate",
   "remote-state",
@@ -5378,6 +5380,20 @@ export interface OperatorWorkItem {
   errorCategory?: string;
   retriable?: boolean;
   nextActions: OperatorWorkNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface OperatorWorkEvent {
+  id: string;
+  sequence: number;
+  kind: string;
+  status?: OperatorWorkStatus;
+  phase?: string;
+  step?: string;
+  message?: string;
+  workerId?: string;
+  workerGroup?: string;
+  occurredAt: string;
   safeDetails?: Record<string, string | number | boolean | null>;
 }
 
@@ -5454,6 +5470,7 @@ export interface OperatorWorkList {
 export interface OperatorWorkDetail {
   schemaVersion: "operator-work.show/v1";
   item: OperatorWorkItem;
+  events?: OperatorWorkEvent[];
   generatedAt: string;
 }
 

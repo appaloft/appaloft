@@ -4867,6 +4867,8 @@ export const listDeploymentsResponseSchema = z.object({
 
 export const operatorWorkKindSchema = z.enum([
   "deployment",
+  "quick-deploy",
+  "blueprint-install",
   "proxy-bootstrap",
   "certificate",
   "remote-state",
@@ -4918,6 +4920,20 @@ export const operatorWorkItemSchema = z.object({
   safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
 });
 
+export const operatorWorkEventSchema = z.object({
+  id: z.string(),
+  sequence: z.number().int().positive(),
+  kind: z.string(),
+  status: operatorWorkStatusSchema.optional(),
+  phase: z.string().optional(),
+  step: z.string().optional(),
+  message: z.string().optional(),
+  workerId: z.string().optional(),
+  workerGroup: z.string().optional(),
+  occurredAt: z.string(),
+  safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
+});
+
 export const listOperatorWorkResponseSchema = z.object({
   schemaVersion: z.literal("operator-work.list/v1"),
   items: z.array(operatorWorkItemSchema),
@@ -4927,6 +4943,7 @@ export const listOperatorWorkResponseSchema = z.object({
 export const showOperatorWorkResponseSchema = z.object({
   schemaVersion: z.literal("operator-work.show/v1"),
   item: operatorWorkItemSchema,
+  events: z.array(operatorWorkEventSchema).optional(),
   generatedAt: z.string(),
 });
 
@@ -6731,6 +6748,7 @@ export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;
 export type OperatorWorkNextAction = z.infer<typeof operatorWorkNextActionSchema>;
 export type OperatorWorkItem = z.infer<typeof operatorWorkItemSchema>;
+export type OperatorWorkEvent = z.infer<typeof operatorWorkEventSchema>;
 export type ListOperatorWorkResponse = z.infer<typeof listOperatorWorkResponseSchema>;
 export type ShowOperatorWorkResponse = z.infer<typeof showOperatorWorkResponseSchema>;
 export type RetryOperatorWorkResponse = z.infer<typeof retryOperatorWorkResponseSchema>;
