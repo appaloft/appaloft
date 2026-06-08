@@ -33,6 +33,7 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-025 | Operator-work show returns ordered safe durable work events from the durable work ledger. | Application | `packages/application/test/operator-work-query.test.ts` |
 | PROC-DELIVERY-WORKER-026 | Quick Deploy outcome includes machine-readable deployment/operator-work monitoring commands. | Contracts | `packages/contracts/test/quick-deploy-workflow.test.ts` |
 | PROC-DELIVERY-WORKER-027 | Blueprint install responses can expose public-neutral monitoring references for component deployment work. | Cloud composition + public schema | `apps/cloud-runtime/test/cloud-blueprint-marketplace-api.test.ts` plus `packages/application` typecheck |
+| PROC-DELIVERY-WORKER-028 | Server durable worker runtime composes extension-provided handlers for non-deployment work kinds. | Server composition | `packages/server/test/durable-work-runtime.test.ts` |
 
 ## Deferred Coverage
 

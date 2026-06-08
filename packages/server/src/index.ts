@@ -21,6 +21,7 @@ import {
   type DeploymentLifecycleService,
   type DeploymentRepository,
   type DeployTokenRepository,
+  type DurableWorkHandlerRegistry,
   type DurableWorkQueueAdapter,
   type EnvironmentReadModel,
   type EventBus,
@@ -255,6 +256,15 @@ interface RequestContextRunner extends IntegrationAuthPort {
 
 function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol): T {
   return dependencyContainer.resolve(token as never) as T;
+}
+
+function resolveOptionalToken<T>(
+  dependencyContainer: DependencyContainer,
+  token: symbol,
+): T | undefined {
+  return dependencyContainer.isRegistered(token as never, true)
+    ? (dependencyContainer.resolve(token as never) as T)
+    : undefined;
 }
 
 function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLinkStore {
@@ -918,6 +928,10 @@ export async function createAppaloftServer(
   if (durableWorkTopology.isErr()) {
     throw new Error(durableWorkTopology.error.message);
   }
+  const durableWorkHandlerRegistry = resolveOptionalToken<DurableWorkHandlerRegistry>(
+    childContainer,
+    tokens.durableWorkHandlerRegistry,
+  );
   const durableWorkRuntimeRunner = createDurableWorkRuntimeRunner({
     topology: durableWorkTopology.value,
     adapter: resolveToken<DurableWorkQueueAdapter>(childContainer, tokens.durableWorkQueueAdapter),
@@ -937,6 +951,7 @@ export async function createAppaloftServer(
     ),
     executionContextFactory,
     logger,
+    ...(durableWorkHandlerRegistry ? { handlerRegistry: durableWorkHandlerRegistry } : {}),
   });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);

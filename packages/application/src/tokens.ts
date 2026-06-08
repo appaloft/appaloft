@@ -25,6 +25,7 @@ export const tokens = {
   ),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   durableWorkQueueAdapter: Symbol.for("appaloft.durable_work_queue_adapter"),
+  durableWorkHandlerRegistry: Symbol.for("appaloft.durable_work_handler_registry"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),

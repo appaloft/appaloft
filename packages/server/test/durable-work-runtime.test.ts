@@ -8,6 +8,8 @@ import {
   type CommandBus,
   CreateDeploymentCommand,
   type DeploymentRepository,
+  type DurableWorkHandler,
+  type DurableWorkItemRecord,
   type DurableWorkQueueAdapter,
   type ExecutionContext,
   type RuntimePlanResolver,
@@ -83,6 +85,7 @@ import {
   Version,
 } from "@appaloft/core";
 import { createAppaloftServer } from "@appaloft/server";
+import { createCompositeDurableWorkHandlerRegistry } from "../src/durable-work-runtime-runner";
 
 const tempRoots: string[] = [];
 
@@ -218,6 +221,22 @@ function createTestAuthRuntime(): AuthRuntime {
   };
 }
 
+function durableWorkItem(overrides: Partial<DurableWorkItemRecord> = {}): DurableWorkItemRecord {
+  return {
+    id: "dw_test",
+    kind: "deployment",
+    status: "pending",
+    operationKey: "deployments.create",
+    queueBackend: "database",
+    priority: 0,
+    attemptCount: 0,
+    maxAttempts: 1,
+    availableAt: "2026-06-08T00:00:00.000Z",
+    updatedAt: "2026-06-08T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 async function seedDeploymentContext(server: Awaited<ReturnType<typeof createAppaloftServer>>) {
   const context = server.executionContextFactory.create({ entrypoint: "system" });
   const repositoryContext = toRepositoryContext(context);
@@ -314,6 +333,30 @@ async function waitFor<T>(
 }
 
 describe("durable work server runtime", () => {
+  test("[PROC-DELIVERY-WORKER-028] runtime handler registry accepts public extension handlers", () => {
+    const deploymentHandler: DurableWorkHandler = {
+      async handle() {
+        return ok({});
+      },
+    };
+    const blueprintInstallHandler: DurableWorkHandler = {
+      async handle() {
+        return ok({});
+      },
+    };
+    const registry = createCompositeDurableWorkHandlerRegistry(deploymentHandler, {
+      resolve(item) {
+        return item.kind === "blueprint-install" ? blueprintInstallHandler : undefined;
+      },
+    });
+
+    expect(registry.resolve(durableWorkItem({ kind: "deployment" }))).toBe(deploymentHandler);
+    expect(registry.resolve(durableWorkItem({ kind: "blueprint-install" }))).toBe(
+      blueprintInstallHandler,
+    );
+    expect(registry.resolve(durableWorkItem({ kind: "unhandled" }))).toBeUndefined();
+  });
+
   test("[PROC-DELIVERY-WORKER-023] composed server drains deployment work through PG durable queue", async () => {
     const dataDir = await createTempDataDir();
     const executionBackend = new HermeticExecutionBackend();

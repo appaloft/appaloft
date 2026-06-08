@@ -61,6 +61,7 @@ query, or domain language.
 | PROC-DELIVERY-WORKER-025 | Operator work shows durable work events | a durable work item has accepted, claimed, progress, or terminal events | `operator-work.show` runs with the durable work id | the public response includes ordered safe progress events from `durable_work_events` without exposing secrets or provider command lines. |
 | PROC-DELIVERY-WORKER-026 | Quick Deploy exposes monitoring references | Quick Deploy reaches `deployments.create` | the outcome packet is created | the result keeps `deploymentId` and includes machine-readable operator-work and deployment-event follow-up commands for later monitoring. |
 | PROC-DELIVERY-WORKER-027 | Blueprint install exposes monitoring references | Cloud or another adapter accepts a Blueprint install and creates component deployment attempts | the install command or route returns | the response may include public-neutral `monitoring` fields with deployment ids, durable work ids, and operator-work/deployment-event commands while installed application state remains adapter-owned. |
+| PROC-DELIVERY-WORKER-028 | Server worker accepts extension handlers | an extension contributes a durable work handler registry | the public server worker drains due work | extension-owned durable work kinds can be resolved without teaching public server code Cloud-specific domains, while deployment work still uses the built-in handler. |
 
 ## Domain Ownership
 
@@ -86,7 +87,8 @@ query, or domain language.
   `APPALOFT_WORKER_COUNT`, `APPALOFT_WORKER_GROUP`, and
   `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND`.
 - Ports: `DurableWorkLedger` owns authoritative durable item/event facts; `DurableWorkQueueAdapter`
-  remains the replaceable queue/delivery adapter boundary.
+  remains the replaceable queue/delivery adapter boundary. `durableWorkHandlerRegistry` is an
+  optional composition extension point for public-neutral handlers outside deployment execution.
 - Events/logs: `durable_work_events` stores ordered safe progress events for worker execution. It
   does not replace domain events, audit logs, deployment logs, or provider job logs.
 

@@ -3,6 +3,9 @@ import {
   DeploymentDurableWorkHandler,
   type DeploymentLifecycleService,
   type DeploymentRepository,
+  type DurableWorkHandler,
+  type DurableWorkHandlerRegistry,
+  type DurableWorkItemRecord,
   type DurableWorkQueueAdapter,
   type DurableWorkTopology,
   drainDurableWorkOnce,
@@ -27,9 +30,37 @@ export interface DurableWorkRuntimeRunnerInput {
   processAttemptRecorder: ProcessAttemptRecorder;
   executionContextFactory: ExecutionContextFactory;
   logger: AppLogger;
+  handlerRegistry?: DurableWorkHandlerRegistry;
   intervalSeconds?: number;
   batchSize?: number;
   leaseDurationMs?: number;
+}
+
+function createDeploymentHandler(
+  input: DurableWorkRuntimeRunnerInput,
+): DeploymentDurableWorkHandler {
+  return new DeploymentDurableWorkHandler(
+    input.deploymentRepository,
+    input.deploymentLifecycleService,
+    input.executionBackend,
+    input.eventBus,
+    input.logger,
+    input.processAttemptRecorder,
+  );
+}
+
+export function createCompositeDurableWorkHandlerRegistry(
+  deploymentHandler: DurableWorkHandler,
+  extensionRegistry?: DurableWorkHandlerRegistry,
+): DurableWorkHandlerRegistry {
+  return {
+    resolve(item: DurableWorkItemRecord) {
+      return (
+        extensionRegistry?.resolve(item) ??
+        (item.kind === "deployment" ? deploymentHandler : undefined)
+      );
+    },
+  };
 }
 
 export function createDurableWorkRuntimeRunner(
@@ -61,22 +92,11 @@ export function createDurableWorkRuntimeRunner(
           label: "Durable work runtime",
         },
       });
-      const handler = new DeploymentDurableWorkHandler(
-        input.deploymentRepository,
-        input.deploymentLifecycleService,
-        input.executionBackend,
-        input.eventBus,
-        input.logger,
-        input.processAttemptRecorder,
-      );
+      const handler = createDeploymentHandler(input);
       const report = await drainDurableWorkOnce(
         context,
         input.adapter,
-        {
-          resolve(item) {
-            return item.kind === "deployment" ? handler : undefined;
-          },
-        },
+        createCompositeDurableWorkHandlerRegistry(handler, input.handlerRegistry),
         {
           worker,
           now: new Date().toISOString(),
