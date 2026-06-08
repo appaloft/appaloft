@@ -46,6 +46,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm, requestConsolePrompt } from "$lib/console/modal-interaction";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
   import {
@@ -589,7 +590,7 @@
     });
   }
 
-  function archiveProject(): void {
+  async function archiveProject(): Promise<void> {
     if (
       !browser ||
       !project ||
@@ -600,7 +601,12 @@
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.projects.archiveConfirm))) {
+    if (
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.projects.archiveConfirm),
+        destructive: true,
+      }))
+    ) {
       return;
     }
 
@@ -610,7 +616,7 @@
     });
   }
 
-  function restoreProject(): void {
+  async function restoreProject(): Promise<void> {
     if (
       !browser ||
       !project ||
@@ -621,7 +627,7 @@
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.projects.restoreConfirm))) {
+    if (!(await requestConsoleConfirm($t(i18nKeys.console.projects.restoreConfirm)))) {
       return;
     }
 
@@ -631,7 +637,7 @@
     });
   }
 
-  function deleteProject(): void {
+  async function deleteProject(): Promise<void> {
     if (
       !browser ||
       !project ||
@@ -642,7 +648,10 @@
       return;
     }
 
-    const confirmation = window.prompt($t(i18nKeys.console.projects.deleteConfirmPrompt), "");
+    const confirmation = await requestConsolePrompt({
+      message: $t(i18nKeys.console.projects.deleteConfirmPrompt),
+      destructive: true,
+    });
     if (confirmation !== project.id) {
       return;
     }
@@ -654,7 +663,7 @@
     });
   }
 
-  function archiveEnvironment(environmentId: string): void {
+  async function archiveEnvironment(environmentId: string): Promise<void> {
     if (!browser || !project || isProjectArchived || archiveEnvironmentMutation.isPending) {
       return;
     }
@@ -664,7 +673,12 @@
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.projects.environmentArchiveConfirm))) {
+    if (
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.projects.environmentArchiveConfirm),
+        destructive: true,
+      }))
+    ) {
       return;
     }
 
@@ -728,7 +742,7 @@
     });
   }
 
-  function lockEnvironment(environmentId: string): void {
+  async function lockEnvironment(environmentId: string): Promise<void> {
     if (!browser || !project || isProjectArchived || lockEnvironmentMutation.isPending) {
       return;
     }
@@ -738,7 +752,12 @@
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.projects.environmentLockConfirm))) {
+    if (
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.projects.environmentLockConfirm),
+        destructive: true,
+      }))
+    ) {
       return;
     }
 

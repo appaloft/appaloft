@@ -13,8 +13,10 @@ export const zhCN = {
       backToProjects: "返回项目",
       backToServers: "返回服务器",
       bindDomain: "绑定域名",
+      cancel: "取消",
       checkHealth: "检查 /api/health",
       close: "关闭",
+      confirm: "确认",
       connectGitHub: "连接 GitHub",
       createAndDeploy: "创建并部署",
       deploy: "部署",
@@ -57,6 +59,11 @@ export const zhCN = {
     app: {
       consoleSubtitle: "部署控制台",
       productName: "Appaloft",
+    },
+    dialog: {
+      confirmTitle: "确认操作",
+      promptInputLabel: "确认内容",
+      promptTitle: "输入确认内容",
     },
     domain: {
       currentList: "当前列表",

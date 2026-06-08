@@ -31,6 +31,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm } from "$lib/console/modal-interaction";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -308,17 +309,18 @@ server-config-deploy: true`);
       : session.serverId;
   }
 
-  function closeTerminalSession(session: TerminalSessionSummary) {
+  async function closeTerminalSession(session: TerminalSessionSummary): Promise<void> {
     if (!browser || closeTerminalSessionMutation.isPending) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.terminal.lifecycleCloseConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.terminal.lifecycleCloseConfirm, {
           sessionId: session.sessionId,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -327,12 +329,17 @@ server-config-deploy: true`);
     closeTerminalSessionMutation.mutate({ sessionId: session.sessionId });
   }
 
-  function expireOldTerminalSessions() {
+  async function expireOldTerminalSessions(): Promise<void> {
     if (!browser || expireTerminalSessionsMutation.isPending) {
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.terminal.lifecycleExpireConfirm))) {
+    if (
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.terminal.lifecycleExpireConfirm),
+        destructive: true,
+      }))
+    ) {
       return;
     }
 

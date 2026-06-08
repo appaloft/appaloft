@@ -67,6 +67,7 @@ export const uiPackage = {
   designPackage: designPackage.name,
   cssEntrypoints: designPackage.cssEntrypoints,
   primitiveEntrypoints: {
+    alertDialog: "@appaloft/ui/alert-dialog",
     avatar: "@appaloft/ui/avatar",
     badge: "@appaloft/ui/badge",
     breadcrumb: "@appaloft/ui/breadcrumb",
