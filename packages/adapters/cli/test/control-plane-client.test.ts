@@ -1269,7 +1269,7 @@ describe("CLI remote control-plane client", () => {
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       ["GET /api/version", "GET /api/organizations/current-context", "GET /api/servers"],
     );
-    expect(new URL(requests[2]?.url ?? "http://localhost").search).toBe("");
+    expect(new URL(requests[2]?.url ?? "http://localhost").search).toBe("?runtimeAvailability=all");
     expect(listed.stdout).toContain("srv_remote");
   });
 
@@ -1431,6 +1431,56 @@ describe("CLI remote control-plane client", () => {
     );
     expect(await requests[2]?.json()).toMatchObject({ serverId: "srv_remote" });
     expect(tested.stdout).toContain("reachable");
+  });
+
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] server runtime prepare dispatches through the generated SDK route", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/servers/srv_remote/runtime/prepare": jsonResponse({
+          serverId: "srv_remote",
+          status: "ready",
+          preparedAt: "2026-05-17T00:00:00.000Z",
+          steps: [
+            {
+              phase: "docker",
+              status: "succeeded",
+              message: "Docker is already available",
+              durationMs: 0,
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const prepared = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "runtime",
+        "prepare",
+        "srv_remote",
+        "--mode",
+        "repair",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/servers/srv_remote/runtime/prepare",
+      ],
+    );
+    expect(await requests[2]?.json()).toMatchObject({
+      serverId: "srv_remote",
+      mode: "repair",
+    });
+    expect(prepared.stdout).toContain("srv_remote");
   });
 
   test("[STATIC-ARTIFACT-EXT-018][CONTROL-PLANE-CLI-010] static artifact publish uploads local dist files through the remote payload route", async () => {
