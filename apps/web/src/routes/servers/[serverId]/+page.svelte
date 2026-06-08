@@ -52,6 +52,7 @@
     runtimeMonitoringRollupQueryOptions,
     runtimeMonitoringSamplesQueryOptions,
     runtimeMonitoringThresholdsQueryOptions,
+    type RuntimeMonitoringTimeRangeId,
     runtimeUsageQueryOptions,
   } from "$lib/console/runtime-usage-query";
   import { serverProviderDisplayLabel } from "$lib/console/server-registration";
@@ -67,6 +68,7 @@
   import { i18nKeys, t } from "$lib/i18n";
 
   const serverId = $derived(page.params.serverId ?? "");
+  let runtimeMonitoringTimeRange = $state<RuntimeMonitoringTimeRangeId>("1h");
   type ServerDetailTab =
     | "overview"
     | "monitor"
@@ -130,13 +132,21 @@
   });
   const activeTab = $derived(parseServerDetailTab(page.url.searchParams.get("tab")));
   const serverRuntimeUsageQuery = createQuery(() =>
-    runtimeUsageQueryOptions(serverRuntimeScope, browser && serverId.length > 0 && activeTab !== "monitor"),
+    runtimeUsageQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
   );
   const serverRuntimeMonitoringSamplesQuery = createQuery(() =>
-    runtimeMonitoringSamplesQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+    runtimeMonitoringSamplesQueryOptions(
+      serverRuntimeScope,
+      browser && serverId.length > 0,
+      runtimeMonitoringTimeRange,
+    ),
   );
   const serverRuntimeMonitoringRollupQuery = createQuery(() =>
-    runtimeMonitoringRollupQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
+    runtimeMonitoringRollupQueryOptions(
+      serverRuntimeScope,
+      browser && serverId.length > 0,
+      runtimeMonitoringTimeRange,
+    ),
   );
   const serverRuntimeMonitoringThresholdsQuery = createQuery(() =>
     runtimeMonitoringThresholdsQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
@@ -576,6 +586,13 @@
     void queryClient.invalidateQueries({ queryKey: ["servers", "capacity", "inspect", serverId] });
   }
 
+  function refreshRuntimeMonitor(): void {
+    void serverRuntimeUsageQuery.refetch();
+    void serverRuntimeMonitoringSamplesQuery.refetch();
+    void serverRuntimeMonitoringRollupQuery.refetch();
+    void serverRuntimeMonitoringThresholdsQuery.refetch();
+  }
+
   function capacityBytes(value: number | null | undefined): string {
     return formatRuntimeUsageBytes(value ?? undefined) ?? "-";
   }
@@ -986,8 +1003,15 @@
           thresholds={serverRuntimeMonitoringThresholds}
           thresholdsLoading={serverRuntimeMonitoringThresholdsQuery.isPending}
           thresholdsError={serverRuntimeMonitoringThresholdsError}
-          eventsHref={serverTabHref("deployments")}
-          capacityHref={serverTabHref("capacity")}
+          timeRange={runtimeMonitoringTimeRange}
+          refreshing={serverRuntimeUsageQuery.isFetching ||
+            serverRuntimeMonitoringSamplesQuery.isFetching ||
+            serverRuntimeMonitoringRollupQuery.isFetching ||
+            serverRuntimeMonitoringThresholdsQuery.isFetching}
+          onTimeRangeChange={(nextTimeRange) => {
+            runtimeMonitoringTimeRange = nextTimeRange;
+          }}
+          onRefresh={refreshRuntimeMonitor}
         />
           </Tabs.Content>
 
