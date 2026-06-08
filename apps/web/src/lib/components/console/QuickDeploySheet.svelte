@@ -327,7 +327,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     parameters?: Record<string, BlueprintPrimitiveParameterValue>;
     dependencyProvisioning?: ReturnType<typeof blueprintDependencyProvisioningPayload>;
     target?: {
+      projectId?: string;
       projectName?: string;
+      environmentId?: string;
       environmentName?: string;
       resourceSlugPrefix?: string;
       serverId?: string;
@@ -3407,6 +3409,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       if (!selectedEnvironmentId) {
         throw new Error("请选择或创建一个环境。");
       }
+      if (selectedEnvironment?.projectId !== projectId) {
+        throw new Error("请选择当前项目下的环境。");
+      }
       return selectedEnvironmentId;
     }
 
@@ -3686,7 +3691,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
   }
 
-  function blueprintInstallTarget(serverId: string): NonNullable<BlueprintInstallInput["target"]> {
+  type BlueprintResolvedInstallTarget = {
+    projectId: string;
+    projectName: string;
+    environmentId: string;
+    environmentName: string;
+    serverId: string;
+  };
+
+  async function ensureBlueprintInstallTarget(
+    serverId: string,
+  ): Promise<BlueprintResolvedInstallTarget> {
     const projectTargetName =
       projectMode === "existing"
         ? selectedProject?.name
@@ -3704,11 +3719,28 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       throw new Error("请选择环境或填写环境名。");
     }
 
+    const projectId = await ensureQuickDeployProjectId();
+    const environmentId = await ensureQuickDeployEnvironmentId(projectId);
+
     return {
+      projectId,
       projectName: projectTargetName,
+      environmentId,
       environmentName: environmentTargetName,
-      resourceSlugPrefix: selectedBlueprintSlug.trim(),
       serverId,
+    };
+  }
+
+  function blueprintInstallTarget(
+    target: BlueprintResolvedInstallTarget,
+  ): NonNullable<BlueprintInstallInput["target"]> {
+    return {
+      projectId: target.projectId,
+      projectName: target.projectName,
+      environmentId: target.environmentId,
+      environmentName: target.environmentName,
+      resourceSlugPrefix: selectedBlueprintSlug.trim(),
+      serverId: target.serverId,
     };
   }
 
@@ -3775,13 +3807,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
     const slug = selectedBlueprintSlug.trim();
     const serverId = await ensureBlueprintInstallServerId();
+    const target = await ensureBlueprintInstallTarget(serverId);
     const installInput: BlueprintInstallInput = {
       slug,
       ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
       profile: "production",
       parameters: blueprintInstallParameters(),
       dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
-      target: blueprintInstallTarget(serverId),
+      target: blueprintInstallTarget(target),
       ...(authIdentity ? { acceptedBy: authIdentity } : {}),
       idempotencyKey: blueprintInstallIdempotencyKey(slug),
       acknowledgements: [

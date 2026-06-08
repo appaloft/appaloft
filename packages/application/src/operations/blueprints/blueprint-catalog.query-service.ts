@@ -104,7 +104,11 @@ export class BlueprintCatalogQueryService {
       ...(query.input.profile ? { profile: query.input.profile } : {}),
       ...(query.input.parameters ? { parameters: query.input.parameters } : {}),
       target: {
+        ...(query.input.target?.projectId ? { projectId: query.input.target.projectId } : {}),
         projectName: query.input.target?.projectName ?? manifest.name,
+        ...(query.input.target?.environmentId
+          ? { environmentId: query.input.target.environmentId }
+          : {}),
         environmentName: query.input.target?.environmentName ?? "production",
         resourceSlugPrefix:
           query.input.target?.resourceSlugPrefix ?? fallbackResourceSlugPrefix(entry.id),
