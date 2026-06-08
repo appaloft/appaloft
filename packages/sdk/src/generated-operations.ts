@@ -3491,6 +3491,23 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "servers.prepare-runtime",
+    operationGroup: "servers",
+    operationMethod: "prepareRuntime",
+    operationId: "servers.prepareRuntime",
+    kind: "command",
+    domain: "servers",
+    messageName: "PrepareServerRuntimeCommand",
+    route: {
+      method: "POST",
+      path: "/servers/{serverId}/runtime/prepare",
+    },
+    docsHref: "/docs/servers/operations/proxy-and-terminal/#server-proxy-readiness",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "servers.capacity.inspect",
     operationGroup: "servers",
     operationMethod: "capacityInspect",

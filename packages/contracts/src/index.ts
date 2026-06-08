@@ -574,6 +574,13 @@ export const serverSummarySchema = z.object({
       lastErrorMessage: z.string().optional(),
     })
     .optional(),
+  runtimeAvailability: z
+    .object({
+      status: z.enum(["available", "unavailable"]),
+      reasonCodes: z.array(z.string()),
+      message: z.string().optional(),
+    })
+    .optional(),
   credential: z
     .object({
       kind: z.enum(["local-ssh-agent", "ssh-private-key"]),
@@ -1565,6 +1572,22 @@ export const testServerConnectivityResponseSchema = z.object({
 export const bootstrapServerProxyResponseSchema = z.object({
   serverId: z.string().min(1),
   attemptId: z.string().min(1),
+});
+
+export const serverRuntimePrepareStepSchema = z.object({
+  phase: z.enum(["connectivity-before", "docker", "edge-proxy", "connectivity-after"]),
+  status: z.enum(["succeeded", "failed", "skipped"]),
+  message: z.string(),
+  durationMs: z.number(),
+  metadata: z.record(z.string(), z.string()).optional(),
+  checks: z.array(serverConnectivityCheckSchema).optional(),
+});
+
+export const prepareServerRuntimeResponseSchema = z.object({
+  serverId: z.string().min(1),
+  status: z.enum(["ready", "failed"]),
+  preparedAt: z.string(),
+  steps: z.array(serverRuntimePrepareStepSchema),
 });
 
 export const environmentVariableSchema = z.object({
@@ -6338,6 +6361,7 @@ export type ShowSshCredentialResponse = z.infer<typeof showSshCredentialResponse
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
 export type BootstrapServerProxyResponse = z.infer<typeof bootstrapServerProxyResponseSchema>;
+export type PrepareServerRuntimeResponse = z.infer<typeof prepareServerRuntimeResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
 export type EnvironmentEffectivePrecedence = z.infer<typeof environmentEffectivePrecedenceSchema>;
 export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSummarySchema>;

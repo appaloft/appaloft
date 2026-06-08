@@ -41,6 +41,7 @@ import {
   ListServersQuery,
   ListStorageVolumesQuery,
   type ManagedDependencyResourceKind,
+  PrepareServerRuntimeCommand,
   type PreviewPolicySettings,
   type PreviewPolicySummary,
   type ProjectSummary,
@@ -69,6 +70,7 @@ import {
   ShowResourceSecretReferenceQuery,
   ShowRuntimeMonitoringThresholdsQuery,
   type StorageVolumeSummary,
+  TestServerConnectivityCommand,
 } from "@appaloft/application";
 import {
   type ConfigureResourceNetworkInput,
@@ -1034,6 +1036,27 @@ function configureServerCredential(input: ConfigureServerCredentialCommandInput)
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const message = yield* resultToEffect(ConfigureServerCredentialCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function prepareServerRuntime(input: {
+  serverId: string;
+  mode?: "prepare" | "repair" | "upgrade";
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(PrepareServerRuntimeCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function testServerConnectivity(input: { serverId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(TestServerConnectivityCommand.create(input));
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
   });
@@ -4476,6 +4499,10 @@ function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
       return createSshCredential(step.input);
     case "servers.configureCredential":
       return configureServerCredential(step.input);
+    case "servers.prepareRuntime":
+      return prepareServerRuntime(step.input);
+    case "servers.testConnectivity":
+      return testServerConnectivity(step.input);
     case "environments.create":
       return createEnvironment(step.input);
     case "resources.create":

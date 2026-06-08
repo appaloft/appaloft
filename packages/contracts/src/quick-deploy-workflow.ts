@@ -225,6 +225,19 @@ export type QuickDeployWorkflowStep =
       input: ConfigureServerCredentialInput;
     }
   | {
+      kind: "servers.prepareRuntime";
+      input: {
+        serverId: string;
+        mode?: "prepare" | "repair" | "upgrade";
+      };
+    }
+  | {
+      kind: "servers.testConnectivity";
+      input: {
+        serverId: string;
+      };
+    }
+  | {
       kind: "environments.create";
       input: CreateEnvironmentInput;
     }
