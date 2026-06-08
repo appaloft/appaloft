@@ -4,6 +4,10 @@ import { type ServerReadModel } from "../../ports";
 import { tokens } from "../../tokens";
 import { boundedListLimit } from "../shared-schema";
 import { type ListServersQuery } from "./list-servers.query";
+import {
+  serverMatchesRuntimeAvailabilityFilter,
+  withServerRuntimeAvailability,
+} from "./server-runtime-availability";
 
 @injectable()
 export class ListServersQueryService {
@@ -15,10 +19,15 @@ export class ListServersQueryService {
   ): Promise<{
     items: Awaited<ReturnType<ServerReadModel["list"]>>;
   }> {
+    const filter = query?.runtimeAvailability ?? "all";
+    const servers = await this.readModel.list(toRepositoryContext(context), {
+      limit: boundedListLimit(query?.limit),
+    });
+
     return {
-      items: await this.readModel.list(toRepositoryContext(context), {
-        limit: boundedListLimit(query?.limit),
-      }),
+      items: servers
+        .map(withServerRuntimeAvailability)
+        .filter((server) => serverMatchesRuntimeAvailabilityFilter(server, filter)),
     };
   }
 }

@@ -13,9 +13,13 @@ For deployment work, use this Appaloft deploy protocol:
 7. Observe deployment detail, logs, resource health, diagnostics, and recovery readiness.
 8. Return URL/access state first, then ids and next safe actions.
 
-For Cloud deployments to a registered SSH server, run `appaloft server test <serverId>` before
-starting deployment. A failure that says `Executable not found in $PATH: "ssh"` is a control-plane
-runtime packaging blocker: report it and stop rather than bypassing Appaloft with direct SSH.
+For Cloud deployments to a registered SSH server, read the server readiness summary and run
+`appaloft server test <serverId>` before starting deployment. If the target is unavailable,
+pending, or failed for Appaloft runtime work, run `appaloft server proxy repair <serverId>` and
+re-check readiness before deploying. A failure that says `Executable not found in $PATH: "ssh"` is
+a control-plane runtime packaging blocker; a failure that says `Docker is not available on the SSH
+target` is a server initialization blocker. Report and stop rather than bypassing Appaloft with
+direct SSH.
 
 ## GitHub Action Deployment Modes
 
@@ -140,7 +144,8 @@ Use this order:
    and dry-run planning. For Web quick deploy, use
    `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
    extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint
-   deploy command.
+   deploy command. Submit the install command once, then follow the returned deployment through
+   `appaloft deployments events`, deployment detail, and deployment logs.
 
 ## Follow-Up Commands
 

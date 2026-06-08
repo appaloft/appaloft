@@ -1470,6 +1470,11 @@ export interface ServerSummary {
     lastErrorCode?: string;
     lastErrorMessage?: string;
   };
+  runtimeAvailability?: {
+    status: "available" | "unavailable";
+    reasonCodes: string[];
+    message?: string;
+  };
   credential?: {
     kind: "local-ssh-agent" | "ssh-private-key";
     credentialId?: string;

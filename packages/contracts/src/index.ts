@@ -574,6 +574,13 @@ export const serverSummarySchema = z.object({
       lastErrorMessage: z.string().optional(),
     })
     .optional(),
+  runtimeAvailability: z
+    .object({
+      status: z.enum(["available", "unavailable"]),
+      reasonCodes: z.array(z.string()),
+      message: z.string().optional(),
+    })
+    .optional(),
   credential: z
     .object({
       kind: z.enum(["local-ssh-agent", "ssh-private-key"]),

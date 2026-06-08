@@ -90,7 +90,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     endpointFromTemplate,
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
-  import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
+  import {
+    createDeploymentWithProgress,
+    observeDeploymentProgressAfterAcceptance,
+  } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
   import { defaultAuthSession, defaultConsoleListLimit } from "$lib/console/queries";
   import {
@@ -360,6 +363,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     secretValues?: { key: string; value: string }[];
   };
   type BlueprintInstallResult = {
+    duplicate?: boolean;
     executionStatus?: string;
     installedApplication?: {
       applicationId?: string;
@@ -369,6 +373,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         deployment?: { deploymentId?: string };
         endpoints?: readonly { url?: string }[];
       }[];
+      executionFailure?: {
+        code?: string;
+        reason?: string;
+        details?: Record<string, unknown>;
+      };
     };
   };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
@@ -628,8 +637,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   );
   const serversQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["servers", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.servers.list({ limit: defaultConsoleListLimit }),
+      queryKey: ["servers", { limit: defaultConsoleListLimit, runtimeAvailability: "all" }],
+      queryFn: () =>
+        orpcClient.servers.list({
+          limit: defaultConsoleListLimit,
+          runtimeAvailability: "all",
+        }),
       enabled: browser && enabled,
     }),
   );
@@ -712,6 +725,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let workflowProgressError = $state("");
   let dependencyProvisioningInFlight = $state(false);
   let deploymentCreateInFlight = $state(false);
+  let blueprintInstallInFlight = $state(false);
   let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
   let environmentName = $state(
     browser
@@ -1267,6 +1281,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     projects.find((project) => project.id === selectedProjectId) ?? null,
   );
   const selectedServer = $derived(servers.find((server) => server.id === selectedServerId) ?? null);
+  const deployableServers = $derived(servers.filter((server) => serverIsRuntimeAvailable(server)));
   const selectedEnvironment = $derived(
     environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
   );
@@ -1299,7 +1314,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       publishStaticArtifactPayloadMutation.isPending ||
       publishStaticArtifactArchiveMutation.isPending ||
       dependencyProvisioningInFlight ||
-      deploymentCreateInFlight,
+      deploymentCreateInFlight ||
+      blueprintInstallInFlight,
   );
   const sourceLocator = $derived.by(() => {
     switch (sourceKind) {
@@ -1678,7 +1694,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     if (serverMode === "existing") {
-      return selectedServer ? `${selectedServer.name} · ${selectedServer.host}` : "未选择服务器";
+      return selectedServer
+        ? `${selectedServer.name} · ${selectedServer.host} · ${serverRuntimeAvailabilityLabel(selectedServer)}`
+        : "未选择服务器";
     }
 
     return serverDraft.name.trim() && serverDraft.host.trim()
@@ -1941,7 +1959,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     if (!selectedServerId) {
-      selectedServerId = servers[0].id;
+      selectedServerId = (deployableServers[0] ?? servers[0]).id;
     }
   });
 
@@ -2311,7 +2329,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     if (serverRequiredForQuickDeploy && !stepIsComplete("server")) {
-      issues.push(serverMode === "existing" ? "服务器：请选择服务器" : "服务器：请完善服务器连接信息");
+      issues.push(
+        serverMode === "existing"
+          ? selectedServer
+            ? `服务器：${serverRuntimeAvailabilityLabel(selectedServer)}`
+            : "服务器：请选择服务器"
+          : "服务器：请完善服务器连接信息",
+      );
     }
 
     return issues;
@@ -3184,7 +3208,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         }
 
         if (serverMode === "existing") {
-          return Boolean(selectedServerId);
+          return Boolean(selectedServerId) && serverIsRuntimeAvailable(selectedServer);
         }
 
         return isServerRegistrationDraftComplete(serverDraft, sshCredentials);
@@ -3934,15 +3958,115 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       ?.deploymentId ?? "";
   }
 
-  async function waitForBlueprintInstall(input: BlueprintInstallInput): Promise<unknown> {
-    let result = await orpcClient.blueprints.install(input);
+  function readBlueprintInstallResourceId(result: unknown): string {
+    const components =
+      result && typeof result === "object"
+        ? (result as BlueprintInstallResult).installedApplication?.components
+        : undefined;
+    return components?.find((component) => component.resource?.resourceId)?.resource?.resourceId ?? "";
+  }
 
-    for (let attempt = 0; attempt < 24 && readBlueprintInstallStatus(result) === "installing"; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5_000));
-      result = await orpcClient.blueprints.install(input);
+  function readBlueprintInstallFailureReason(result: unknown): string {
+    if (!result || typeof result !== "object") {
+      return "";
     }
 
-    return result;
+    const failure = (result as BlueprintInstallResult).installedApplication?.executionFailure;
+    return failure?.reason ?? failure?.code ?? "";
+  }
+
+  function blueprintDeploymentTerminalStatus(): string {
+    return [...workflowDeploymentProgressEvents]
+      .reverse()
+      .find((event) => event.status === "failed" || event.status === "succeeded")?.status ?? "";
+  }
+
+  function serverIsRuntimeAvailable(server: ServerSummary | null | undefined): boolean {
+    if (!server) {
+      return false;
+    }
+
+    const status = server.runtimeAvailability?.status;
+    if (status) {
+      return status === "available";
+    }
+
+    if (server.lifecycleStatus !== "active") {
+      return false;
+    }
+
+    const edgeProxy = server.edgeProxy;
+    return !edgeProxy || edgeProxy.kind === "none" || edgeProxy.status === "disabled" || edgeProxy.status === "ready";
+  }
+
+  function serverRuntimeAvailabilityLabel(server: ServerSummary | null | undefined): string {
+    if (!server) {
+      return "未选择";
+    }
+
+    if (serverIsRuntimeAvailable(server)) {
+      return "可部署";
+    }
+
+    if (server.runtimeAvailability?.message) {
+      return server.runtimeAvailability.message;
+    }
+
+    const edgeProxy = server.edgeProxy;
+    if (server.lifecycleStatus !== "active") {
+      return server.deactivationReason ?? "服务器未激活";
+    }
+
+    if (!edgeProxy) {
+      return "需要初始化运行时";
+    }
+
+    if (edgeProxy.status === "failed") {
+      return edgeProxy.lastErrorMessage ?? "运行时初始化失败";
+    }
+
+    return "需要初始化运行时";
+  }
+
+  async function readServerSummary(serverId: string): Promise<ServerSummary | null> {
+    const detail = await orpcClient.servers.show({
+      serverId,
+      includeRollups: false,
+    });
+    return detail.server as ServerSummary;
+  }
+
+  async function ensureQuickDeployServerRuntimeAvailable(serverId: string): Promise<void> {
+    let server =
+      selectedServer?.id === serverId ? selectedServer : servers.find((item) => item.id === serverId) ?? null;
+
+    if (!server) {
+      server = await readServerSummary(serverId);
+    }
+
+    if (serverIsRuntimeAvailable(server)) {
+      return;
+    }
+
+    setWorkflowStepStatus("servers.register", "running");
+
+    try {
+      await orpcClient.servers.bootstrapProxy({ serverId, reason: "post-connect" });
+      await serversQuery.refetch();
+      server = await readServerSummary(serverId);
+    } catch (error) {
+      setWorkflowStepStatus("servers.register", "failed");
+      throw new Error(`服务器初始化失败：${readErrorMessage(error)}`);
+    }
+
+    if (!serverIsRuntimeAvailable(server)) {
+      setWorkflowStepStatus("servers.register", "failed");
+      throw new Error(
+        `服务器还不能用于部署：${serverRuntimeAvailabilityLabel(server)}。请在服务器详情页运行连通性测试，或执行 appaloft server proxy repair ${serverId} 后再重试。`,
+      );
+    }
+
+    setWorkflowStepStatus("servers.register", "succeeded");
   }
 
   async function installBlueprintFromQuickDeploy(): Promise<void> {
@@ -3964,44 +4088,78 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     const slug = selectedBlueprintSlug.trim();
-    const serverId = await ensureBlueprintInstallServerId();
-    const target = await ensureBlueprintInstallTarget(serverId);
-    const installInput: BlueprintInstallInput = {
-      slug,
-      ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
-      profile: "production",
-      parameters: blueprintInstallParameters(),
-      dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
-      target: blueprintInstallTarget(target),
-      ...(authIdentity ? { acceptedBy: authIdentity } : {}),
-      idempotencyKey: blueprintInstallIdempotencyKey(slug),
-      acknowledgements: [
-        "accepts-blueprint-application-bundle",
-        "reviews-dependency-resource-bindings",
-        "preserves-user-owned-configuration",
-      ],
-      secretValues: blueprintInstallSecretValueInput(),
-    };
-    const installResult = await waitForBlueprintInstall(installInput);
-    const status = readBlueprintInstallStatus(installResult);
+    blueprintInstallInFlight = true;
+    workflowProgressDialogOpen = true;
+    setWorkflowStepStatus("deployments.create", "running");
 
-    await refreshWorkspaceData();
-    lastAccessUrl = readBlueprintInstallAccessUrl(installResult);
-    lastCreatedDeploymentId = readBlueprintInstallDeploymentId(installResult);
-    const installSucceeded = status !== "rollback-required";
-    deployFeedback = {
-      kind: installSucceeded ? "success" : "error",
-      title: installSucceeded
-        ? $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle)
-        : $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
-      detail:
-        lastAccessUrl ||
-        (lastCreatedDeploymentId
-          ? $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
-              deploymentId: lastCreatedDeploymentId,
-            })
-          : status || "Blueprint install accepted."),
-    };
+    try {
+      const serverId = await ensureBlueprintInstallServerId();
+      await ensureQuickDeployServerRuntimeAvailable(serverId);
+      const target = await ensureBlueprintInstallTarget(serverId);
+      const installInput: BlueprintInstallInput = {
+        slug,
+        ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
+        profile: "production",
+        parameters: blueprintInstallParameters(),
+        dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
+        target: blueprintInstallTarget(target),
+        ...(authIdentity ? { acceptedBy: authIdentity } : {}),
+        idempotencyKey: blueprintInstallIdempotencyKey(slug),
+        acknowledgements: [
+          "accepts-blueprint-application-bundle",
+          "reviews-dependency-resource-bindings",
+          "preserves-user-owned-configuration",
+        ],
+        secretValues: blueprintInstallSecretValueInput(),
+      };
+      const installResult = await orpcClient.blueprints.install(installInput);
+      const status = readBlueprintInstallStatus(installResult);
+
+      lastAccessUrl = readBlueprintInstallAccessUrl(installResult);
+      lastCreatedDeploymentId = readBlueprintInstallDeploymentId(installResult);
+      selectedResourceId = readBlueprintInstallResourceId(installResult) || selectedResourceId;
+
+      if (lastCreatedDeploymentId) {
+        await observeDeploymentProgressAfterAcceptance(
+          lastCreatedDeploymentId,
+          appendWorkflowDeploymentProgressEvent,
+          {
+            onStreamError: (message) => {
+              workflowProgressError = message;
+            },
+          },
+        );
+      }
+
+      await refreshWorkspaceData();
+
+      const terminalStatus = blueprintDeploymentTerminalStatus();
+      const failureReason =
+        readBlueprintInstallFailureReason(installResult) ||
+        (terminalStatus === "failed" ? workflowProgressError : "");
+      const installSucceeded = status !== "rollback-required" && terminalStatus !== "failed" && !failureReason;
+      setWorkflowStepStatus("deployments.create", installSucceeded ? "succeeded" : "failed");
+      deployFeedback = {
+        kind: installSucceeded ? "success" : "error",
+        title: installSucceeded
+          ? $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle)
+          : $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
+        detail:
+          failureReason ||
+          lastAccessUrl ||
+          (lastCreatedDeploymentId
+            ? $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
+                deploymentId: lastCreatedDeploymentId,
+              })
+            : status || "Blueprint install accepted."),
+      };
+    } catch (error) {
+      setWorkflowStepStatus("deployments.create", "failed");
+      workflowProgressError = readErrorMessage(error);
+      throw error;
+    } finally {
+      blueprintInstallInFlight = false;
+    }
   }
 
   async function ensureStaticSiteResourceId(
@@ -5579,15 +5737,26 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                       class="w-full justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                       size="sm"
                       variant="ghost"
+                      disabled={!serverIsRuntimeAvailable(server)}
                       data-selected={selectedServerId === server.id ? "true" : undefined}
                       onclick={() => {
+                        if (!serverIsRuntimeAvailable(server)) {
+                          return;
+                        }
                         selectedServerId = server.id;
                       }}
                     >
-                      {server.name} · {server.host}
-                      {#if server.credential}
-                        · {server.credential.kind === "ssh-private-key" ? "SSH key" : "SSH agent"}
-                      {/if}
+                      <span class="min-w-0 text-left">
+                        <span class="block truncate">
+                          {server.name} · {server.host}
+                          {#if server.credential}
+                            · {server.credential.kind === "ssh-private-key" ? "SSH key" : "SSH agent"}
+                          {/if}
+                        </span>
+                        <span class="block truncate text-xs text-muted-foreground">
+                          {serverRuntimeAvailabilityLabel(server)}
+                        </span>
+                      </span>
                     </Button>
                   {/each}
                 {:else}
@@ -6062,9 +6231,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           </div>
           <div>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
-            {#if deployFeedback.kind === "success" && (lastCreatedDeploymentId || lastAccessUrl)}
+            {#if lastCreatedDeploymentId || (deployFeedback.kind === "success" && lastAccessUrl)}
               <div class="mt-4 flex flex-wrap gap-2">
-                {#if lastAccessUrl}
+                {#if deployFeedback.kind === "success" && lastAccessUrl}
                   <Button
                     href={lastAccessUrl}
                     target="_blank"

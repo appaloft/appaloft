@@ -39,7 +39,9 @@ the npm package is actually published and verified in the user's environment.
    Blueprint quick deploy is currently a Web workflow. For an official or extension-provided
    Blueprint such as PocketBase, enter the deploy flow through
    `/deploy?source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>`; then use
-   CLI/API operations for auth, server readiness, deployment observation, and recovery.
+   CLI/API operations for auth, server readiness, deployment observation, and recovery. The Web
+   flow must submit Blueprint install once and observe the returned deployment through deployment
+   events/logs; repeated install calls are not a progress mechanism.
 4. Repository config: use Appaloft config files as deployment intent, not as a replacement for
    Resource profile ownership. `controlPlane.mode` and safe `controlPlane.url` may select
    connection policy; project/resource/server ids are bootstrap/advanced override context, not the

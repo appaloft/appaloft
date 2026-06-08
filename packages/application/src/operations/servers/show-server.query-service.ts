@@ -24,6 +24,7 @@ import {
   type ServerStatusCount,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { withServerRuntimeAvailability } from "./server-runtime-availability";
 import { type ShowServerQuery } from "./show-server.query";
 
 function withShowServerDetails(
@@ -166,11 +167,12 @@ export class ShowServerQueryService {
       if (!server) {
         return err(serverReadNotFound(query.serverId));
       }
+      const serverWithAvailability = withServerRuntimeAvailability(server);
 
       if (!query.includeRollups) {
         return ok({
           schemaVersion: "servers.show/v1",
-          server,
+          server: serverWithAvailability,
           generatedAt: this.clock.now(),
         });
       }
@@ -183,7 +185,7 @@ export class ShowServerQueryService {
 
         return ok({
           schemaVersion: "servers.show/v1",
-          server,
+          server: serverWithAvailability,
           rollups: buildRollups(query.serverId, deployments, domainBindings),
           generatedAt: this.clock.now(),
         });
