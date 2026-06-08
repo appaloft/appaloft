@@ -4199,7 +4199,13 @@ describe("console e2e with Bun.WebView", () => {
         capabilities?: unknown;
         target?: { serverId?: string };
       }>;
-      target?: { projectName?: string; environmentName?: string; serverId?: string };
+      target?: {
+        projectId?: string;
+        projectName?: string;
+        environmentId?: string;
+        environmentName?: string;
+        serverId?: string;
+      };
       secretValues?: Array<{ key?: string; value?: string }>;
       acknowledgements?: string[];
     };
@@ -4209,7 +4215,9 @@ describe("console e2e with Bun.WebView", () => {
     expect(installInput.variant).toBe("community");
     expect(installInput.profile).toBe("production");
     expect(installInput.target).toMatchObject({
+      projectId: "prj_demo",
       projectName: "Demo",
+      environmentId: "env_demo",
       environmentName: "production",
       serverId: "srv_demo",
     });

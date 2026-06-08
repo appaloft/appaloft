@@ -178,7 +178,9 @@ export const blueprintSlugSchema = nonEmptyTrimmedString("Blueprint slug");
 
 export const blueprintInstallTargetSchema = z
   .object({
+    projectId: nonEmptyTrimmedString("Project id").optional(),
     projectName: nonEmptyTrimmedString("Project name").optional(),
+    environmentId: nonEmptyTrimmedString("Environment id").optional(),
     environmentName: nonEmptyTrimmedString("Environment name").optional(),
     resourceSlugPrefix: nonEmptyTrimmedString("Resource slug prefix").optional(),
     serverId: nonEmptyTrimmedString("Target server id").optional(),
