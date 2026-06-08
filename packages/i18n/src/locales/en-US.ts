@@ -7,8 +7,10 @@ export const enUS = {
       backToProjects: "Back to projects",
       backToServers: "Back to servers",
       bindDomain: "Bind domain",
+      cancel: "Cancel",
       checkHealth: "Check /api/health",
       close: "Close",
+      confirm: "Confirm",
       connectGitHub: "Connect GitHub",
       createAndDeploy: "Create and deploy",
       deploy: "Deploy",
@@ -51,6 +53,11 @@ export const enUS = {
     app: {
       consoleSubtitle: "Deployment console",
       productName: "Appaloft",
+    },
+    dialog: {
+      confirmTitle: "Confirm action",
+      promptInputLabel: "Confirmation text",
+      promptTitle: "Enter confirmation text",
     },
     domain: {
       currentList: "Current list",

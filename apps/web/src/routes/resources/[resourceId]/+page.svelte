@@ -97,6 +97,7 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { Textarea } from "$lib/components/ui/textarea";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm, requestConsolePrompt } from "$lib/console/modal-interaction";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     selectCurrentResourceAccessRoute,
@@ -2567,12 +2568,17 @@
     }
   }
 
-  function archiveResource(): void {
+  async function archiveResource(): Promise<void> {
     if (!browser || !resource || isResourceArchived || archiveResourceMutation.isPending) {
       return;
     }
 
-    if (!window.confirm($t(i18nKeys.console.resources.archiveConfirm))) {
+    if (
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.archiveConfirm),
+        destructive: true,
+      }))
+    ) {
       return;
     }
 
@@ -2582,14 +2588,15 @@
     });
   }
 
-  function deleteResource(): void {
+  async function deleteResource(): Promise<void> {
     if (!browser || !resource || !isResourceArchived || deleteResourceMutation.isPending) {
       return;
     }
 
-    const resourceSlug = window.prompt(
-      `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
-    );
+    const resourceSlug = await requestConsolePrompt({
+      message: `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
+      destructive: true,
+    });
     if (resourceSlug === null) {
       return;
     }
@@ -2603,7 +2610,7 @@
     });
   }
 
-  function deletePreviewResource(): void {
+  async function deletePreviewResource(): Promise<void> {
     if (
       !browser ||
       !resource ||
@@ -2613,9 +2620,10 @@
       return;
     }
 
-    const resourceSlug = window.prompt(
-      `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
-    );
+    const resourceSlug = await requestConsolePrompt({
+      message: `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
+      destructive: true,
+    });
     if (resourceSlug === null) {
       return;
     }
@@ -3163,17 +3171,18 @@
     });
   }
 
-  function deleteScheduledTask(task: ScheduledTaskDefinitionSummary): void {
+  async function deleteScheduledTask(task: ScheduledTaskDefinitionSummary): Promise<void> {
     if (!resource || isResourceArchived || deleteScheduledTaskMutation.isPending) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.scheduledTaskDeleteConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.scheduledTaskDeleteConfirm, {
           taskId: task.taskId,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3600,17 +3609,18 @@
     });
   }
 
-  function deleteStorageVolume(volume: StorageVolumeSummary): void {
+  async function deleteStorageVolume(volume: StorageVolumeSummary): Promise<void> {
     if (!browser || deleteStorageVolumeMutation.isPending) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.storageVolumeDeleteConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.storageVolumeDeleteConfirm, {
           name: volume.name,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3637,17 +3647,18 @@
     cleanupStorageRuntime(true);
   }
 
-  function applyStorageRuntimeCleanup(): void {
+  async function applyStorageRuntimeCleanup(): Promise<void> {
     if (!browser || !selectedStorageRuntimeCleanupVolume) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.storageRuntimeCleanupConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.storageRuntimeCleanupConfirm, {
           name: selectedStorageRuntimeCleanupVolume.name,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3754,7 +3765,7 @@
     });
   }
 
-  function deleteDependencyResource(dependency: DependencyResourceSummary): void {
+  async function deleteDependencyResource(dependency: DependencyResourceSummary): Promise<void> {
     if (!browser || !resource || isResourceArchived || deleteDependencyResourceMutation.isPending) {
       return;
     }
@@ -3764,11 +3775,12 @@
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.dependencyDeleteConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.dependencyDeleteConfirm, {
           name: dependency.name,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3818,17 +3830,18 @@
     });
   }
 
-  function unbindDependencyResource(binding: ResourceDependencyBindingSummary): void {
+  async function unbindDependencyResource(binding: ResourceDependencyBindingSummary): Promise<void> {
     if (!browser || !resource || isResourceArchived || unbindResourceDependencyMutation.isPending) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.dependencyUnbindConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.dependencyUnbindConfirm, {
           targetName: binding.target.targetName,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3840,17 +3853,18 @@
     });
   }
 
-  function detachResourceStorage(attachment: ResourceStorageAttachmentSummary): void {
+  async function detachResourceStorage(attachment: ResourceStorageAttachmentSummary): Promise<void> {
     if (!browser || !resource || isResourceArchived || detachResourceStorageMutation.isPending) {
       return;
     }
 
     if (
-      !window.confirm(
-        $t(i18nKeys.console.resources.storageDetachConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.storageDetachConfirm, {
           destinationPath: attachment.destinationPath,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -3944,15 +3958,16 @@
     revokeCertificateMutation.mutate({ certificateId: certificate.id });
   }
 
-  function deleteCertificate(certificate: CertificateSummary): void {
+  async function deleteCertificate(certificate: CertificateSummary): Promise<void> {
     if (
       !canDeleteCertificate(certificate) ||
       deleteCertificateMutation.isPending ||
-      !window.confirm(
-        $t(i18nKeys.console.resources.certificateDeleteConfirm, {
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.resources.certificateDeleteConfirm, {
           certificateId: certificate.id,
         }),
-      )
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -4068,7 +4083,9 @@
       : false;
   }
 
-  function cleanupPreviewEnvironment(previewEnvironment: PreviewEnvironmentSummary): void {
+  async function cleanupPreviewEnvironment(
+    previewEnvironment: PreviewEnvironmentSummary,
+  ): Promise<void> {
     if (
       !browser ||
       cleanupPreviewEnvironmentMutation.isPending ||
@@ -4077,11 +4094,12 @@
       return;
     }
 
-    const confirmed = window.confirm(
-      $t(i18nKeys.console.previewEnvironments.cleanupConfirm, {
+    const confirmed = await requestConsoleConfirm({
+      message: $t(i18nKeys.console.previewEnvironments.cleanupConfirm, {
         previewEnvironmentId: previewEnvironment.previewEnvironmentId,
       }),
-    );
+      destructive: true,
+    });
     if (!confirmed) {
       return;
     }

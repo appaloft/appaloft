@@ -35,6 +35,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm } from "$lib/console/modal-interaction";
   import { organizationSettingsItems } from "$lib/console/settings-nav";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime, projectDetailHref } from "$lib/console/utils";
@@ -697,7 +698,7 @@
     }
   }
 
-  function removeMember(memberId: string): void {
+  async function removeMember(memberId: string): Promise<void> {
     if (!browser || !canRemoveMembers) {
       return;
     }
@@ -705,7 +706,12 @@
     if (member?.role === "owner" || member?.status === "deactivated") {
       return;
     }
-    if (window.confirm($t(i18nKeys.console.organization.removeMemberConfirm, { memberId }))) {
+    if (
+      await requestConsoleConfirm({
+        message: $t(i18nKeys.console.organization.removeMemberConfirm, { memberId }),
+        destructive: true,
+      })
+    ) {
       removeMemberMutation.mutate(memberId);
     }
   }
@@ -721,20 +727,30 @@
     reactivateMemberMutation.mutate(memberId);
   }
 
-  function rotateDeployToken(tokenId: string): void {
+  async function rotateDeployToken(tokenId: string): Promise<void> {
     if (!browser || !canManageDeployTokens) {
       return;
     }
-    if (window.confirm($t(i18nKeys.console.organization.rotateConfirm, { tokenId }))) {
+    if (
+      await requestConsoleConfirm({
+        message: $t(i18nKeys.console.organization.rotateConfirm, { tokenId }),
+        destructive: true,
+      })
+    ) {
       rotateDeployTokenMutation.mutate(tokenId);
     }
   }
 
-  function revokeDeployToken(tokenId: string): void {
+  async function revokeDeployToken(tokenId: string): Promise<void> {
     if (!browser || !canManageDeployTokens) {
       return;
     }
-    if (window.confirm($t(i18nKeys.console.organization.revokeConfirm, { tokenId }))) {
+    if (
+      await requestConsoleConfirm({
+        message: $t(i18nKeys.console.organization.revokeConfirm, { tokenId }),
+        destructive: true,
+      })
+    ) {
       revokeDeployTokenMutation.mutate(tokenId);
     }
   }
