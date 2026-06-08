@@ -39,6 +39,10 @@ type ResourceDeploymentRow = {
   id: string;
   resource_id: string;
   status: string;
+  target_kind: string;
+  static_artifact_publication_id: string | null;
+  static_artifact_id: string | null;
+  static_artifact_route_url: string | null;
   runtime_plan: unknown;
   created_at: string;
 };
@@ -140,6 +144,21 @@ function toResourceSummary(
         id: deployment.id,
         status: deployment.status as NonNullable<ResourceSummaryItem["lastDeploymentStatus"]>,
         createdAt: normalizeTimestamp(deployment.created_at) ?? deployment.created_at,
+        target:
+          deployment.target_kind === "serverless-static-artifact"
+            ? {
+                kind: "serverless-static-artifact" as const,
+                ...(deployment.static_artifact_publication_id
+                  ? { publicationId: deployment.static_artifact_publication_id }
+                  : {}),
+                ...(deployment.static_artifact_id
+                  ? { artifactId: deployment.static_artifact_id }
+                  : {}),
+                ...(deployment.static_artifact_route_url
+                  ? { routeUrl: deployment.static_artifact_route_url }
+                  : {}),
+              }
+            : { kind: "server-backed" as const },
         runtimePlan: {
           execution: {
             ...(runtimePlan.execution.accessRoutes
@@ -342,7 +361,17 @@ export class PgResourceReadModel implements ResourceReadModel {
           rows.length > 0
             ? await executor
                 .selectFrom("deployments")
-                .select(["id", "resource_id", "status", "runtime_plan", "created_at"])
+                .select([
+                  "id",
+                  "resource_id",
+                  "status",
+                  "target_kind",
+                  "static_artifact_publication_id",
+                  "static_artifact_id",
+                  "static_artifact_route_url",
+                  "runtime_plan",
+                  "created_at",
+                ])
                 .where(
                   "resource_id",
                   "in",
@@ -466,7 +495,17 @@ export class PgResourceReadModel implements ResourceReadModel {
         ] = await Promise.all([
           executor
             .selectFrom("deployments")
-            .select(["id", "resource_id", "status", "runtime_plan", "created_at"])
+            .select([
+              "id",
+              "resource_id",
+              "status",
+              "target_kind",
+              "static_artifact_publication_id",
+              "static_artifact_id",
+              "static_artifact_route_url",
+              "runtime_plan",
+              "created_at",
+            ])
             .where("resource_id", "=", row.id)
             .orderBy("created_at", "desc")
             .execute(),

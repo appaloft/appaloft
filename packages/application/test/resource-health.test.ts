@@ -338,6 +338,58 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
   };
 }
 
+function staticArtifactDeploymentSummary(): DeploymentSummary {
+  return {
+    id: "dep_static",
+    projectId: "prj_demo",
+    environmentId: "env_demo",
+    resourceId: "res_web",
+    target: {
+      kind: "serverless-static-artifact",
+      publicationId: "pub_static",
+      artifactId: "artifact_static",
+      routeUrl: "https://www-static-web-mq4k8lca-o7zpbs.appaloft.app/",
+    },
+    status: "succeeded",
+    runtimePlan: {
+      id: "rplan_static",
+      source: {
+        kind: "zip-artifact",
+        locator: "static-artifact:artifact_static",
+        displayName: "Static artifact publication",
+      },
+      buildStrategy: "static-artifact",
+      packagingMode: "optional-future-binary",
+      execution: {
+        kind: "docker-container",
+        metadata: {
+          "execution.kind": "serverless-static-artifact",
+        },
+      },
+      target: {
+        kind: "single-server",
+        providerKey: "static-artifact",
+        serverIds: [],
+      },
+      detectSummary: "Static artifact publication",
+      generatedAt: "2026-06-08T01:56:55.000Z",
+      steps: ["Publish static artifact"],
+    },
+    environmentSnapshot: {
+      id: "snap_static",
+      environmentId: "env_demo",
+      createdAt: "2026-06-08T01:56:55.000Z",
+      precedence: ["environment"],
+      variables: [],
+    },
+    logs: [],
+    createdAt: "2026-06-08T01:56:55.000Z",
+    startedAt: "2026-06-08T01:56:55.000Z",
+    finishedAt: "2026-06-08T01:56:55.000Z",
+    logCount: 0,
+  };
+}
+
 function resourceAggregateWithHealthPolicy(): Resource {
   return Resource.rehydrate({
     id: ResourceId.rehydrate("res_web"),
@@ -456,6 +508,51 @@ describe("ResourceHealthQueryService", () => {
         code: "resource_health_policy_not_configured",
       }),
     );
+  });
+
+  test("[CLOUD-STATIC-DEPLOY-158] reports serverless static artifact access as healthy when the route is published", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          deploymentCount: 1,
+          lastDeploymentId: "dep_static",
+          lastDeploymentStatus: "succeeded",
+          networkProfile: undefined,
+          accessSummary: {
+            latestStaticArtifactRoute: {
+              url: "https://www-static-web-mq4k8lca-o7zpbs.appaloft.app/",
+              hostname: "www-static-web-mq4k8lca-o7zpbs.appaloft.app",
+              scheme: "https",
+              publicationId: "pub_static",
+              artifactId: "artifact_static",
+              pathPrefix: "/",
+              updatedAt: "2026-06-08T01:56:55.000Z",
+            },
+          },
+        }),
+      ],
+      deployments: [staticArtifactDeploymentSummary()],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("healthy");
+    expect(summary.publicAccess).toEqual({
+      status: "ready",
+      url: "https://www-static-web-mq4k8lca-o7zpbs.appaloft.app/",
+      kind: "static-artifact",
+    });
+    expect(summary.proxy).toEqual({
+      status: "not-configured",
+      reasonCode: "resource_proxy_not_configured",
+    });
+    expect(summary.healthPolicy).toEqual({
+      status: "unsupported",
+      enabled: false,
+      reasonCode: "serverless_static_artifact_health_policy_unsupported",
+    });
   });
 
   test("[RUNTIME-CTRL-READ-001] includes latest runtime-control readback when projected", async () => {
