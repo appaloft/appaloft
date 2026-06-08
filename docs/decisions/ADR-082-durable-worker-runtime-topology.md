@@ -48,6 +48,11 @@ process-attempt state for `operator-work.*` visibility.
 - `ProcessAttempt*` ports remain the operator-facing projection and compatibility query contract.
 - `DurableWorkQueueAdapter` is the replaceable queue/delivery adapter boundary for database and
   external workflow engines.
+- The PG adapter records safe work item/event state, lists due candidates, claims through
+  status/lease conditions, refuses duplicate workers, and clears leases when work completes.
+- The neutral worker drain primitive depends only on the durable work adapter and handler registry:
+  it lists due items, skips unhandled work, claims leases before execution, completes successful
+  handler results, and turns handler domain errors into retriable failed work.
 - `workerRuntime` config records mode, queue backend, worker count, worker group, and optional
   external backend kind.
 - `appaloft serve` starts the embedded backend service and worker runtime together. `appaloft

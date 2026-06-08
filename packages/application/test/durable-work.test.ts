@@ -1,11 +1,159 @@
 import { describe, expect, test } from "bun:test";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 
 import {
   createDurableWorkTopology,
+  type DurableWorkClaimInput,
+  type DurableWorkClaimResult,
+  type DurableWorkCompletionInput,
+  type DurableWorkCompletionResult,
+  type DurableWorkDeliveryCandidateFilter,
+  type DurableWorkEventRecord,
+  type DurableWorkHandlerRegistry,
+  type DurableWorkItemRecord,
   type DurableWorkLedger,
+  type DurableWorkListFilter,
   type DurableWorkQueueAdapter,
   describeDurableWorkQueueBackend,
+  drainDurableWorkOnce,
 } from "../src/durable-work";
+import {
+  createExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../src/execution-context";
+
+function repositoryContext() {
+  return toRepositoryContext(
+    createExecutionContext({
+      entrypoint: "system",
+      requestId: "req_durable_work_test",
+      tracer: {
+        startActiveSpan(_name, _options, callback) {
+          return Promise.resolve(
+            callback({
+              addEvent() {},
+              recordError() {},
+              setAttribute() {},
+              setAttributes() {},
+              setStatus() {},
+            }),
+          );
+        },
+      },
+    }),
+  );
+}
+
+function durableWorkItem(input: Partial<DurableWorkItemRecord> = {}): DurableWorkItemRecord {
+  return {
+    id: "dw_test_1",
+    kind: "deployment",
+    status: "pending",
+    operationKey: "deployments.create",
+    queueBackend: "database",
+    priority: 10,
+    attemptCount: 0,
+    maxAttempts: 3,
+    availableAt: "2026-06-08T00:00:00.000Z",
+    updatedAt: "2026-06-08T00:00:00.000Z",
+    ...input,
+  };
+}
+
+class MemoryDurableWorkAdapter implements DurableWorkQueueAdapter {
+  readonly claims: DurableWorkClaimInput[] = [];
+  readonly completions: DurableWorkCompletionInput[] = [];
+
+  constructor(private readonly candidates: DurableWorkItemRecord[]) {}
+
+  async recordItem(
+    _context: RepositoryContext,
+    item: DurableWorkItemRecord,
+  ): Promise<Result<DurableWorkItemRecord>> {
+    return ok(item);
+  }
+
+  async appendEvent(
+    _context: RepositoryContext,
+    event: DurableWorkEventRecord,
+  ): Promise<Result<DurableWorkEventRecord>> {
+    return ok(event);
+  }
+
+  async findItem(
+    _context: RepositoryContext,
+    id: string,
+  ): Promise<Result<DurableWorkItemRecord | null>> {
+    return ok(this.candidates.find((item) => item.id === id) ?? null);
+  }
+
+  async listItems(
+    _context: RepositoryContext,
+    _filter?: DurableWorkListFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(this.candidates);
+  }
+
+  async listEvents(
+    _context: RepositoryContext,
+    _workItemId: string,
+  ): Promise<Result<DurableWorkEventRecord[]>> {
+    return ok([]);
+  }
+
+  async listDueCandidates(
+    _context: RepositoryContext,
+    _filter: DurableWorkDeliveryCandidateFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(this.candidates);
+  }
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: DurableWorkClaimInput,
+  ): Promise<Result<DurableWorkClaimResult>> {
+    this.claims.push(input);
+    const item = this.candidates.find((candidate) => candidate.id === input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    return ok({
+      status: "claimed",
+      workItem: {
+        ...item,
+        status: "running",
+        attemptCount: item.attemptCount + 1,
+        leaseOwner: input.workerId,
+        leaseExpiresAt: input.leaseExpiresAt,
+        phase: "worker-claim",
+        step: "claimed",
+        startedAt: input.claimedAt,
+        updatedAt: input.claimedAt,
+      },
+    });
+  }
+
+  async complete(
+    _context: RepositoryContext,
+    input: DurableWorkCompletionInput,
+  ): Promise<Result<DurableWorkCompletionResult>> {
+    this.completions.push(input);
+    const item = this.candidates.find((candidate) => candidate.id === input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    return ok({
+      status: "completed",
+      workItem: {
+        ...item,
+        status: input.status,
+        updatedAt: input.completedAt,
+        finishedAt: input.completedAt,
+      },
+    });
+  }
+}
 
 describe("durable work topology", () => {
   test("[PROC-DELIVERY-WORKER-001] embedded server runtime starts an explicit worker set", () => {
@@ -126,25 +274,25 @@ describe("durable work queue backend", () => {
 
   test("[PROC-DELIVERY-WORKER-008] queue adapter is the single public claim/progress contract", () => {
     const adapterMethods: Array<keyof DurableWorkQueueAdapter> = [
-      "record",
-      "list",
-      "findOne",
-      "listDueDeliveryCandidates",
-      "listDueRetries",
-      "generateDueRetry",
+      "recordItem",
+      "appendEvent",
+      "findItem",
+      "listItems",
+      "listEvents",
+      "listDueCandidates",
       "claimDue",
       "complete",
     ];
 
     expect(adapterMethods.sort()).toEqual([
+      "appendEvent",
       "claimDue",
       "complete",
-      "findOne",
-      "generateDueRetry",
-      "list",
-      "listDueDeliveryCandidates",
-      "listDueRetries",
-      "record",
+      "findItem",
+      "listDueCandidates",
+      "listEvents",
+      "listItems",
+      "recordItem",
     ]);
   });
 
@@ -153,9 +301,162 @@ describe("durable work queue backend", () => {
       "recordItem",
       "appendEvent",
       "findItem",
+      "listItems",
       "listEvents",
     ];
 
-    expect(ledgerMethods.sort()).toEqual(["appendEvent", "findItem", "listEvents", "recordItem"]);
+    expect(ledgerMethods.sort()).toEqual([
+      "appendEvent",
+      "findItem",
+      "listEvents",
+      "listItems",
+      "recordItem",
+    ]);
+  });
+});
+
+describe("durable work drain", () => {
+  test("[PROC-DELIVERY-WORKER-017] worker drains due work through claim and completion", async () => {
+    const adapter = new MemoryDurableWorkAdapter([durableWorkItem()]);
+    const handlers: DurableWorkHandlerRegistry = {
+      resolve() {
+        return {
+          async handle() {
+            return ok({
+              status: "succeeded",
+              phase: "release",
+              step: "finished",
+              safeDetails: {
+                imageDigest: "sha256:abc",
+              },
+            });
+          },
+        };
+      },
+    };
+
+    const report = await drainDurableWorkOnce(repositoryContext(), adapter, handlers, {
+      worker: {
+        workerId: "worker-1",
+        workerGroup: "worker",
+        slot: 1,
+      },
+      now: "2026-06-08T00:00:01.000Z",
+      leaseDurationMs: 300000,
+    });
+
+    expect(report.isOk()).toBe(true);
+    if (report.isErr()) throw new Error(report.error.message);
+    expect(report.value).toEqual({
+      scanned: 1,
+      claimed: 1,
+      completed: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(adapter.claims).toEqual([
+      {
+        workItemId: "dw_test_1",
+        workerId: "worker-1",
+        workerGroup: "worker",
+        claimedAt: "2026-06-08T00:00:01.000Z",
+        leaseExpiresAt: "2026-06-08T00:05:01.000Z",
+      },
+    ]);
+    expect(adapter.completions).toEqual([
+      {
+        workItemId: "dw_test_1",
+        status: "succeeded",
+        completedAt: "2026-06-08T00:00:01.000Z",
+        phase: "release",
+        step: "finished",
+        safeDetails: {
+          imageDigest: "sha256:abc",
+        },
+      },
+    ]);
+  });
+
+  test("[PROC-DELIVERY-WORKER-018] worker skips due work without a registered handler", async () => {
+    const adapter = new MemoryDurableWorkAdapter([durableWorkItem()]);
+    const report = await drainDurableWorkOnce(
+      repositoryContext(),
+      adapter,
+      {
+        resolve() {
+          return undefined;
+        },
+      },
+      {
+        worker: {
+          workerId: "worker-1",
+          workerGroup: "worker",
+          slot: 1,
+        },
+        now: "2026-06-08T00:00:01.000Z",
+        leaseDurationMs: 300000,
+      },
+    );
+
+    expect(report.isOk()).toBe(true);
+    if (report.isErr()) throw new Error(report.error.message);
+    expect(report.value).toEqual({
+      scanned: 1,
+      claimed: 0,
+      completed: 0,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(adapter.claims).toEqual([]);
+    expect(adapter.completions).toEqual([]);
+  });
+
+  test("[PROC-DELIVERY-WORKER-019] worker completes claimed work as failed when handler fails", async () => {
+    const adapter = new MemoryDurableWorkAdapter([durableWorkItem()]);
+    const handlers: DurableWorkHandlerRegistry = {
+      resolve() {
+        return {
+          async handle() {
+            return err(
+              domainError.infra("Deployment handler failed", {
+                phase: "test",
+              }),
+            );
+          },
+        };
+      },
+    };
+
+    const report = await drainDurableWorkOnce(repositoryContext(), adapter, handlers, {
+      worker: {
+        workerId: "worker-1",
+        workerGroup: "worker",
+        slot: 1,
+      },
+      now: "2026-06-08T00:00:01.000Z",
+      leaseDurationMs: 300000,
+    });
+
+    expect(report.isOk()).toBe(true);
+    if (report.isErr()) throw new Error(report.error.message);
+    expect(report.value).toEqual({
+      scanned: 1,
+      claimed: 1,
+      completed: 0,
+      failed: 1,
+      skipped: 0,
+    });
+    expect(adapter.completions).toEqual([
+      {
+        workItemId: "dw_test_1",
+        status: "failed",
+        completedAt: "2026-06-08T00:00:01.000Z",
+        phase: "worker-claim",
+        step: "claimed",
+        errorCode: "infra_error",
+        errorCategory: "infra",
+        retriable: true,
+      },
+    ]);
   });
 });

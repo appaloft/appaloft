@@ -13,7 +13,7 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-005 | Database queue backend uses durable work ledger as durable state authority. | Application | `packages/application/test/durable-work.test.ts` |
 | PROC-DELIVERY-WORKER-006 | External queue backend requires an explicit backend kind. | Application | `packages/application/test/durable-work.test.ts` |
 | PROC-DELIVERY-WORKER-007 | External queue backend preserves the same public adapter contract for Temporal/Kafka/custom adapters. | Application | `packages/application/test/durable-work.test.ts` |
-| PROC-DELIVERY-WORKER-008 | Durable work queue adapter composes process-attempt record/read/candidate/retry/claim/completion ports. | Application | `packages/application/test/durable-work.test.ts` |
+| PROC-DELIVERY-WORKER-008 | Durable work queue adapter exposes item/event ledger, due candidate, claim, and completion methods independently of process-attempt projection. | Application | `packages/application/test/durable-work.test.ts` |
 | PROC-DELIVERY-WORKER-009 | Environment config can select standalone mode, worker count, worker group, and queue backend. | Config | `packages/config/test/index.test.ts` |
 | PROC-DELIVERY-WORKER-010 | Environment config can select an external workflow backend such as Temporal. | Config | `packages/config/test/index.test.ts` |
 | PROC-DELIVERY-WORKER-011 | Environment config can disable durable workers and preserve zero worker count. | Config | `packages/config/test/index.test.ts` |
@@ -21,6 +21,10 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-013 | `appaloft worker` starts worker runtime without starting HTTP server. | CLI | `packages/adapters/cli/test/lifecycle-command.test.ts` |
 | PROC-DELIVERY-WORKER-014 | Database backend migrates durable work item and event ledger tables. | Persistence | `packages/persistence/pg/test/durable-work-ledger.pglite.test.ts` |
 | PROC-DELIVERY-WORKER-015 | Public application durable work ledger port is independent of process-attempt projection. | Application | `packages/application/test/durable-work.test.ts` |
+| PROC-DELIVERY-WORKER-016 | PG durable work ledger records safe item/event state, lists due work, atomically claims one worker, refuses duplicate claims, completes work, and keeps deployment/status monitoring queryable. | Persistence | `packages/persistence/pg/test/durable-work-ledger.pglite.test.ts` |
+| PROC-DELIVERY-WORKER-017 | Worker drain lists due work, claims a lease, invokes a registered handler, and completes the item. | Application | `packages/application/test/durable-work.test.ts` |
+| PROC-DELIVERY-WORKER-018 | Worker drain skips due work without a registered handler and does not acquire a lease. | Application | `packages/application/test/durable-work.test.ts` |
+| PROC-DELIVERY-WORKER-019 | Worker drain completes handler domain errors as retriable failed work instead of leaving a running lease. | Application | `packages/application/test/durable-work.test.ts` |
 
 ## Deferred Coverage
 

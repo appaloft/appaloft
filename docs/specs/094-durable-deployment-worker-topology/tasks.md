@@ -20,9 +20,13 @@
 - [x] Add backend descriptors for database and external queue adapters.
 - [x] Add `workerRuntime` config defaults and environment parsing.
 - [x] Add database durable work item/event migration and schema types.
+- [x] Add PG durable work ledger/queue adapter for record, query, due candidate, claim, and
+  completion.
+- [x] Add application worker drain primitive for due candidate polling, lease claim, handler
+  dispatch, completion, and handler failure completion.
 - [x] Wire server startup status to report `workerRuntime` topology.
 - [x] Add dedicated `appaloft worker` startup mode.
-- [ ] Promote deployment create execution to pending process-attempt claim/completion.
+- [ ] Promote deployment create execution to pending durable work claim/completion.
 
 ## Verification
 
