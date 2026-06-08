@@ -4664,7 +4664,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                                         "min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                         draft.mode === mode
                                           ? "border-primary bg-primary/5 text-foreground"
-                                          : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                                          : "border-border bg-card text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground",
                                       ]}
                                       aria-pressed={draft.mode === mode}
                                       onclick={() =>
@@ -5189,7 +5189,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     </div>
                   {/if}
                   <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
-                  <div class="console-subtle-panel max-h-64 space-y-2 overflow-auto p-2">
+                  <div class="max-h-64 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
                     {#if githubRepositoriesQuery.isPending}
                       {#each Array.from({ length: 4 }) as _, index (index)}
                         <Skeleton class="h-14 w-full" />
@@ -5199,11 +5199,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                         <Button
                           type="button"
                           variant="ghost"
-                          class={`h-auto w-full justify-start whitespace-normal rounded-md px-3 py-3 text-left ${
-                            selectedGitHubRepositoryId === repository.id
-                              ? "bg-primary/5 ring-1 ring-primary/40"
-                              : "hover:bg-muted/50"
-                          }`}
+                          data-selected={selectedGitHubRepositoryId === repository.id ? "true" : undefined}
+                          class="h-auto w-full justify-start whitespace-normal rounded-md border border-transparent bg-card px-3 py-3 text-left text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                           onclick={() => applyGitHubRepository(repository)}
                         >
                           <span class="flex items-start justify-between gap-3">
@@ -5284,12 +5281,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               </div>
             {/if}
             {#if projectMode === "existing" && projects.length > 0}
-              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
+              <div class="max-h-44 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
                 {#each projects as project (project.id)}
                   <Button
-                    class="w-full justify-start"
+                    class="w-full justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                     size="sm"
-                    variant={selectedProjectId === project.id ? "selected" : "ghost"}
+                    variant="ghost"
+                    data-selected={selectedProjectId === project.id ? "true" : undefined}
                     onclick={() => {
                       selectedProjectId = project.id;
                     }}
@@ -5361,13 +5359,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               </Button>
             </div>
             {#if serverMode === "existing"}
-              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
+              <div class="max-h-44 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
                 {#if servers.length > 0}
                   {#each servers as server (server.id)}
                     <Button
-                      class="w-full justify-start"
+                      class="w-full justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                       size="sm"
-                      variant={selectedServerId === server.id ? "selected" : "ghost"}
+                      variant="ghost"
+                      data-selected={selectedServerId === server.id ? "true" : undefined}
                       onclick={() => {
                         selectedServerId = server.id;
                       }}
@@ -5434,13 +5433,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               </Button>
             </div>
             {#if environmentMode === "existing"}
-              <div class="console-subtle-panel max-h-44 space-y-2 overflow-auto p-2">
+              <div class="max-h-44 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
                 {#if filteredEnvironments.length > 0}
                   {#each filteredEnvironments as environment (environment.id)}
                     <Button
-                      class="w-full justify-start"
+                      class="w-full justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                       size="sm"
-                      variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}
+                      variant="ghost"
+                      data-selected={selectedEnvironmentId === environment.id ? "true" : undefined}
                       onclick={() => {
                         selectedEnvironmentId = environment.id;
                       }}

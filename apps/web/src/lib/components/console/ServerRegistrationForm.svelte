@@ -418,14 +418,15 @@
                   <p class="console-field-label">
                     {$t(i18nKeys.console.serverForm.selectCredential)}
                   </p>
-                  <div class="grid gap-2 md:grid-cols-2">
+                  <div class="grid gap-2 rounded-md border border-input bg-card p-2 md:grid-cols-2">
                     {#each sshCredentials as credential (credential.id)}
                       <Button
                         type="button"
                         size="sm"
                         disabled={disabled}
-                        variant={draft.selectedSshCredentialId === credential.id ? "selected" : "outline"}
-                        class="min-w-0 justify-start"
+                        variant="ghost"
+                        data-selected={draft.selectedSshCredentialId === credential.id ? "true" : undefined}
+                        class="min-w-0 justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                         onclick={() => {
                           draft.selectedSshCredentialId = credential.id;
                           draft.credentialPrivateKey = "";
