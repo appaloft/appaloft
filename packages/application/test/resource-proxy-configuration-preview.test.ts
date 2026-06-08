@@ -289,6 +289,11 @@ function deploymentSummary(): DeploymentSummary {
     resourceId: "res_web",
     serverId: "srv_demo",
     destinationId: "dst_demo",
+    target: {
+      kind: "server-backed",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+    },
     status: "succeeded",
     runtimePlan: {
       id: "rplan_demo",

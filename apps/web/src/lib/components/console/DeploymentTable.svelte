@@ -79,7 +79,7 @@
         {@const project = findProject(projects, deployment.projectId)}
         {@const environment = findEnvironment(environments, deployment.environmentId)}
         {@const resource = findResource(resources, deployment.resourceId)}
-        {@const server = findServer(servers, deployment.serverId)}
+        {@const server = deployment.serverId ? findServer(servers, deployment.serverId) : null}
         {@const sourceVersion = sourceVersionForDeployment(deployment)}
         <Table.Row class="group">
           <Table.Cell class="max-w-80">

@@ -11,8 +11,11 @@ import {
   type DestinationRepository,
   type PlannedResourceAccessRouteSummary,
   type ResourceReadModel,
+  type ResourceStaticArtifactAccessRouteSummary,
   type ResourceSummary,
   type ServerRepository,
+  type StaticArtifactPublicationReadModelPort,
+  type StaticArtifactPublicationSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { boundedListLimit } from "../shared-schema";
@@ -27,6 +30,8 @@ export class ListResourcesQueryService {
     private readonly serverRepository: ServerRepository,
     @inject(tokens.defaultAccessDomainProvider)
     private readonly defaultAccessDomainProvider: DefaultAccessDomainProvider,
+    @inject(tokens.staticArtifactPublicationReadModelPort, { isOptional: true })
+    private readonly staticArtifactPublicationReadModel?: StaticArtifactPublicationReadModelPort,
   ) {}
 
   async execute(
@@ -51,6 +56,7 @@ export class ListResourcesQueryService {
       resources.map(async (resource) => {
         const accessSummary = {
           ...(resource.accessSummary ?? {}),
+          ...(await this.latestStaticArtifactRoute(context, resource)),
           ...(await this.plannedGeneratedAccessRoute(context, resource)),
         };
 
@@ -147,6 +153,40 @@ export class ListResourcesQueryService {
       },
     };
   }
+
+  private async latestStaticArtifactRoute(
+    context: ExecutionContext,
+    resource: ResourceSummary,
+  ): Promise<
+    | {
+        latestStaticArtifactRoute: ResourceStaticArtifactAccessRouteSummary;
+      }
+    | Record<string, never>
+  > {
+    if (!this.staticArtifactPublicationReadModel) {
+      return {};
+    }
+
+    const publicationsResult = await this.staticArtifactPublicationReadModel.listPublications(
+      context,
+      {
+        projectId: resource.projectId,
+        resourceId: resource.id,
+        limit: 1,
+      },
+    );
+    if (publicationsResult.isErr()) {
+      return {};
+    }
+
+    const publication = publicationsResult.value.items.find((item) => item.routeUrl);
+    if (!publication?.routeUrl) {
+      return {};
+    }
+
+    const route = staticArtifactRouteSummary(publication);
+    return route ? { latestStaticArtifactRoute: route } : {};
+  }
 }
 
 function routeUrl(input: {
@@ -156,4 +196,34 @@ function routeUrl(input: {
 }): string {
   const path = input.pathPrefix === "/" ? "" : input.pathPrefix;
   return `${input.scheme}://${input.hostname}${path}`;
+}
+
+function staticArtifactRouteSummary(
+  publication: StaticArtifactPublicationSummary,
+): ResourceStaticArtifactAccessRouteSummary | undefined {
+  if (!publication.routeUrl) {
+    return undefined;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(publication.routeUrl);
+  } catch {
+    return undefined;
+  }
+
+  const scheme = parsed.protocol === "https:" ? "https" : "http";
+  const pathPrefix = parsed.pathname || "/";
+  return {
+    url: publication.routeUrl,
+    hostname: parsed.hostname,
+    scheme,
+    ...(publication.routeProviderKey ? { providerKey: publication.routeProviderKey } : {}),
+    publicationId: publication.publicationId,
+    artifactId: publication.artifactId,
+    pathPrefix,
+    fileCount: publication.fileCount,
+    totalBytes: publication.totalBytes,
+    ...(publication.publishedAt ? { updatedAt: publication.publishedAt } : {}),
+  };
 }

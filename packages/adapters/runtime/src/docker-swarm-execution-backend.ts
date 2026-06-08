@@ -33,6 +33,7 @@ import {
   renderDockerSwarmRuntimeIntent,
   type DockerSwarmRuntimeIdentityInput,
 } from "./docker-swarm-runtime-intent";
+import { requireServerBackedDeploymentState } from "./deployment-target";
 import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
@@ -91,7 +92,7 @@ function phaseLog(
 }
 
 function deploymentIdentity(deployment: Deployment): DockerSwarmRuntimeIdentityInput {
-  const state = deployment.toState();
+  const state = requireServerBackedDeploymentState(deployment, "docker swarm deployment identity");
   return {
     resourceId: state.resourceId.value,
     deploymentId: state.id.value,
@@ -160,7 +161,10 @@ function failedExecutionResult(
     logs: input.logs,
     errorCode: input.errorCode,
     ...(input.metadata ? { metadata: input.metadata } : {}),
-    serverId: deployment.toState().serverId.value,
+    serverId: requireServerBackedDeploymentState(
+      deployment,
+      "docker swarm capacity-aware failure fields",
+    ).serverId.value,
   });
 
   return executionResult({

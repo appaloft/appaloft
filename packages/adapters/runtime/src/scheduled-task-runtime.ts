@@ -532,6 +532,14 @@ export class RuntimeTargetScheduledTaskRuntimePort implements ScheduledTaskRunti
       deployment.runtimePlan.target.providerKey === "generic-ssh"
         ? await (async () => {
             const serverId = deployment.runtimePlan.target.serverIds[0] ?? deployment.serverId;
+            if (!serverId) {
+              return err(
+                domainError.validation("Scheduled task runtime requires a server-backed target", {
+                  deploymentId: deployment.id,
+                  resourceId: deployment.resourceId,
+                }),
+              );
+            }
             const target = await this.resolveSshTarget(context, serverId);
             if (target.isErr()) {
               return err(target.error);

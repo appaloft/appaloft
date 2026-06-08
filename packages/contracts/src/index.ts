@@ -1663,6 +1663,20 @@ export const plannedResourceAccessRouteSummarySchema = z.object({
   targetPort: z.number().int().positive(),
 });
 
+export const resourceStaticArtifactAccessRouteSummarySchema = z.object({
+  url: z.string(),
+  hostname: z.string(),
+  scheme: z.enum(["http", "https"]),
+  providerKey: z.string().optional(),
+  targetPort: z.number().optional(),
+  publicationId: z.string(),
+  artifactId: z.string(),
+  pathPrefix: z.string(),
+  fileCount: z.number().int().nonnegative(),
+  totalBytes: z.number().int().nonnegative(),
+  updatedAt: z.string().optional(),
+});
+
 export const resourceAccessFailureDiagnosticSchema = z.object({
   schemaVersion: z.literal("resource-access-failure/v1"),
   requestId: z.string(),
@@ -1762,6 +1776,7 @@ export const resourceAccessSummarySchema = z.object({
   latestGeneratedAccessRoute: resourceAccessRouteSummarySchema.optional(),
   latestDurableDomainRoute: resourceAccessRouteSummarySchema.optional(),
   latestServerAppliedDomainRoute: resourceAccessRouteSummarySchema.optional(),
+  latestStaticArtifactRoute: resourceStaticArtifactAccessRouteSummarySchema.optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
   lastRouteRealizationDeploymentId: z.string().optional(),
   latestAccessFailureDiagnostic: resourceAccessFailureDiagnosticSchema.optional(),
@@ -1974,8 +1989,8 @@ export const resourceHealthDeploymentContextSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
-  serverId: z.string(),
-  destinationId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   lastError: z
     .object({
       timestamp: z.string(),
@@ -2004,6 +2019,7 @@ export const resourceRuntimeControlSummarySchema = z.object({
       "deployment-in-progress",
       "profile-acknowledgement-required",
       "adapter-unsupported",
+      "runtime-control-target-unsupported",
     ])
     .optional(),
   errorCode: z.string().optional(),
@@ -3460,8 +3476,8 @@ export const previewEnvironmentSummarySchema = z.object({
   projectId: z.string(),
   environmentId: z.string(),
   resourceId: z.string(),
-  serverId: z.string(),
-  destinationId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   source: previewEnvironmentSourceSummarySchema,
   status: previewEnvironmentStatusSchema,
   createdAt: z.string(),
@@ -4046,8 +4062,8 @@ export const domainBindingSummarySchema = z.object({
   projectId: z.string(),
   environmentId: z.string(),
   resourceId: z.string(),
-  serverId: z.string(),
-  destinationId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   domainName: z.string(),
   pathPrefix: z.string(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
@@ -4625,13 +4641,28 @@ export const runtimePlanSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const deploymentSummaryTargetSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("server-backed"),
+    serverId: z.string(),
+    destinationId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("serverless-static-artifact"),
+    publicationId: z.string(),
+    artifactId: z.string(),
+    routeUrl: z.string(),
+  }),
+]);
+
 export const deploymentSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
   environmentId: z.string(),
   resourceId: z.string(),
-  serverId: z.string(),
-  destinationId: z.string(),
+  target: deploymentSummaryTargetSchema,
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   status: z.enum([
     "created",
     "planning",
@@ -4960,10 +4991,13 @@ export const deploymentRelatedContextSchema = z.object({
       host: true,
       port: true,
       providerKey: true,
-    }),
-  destination: z.object({
-    id: z.string(),
-  }),
+    })
+    .optional(),
+  destination: z
+    .object({
+      id: z.string(),
+    })
+    .optional(),
 });
 
 export const deploymentDetailSectionErrorSchema = z.object({
@@ -5878,8 +5912,8 @@ export const resourceDiagnosticDeploymentSchema = z.object({
     "compose",
   ]),
   sourceDisplayName: z.string(),
-  serverId: z.string(),
-  destinationId: z.string(),
+  serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
@@ -6303,6 +6337,9 @@ export type EnvironmentEffectivePrecedence = z.infer<typeof environmentEffective
 export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSummarySchema>;
 export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
+>;
+export type ResourceStaticArtifactAccessRouteSummary = z.infer<
+  typeof resourceStaticArtifactAccessRouteSummarySchema
 >;
 export type ResourceAccessFailureDiagnostic = z.infer<typeof resourceAccessFailureDiagnosticSchema>;
 export type AppliedRouteContextMetadata = z.infer<typeof appliedRouteContextMetadataSchema>;

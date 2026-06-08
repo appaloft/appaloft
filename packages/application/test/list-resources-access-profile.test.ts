@@ -19,7 +19,7 @@ import {
   UpdatedAt,
 } from "@appaloft/core";
 
-import { createExecutionContext, type toRepositoryContext } from "../src";
+import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
 import {
   type DefaultAccessDomainProvider,
   type DefaultAccessDomainRequest,
@@ -27,6 +27,8 @@ import {
   type ResourceReadModel,
   type ResourceSummary,
   type ServerRepository,
+  type StaticArtifactPublicationReadModelPort,
+  type StaticArtifactPublicationSummary,
 } from "../src/ports";
 import { ListResourcesQueryService } from "../src/use-cases";
 
@@ -104,6 +106,37 @@ class CapturingDefaultAccessDomainProvider implements DefaultAccessDomainProvide
   }
 }
 
+class StaticArtifactPublicationReadModel implements StaticArtifactPublicationReadModelPort {
+  public readonly calls: Array<{
+    projectId?: string;
+    resourceId?: string;
+    limit?: number;
+  }> = [];
+
+  constructor(private readonly publications: StaticArtifactPublicationSummary[]) {}
+
+  async listPublications(
+    _context: ExecutionContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+      limit?: number;
+    },
+  ) {
+    this.calls.push(input ?? {});
+    return ok({
+      items: this.publications
+        .filter((publication) =>
+          input?.projectId ? publication.projectId === input.projectId : true,
+        )
+        .filter((publication) =>
+          input?.resourceId ? publication.resourceId === input.resourceId : true,
+        )
+        .slice(0, input?.limit ?? this.publications.length),
+    });
+  }
+}
+
 function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary {
   return {
     id: "res_web",
@@ -128,14 +161,17 @@ function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary 
 function createService(
   resource: ResourceSummary,
   provider = new CapturingDefaultAccessDomainProvider(),
+  staticArtifactPublicationReadModel?: StaticArtifactPublicationReadModel,
 ) {
   return {
     provider,
+    staticArtifactPublicationReadModel,
     service: new ListResourcesQueryService(
       new StaticResourceReadModel([resource]),
       new StaticDestinationRepository(),
       new StaticServerRepository(),
       provider,
+      staticArtifactPublicationReadModel,
     ),
   };
 }
@@ -210,5 +246,60 @@ describe("ListResourcesQueryService access profile projection", () => {
 
     expect(result.items[0]?.accessSummary?.plannedGeneratedAccessRoute).toBeUndefined();
     expect(provider.calls).toHaveLength(0);
+  });
+
+  test("[CLOUD-STATIC-DEPLOY-157] projects latest serverless static publication as a resource access route", async () => {
+    const publications = new StaticArtifactPublicationReadModel([
+      {
+        publicationId: "pub_static_current",
+        projectId: "prj_demo",
+        resourceId: "res_web",
+        artifactId: "artifact_static_current",
+        manifestDigest: "manifest-digest",
+        storageRef: "s3-compatible://bucket/publications/manifest.json",
+        storeProviderKey: "cloud-static-artifact-store",
+        routeUrl: "https://www-static-demo.appaloft.app/",
+        routeProviderKey: "cloud-static-artifact-route",
+        fileCount: 3,
+        totalBytes: 2048,
+        publishedAt: "2026-01-01T00:00:04.000Z",
+      },
+    ]);
+    const { service, staticArtifactPublicationReadModel } = createService(
+      resourceSummary({
+        destinationId: undefined,
+        networkProfile: undefined,
+        deploymentCount: 0,
+      }),
+      new CapturingDefaultAccessDomainProvider(),
+      publications,
+    );
+
+    const result = await service.execute(
+      createExecutionContext({
+        requestId: "req_list_resources_static_artifact_access_test",
+        entrypoint: "system",
+      }),
+    );
+
+    expect(result.items[0]?.accessSummary?.latestStaticArtifactRoute).toEqual({
+      url: "https://www-static-demo.appaloft.app/",
+      hostname: "www-static-demo.appaloft.app",
+      scheme: "https",
+      providerKey: "cloud-static-artifact-route",
+      publicationId: "pub_static_current",
+      artifactId: "artifact_static_current",
+      pathPrefix: "/",
+      fileCount: 3,
+      totalBytes: 2048,
+      updatedAt: "2026-01-01T00:00:04.000Z",
+    });
+    expect(staticArtifactPublicationReadModel?.calls).toEqual([
+      {
+        projectId: "prj_demo",
+        resourceId: "res_web",
+        limit: 1,
+      },
+    ]);
   });
 });

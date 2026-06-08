@@ -4109,8 +4109,8 @@ describe("CreateDeploymentUseCase", () => {
     );
     expect(deployment?.toState().projectId.value).toBe("prj_0001");
     expect(deployment?.toState().environmentId.value).toBe("env_0002");
-    expect(deployment?.toState().serverId.value).toBe("srv_0003");
-    expect(deployment?.toState().destinationId.value).toBe("dst_0004");
+    expect(deployment?.toState().serverId?.value).toBe("srv_0003");
+    expect(deployment?.toState().destinationId?.value).toBe("dst_0004");
     expect(deployment?.toState().resourceId.value).toBe("res_0005");
     expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("local-shell");
     expect([...environments.items.values()][0]?.toState().name.value).toBe("local");
@@ -4283,8 +4283,8 @@ describe("CreateDeploymentUseCase", () => {
     );
     expect(deployment?.toState().projectId.value).toBe("prj_0001");
     expect(deployment?.toState().environmentId.value).toBe("env_0002");
-    expect(deployment?.toState().serverId.value).toBe("srv_0003");
-    expect(deployment?.toState().destinationId.value).toBe("dst_0004");
+    expect(deployment?.toState().serverId?.value).toBe("srv_0003");
+    expect(deployment?.toState().destinationId?.value).toBe("dst_0004");
     expect(deployment?.toState().resourceId.value).toBe("res_0005");
   });
 

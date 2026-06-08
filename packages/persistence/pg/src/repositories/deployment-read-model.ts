@@ -108,14 +108,14 @@ function toDeploymentSummary(
     []) as unknown as SerializedDeploymentDependencyBindingReference[];
   const logs = (row.logs ?? []) as unknown as SerializedDeploymentLog[];
   const sourceCommitSha = sourceCommitShaFromRuntimePlan(runtimePlan);
+  const target = deploymentSummaryTargetFromRow(row);
 
-  return {
+  const summaryBase = {
     id: row.id,
     projectId: row.project_id,
     environmentId: row.environment_id,
     resourceId: row.resource_id,
-    serverId: row.server_id,
-    destinationId: row.destination_id,
+    target,
     status: row.status as Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"],
     triggerKind: row.trigger_kind as NonNullable<
       Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["triggerKind"]
@@ -289,6 +289,51 @@ function toDeploymentSummary(
     ...(row.rollback_candidate_deployment_id
       ? { rollbackCandidateDeploymentId: row.rollback_candidate_deployment_id }
       : {}),
+  };
+
+  if (target.kind === "server-backed") {
+    return {
+      ...summaryBase,
+      target,
+      serverId: target.serverId,
+      destinationId: target.destinationId,
+    };
+  }
+
+  return {
+    ...summaryBase,
+    target,
+  };
+}
+
+function deploymentSummaryTargetFromRow(
+  row: Selectable<Database["deployments"]>,
+): Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["target"] {
+  if (row.target_kind === "serverless-static-artifact") {
+    if (
+      !row.static_artifact_publication_id ||
+      !row.static_artifact_id ||
+      !row.static_artifact_route_url
+    ) {
+      throw new Error(`Deployment ${row.id} is missing serverless static artifact target fields`);
+    }
+
+    return {
+      kind: "serverless-static-artifact",
+      publicationId: row.static_artifact_publication_id,
+      artifactId: row.static_artifact_id,
+      routeUrl: row.static_artifact_route_url,
+    };
+  }
+
+  if (!row.server_id || !row.destination_id) {
+    throw new Error(`Deployment ${row.id} is missing server-backed target fields`);
+  }
+
+  return {
+    kind: "server-backed",
+    serverId: row.server_id,
+    destinationId: row.destination_id,
   };
 }
 

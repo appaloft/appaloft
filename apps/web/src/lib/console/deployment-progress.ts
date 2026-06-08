@@ -99,6 +99,10 @@ export function groupDeploymentProgressEvents(
 }
 
 export function deploymentCanRedeploy(deployment: DeploymentSummary): boolean {
+  if (deployment.target.kind !== "server-backed") {
+    return false;
+  }
+
   return (
     deployment.status === "succeeded" ||
     deployment.status === "failed" ||
@@ -660,6 +664,14 @@ function deploymentEventStatus(
 }
 
 export function redeployInputFromDeployment(deployment: DeploymentSummary): CreateDeploymentInput {
+  if (
+    deployment.target.kind !== "server-backed" ||
+    !deployment.serverId ||
+    !deployment.destinationId
+  ) {
+    throw new Error("Redeploy requires a server-backed deployment target");
+  }
+
   return {
     projectId: deployment.projectId,
     serverId: deployment.serverId,

@@ -24,6 +24,7 @@ import {
   type ServerAppliedRouteStateRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { isServerBackedDeploymentState } from "./deployment-target-guards";
 
 const serverAppliedRouteSource = "server-applied-config-domain";
 const serverAppliedRouteFailurePhases = [
@@ -84,6 +85,9 @@ export class MarkServerAppliedRouteStatusOnDeploymentFinishedHandler
       }
 
       const state = deployment.toState();
+      if (!isServerBackedDeploymentState(state)) {
+        return ok(undefined);
+      }
       const metadata = state.runtimePlan.execution.metadata ?? {};
       if (metadata["access.routeSource"] !== serverAppliedRouteSource) {
         return ok(undefined);

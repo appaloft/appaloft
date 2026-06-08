@@ -63,6 +63,10 @@ import {
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import {
+  requireServerBackedDeploymentState,
+  requireServerBackedDeploymentStateFromState,
+} from "./deployment-target";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 import {
   RuntimeCommandBuilder,
@@ -377,6 +381,10 @@ function previewSourceFingerprintFromMetadata(
 }
 
 function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: DeploymentState): string {
+  const serverBackedState = requireServerBackedDeploymentStateFromState(
+    state,
+    "ssh preview artifact marker",
+  );
   const metadata = state.runtimePlan.execution.metadata ?? {};
   const sourceFingerprint = previewSourceFingerprintFromMetadata(metadata);
   if (!sourceFingerprint) {
@@ -390,8 +398,8 @@ function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: Deploymen
     projectId: state.projectId.value,
     environmentId: state.environmentId.value,
     resourceId: state.resourceId.value,
-    serverId: state.serverId.value,
-    destinationId: state.destinationId.value,
+    serverId: serverBackedState.serverId.value,
+    destinationId: serverBackedState.destinationId.value,
     previewId: metadata["preview.id"],
     previewNumber: metadata["preview.number"],
     previewMode: metadata["preview.mode"],
@@ -979,7 +987,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       logs: input.logs,
       errorCode: input.errorCode,
       ...(input.metadata ? { metadata: input.metadata } : {}),
-      serverId: deployment.toState().serverId.value,
+      serverId: requireServerBackedDeploymentState(
+        deployment,
+        "ssh execution capacity-aware failure fields",
+      ).serverId.value,
     });
     deployment.applyExecutionResult(
       FinishedAt.rehydrate(new Date().toISOString()),

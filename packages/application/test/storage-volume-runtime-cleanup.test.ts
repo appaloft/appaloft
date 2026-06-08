@@ -175,6 +175,11 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
     logs: [],
     logCount: 0,
     ...overrides,
+    target: {
+      kind: "server-backed",
+      serverId: overrides.serverId ?? "srv_primary",
+      destinationId: overrides.destinationId ?? "dst_demo",
+    },
   };
 }
 

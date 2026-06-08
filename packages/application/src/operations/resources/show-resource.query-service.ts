@@ -300,8 +300,8 @@ function deploymentContextFromSummary(
     createdAt: deployment.createdAt,
     ...(deployment.startedAt ? { startedAt: deployment.startedAt } : {}),
     ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt } : {}),
-    serverId: deployment.serverId,
-    destinationId: deployment.destinationId,
+    ...(deployment.serverId ? { serverId: deployment.serverId } : {}),
+    ...(deployment.destinationId ? { destinationId: deployment.destinationId } : {}),
   };
 }
 

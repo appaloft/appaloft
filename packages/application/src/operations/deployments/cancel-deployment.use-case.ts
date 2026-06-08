@@ -25,6 +25,7 @@ import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CancelDeploymentCommandInput } from "./cancel-deployment.command";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { deploymentResourceRuntimeScopeForIds } from "./deployment-mutation-scopes";
+import { requireServerBackedDeploymentState } from "./deployment-target-guards";
 
 export interface CancelDeploymentResult {
   id: string;
@@ -88,6 +89,13 @@ export class CancelDeploymentUseCase {
     }
 
     const sourceState = sourceDeployment.toState();
+    const sourceServerBacked = requireServerBackedDeploymentState(
+      sourceDeployment,
+      "deployments.cancel",
+    );
+    if (sourceServerBacked.isErr()) {
+      return err(sourceServerBacked.error);
+    }
     if (input.resourceId && input.resourceId !== sourceState.resourceId.value) {
       return err(
         domainError.resourceContextMismatch(
@@ -111,8 +119,8 @@ export class CancelDeploymentUseCase {
       policy: mutationCoordinationPolicies.cancelDeployment,
       scope: deploymentResourceRuntimeScopeForIds({
         resourceId: sourceState.resourceId.value,
-        serverId: sourceState.serverId.value,
-        destinationId: sourceState.destinationId.value,
+        serverId: sourceServerBacked.value.serverId.value,
+        destinationId: sourceServerBacked.value.destinationId.value,
       }),
       owner: createCoordinationOwner(context, "deployments.cancel"),
       work: async () =>

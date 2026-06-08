@@ -3,6 +3,7 @@ import { type ResourceSummary } from "@appaloft/contracts";
 export type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
 export type CurrentResourceAccessRouteKind =
   | "durable-domain"
+  | "static-artifact"
   | "server-applied-domain"
   | "generated-latest"
   | "generated-planned";
@@ -10,6 +11,10 @@ export type CurrentResourceAccessRoute =
   | {
       kind: "durable-domain";
       route: NonNullable<ResourceAccessSummary["latestDurableDomainRoute"]>;
+    }
+  | {
+      kind: "static-artifact";
+      route: NonNullable<ResourceAccessSummary["latestStaticArtifactRoute"]>;
     }
   | {
       kind: "server-applied-domain";
@@ -35,6 +40,13 @@ export function selectCurrentResourceAccessRoute(
     return {
       kind: "durable-domain",
       route: accessSummary.latestDurableDomainRoute,
+    };
+  }
+
+  if (accessSummary.latestStaticArtifactRoute) {
+    return {
+      kind: "static-artifact",
+      route: accessSummary.latestStaticArtifactRoute,
     };
   }
 

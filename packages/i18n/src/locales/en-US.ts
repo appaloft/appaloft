@@ -1688,6 +1688,7 @@ export const enUS = {
         "External resources keep project ownership and access context without a Appaloft runtime.",
       externalProfileTitle: "External resource",
       generatedAccessRoute: "Generated default access",
+      staticArtifactAccessRoute: "Static artifact access",
       healthChecks: "Health checks",
       healthDescription:
         "Health policy defines application-level probes. When it is not configured, only runtime state is shown.",

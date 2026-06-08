@@ -1,5 +1,7 @@
 import { type DeploymentState } from "@appaloft/core";
 
+import { requireServerBackedDeploymentStateFromState } from "./deployment-target";
+
 const dockerLabelValueLimit = 512;
 
 export interface DockerContainerIdentity {
@@ -159,6 +161,10 @@ export function appaloftDockerContainerLabels(identity: DockerContainerIdentity)
 export function appaloftDockerContainerLabelsForDeployment(
   state: DeploymentState,
 ): string[] {
+  const serverBackedState = requireServerBackedDeploymentStateFromState(
+    state,
+    "docker container labels",
+  );
   const runtimePlan = state.runtimePlan;
   const source = runtimePlan.source;
   const sourceInspection = source.inspection;
@@ -179,11 +185,11 @@ export function appaloftDockerContainerLabelsForDeployment(
     resourceName: metadata["context.resourceName"],
     resourceSlug: metadata["context.resourceSlug"] ?? metadata["resource.slug"],
     resourceKind: metadata["context.resourceKind"],
-    serverId: state.serverId.value,
+    serverId: serverBackedState.serverId.value,
     serverName: metadata["context.serverName"],
     serverProvider: metadata["context.serverProviderKey"] ?? target.providerKey,
     targetKind: metadata["context.serverTargetKind"] ?? target.kind,
-    destinationId: state.destinationId.value,
+    destinationId: serverBackedState.destinationId.value,
     destinationName: metadata["context.destinationName"],
     destinationKind: metadata["context.destinationKind"],
     executionKind: execution.kind,

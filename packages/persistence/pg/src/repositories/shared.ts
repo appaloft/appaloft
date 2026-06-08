@@ -52,6 +52,7 @@ import {
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   DeploymentTargetUsername,
+  DeploymentTargetVariant,
   DeploymentTriggerKindValue,
   DescriptionText,
   DestinationId,
@@ -180,6 +181,9 @@ import {
   SshPrivateKeyText,
   SshPublicKeyText,
   StartedAt,
+  StaticArtifactId,
+  StaticArtifactPublicationId,
+  StaticArtifactRouteUrl,
   StaticPublishDirectory,
   StorageBindSourcePath,
   StorageDestinationPath,
@@ -1784,17 +1788,46 @@ export function rehydrateResourceRow(
   };
 }
 
+function rehydrateDeploymentTargetVariant(
+  row: Selectable<Database["deployments"]>,
+): DeploymentTargetVariant {
+  if (row.target_kind === "serverless-static-artifact") {
+    if (
+      !row.static_artifact_publication_id ||
+      !row.static_artifact_id ||
+      !row.static_artifact_route_url
+    ) {
+      throw new Error(`Deployment ${row.id} is missing serverless static artifact target fields`);
+    }
+
+    return DeploymentTargetVariant.serverlessStaticArtifact({
+      publicationId: StaticArtifactPublicationId.rehydrate(row.static_artifact_publication_id),
+      artifactId: StaticArtifactId.rehydrate(row.static_artifact_id),
+      routeUrl: StaticArtifactRouteUrl.rehydrate(row.static_artifact_route_url),
+    });
+  }
+
+  if (!row.server_id || !row.destination_id) {
+    throw new Error(`Deployment ${row.id} is missing server-backed target fields`);
+  }
+
+  return DeploymentTargetVariant.serverBacked({
+    serverId: DeploymentTargetId.rehydrate(row.server_id),
+    destinationId: DestinationId.rehydrate(row.destination_id),
+  });
+}
+
 export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>) {
   const startedAt = normalizeTimestamp(row.started_at);
   const finishedAt = normalizeTimestamp(row.finished_at);
+  const target = rehydrateDeploymentTargetVariant(row);
 
   return {
     id: DeploymentId.rehydrate(row.id),
     projectId: ProjectId.rehydrate(row.project_id),
     environmentId: EnvironmentId.rehydrate(row.environment_id),
     resourceId: ResourceId.rehydrate(row.resource_id),
-    serverId: DeploymentTargetId.rehydrate(row.server_id),
-    destinationId: DestinationId.rehydrate(row.destination_id),
+    target,
     status: DeploymentStatusValue.rehydrate(row.status as DeploymentStatusInput),
     runtimePlan: rehydrateRuntimePlan(row.runtime_plan),
     environmentSnapshot: rehydrateEnvironmentSnapshot(row.environment_snapshot),

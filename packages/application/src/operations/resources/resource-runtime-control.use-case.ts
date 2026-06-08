@@ -33,6 +33,7 @@ import {
 import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { deploymentResourceRuntimeScopeForIds } from "../deployments/deployment-mutation-scopes";
+import { isServerBackedDeploymentSummary } from "../deployments/deployment-target-guards";
 
 type ResourceRuntimeControlInput = {
   operation: ResourceRuntimeControlOperation;
@@ -264,7 +265,7 @@ async function recordRuntimeControlProcessAttempt(input: {
     step: `${input.attempt.operation}-${input.attempt.status}`,
     resourceId: input.attempt.resourceId,
     ...(input.attempt.deploymentId ? { deploymentId: input.attempt.deploymentId } : {}),
-    serverId: input.attempt.serverId,
+    ...(input.attempt.serverId ? { serverId: input.attempt.serverId } : {}),
     startedAt: input.attempt.startedAt,
     updatedAt: input.attempt.completedAt ?? input.attempt.startedAt,
     ...(input.attempt.completedAt ? { finishedAt: input.attempt.completedAt } : {}),
@@ -364,6 +365,16 @@ export class ResourceRuntimeControlUseCase {
         ResourceByIdSpec.create(resourceId),
       );
       const deployment = yield* await useCase.resolveDeployment(context, input, resourceSummary);
+      if (!isServerBackedDeploymentSummary(deployment)) {
+        return err(
+          blockedError({
+            message: "Resource runtime control requires a server-backed deployment",
+            resourceId: input.resourceId,
+            operation: input.operation,
+            blockedReason: "runtime-control-target-unsupported",
+          }),
+        );
+      }
       const runtimeState = inferRuntimeState(resourceSummary, deployment);
 
       const latestRuntimeControl = resourceSummary?.latestRuntimeControl;

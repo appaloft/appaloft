@@ -328,8 +328,12 @@ export interface DeploymentsTable {
   project_id: string;
   environment_id: string;
   resource_id: string;
-  server_id: string;
-  destination_id: string;
+  target_kind: ColumnType<string, string | undefined, string>;
+  server_id: string | null;
+  destination_id: string | null;
+  static_artifact_publication_id: string | null;
+  static_artifact_id: string | null;
+  static_artifact_route_url: string | null;
   status: string;
   runtime_plan: ColumnType<
     Record<string, unknown>,

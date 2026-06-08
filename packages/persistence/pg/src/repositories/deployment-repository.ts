@@ -87,14 +87,22 @@ class KyselyDeploymentMutationVisitor
     }>
 {
   visitUpsertDeployment(spec: UpsertDeploymentSpec) {
+    const target = spec.state.target.toState();
     return {
       values: {
         id: spec.state.id.value,
         project_id: spec.state.projectId.value,
         environment_id: spec.state.environmentId.value,
         resource_id: spec.state.resourceId.value,
-        server_id: spec.state.serverId.value,
-        destination_id: spec.state.destinationId.value,
+        target_kind: target.kind,
+        server_id: target.kind === "server-backed" ? target.serverId.value : null,
+        destination_id: target.kind === "server-backed" ? target.destinationId.value : null,
+        static_artifact_publication_id:
+          target.kind === "serverless-static-artifact" ? target.publicationId.value : null,
+        static_artifact_id:
+          target.kind === "serverless-static-artifact" ? target.artifactId.value : null,
+        static_artifact_route_url:
+          target.kind === "serverless-static-artifact" ? target.routeUrl.value : null,
         status: spec.state.status.value,
         runtime_plan: serializeRuntimePlan(spec.state.runtimePlan),
         environment_snapshot: serializeEnvironmentSnapshot(spec.state.environmentSnapshot),
@@ -212,8 +220,13 @@ export class PgDeploymentRepository implements DeploymentRepository {
             .updateTable("deployments")
             .set({
               resource_id: mutation.values.resource_id,
+              target_kind: mutation.values.target_kind,
               server_id: mutation.values.server_id,
               destination_id: mutation.values.destination_id,
+              static_artifact_publication_id:
+                mutation.values.static_artifact_publication_id ?? null,
+              static_artifact_id: mutation.values.static_artifact_id ?? null,
+              static_artifact_route_url: mutation.values.static_artifact_route_url ?? null,
               status: mutation.values.status,
               runtime_plan: mutation.values.runtime_plan as unknown as Record<string, unknown>,
               environment_snapshot: mutation.values.environment_snapshot as unknown as Record<

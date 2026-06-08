@@ -31,6 +31,10 @@ import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { deploymentResourceRuntimeScopeForIds } from "./deployment-mutation-scopes";
+import {
+  isServerBackedDeploymentState,
+  requireServerBackedDeploymentState,
+} from "./deployment-target-guards";
 import { type RollbackDeploymentCommandInput } from "./rollback-deployment.command";
 
 function recoveryStateTimestamp(state: DeploymentState): string {
@@ -95,6 +99,13 @@ function isCompatibleRollbackCandidate(input: {
   source: DeploymentState;
   candidate: DeploymentState;
 }): boolean {
+  if (
+    !isServerBackedDeploymentState(input.source) ||
+    !isServerBackedDeploymentState(input.candidate)
+  ) {
+    return false;
+  }
+
   return (
     input.source.resourceId.value === input.candidate.resourceId.value &&
     input.source.projectId.value === input.candidate.projectId.value &&
@@ -114,7 +125,10 @@ async function recordRollbackDeploymentProcessAttempt(input: {
   context: ExecutionContext;
   deployment: Deployment;
 }): Promise<void> {
-  const state = input.deployment.toState();
+  const state = requireServerBackedDeploymentState(
+    input.deployment,
+    "deployments.rollback",
+  )._unsafeUnwrap();
   const runtimePlan = state.runtimePlan;
   const runtimePlanState = runtimePlan.toState();
   const execution = runtimePlan.execution;
@@ -227,6 +241,10 @@ export class RollbackDeploymentUseCase {
       }
 
       const sourceState = sourceDeployment.toState();
+      const sourceServerBacked = yield* requireServerBackedDeploymentState(
+        sourceDeployment,
+        "deployments.rollback",
+      );
       if (input.resourceId && input.resourceId !== sourceState.resourceId.value) {
         return err(
           domainError.resourceContextMismatch(
@@ -321,8 +339,8 @@ export class RollbackDeploymentUseCase {
         policy: mutationCoordinationPolicies.rollbackDeployment,
         scope: deploymentResourceRuntimeScopeForIds({
           resourceId: sourceState.resourceId.value,
-          serverId: sourceState.serverId.value,
-          destinationId: sourceState.destinationId.value,
+          serverId: sourceServerBacked.serverId.value,
+          destinationId: sourceServerBacked.destinationId.value,
         }),
         owner: createCoordinationOwner(context, "deployments.rollback"),
         work: async () =>

@@ -1605,6 +1605,7 @@ export const zhCN = {
       externalProfileDescription: "外部资源只保留项目关系和访问上下文，不由 Appaloft 执行运行时。",
       externalProfileTitle: "外部资源",
       generatedAccessRoute: "默认生成访问",
+      staticArtifactAccessRoute: "静态产物访问",
       healthChecks: "健康检查",
       healthDescription: "健康策略用于定义应用级探测；未配置时只显示运行时状态。",
       healthLatestDeployment: "最新部署",
