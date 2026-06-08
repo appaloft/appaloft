@@ -65,9 +65,10 @@ describe("RuntimeServerRuntimePreparer", () => {
     ]);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("ssh");
-    expect(calls[0]?.timeoutMs).toBe(300_000);
+    expect(calls[0]?.timeoutMs).toBe(900_000);
     expect(calls[0]?.args.join(" ")).toContain("docker version");
-    expect(calls[0]?.args.join(" ")).toContain("apt-get install -y docker-ce");
+    expect(calls[0]?.args.join(" ")).toContain("APPALOFT_DOCKER_PREPARE apt-bootstrap");
+    expect(calls[0]?.args.join(" ")).toContain("install -y docker-ce");
   });
 
   test("marks unsupported providers as failed instead of pretending readiness", async () => {

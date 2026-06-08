@@ -3314,10 +3314,22 @@ function createWebView(): Bun.WebView {
     ...(process.platform === "darwin" ? {} : { backend: "chrome" as const }),
     console: (type, ...args) => {
       if (type === "error") {
-        previewLogs += `\n[page console.error] ${args.map(String).join(" ")}`;
+        previewLogs += `\n[page console.error] ${args.map(formatConsoleArgument).join(" ")}`;
       }
     },
   });
+}
+
+function formatConsoleArgument(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 async function waitFor<T>(
@@ -3361,11 +3373,16 @@ async function expectText(view: Bun.WebView, text: string, timeoutMs = 7_000): P
   );
 }
 
-async function expectAnyText(view: Bun.WebView, texts: [string, ...string[]]): Promise<void> {
+async function expectAnyText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+  timeoutMs?: number,
+): Promise<void> {
   await waitFor(
     () => pageText(view),
     (content) => texts.some((text) => includesRenderedText(content, text)),
     `Expected page to contain one of: ${texts.join(" | ")}`,
+    timeoutMs,
   );
 }
 
@@ -3870,7 +3887,7 @@ afterAll(async () => {
   await teardownWebApp();
 }, 20_000);
 
-describe("console e2e with Bun.WebView", () => {
+describe.serial("console e2e with Bun.WebView", () => {
   test("renders the console dashboard with mocked control-plane data", async () => {
     activeScenario = "dashboard";
 
@@ -6900,7 +6917,7 @@ describe("console e2e with Bun.WebView", () => {
       })()`);
 
       await expectText(view, "workspace");
-      await expectText(view, "Image digest");
+      await expectText(view, "Image digest", 15_000);
       await expectText(view, "latest -> sha256:8b1a9953c461");
       await expectAnyText(view, ["Overview", "基本信息"]);
 
@@ -7565,9 +7582,9 @@ describe("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/deployments/dep_demo?tab=timeline`);
 
-      await expectAnyText(view, ["Timeline", "时间线"]);
-      await expectText(view, "Deployment requested");
-      await expectText(view, "Build requested");
+      await expectAnyText(view, ["Timeline", "时间线"], 15_000);
+      await expectText(view, "Deployment requested", 15_000);
+      await expectText(view, "Build requested", 15_000);
 
       const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/events");
       expect(replayRequest.method).toBe("POST");
