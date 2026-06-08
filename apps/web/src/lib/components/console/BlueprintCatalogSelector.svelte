@@ -4,6 +4,7 @@
   import {
     BlueprintMarketplacePage,
     type BlueprintMarketplaceListing,
+    type BlueprintMarketplaceSurface,
   } from "@appaloft/blueprint-marketplace-web";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
@@ -15,7 +16,7 @@
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
 
-  type CatalogSurface = "page" | "dialog";
+  type CatalogSurface = Extract<BlueprintMarketplaceSurface, "page" | "dialog">;
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
   };
@@ -69,6 +70,13 @@
       findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
   );
   const catalogMetadata = $derived(readBlueprintCatalogExtensionMetadata(catalogExtension));
+  const marketplaceSurface: BlueprintMarketplaceSurface = $derived(
+    surface === "dialog"
+      ? "dialog"
+      : page.url.searchParams.get("surface") === "quick-deploy"
+        ? "quick-deploy"
+        : "page",
+  );
 </script>
 
 <div
@@ -81,6 +89,7 @@
     subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"
     badgeLabel="蓝图目录"
     loading={webExtensionsQuery.isPending}
+    surface={marketplaceSurface}
     listEndpoint={catalogMetadata?.listEndpoint ?? ""}
     selectedSlug={selectedSlug}
     primaryAction={onselect ? "select" : "detail"}

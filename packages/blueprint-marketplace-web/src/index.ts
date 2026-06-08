@@ -9,6 +9,7 @@ export type {
   BlueprintMarketplaceListing,
   BlueprintMarketplaceListResponse,
   BlueprintMarketplacePrimaryAction,
+  BlueprintMarketplaceSurface,
 } from "./types";
 export {
   createBlueprintDeployHandoffUrl,
