@@ -55,11 +55,29 @@ case "$ID" in
     exit 44
     ;;
 esac
-$SUDO apt-get update
-$SUDO apt-get install -y ca-certificates curl gnupg
+export DEBIAN_FRONTEND=noninteractive
+apt_run() {
+  attempt=1
+  while true; do
+    "$@" && return 0
+    status="$?"
+    if [ "$attempt" -ge 5 ]; then
+      return "$status"
+    fi
+    printf 'APPALOFT_APT_RETRY attempt:%s status:%s command:%s\n' "$attempt" "$status" "$*" >&2
+    $SUDO dpkg --configure -a || true
+    sleep "$((attempt * 5))"
+    attempt="$((attempt + 1))"
+  done
+}
+printf 'APPALOFT_DOCKER_PREPARE apt-bootstrap\n'
+apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 update
+apt_run $SUDO dpkg --configure -a
+apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 install -y ca-certificates curl gnupg
 $SUDO install -m 0755 -d /etc/apt/keyrings
-if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
-  curl -fsSL "https://download.docker.com/linux/$ID/gpg" | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+if [ ! -s /etc/apt/keyrings/docker.gpg ]; then
+  $SUDO rm -f /etc/apt/keyrings/docker.gpg
+  curl -fsSL "https://download.docker.com/linux/$ID/gpg" | $SUDO gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
 fi
 $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
 ARCH="$(dpkg --print-architecture)"
@@ -71,9 +89,11 @@ if [ -z "$CODENAME" ]; then
   printf 'APPALOFT_DOCKER_UNSUPPORTED codename\n' >&2
   exit 45
 fi
+printf 'APPALOFT_DOCKER_PREPARE docker-repository %s %s %s\n' "$ID" "$CODENAME" "$ARCH"
 printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/%s %s stable\n' "$ARCH" "$ID" "$CODENAME" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
-$SUDO apt-get update
-$SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 update
+printf 'APPALOFT_DOCKER_PREPARE docker-packages\n'
+apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 if command -v systemctl >/dev/null 2>&1; then
   $SUDO systemctl enable --now docker || true
 fi
@@ -87,7 +107,9 @@ function hostWithUsername(host: string, username?: string): string {
 
 function trimOutput(stdout: string | undefined, stderr: string | undefined): string {
   const output = `${String(stdout ?? "")}\n${String(stderr ?? "")}`.trim();
-  return output.length > 0 ? output.slice(0, 720) : "";
+  if (output.length === 0) return "";
+  if (output.length <= 4_000) return output;
+  return `${output.slice(0, 1_600)}\n...APPALOFT_OUTPUT_TRUNCATED...\n${output.slice(-2_000)}`;
 }
 
 function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): PreparedSshArgs {
@@ -242,7 +264,7 @@ export class RuntimeServerRuntimePreparer implements ServerRuntimePreparer {
     const prepared = prepareSshArgs(server, remoteDockerPrepareCommand);
     const startedAt = Date.now();
     try {
-      const result = await this.commandRunner("ssh", prepared.args, 300_000);
+      const result = await this.commandRunner("ssh", prepared.args, 900_000);
       return ok({
         serverId: server.id.value,
         steps: [
