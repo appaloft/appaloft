@@ -38,6 +38,11 @@ describe("Blueprint marketplace web URLs", () => {
     ]);
 
     expect(pageSource).toContain("BlueprintMarketplaceCard");
+    expect(pageSource).toContain("readonly surface?: BlueprintMarketplaceSurface");
+    expect(pageSource).toContain("data-marketplace-surface={surface}");
+    expect(pageSource).toContain(".marketplace-controls");
+    expect(pageSource).toContain('data-marketplace-surface="dialog"');
+    expect(pageSource).toContain('data-marketplace-surface="quick-deploy"');
     expect(pageSource).toContain("isBlueprintRegistryListResponse(value)");
     expect(pageSource).toContain("registryEntryToListing");
     expect(pageSource).not.toContain('name: "Appaloft"');
