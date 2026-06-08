@@ -5986,8 +5986,8 @@
                         class={[
                           "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
                           activeSettingsSection === section
-                            ? "border-border bg-muted/60 text-foreground shadow-xs"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                            ? "border-primary/40 bg-primary/5 text-foreground shadow-xs"
+                            : "bg-card text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground",
                         ]}
                         onclick={(event) => selectResourceSettingsSection(section, event)}
                       >

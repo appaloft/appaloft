@@ -831,7 +831,7 @@
                     "rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     provisioningMode === mode
                       ? "border-primary bg-primary/5 text-foreground shadow-sm"
-                      : "border-border bg-background text-foreground hover:bg-muted/50",
+                      : "border-border bg-card text-foreground hover:border-primary/25 hover:bg-primary/5",
                   ]}
                   aria-pressed={provisioningMode === mode}
                   onclick={() => selectProvisioningMode(mode)}
@@ -984,7 +984,7 @@
                     "flex min-h-20 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     createKind === dependencyKind
                       ? "border-primary bg-primary/5 text-foreground shadow-sm"
-                      : "border-border bg-background text-foreground hover:bg-muted/50",
+                      : "border-border bg-card text-foreground hover:border-primary/25 hover:bg-primary/5",
                   ]}
                   aria-pressed={createKind === dependencyKind}
                   onclick={() => selectDependencyKind(dependencyKind)}

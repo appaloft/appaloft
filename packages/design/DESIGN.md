@@ -116,6 +116,10 @@ area uses one named surface:
   owner surface.
 - `console-side-panel`: secondary owner-side context such as environment or public access summaries.
 - `console-record-list` and `console-record-row`: repeated operational records.
+- Selectable object choices such as repositories, projects, servers, environments, and credentials
+  use Tailwind utilities at the consuming component: white `bg-card` row surface, soft Appaloft blue
+  `hover:bg-primary/5`, and blue border/tint selected state. Do not use failure red, pink, rose, or
+  destructive tints for normal selectable rows.
 - `console-metric-strip`: compact related counters.
 - danger surface: destructive action plus readiness or blocker evidence.
 
