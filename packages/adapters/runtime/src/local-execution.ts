@@ -57,6 +57,7 @@ import {
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import { requireServerBackedDeploymentState } from "./deployment-target";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 import {
   RuntimeCommandBuilder,
@@ -680,7 +681,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       logs: input.logs,
       errorCode: input.errorCode,
       ...(input.metadata ? { metadata: input.metadata } : {}),
-      serverId: deployment.toState().serverId.value,
+      serverId: requireServerBackedDeploymentState(
+        deployment,
+        "local execution capacity-aware failure fields",
+      ).serverId.value,
     });
     deployment.applyExecutionResult(
       FinishedAt.rehydrate(new Date().toISOString()),

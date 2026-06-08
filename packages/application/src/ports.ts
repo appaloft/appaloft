@@ -2653,7 +2653,7 @@ export interface ResourceSummary {
   id: string;
   projectId: string;
   environmentId: string;
-  destinationId?: string;
+  destinationId?: string | undefined;
   name: string;
   slug: string;
   kind: ResourceKind;
@@ -2663,13 +2663,15 @@ export interface ResourceSummary {
     name: string;
     kind: ResourceServiceKind;
   }>;
-  networkProfile?: {
-    internalPort: number;
-    upstreamProtocol: ResourceNetworkProtocol;
-    exposureMode: ResourceExposureMode;
-    targetServiceName?: string;
-    hostPort?: number;
-  };
+  networkProfile?:
+    | {
+        internalPort: number;
+        upstreamProtocol: ResourceNetworkProtocol;
+        exposureMode: ResourceExposureMode;
+        targetServiceName?: string;
+        hostPort?: number;
+      }
+    | undefined;
   accessProfile?: ResourceAccessProfile;
   deploymentCount: number;
   lastDeploymentId?: string;
@@ -2701,6 +2703,20 @@ export interface ResourceAccessRouteSummary {
   updatedAt: string;
 }
 
+export interface ResourceStaticArtifactAccessRouteSummary {
+  url: string;
+  hostname: string;
+  scheme: "http" | "https";
+  providerKey?: string;
+  targetPort?: number;
+  publicationId: string;
+  artifactId: string;
+  pathPrefix: string;
+  fileCount: number;
+  totalBytes: number;
+  updatedAt?: string;
+}
+
 export interface PlannedResourceAccessRouteSummary {
   url: string;
   hostname: string;
@@ -2716,6 +2732,7 @@ export interface ResourceAccessSummary {
   latestGeneratedAccessRoute?: ResourceAccessRouteSummary;
   latestDurableDomainRoute?: ResourceAccessRouteSummary;
   latestServerAppliedDomainRoute?: ResourceAccessRouteSummary;
+  latestStaticArtifactRoute?: ResourceStaticArtifactAccessRouteSummary;
   proxyRouteStatus?: "unknown" | "ready" | "not-ready" | "failed";
   lastRouteRealizationDeploymentId?: string;
   latestAccessFailureDiagnostic?: ResourceAccessFailureDiagnostic;
@@ -3139,8 +3156,8 @@ export interface ResourceDetailDeploymentContext {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
 }
 
 export interface ResourceDetailLifecycle {
@@ -3774,8 +3791,8 @@ export interface ResourceHealthDeploymentContext {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
   lastError?: {
     timestamp: string;
     phase: DeploymentLogSummary["phase"];
@@ -3865,7 +3882,8 @@ export type ResourceRuntimeControlBlockedReason =
   | "runtime-control-in-progress"
   | "deployment-in-progress"
   | "profile-acknowledgement-required"
-  | "adapter-unsupported";
+  | "adapter-unsupported"
+  | "runtime-control-target-unsupported";
 
 export interface ResourceRuntimeControlPhaseSummary {
   phase: "stop" | "start";
@@ -3891,8 +3909,8 @@ export interface ResourceRuntimeControlCommandResult extends ResourceRuntimeCont
 }
 
 export interface ResourceRuntimeControlAttemptRecord extends ResourceRuntimeControlCommandResult {
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
   reason?: string;
   idempotencyKey?: string;
 }
@@ -3928,8 +3946,8 @@ export interface ResourceRuntimeControlTargetRequest {
   operation: ResourceRuntimeControlOperation;
   resourceId: string;
   deploymentId: string;
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
   runtimeKind: ExecutionStrategyKind;
   targetKind: TargetKind;
   providerKey: string;
@@ -4448,8 +4466,8 @@ export interface ResourceDiagnosticDeployment {
   runtimePlanId: string;
   sourceKind: SourceKind;
   sourceDisplayName: string;
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
@@ -4590,13 +4608,29 @@ export interface EnvironmentDiffSummary {
   };
 }
 
-export interface DeploymentSummary {
+export interface ServerBackedDeploymentSummaryTarget {
+  kind: "server-backed";
+  serverId: string;
+  destinationId: string;
+}
+
+export interface ServerlessStaticArtifactDeploymentSummaryTarget {
+  kind: "serverless-static-artifact";
+  publicationId: string;
+  artifactId: string;
+  routeUrl: string;
+}
+
+export type DeploymentSummaryTarget =
+  | ServerBackedDeploymentSummaryTarget
+  | ServerlessStaticArtifactDeploymentSummaryTarget;
+
+export interface BaseDeploymentSummary {
   id: string;
   projectId: string;
   environmentId: string;
   resourceId: string;
-  serverId: string;
-  destinationId: string;
+  target: DeploymentSummaryTarget;
   status: DeploymentStatus;
   triggerKind?: DeploymentTriggerKind;
   sourceDeploymentId?: string;
@@ -4816,6 +4850,22 @@ export interface DeploymentSummary {
   rollbackOfDeploymentId?: string;
   logCount: number;
 }
+
+export type ServerBackedDeploymentSummary = BaseDeploymentSummary & {
+  target: ServerBackedDeploymentSummaryTarget;
+  serverId: string;
+  destinationId: string;
+};
+
+export type ServerlessStaticArtifactDeploymentSummary = BaseDeploymentSummary & {
+  target: ServerlessStaticArtifactDeploymentSummaryTarget;
+  serverId?: never;
+  destinationId?: never;
+};
+
+export type DeploymentSummary =
+  | ServerBackedDeploymentSummary
+  | ServerlessStaticArtifactDeploymentSummary;
 
 export type DeploymentDetailSummary = Omit<DeploymentSummary, "logs">;
 
@@ -5107,8 +5157,8 @@ export interface DeploymentRelatedContext {
   project: DeploymentRelatedProjectContext;
   environment: DeploymentRelatedEnvironmentContext;
   resource: DeploymentRelatedResourceContext;
-  server: DeploymentRelatedServerContext;
-  destination: DeploymentRelatedDestinationContext;
+  server?: DeploymentRelatedServerContext;
+  destination?: DeploymentRelatedDestinationContext;
 }
 
 export type DeploymentAttemptNextAction =

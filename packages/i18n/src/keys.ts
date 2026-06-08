@@ -1548,6 +1548,7 @@ export const i18nKeys = {
       externalProfileDescription: "console:resources.externalProfileDescription",
       externalProfileTitle: "console:resources.externalProfileTitle",
       generatedAccessRoute: "console:resources.generatedAccessRoute",
+      staticArtifactAccessRoute: "console:resources.staticArtifactAccessRoute",
       healthChecks: "console:resources.healthChecks",
       healthDescription: "console:resources.healthDescription",
       healthLatestDeployment: "console:resources.healthLatestDeployment",

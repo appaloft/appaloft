@@ -52,6 +52,11 @@ function createDeployment(input: {
     resourceId: input.resourceId ?? "res_web",
     serverId: input.serverId ?? "srv_web",
     destinationId: input.destinationId ?? "dst_web",
+    target: {
+      kind: "server-backed",
+      serverId: input.serverId ?? "srv_web",
+      destinationId: input.destinationId ?? "dst_web",
+    },
     status: input.status ?? "succeeded",
     runtimePlan: {
       id: `plan_${input.id}`,

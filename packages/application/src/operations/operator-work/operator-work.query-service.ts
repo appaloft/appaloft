@@ -114,7 +114,7 @@ function deploymentToWorkItem(deployment: DeploymentSummary): OperatorWorkItem {
     projectId: deployment.projectId,
     resourceId: deployment.resourceId,
     deploymentId: deployment.id,
-    serverId: deployment.serverId,
+    ...(deployment.serverId ? { serverId: deployment.serverId } : {}),
     startedAt: deployment.startedAt ?? deployment.createdAt,
     updatedAt: deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt,
     ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt } : {}),
@@ -126,7 +126,7 @@ function deploymentToWorkItem(deployment: DeploymentSummary): OperatorWorkItem {
       : {}),
     nextActions: deploymentNextActions(status),
     safeDetails: {
-      destinationId: deployment.destinationId,
+      ...(deployment.destinationId ? { destinationId: deployment.destinationId } : {}),
       runtimeTargetKind: deployment.runtimePlan.target.kind,
       runtimeTargetProviderKey: deployment.runtimePlan.target.providerKey,
       buildStrategy: deployment.runtimePlan.buildStrategy,

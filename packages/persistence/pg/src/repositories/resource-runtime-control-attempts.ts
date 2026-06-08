@@ -128,6 +128,10 @@ function validateAttempt(attempt: ResourceRuntimeControlAttemptRecord): Result<v
 function toInsertable(
   attempt: ResourceRuntimeControlAttemptRecord,
 ): Insertable<ResourceRuntimeControlAttemptsTable> {
+  if (!attempt.serverId || !attempt.destinationId) {
+    throw new Error("Resource runtime control attempts require server and destination ids");
+  }
+
   return {
     id: attempt.runtimeControlAttemptId,
     resource_id: attempt.resourceId,

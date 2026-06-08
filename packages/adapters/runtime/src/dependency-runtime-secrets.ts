@@ -11,6 +11,8 @@ import {
   type Result,
 } from "@appaloft/core";
 
+import { requireServerBackedDeploymentState } from "./deployment-target";
+
 const appaloftOwnedDependencySecretRefPrefixes = [
   "appaloft://dependency-resources/",
   "appaloft+pg://resource-binding/",
@@ -112,7 +114,10 @@ export async function resolveDependencyRuntimeEnvironment(input: {
   baseEnv?: NodeJS.ProcessEnv;
   includeDependencyRuntimeSecrets?: boolean;
 }): Promise<Result<DependencyRuntimeEnvironment>> {
-  const state = input.deployment.toState();
+  const state = requireServerBackedDeploymentState(
+    input.deployment,
+    "dependency runtime environment resolution",
+  );
   const env = {
     ...(input.baseEnv ?? process.env),
     APPALOFT_DEPLOYMENT_ID: state.id.value,

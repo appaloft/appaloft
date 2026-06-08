@@ -88,6 +88,7 @@ import { githubAppInstallationsMigration } from "./migrations/079_github_app_ins
 import { authPendingVerificationIntentMigration } from "./migrations/080_auth_pending_verification_intent";
 import { dependencyResourceCapabilitiesMigration } from "./migrations/081_dependency_resource_capabilities";
 import { memberLifecycleStatusMigration } from "./migrations/082_member_lifecycle_status";
+import * as deploymentTargetVariantsMigration from "./migrations/083_deployment_target_variants";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -266,6 +267,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "080_auth_pending_verification_intent": authPendingVerificationIntentMigration,
       "081_dependency_resource_capabilities": dependencyResourceCapabilitiesMigration,
       "082_member_lifecycle_status": memberLifecycleStatusMigration,
+      "083_deployment_target_variants": deploymentTargetVariantsMigration,
     };
   }
 }

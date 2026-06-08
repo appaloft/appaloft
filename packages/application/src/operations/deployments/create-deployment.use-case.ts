@@ -71,6 +71,7 @@ import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { deploymentResourceRuntimeScope } from "./deployment-mutation-scopes";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
+import { requireServerBackedDeploymentState } from "./deployment-target-guards";
 import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolution-input.builder";
 
 function createResourceSourceDescriptor(
@@ -498,7 +499,10 @@ async function recordDeploymentProcessAttempt(input: {
   deployment: Deployment;
   operationKey: "deployments.create" | "deployments.redeploy";
 }): Promise<void> {
-  const state = input.deployment.toState();
+  const state = requireServerBackedDeploymentState(
+    input.deployment,
+    input.operationKey,
+  )._unsafeUnwrap();
   const runtimePlan = state.runtimePlan;
   const runtimePlanState = runtimePlan.toState();
   const execution = runtimePlan.execution;

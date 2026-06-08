@@ -30,6 +30,7 @@ import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { deploymentResourceRuntimeScopeForIds } from "./deployment-mutation-scopes";
+import { requireServerBackedDeploymentState } from "./deployment-target-guards";
 import { type RetryDeploymentCommandInput } from "./retry-deployment.command";
 
 function recoveryStateTimestamp(state: DeploymentState): string {
@@ -62,7 +63,10 @@ async function recordRetryDeploymentProcessAttempt(input: {
   context: ExecutionContext;
   deployment: Deployment;
 }): Promise<void> {
-  const state = input.deployment.toState();
+  const state = requireServerBackedDeploymentState(
+    input.deployment,
+    "deployments.retry",
+  )._unsafeUnwrap();
   const runtimePlan = state.runtimePlan;
   const runtimePlanState = runtimePlan.toState();
   const execution = runtimePlan.execution;
@@ -172,6 +176,10 @@ export class RetryDeploymentUseCase {
       }
 
       const sourceState = sourceDeployment.toState();
+      const sourceServerBacked = yield* requireServerBackedDeploymentState(
+        sourceDeployment,
+        "deployments.retry",
+      );
       if (input.resourceId && input.resourceId !== sourceState.resourceId.value) {
         return err(
           domainError.resourceContextMismatch(
@@ -219,8 +227,8 @@ export class RetryDeploymentUseCase {
         policy: mutationCoordinationPolicies.retryDeployment,
         scope: deploymentResourceRuntimeScopeForIds({
           resourceId: sourceState.resourceId.value,
-          serverId: sourceState.serverId.value,
-          destinationId: sourceState.destinationId.value,
+          serverId: sourceServerBacked.serverId.value,
+          destinationId: sourceServerBacked.destinationId.value,
         }),
         owner: createCoordinationOwner(context, "deployments.retry"),
         work: async () =>

@@ -37,6 +37,7 @@ import { tokens } from "../../tokens";
 import { dependencyBindingSnapshotSummaryFromReferenceSummaries } from "./dependency-binding-snapshot-references";
 import { DeploymentRecoveryReadinessQuery } from "./deployment-recovery-readiness.query";
 import { type DeploymentRecoveryReadinessQueryService } from "./deployment-recovery-readiness.query-service";
+import { isServerBackedDeploymentSummary } from "./deployment-target-guards";
 import { type ShowDeploymentQuery } from "./show-deployment.query";
 
 function withShowDeploymentDetails(
@@ -166,6 +167,9 @@ export class ShowDeploymentQueryService {
 
       if (query.includeRelatedContext) {
         try {
+          const serverBackedDeployment = isServerBackedDeploymentSummary(deployment)
+            ? deployment
+            : undefined;
           const [project, environment, resource, server] = await Promise.all([
             this.projectReadModel.findOne(
               repositoryContext,
@@ -179,10 +183,14 @@ export class ShowDeploymentQueryService {
               repositoryContext,
               ResourceByIdSpec.create(ResourceId.rehydrate(deployment.resourceId)),
             ),
-            this.serverReadModel.findOne(
-              repositoryContext,
-              ServerByIdSpec.create(DeploymentTargetId.rehydrate(deployment.serverId)),
-            ),
+            serverBackedDeployment
+              ? this.serverReadModel.findOne(
+                  repositoryContext,
+                  ServerByIdSpec.create(
+                    DeploymentTargetId.rehydrate(serverBackedDeployment.serverId),
+                  ),
+                )
+              : Promise.resolve(null),
           ]);
 
           relatedContext = {
@@ -202,19 +210,23 @@ export class ShowDeploymentQueryService {
               ...(resource?.slug ? { slug: resource.slug } : {}),
               ...(resource?.kind ? { kind: resource.kind } : {}),
             },
-            server: {
-              id: deployment.serverId,
-              ...(server?.name ? { name: server.name } : {}),
-              ...(server?.host ? { host: server.host } : {}),
-              ...(typeof server?.port === "number" ? { port: server.port } : {}),
-              ...(server?.providerKey ? { providerKey: server.providerKey } : {}),
-            },
-            destination: {
-              id: deployment.destinationId,
-            },
+            ...(serverBackedDeployment
+              ? {
+                  server: {
+                    id: serverBackedDeployment.serverId,
+                    ...(server?.name ? { name: server.name } : {}),
+                    ...(server?.host ? { host: server.host } : {}),
+                    ...(typeof server?.port === "number" ? { port: server.port } : {}),
+                    ...(server?.providerKey ? { providerKey: server.providerKey } : {}),
+                  },
+                  destination: {
+                    id: serverBackedDeployment.destinationId,
+                  },
+                }
+              : {}),
           };
 
-          if (!project || !environment || !resource || !server) {
+          if (!project || !environment || !resource || (serverBackedDeployment && !server)) {
             sectionErrors.push(
               relatedContextError(
                 deployment.id,
@@ -224,7 +236,9 @@ export class ShowDeploymentQueryService {
                     ? deployment.environmentId
                     : !resource
                       ? deployment.resourceId
-                      : deployment.serverId,
+                      : serverBackedDeployment
+                        ? serverBackedDeployment.serverId
+                        : deployment.id,
               ),
             );
           }

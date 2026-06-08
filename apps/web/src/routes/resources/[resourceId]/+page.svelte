@@ -4602,6 +4602,8 @@
         return $t(i18nKeys.console.resources.durableDomainAccess);
       case "server-applied-domain":
         return $t(i18nKeys.console.resources.serverAppliedDomainAccess);
+      case "static-artifact":
+        return $t(i18nKeys.console.resources.staticArtifactAccessRoute);
       case "generated-latest":
         return $t(i18nKeys.console.resources.generatedAccessRoute);
       case "generated-planned":
@@ -5100,7 +5102,9 @@
                             {$t(i18nKeys.common.domain.server)}
                           </dt>
                           <dd class="font-medium">
-                            {findServer(servers, latestDeployment.serverId)?.name ??
+                            {(latestDeployment.serverId
+                              ? findServer(servers, latestDeployment.serverId)?.name
+                              : null) ??
                               latestDeployment.serverId}
                           </dd>
                         </div>
@@ -8770,7 +8774,7 @@
                 <div class="space-y-3">
                   {#if resourceDomainBindings.length > 0}
                     {#each resourceDomainBindings as binding (binding.id)}
-                      {@const server = findServer(servers, binding.serverId)}
+                      {@const server = binding.serverId ? findServer(servers, binding.serverId) : null}
                       {@const bindingCertificate = latestCertificateForBinding(binding.id)}
                       {@const isImportOpen = importBindingId === binding.id}
                       <article class="rounded-md border bg-background p-4">

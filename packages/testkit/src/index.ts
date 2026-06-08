@@ -2292,6 +2292,9 @@ export class MemoryDomainRouteFailureCandidateReader implements DomainRouteFailu
     for (const domainBinding of this.domainBindings.items.values()) {
       const state = domainBinding.toState();
       if (
+        deployment.target.toState().kind === "server-backed" &&
+        deployment.serverId &&
+        deployment.destinationId &&
         state.projectId.equals(deployment.projectId) &&
         state.environmentId.equals(deployment.environmentId) &&
         state.resourceId.equals(deployment.resourceId) &&
@@ -2567,13 +2570,28 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           sourceMetadata["source.commitSha"] ??
           sourceMetadata.commitSha;
 
+        const target = deployment.target.toState();
+        if (target.kind !== "server-backed") {
+          throw new Error("In-memory deployment read model only supports server-backed fixtures");
+        }
+        const serverId = deployment.serverId;
+        const destinationId = deployment.destinationId;
+        if (!serverId || !destinationId) {
+          throw new Error("Server-backed deployment fixture is missing server or destination id");
+        }
+
         return {
           id: deployment.id.value,
           projectId: deployment.projectId.value,
           environmentId: deployment.environmentId.value,
           resourceId: deployment.resourceId.value,
-          serverId: deployment.serverId.value,
-          destinationId: deployment.destinationId.value,
+          target: {
+            kind: "server-backed",
+            serverId: serverId.value,
+            destinationId: destinationId.value,
+          },
+          serverId: serverId.value,
+          destinationId: destinationId.value,
           status: deployment.status.value,
           triggerKind: deployment.triggerKind.value,
           ...(deployment.sourceDeploymentId

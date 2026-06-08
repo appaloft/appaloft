@@ -20,8 +20,13 @@ import {
   type StartedAt,
 } from "../shared/temporal";
 import { PlanStepText } from "../shared/text-values";
-import { ScalarValueObject } from "../shared/value-object";
+import { ScalarValueObject, ValueObject } from "../shared/value-object";
 import { Version, VersionReference } from "../shared/version";
+import {
+  type StaticArtifactId,
+  type StaticArtifactPublicationId,
+  type StaticArtifactRouteUrl,
+} from "../workload-delivery/static-artifact";
 import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
   type AccessRouteExpectation,
@@ -32,6 +37,128 @@ import {
 } from "./runtime-plan";
 
 export type DeploymentTriggerKind = "create" | "retry" | "redeploy" | "rollback";
+export type DeploymentTargetVariantKind = "server-backed" | "serverless-static-artifact";
+
+export interface ServerBackedDeploymentTargetState {
+  kind: "server-backed";
+  serverId: DeploymentTargetId;
+  destinationId: DestinationId;
+}
+
+export interface ServerlessStaticArtifactDeploymentTargetState {
+  kind: "serverless-static-artifact";
+  publicationId: StaticArtifactPublicationId;
+  artifactId: StaticArtifactId;
+  routeUrl: StaticArtifactRouteUrl;
+}
+
+export type DeploymentTargetVariantState =
+  | ServerBackedDeploymentTargetState
+  | ServerlessStaticArtifactDeploymentTargetState;
+
+type LegacyServerBackedDeploymentTargetInput = {
+  serverId?: DeploymentTargetId;
+  destinationId?: DestinationId;
+};
+
+export class DeploymentTargetVariant extends ValueObject<DeploymentTargetVariantState> {
+  private constructor(state: DeploymentTargetVariantState) {
+    super(state);
+  }
+
+  static serverBacked(input: {
+    serverId: DeploymentTargetId;
+    destinationId: DestinationId;
+  }): DeploymentTargetVariant {
+    return new DeploymentTargetVariant({
+      kind: "server-backed",
+      serverId: input.serverId,
+      destinationId: input.destinationId,
+    });
+  }
+
+  static serverlessStaticArtifact(input: {
+    publicationId: StaticArtifactPublicationId;
+    artifactId: StaticArtifactId;
+    routeUrl: StaticArtifactRouteUrl;
+  }): DeploymentTargetVariant {
+    return new DeploymentTargetVariant({
+      kind: "serverless-static-artifact",
+      publicationId: input.publicationId,
+      artifactId: input.artifactId,
+      routeUrl: input.routeUrl,
+    });
+  }
+
+  static rehydrate(state: DeploymentTargetVariantState): DeploymentTargetVariant {
+    return new DeploymentTargetVariant(state);
+  }
+
+  get kind(): DeploymentTargetVariantKind {
+    return this.state.kind;
+  }
+
+  isServerBacked(): this is DeploymentTargetVariant & {
+    toState(): ServerBackedDeploymentTargetState;
+  } {
+    return this.state.kind === "server-backed";
+  }
+
+  isServerlessStaticArtifact(): this is DeploymentTargetVariant & {
+    toState(): ServerlessStaticArtifactDeploymentTargetState;
+  } {
+    return this.state.kind === "serverless-static-artifact";
+  }
+
+  toState(): DeploymentTargetVariantState {
+    return { ...this.state };
+  }
+}
+
+function cloneDeploymentTargetVariant(target: DeploymentTargetVariant): DeploymentTargetVariant {
+  return DeploymentTargetVariant.rehydrate(target.toState());
+}
+
+function serverBackedDeploymentTargetFromLegacyInput(
+  input: LegacyServerBackedDeploymentTargetInput,
+): DeploymentTargetVariant | undefined {
+  if (!input.serverId || !input.destinationId) {
+    return undefined;
+  }
+
+  return DeploymentTargetVariant.serverBacked({
+    serverId: input.serverId,
+    destinationId: input.destinationId,
+  });
+}
+
+function deploymentTargetFromState(
+  state: Partial<Pick<BaseDeploymentState, "target">> & LegacyServerBackedDeploymentTargetInput,
+): DeploymentTargetVariant | undefined {
+  if (state.target) {
+    return cloneDeploymentTargetVariant(state.target);
+  }
+
+  return serverBackedDeploymentTargetFromLegacyInput(state);
+}
+
+function deploymentTargetStateFields(
+  target: DeploymentTargetVariant,
+):
+  | { target: DeploymentTargetVariant; serverId: DeploymentTargetId; destinationId: DestinationId }
+  | { target: DeploymentTargetVariant } {
+  const clonedTarget = cloneDeploymentTargetVariant(target);
+  const targetState = clonedTarget.toState();
+  if (targetState.kind === "server-backed") {
+    return {
+      target: clonedTarget,
+      serverId: targetState.serverId,
+      destinationId: targetState.destinationId,
+    };
+  }
+
+  return { target: clonedTarget };
+}
 
 function dockerImageSourceVersionFromExecutionMetadata(
   runtimePlan: RuntimePlan,
@@ -133,13 +260,12 @@ export class DeploymentTriggerKindValue extends ScalarValueObject<DeploymentTrig
   }
 }
 
-export interface DeploymentState {
+export interface BaseDeploymentState {
   id: DeploymentId;
   projectId: ProjectId;
   environmentId: EnvironmentId;
   resourceId: ResourceId;
-  serverId: DeploymentTargetId;
-  destinationId: DestinationId;
+  target: DeploymentTargetVariant;
   status: DeploymentStatusValue;
   runtimePlan: RuntimePlan;
   environmentSnapshot: EnvironmentSnapshot;
@@ -156,6 +282,25 @@ export interface DeploymentState {
   supersededByDeploymentId?: DeploymentId;
   archivedAt?: ArchivedAt;
 }
+
+type LegacyServerBackedDeploymentState = Omit<BaseDeploymentState, "target"> & {
+  serverId: DeploymentTargetId;
+  destinationId: DestinationId;
+};
+
+export type ServerBackedDeploymentState = BaseDeploymentState & {
+  target: DeploymentTargetVariant;
+  serverId: DeploymentTargetId;
+  destinationId: DestinationId;
+};
+
+export type ServerlessStaticArtifactDeploymentState = BaseDeploymentState & {
+  target: DeploymentTargetVariant;
+  serverId?: never;
+  destinationId?: never;
+};
+
+export type DeploymentState = ServerBackedDeploymentState | ServerlessStaticArtifactDeploymentState;
 
 export interface DeploymentExecutionContinuation {
   allowed: boolean;
@@ -176,8 +321,9 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     projectId: ProjectId;
     environmentId: EnvironmentId;
     resourceId: ResourceId;
-    serverId: DeploymentTargetId;
-    destinationId: DestinationId;
+    target?: DeploymentTargetVariant;
+    serverId?: DeploymentTargetId;
+    destinationId?: DestinationId;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
     dependencyBindingReferences?: DeploymentDependencyBindingReferenceState[];
@@ -194,14 +340,23 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       return err(domainError.validation("Runtime plan must contain at least one step"));
     }
 
+    const target = input.target ?? serverBackedDeploymentTargetFromLegacyInput(input);
+    if (!target) {
+      return err(
+        domainError.validation("Deployment target must be an explicit variant", {
+          deploymentId: input.id.value,
+          resourceId: input.resourceId.value,
+        }),
+      );
+    }
+
     return ok(
       new Deployment({
         id: input.id,
         projectId: input.projectId,
         environmentId: input.environmentId,
         resourceId: input.resourceId,
-        serverId: input.serverId,
-        destinationId: input.destinationId,
+        ...deploymentTargetStateFields(target),
         status: DeploymentStatusValue.created(),
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
@@ -227,9 +382,15 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     );
   }
 
-  static rehydrate(state: DeploymentState): Deployment {
+  static rehydrate(state: DeploymentState | LegacyServerBackedDeploymentState): Deployment {
+    const target = deploymentTargetFromState(state);
+    if (!target) {
+      throw new Error("Deployment rehydrate requires an explicit target variant");
+    }
+
     return new Deployment({
       ...state,
+      ...deploymentTargetStateFields(target),
       triggerKind: state.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
       dependencyBindingReferences: [...(state.dependencyBindingReferences ?? [])],
       logs: [...state.logs],
@@ -453,6 +614,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
   toState(): DeploymentState {
     return {
       ...this.state,
+      ...deploymentTargetStateFields(this.state.target),
       dependencyBindingReferences: [...this.state.dependencyBindingReferences],
       logs: [...this.state.logs],
     };

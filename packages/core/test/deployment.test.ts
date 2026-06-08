@@ -10,6 +10,7 @@ import {
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTargetVariant,
   DeploymentTriggerKindValue,
   DestinationId,
   DetectSummary,
@@ -44,6 +45,9 @@ import {
   SourceKindValue,
   SourceLocator,
   StartedAt,
+  StaticArtifactId,
+  StaticArtifactPublicationId,
+  StaticArtifactRouteUrl,
   TargetKindValue,
   TlsModeValue,
 } from "../src";
@@ -91,8 +95,10 @@ function deployment(input: {
     projectId: ProjectId.rehydrate("prj_demo"),
     environmentId: EnvironmentId.rehydrate("env_demo"),
     resourceId: ResourceId.rehydrate("res_demo"),
-    serverId: DeploymentTargetId.rehydrate("srv_demo"),
-    destinationId: DestinationId.rehydrate("dst_demo"),
+    target: DeploymentTargetVariant.serverBacked({
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+    }),
     status: DeploymentStatusValue.rehydrate(input.status),
     runtimePlan: runtimePlan(),
     environmentSnapshot: snapshot(),
@@ -134,6 +140,32 @@ function accessRoute(input: {
 }
 
 describe("Deployment", () => {
+  test("[CLOUD-STATIC-DEPLOY-157] models deployment targets as explicit server-backed or serverless static variants", () => {
+    const serverBacked = DeploymentTargetVariant.serverBacked({
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+    });
+    const serverlessStatic = DeploymentTargetVariant.serverlessStaticArtifact({
+      publicationId: StaticArtifactPublicationId.rehydrate("pub_static"),
+      artifactId: StaticArtifactId.rehydrate("artifact_static"),
+      routeUrl: StaticArtifactRouteUrl.rehydrate("https://www-static-demo.appaloft.app/"),
+    });
+
+    expect(serverBacked.toState()).toMatchObject({
+      kind: "server-backed",
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+    });
+    expect(serverlessStatic.toState()).toMatchObject({
+      kind: "serverless-static-artifact",
+      publicationId: StaticArtifactPublicationId.rehydrate("pub_static"),
+      artifactId: StaticArtifactId.rehydrate("artifact_static"),
+      routeUrl: StaticArtifactRouteUrl.rehydrate("https://www-static-demo.appaloft.app/"),
+    });
+    expect(serverBacked.isServerBacked()).toBe(true);
+    expect(serverlessStatic.isServerlessStaticArtifact()).toBe(true);
+  });
+
   test("[DMBH-DEPLOY-001] answers execution-continuation decisions", () => {
     expect(deployment({ status: "running" }).resolveExecutionContinuation()).toEqual({
       allowed: true,
