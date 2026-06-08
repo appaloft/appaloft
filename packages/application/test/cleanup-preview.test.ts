@@ -186,6 +186,11 @@ function createDeploymentSummary(input?: {
     resourceId: input?.resourceId ?? "res_preview_1",
     serverId: input?.serverId ?? "srv_preview_1",
     destinationId: input?.destinationId ?? "dst_preview_1",
+    target: {
+      kind: "server-backed",
+      serverId: input?.serverId ?? "srv_preview_1",
+      destinationId: input?.destinationId ?? "dst_preview_1",
+    },
     status: "succeeded",
     runtimePlan: {
       id: input?.planId ?? "plan_preview_1",

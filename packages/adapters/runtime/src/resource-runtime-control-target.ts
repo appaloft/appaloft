@@ -497,6 +497,15 @@ export class RuntimeResourceRuntimeControlTarget implements ResourceRuntimeContr
       return ok(plan.result);
     }
 
+    if (!request.serverId) {
+      return err(
+        domainError.validation("Runtime control requires a server-backed target", {
+          resourceId: request.resourceId,
+          operation: request.operation,
+        }),
+      );
+    }
+
     const execution = await this.executor.run(context, {
       command: plan.plan.command,
       ...(plan.plan.workingDirectory ? { workingDirectory: plan.plan.workingDirectory } : {}),

@@ -941,7 +941,7 @@
                 {@const project = findProject(projects, binding.projectId)}
                 {@const environment = findEnvironment(environments, binding.environmentId)}
                 {@const resource = findResource(resources, binding.resourceId)}
-                {@const server = findServer(servers, binding.serverId)}
+                {@const server = binding.serverId ? findServer(servers, binding.serverId) : null}
                 {@const detail = bindingDetails[binding.id]}
                 {@const redirectTargets = domainBindings.filter(
                   (candidate) =>

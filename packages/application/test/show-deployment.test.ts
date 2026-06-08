@@ -368,6 +368,11 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
     finishedAt: "2026-01-01T00:00:09.000Z",
     logCount: 3,
     ...overrides,
+    target: {
+      kind: "server-backed",
+      serverId: overrides?.serverId ?? "srv_demo",
+      destinationId: overrides?.destinationId ?? "dst_demo",
+    },
   };
 }
 

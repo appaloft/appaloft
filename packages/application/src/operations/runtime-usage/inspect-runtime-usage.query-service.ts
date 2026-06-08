@@ -158,7 +158,9 @@ function artifactWithDeploymentContext(
     projectId: artifact.projectId ?? deployment.projectId,
     environmentId: artifact.environmentId ?? deployment.environmentId,
     resourceId: artifact.resourceId ?? deployment.resourceId,
-    destinationId: artifact.destinationId ?? deployment.destinationId,
+    ...(artifact.destinationId || deployment.destinationId
+      ? { destinationId: artifact.destinationId ?? deployment.destinationId }
+      : {}),
     ...(runtimeId ? { runtimeId } : {}),
     ownership: "attributed",
     evidence:
@@ -464,7 +466,11 @@ export class RuntimeUsageInspectionQueryService {
     input: RuntimeUsageInspectorInput,
     resolved: ResolvedRuntimeUsageScope,
   ): Promise<RuntimeUsageInspection> {
-    const serverIds = uniqueStrings(resolved.deployments.map((deployment) => deployment.serverId));
+    const serverIds = uniqueStrings(
+      resolved.deployments
+        .map((deployment) => deployment.serverId)
+        .filter((serverId): serverId is string => Boolean(serverId)),
+    );
     const serverResults = await Promise.all(
       serverIds.map((serverId) =>
         this.runtimeUsageInspector.inspect(context, {

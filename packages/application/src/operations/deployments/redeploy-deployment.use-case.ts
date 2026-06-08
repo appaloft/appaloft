@@ -14,6 +14,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import { type DeploymentRepository } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CreateDeploymentUseCase } from "./create-deployment.use-case";
+import { isServerBackedDeploymentState } from "./deployment-target-guards";
 import { type RedeployDeploymentCommandInput } from "./redeploy-deployment.command";
 
 function stateTimestamp(input: {
@@ -53,6 +54,20 @@ export class RedeployDeploymentUseCase {
       }
 
       const sourceState = sourceDeployment?.toState();
+      if (sourceState && !isServerBackedDeploymentState(sourceState)) {
+        return err(
+          domainError.deploymentNotRedeployable(
+            "Redeploy source deployment must be server-backed",
+            {
+              commandName: "deployments.redeploy",
+              phase: "redeploy-admission",
+              deploymentId: sourceState.id.value,
+              resourceId: sourceState.resourceId.value,
+              causeCode: "serverless_static_redeploy_not_supported",
+            },
+          ),
+        );
+      }
       if (sourceState && sourceState.resourceId.value !== input.resourceId) {
         return err(
           domainError.resourceContextMismatch(

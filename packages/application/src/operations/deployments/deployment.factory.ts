@@ -4,6 +4,7 @@ import {
   type Deployment as DeploymentAggregate,
   type DeploymentDependencyBindingReferenceState,
   DeploymentId,
+  DeploymentTargetVariant,
   DeploymentTriggerKindValue,
   type Destination,
   type EnvironmentProfile,
@@ -51,8 +52,10 @@ export class DeploymentFactory {
       return Deployment.create({
         id: deploymentId,
         projectId: input.project.toState().id,
-        serverId: input.server.toState().id,
-        destinationId: input.destination.toState().id,
+        target: DeploymentTargetVariant.serverBacked({
+          serverId: input.server.toState().id,
+          destinationId: input.destination.toState().id,
+        }),
         environmentId: input.environment.toState().id,
         resourceId: input.resource.toState().id,
         runtimePlan: input.runtimePlan,
@@ -85,8 +88,7 @@ export class DeploymentFactory {
       return Deployment.create({
         id: deploymentId,
         projectId: state.projectId,
-        serverId: state.serverId,
-        destinationId: state.destinationId,
+        target: state.target,
         environmentId: state.environmentId,
         resourceId: state.resourceId,
         runtimePlan: state.runtimePlan,
@@ -117,8 +119,7 @@ export class DeploymentFactory {
       return Deployment.create({
         id: deploymentId,
         projectId: state.projectId,
-        serverId: state.serverId,
-        destinationId: state.destinationId,
+        target: state.target,
         environmentId: state.environmentId,
         resourceId: state.resourceId,
         runtimePlan: state.runtimePlan,

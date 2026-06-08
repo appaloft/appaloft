@@ -27,6 +27,7 @@ import {
   type TerminalSessionGateway,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { isServerBackedDeploymentSummary } from "../deployments/deployment-target-guards";
 import { type OpenTerminalSessionCommand } from "./open-terminal-session.command";
 
 const openTerminalSessionOperation = findOperationCatalogEntryByKey("terminal-sessions.open");
@@ -227,13 +228,26 @@ export class OpenTerminalSessionUseCase {
       );
     }
 
+    const serverBackedDeployment = isServerBackedDeploymentSummary(deployment)
+      ? deployment
+      : undefined;
+    if (!serverBackedDeployment) {
+      return err(
+        domainError.validation("Terminal sessions require a server-backed deployment", {
+          deploymentId: deployment.id,
+          resourceId: resource.id,
+          targetKind: deployment.target?.kind ?? "unknown",
+        }),
+      );
+    }
+
     const server = await this.serverReadModel.findOne(
       repositoryContext,
-      ServerByIdSpec.create(DeploymentTargetId.rehydrate(deployment.serverId)),
+      ServerByIdSpec.create(DeploymentTargetId.rehydrate(serverBackedDeployment.serverId)),
     );
 
     if (!server) {
-      return err(domainError.notFound("server", deployment.serverId));
+      return err(domainError.notFound("server", serverBackedDeployment.serverId));
     }
 
     const workspace = resolveDeploymentWorkspace(deployment);
