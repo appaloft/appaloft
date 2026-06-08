@@ -575,7 +575,19 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   const githubSourceModes = ["url", "browser"] as const satisfies readonly GithubSourceMode[];
   const draftModeKeys = ["existing", "new"] as const;
 
-  let { enabled = true }: { enabled?: boolean } = $props();
+  let {
+    enabled = true,
+    lockedProjectId = "",
+    lockedProjectName = "",
+    statePath = "/deploy",
+    stateModal = "",
+  }: {
+    enabled?: boolean;
+    lockedProjectId?: string;
+    lockedProjectName?: string;
+    statePath?: string;
+    stateModal?: string;
+  } = $props();
 
   const authSessionQuery = createQuery(() =>
     queryOptions({
@@ -1628,7 +1640,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   });
   const projectSummary = $derived.by(() => {
     if (projectMode === "existing") {
-      return selectedProject?.name ?? (projects.length === 0 ? defaultProjectSummary : "未选择项目");
+      return selectedProject?.name ??
+        (lockedProjectId ? lockedProjectName || lockedProjectId : projects.length === 0 ? defaultProjectSummary : "未选择项目");
     }
 
     return projectName.trim() || (projects.length === 0 ? "Local Workspace" : "待创建项目");
@@ -1848,6 +1861,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   $effect(() => {
     if (!projectsQuery.isSuccess) {
+      return;
+    }
+
+    if (lockedProjectId) {
+      projectMode = "existing";
+      selectedProjectId = lockedProjectId;
+      projectContextEnabled = true;
       return;
     }
 
@@ -2386,10 +2406,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   function buildDeployStateUrl(): URL {
     const url = new URL(browser ? window.location.href : page.url.href);
-    url.pathname = "/deploy";
+    url.pathname = statePath || "/deploy";
     url.search = "";
 
     const params = url.searchParams;
+    setSearchParam(params, "modal", stateModal);
     setSearchParam(params, "step", activeStep, "source");
     setSearchParam(params, "source", sourceKind, "local-folder");
     setSearchParam(
@@ -2425,9 +2446,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
-    setSearchParam(params, "projectMode", projectMode, "existing");
-    if (projectMode === "existing") {
-      setSearchParam(params, "projectId", selectedProjectId);
+    setSearchParam(params, "projectMode", lockedProjectId ? "existing" : projectMode, "existing");
+    if (lockedProjectId || projectMode === "existing") {
+      setSearchParam(params, "projectId", lockedProjectId || selectedProjectId);
     } else {
       setSearchParam(params, "projectName", projectName);
       setSearchParam(params, "projectDescription", projectDescription);
@@ -2573,6 +2594,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     githubRepositorySearch = params.get("repository") ?? "";
     selectedGitHubRepositoryId = params.get("githubRepositoryId") ?? "";
     selectedGitHubRepository = null;
+
+    if (lockedProjectId) {
+      projectMode = "existing";
+      selectedProjectId = lockedProjectId;
+      projectContextEnabled = true;
+    }
     if (selectedBlueprintSlug !== (params.get("blueprintSlug") ?? "")) {
       blueprintDependencyProvisioningDrafts = {};
     }
