@@ -14,6 +14,26 @@ const deployPageSource = readFileSync(
   fileURLToPath(new URL("../../../routes/deploy/+page.svelte", import.meta.url)),
   "utf8",
 );
+const projectDetailPageSource = readFileSync(
+  fileURLToPath(new URL("../../../routes/projects/[projectId]/+page.svelte", import.meta.url)),
+  "utf8",
+);
+const legacyResourceCreatePageSource = readFileSync(
+  fileURLToPath(
+    new URL("../../../routes/projects/[projectId]/resources/new/+page.svelte", import.meta.url),
+  ),
+  "utf8",
+);
+const legacyResourceCreateRouteSource = readFileSync(
+  fileURLToPath(
+    new URL("../../../routes/projects/[projectId]/resources/new/+page.ts", import.meta.url),
+  ),
+  "utf8",
+);
+const consoleUtilsSource = readFileSync(
+  fileURLToPath(new URL("../../console/utils.ts", import.meta.url)),
+  "utf8",
+);
 
 describe("QuickDeploySheet structure", () => {
   test("[QUICK-DEPLOY-UX-001] keeps the lower quick deploy section scoped to variables", () => {
@@ -38,6 +58,32 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain("fixed inset-x-0 bottom-0");
     expect(quickDeploySheetSource).not.toContain("min-h-16 w-full items-center justify-between");
     expect(quickDeploySheetSource).toContain('class="w-full"');
+  });
+
+  test("[QUICK-DEPLOY-UX-002B] opens project quick deploy as a URL-addressable locked modal", () => {
+    expect(quickDeploySheetSource).toContain("lockedProjectId");
+    expect(quickDeploySheetSource).toContain('setSearchParam(params, "modal", stateModal)');
+    expect(quickDeploySheetSource).toContain('url.pathname = statePath || "/deploy"');
+    expect(quickDeploySheetSource).toContain(
+      'setSearchParam(params, "projectMode", lockedProjectId ? "existing" : projectMode, "existing")',
+    );
+    expect(quickDeploySheetSource).toContain("selectedProjectId = lockedProjectId");
+    expect(projectDetailPageSource).toContain('modalIsOpen(page, "quick-deploy")');
+    expect(projectDetailPageSource).toContain("projectQuickDeployHref(project.id)");
+    expect(projectDetailPageSource).toContain("<Dialog.Root bind:open={quickDeployDialogOpen}");
+    expect(projectDetailPageSource).toContain("<QuickDeploySheet");
+    expect(projectDetailPageSource).toContain("lockedProjectId={project.id}");
+    expect(projectDetailPageSource).not.toContain("projectCreateResourceHref(project.id)");
+    expect(consoleUtilsSource).toContain("projectQuickDeployHref");
+    expect(consoleUtilsSource).toContain('modal: "quick-deploy"');
+    expect(consoleUtilsSource).not.toContain("/resources/new");
+    expect(legacyResourceCreateRouteSource).toContain('searchParams.set("modal", "quick-deploy")');
+    expect(legacyResourceCreateRouteSource).toContain(
+      'searchParams.set("projectMode", "existing")',
+    );
+    expect(legacyResourceCreateRouteSource).toContain("throw redirect");
+    expect(legacyResourceCreatePageSource).not.toContain("CreateResourceInput");
+    expect(legacyResourceCreatePageSource).not.toContain("ResourceSourceOption");
   });
 
   test("[QUICK-DEPLOY-UX-003] keeps the deploy entry readable at constrained console widths", () => {
