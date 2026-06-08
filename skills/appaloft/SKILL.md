@@ -57,10 +57,15 @@ surface available in the session.
   discovery and dry-run planning, then use the Blueprint quick-deploy entrypoint when the source is
   an official or extension-provided Blueprint such as PocketBase. Do not invent a separate
   `blueprint deploy` CLI command unless the operation catalog adds one. Before accepting a
-  deployment target, run
-  `appaloft server test <serverId>`; if the control plane reports `Executable not found in $PATH:
-  "ssh"`, treat that as a control-plane runtime packaging blocker rather than manually SSHing
-  around the Appaloft operation.
+  deployment target, inspect the registered server summary/readiness, run
+  `appaloft server test <serverId>`, and run `appaloft server proxy repair <serverId>` when the
+  target is pending, failed, or unavailable for Appaloft runtime work. A newly registered SSH server
+  is not deployable evidence until Appaloft operations prove SSH, Docker runtime, and the configured
+  edge proxy are ready. If the control plane reports `Executable not found in $PATH: "ssh"` or
+  `Docker is not available on the SSH target`, stop and report the server initialization blocker
+  rather than manually SSHing around the Appaloft operation. Treat `blueprints.install` as a command:
+  submit it once, then observe the returned deployment through deployment events/logs; do not poll
+  progress by repeatedly calling install with the same idempotency key.
 - GitHub Action deploy: default to Pure SSH Action when the user supplies an SSH target and no
   control plane; use Self-hosted Server Action only when `control-plane-url` selects an Appaloft
   instance and a deploy token is available; treat product-grade previews as control-plane-owned,
