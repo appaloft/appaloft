@@ -66,6 +66,7 @@ import {
   type RepositoryContext,
   toRepositoryContext,
 } from "../src";
+import { CreateDomainBindingCommand } from "../src/operations/domain-bindings/create-domain-binding.command";
 import { CreateDomainBindingUseCase, ListDomainBindingsQueryService } from "../src/use-cases";
 
 function createTestContext(): ExecutionContext {
@@ -90,6 +91,25 @@ function domainBindingRequestedEvent(events: unknown[]): DomainEvent {
 
   return event;
 }
+
+describe("CreateDomainBindingCommand input", () => {
+  test("DOMAIN-BINDING-VARIANT-001 rejects serverless static artifact bindings without server and destination", () => {
+    const serverlessStaticArtifactInput = {
+      projectId: "prj_static",
+      environmentId: "env_static",
+      resourceId: "res_static",
+      domainName: "www.example.com",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    } as unknown as Parameters<typeof CreateDomainBindingCommand.create>[0];
+
+    const command = CreateDomainBindingCommand.create(serverlessStaticArtifactInput);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+});
 
 class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   readonly records: ProcessAttemptRecord[] = [];
