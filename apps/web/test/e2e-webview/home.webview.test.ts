@@ -3799,14 +3799,34 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
     await expectAnyText(view, ["Recent deployments", "最近部署"]);
     const homeProjectLayout = JSON.parse(
-      await view.evaluate<string>(`JSON.stringify({
-        clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-        cardCount: document.querySelectorAll('[data-home-project-row]').length,
-        firstCardHasHeader: Boolean(document.querySelector('[data-home-project-row] .nothing-project-card-header')),
-        firstCardHasMetrics: Boolean(document.querySelector('[data-home-project-row] .nothing-project-metrics')),
-        firstCardHasAccessRow: Boolean(document.querySelector('[data-home-project-row] .nothing-project-access-row')),
-      })`),
+      await view.evaluate<string>(`(() => {
+        const cards = Array.from(document.querySelectorAll('[data-home-project-row]'));
+        const firstCard = cards[0];
+        const secondCard = cards[1];
+        const metrics = firstCard?.querySelector('.nothing-project-metrics');
+        const accessRow = firstCard?.querySelector('.nothing-project-access-row');
+        const firstRect = firstCard?.getBoundingClientRect();
+        const secondRect = secondCard?.getBoundingClientRect();
+        const metricsRect = metrics?.getBoundingClientRect();
+        const accessRect = accessRow?.getBoundingClientRect();
+        return JSON.stringify({
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          cardCount: cards.length,
+          firstCardHasHeader: Boolean(firstCard?.querySelector('.nothing-project-card-header')),
+          firstCardHasMetrics: Boolean(metrics),
+          firstCardHasAccessRow: Boolean(accessRow),
+          projectGap: firstRect && secondRect ? secondRect.top - firstRect.bottom : null,
+          metricsTouchesCardEdges:
+            Boolean(firstRect && metricsRect) &&
+            Math.abs(metricsRect.left - firstRect.left) <= 1 &&
+            Math.abs(metricsRect.right - firstRect.right) <= 1,
+          accessTouchesCardEdges:
+            Boolean(firstRect && accessRect) &&
+            Math.abs(accessRect.left - firstRect.left) <= 1 &&
+            Math.abs(accessRect.right - firstRect.right) <= 1,
+        });
+      })()`),
     ) as {
       clientWidth: number;
       scrollWidth: number;
@@ -3814,11 +3834,19 @@ describe("console e2e with Bun.WebView", () => {
       firstCardHasHeader: boolean;
       firstCardHasMetrics: boolean;
       firstCardHasAccessRow: boolean;
+      projectGap: number | null;
+      metricsTouchesCardEdges: boolean;
+      accessTouchesCardEdges: boolean;
     };
     expect(homeProjectLayout.cardCount).toBeGreaterThan(0);
     expect(homeProjectLayout.firstCardHasHeader).toBe(true);
     expect(homeProjectLayout.firstCardHasMetrics).toBe(true);
     expect(homeProjectLayout.firstCardHasAccessRow).toBe(true);
+    if (homeProjectLayout.projectGap !== null) {
+      expect(homeProjectLayout.projectGap).toBeGreaterThanOrEqual(12);
+    }
+    expect(homeProjectLayout.metricsTouchesCardEdges).toBe(true);
+    expect(homeProjectLayout.accessTouchesCardEdges).toBe(true);
     expect(homeProjectLayout.scrollWidth).toBeLessThanOrEqual(homeProjectLayout.clientWidth);
 
     await view.navigate(`${previewUrl}/projects`);

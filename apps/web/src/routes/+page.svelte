@@ -584,6 +584,12 @@
   .nothing-project-list {
     container-type: inline-size;
     display: grid;
+    gap: 14px;
+  }
+
+  .nothing-project-card {
+    display: grid;
+    min-width: 0;
     overflow: hidden;
     border: 1px solid var(--input);
     border-radius: var(--radius-lg);
@@ -591,22 +597,9 @@
     box-shadow: var(--shadow-2xs);
   }
 
-  .nothing-project-card {
-    display: grid;
-    min-width: 0;
-    gap: 15px;
-    border-bottom: 1px solid var(--border);
-    padding: 18px;
-  }
-
-  .nothing-project-card:last-child {
-    border-bottom: 0;
-  }
-
   @container (min-width: 42rem) {
     .nothing-project-card {
-      gap: 16px;
-      padding: 20px;
+      border-radius: var(--radius-lg);
     }
   }
 
@@ -631,6 +624,13 @@
     align-items: start;
     justify-content: space-between;
     gap: 14px;
+    padding: 18px;
+  }
+
+  @container (min-width: 42rem) {
+    .nothing-project-card-header {
+      padding: 20px;
+    }
   }
 
   .nothing-project-identity {
@@ -737,6 +737,7 @@
     display: grid;
     border-top: 1px solid var(--input);
     border-bottom: 1px solid var(--input);
+    background: color-mix(in oklch, var(--muted) 18%, var(--surface));
   }
 
   @container (min-width: 42rem) {
@@ -750,7 +751,7 @@
     min-width: 0;
     gap: 4px;
     border-bottom: 1px solid var(--border);
-    padding: 12px 0;
+    padding: 12px 18px;
   }
 
   .nothing-project-metric:last-child {
@@ -761,16 +762,11 @@
     .nothing-project-metric {
       border-right: 1px solid var(--border);
       border-bottom: 0;
-      padding: 12px 16px;
-    }
-
-    .nothing-project-metric:first-child {
-      padding-left: 0;
+      padding: 12px 20px;
     }
 
     .nothing-project-metric:last-child {
       border-right: 0;
-      padding-right: 0;
     }
   }
 
@@ -805,6 +801,13 @@
     min-width: 0;
     flex-wrap: wrap;
     gap: 8px;
+    padding: 14px 18px;
+  }
+
+  @container (min-width: 42rem) {
+    .nothing-resource-strip {
+      padding: 14px 20px;
+    }
   }
 
   .nothing-resource-chip {
@@ -873,7 +876,13 @@
     justify-content: space-between;
     gap: 12px;
     border-top: 1px solid var(--input);
-    padding-top: 14px;
+    padding: 14px 18px 16px;
+  }
+
+  @container (min-width: 42rem) {
+    .nothing-project-access-row {
+      padding: 14px 20px 16px;
+    }
   }
 
   .nothing-project-access {
