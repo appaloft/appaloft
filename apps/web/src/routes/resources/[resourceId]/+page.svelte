@@ -1104,11 +1104,21 @@
 
     return currentAccessRoute?.route ?? null;
   });
-  const shouldShowServerField = $derived(!latestDeployment?.serverId);
-  const shouldShowDestinationField = $derived(!defaultDestinationId);
+  const isServerlessStaticArtifactAccess = $derived(
+    currentAccessRoute?.kind === "static-artifact" &&
+      !latestDeployment?.serverId &&
+      !defaultDestinationId,
+  );
+  const shouldShowServerField = $derived(
+    !isServerlessStaticArtifactAccess && !latestDeployment?.serverId,
+  );
+  const shouldShowDestinationField = $derived(
+    !isServerlessStaticArtifactAccess && !defaultDestinationId,
+  );
   const canCreateBinding = $derived(
     Boolean(
-      resource &&
+      !isServerlessStaticArtifactAccess &&
+        resource &&
         serverId &&
         destinationId &&
         domainName.trim() &&
@@ -8615,11 +8625,41 @@
                   </p>
                 </div>
 
-                <form
-                  id="resource-domain-binding-create-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={createResourceDomainBinding}
-                >
+                {#if isServerlessStaticArtifactAccess}
+                  <div class="rounded-md border bg-muted/15 p-4">
+                    <div class="flex gap-3">
+                      <Globe2 class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <div class="min-w-0 space-y-2">
+                        <div>
+                          <h3 class="text-sm font-semibold">
+                            {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
+                          </p>
+                        </div>
+                        {#if currentAccessRoute}
+                          <a
+                            class="inline-flex max-w-full items-center gap-2 truncate text-sm font-medium text-primary underline-offset-4 hover:underline"
+                            href={currentAccessRoute.route.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <span class="shrink-0">
+                              {$t(i18nKeys.console.resources.staticArtifactDefaultAccess)}
+                            </span>
+                            <span class="truncate">{currentAccessRoute.route.url}</span>
+                          </a>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                {:else}
+                  <form
+                    id="resource-domain-binding-create-form"
+                    class="rounded-md border bg-background p-4"
+                    onsubmit={createResourceDomainBinding}
+                  >
                   <div class="flex flex-wrap gap-x-4 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
                     <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
                     <span>
@@ -8830,7 +8870,8 @@
                         : $t(i18nKeys.common.actions.bindDomain)}
                     </Button>
                   </div>
-                </form>
+                  </form>
+                {/if}
 
                 <div class="space-y-3">
                   {#if resourceDomainBindings.length > 0}

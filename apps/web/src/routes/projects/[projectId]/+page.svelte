@@ -45,6 +45,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
+  import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { requestConsoleConfirm, requestConsolePrompt } from "$lib/console/modal-interaction";
   import { createConsoleQueries } from "$lib/console/queries";
@@ -284,20 +285,24 @@
     runtimeMonitoringTopContributorItems(environmentRuntimeMonitoringRollup),
   );
   const projectAccessRoutes = $derived.by(() =>
-    projectDeployments.flatMap((deployment) =>
-      (deployment.runtimePlan.execution.accessRoutes ?? []).flatMap((route) =>
-        route.domains.map((domain) => ({
-          deployment,
-          domain,
-          pathPrefix: route.pathPrefix,
-          proxyKind: route.proxyKind,
-          resourceName:
-            projectResources.find((resource) => resource.id === deployment.resourceId)?.name ??
-            deployment.resourceId,
-          tlsMode: route.tlsMode,
-        })),
-      ),
-    ),
+    projectResources.flatMap((resource) => {
+      const currentAccessRoute = selectCurrentResourceAccessRoute(resource.accessSummary);
+      if (!currentAccessRoute) {
+        return [];
+      }
+
+      return [
+        {
+          resourceId: resource.id,
+          resourceName: resource.name,
+          kind: currentAccessRoute.kind,
+          hostname: currentAccessRoute.route.hostname,
+          pathPrefix: currentAccessRoute.route.pathPrefix,
+          scheme: currentAccessRoute.route.scheme,
+          url: currentAccessRoute.route.url,
+        },
+      ];
+    }),
   );
   const selectedMonitoringEnvironment = $derived(
     projectEnvironments.find((environment) => environment.id === selectedMonitoringEnvironmentId) ??
@@ -1212,18 +1217,19 @@
 
               <div class="console-record-list">
                 {#if projectAccessRoutes.length > 0}
-                  {#each projectAccessRoutes.slice(0, 5) as route (`${route.deployment.id}-${route.domain}-${route.pathPrefix}`)}
+                  {#each projectAccessRoutes.slice(0, 5) as route (`${route.resourceId}-${route.hostname}-${route.pathPrefix}`)}
                     <a
-                      href={deploymentDetailHref(route.deployment)}
+                      href={route.url}
+                      target="_blank"
+                      rel="noreferrer"
                       class="console-record-row block"
                     >
                       <div class="flex flex-wrap items-center justify-between gap-2">
-                        <p class="min-w-0 truncate text-sm font-medium">{route.domain}</p>
-                        <Badge variant="secondary">{route.proxyKind}</Badge>
+                        <p class="min-w-0 truncate text-sm font-medium">{route.hostname}</p>
+                        <Badge variant="secondary">{route.kind}</Badge>
                       </div>
                       <p class="mt-1 text-xs text-muted-foreground">
-                        {route.resourceName} · {route.pathPrefix} · {$t(i18nKeys.common.domain.tls)}
-                        {route.tlsMode}
+                        {route.resourceName} · {route.pathPrefix} · {route.scheme.toUpperCase()}
                       </p>
                     </a>
                   {/each}
