@@ -5,6 +5,7 @@
 - [x] Define public-neutral worker runtime modes.
 - [x] Decide coordinator/worker language and reject master/slave terminology.
 - [x] Define database and external queue backend boundaries.
+- [x] Define dedicated durable work item/event ledger tables for the database backend.
 - [x] Record PGlite/CLI disabled-worker behavior as supported topology, not a separate model.
 
 ## Test Matrix
@@ -18,12 +19,14 @@
 - [x] Add `DurableWorkRuntimeConfig`, `DurableWorkTopology`, and `DurableWorkQueueAdapter`.
 - [x] Add backend descriptors for database and external queue adapters.
 - [x] Add `workerRuntime` config defaults and environment parsing.
-- [ ] Wire server startup status to report `workerRuntime` topology.
-- [ ] Add dedicated `appaloft worker` startup mode.
+- [x] Add database durable work item/event migration and schema types.
+- [x] Wire server startup status to report `workerRuntime` topology.
+- [x] Add dedicated `appaloft worker` startup mode.
 - [ ] Promote deployment create execution to pending process-attempt claim/completion.
 
 ## Verification
 
 - [x] Run `bun test packages/application/test/durable-work.test.ts`.
+- [x] Run `bun test packages/persistence/pg/test/durable-work-ledger.pglite.test.ts`.
 - [x] Run `bun test packages/config/test/index.test.ts`.
 - [x] Run targeted typecheck for changed public packages.

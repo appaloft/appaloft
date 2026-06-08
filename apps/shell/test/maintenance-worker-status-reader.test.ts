@@ -1,3 +1,5 @@
+import "../../../packages/application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolveConfig } from "@appaloft/config";
@@ -9,6 +11,34 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     const reader = new ConfigMaintenanceWorkerStatusReader(resolveConfig());
 
     expect(reader.list()).toMatchObject([
+      {
+        key: "durable-worker-runtime",
+        enabled: true,
+        activation: "starts-with-backend-service",
+        intervalSeconds: 0,
+        safetyMode: "durable-process-delivery",
+        runtimeTopology: {
+          mode: "embedded",
+          queueBackend: "database",
+          workerCount: 1,
+          workerGroup: "appaloft-worker",
+          workerIds: ["appaloft-worker-1"],
+          coordinationRole: "coordinator",
+        },
+        configurationKeys: [
+          "APPALOFT_WORKER_RUNTIME_MODE",
+          "APPALOFT_WORKER_QUEUE_BACKEND",
+          "APPALOFT_WORKER_COUNT",
+          "APPALOFT_WORKER_GROUP",
+          "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
+        ],
+        operationKeys: [
+          "deployments.create",
+          "deployments.retry",
+          "deployments.rollback",
+          "operator-work.*",
+        ],
+      },
       {
         key: "certificate-retry-scheduler",
         enabled: true,
@@ -133,12 +163,34 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED: "true",
           APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS: "120",
           APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE: "5",
+          APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+          APPALOFT_WORKER_QUEUE_BACKEND: "database",
+          APPALOFT_WORKER_COUNT: "3",
+          APPALOFT_WORKER_GROUP: "cloud-deployment-worker",
         },
       }),
     );
 
     const statuses = new Map(reader.list().map((entry) => [entry.key, entry]));
 
+    expect(statuses.get("durable-worker-runtime")).toMatchObject({
+      enabled: true,
+      activation: "starts-as-standalone-process",
+      intervalSeconds: 0,
+      safetyMode: "durable-process-delivery",
+      runtimeTopology: {
+        mode: "standalone",
+        queueBackend: "database",
+        workerCount: 3,
+        workerGroup: "cloud-deployment-worker",
+        workerIds: [
+          "cloud-deployment-worker-1",
+          "cloud-deployment-worker-2",
+          "cloud-deployment-worker-3",
+        ],
+        coordinationRole: "coordinator",
+      },
+    });
     expect(statuses.get("scheduled-task-runner")).toMatchObject({
       enabled: true,
       activation: "starts-with-backend-service",
@@ -176,6 +228,31 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     });
   });
 
+  test("[PROC-DELIVERY-WORKER-012] reports disabled durable runtime without worker slots", () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(
+      resolveConfig({
+        env: {
+          APPALOFT_WORKER_RUNTIME_MODE: "disabled",
+          APPALOFT_WORKER_COUNT: "0",
+        },
+      }),
+    );
+
+    expect(reader.list().find((entry) => entry.key === "durable-worker-runtime")).toMatchObject({
+      enabled: false,
+      activation: "disabled-by-config",
+      safetyMode: "durable-process-delivery",
+      runtimeTopology: {
+        mode: "disabled",
+        queueBackend: "database",
+        workerCount: 0,
+        workerGroup: "appaloft-worker",
+        workerIds: [],
+        coordinationRole: "disabled",
+      },
+    });
+  });
+
   test("[SCHED-MAINT-WORKER-001] public docs identify the default-on worker exception", () => {
     const englishDocs = readFileSync(
       "apps/docs/src/content/docs/en/reference/configuration.md",
@@ -187,9 +264,13 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     );
 
     expect(englishDocs).toContain("certificate retry scheduler is the default-on exception");
+    expect(englishDocs).toContain("Durable worker runtime");
+    expect(englishDocs).toContain("appaloft worker");
     expect(englishDocs).toContain("runtime prune");
     expect(englishDocs).toContain("preview cleanup workers stay disabled");
     expect(defaultDocs).toContain("certificate retry scheduler 是默认开启的例外");
+    expect(defaultDocs).toContain("Durable worker runtime");
+    expect(defaultDocs).toContain("appaloft worker");
     expect(defaultDocs).toContain("preview cleanup worker 都保持默认关闭");
   });
 });

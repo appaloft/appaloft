@@ -11,6 +11,7 @@ import {
   type ExecutionContextFactory,
   ListPluginsQuery,
   ListProvidersQuery,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
 } from "@appaloft/application";
@@ -42,14 +43,33 @@ function mountSystemDiagnosticRoutes(queryBus: QueryBus) {
     execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
       ok({} as T),
   } as CommandBus;
+  const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+    authorizeProductSession: async (_context, input) =>
+      ok({
+        actor: {
+          kind: "user",
+          id: "usr_system_diagnostics",
+          label: "system-diagnostics@example.test",
+        },
+        email: "system-diagnostics@example.test",
+        organizationId: input.organizationId ?? "org_system_diagnostics",
+        role: input.requiredRole,
+        userId: "usr_system_diagnostics",
+      }),
+  };
 
   return mountAppaloftOrpcRoutes(new Elysia(), {
     commandBus,
     executionContextFactory: new TestExecutionContextFactory(),
     logger: new NoopLogger(),
+    productSessionAuthorizationPort,
     queryBus,
   });
 }
+
+const authHeaders = {
+  cookie: "better-auth.session_token=test-session",
+};
 
 describe("system diagnostics HTTP routes", () => {
   test("[SYSTEM-DIAG-003] exposes safe provider capability and configuration diagnostics", async () => {
@@ -89,7 +109,9 @@ describe("system diagnostics HTTP routes", () => {
     } as QueryBus;
     const app = mountSystemDiagnosticRoutes(queryBus);
 
-    const response = await app.handle(new Request("http://localhost/api/providers"));
+    const response = await app.handle(
+      new Request("http://localhost/api/providers", { headers: authHeaders }),
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -152,7 +174,9 @@ describe("system diagnostics HTTP routes", () => {
     } as QueryBus;
     const app = mountSystemDiagnosticRoutes(queryBus);
 
-    const response = await app.handle(new Request("http://localhost/api/plugins"));
+    const response = await app.handle(
+      new Request("http://localhost/api/plugins", { headers: authHeaders }),
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -194,6 +218,35 @@ describe("system diagnostics HTTP routes", () => {
           plugins: [],
           maintenanceWorkers: [
             {
+              key: "durable-worker-runtime",
+              label: "Durable worker runtime",
+              enabled: true,
+              activation: "starts-as-standalone-process",
+              safetyMode: "durable-process-delivery",
+              intervalSeconds: 0,
+              runtimeTopology: {
+                mode: "standalone",
+                queueBackend: "database",
+                workerCount: 2,
+                workerGroup: "cloud-deployment-worker",
+                workerIds: ["cloud-deployment-worker-1", "cloud-deployment-worker-2"],
+                coordinationRole: "coordinator",
+              },
+              configurationKeys: [
+                "APPALOFT_WORKER_RUNTIME_MODE",
+                "APPALOFT_WORKER_QUEUE_BACKEND",
+                "APPALOFT_WORKER_COUNT",
+                "APPALOFT_WORKER_GROUP",
+                "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
+              ],
+              operationKeys: [
+                "deployments.create",
+                "deployments.retry",
+                "deployments.rollback",
+                "operator-work.*",
+              ],
+            },
+            {
               key: "scheduled-task-runner",
               label: "Scheduled task runner",
               enabled: false,
@@ -231,7 +284,9 @@ describe("system diagnostics HTTP routes", () => {
     } as QueryBus;
     const app = mountSystemDiagnosticRoutes(queryBus);
 
-    const response = await app.handle(new Request("http://localhost/api/system/doctor"));
+    const response = await app.handle(
+      new Request("http://localhost/api/system/doctor", { headers: authHeaders }),
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -240,6 +295,21 @@ describe("system diagnostics HTTP routes", () => {
         status: "ready",
       },
       maintenanceWorkers: [
+        {
+          key: "durable-worker-runtime",
+          enabled: true,
+          activation: "starts-as-standalone-process",
+          safetyMode: "durable-process-delivery",
+          intervalSeconds: 0,
+          runtimeTopology: {
+            mode: "standalone",
+            queueBackend: "database",
+            workerCount: 2,
+            workerGroup: "cloud-deployment-worker",
+            workerIds: ["cloud-deployment-worker-1", "cloud-deployment-worker-2"],
+            coordinationRole: "coordinator",
+          },
+        },
         {
           key: "scheduled-task-runner",
           enabled: false,

@@ -141,6 +141,7 @@ export interface EventBus {
 
 export type MaintenanceWorkerKey =
   | "certificate-retry-scheduler"
+  | "durable-worker-runtime"
   | "preview-expiry-cleanup-scheduler"
   | "preview-cleanup-retry-scheduler"
   | "scheduled-task-runner"
@@ -148,16 +149,30 @@ export type MaintenanceWorkerKey =
   | "scheduled-history-retention-runner"
   | "runtime-monitoring-collector-runner";
 
-export type MaintenanceWorkerActivation = "disabled-by-config" | "starts-with-backend-service";
+export type MaintenanceWorkerActivation =
+  | "disabled-by-config"
+  | "starts-with-backend-service"
+  | "starts-as-standalone-process";
 
 export type MaintenanceWorkerSafetyMode =
   | "certificate-retry"
+  | "durable-process-delivery"
   | "preview-expiry-cleanup"
   | "preview-cleanup-retry"
   | "runtime-execution"
   | "policy-gated-prune"
   | "policy-gated-retention"
   | "read-only-collection";
+
+export interface MaintenanceWorkerRuntimeTopology {
+  mode: "embedded" | "standalone" | "disabled";
+  queueBackend: "database" | "external";
+  workerCount: number;
+  workerGroup: string;
+  workerIds: string[];
+  coordinationRole: "coordinator" | "worker" | "disabled";
+  externalBackendKind?: "kafka" | "temporal" | "custom";
+}
 
 export interface MaintenanceWorkerStatus {
   key: MaintenanceWorkerKey;
@@ -169,6 +184,7 @@ export interface MaintenanceWorkerStatus {
   batchSize?: number;
   defaultRetryDelaySeconds?: number;
   rawRetentionHours?: number;
+  runtimeTopology?: MaintenanceWorkerRuntimeTopology;
   configurationKeys: string[];
   operationKeys: string[];
 }

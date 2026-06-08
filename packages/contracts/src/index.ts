@@ -6116,10 +6116,12 @@ export const listPluginsResponseSchema = z.object({
 export const maintenanceWorkerActivationSchema = z.enum([
   "disabled-by-config",
   "starts-with-backend-service",
+  "starts-as-standalone-process",
 ]);
 
 export const maintenanceWorkerSafetyModeSchema = z.enum([
   "certificate-retry",
+  "durable-process-delivery",
   "preview-expiry-cleanup",
   "preview-cleanup-retry",
   "runtime-execution",
@@ -6128,9 +6130,20 @@ export const maintenanceWorkerSafetyModeSchema = z.enum([
   "read-only-collection",
 ]);
 
+export const maintenanceWorkerRuntimeTopologySchema = z.object({
+  mode: z.enum(["embedded", "standalone", "disabled"]),
+  queueBackend: z.enum(["database", "external"]),
+  workerCount: z.number().int().nonnegative(),
+  workerGroup: z.string(),
+  workerIds: z.array(z.string()),
+  coordinationRole: z.enum(["coordinator", "worker", "disabled"]),
+  externalBackendKind: z.enum(["kafka", "temporal", "custom"]).optional(),
+});
+
 export const maintenanceWorkerStatusSchema = z.object({
   key: z.enum([
     "certificate-retry-scheduler",
+    "durable-worker-runtime",
     "preview-expiry-cleanup-scheduler",
     "preview-cleanup-retry-scheduler",
     "scheduled-task-runner",
@@ -6142,10 +6155,11 @@ export const maintenanceWorkerStatusSchema = z.object({
   enabled: z.boolean(),
   activation: maintenanceWorkerActivationSchema,
   safetyMode: maintenanceWorkerSafetyModeSchema,
-  intervalSeconds: z.number().int().positive(),
+  intervalSeconds: z.number().int().nonnegative(),
   batchSize: z.number().int().positive().optional(),
   defaultRetryDelaySeconds: z.number().int().positive().optional(),
   rawRetentionHours: z.number().int().positive().optional(),
+  runtimeTopology: maintenanceWorkerRuntimeTopologySchema.optional(),
   configurationKeys: z.array(z.string()),
   operationKeys: z.array(z.string()),
 });

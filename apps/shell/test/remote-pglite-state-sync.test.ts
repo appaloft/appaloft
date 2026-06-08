@@ -106,6 +106,12 @@ function testConfig(
       batchSize: 25,
       rawRetentionHours: 24,
     },
+    workerRuntime: {
+      mode: "embedded" as const,
+      queueBackend: "database" as const,
+      workerCount: 1,
+      workerGroup: "appaloft-worker",
+    },
     enabledSystemPlugins: [],
   };
 }

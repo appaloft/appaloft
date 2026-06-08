@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createDurableWorkTopology,
+  type DurableWorkLedger,
   type DurableWorkQueueAdapter,
   describeDurableWorkQueueBackend,
 } from "../src/durable-work";
@@ -81,7 +82,7 @@ describe("durable work topology", () => {
 });
 
 describe("durable work queue backend", () => {
-  test("[PROC-DELIVERY-WORKER-005] database queue keeps process attempts as durable state authority", () => {
+  test("[PROC-DELIVERY-WORKER-005] database queue keeps durable work ledger as state authority", () => {
     const descriptor = describeDurableWorkQueueBackend({
       queueBackend: "database",
     });
@@ -90,7 +91,7 @@ describe("durable work queue backend", () => {
     if (descriptor.isErr()) throw new Error(descriptor.error.message);
     expect(descriptor.value).toMatchObject({
       backend: "database",
-      durableStateAuthority: "process-attempt-journal",
+      durableStateAuthority: "durable-work-ledger",
       supportsMultipleWorkers: true,
       supportsAtomicClaim: true,
     });
@@ -145,5 +146,16 @@ describe("durable work queue backend", () => {
       "listDueRetries",
       "record",
     ]);
+  });
+
+  test("[PROC-DELIVERY-WORKER-015] durable work ledger is a public item/event contract", () => {
+    const ledgerMethods: Array<keyof DurableWorkLedger> = [
+      "recordItem",
+      "appendEvent",
+      "findItem",
+      "listEvents",
+    ];
+
+    expect(ledgerMethods.sort()).toEqual(["appendEvent", "findItem", "listEvents", "recordItem"]);
   });
 });

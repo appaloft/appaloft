@@ -12,6 +12,25 @@ import {
 export type DurableWorkRuntimeMode = "embedded" | "standalone" | "disabled";
 export type DurableWorkQueueBackend = "database" | "external";
 export type DurableWorkExternalBackendKind = "kafka" | "temporal" | "custom";
+export type DurableWorkItemStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled"
+  | "retry-scheduled"
+  | "dead-lettered";
+export type DurableWorkEventKind =
+  | "accepted"
+  | "claimed"
+  | "progress"
+  | "retry-scheduled"
+  | "completed"
+  | "failed"
+  | "canceled"
+  | "dead-lettered";
+
+type DurableWorkSafeValue = string | number | boolean | null;
 
 export interface DurableWorkRuntimeConfig {
   readonly mode: DurableWorkRuntimeMode;
@@ -49,10 +68,66 @@ export interface DurableWorkQueueBackendDescriptor {
   readonly backend: DurableWorkQueueBackend;
   readonly externalBackendKind?: DurableWorkExternalBackendKind;
   readonly durableStateAuthority:
-    | "process-attempt-journal"
+    | "durable-work-ledger"
     | "external-workflow-engine-with-process-attempt-projection";
   readonly supportsMultipleWorkers: boolean;
   readonly supportsAtomicClaim: boolean;
+}
+
+export interface DurableWorkItemRecord {
+  readonly id: string;
+  readonly kind: string;
+  readonly status: DurableWorkItemStatus;
+  readonly operationKey: string;
+  readonly queueBackend: DurableWorkQueueBackend;
+  readonly dedupeKey?: string;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+  readonly projectId?: string;
+  readonly environmentId?: string;
+  readonly resourceId?: string;
+  readonly deploymentId?: string;
+  readonly serverId?: string;
+  readonly subjectKind?: string;
+  readonly subjectId?: string;
+  readonly phase?: string;
+  readonly step?: string;
+  readonly priority: number;
+  readonly attemptCount: number;
+  readonly maxAttempts: number;
+  readonly availableAt: string;
+  readonly leaseOwner?: string;
+  readonly leaseExpiresAt?: string;
+  readonly startedAt?: string;
+  readonly updatedAt: string;
+  readonly finishedAt?: string;
+  readonly errorCode?: string;
+  readonly errorCategory?: string;
+  readonly retriable?: boolean;
+  readonly safeInput?: Record<string, DurableWorkSafeValue>;
+  readonly safeDetails?: Record<string, DurableWorkSafeValue>;
+}
+
+export interface DurableWorkEventRecord {
+  readonly id: string;
+  readonly workItemId: string;
+  readonly sequence: number;
+  readonly kind: DurableWorkEventKind;
+  readonly status?: DurableWorkItemStatus;
+  readonly phase?: string;
+  readonly step?: string;
+  readonly message?: string;
+  readonly workerId?: string;
+  readonly workerGroup?: string;
+  readonly occurredAt: string;
+  readonly safeDetails?: Record<string, DurableWorkSafeValue>;
+}
+
+export interface DurableWorkLedger {
+  recordItem(item: DurableWorkItemRecord): Promise<Result<DurableWorkItemRecord>>;
+  appendEvent(event: DurableWorkEventRecord): Promise<Result<DurableWorkEventRecord>>;
+  findItem(id: string): Promise<Result<DurableWorkItemRecord | null>>;
+  listEvents(workItemId: string): Promise<Result<DurableWorkEventRecord[]>>;
 }
 
 export function createDurableWorkTopology(
@@ -121,7 +196,7 @@ export function describeDurableWorkQueueBackend(
   if (config.queueBackend === "database") {
     return ok({
       backend: "database",
-      durableStateAuthority: "process-attempt-journal",
+      durableStateAuthority: "durable-work-ledger",
       supportsMultipleWorkers: true,
       supportsAtomicClaim: true,
     });

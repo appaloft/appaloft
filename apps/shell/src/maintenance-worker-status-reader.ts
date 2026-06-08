@@ -1,4 +1,5 @@
 import {
+  createDurableWorkTopology,
   type MaintenanceWorkerActivation,
   type MaintenanceWorkerSafetyMode,
   type MaintenanceWorkerStatus,
@@ -19,6 +20,8 @@ function status(input: {
   batchSize?: number;
   defaultRetryDelaySeconds?: number;
   rawRetentionHours?: number;
+  runtimeTopology?: MaintenanceWorkerStatus["runtimeTopology"];
+  activation?: MaintenanceWorkerActivation;
   configurationKeys: string[];
   operationKeys: string[];
 }): MaintenanceWorkerStatus {
@@ -26,7 +29,7 @@ function status(input: {
     key: input.key,
     label: input.label,
     enabled: input.enabled,
-    activation: activation(input.enabled),
+    activation: input.activation ?? activation(input.enabled),
     safetyMode: input.safetyMode,
     intervalSeconds: input.intervalSeconds,
     ...(input.batchSize !== undefined ? { batchSize: input.batchSize } : {}),
@@ -36,9 +39,56 @@ function status(input: {
     ...(input.rawRetentionHours !== undefined
       ? { rawRetentionHours: input.rawRetentionHours }
       : {}),
+    ...(input.runtimeTopology ? { runtimeTopology: input.runtimeTopology } : {}),
     configurationKeys: input.configurationKeys,
     operationKeys: input.operationKeys,
   };
+}
+
+function durableWorkerRuntimeStatus(config: AppConfig): MaintenanceWorkerStatus {
+  const { workerRuntime } = config;
+  const topology = createDurableWorkTopology(workerRuntime);
+  const workerIds = topology.isOk()
+    ? topology.value.workers.map((worker) => worker.workerId)
+    : Array.from(
+        { length: workerRuntime.mode === "disabled" ? 0 : workerRuntime.workerCount },
+        (_, index) => `${workerRuntime.workerGroup}-${index + 1}`,
+      );
+  const enabled = workerRuntime.mode !== "disabled";
+
+  return status({
+    key: "durable-worker-runtime",
+    label: "Durable worker runtime",
+    enabled,
+    activation:
+      workerRuntime.mode === "standalone" ? "starts-as-standalone-process" : activation(enabled),
+    safetyMode: "durable-process-delivery",
+    intervalSeconds: 0,
+    runtimeTopology: {
+      mode: workerRuntime.mode,
+      queueBackend: workerRuntime.queueBackend,
+      workerCount: workerIds.length,
+      workerGroup: workerRuntime.workerGroup,
+      workerIds,
+      coordinationRole: topology.isOk() ? topology.value.coordinationRole : "disabled",
+      ...(workerRuntime.externalBackendKind
+        ? { externalBackendKind: workerRuntime.externalBackendKind }
+        : {}),
+    },
+    configurationKeys: [
+      "APPALOFT_WORKER_RUNTIME_MODE",
+      "APPALOFT_WORKER_QUEUE_BACKEND",
+      "APPALOFT_WORKER_COUNT",
+      "APPALOFT_WORKER_GROUP",
+      "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
+    ],
+    operationKeys: [
+      "deployments.create",
+      "deployments.retry",
+      "deployments.rollback",
+      "operator-work.*",
+    ],
+  });
 }
 
 export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerStatusReader {
@@ -56,6 +106,7 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
     } = this.config;
 
     return [
+      durableWorkerRuntimeStatus(this.config),
       status({
         key: "certificate-retry-scheduler",
         label: "Certificate retry scheduler",

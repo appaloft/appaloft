@@ -16,6 +16,7 @@ import {
   type CertificateRetryScheduler,
   type Clock,
   type CommandBus,
+  createDurableWorkTopology,
   type DependencyResourceBackupPolicyRepository,
   type DeployTokenRepository,
   type EnvironmentReadModel,
@@ -156,6 +157,7 @@ export interface AppaloftServer {
   executionContextFactory: ExecutionContextFactory;
   httpApp: AppaloftHttpApp;
   startServer(): Promise<void>;
+  startWorkerRuntime(): Promise<void>;
   shutdown(): Promise<void>;
 }
 
@@ -939,7 +941,41 @@ export async function createAppaloftServer(
   });
 
   let started = false;
+  let workerRuntimeStarted = false;
   let serverHandle: AppaloftHttpServerHandle | null = null;
+
+  const startWorkerRuntime = async (): Promise<void> => {
+    if (workerRuntimeStarted) {
+      return;
+    }
+
+    const topology = createDurableWorkTopology(config.workerRuntime);
+    if (topology.isErr()) {
+      throw new Error(topology.error.message);
+    }
+
+    workerRuntimeStarted = true;
+    logger.info("durable_worker_runtime.started", {
+      mode: config.workerRuntime.mode,
+      queueBackend: config.workerRuntime.queueBackend,
+      workerCount: topology.value.expectedWorkerCount,
+      workerGroup: config.workerRuntime.workerGroup,
+      workerIds: topology.value.workers.map((worker) => worker.workerId),
+      coordinationRole: topology.value.coordinationRole,
+      ...(config.workerRuntime.externalBackendKind
+        ? { externalBackendKind: config.workerRuntime.externalBackendKind }
+        : {}),
+    });
+
+    certificateRetrySchedulerRunner.start();
+    previewExpiryCleanupSchedulerRunner.start();
+    previewCleanupRetrySchedulerRunner.start();
+    scheduledTaskRunner.start();
+    scheduledRuntimePruneRunner.start();
+    scheduledDependencyBackupRunner.start();
+    scheduledHistoryRetentionRunner.start();
+    runtimeMonitoringCollectorRunner.start();
+  };
 
   const startServer = async (): Promise<void> => {
     if (started) {
@@ -966,14 +1002,7 @@ export async function createAppaloftServer(
       webOrigin: config.webOrigin,
     });
 
-    certificateRetrySchedulerRunner.start();
-    previewExpiryCleanupSchedulerRunner.start();
-    previewCleanupRetrySchedulerRunner.start();
-    scheduledTaskRunner.start();
-    scheduledRuntimePruneRunner.start();
-    scheduledDependencyBackupRunner.start();
-    scheduledHistoryRetentionRunner.start();
-    runtimeMonitoringCollectorRunner.start();
+    await startWorkerRuntime();
   };
 
   const server: AppaloftServer = {
@@ -983,6 +1012,7 @@ export async function createAppaloftServer(
     executionContextFactory,
     httpApp,
     startServer,
+    startWorkerRuntime,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
       previewExpiryCleanupSchedulerRunner.stop();
