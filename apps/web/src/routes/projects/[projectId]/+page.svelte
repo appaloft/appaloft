@@ -850,6 +850,7 @@
       label: project?.name ?? $t(i18nKeys.console.projects.pageTitle),
       kind: "project",
       loading: projectHeaderLoading,
+      href: project ? projectDetailHref(project.id) : undefined,
       switcherLabel: $t(i18nKeys.console.projects.pageTitle),
       switcherItems: projectHeaderSwitchItems,
     },

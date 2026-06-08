@@ -447,22 +447,53 @@
                       </div>
                     {:else if switcherItems(item).length > 0}
                       <DropdownMenu>
-                        <DropdownMenuTrigger
-                          data-console-header-switcher-trigger
-                          class="group inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-2 rounded-md border border-transparent px-2 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[16rem]"
+                        <div
+                          data-console-header-switcher
+                          class="group inline-flex h-8 min-w-0 max-w-[12rem] overflow-hidden rounded-md border border-transparent text-sm font-medium text-foreground transition-colors hover:border-border sm:max-w-[16rem]"
                         >
-                          {#if item.kind === "project"}
-                            <FolderOpen class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
-                          {:else if item.kind === "resource"}
-                            <Package class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
-                          {:else if item.kind === "deployment"}
-                            <Rocket class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
-                          {:else if item.kind === "environment"}
-                            <ServerCrash class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                          {#if item.href}
+                            <a
+                              data-console-header-switcher-link
+                              href={item.href}
+                              class="inline-flex h-full min-w-0 flex-1 items-center gap-2 px-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {#if item.kind === "project"}
+                                <FolderOpen class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "resource"}
+                                <Package class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "deployment"}
+                                <Rocket class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "environment"}
+                                <ServerCrash class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {/if}
+                              <span class="min-w-0 truncate">{item.label}</span>
+                            </a>
+                          {:else}
+                            <span
+                              data-console-header-switcher-label
+                              class="inline-flex h-full min-w-0 flex-1 items-center gap-2 px-2"
+                            >
+                              {#if item.kind === "project"}
+                                <FolderOpen class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "resource"}
+                                <Package class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "deployment"}
+                                <Rocket class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {:else if item.kind === "environment"}
+                                <ServerCrash class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                              {/if}
+                              <span class="min-w-0 truncate">{item.label}</span>
+                            </span>
                           {/if}
-                          <span class="min-w-0 truncate">{item.label}</span>
-                          <ChevronDown class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                        </DropdownMenuTrigger>
+                          <DropdownMenuTrigger
+                            data-console-header-switcher-trigger
+                            aria-label={item.switcherLabel ?? item.label}
+                            title={item.switcherLabel ?? item.label}
+                            class="group/dropdown-trigger inline-flex h-full w-8 shrink-0 items-center justify-center border-l border-border/70 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
+                          </DropdownMenuTrigger>
+                        </div>
                         <DropdownMenuContent
                           align="start"
                           sideOffset={6}

@@ -1049,6 +1049,7 @@
       label: headerDeployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment),
       kind: "deployment",
       loading: deploymentHeaderLoading,
+      href: headerDeployment ? deploymentDetailHref(headerDeployment) : undefined,
       switcherLabel: $t(i18nKeys.console.deployments.pageTitle),
       switcherItems: deploymentHeaderSwitchItems,
     },

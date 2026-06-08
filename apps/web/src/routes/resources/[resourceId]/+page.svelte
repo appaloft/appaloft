@@ -4784,6 +4784,7 @@
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
       kind: "resource",
       loading: resourceHeaderLoading,
+      href: resource ? resourceDetailHref(resource) : undefined,
       switcherLabel: $t(i18nKeys.console.resources.pageTitle),
       switcherItems: resourceHeaderSwitchItems,
     },
