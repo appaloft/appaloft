@@ -56,6 +56,7 @@ query, or domain language.
 | PROC-DELIVERY-WORKER-020 | Deployment admission creates durable work | `deployments.create` has accepted and persisted a deployment attempt and a durable work adapter is configured | the command completes | runtime execution is not called inline; a pending deployment work item and accepted event are recorded with the deployment id for monitoring. |
 | PROC-DELIVERY-WORKER-021 | Deployment worker executes accepted work | a pending deployment work item has been accepted | a deployment worker drains due work | the worker claims the item, loads the deployment, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. |
 | PROC-DELIVERY-WORKER-022 | Server runtime composes PG durable queue | the public server starts with database queue backend | runtime dependencies are registered and worker runtime starts | `PgDurableWorkLedger` is registered as the durable queue adapter and the worker runtime starts database drain loops for declared worker slots. |
+| PROC-DELIVERY-WORKER-023 | Composed server drains deployment work end to end | a public server is created with PGlite, database queue backend, and hermetic runtime adapters | `deployments.create` is dispatched and `startWorkerRuntime` runs | the command returns before runtime execution, the PG durable queue stores pending work, the worker drain claims and completes the item, and the Deployment reaches `succeeded`. |
 
 ## Domain Ownership
 

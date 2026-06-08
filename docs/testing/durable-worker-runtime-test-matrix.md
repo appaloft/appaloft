@@ -28,10 +28,10 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-020 | `deployments.create` records pending durable deployment work and an accepted event when a durable queue adapter is configured, without inline runtime execution. | Application | `packages/application/test/create-deployment.test.ts` |
 | PROC-DELIVERY-WORKER-021 | Deployment worker drain claims accepted deployment work, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. | Application | `packages/application/test/create-deployment.test.ts` |
 | PROC-DELIVERY-WORKER-022 | Server runtime registers the PG durable queue adapter and starts database worker drain loops for declared worker slots. | Server composition | `packages/server` typecheck plus `packages/server/src/index.ts` composition review |
+| PROC-DELIVERY-WORKER-023 | Composed PGlite server accepts `deployments.create`, stores pending PG durable work, starts worker runtime, drains the item, and reaches succeeded deployment state. | Server composition | `packages/server/test/durable-work-runtime.test.ts` |
 
 ## Deferred Coverage
 
 - Deployment retry and rollback worker claim/completion.
 - Server `/api/system` worker topology readback.
-- Composed-server smoke coverage for `deployments.create` through the PG durable queue and worker drain.
 - Cloud Blueprint install acceptance composing public deployment worker attempts.

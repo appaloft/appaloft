@@ -31,7 +31,7 @@
 - [x] Start durable worker drain loops from `startWorkerRuntime` for declared database worker slots.
 - [x] Wire server startup status to report `workerRuntime` topology.
 - [x] Add dedicated `appaloft worker` startup mode.
-- [ ] Add composed-server smoke coverage that observes `deployments.create` through the PG durable
+- [x] Add composed-server smoke coverage that observes `deployments.create` through the PG durable
   queue and worker drain end to end.
 
 ## Verification
@@ -39,4 +39,5 @@
 - [x] Run `bun test packages/application/test/durable-work.test.ts`.
 - [x] Run `bun test packages/persistence/pg/test/durable-work-ledger.pglite.test.ts`.
 - [x] Run `bun test packages/config/test/index.test.ts`.
+- [x] Run `bun test packages/server/test/durable-work-runtime.test.ts`.
 - [x] Run targeted typecheck for changed public packages.
