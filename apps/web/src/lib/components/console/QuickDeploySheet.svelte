@@ -2177,7 +2177,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         requirementId: requirement.id,
         kind: requirement.kind,
         label: requirement.label,
-        capabilities: requirement.capabilities,
         mode: draft.mode,
         providerKey,
         ...(draft.mode === "create"
