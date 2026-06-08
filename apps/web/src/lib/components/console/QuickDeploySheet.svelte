@@ -3,6 +3,7 @@
   import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import {
+    AlertCircle,
     CheckCircle2,
     ChevronDown,
     Code2,
@@ -144,6 +145,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     reuseConnectionUrl: string;
     reuseSecretRef: string;
   };
+  type BlueprintSecretInputMode = "generated" | "manual";
+  type BlueprintGeneratedSecretPolicy = {
+    bytes: number;
+    encoding?: "hex" | "base64url" | "base64";
+    description?: string;
+    scope?: "component" | "application" | "environment";
+    rotation?: {
+      strategy?: "manual" | "periodic";
+      intervalDays?: number;
+    };
+  };
+  type BlueprintSecretDefinition = {
+    key: string;
+    label: string;
+    required?: boolean;
+    source?: "user-provided" | "generated";
+    generation?: BlueprintGeneratedSecretPolicy;
+    description?: string;
+  };
   type BlueprintDependencyRequirement = {
     id: string;
     kind: BlueprintDependencyKind;
@@ -278,7 +298,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       description?: string;
       tags?: readonly string[];
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
-      secrets: readonly { key: string; label: string; required?: boolean; description?: string }[];
+      secrets: readonly BlueprintSecretDefinition[];
       resources: readonly {
         id: string;
         kind: string;
@@ -294,7 +314,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         description?: string;
         defaultProfile?: string;
         parameters?: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
-        secrets?: readonly { key: string; label: string; required?: boolean; description?: string }[];
+        secrets?: readonly BlueprintSecretDefinition[];
         resources?: readonly {
           id: string;
           kind: string;
@@ -312,7 +332,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       profiles: readonly string[];
       defaultProfile: string;
       parameters: readonly { key: string; label: string; type: string; required?: boolean; default?: unknown }[];
-      secrets: readonly { key: string; label: string; required?: boolean }[];
+      secrets: readonly BlueprintSecretDefinition[];
       defaultVariant?: string;
       variants?: readonly { id: string; label?: string; summary?: string }[];
       upgrade?: BlueprintUpgradePolicy;
@@ -796,6 +816,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     Record<string, BlueprintDependencyProvisioningDraft>
   >({});
   let blueprintSecretValues = $state<Record<string, string>>({});
+  let blueprintSecretInputModes = $state<Record<string, BlueprintSecretInputMode>>({});
+  let blueprintSecretValueVisible = $state<Record<string, boolean>>({});
   let blueprintSelectorDialogOpen = $state(false);
   let blueprintDetailDialogOpen = $state(false);
   let blueprintDetailSlug = $state("");
@@ -1783,6 +1805,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       stepIsComplete("project") &&
       (!serverRequiredForQuickDeploy || stepIsComplete("server")),
   );
+  const quickDeployReadinessIssues = $derived(readinessIssues());
+  const quickDeployActionHint = $derived.by(() => {
+    if (quickDeployReady) {
+      return staticPublishesToManaged ? "静态文件和项目已就绪。" : "来源、项目和服务器已就绪。";
+    }
+
+    return quickDeployReadinessIssues[0] ??
+      (staticPublishesToManaged ? "请先上传静态文件并确认项目。" : "请先完善来源、项目和服务器。");
+  });
   const quickDeployDiagnosticSummaryButtonLabel = $derived.by(() => {
     if (diagnosticSummaryLoading) {
       return $t(i18nKeys.console.resources.diagnosticSummaryLoading);
@@ -2164,10 +2195,114 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
   }
 
-  function blueprintSecretValuesComplete(): boolean {
-    return selectedBlueprintSecrets.every(
-      (secret) => secret.required === false || Boolean(blueprintSecretValues[secret.key]?.trim()),
+  function blueprintSecretCanGenerate(secret: BlueprintSecretDefinition): boolean {
+    return secret.source === "generated" && Boolean(secret.generation);
+  }
+
+  function blueprintSecretInputMode(secret: BlueprintSecretDefinition): BlueprintSecretInputMode {
+    if (!blueprintSecretCanGenerate(secret)) {
+      return "manual";
+    }
+
+    return blueprintSecretInputModes[secret.key] ?? "generated";
+  }
+
+  function setBlueprintSecretInputMode(
+    secret: BlueprintSecretDefinition,
+    mode: BlueprintSecretInputMode,
+  ): void {
+    blueprintSecretInputModes = {
+      ...blueprintSecretInputModes,
+      [secret.key]: mode,
+    };
+  }
+
+  function toggleBlueprintSecretValueVisibility(secretKey: string): void {
+    blueprintSecretValueVisible = {
+      ...blueprintSecretValueVisible,
+      [secretKey]: !blueprintSecretValueVisible[secretKey],
+    };
+  }
+
+  function blueprintSecretLabel(secret: BlueprintSecretDefinition): string {
+    return secret.label || secret.key;
+  }
+
+  function blueprintSecretGenerationSummary(secret: BlueprintSecretDefinition): string {
+    const generation = secret.generation;
+    if (!generation) {
+      return "安装时由后端生成并写入 secret 引用。";
+    }
+
+    return `安装时由后端生成 ${generation.bytes} bytes ${generation.encoding ?? "base64url"} secret，并只保存引用。`;
+  }
+
+  function blueprintSecretManualValueMissing(secret: BlueprintSecretDefinition): boolean {
+    return (
+      secret.required !== false &&
+      blueprintSecretInputMode(secret) === "manual" &&
+      !blueprintSecretValues[secret.key]?.trim()
     );
+  }
+
+  function missingBlueprintSecrets(): BlueprintSecretDefinition[] {
+    return selectedBlueprintSecrets.filter(blueprintSecretManualValueMissing);
+  }
+
+  function blueprintSecretValuesComplete(): boolean {
+    return missingBlueprintSecrets().length === 0;
+  }
+
+  function variableSectionComplete(): boolean {
+    return sourceKind !== "blueprint" || missingBlueprintSecrets().length === 0;
+  }
+
+  function statusIconClasses(complete: boolean): string {
+    return complete ? "text-emerald-600" : "text-destructive";
+  }
+
+  function readinessIssues(): string[] {
+    const issues: string[] = [];
+
+    if (!stepIsComplete("source")) {
+      if (sourceKind === "blueprint") {
+        if (!selectedBlueprintSlug.trim()) {
+          issues.push("来源：请选择一个蓝图");
+        } else if (selectedBlueprintDetailQuery.isError) {
+          issues.push("来源：蓝图详情读取失败");
+        } else if (!selectedBlueprintManifest) {
+          issues.push("来源：正在读取蓝图详情");
+        }
+
+        for (const requirement of selectedBlueprintProvisionableDependencies) {
+          const draft = blueprintDependencyDraft(requirement);
+          if (
+            draft.mode === "reuse" &&
+            (!draft.reuseConnectionUrl.trim() || !draft.reuseSecretRef.trim())
+          ) {
+            issues.push(`依赖资源：${requirement.label || requirement.id} 需要填写复用连接和 secret ref`);
+          }
+        }
+
+        for (const secret of missingBlueprintSecrets()) {
+          issues.push(`变量：${blueprintSecretLabel(secret)} 需要填写`);
+        }
+      } else if (sourceKind === "static-site") {
+        issues.push("来源：请先上传静态文件");
+      } else {
+        issues.push("来源：请填写或选择部署来源");
+      }
+    }
+
+    if (!stepIsComplete("project")) {
+      issues.push(projectMode === "existing" ? "项目：请选择项目" : "项目：请填写项目名称");
+    }
+
+    if (serverRequiredForQuickDeploy && !stepIsComplete("server")) {
+      issues.push(serverMode === "existing" ? "服务器：请选择服务器" : "服务器：请完善服务器连接信息");
+    }
+
+    return issues;
   }
 
   function blueprintDependencyProvisioningPayload(targetServerId = selectedServerId) {
@@ -2373,6 +2508,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       selectedBlueprintVariant = "";
       blueprintDependencyProvisioningDrafts = {};
       blueprintSecretValues = {};
+      blueprintSecretInputModes = {};
+      blueprintSecretValueVisible = {};
     }
   }
 
@@ -2380,6 +2517,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     if (selectedBlueprintSlug !== item.slug) {
       blueprintDependencyProvisioningDrafts = {};
       blueprintSecretValues = {};
+      blueprintSecretInputModes = {};
+      blueprintSecretValueVisible = {};
     }
     selectedBlueprintSlug = item.slug;
     selectedBlueprintTitle = item.title;
@@ -2603,6 +2742,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
     if (selectedBlueprintSlug !== (params.get("blueprintSlug") ?? "")) {
       blueprintDependencyProvisioningDrafts = {};
+      blueprintSecretValues = {};
+      blueprintSecretInputModes = {};
+      blueprintSecretValueVisible = {};
     }
     selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
     selectedBlueprintSlug = params.get("blueprintSlug") ?? "";
@@ -3679,6 +3821,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   function blueprintInstallSecretValueInput(): { key: string; value: string }[] {
     return selectedBlueprintSecrets.flatMap((secret) => {
+      if (blueprintSecretInputMode(secret) === "generated") {
+        return [];
+      }
+
       const value = blueprintSecretValues[secret.key]?.trim() ?? "";
       if (!value) {
         if (secret.required !== false) {
@@ -4381,11 +4527,46 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               : "选择来源，并在同一页确认项目、服务器与运行配置。"}
           </p>
         </div>
+        <div
+          class={`rounded-md border px-3 py-3 text-sm ${
+            quickDeployReady
+              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+              : "border-destructive/30 bg-destructive/5 text-foreground"
+          }`}
+          data-quick-deploy-readiness-panel
+        >
+          <div class="flex items-start gap-2">
+            {#if quickDeployReady}
+              <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-emerald-600" />
+              <div class="min-w-0">
+                <p class="font-medium">安装前置配置已完成</p>
+                <p class="mt-1 text-xs text-emerald-800">
+                  可以继续提交，运行时仍会在后端做最终校验。
+                </p>
+              </div>
+            {:else}
+              <AlertCircle class="mt-0.5 size-4 shrink-0 text-destructive" />
+              <div class="min-w-0">
+                <p class="font-medium">还差 {quickDeployReadinessIssues.length} 项才能继续</p>
+                <ul class="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {#each quickDeployReadinessIssues as issue (issue)}
+                    <li>{issue}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+          </div>
+        </div>
         <div class="space-y-6">
           <section class="space-y-3">
           <div class="space-y-3">
             {#if !selectedBlueprintSourceLocked}
               <div class="flex items-center gap-2 text-sm font-medium">
+                {#if stepIsComplete("source")}
+                  <CheckCircle2 class={`size-4 ${statusIconClasses(true)}`} />
+                {:else}
+                  <AlertCircle class={`size-4 ${statusIconClasses(false)}`} />
+                {/if}
                 <Waypoints class="size-4 text-muted-foreground" />
                 <span>{$t(i18nKeys.common.domain.source)}</span>
                 <DocsHelpLink
@@ -5247,9 +5428,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
           <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("project")}>
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-              <span class="min-w-0">
+              <span class="flex min-w-0 items-start gap-2">
+                {#if stepIsComplete("project")}
+                  <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
+                {:else}
+                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                {/if}
+                <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.project)}</span>
                 <span class="mt-1 block break-words text-xs text-muted-foreground">{projectSummary}</span>
+                </span>
               </span>
               <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
             </summary>
@@ -5325,10 +5513,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           {#if serverRequiredForQuickDeploy}
           <details class="group rounded-md border bg-card px-3 py-3" open={!stepIsComplete("server")}>
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-              <span class="min-w-0">
+              <span class="flex min-w-0 items-start gap-2">
+                {#if stepIsComplete("server")}
+                  <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
+                {:else}
+                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                {/if}
+                <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.server)}</span>
                 <span class="mt-1 block break-words text-xs text-muted-foreground">{serverSummary}</span>
                 <span class="mt-1 block break-words text-xs text-muted-foreground">{serverCredentialSummary}</span>
+                </span>
               </span>
               <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
             </summary>
@@ -5399,9 +5594,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
           <details class="group rounded-md border bg-card px-3 py-3">
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-              <span class="min-w-0">
+              <span class="flex min-w-0 items-start gap-2">
+                {#if stepIsComplete("environment")}
+                  <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
+                {:else}
+                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                {/if}
+                <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</span>
                 <span class="mt-1 block break-words text-xs text-muted-foreground">{environmentSummary}</span>
+                </span>
               </span>
               <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
             </summary>
@@ -5484,15 +5686,22 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           <details
             class="group rounded-md border bg-card px-3 py-3"
             data-quick-deploy-variables-section
-            open={variableContextEnabled}
+            open={variableContextEnabled || !variableSectionComplete()}
             ontoggle={(event) => {
               variableContextEnabled = event.currentTarget.open;
             }}
           >
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-              <span class="min-w-0">
+              <span class="flex min-w-0 items-start gap-2">
+                {#if variableSectionComplete()}
+                  <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
+                {:else}
+                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                {/if}
+                <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</span>
                 <span class="mt-1 block break-words text-xs text-muted-foreground">{variableSummary}</span>
+                </span>
               </span>
               <ChevronDown class="size-4 shrink-0 text-muted-foreground transition group-open:rotate-180" />
             </summary>
@@ -5510,19 +5719,28 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if sourceKind === "blueprint" && selectedBlueprintVariables.length > 0}
                   <div class="space-y-2" data-blueprint-variable-list>
                     {#each selectedBlueprintVariables as variable (`${variable.key}:${variable.value}`)}
-                      <div class="grid gap-3 sm:grid-cols-2">
-                        <Input
-                          value={variable.key}
-                          readonly
-                          data-blueprint-variable-key={variable.key}
-                          aria-label={`Blueprint variable ${variable.key}`}
-                        />
-                        <Input
-                          value={variable.value}
-                          readonly
-                          data-blueprint-variable-value={variable.key}
-                          aria-label={`Blueprint variable value ${variable.key}`}
-                        />
+                      <div class="rounded-md border bg-background p-3">
+                        <div class="mb-2 flex items-center justify-between gap-3">
+                          <span class="text-xs font-medium text-muted-foreground">蓝图固定变量</span>
+                          <Badge variant="outline">不可变更</Badge>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <Input
+                            value={variable.key}
+                            readonly
+                            data-blueprint-variable-key={variable.key}
+                            aria-label={`Blueprint variable ${variable.key}`}
+                          />
+                          <Input
+                            value={variable.value}
+                            readonly
+                            data-blueprint-variable-value={variable.key}
+                            aria-label={`Blueprint variable value ${variable.key}`}
+                          />
+                        </div>
+                        <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                          这个值来自蓝图运行配置，安装时按蓝图声明写入，不在快速部署里编辑。
+                        </p>
                       </div>
                       {#if variable.description}
                         <p class="text-xs text-muted-foreground">{variable.description}</p>
@@ -5534,27 +5752,98 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if sourceKind === "blueprint" && selectedBlueprintSecrets.length > 0}
                   <div class="space-y-2" data-blueprint-secret-list>
                     {#each selectedBlueprintSecrets as secret (secret.key)}
-                      <div class="grid gap-3 sm:grid-cols-2">
-                        <Input
-                          value={secret.key}
-                          readonly
-                          data-blueprint-secret-key={secret.key}
-                          aria-label={`Blueprint secret ${secret.key}`}
-                        />
-                        <Input
-                          type="password"
-                          value={blueprintSecretValues[secret.key] ?? ""}
-                          required={secret.required !== false}
-                          data-blueprint-secret-value={secret.key}
-                          aria-label={`Blueprint secret value ${secret.key}`}
-                          placeholder={secret.label || secret.key}
-                          oninput={(event) => {
-                            blueprintSecretValues = {
-                              ...blueprintSecretValues,
-                              [secret.key]: event.currentTarget.value,
-                            };
-                          }}
-                        />
+                      <div
+                        class={`rounded-md border bg-background p-3 ${
+                          blueprintSecretManualValueMissing(secret) ? "border-destructive/40" : ""
+                        }`}
+                      >
+                        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="min-w-0">
+                            <p class="flex items-center gap-2 text-sm font-medium">
+                              {#if blueprintSecretManualValueMissing(secret)}
+                                <AlertCircle class="size-4 shrink-0 text-destructive" />
+                              {:else}
+                                <CheckCircle2 class="size-4 shrink-0 text-emerald-600" />
+                              {/if}
+                              <span class="truncate">{blueprintSecretLabel(secret)}</span>
+                            </p>
+                            <p class="mt-1 font-mono text-xs text-muted-foreground">{secret.key}</p>
+                          </div>
+                          <div class="flex shrink-0 flex-wrap gap-2">
+                            <Badge variant="outline">Secret</Badge>
+                            {#if blueprintSecretCanGenerate(secret)}
+                              <Badge variant="outline">可自动生成</Badge>
+                            {:else}
+                              <Badge variant="outline">需要输入</Badge>
+                            {/if}
+                          </div>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                          <Input
+                            value={secret.key}
+                            readonly
+                            data-blueprint-secret-key={secret.key}
+                            aria-label={`Blueprint secret ${secret.key}`}
+                          />
+                          <div class="min-w-0 space-y-2">
+                            {#if blueprintSecretCanGenerate(secret)}
+                              <div class="grid gap-2 sm:grid-cols-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={blueprintSecretInputMode(secret) === "generated" ? "selected" : "outline"}
+                                  onclick={() => setBlueprintSecretInputMode(secret, "generated")}
+                                >
+                                  后端生成
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={blueprintSecretInputMode(secret) === "manual" ? "selected" : "outline"}
+                                  onclick={() => setBlueprintSecretInputMode(secret, "manual")}
+                                >
+                                  自己输入
+                                </Button>
+                              </div>
+                            {/if}
+
+                            {#if blueprintSecretInputMode(secret) === "generated"}
+                              <div class="rounded-md border bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                                {blueprintSecretGenerationSummary(secret)}
+                              </div>
+                            {:else}
+                              <div class="flex min-w-0 flex-col gap-2 sm:flex-row">
+                                <Input
+                                  type={blueprintSecretValueVisible[secret.key] ? "text" : "password"}
+                                  value={blueprintSecretValues[secret.key] ?? ""}
+                                  required={secret.required !== false}
+                                  data-blueprint-secret-value={secret.key}
+                                  aria-label={`Blueprint secret value ${secret.key}`}
+                                  placeholder={secret.label || secret.key}
+                                  oninput={(event) => {
+                                    blueprintSecretValues = {
+                                      ...blueprintSecretValues,
+                                      [secret.key]: event.currentTarget.value,
+                                    };
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  class="shrink-0"
+                                  onclick={() => toggleBlueprintSecretValueVisibility(secret.key)}
+                                >
+                                  <Eye class="size-4" />
+                                  {blueprintSecretValueVisible[secret.key] ? "隐藏" : "显示"}
+                                </Button>
+                              </div>
+                              {#if blueprintSecretManualValueMissing(secret)}
+                                <p class="text-xs text-destructive">请填写这个 secret，或选择后端生成。</p>
+                              {/if}
+                            {/if}
+                          </div>
+                        </div>
                       </div>
                       {#if secret.description}
                         <p class="text-xs text-muted-foreground">{secret.description}</p>
@@ -5711,12 +6000,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         data-quick-deploy-action-panel
       >
         <p class="min-w-0 text-xs text-muted-foreground">
-          {#if quickDeployReady}
-            {staticPublishesToManaged ? "静态文件和项目已就绪。" : "来源、项目和服务器已就绪。"}
-          {:else}
-            {staticPublishesToManaged ? "请先上传静态文件并确认项目。" : "请先完善来源、项目和服务器。"}
-          {/if}
+          {quickDeployActionHint}
         </p>
+        {#if !quickDeployReady && quickDeployReadinessIssues.length > 1}
+          <ul class="space-y-1 text-xs text-muted-foreground">
+            {#each quickDeployReadinessIssues.slice(1, 4) as issue (issue)}
+              <li>{issue}</li>
+            {/each}
+          </ul>
+        {/if}
         <Button
           class="w-full"
           disabled={deployPending || !quickDeployReady}
