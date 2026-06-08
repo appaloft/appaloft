@@ -14,7 +14,9 @@ const slugArg = Args.text({ name: "slug" });
 const applicationIdArg = Args.text({ name: "application-id" });
 const variantOption = Options.text("variant").pipe(Options.optional);
 const profileOption = Options.text("profile").pipe(Options.optional);
+const projectIdOption = Options.text("project-id").pipe(Options.optional);
 const projectNameOption = Options.text("project-name").pipe(Options.optional);
+const environmentIdOption = Options.text("environment-id").pipe(Options.optional);
 const environmentNameOption = Options.text("environment-name").pipe(Options.optional);
 const resourceSlugPrefixOption = Options.text("resource-slug-prefix").pipe(Options.optional);
 const parameterOption = Options.text("parameter").pipe(Options.repeated);
@@ -86,13 +88,17 @@ function dependencyProvisioningOptions(input: {
 }
 
 export function installTargetInput(input: {
+  readonly projectId?: string | undefined;
   readonly projectName?: string | undefined;
+  readonly environmentId?: string | undefined;
   readonly environmentName?: string | undefined;
   readonly resourceSlugPrefix?: string | undefined;
   readonly serverId?: string | undefined;
 }) {
   return {
+    ...(input.projectId ? { projectId: input.projectId } : {}),
     ...(input.projectName ? { projectName: input.projectName } : {}),
+    ...(input.environmentId ? { environmentId: input.environmentId } : {}),
     ...(input.environmentName ? { environmentName: input.environmentName } : {}),
     ...(input.resourceSlugPrefix ? { resourceSlugPrefix: input.resourceSlugPrefix } : {}),
     ...(input.serverId ? { serverId: input.serverId } : {}),
@@ -138,7 +144,9 @@ const planInstallCommand = EffectCommand.make(
     slug: slugArg,
     variant: variantOption,
     profile: profileOption,
+    projectId: projectIdOption,
     projectName: projectNameOption,
+    environmentId: environmentIdOption,
     environmentName: environmentNameOption,
     resourceSlugPrefix: resourceSlugPrefixOption,
     parameter: parameterOption,
@@ -150,9 +158,11 @@ const planInstallCommand = EffectCommand.make(
     dependencyCreate,
     dependencyProvider,
     environmentName,
+    environmentId,
     parameter,
     profile,
     projectName,
+    projectId,
     resourceSlugPrefix,
     slug,
     targetServer,
@@ -170,7 +180,9 @@ const planInstallCommand = EffectCommand.make(
           targetServer,
         }),
         target: installTargetInput({
+          projectId: nonEmptyOptional(projectId),
           projectName: nonEmptyOptional(projectName),
+          environmentId: nonEmptyOptional(environmentId),
           environmentName: nonEmptyOptional(environmentName),
           resourceSlugPrefix: nonEmptyOptional(resourceSlugPrefix),
           serverId: nonEmptyOptional(targetServer),
@@ -185,7 +197,9 @@ const installCommand = EffectCommand.make(
     slug: slugArg,
     variant: variantOption,
     profile: profileOption,
+    projectId: projectIdOption,
     projectName: projectNameOption,
+    environmentId: environmentIdOption,
     environmentName: environmentNameOption,
     resourceSlugPrefix: resourceSlugPrefixOption,
     parameter: parameterOption,
@@ -205,10 +219,12 @@ const installCommand = EffectCommand.make(
     dependencyCreate,
     dependencyProvider,
     environmentName,
+    environmentId,
     idempotencyKey,
     parameter,
     profile,
     projectName,
+    projectId,
     resourceSlugPrefix,
     secret,
     slug,
@@ -227,7 +243,9 @@ const installCommand = EffectCommand.make(
           targetServer,
         }),
         target: installTargetInput({
+          projectId: nonEmptyOptional(projectId),
           projectName: nonEmptyOptional(projectName),
+          environmentId: nonEmptyOptional(environmentId),
           environmentName: nonEmptyOptional(environmentName),
           resourceSlugPrefix: nonEmptyOptional(resourceSlugPrefix),
           serverId: nonEmptyOptional(targetServer),
