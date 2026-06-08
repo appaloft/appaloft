@@ -53,6 +53,11 @@ process-attempt state for `operator-work.*` visibility.
 - The neutral worker drain primitive depends only on the durable work adapter and handler registry:
   it lists due items, skips unhandled work, claims leases before execution, completes successful
   handler results, and turns handler domain errors into retriable failed work.
+- `deployments.create` can schedule accepted deployment attempts as durable work when composition
+  provides a durable queue adapter; the deployment worker handler owns runtime execution,
+  terminal deployment persistence, and operator projection updates after claim.
+- The public server runtime registers `PgDurableWorkLedger` as the database durable queue adapter
+  and `startWorkerRuntime` starts database drain loops for declared worker slots.
 - `workerRuntime` config records mode, queue backend, worker count, worker group, and optional
   external backend kind.
 - `appaloft serve` starts the embedded backend service and worker runtime together. `appaloft
@@ -61,8 +66,8 @@ process-attempt state for `operator-work.*` visibility.
   shared database/external backend.
 - PGlite local/CLI mode can keep `embedded` for a long-running local server, or use `disabled`
   when the CLI command performs a bounded synchronous loop and the caller polls deployment status.
-- Deployment execution still requires a governed worker binding before it is fully restart
-  resumable. This ADR establishes the neutral topology and adapter boundary first.
+- Deployment execution has a public worker binding in the server composition. End-to-end composed
+  server smoke coverage is still required before treating this as fully release-ready.
 
 ## Guardrails
 

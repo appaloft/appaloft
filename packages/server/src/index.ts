@@ -18,8 +18,13 @@ import {
   type CommandBus,
   createDurableWorkTopology,
   type DependencyResourceBackupPolicyRepository,
+  type DeploymentLifecycleService,
+  type DeploymentRepository,
   type DeployTokenRepository,
+  type DurableWorkQueueAdapter,
   type EnvironmentReadModel,
+  type EventBus,
+  type ExecutionBackend,
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionProviderAccessTokens,
@@ -33,6 +38,7 @@ import {
   type PreviewCleanupRetryScheduler,
   type PreviewExpiryCleanupScheduler,
   type ProcessAttemptDeliveryCandidateReader,
+  type ProcessAttemptRecorder,
   type ProcessAttemptRetryCandidateReader,
   type ProcessAttemptRetryGenerator,
   type ProjectReadModel,
@@ -95,6 +101,7 @@ import {
 } from "./certificate-retry-scheduler-runner";
 import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
+import { createDurableWorkRuntimeRunner } from "./durable-work-runtime-runner";
 import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
 import {
@@ -907,6 +914,30 @@ export async function createAppaloftServer(
         logger,
       })
     : createDisabledRuntimeMonitoringCollectorRunner();
+  const durableWorkTopology = createDurableWorkTopology(config.workerRuntime);
+  if (durableWorkTopology.isErr()) {
+    throw new Error(durableWorkTopology.error.message);
+  }
+  const durableWorkRuntimeRunner = createDurableWorkRuntimeRunner({
+    topology: durableWorkTopology.value,
+    adapter: resolveToken<DurableWorkQueueAdapter>(childContainer, tokens.durableWorkQueueAdapter),
+    deploymentRepository: resolveToken<DeploymentRepository>(
+      childContainer,
+      tokens.deploymentRepository,
+    ),
+    deploymentLifecycleService: resolveToken<DeploymentLifecycleService>(
+      childContainer,
+      tokens.deploymentLifecycleService,
+    ),
+    executionBackend: resolveToken<ExecutionBackend>(childContainer, tokens.executionBackend),
+    eventBus: resolveToken<EventBus>(childContainer, tokens.eventBus),
+    processAttemptRecorder: resolveToken<ProcessAttemptRecorder>(
+      childContainer,
+      tokens.processAttemptRecorder,
+    ),
+    executionContextFactory,
+    logger,
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 
@@ -949,24 +980,20 @@ export async function createAppaloftServer(
       return;
     }
 
-    const topology = createDurableWorkTopology(config.workerRuntime);
-    if (topology.isErr()) {
-      throw new Error(topology.error.message);
-    }
-
     workerRuntimeStarted = true;
     logger.info("durable_worker_runtime.started", {
       mode: config.workerRuntime.mode,
       queueBackend: config.workerRuntime.queueBackend,
-      workerCount: topology.value.expectedWorkerCount,
+      workerCount: durableWorkTopology.value.expectedWorkerCount,
       workerGroup: config.workerRuntime.workerGroup,
-      workerIds: topology.value.workers.map((worker) => worker.workerId),
-      coordinationRole: topology.value.coordinationRole,
+      workerIds: durableWorkTopology.value.workers.map((worker) => worker.workerId),
+      coordinationRole: durableWorkTopology.value.coordinationRole,
       ...(config.workerRuntime.externalBackendKind
         ? { externalBackendKind: config.workerRuntime.externalBackendKind }
         : {}),
     });
 
+    durableWorkRuntimeRunner.start();
     certificateRetrySchedulerRunner.start();
     previewExpiryCleanupSchedulerRunner.start();
     previewCleanupRetrySchedulerRunner.start();
@@ -1022,6 +1049,7 @@ export async function createAppaloftServer(
       scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
       runtimeMonitoringCollectorRunner.stop();
+      durableWorkRuntimeRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

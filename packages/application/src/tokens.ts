@@ -24,6 +24,7 @@ export const tokens = {
     "appaloft.static_artifact_publication_read_model_port",
   ),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
+  durableWorkQueueAdapter: Symbol.for("appaloft.durable_work_queue_adapter"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),

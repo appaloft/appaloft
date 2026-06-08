@@ -25,11 +25,13 @@ long-running Appaloft work. It extends durable process delivery without replacin
 | PROC-DELIVERY-WORKER-017 | Worker drain lists due work, claims a lease, invokes a registered handler, and completes the item. | Application | `packages/application/test/durable-work.test.ts` |
 | PROC-DELIVERY-WORKER-018 | Worker drain skips due work without a registered handler and does not acquire a lease. | Application | `packages/application/test/durable-work.test.ts` |
 | PROC-DELIVERY-WORKER-019 | Worker drain completes handler domain errors as retriable failed work instead of leaving a running lease. | Application | `packages/application/test/durable-work.test.ts` |
+| PROC-DELIVERY-WORKER-020 | `deployments.create` records pending durable deployment work and an accepted event when a durable queue adapter is configured, without inline runtime execution. | Application | `packages/application/test/create-deployment.test.ts` |
+| PROC-DELIVERY-WORKER-021 | Deployment worker drain claims accepted deployment work, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. | Application | `packages/application/test/create-deployment.test.ts` |
+| PROC-DELIVERY-WORKER-022 | Server runtime registers the PG durable queue adapter and starts database worker drain loops for declared worker slots. | Server composition | `packages/server` typecheck plus `packages/server/src/index.ts` composition review |
 
 ## Deferred Coverage
 
-- Deployment create worker claim/completion.
 - Deployment retry and rollback worker claim/completion.
 - Server `/api/system` worker topology readback.
-- Dedicated `appaloft worker` startup command.
+- Composed-server smoke coverage for `deployments.create` through the PG durable queue and worker drain.
 - Cloud Blueprint install acceptance composing public deployment worker attempts.

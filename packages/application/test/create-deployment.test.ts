@@ -139,6 +139,18 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 import {
+  type DurableWorkClaimInput,
+  type DurableWorkClaimResult,
+  type DurableWorkCompletionInput,
+  type DurableWorkCompletionResult,
+  type DurableWorkDeliveryCandidateFilter,
+  type DurableWorkEventRecord,
+  type DurableWorkItemRecord,
+  type DurableWorkListFilter,
+  type DurableWorkQueueAdapter,
+  drainDurableWorkOnce,
+} from "../src/durable-work";
+import {
   createExecutionContext,
   type ExecutionContext,
   type RepositoryContext,
@@ -187,6 +199,7 @@ import {
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
+  DeploymentDurableWorkHandler,
   DeploymentFactory,
   DeploymentLifecycleService,
   DeploymentLogsQueryService,
@@ -411,6 +424,18 @@ class DeferredExecutionBackend extends HermeticExecutionBackend {
   }
 }
 
+class CountingExecutionBackend extends HermeticExecutionBackend {
+  calls = 0;
+
+  override async execute(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    this.calls += 1;
+    return super.execute(context, deployment);
+  }
+}
+
 class HermeticRuntimeTargetBackend
   extends HermeticExecutionBackend
   implements RuntimeTargetBackend
@@ -536,6 +561,129 @@ class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
   ): Promise<Result<ProcessAttemptRecord>> {
     this.records.push(attempt);
     return ok(attempt);
+  }
+}
+
+class RecordingDurableWorkAdapter implements DurableWorkQueueAdapter {
+  readonly items = new Map<string, DurableWorkItemRecord>();
+  readonly events: DurableWorkEventRecord[] = [];
+  readonly claims: DurableWorkClaimInput[] = [];
+  readonly completions: DurableWorkCompletionInput[] = [];
+
+  async recordItem(
+    _context: RepositoryContext,
+    item: DurableWorkItemRecord,
+  ): Promise<Result<DurableWorkItemRecord>> {
+    this.items.set(item.id, item);
+    return ok(item);
+  }
+
+  async appendEvent(
+    _context: RepositoryContext,
+    event: DurableWorkEventRecord,
+  ): Promise<Result<DurableWorkEventRecord>> {
+    this.events.push(event);
+    return ok(event);
+  }
+
+  async findItem(
+    _context: RepositoryContext,
+    id: string,
+  ): Promise<Result<DurableWorkItemRecord | null>> {
+    return ok(this.items.get(id) ?? null);
+  }
+
+  async listItems(
+    _context: RepositoryContext,
+    filter: DurableWorkListFilter = {},
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(
+      Array.from(this.items.values()).filter((item) => {
+        const matchesDeployment = filter.deploymentId
+          ? item.deploymentId === filter.deploymentId
+          : true;
+        const matchesStatus = filter.status ? item.status === filter.status : true;
+        const matchesOperation = filter.operationKey
+          ? item.operationKey === filter.operationKey
+          : true;
+        return matchesDeployment && matchesStatus && matchesOperation;
+      }),
+    );
+  }
+
+  async listEvents(
+    _context: RepositoryContext,
+    workItemId: string,
+  ): Promise<Result<DurableWorkEventRecord[]>> {
+    return ok(this.events.filter((event) => event.workItemId === workItemId));
+  }
+
+  async listDueCandidates(
+    _context: RepositoryContext,
+    filter: DurableWorkDeliveryCandidateFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(
+      Array.from(this.items.values()).filter((item) => {
+        const matchesStatus = item.status === "pending" || item.status === "retry-scheduled";
+        const matchesTime = item.availableAt <= filter.now;
+        const matchesOperation = filter.operationKey
+          ? item.operationKey === filter.operationKey
+          : true;
+        return matchesStatus && matchesTime && matchesOperation;
+      }),
+    );
+  }
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: DurableWorkClaimInput,
+  ): Promise<Result<DurableWorkClaimResult>> {
+    this.claims.push(input);
+    const item = this.items.get(input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    if (item.status !== "pending" && item.status !== "retry-scheduled") {
+      return ok({ status: "refused", reason: "not-claimable", workItem: item });
+    }
+    const claimed: DurableWorkItemRecord = {
+      ...item,
+      status: "running",
+      attemptCount: item.attemptCount + 1,
+      leaseOwner: input.workerId,
+      leaseExpiresAt: input.leaseExpiresAt,
+      phase: "worker-claim",
+      step: "claimed",
+      startedAt: input.claimedAt,
+      updatedAt: input.claimedAt,
+    };
+    this.items.set(item.id, claimed);
+    return ok({ status: "claimed", workItem: claimed });
+  }
+
+  async complete(
+    _context: RepositoryContext,
+    input: DurableWorkCompletionInput,
+  ): Promise<Result<DurableWorkCompletionResult>> {
+    this.completions.push(input);
+    const item = this.items.get(input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    if (item.status !== "running") {
+      return ok({ status: "not-running", workItem: item });
+    }
+    const { leaseOwner: _leaseOwner, leaseExpiresAt: _leaseExpiresAt, ...itemWithoutLease } = item;
+    const completed: DurableWorkItemRecord = {
+      ...itemWithoutLease,
+      status: input.status,
+      ...(input.phase ? { phase: input.phase } : {}),
+      ...(input.step ? { step: input.step } : {}),
+      updatedAt: input.completedAt,
+      finishedAt: input.completedAt,
+    };
+    this.items.set(item.id, completed);
+    return ok({ status: "completed", workItem: completed });
   }
 }
 
@@ -764,6 +912,7 @@ async function createDeploymentFixture(
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
     processAttemptRecorder?: ProcessAttemptRecorder;
+    durableWorkQueueAdapter?: DurableWorkQueueAdapter;
     operationGuardPort?: OperationGuardPort;
     sourceVersionDetector?: SourceVersionDetector;
   } = {},
@@ -908,6 +1057,7 @@ async function createDeploymentFixture(
     undefined,
     options.operationGuardPort,
     options.sourceVersionDetector,
+    options.durableWorkQueueAdapter,
   );
   const provisionDependency = new ProvisionDependencyResourceUseCase(
     projects,
@@ -1468,6 +1618,140 @@ describe("CreateDeploymentUseCase", () => {
 
     expect(command.isErr()).toBe(true);
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
+  test("[PROC-DELIVERY-WORKER-020] accepts deployment work durably without inline runtime execution", async () => {
+    const durableWork = new RecordingDurableWorkAdapter();
+    const executionBackend = new CountingExecutionBackend();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(undefined, {
+      durableWorkQueueAdapter: durableWork,
+      executionBackend,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw new Error(result.error.message);
+    expect(executionBackend.calls).toBe(0);
+    const deploymentId = result.value.id;
+    const workItems = Array.from(durableWork.items.values());
+    expect(workItems).toEqual([
+      expect.objectContaining({
+        id: `dw_deployment_${deploymentId}`,
+        kind: "deployment",
+        status: "pending",
+        operationKey: "deployments.create",
+        deploymentId,
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        subjectKind: "deployment",
+        subjectId: deploymentId,
+        phase: "accepted",
+        step: "queued",
+      }),
+    ]);
+    expect(durableWork.events).toEqual([
+      expect.objectContaining({
+        id: `dwe_deployment_${deploymentId}_accepted`,
+        workItemId: `dw_deployment_${deploymentId}`,
+        sequence: 1,
+        kind: "accepted",
+        status: "pending",
+      }),
+    ]);
+
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
+    );
+    expect(deployment?.toState().status.value).toBe("running");
+  });
+
+  test("[PROC-DELIVERY-WORKER-021] worker drain executes accepted deployment work", async () => {
+    const durableWork = new RecordingDurableWorkAdapter();
+    const executionBackend = new CountingExecutionBackend();
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const {
+      clock,
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      eventBus,
+      logger,
+      repositoryContext,
+    } = await createDeploymentFixture(undefined, {
+      durableWorkQueueAdapter: durableWork,
+      executionBackend,
+      processAttemptRecorder,
+    });
+    const accepted = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    expect(accepted.isOk()).toBe(true);
+    if (accepted.isErr()) throw new Error(accepted.error.message);
+
+    const handler = new DeploymentDurableWorkHandler(
+      deployments,
+      new DeploymentLifecycleService(clock),
+      executionBackend,
+      eventBus,
+      logger,
+      processAttemptRecorder,
+    );
+    const drained = await drainDurableWorkOnce(
+      context,
+      durableWork,
+      {
+        resolve(item) {
+          return item.kind === "deployment" ? handler : undefined;
+        },
+      },
+      {
+        worker: {
+          workerId: "deployment-worker-1",
+          workerGroup: "deployment-worker",
+          slot: 1,
+        },
+        now: "2026-01-01T00:00:00.000Z",
+        leaseDurationMs: 300000,
+      },
+    );
+
+    expect(drained.isOk()).toBe(true);
+    if (drained.isErr()) throw new Error(drained.error.message);
+    expect(drained.value).toEqual({
+      scanned: 1,
+      claimed: 1,
+      completed: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(executionBackend.calls).toBe(1);
+    expect(durableWork.completions).toEqual([
+      expect.objectContaining({
+        workItemId: `dw_deployment_${accepted.value.id}`,
+        status: "succeeded",
+        phase: "runtime-execution",
+        step: "completed",
+      }),
+    ]);
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(accepted.value.id)),
+    );
+    expect(deployment?.toState().status.value).toBe("succeeded");
+    expect(processAttemptRecorder.records.at(-1)).toMatchObject({
+      deploymentId: accepted.value.id,
+      status: "succeeded",
+      operationKey: "deployments.create",
+    });
   });
 
   test("[DEP-CREATE-ASYNC-001] admits detached deployment execution before runtime completion", async () => {

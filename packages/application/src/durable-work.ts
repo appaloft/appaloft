@@ -1,5 +1,9 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
-import { type RepositoryContext } from "./execution-context";
+import {
+  type ExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "./execution-context";
 
 export type DurableWorkRuntimeMode = "embedded" | "standalone" | "disabled";
 export type DurableWorkQueueBackend = "database" | "external";
@@ -240,7 +244,7 @@ export interface DurableWorkHandlerResult {
 
 export interface DurableWorkHandler {
   handle(
-    context: RepositoryContext,
+    context: ExecutionContext,
     item: DurableWorkItemRecord,
     worker: DurableWorkWorkerIdentity,
   ): Promise<Result<DurableWorkHandlerResult>>;
@@ -291,17 +295,18 @@ function addMilliseconds(timestamp: string, milliseconds: number): Result<string
 }
 
 export async function drainDurableWorkOnce(
-  context: RepositoryContext,
+  context: ExecutionContext,
   adapter: DurableWorkQueueAdapter,
   handlers: DurableWorkHandlerRegistry,
   input: DurableWorkDrainInput,
 ): Promise<Result<DurableWorkDrainReport>> {
+  const repositoryContext = toRepositoryContext(context);
   const leaseExpiresAt = addMilliseconds(input.now, input.leaseDurationMs);
   if (leaseExpiresAt.isErr()) {
     return err(leaseExpiresAt.error);
   }
 
-  const candidates = await adapter.listDueCandidates(context, {
+  const candidates = await adapter.listDueCandidates(repositoryContext, {
     now: input.now,
     ...(input.kind ? { kind: input.kind } : {}),
     ...(input.operationKey ? { operationKey: input.operationKey } : {}),
@@ -323,7 +328,7 @@ export async function drainDurableWorkOnce(
       continue;
     }
 
-    const claim = await adapter.claimDue(context, {
+    const claim = await adapter.claimDue(repositoryContext, {
       workItemId: candidate.id,
       workerId: input.worker.workerId,
       workerGroup: input.worker.workerGroup,
@@ -344,7 +349,7 @@ export async function drainDurableWorkOnce(
     try {
       const handled = await handler.handle(context, claim.value.workItem, input.worker);
       if (handled.isErr()) {
-        const completion = await adapter.complete(context, {
+        const completion = await adapter.complete(repositoryContext, {
           workItemId: claim.value.workItem.id,
           status: "failed",
           completedAt: input.now,
@@ -361,7 +366,7 @@ export async function drainDurableWorkOnce(
         continue;
       }
 
-      const completion = await adapter.complete(context, {
+      const completion = await adapter.complete(repositoryContext, {
         workItemId: claim.value.workItem.id,
         status: handled.value.status ?? "succeeded",
         completedAt: input.now,
@@ -381,7 +386,7 @@ export async function drainDurableWorkOnce(
 
       completed += completion.value.status === "completed" ? 1 : 0;
     } catch (error) {
-      const completion = await adapter.complete(context, {
+      const completion = await adapter.complete(repositoryContext, {
         workItemId: claim.value.workItem.id,
         status: "failed",
         completedAt: input.now,

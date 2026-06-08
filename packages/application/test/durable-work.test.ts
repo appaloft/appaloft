@@ -17,32 +17,26 @@ import {
   describeDurableWorkQueueBackend,
   drainDurableWorkOnce,
 } from "../src/durable-work";
-import {
-  createExecutionContext,
-  type RepositoryContext,
-  toRepositoryContext,
-} from "../src/execution-context";
+import { createExecutionContext, type RepositoryContext } from "../src/execution-context";
 
-function repositoryContext() {
-  return toRepositoryContext(
-    createExecutionContext({
-      entrypoint: "system",
-      requestId: "req_durable_work_test",
-      tracer: {
-        startActiveSpan(_name, _options, callback) {
-          return Promise.resolve(
-            callback({
-              addEvent() {},
-              recordError() {},
-              setAttribute() {},
-              setAttributes() {},
-              setStatus() {},
-            }),
-          );
-        },
+function executionContext() {
+  return createExecutionContext({
+    entrypoint: "system",
+    requestId: "req_durable_work_test",
+    tracer: {
+      startActiveSpan(_name, _options, callback) {
+        return Promise.resolve(
+          callback({
+            addEvent() {},
+            recordError() {},
+            setAttribute() {},
+            setAttributes() {},
+            setStatus() {},
+          }),
+        );
       },
-    }),
-  );
+    },
+  });
 }
 
 function durableWorkItem(input: Partial<DurableWorkItemRecord> = {}): DurableWorkItemRecord {
@@ -335,7 +329,7 @@ describe("durable work drain", () => {
       },
     };
 
-    const report = await drainDurableWorkOnce(repositoryContext(), adapter, handlers, {
+    const report = await drainDurableWorkOnce(executionContext(), adapter, handlers, {
       worker: {
         workerId: "worker-1",
         workerGroup: "worker",
@@ -380,7 +374,7 @@ describe("durable work drain", () => {
   test("[PROC-DELIVERY-WORKER-018] worker skips due work without a registered handler", async () => {
     const adapter = new MemoryDurableWorkAdapter([durableWorkItem()]);
     const report = await drainDurableWorkOnce(
-      repositoryContext(),
+      executionContext(),
       adapter,
       {
         resolve() {
@@ -427,7 +421,7 @@ describe("durable work drain", () => {
       },
     };
 
-    const report = await drainDurableWorkOnce(repositoryContext(), adapter, handlers, {
+    const report = await drainDurableWorkOnce(executionContext(), adapter, handlers, {
       worker: {
         workerId: "worker-1",
         workerGroup: "worker",

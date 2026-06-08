@@ -24,9 +24,15 @@
   completion.
 - [x] Add application worker drain primitive for due candidate polling, lease claim, handler
   dispatch, completion, and handler failure completion.
+- [x] Add `deployments.create` durable work scheduling when a durable queue adapter is configured.
+- [x] Add deployment durable work handler for worker-owned runtime execution and terminal state
+  persistence.
+- [x] Register the PG durable queue adapter in public server runtime dependencies.
+- [x] Start durable worker drain loops from `startWorkerRuntime` for declared database worker slots.
 - [x] Wire server startup status to report `workerRuntime` topology.
 - [x] Add dedicated `appaloft worker` startup mode.
-- [ ] Promote deployment create execution to pending durable work claim/completion.
+- [ ] Add composed-server smoke coverage that observes `deployments.create` through the PG durable
+  queue and worker drain end to end.
 
 ## Verification
 

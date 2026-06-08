@@ -53,6 +53,9 @@ query, or domain language.
 | PROC-DELIVERY-WORKER-017 | Worker drain executes due work through the queue adapter | a due durable work item has a registered handler | the worker drains once | the runtime lists due work, claims it with a lease, invokes the handler, and completes the item. |
 | PROC-DELIVERY-WORKER-018 | Worker drain does not claim unhandled work | a due durable work item has no registered handler | the worker drains once | the runtime skips the item without acquiring a lease so a future handler can own it. |
 | PROC-DELIVERY-WORKER-019 | Worker drain completes handler failures | a claimed durable work handler returns a domain error | the worker drains once | the runtime completes the claimed item as failed with retriable error metadata instead of leaving it running forever. |
+| PROC-DELIVERY-WORKER-020 | Deployment admission creates durable work | `deployments.create` has accepted and persisted a deployment attempt and a durable work adapter is configured | the command completes | runtime execution is not called inline; a pending deployment work item and accepted event are recorded with the deployment id for monitoring. |
+| PROC-DELIVERY-WORKER-021 | Deployment worker executes accepted work | a pending deployment work item has been accepted | a deployment worker drains due work | the worker claims the item, loads the deployment, executes the runtime backend, persists terminal deployment state, records operator projection state, and completes the durable work item. |
+| PROC-DELIVERY-WORKER-022 | Server runtime composes PG durable queue | the public server starts with database queue backend | runtime dependencies are registered and worker runtime starts | `PgDurableWorkLedger` is registered as the durable queue adapter and the worker runtime starts database drain loops for declared worker slots. |
 
 ## Domain Ownership
 
