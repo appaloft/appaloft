@@ -101,8 +101,12 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("lg:sticky");
     expect(quickDeploySheetSource).not.toContain("md:sticky");
     expect(resourceSourceOptionSource).toContain("min-h-24");
+    expect(resourceSourceOptionSource).toContain("flex-col items-start");
     expect(resourceSourceOptionSource).toContain("px-4 py-4");
-    expect(resourceSourceOptionSource).toContain("text-sm font-medium leading-5");
+    expect(resourceSourceOptionSource).toContain("flex w-full min-w-0 items-center gap-3");
+    expect(resourceSourceOptionSource).toContain("truncate text-sm font-medium leading-5");
+    expect(resourceSourceOptionSource).toContain("block w-full text-xs font-normal leading-5");
+    expect(resourceSourceOptionSource).not.toContain("space-y-1");
     expect(resourceSourceOptionSource).not.toContain("block truncate text-sm font-medium");
   });
 
