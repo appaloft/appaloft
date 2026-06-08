@@ -11,7 +11,7 @@
 ## Test Matrix
 
 - [x] Add stable test ids for topology, adapter, and config coverage.
-- [ ] Add deployment-worker binding test ids when `deployments.create` moves from inline
+- [x] Add deployment-worker binding test ids when `deployments.create` moves from inline
   projection to durable worker execution.
 
 ## Code Round
@@ -33,6 +33,9 @@
 - [x] Add dedicated `appaloft worker` startup mode.
 - [x] Add composed-server smoke coverage that observes `deployments.create` through the PG durable
   queue and worker drain end to end.
+- [x] Add operator-work list/show coverage for durable work items and safe durable work events.
+- [x] Add durable work handler registry extension coverage so application extensions can own
+  non-deployment durable work kinds without changing public deployment handling.
 
 ## Verification
 

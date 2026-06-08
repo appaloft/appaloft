@@ -107,6 +107,7 @@ query, or domain language.
    executes runtime/provider work.
 3. Promote `deployments.retry` and `deployments.rollback` to the same worker binding.
 4. Let Blueprint install responses expose public deployment-work monitoring references for created
-   component deployments while Cloud `InstalledApplication` records install-specific business state.
-5. Later, promote Blueprint install itself to a parent durable work item when the public-neutral
-   workflow execution boundary is specified.
+   component deployments while extension-owned installed-application or workflow state records
+   install-specific business state.
+5. Extension-owned parent workflows can schedule their own durable work kind through the neutral
+   handler registry and still reuse public operator-work monitoring.

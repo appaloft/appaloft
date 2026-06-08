@@ -9,12 +9,12 @@
 5. Add a dedicated `appaloft worker` startup entrypoint for standalone worker processes.
 6. Add focused tests for topology, backend descriptors, adapter boundary, environment config,
    diagnostics, and CLI startup routing.
-7. Synchronize ADR/spec/test matrix and mark the deployment-worker execution binding as the next
-   governed Code Round.
+7. Synchronize ADR/spec/test matrix and keep workflow-specific durable work handlers behind the
+   neutral handler registry extension point.
 
 ## Deferred Code Rounds
 
-- `deployments.create` durable worker binding.
 - `deployments.retry` and `deployments.rollback` durable worker binding.
-- CLI/server startup command split for dedicated `appaloft worker` process.
-- Cloud Blueprint install acceptance integration after public deployment worker binding exists.
+- Additional workflow-specific parent durable work kinds remain extension-owned; public Appaloft
+  exposes the handler registry, durable ledger, and operator-work monitoring surfaces without
+  importing product-specific application domains.
