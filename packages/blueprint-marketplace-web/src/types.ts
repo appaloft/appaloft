@@ -1,6 +1,7 @@
 export type BlueprintMarketplaceChrome = "standalone" | "embedded";
 export type BlueprintMarketplaceCardDensity = "default" | "compact" | "mini";
 export type BlueprintMarketplacePrimaryAction = "deploy" | "detail" | "select";
+export type BlueprintMarketplaceSurface = "page" | "dialog" | "quick-deploy";
 
 export interface BlueprintMarketplaceCategory {
   readonly key: string;
