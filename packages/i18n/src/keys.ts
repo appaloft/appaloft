@@ -7,8 +7,10 @@ export const i18nKeys = {
       backToProjects: "common:actions.backToProjects",
       backToServers: "common:actions.backToServers",
       bindDomain: "common:actions.bindDomain",
+      cancel: "common:actions.cancel",
       checkHealth: "common:actions.checkHealth",
       close: "common:actions.close",
+      confirm: "common:actions.confirm",
       connectGitHub: "common:actions.connectGitHub",
       createAndDeploy: "common:actions.createAndDeploy",
       deploy: "common:actions.deploy",
@@ -51,6 +53,11 @@ export const i18nKeys = {
     app: {
       consoleSubtitle: "common:app.consoleSubtitle",
       productName: "common:app.productName",
+    },
+    dialog: {
+      confirmTitle: "common:dialog.confirmTitle",
+      promptInputLabel: "common:dialog.promptInputLabel",
+      promptTitle: "common:dialog.promptTitle",
     },
     domain: {
       currentList: "common:domain.currentList",

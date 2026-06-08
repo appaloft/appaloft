@@ -1,3 +1,4 @@
+import * as AlertDialog from "@appaloft/ui/alert-dialog";
 import { AppShell, AppShellRegion } from "@appaloft/ui/app-shell";
 import { Badge, badgeVariants } from "@appaloft/ui/badge";
 import { Button, type ButtonProps, type ButtonVariant, buttonVariants } from "@appaloft/ui/button";
@@ -23,6 +24,7 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 describe("@appaloft/ui public exports", () => {
   test("exposes neutral primitive entrypoints", () => {
     expect(uiPackage.name).toBe("@appaloft/ui");
+    expect(uiPackage.primitiveEntrypoints.alertDialog).toBe("@appaloft/ui/alert-dialog");
     expect(uiPackage.primitiveEntrypoints.button).toBe("@appaloft/ui/button");
     expect(uiPackage.primitiveEntrypoints.empty).toBe("@appaloft/ui/empty");
     expect(uiPackage.primitiveEntrypoints.dropdownMenu).toBe("@appaloft/ui/dropdown-menu");
@@ -39,6 +41,8 @@ describe("@appaloft/ui public exports", () => {
 
   test("resolves Svelte component exports through package subpaths", () => {
     expect(Button).toBeDefined();
+    expect(AlertDialog.AlertDialogContent).toBeDefined();
+    expect(AlertDialog.AlertDialogAction).toBeDefined();
     expect(Badge).toBeDefined();
     expect(ChartContainer).toBeDefined();
     expect(Dialog.DialogContent).toBeDefined();

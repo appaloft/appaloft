@@ -47,6 +47,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm } from "$lib/console/modal-interaction";
   import {
     runtimeMonitoringRollupQueryOptions,
     runtimeMonitoringSamplesQueryOptions,
@@ -547,14 +548,17 @@
     };
   }
 
-  function runCapacityPrune(dryRun: boolean): void {
+  async function runCapacityPrune(dryRun: boolean): Promise<void> {
     if (!server || !canPreviewCapacityPrune || pruneServerCapacityMutation.isPending) {
       return;
     }
 
     if (
       !dryRun &&
-      !window.confirm($t(i18nKeys.console.servers.capacityConfirmApply, { serverId: server.id }))
+      !(await requestConsoleConfirm({
+        message: $t(i18nKeys.console.servers.capacityConfirmApply, { serverId: server.id }),
+        destructive: true,
+      }))
     ) {
       return;
     }
