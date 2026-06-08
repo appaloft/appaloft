@@ -113,6 +113,7 @@
     runtimeMonitoringRollupQueryOptions,
     runtimeMonitoringSamplesQueryOptions,
     runtimeMonitoringThresholdsQueryOptions,
+    type RuntimeMonitoringTimeRangeId,
     runtimeUsageQueryOptions,
   } from "$lib/console/runtime-usage-query";
   import {
@@ -158,7 +159,7 @@
   type WindowWithAppaloftDesktopBridge = Window &
     typeof globalThis & {
       appaloftDesktop?: AppaloftDesktopBridge;
-    };
+  };
   type ResourceDetailTab =
     | "overview"
     | "deployments"
@@ -171,6 +172,7 @@
     | "monitor"
     | "settings"
     | "terminal";
+  let runtimeMonitoringTimeRange = $state<RuntimeMonitoringTimeRangeId>("1h");
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
   type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
@@ -370,10 +372,18 @@
     runtimeUsageHasMonitorSignals(resourceRuntimeUsage),
   );
   const resourceRuntimeMonitoringSamplesQuery = createQuery(() =>
-    runtimeMonitoringSamplesQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
+    runtimeMonitoringSamplesQueryOptions(
+      resourceRuntimeScope,
+      browser && resourceId.length > 0,
+      runtimeMonitoringTimeRange,
+    ),
   );
   const resourceRuntimeMonitoringRollupQuery = createQuery(() =>
-    runtimeMonitoringRollupQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
+    runtimeMonitoringRollupQueryOptions(
+      resourceRuntimeScope,
+      browser && resourceId.length > 0,
+      runtimeMonitoringTimeRange,
+    ),
   );
   const resourceRuntimeMonitoringThresholdsQuery = createQuery(() =>
     runtimeMonitoringThresholdsQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0),
@@ -592,12 +602,14 @@
     runtimeMonitoringSamplesQueryOptions(
       resourceFallbackServerScope ?? resourceRuntimeScope,
       shouldLoadResourceFallbackServerRuntime,
+      runtimeMonitoringTimeRange,
     ),
   );
   const resourceFallbackServerRuntimeMonitoringRollupQuery = createQuery(() =>
     runtimeMonitoringRollupQueryOptions(
       resourceFallbackServerScope ?? resourceRuntimeScope,
       shouldLoadResourceFallbackServerRuntime,
+      runtimeMonitoringTimeRange,
     ),
   );
   const resourceDeployments = $derived(
@@ -3101,6 +3113,16 @@
       .split(/[\n,]/)
       .map((ref) => ref.trim())
       .filter((ref) => ref.length > 0);
+  }
+
+  function refreshRuntimeMonitor(): void {
+    void resourceRuntimeUsageQuery.refetch();
+    void resourceRuntimeMonitoringSamplesQuery.refetch();
+    void resourceRuntimeMonitoringRollupQuery.refetch();
+    void resourceRuntimeMonitoringThresholdsQuery.refetch();
+    void resourceFallbackServerRuntimeUsageQuery.refetch();
+    void resourceFallbackServerRuntimeMonitoringSamplesQuery.refetch();
+    void resourceFallbackServerRuntimeMonitoringRollupQuery.refetch();
   }
 
   async function invalidateScheduledTaskQueries(): Promise<void> {
@@ -9902,8 +9924,19 @@
             thresholds={resourceRuntimeMonitoringThresholds}
             thresholdsLoading={resourceRuntimeMonitoringThresholdsQuery.isPending}
             thresholdsError={resourceRuntimeMonitoringThresholdsError}
+            timeRange={runtimeMonitoringTimeRange}
+            refreshing={resourceRuntimeUsageQuery.isFetching ||
+              resourceRuntimeMonitoringSamplesQuery.isFetching ||
+              resourceRuntimeMonitoringRollupQuery.isFetching ||
+              resourceRuntimeMonitoringThresholdsQuery.isFetching ||
+              resourceFallbackServerRuntimeUsageQuery.isFetching ||
+              resourceFallbackServerRuntimeMonitoringSamplesQuery.isFetching ||
+              resourceFallbackServerRuntimeMonitoringRollupQuery.isFetching}
+            onTimeRangeChange={(nextTimeRange) => {
+              runtimeMonitoringTimeRange = nextTimeRange;
+            }}
+            onRefresh={refreshRuntimeMonitor}
             logsHref={resourceTabHref("logs")}
-            eventsHref={resourceTabHref("deployments")}
             diagnosticsHref={resourceSettingsSectionHref("diagnostics")}
             cleanupHref={resourceSettingsSectionHref("storage")}
           />

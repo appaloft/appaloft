@@ -11,12 +11,54 @@ import { orpcClient } from "$lib/orpc";
 
 import { runtimeMonitoringScopeQueryKey, runtimeUsageQueryKey } from "./runtime-usage";
 
-const retainedSampleWindowMs = 60 * 60 * 1000;
+export const runtimeMonitoringRefreshIntervalMs = 15_000;
 
-function recentRetainedSampleWindow(): { from: string; to: string } {
+export type RuntimeMonitoringTimeRangeId = "15m" | "1h" | "6h" | "24h";
+
+export const runtimeMonitoringTimeRangeOptions: readonly RuntimeMonitoringTimeRangeId[] = [
+  "15m",
+  "1h",
+  "6h",
+  "24h",
+];
+
+function runtimeMonitoringTimeRangeMs(timeRange: RuntimeMonitoringTimeRangeId): number {
+  switch (timeRange) {
+    case "15m":
+      return 15 * 60 * 1000;
+    case "1h":
+      return 60 * 60 * 1000;
+    case "6h":
+      return 6 * 60 * 60 * 1000;
+    case "24h":
+      return 24 * 60 * 60 * 1000;
+  }
+}
+
+function runtimeMonitoringBucket(timeRange: RuntimeMonitoringTimeRangeId) {
+  switch (timeRange) {
+    case "15m":
+    case "1h":
+      return "minute" as const;
+    case "6h":
+      return "five-minute" as const;
+    case "24h":
+      return "hour" as const;
+  }
+}
+
+function runtimeMonitoringSampleLimit(timeRange: RuntimeMonitoringTimeRangeId): number {
+  const minuteCount = Math.ceil(runtimeMonitoringTimeRangeMs(timeRange) / (60 * 1000));
+  return Math.min(720, Math.max(60, minuteCount + 1));
+}
+
+function recentRetainedSampleWindow(timeRange: RuntimeMonitoringTimeRangeId): {
+  from: string;
+  to: string;
+} {
   const to = new Date();
   return {
-    from: new Date(to.getTime() - retainedSampleWindowMs).toISOString(),
+    from: new Date(to.getTime() - runtimeMonitoringTimeRangeMs(timeRange)).toISOString(),
     to: to.toISOString(),
   };
 }
@@ -36,36 +78,44 @@ export function runtimeUsageQueryOptions(scope: RuntimeUsageScope, enabled: bool
   });
 }
 
-export function runtimeMonitoringSamplesQueryOptions(scope: RuntimeUsageScope, enabled: boolean) {
+export function runtimeMonitoringSamplesQueryOptions(
+  scope: RuntimeUsageScope,
+  enabled: boolean,
+  timeRange: RuntimeMonitoringTimeRangeId = "1h",
+) {
   return queryOptions<RuntimeMonitoringSamplesResponse>({
-    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-samples", scope), "last-hour"],
+    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-samples", scope), timeRange],
     queryFn: () =>
       orpcClient.runtimeMonitoring.samples({
         scope,
-        window: recentRetainedSampleWindow(),
+        window: recentRetainedSampleWindow(timeRange),
         signals: ["cpu", "memory", "disk"],
-        limit: 60,
+        limit: runtimeMonitoringSampleLimit(timeRange),
       }),
     enabled,
     staleTime: 10_000,
-    refetchInterval: 15_000,
+    refetchInterval: runtimeMonitoringRefreshIntervalMs,
   });
 }
 
-export function runtimeMonitoringRollupQueryOptions(scope: RuntimeUsageScope, enabled: boolean) {
+export function runtimeMonitoringRollupQueryOptions(
+  scope: RuntimeUsageScope,
+  enabled: boolean,
+  timeRange: RuntimeMonitoringTimeRangeId = "1h",
+) {
   return queryOptions<RuntimeMonitoringRollupResponse>({
-    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-rollup", scope), "last-hour"],
+    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-rollup", scope), timeRange],
     queryFn: () =>
       orpcClient.runtimeMonitoring.rollup({
         scope,
-        window: recentRetainedSampleWindow(),
-        bucket: "minute",
+        window: recentRetainedSampleWindow(timeRange),
+        bucket: runtimeMonitoringBucket(timeRange),
         signals: ["cpu", "memory", "disk"],
         includeDeploymentMarkers: true,
       }),
     enabled,
     staleTime: 10_000,
-    refetchInterval: 15_000,
+    refetchInterval: runtimeMonitoringRefreshIntervalMs,
   });
 }
 
