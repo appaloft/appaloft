@@ -10,6 +10,14 @@ const resourceSourceOptionSource = readFileSync(
   fileURLToPath(new URL("./ResourceSourceOption.svelte", import.meta.url)),
   "utf8",
 );
+const serverRegistrationFormSource = readFileSync(
+  fileURLToPath(new URL("./ServerRegistrationForm.svelte", import.meta.url)),
+  "utf8",
+);
+const consoleLayoutCssSource = readFileSync(
+  fileURLToPath(new URL("../../../routes/layout.css", import.meta.url)),
+  "utf8",
+);
 const deployPageSource = readFileSync(
   fileURLToPath(new URL("../../../routes/deploy/+page.svelte", import.meta.url)),
   "utf8",
@@ -217,6 +225,34 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain(
       'sourceKind !== "docker-image" && sourceKind !== "blueprint"',
     );
+  });
+
+  test("[QD-CHOICE-LIST-001] keeps selectable object lists on Tailwind white and blue surfaces", () => {
+    expect(consoleLayoutCssSource).not.toContain(".console-choice-list");
+    expect(consoleLayoutCssSource).not.toContain(".console-choice-item");
+    expect(quickDeploySheetSource).toContain("rounded-md border border-input bg-card p-2");
+    expect(quickDeploySheetSource).toContain("bg-card text-foreground");
+    expect(quickDeploySheetSource).toContain("hover:bg-primary/5");
+    expect(quickDeploySheetSource).toContain("data-[selected=true]:border-primary/40");
+    expect(quickDeploySheetSource).toContain("data-[selected=true]:bg-primary/5");
+    expect(quickDeploySheetSource).toContain(
+      "data-selected={selectedGitHubRepositoryId === repository.id",
+    );
+    expect(quickDeploySheetSource).not.toContain("hover:bg-muted/50");
+    expect(quickDeploySheetSource).not.toContain(
+      'variant={selectedServerId === server.id ? "selected" : "ghost"}',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'variant={selectedProjectId === project.id ? "selected" : "ghost"}',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}',
+    );
+    expect(serverRegistrationFormSource).toContain("rounded-md border border-input bg-card p-2");
+    expect(serverRegistrationFormSource).toContain("hover:bg-primary/5");
+    expect(serverRegistrationFormSource).toContain("data-[selected=true]:bg-primary/5");
+    expect(serverRegistrationFormSource).not.toContain("console-choice-list");
+    expect(serverRegistrationFormSource).not.toContain("console-choice-item");
   });
 
   test("[QD-STATIC-001] treats static sites as uploaded artifacts with optional server hosting", () => {
