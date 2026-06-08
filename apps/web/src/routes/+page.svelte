@@ -261,36 +261,28 @@
         <div class="nothing-project-list" data-home-project-list>
           {#if projectsLoading || (projects.length === 0 && workStateLoading)}
             {#each Array.from({ length: 4 }) as _, index (index)}
-              <article class="nothing-project-row" aria-hidden="true">
-                <div class="nothing-project-main">
+              <article class="nothing-project-card" aria-hidden="true">
+                <div class="nothing-project-card-header">
                   <Skeleton class="size-11 shrink-0 rounded-md" />
-                  <span class="nothing-project-copy">
+                  <span class="nothing-project-copy flex-1">
                     <Skeleton class="h-5 w-full max-w-72" />
                     <Skeleton class="h-4 w-full max-w-xl" />
-                    <span class="nothing-project-meta">
-                      <Skeleton class="h-[22px] w-16" />
-                      <Skeleton class="h-[22px] w-20" />
-                      <Skeleton class="h-[22px] w-24" />
-                    </span>
                   </span>
+                  <Skeleton class="h-6 w-28" />
                 </div>
-                <div class="nothing-resource-preview">
-                  <Skeleton class="h-11 w-full" />
-                  <Skeleton class="h-11 w-full" />
+                <div class="nothing-project-metrics">
+                  <Skeleton class="h-14 w-full" />
+                  <Skeleton class="h-14 w-full" />
+                  <Skeleton class="h-14 w-full" />
                 </div>
-                <div class="nothing-project-status">
-                  <span class="nothing-status-block">
-                    <Skeleton class="h-3 w-20" />
-                    <Skeleton class="h-6 w-36" />
-                  </span>
-                  <span class="nothing-status-block">
-                    <Skeleton class="h-3 w-16" />
-                    <Skeleton class="h-5 w-48" />
-                  </span>
+                <div class="nothing-resource-strip">
+                  <Skeleton class="h-8 w-32" />
+                  <Skeleton class="h-8 w-40" />
                 </div>
-                <span class="nothing-project-open">
+                <div class="nothing-project-access-row">
+                  <Skeleton class="h-5 w-full max-w-md" />
                   <Skeleton class="h-5 w-20" />
-                </span>
+                </div>
               </article>
             {/each}
           {/if}
@@ -300,50 +292,82 @@
             {@const latestDeployment = latestProjectDeployment(project, deployments)}
             {@const primaryAccessResource = projectPrimaryAccessResource(project)}
             {@const primaryAccessUrl = accessUrl(primaryAccessResource)}
-            <article class="nothing-project-row" data-home-project-row>
-              <a href={projectDetailHref(project.id)} class="nothing-project-main">
-                <span class="nothing-project-icon" aria-hidden="true">
-                  <FolderOpen class="size-5" />
-                </span>
-                <span class="nothing-project-copy">
-                  <span class="nothing-project-title">
-                    <strong>{project.name}</strong>
-                    <small>{project.slug}</small>
+            <article class="nothing-project-card" data-home-project-row>
+              <div class="nothing-project-card-header">
+                <a href={projectDetailHref(project.id)} class="nothing-project-identity">
+                  <span class="nothing-project-icon" aria-hidden="true">
+                    <FolderOpen class="size-5" />
                   </span>
-                  <span class="nothing-project-description">
-                    {project.description ?? $t(i18nKeys.console.home.noProjectDescription)}
+                  <span class="nothing-project-copy">
+                    <span class="nothing-project-title">
+                      <strong>{project.name}</strong>
+                      <small>{project.slug}</small>
+                    </span>
+                    <span class="nothing-project-description">
+                      {project.description ?? $t(i18nKeys.console.home.noProjectDescription)}
+                    </span>
                   </span>
-                  <span class="nothing-project-meta">
-                    {#if resourcesLoading}
-                      <Skeleton class="h-[22px] w-16" />
-                    {:else}
-                      <span>
-                        {resourcesForProject.length}
-                        {$t(i18nKeys.common.domain.resources)}
-                      </span>
-                    {/if}
-                    {#if environmentsLoading}
-                      <Skeleton class="h-[22px] w-20" />
-                      <Skeleton class="h-[22px] w-24" />
-                    {:else}
-                      <span>
-                        {countProjectEnvironments(project, environments)}
-                        {$t(i18nKeys.common.domain.environments)}
-                      </span>
-                      <span>{projectEnvironmentNames(project)}</span>
-                    {/if}
-                  </span>
-                </span>
-              </a>
+                </a>
 
-              <div class="nothing-resource-preview" aria-label={$t(i18nKeys.console.home.resourcePreviewLabel)}>
+                <div class="nothing-project-deploy-state">
+                  <small>{$t(i18nKeys.console.home.latestDeploymentTitle)}</small>
+                  {#if deploymentsLoading}
+                    <Skeleton class="h-6 w-28" />
+                  {:else}
+                    <DeploymentStatusBadge status={latestDeployment?.status} />
+                  {/if}
+                </div>
+              </div>
+
+              <div class="nothing-project-metrics">
+                <a href={projectDetailHref(project.id)} class="nothing-project-metric">
+                  <small>{$t(i18nKeys.common.domain.resources)}</small>
+                  {#if resourcesLoading}
+                    <Skeleton class="h-6 w-10" />
+                    <Skeleton class="h-3 w-28" />
+                  {:else}
+                    <strong>{resourcesForProject.length}</strong>
+                    <span>
+                      {visibleResources.length > 0
+                        ? visibleResources.map((resource) => resource.name).join(" / ")
+                        : $t(i18nKeys.console.home.noResourcesInProject)}
+                    </span>
+                  {/if}
+                </a>
+
+                <a href={projectDetailHref(project.id)} class="nothing-project-metric">
+                  <small>{$t(i18nKeys.common.domain.environments)}</small>
+                  {#if environmentsLoading}
+                    <Skeleton class="h-6 w-10" />
+                    <Skeleton class="h-3 w-28" />
+                  {:else}
+                    <strong>{countProjectEnvironments(project, environments)}</strong>
+                    <span>{projectEnvironmentNames(project)}</span>
+                  {/if}
+                </a>
+
+                <a href="/deployments" class="nothing-project-metric">
+                  <small>{$t(i18nKeys.common.domain.deployment)}</small>
+                  {#if deploymentsLoading}
+                    <Skeleton class="h-6 w-32" />
+                    <Skeleton class="h-3 w-24" />
+                  {:else if latestDeployment}
+                    <strong>{latestDeployment.runtimePlan.source.displayName}</strong>
+                    <span>{formatTime(latestDeployment.createdAt)}</span>
+                  {:else}
+                    <strong>{$t(i18nKeys.console.home.noDeploymentsShort)}</strong>
+                    <span>{$t(i18nKeys.console.home.latestDeploymentEmpty)}</span>
+                  {/if}
+                </a>
+              </div>
+
+              <div class="nothing-resource-strip" aria-label={$t(i18nKeys.console.home.resourcePreviewLabel)}>
                 {#if resourcesLoading}
-                  <Skeleton class="h-11 w-full" />
-                  <Skeleton class="h-11 w-full" />
+                  <Skeleton class="h-8 w-32" />
+                  <Skeleton class="h-8 w-40" />
                 {:else if visibleResources.length > 0}
                   {#each visibleResources as resource (resource.id)}
                     {@const Icon = resourceIcon(resource)}
-                    {@const resourceAccessUrl = accessUrl(resource)}
                     <a href={resourceDetailHref(resource)} class="nothing-resource-chip">
                       <span class="nothing-resource-icon" aria-hidden="true">
                         <Icon class="size-3.5" />
@@ -351,10 +375,7 @@
                       <span class="min-w-0">
                         <strong>{resource.name}</strong>
                         <small>
-                          {$t(resourceKindLabelKey(resource.kind))}
-                          {#if resourceAccessUrl}
-                            · {environmentName(resource.environmentId)}
-                          {/if}
+                          {$t(resourceKindLabelKey(resource.kind))} · {environmentName(resource.environmentId)}
                         </small>
                       </span>
                     </a>
@@ -373,23 +394,8 @@
                 {/if}
               </div>
 
-              <div class="nothing-project-status">
-                <span class="nothing-status-block">
-                  <small>{$t(i18nKeys.console.home.latestDeploymentTitle)}</small>
-                  {#if deploymentsLoading}
-                    <Skeleton class="h-6 w-36" />
-                  {:else}
-                    <span>
-                      <DeploymentStatusBadge status={latestDeployment?.status} />
-                      {#if latestDeployment}
-                        <em>{formatTime(latestDeployment.createdAt)}</em>
-                      {:else}
-                        <em>{$t(i18nKeys.console.home.noDeploymentsShort)}</em>
-                      {/if}
-                    </span>
-                  {/if}
-                </span>
-                <span class="nothing-status-block">
+              <div class="nothing-project-access-row">
+                <div class="nothing-project-access">
                   <small>{$t(i18nKeys.console.home.accessRouteTitle)}</small>
                   {#if resourcesLoading}
                     <Skeleton class="h-5 w-48" />
@@ -403,13 +409,13 @@
                       {$t(i18nKeys.console.home.noAccessRoute)}
                     </span>
                   {/if}
-                </span>
-              </div>
+                </div>
 
-              <a href={projectDetailHref(project.id)} class="nothing-project-open">
-                {$t(i18nKeys.common.actions.viewDetails)}
-                <ArrowRight class="size-4" />
-              </a>
+                <a href={projectDetailHref(project.id)} class="nothing-project-open">
+                  {$t(i18nKeys.common.actions.viewDetails)}
+                  <ArrowRight class="size-4" />
+                </a>
+              </div>
             </article>
           {/each}
         </div>
@@ -585,38 +591,31 @@
     box-shadow: var(--shadow-2xs);
   }
 
-  .nothing-project-row {
+  .nothing-project-card {
     display: grid;
     min-width: 0;
-    grid-template-areas:
-      "project"
-      "resource"
-      "status"
-      "action";
-    gap: 16px;
-    align-items: start;
+    gap: 15px;
     border-bottom: 1px solid var(--border);
     padding: 18px;
   }
 
-  .nothing-project-row:last-child {
+  .nothing-project-card:last-child {
     border-bottom: 0;
   }
 
   @container (min-width: 42rem) {
-    .nothing-project-row {
-      grid-template-areas:
-        "project status"
-        "resource status"
-        "resource action";
-      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    .nothing-project-card {
+      gap: 16px;
+      padding: 20px;
     }
   }
 
-  .nothing-project-main,
+  .nothing-project-identity,
+  .nothing-project-metric,
   .nothing-resource-chip,
   .nothing-resource-more,
   .nothing-resource-empty,
+  .nothing-project-access a,
   .nothing-project-open,
   .nothing-context-cell,
   .nothing-activity-row,
@@ -625,10 +624,19 @@
     text-decoration: none;
   }
 
-  .nothing-project-main {
-    display: grid;
+  .nothing-project-card-header {
+    display: flex;
     min-width: 0;
-    grid-area: project;
+    flex-wrap: wrap;
+    align-items: start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .nothing-project-identity {
+    display: grid;
+    flex: 1 1 24rem;
+    min-width: 0;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 12px;
   }
@@ -651,10 +659,9 @@
 
   .nothing-project-copy,
   .nothing-project-title,
-  .nothing-project-meta,
-  .nothing-status-block,
-  .nothing-status-block > span,
-  .nothing-status-block a,
+  .nothing-project-metric,
+  .nothing-project-access,
+  .nothing-project-access a,
   .nothing-activity-row,
   .nothing-activity-row > span,
   .nothing-next-row {
@@ -674,15 +681,19 @@
   }
 
   .nothing-project-title strong {
+    overflow: hidden;
     color: var(--text-display);
     font-size: 16px;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .nothing-project-title small,
-  .nothing-project-meta span,
+  .nothing-project-deploy-state small,
+  .nothing-project-metric small,
+  .nothing-project-access small,
   .nothing-resource-chip small,
-  .nothing-status-block small,
   .nothing-activity-row small,
   .nothing-activity-row em {
     color: var(--text-secondary);
@@ -691,40 +702,119 @@
     line-height: 1.4;
   }
 
-  .nothing-project-title small,
-  .nothing-project-meta span {
+  .nothing-project-title small {
+    overflow: hidden;
     border: 1px solid var(--input);
     border-radius: var(--radius-sm);
     padding: 2px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .nothing-project-description {
+    overflow: hidden;
     color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .nothing-project-meta {
-    display: flex;
-    flex-wrap: wrap;
+  .nothing-project-deploy-state {
+    display: grid;
+    justify-items: start;
     gap: 6px;
   }
 
-  .nothing-resource-preview {
+  @container (min-width: 42rem) {
+    .nothing-project-deploy-state {
+      justify-items: end;
+      text-align: right;
+    }
+  }
+
+  .nothing-project-metrics {
     display: grid;
-    grid-area: resource;
+    border-top: 1px solid var(--input);
+    border-bottom: 1px solid var(--input);
+  }
+
+  @container (min-width: 42rem) {
+    .nothing-project-metrics {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .nothing-project-metric {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0;
+  }
+
+  .nothing-project-metric:last-child {
+    border-bottom: 0;
+  }
+
+  @container (min-width: 42rem) {
+    .nothing-project-metric {
+      border-right: 1px solid var(--border);
+      border-bottom: 0;
+      padding: 12px 16px;
+    }
+
+    .nothing-project-metric:first-child {
+      padding-left: 0;
+    }
+
+    .nothing-project-metric:last-child {
+      border-right: 0;
+      padding-right: 0;
+    }
+  }
+
+  .nothing-project-metric strong {
+    overflow: hidden;
+    color: var(--text-display);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nothing-project-metric span {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nothing-project-metric:hover strong,
+  .nothing-project-metric:focus-visible strong,
+  .nothing-project-identity:hover strong,
+  .nothing-project-identity:focus-visible strong {
+    color: var(--primary);
+  }
+
+  .nothing-resource-strip {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
   .nothing-resource-chip {
-    display: grid;
+    display: inline-flex;
     min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 9px;
     border: 1px solid var(--input);
     border-radius: var(--radius-md);
-    padding: 8px;
+    padding: 7px 9px 7px 7px;
     transition:
       border-color var(--nothing-motion-duration) var(--nothing-motion-ease),
       background-color var(--nothing-motion-duration) var(--nothing-motion-ease);
@@ -737,8 +827,8 @@
   }
 
   .nothing-resource-icon {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
   }
 
   .nothing-resource-chip strong,
@@ -762,6 +852,7 @@
 
   .nothing-resource-more,
   .nothing-resource-empty {
+    align-self: center;
     color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
@@ -770,52 +861,44 @@
 
   .nothing-resource-more:hover,
   .nothing-resource-empty:hover,
-  .nothing-project-main:hover strong,
   .nothing-project-open:hover {
     color: var(--primary);
   }
 
-  .nothing-project-status {
-    display: grid;
-    grid-area: status;
+  .nothing-project-access-row {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
     gap: 12px;
+    border-top: 1px solid var(--input);
+    padding-top: 14px;
   }
 
-  .nothing-status-block {
+  .nothing-project-access {
     display: grid;
+    flex: 1 1 18rem;
     gap: 5px;
   }
 
-  .nothing-status-block > span,
-  .nothing-status-block a {
+  .nothing-project-access a {
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .nothing-status-block em {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-style: normal;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-status-block a {
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-size: 12px;
   }
 
-  .nothing-status-block a span {
+  .nothing-project-access a span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .nothing-status-block a:hover {
+  .nothing-project-access a:hover,
+  .nothing-project-access a:focus-visible {
     color: var(--primary);
   }
 
@@ -828,7 +911,6 @@
     display: inline-flex;
     align-items: center;
     justify-self: start;
-    grid-area: action;
     gap: 6px;
     color: var(--text-secondary);
     font-size: 13px;
@@ -836,12 +918,6 @@
     transition:
       color var(--nothing-motion-duration) var(--nothing-motion-ease),
       transform var(--nothing-motion-duration) var(--nothing-motion-ease);
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-open {
-      align-self: end;
-    }
   }
 
   .nothing-project-open:hover,
@@ -975,10 +1051,12 @@
     padding: 16px;
   }
 
-  .nothing-project-main:focus-visible,
+  .nothing-project-identity:focus-visible,
+  .nothing-project-metric:focus-visible,
   .nothing-resource-chip:focus-visible,
   .nothing-resource-more:focus-visible,
   .nothing-resource-empty:focus-visible,
+  .nothing-project-access a:focus-visible,
   .nothing-project-open:focus-visible,
   .nothing-context-cell:focus-visible,
   .nothing-activity-row:focus-visible,
