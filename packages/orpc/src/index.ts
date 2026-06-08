@@ -8762,6 +8762,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",
     "/api/servers/:serverId/edge-proxy/bootstrap",
+    "/api/servers/:serverId/runtime/prepare",
     "/api/environments",
     "/api/default-access-domain-policies",
     "/api/default-access-domain-policies/show",

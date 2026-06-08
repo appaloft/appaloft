@@ -7,8 +7,10 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProductSessionAuthorizationPort,
   type QueryBus,
 } from "@appaloft/application";
+import { ok } from "@appaloft/core";
 import { os } from "@orpc/server";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -165,6 +167,69 @@ describe("Appaloft oRPC router contributions", () => {
     });
     expect(logger.errors[0]?.context?.stack).toContain(
       "database relation cloud_tenants does not exist",
+    );
+  });
+
+  test("mounts server runtime prepare at its generated HTTP path", async () => {
+    const commands: unknown[] = [];
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: {
+        async execute(_context, command) {
+          commands.push(command);
+          return ok({
+            serverId: "srv_route",
+            status: "ready",
+            preparedAt: "2026-05-17T00:00:00.000Z",
+            steps: [
+              {
+                phase: "docker",
+                status: "succeeded",
+                message: "Docker is already available",
+                durationMs: 0,
+              },
+            ],
+          });
+        },
+      } as CommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new CapturingLogger(),
+      productSessionAuthorizationPort: {
+        authorizeProductSession: async (_context, input) =>
+          ok({
+            actor: {
+              kind: "user",
+              id: "usr_admin",
+              label: "admin@example.com",
+            },
+            email: "admin@example.com",
+            organizationId: "org_self_hosted",
+            role: input.requiredRole,
+            userId: "usr_admin",
+          }),
+      } satisfies ProductSessionAuthorizationPort,
+      queryBus: {} as QueryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/servers/srv_route/runtime/prepare", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=test-admin-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ serverId: "srv_route", mode: "repair" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      serverId: "srv_route",
+      status: "ready",
+    });
+    expect(commands).toHaveLength(1);
+    const command = commands[0];
+    expect(command && typeof command === "object" ? command.constructor.name : "").toBe(
+      "PrepareServerRuntimeCommand",
     );
   });
 });

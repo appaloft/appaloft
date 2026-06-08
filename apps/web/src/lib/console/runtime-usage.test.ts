@@ -149,6 +149,7 @@ describe("runtime usage console readback", () => {
 
     expect(serverSource).not.toContain('eventsHref={serverTabHref("deployments")}');
     expect(serverSource).not.toContain('capacityHref={serverTabHref("capacity")}');
+    expect(serverSource).toContain('cleanupHref={serverTabHref("capacity")}');
     expect(serverSource).toContain("orpcClient.servers.capacity.inspect");
     expect(serverSource).toContain("orpcClient.servers.capacity.prune");
     expect(serverSource).toContain("capacityPruneBefore = handoff.to");

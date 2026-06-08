@@ -1012,6 +1012,7 @@
             runtimeMonitoringTimeRange = nextTimeRange;
           }}
           onRefresh={refreshRuntimeMonitor}
+          cleanupHref={serverTabHref("capacity")}
         />
           </Tabs.Content>
 

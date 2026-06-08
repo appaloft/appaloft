@@ -7016,13 +7016,12 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
     await expectText(view, "Deployment dep_demo succeeded");
-    await expectAnyText(view, ["Capacity", "容量"]);
     await waitFor(
       () =>
         view.evaluate<boolean>(
           `(() => {
             const link = Array.from(document.querySelectorAll("a")).find((candidate) =>
-              (candidate.textContent?.includes("Capacity") || candidate.textContent?.includes("容量")) &&
+              candidate.getAttribute("href")?.includes("tab=capacity") &&
               candidate.getAttribute("href")?.includes("runtimeMonitoringFrom=")
             );
             if (!link) {
@@ -7033,7 +7032,7 @@ describe("console e2e with Bun.WebView", () => {
           })()`,
         ),
       Boolean,
-      "Expected Monitor capacity handoff link",
+      "Expected Monitor cleanup handoff link",
     );
 
     await expectAnyText(view, ["Runtime capacity", "运行时容量"]);
