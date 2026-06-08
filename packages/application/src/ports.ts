@@ -2712,8 +2712,8 @@ export interface ResourceStaticArtifactAccessRouteSummary {
   publicationId: string;
   artifactId: string;
   pathPrefix: string;
-  fileCount: number;
-  totalBytes: number;
+  fileCount?: number;
+  totalBytes?: number;
   updatedAt?: string;
 }
 
@@ -3826,7 +3826,12 @@ export interface ResourceHealthPolicySection {
 export interface ResourcePublicAccessHealthSection {
   status: "ready" | "not-ready" | "failed" | "unknown" | "not-configured";
   url?: string;
-  kind?: "durable-domain" | "server-applied-domain" | "generated-latest" | "generated-planned";
+  kind?:
+    | "durable-domain"
+    | "static-artifact"
+    | "server-applied-domain"
+    | "generated-latest"
+    | "generated-planned";
   reasonCode?: string;
   phase?: string;
   routeIntentStatus?: RouteIntentStatusDescriptor;

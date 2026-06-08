@@ -1672,8 +1672,8 @@ export const resourceStaticArtifactAccessRouteSummarySchema = z.object({
   publicationId: z.string(),
   artifactId: z.string(),
   pathPrefix: z.string(),
-  fileCount: z.number().int().nonnegative(),
-  totalBytes: z.number().int().nonnegative(),
+  fileCount: z.number().int().nonnegative().optional(),
+  totalBytes: z.number().int().nonnegative().optional(),
   updatedAt: z.string().optional(),
 });
 
@@ -2076,7 +2076,13 @@ export const resourceHealthSummarySchema = z.object({
     status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
     url: z.string().optional(),
     kind: z
-      .enum(["durable-domain", "server-applied-domain", "generated-latest", "generated-planned"])
+      .enum([
+        "durable-domain",
+        "static-artifact",
+        "server-applied-domain",
+        "generated-latest",
+        "generated-planned",
+      ])
       .optional(),
     reasonCode: z.string().optional(),
     phase: z.string().optional(),

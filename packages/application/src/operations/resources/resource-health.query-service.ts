@@ -127,6 +127,12 @@ function proxyProviderKey(accessSummary: ResourceAccessSummary | undefined): str
   );
 }
 
+function isServerlessStaticArtifactDeployment(
+  deployment: DeploymentSummary | undefined,
+): deployment is DeploymentSummary & { target: { kind: "serverless-static-artifact" } } {
+  return deployment?.target.kind === "serverless-static-artifact";
+}
+
 function latestAccessFailureSource(
   diagnostic: ResourceAccessFailureDiagnostic,
 ): ResourceHealthSource {
@@ -414,6 +420,14 @@ function healthPolicySection(
   resourceState: ResourceState | undefined,
   deployment: DeploymentSummary | undefined,
 ): ResourceHealthPolicySection {
+  if (isServerlessStaticArtifactDeployment(deployment)) {
+    return {
+      status: "unsupported" as const,
+      enabled: false,
+      reasonCode: "serverless_static_artifact_health_policy_unsupported",
+    };
+  }
+
   const healthCheck = resolvedHttpHealthPolicy({
     resource,
     resourceState,
@@ -492,19 +506,22 @@ function publicAccessSection(
 
   const route =
     access?.latestDurableDomainRoute ??
+    access?.latestStaticArtifactRoute ??
     access?.latestServerAppliedDomainRoute ??
     access?.latestGeneratedAccessRoute ??
     access?.plannedGeneratedAccessRoute;
   const kind: ResourcePublicAccessHealthSection["kind"] | undefined =
     route === access?.latestDurableDomainRoute
       ? "durable-domain"
-      : route === access?.latestServerAppliedDomainRoute
-        ? "server-applied-domain"
-        : route === access?.latestGeneratedAccessRoute
-          ? "generated-latest"
-          : route === access?.plannedGeneratedAccessRoute
-            ? "generated-planned"
-            : undefined;
+      : route === access?.latestStaticArtifactRoute
+        ? "static-artifact"
+        : route === access?.latestServerAppliedDomainRoute
+          ? "server-applied-domain"
+          : route === access?.latestGeneratedAccessRoute
+            ? "generated-latest"
+            : route === access?.plannedGeneratedAccessRoute
+              ? "generated-planned"
+              : undefined;
 
   const routeIntentStatus = selectedRouteIntentStatus({
     resourceId: resource.id,
@@ -573,6 +590,14 @@ function publicAccessSection(
     return {
       status: "not-configured",
       reasonCode: "resource_public_access_not_configured",
+    };
+  }
+
+  if (kind === "static-artifact") {
+    return {
+      status: "ready",
+      url: route.url,
+      kind,
     };
   }
 
@@ -776,6 +801,15 @@ function overallStatus(input: {
     return "degraded";
   }
 
+  if (
+    isServerlessStaticArtifactDeployment(input.deployment) &&
+    input.deployment.status === "succeeded" &&
+    input.publicAccess.status === "ready" &&
+    input.proxy.status === "not-configured"
+  ) {
+    return "healthy";
+  }
+
   if (input.healthPolicy.status !== "configured") {
     return "unknown";
   }
@@ -876,6 +910,7 @@ function runtimeProbeUrl(input: {
 
   const publicRoute =
     input.resource.accessSummary?.latestDurableDomainRoute ??
+    input.resource.accessSummary?.latestStaticArtifactRoute ??
     input.resource.accessSummary?.latestServerAppliedDomainRoute ??
     input.resource.accessSummary?.latestGeneratedAccessRoute;
   return publicRoute ? withPolicyPath(publicRoute.url, input.policy.path) : undefined;

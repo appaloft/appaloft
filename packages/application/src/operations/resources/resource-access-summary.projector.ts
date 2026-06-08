@@ -10,6 +10,12 @@ export interface ResourceAccessSummaryDeployment {
   id: string;
   status: DeploymentStatus;
   createdAt: string;
+  target?: {
+    kind: "server-backed" | "serverless-static-artifact";
+    publicationId?: string;
+    artifactId?: string;
+    routeUrl?: string;
+  };
   runtimePlan: {
     execution: {
       accessRoutes?: Array<{
@@ -103,6 +109,35 @@ function proxyRouteStatusFor(
   }
 }
 
+function staticArtifactRouteFor(
+  deployment: ResourceAccessSummaryDeployment,
+): NonNullable<ResourceAccessSummary["latestStaticArtifactRoute"]> | undefined {
+  if (deployment.target?.kind !== "serverless-static-artifact" || !deployment.target.routeUrl) {
+    return undefined;
+  }
+  if (!deployment.target.publicationId || !deployment.target.artifactId) {
+    return undefined;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(deployment.target.routeUrl);
+  } catch {
+    return undefined;
+  }
+
+  const scheme = parsed.protocol === "https:" ? "https" : "http";
+  return {
+    url: deployment.target.routeUrl,
+    hostname: parsed.hostname,
+    scheme,
+    publicationId: deployment.target.publicationId ?? "",
+    artifactId: deployment.target.artifactId ?? "",
+    pathPrefix: parsed.pathname || "/",
+    updatedAt: deployment.createdAt,
+  };
+}
+
 export function projectResourceAccessSummary(
   deployments: ResourceAccessSummaryDeployment[],
   domainBindings: ResourceAccessSummaryDomainBinding[] = [],
@@ -124,9 +159,20 @@ export function projectResourceAccessSummary(
   let latestGeneratedRoute: typeof latestRoute;
   let latestDurableRoute: typeof latestRoute;
   let latestServerAppliedRoute: typeof latestRoute;
+  let latestStaticArtifactRoute:
+    | {
+        deployment: ResourceAccessSummaryDeployment;
+        route: NonNullable<ResourceAccessSummary["latestStaticArtifactRoute"]>;
+      }
+    | undefined;
 
   for (const deployment of sortedDeployments) {
     const metadata = deployment.runtimePlan.execution.metadata ?? {};
+    const staticArtifactRoute = staticArtifactRouteFor(deployment);
+    if (staticArtifactRoute) {
+      latestStaticArtifactRoute ??= { deployment, route: staticArtifactRoute };
+    }
+
     const route = deployment.runtimePlan.execution.accessRoutes?.find(
       (candidate) => candidate.proxyKind !== "none" && candidate.domains.length > 0,
     );
@@ -156,6 +202,7 @@ export function projectResourceAccessSummary(
 
   if (
     !latestGeneratedRoute &&
+    !latestStaticArtifactRoute &&
     !latestServerAppliedRoute &&
     (!readyDurableBinding || !latestRoute)
   ) {
@@ -163,6 +210,10 @@ export function projectResourceAccessSummary(
   }
 
   const summary: ResourceAccessSummary = {};
+
+  if (latestStaticArtifactRoute) {
+    summary.latestStaticArtifactRoute = latestStaticArtifactRoute.route;
+  }
 
   if (latestGeneratedRoute) {
     const { deployment, metadata, route } = latestGeneratedRoute;
