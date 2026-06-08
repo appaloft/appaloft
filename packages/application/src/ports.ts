@@ -1590,6 +1590,29 @@ export interface ServerConnectivityResult {
   checks: ServerConnectivityCheck[];
 }
 
+export interface ServerRuntimePreparationStep {
+  phase: "docker";
+  status: "succeeded" | "failed" | "skipped";
+  message: string;
+  durationMs: number;
+  metadata?: Record<string, string>;
+}
+
+export interface ServerRuntimePrepareResult {
+  serverId: string;
+  steps: ServerRuntimePreparationStep[];
+}
+
+export interface ServerRuntimePreparer {
+  prepare(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+      mode: "prepare" | "repair" | "upgrade";
+    },
+  ): Promise<Result<ServerRuntimePrepareResult>>;
+}
+
 export interface RuntimeTargetDiskCapacity {
   path: string;
   mount: string;

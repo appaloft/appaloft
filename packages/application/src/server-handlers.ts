@@ -14,6 +14,7 @@ export * from "./operations/servers/inspect-server-capacity.handler";
 export * from "./operations/servers/list-scheduled-runtime-prune-policies.handler";
 export * from "./operations/servers/list-servers.handler";
 export * from "./operations/servers/list-ssh-credentials.handler";
+export * from "./operations/servers/prepare-server-runtime.handler";
 export * from "./operations/servers/prune-server-capacity.handler";
 export * from "./operations/servers/register-server.handler";
 export * from "./operations/servers/rename-server.handler";

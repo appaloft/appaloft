@@ -154,7 +154,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("installBlueprintFromQuickDeploy");
     expect(quickDeploySource).toContain("orpcClient.blueprints.install");
     expect(quickDeploySource).toContain("observeDeploymentProgressAfterAcceptance");
-    expect(quickDeploySource).toContain("orpcClient.servers.bootstrapProxy");
+    expect(quickDeploySource).toContain("orpcClient.servers.prepareRuntime");
+    expect(quickDeploySource).toContain("servers.testConnectivity");
     expect(quickDeploySource).toContain("runtimeAvailability");
     expect(quickDeploySource).not.toContain("waitForBlueprintInstall");
     expect(quickDeploySource.match(/orpcClient\.blueprints\.install/g) ?? []).toHaveLength(1);

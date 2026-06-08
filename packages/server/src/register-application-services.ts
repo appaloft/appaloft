@@ -326,6 +326,8 @@ import {
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
   operationCatalog,
+  PrepareServerRuntimeCommandHandler,
+  PrepareServerRuntimeUseCase,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
@@ -2365,6 +2367,7 @@ export function registerApplicationServices(
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(PrepareServerRuntimeCommandHandler);
   container.registerSingleton(QueryCapabilitiesQueryHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
@@ -3194,6 +3197,7 @@ export function registerApplicationServices(
     CheckServerDeleteSafetyQueryService,
   );
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
+  container.registerSingleton(tokens.prepareServerRuntimeUseCase, PrepareServerRuntimeUseCase);
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);

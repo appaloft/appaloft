@@ -116,6 +116,7 @@ import {
   type ListTerminalSessionsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
+  type PrepareServerRuntimeCommandInput,
   type PromoteEnvironmentCommandInput,
   type ProvisionDependencyResourceCommandInput,
   type PruneDeploymentLogsCommandInput,
@@ -325,6 +326,7 @@ import {
   type ListTerminalSessionsResponse,
   type LockEnvironmentResponse,
   type OrganizationProfileResponse,
+  type PrepareServerRuntimeResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type PruneDeploymentLogsResponse,
@@ -854,6 +856,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       TestDraftServerConnectivityCommandInput,
       TestServerConnectivityResponse,
+      AppaloftClientError
+    >;
+    prepareRuntime: Client<
+      AppaloftClientContext,
+      PrepareServerRuntimeCommandInput,
+      PrepareServerRuntimeResponse,
       AppaloftClientError
     >;
     bootstrapProxy: Client<

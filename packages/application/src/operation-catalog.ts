@@ -212,6 +212,7 @@ import { inspectServerCapacityQueryInputSchema } from "./operations/servers/insp
 import { listScheduledRuntimePrunePoliciesQueryInputSchema } from "./operations/servers/list-scheduled-runtime-prune-policies.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
+import { prepareServerRuntimeCommandInputSchema } from "./operations/servers/prepare-server-runtime.command";
 import { pruneServerCapacityCommandInputSchema } from "./operations/servers/prune-server-capacity.command";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
@@ -1505,6 +1506,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server proxy repair <serverId>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/bootstrap" },
+    },
+  },
+  {
+    key: "servers.prepare-runtime",
+    kind: "command",
+    domain: "servers",
+    messageName: "PrepareServerRuntimeCommand",
+    handlerName: "PrepareServerRuntimeCommandHandler",
+    serviceName: "PrepareServerRuntimeUseCase",
+    inputSchema: prepareServerRuntimeCommandInputSchema,
+    serviceToken: tokens.prepareServerRuntimeUseCase,
+    transports: {
+      cli: "appaloft server runtime prepare <serverId>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/runtime/prepare" },
     },
   },
   {
