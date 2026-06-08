@@ -1466,7 +1466,9 @@ export interface LocalFileBlueprintRegistryOptions {
 }
 
 export interface BlueprintInstallTarget {
+  readonly projectId?: string;
   readonly projectName: string;
+  readonly environmentId?: string;
   readonly environmentName: string;
   readonly resourceSlugPrefix?: string;
   readonly serverId?: string;
@@ -1482,11 +1484,13 @@ export interface CreateBlueprintInstallPlanInput {
 
 export type BlueprintInstallOperation =
   | {
-      readonly kind: "create-project";
+      readonly kind: "resolve-project";
+      readonly projectId?: string;
       readonly projectName: string;
     }
   | {
-      readonly kind: "create-environment";
+      readonly kind: "resolve-environment";
+      readonly environmentId?: string;
       readonly environmentName: string;
       readonly profile: string;
     }
@@ -1612,7 +1616,9 @@ export interface BlueprintApplicationBundleIdentity {
   readonly blueprintName: string;
   readonly blueprintVersion: string;
   readonly blueprintVariant?: string;
+  readonly projectId?: string;
   readonly projectName: string;
+  readonly environmentId?: string;
   readonly environmentName: string;
   readonly targetServerId?: string;
   readonly profile: string;
@@ -2194,11 +2200,13 @@ export function createBlueprintInstallPlan(
 
   const operations: BlueprintInstallOperation[] = [
     {
-      kind: "create-project",
+      kind: "resolve-project",
+      ...(input.target.projectId ? { projectId: input.target.projectId } : {}),
       projectName: input.target.projectName,
     },
     {
-      kind: "create-environment",
+      kind: "resolve-environment",
+      ...(input.target.environmentId ? { environmentId: input.target.environmentId } : {}),
       environmentName: input.target.environmentName,
       profile: profileName,
     },
@@ -2638,8 +2646,8 @@ export function createBlueprintApplicationBundlePlan(
         component.value.deploymentReason = operation.reason;
         break;
       }
-      case "create-project":
-      case "create-environment":
+      case "resolve-project":
+      case "resolve-environment":
         break;
     }
   }
@@ -2654,7 +2662,11 @@ export function createBlueprintApplicationBundlePlan(
         blueprintName: input.plan.blueprint.name,
         blueprintVersion: input.plan.blueprint.version,
         ...(input.plan.blueprint.variant ? { blueprintVariant: input.plan.blueprint.variant } : {}),
+        ...(input.plan.target.projectId ? { projectId: input.plan.target.projectId } : {}),
         projectName: input.plan.target.projectName,
+        ...(input.plan.target.environmentId
+          ? { environmentId: input.plan.target.environmentId }
+          : {}),
         environmentName: input.plan.target.environmentName,
         ...(input.plan.target.serverId ? { targetServerId: input.plan.target.serverId } : {}),
         profile: input.plan.profile,

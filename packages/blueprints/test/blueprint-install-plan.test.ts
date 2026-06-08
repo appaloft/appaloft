@@ -69,7 +69,9 @@ describe("Blueprint install plan", () => {
         APP_NAME: "api",
       },
       target: {
+        projectId: "prj_api",
         projectName: "API Project",
+        environmentId: "env_api_prod",
         environmentName: "production",
         resourceSlugPrefix: "demo",
       },
@@ -79,8 +81,8 @@ describe("Blueprint install plan", () => {
     if (result.ok) {
       expect(result.value.createsExternalResources).toBe(false);
       expect(result.value.operations.map((operation) => operation.kind)).toEqual([
-        "create-project",
-        "create-environment",
+        "resolve-project",
+        "resolve-environment",
         "create-resource",
         "configure-runtime",
         "configure-network",
@@ -90,6 +92,16 @@ describe("Blueprint install plan", () => {
         "bind-dependency",
         "create-deployment",
       ]);
+      expect(result.value.operations[0]).toMatchObject({
+        kind: "resolve-project",
+        projectId: "prj_api",
+        projectName: "API Project",
+      });
+      expect(result.value.operations[1]).toMatchObject({
+        kind: "resolve-environment",
+        environmentId: "env_api_prod",
+        environmentName: "production",
+      });
     }
   });
 
