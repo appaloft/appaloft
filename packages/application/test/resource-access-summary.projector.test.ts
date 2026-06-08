@@ -6,6 +6,37 @@ import {
 } from "../src/operations/resources/route-intent-status";
 
 describe("projectResourceAccessSummary", () => {
+  test("[CLOUD-STATIC-DEPLOY-158] projects serverless static artifact deployment route", () => {
+    const summary = projectResourceAccessSummary([
+      {
+        id: "dep_static",
+        status: "succeeded",
+        createdAt: "2026-06-08T01:56:55.000Z",
+        target: {
+          kind: "serverless-static-artifact",
+          publicationId: "pub_static",
+          artifactId: "artifact_static",
+          routeUrl: "https://www-static-web-mq4k8lca-o7zpbs.appaloft.app/",
+        },
+        runtimePlan: {
+          execution: {},
+        },
+      },
+    ]);
+
+    expect(summary).toEqual({
+      latestStaticArtifactRoute: {
+        url: "https://www-static-web-mq4k8lca-o7zpbs.appaloft.app/",
+        hostname: "www-static-web-mq4k8lca-o7zpbs.appaloft.app",
+        scheme: "https",
+        publicationId: "pub_static",
+        artifactId: "artifact_static",
+        pathPrefix: "/",
+        updatedAt: "2026-06-08T01:56:55.000Z",
+      },
+    });
+  });
+
   test("projects the latest generated access route separately from deployment history", () => {
     const summary = projectResourceAccessSummary([
       {
