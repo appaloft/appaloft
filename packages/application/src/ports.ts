@@ -1470,6 +1470,11 @@ export interface ServerSummary {
     lastErrorCode?: string;
     lastErrorMessage?: string;
   };
+  runtimeAvailability?: {
+    status: "available" | "unavailable";
+    reasonCodes: string[];
+    message?: string;
+  };
   credential?: {
     kind: "local-ssh-agent" | "ssh-private-key";
     credentialId?: string;
@@ -1583,6 +1588,29 @@ export interface ServerConnectivityResult {
   checkedAt: string;
   status: "healthy" | "degraded" | "unreachable";
   checks: ServerConnectivityCheck[];
+}
+
+export interface ServerRuntimePreparationStep {
+  phase: "docker";
+  status: "succeeded" | "failed" | "skipped";
+  message: string;
+  durationMs: number;
+  metadata?: Record<string, string>;
+}
+
+export interface ServerRuntimePrepareResult {
+  serverId: string;
+  steps: ServerRuntimePreparationStep[];
+}
+
+export interface ServerRuntimePreparer {
+  prepare(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+      mode: "prepare" | "repair" | "upgrade";
+    },
+  ): Promise<Result<ServerRuntimePrepareResult>>;
 }
 
 export interface RuntimeTargetDiskCapacity {

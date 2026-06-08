@@ -16,6 +16,7 @@ describe("bounded list query defaults", () => {
     expect(ListProjectsQuery.create()._unsafeUnwrap().limit).toBe(100);
     expect(ListProjectsQuery.create()._unsafeUnwrap().lifecycleStatus).toBe("active");
     expect(ListServersQuery.create()._unsafeUnwrap().limit).toBe(100);
+    expect(ListServersQuery.create()._unsafeUnwrap().runtimeAvailability).toBe("all");
     expect(ListEnvironmentsQuery.create({})._unsafeUnwrap().limit).toBe(100);
     expect(ListResourcesQuery.create({})._unsafeUnwrap().limit).toBe(100);
     expect(ListDeploymentsQuery.create({})._unsafeUnwrap().limit).toBe(100);
@@ -33,5 +34,9 @@ describe("bounded list query defaults", () => {
 
   test("[CQRS-LIST-BOUND-003] HTTP query string limits are coerced before handlers run", () => {
     expect(ListServersQuery.create({ limit: "50" })._unsafeUnwrap().limit).toBe(50);
+    expect(
+      ListServersQuery.create({ runtimeAvailability: "available" })._unsafeUnwrap()
+        .runtimeAvailability,
+    ).toBe("available");
   });
 });

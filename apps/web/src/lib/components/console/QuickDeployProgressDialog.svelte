@@ -55,6 +55,10 @@
         return $t(i18nKeys.console.quickDeploy.workflowStepSshCredentialCreate);
       case "servers.configureCredential":
         return $t(i18nKeys.console.quickDeploy.workflowStepServerCredentialConfigure);
+      case "servers.prepareRuntime":
+        return "初始化服务器运行时";
+      case "servers.testConnectivity":
+        return "验证部署连通性";
       case "environments.create":
         return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentsCreate);
       case "resources.create":

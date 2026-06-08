@@ -8,6 +8,13 @@ Server registration and server connection are distinct lifecycle concerns.
 
 `servers.connect` is the lifecycle command or process-manager command for verifying that a registered server can be operated by the platform. It is the formal command boundary for promoting a server from registered metadata to a connected lifecycle state.
 
+`servers.prepare-runtime` is the idempotent operator/user command for preparing a registered server
+for Appaloft deployments. It may check SSH, prepare Docker when the target runtime supports
+automated installation, repair or bootstrap the configured edge proxy, and run final deployability
+checks. It is the public command to use after adding an SSH server and before admitting app
+deployments onto that server. It is intentionally named `prepare`, not `init`, because it can be
+rerun after registration, repair, host drift, or future runtime upgrades.
+
 Draft connectivity checks may exist for UX preflight, but they must not mutate server lifecycle state or publish `server-connected`.
 
 `servers.test-connectivity` must include edge proxy diagnostics when the target has provider-backed
@@ -16,7 +23,8 @@ diagnostic must be provider-rendered through the edge proxy provider contract, t
 runtime adapter locally or over SSH. It may perform bounded temporary Docker probes, but it must
 clean them up and must not persist lifecycle state, publish readiness events, or silently repair the
 server. Provider-owned proxy repair is performed only by lifecycle bootstrap/repair operations such
-as `servers.bootstrap-proxy`, or by idempotent provider ensure during accepted deployment execution.
+as `servers.bootstrap-proxy`, the broader `servers.prepare-runtime`, or by idempotent provider ensure
+during accepted deployment execution.
 
 ## Global References
 
@@ -39,6 +47,7 @@ This file defines only server/proxy command responsibilities and lifecycle seman
 | `servers.connect` | Process manager, API/CLI when explicitly requested | Lifecycle command | Connectivity verification request is accepted or completed according to command mode. |
 | `servers.test-connectivity` | Web, CLI, API | Diagnostic/preflight command | Connectivity and provider-rendered proxy diagnostic results are returned to the caller; no lifecycle state is changed. |
 | `servers.bootstrap-proxy` | Process manager, worker, CLI/API explicit repair | Lifecycle command for edge proxy bootstrap or repair | New proxy bootstrap attempt is accepted for an operable server. |
+| `servers.prepare-runtime` | Web, CLI, API, automation | Idempotent runtime readiness command | Docker/runtime prerequisites, edge proxy state, and final deployability checks have been attempted and reported. |
 
 If only one public command exists in a transitional implementation, the source-of-truth model still treats register, connect, and proxy bootstrap as separate responsibilities.
 
@@ -75,6 +84,13 @@ If only one public command exists in a transitional implementation, the source-o
 | `causationId` | Required when event-driven | Event id or command id that requested bootstrap. |
 | `reason` | Optional | Safe operator/system reason such as `repair`, `retry`, `post-connect`, or `doctor-follow-up`. |
 
+### `servers.prepare-runtime`
+
+| Field | Requirement | Meaning |
+| --- | --- | --- |
+| `serverId` | Required | Registered server id. |
+| `mode` | Optional | `prepare`, `repair`, or `upgrade`. Defaults to `prepare`. All modes are idempotent and must report the steps attempted. |
+
 ## Synchronous Admission
 
 `servers.register` must synchronously validate:
@@ -100,6 +116,13 @@ If only one public command exists in a transitional implementation, the source-o
 - edge proxy provider is required and registered;
 - requested provider key matches the server proxy intent;
 - duplicate attempt handling.
+
+`servers.prepare-runtime` must synchronously validate:
+
+- server id shape;
+- server existence;
+- provider/runtime preparation support;
+- credential presence for provider policies that require credentials.
 
 Admission failures return `err(DomainError)`.
 
@@ -139,6 +162,20 @@ type BootstrapServerProxyResult = Result<
   { serverId: string; attemptId: string },
   DomainError
 >;
+
+type PrepareServerRuntimeResult = Result<
+  {
+    serverId: string;
+    status: "ready" | "failed";
+    preparedAt: string;
+    steps: Array<{
+      phase: "connectivity-before" | "docker" | "edge-proxy" | "connectivity-after";
+      status: "succeeded" | "failed" | "skipped";
+      message: string;
+    }>;
+  },
+  DomainError
+>;
 ```
 
 Lifecycle failures after async acceptance are represented in server/proxy state and events according to the shared async lifecycle contract.
@@ -147,6 +184,12 @@ Lifecycle failures after async acceptance are represented in server/proxy state 
 operator action after `server doctor` reports a proxy problem. The operation must not mutate user
 workload containers. It may create, verify, replace, or restart only provider-owned proxy
 infrastructure and provider-owned networks or volumes rendered by the selected edge proxy provider.
+
+`servers.prepare-runtime` may be invoked by `appaloft server runtime prepare <serverId>` after
+server registration, before deployment admission, or after a runtime prerequisite failure such as
+`Docker is not available on the SSH target`. For generic SSH targets, the first runtime preparer may
+install Docker on supported Debian/Ubuntu hosts and must fail with an explicit unsupported message
+for target operating systems or privilege modes it cannot safely prepare.
 
 ## Event Contract
 
