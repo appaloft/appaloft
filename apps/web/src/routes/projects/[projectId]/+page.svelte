@@ -39,14 +39,17 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
+  import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
   import ResourceListTable from "$lib/components/console/ResourceListTable.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { requestConsoleConfirm, requestConsolePrompt } from "$lib/console/modal-interaction";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
@@ -64,8 +67,8 @@
     findResource,
     formatTime,
     previewEnvironmentDetailHref,
-    projectCreateResourceHref,
     projectDetailHref,
+    projectQuickDeployHref,
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -315,6 +318,7 @@
   } | null>(null);
   let projectFormProjectId = $state("");
   let projectName = $state("");
+  let quickDeployDialogOpen = $state(false);
   let resourceFilterQuery = $state("");
   let resourceEnvironmentFilter = $state("all");
   let cloneEnvironmentNames = $state<Record<string, string>>({});
@@ -559,6 +563,10 @@
 
     loadedProjectCapabilityLoadKey = projectCapabilityLoadKey;
     void capabilities.fetch(projectCapabilityQueries);
+  });
+
+  $effect(() => {
+    quickDeployDialogOpen = modalIsOpen(page, "quick-deploy");
   });
 
   function cloneEnvironmentName(environmentId: string): string {
@@ -827,6 +835,11 @@
     void goto(projectTabHref(tab), { noScroll: true, keepFocus: true });
   }
 
+  function setQuickDeployDialogOpen(open: boolean): void {
+    quickDeployDialogOpen = open;
+    void setModalOpen(page, "quick-deploy", open);
+  }
+
   function projectTabLabel(tab: ProjectDetailTab): string {
     switch (tab) {
       case "overview":
@@ -940,11 +953,11 @@
             <CapabilityGate operationKey="resources.create" resourceRefs={{ projectId: project.id }}>
               {#snippet children({ disabled })}
                 <Button
-                  href={projectCreateResourceHref(project.id)}
+                  href={projectQuickDeployHref(project.id)}
                   disabled={disabled || isProjectArchived}
                 >
                   <Plus class="size-4" />
-                  {$t(i18nKeys.common.actions.createResource)}
+                  {$t(i18nKeys.common.actions.quickDeploy)}
                 </Button>
               {/snippet}
             </CapabilityGate>
@@ -1165,8 +1178,8 @@
                   {environments}
                   emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
                   emptyDescription={$t(i18nKeys.console.projects.noResources)}
-                  createHref={projectCreateResourceHref(project.id)}
-                  createLabel={$t(i18nKeys.common.actions.createResource)}
+                  createHref={projectQuickDeployHref(project.id)}
+                  createLabel={$t(i18nKeys.common.actions.quickDeploy)}
                   createDisabled={isProjectArchived}
                   showEnvironment
                 />
@@ -1188,7 +1201,7 @@
                         {#snippet children({ disabled })}
                           <Button
                             size="sm"
-                            href={projectCreateResourceHref(project.id)}
+                            href={projectQuickDeployHref(project.id)}
                             disabled={disabled || isProjectArchived}
                           >
                             <Play class="size-4" />
@@ -1285,11 +1298,11 @@
                 >
                   {#snippet children({ disabled })}
                     <Button
-                      href={projectCreateResourceHref(project.id)}
+                      href={projectQuickDeployHref(project.id)}
                       disabled={disabled || isProjectArchived}
                     >
                       <Plus class="size-4" />
-                      {$t(i18nKeys.common.actions.createResource)}
+                      {$t(i18nKeys.common.actions.quickDeploy)}
                     </Button>
                   {/snippet}
                 </CapabilityGate>
@@ -1304,8 +1317,8 @@
               emptyDescription={projectResources.length === 0
                 ? $t(i18nKeys.console.projects.noResources)
                 : $t(i18nKeys.console.projects.noFilteredResources)}
-              createHref={projectCreateResourceHref(project.id)}
-              createLabel={$t(i18nKeys.common.actions.createResource)}
+              createHref={projectQuickDeployHref(project.id)}
+              createLabel={$t(i18nKeys.common.actions.quickDeploy)}
               createDisabled={isProjectArchived}
               showEnvironment
             />
@@ -1715,7 +1728,7 @@
                       {#snippet children({ disabled })}
                         <Button
                           size="sm"
-                          href={projectCreateResourceHref(project.id)}
+                          href={projectQuickDeployHref(project.id)}
                           disabled={disabled || isProjectArchived}
                         >
                           <Play class="size-4" />
@@ -1882,5 +1895,24 @@
         </Tabs.Content>
       </Tabs.Root>
     </div>
+
+    <Dialog.Root bind:open={quickDeployDialogOpen} onOpenChange={setQuickDeployDialogOpen}>
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-7xl">
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.projects.detailDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5">
+          <QuickDeploySheet
+            lockedProjectId={project.id}
+            lockedProjectName={project.name}
+            statePath={page.url.pathname}
+            stateModal="quick-deploy"
+          />
+        </div>
+      </Dialog.Content>
+    </Dialog.Root>
   {/if}
 </ConsoleShell>

@@ -81,8 +81,15 @@ export function projectDetailHref(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;
 }
 
-export function projectCreateResourceHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}/resources/new`;
+export function projectQuickDeployHref(projectId: string): string {
+  const encodedProjectId = encodeURIComponent(projectId);
+  const params = new URLSearchParams({
+    modal: "quick-deploy",
+    projectMode: "existing",
+    projectId,
+  });
+
+  return `/projects/${encodedProjectId}?${params.toString()}`;
 }
 
 export function resourceDetailHref(
