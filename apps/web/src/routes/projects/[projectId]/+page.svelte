@@ -63,6 +63,7 @@
     formatTime,
     previewEnvironmentDetailHref,
     projectCreateResourceHref,
+    projectDetailHref,
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -147,6 +148,14 @@
       projectDetailQuery.isPending,
   );
   const project = $derived(projectDetailQuery.data ?? findProject(projects, projectId));
+  const projectHeaderLoading = $derived(projectDetailQuery.isPending && !project);
+  const projectHeaderSwitchItems = $derived(
+    projects.map((projectItem) => ({
+      label: projectItem.name,
+      href: projectDetailHref(projectItem.id),
+      selected: projectItem.id === projectId,
+    })),
+  );
   const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
   const projectDeleteSafety = $derived(projectDeleteSafetyQuery.data ?? null);
   const projectDeleteBlockerCount = $derived(projectDeleteSafety?.blockers.length ?? 0);
@@ -837,7 +846,13 @@
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.home), href: "/" },
     { label: $t(i18nKeys.console.projects.pageTitle), href: "/projects" },
-    { label: project?.name ?? $t(i18nKeys.console.projects.pageTitle) },
+    {
+      label: project?.name ?? $t(i18nKeys.console.projects.pageTitle),
+      kind: "project",
+      loading: projectHeaderLoading,
+      switcherLabel: $t(i18nKeys.console.projects.pageTitle),
+      switcherItems: projectHeaderSwitchItems,
+    },
   ]}
 >
   {#if pageLoading}
