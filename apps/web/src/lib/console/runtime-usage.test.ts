@@ -69,9 +69,10 @@ describe("runtime usage console readback", () => {
       ]);
 
     expect(componentSource).toContain("i18nKeys.console.runtimeUsage");
-    expect(monitorSource).toContain("AreaChart");
-    expect(monitorSource).toContain("Chart.Container");
-    expect(monitorSource).toContain("inspectStream");
+    expect(monitorSource).toContain("runtimeMonitoringTimeRangeOptions");
+    expect(monitorSource).toContain("runtimeMonitoringRefreshIntervalMs");
+    expect(monitorSource).toContain('viewBox="0 0 360 150"');
+    expect(monitorSource).toContain("chartY(tick)");
     expect(monitorSource).toContain("retainedSamples");
     expect(monitorSource).toContain("rollup");
     expect(monitorSource).toContain("runtimeMonitoringDeploymentMarkerItems");
@@ -81,6 +82,8 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("thresholds");
     expect(monitorSource).toContain("thresholdConfigure");
     expect(monitorSource).toContain("openLogs");
+    expect(monitorSource).toContain("refreshNow");
+    expect(monitorSource).toContain("onTimeRangeChange");
     expect(componentSource).toContain("runtimeUsageInspect");
     expect(serverSource).toContain("RuntimeMonitorPanel");
     expect(serverSource).toContain('"monitor"');
@@ -88,12 +91,16 @@ describe("runtime usage console readback", () => {
     expect(serverSource).toContain("runtimeMonitoringSamplesQueryOptions");
     expect(serverSource).toContain("runtimeMonitoringRollupQueryOptions");
     expect(serverSource).toContain("runtimeMonitoringThresholdsQueryOptions");
+    expect(serverSource).toContain("runtimeMonitoringTimeRange");
+    expect(serverSource).toContain("refreshRuntimeMonitor");
     expect(resourceSource).toContain("RuntimeMonitorPanel");
     expect(resourceSource).toContain('"monitor"');
     expect(resourceSource).toContain('kind: "resource"');
     expect(resourceSource).toContain("runtimeMonitoringSamplesQueryOptions");
     expect(resourceSource).toContain("runtimeMonitoringRollupQueryOptions");
     expect(resourceSource).toContain("runtimeMonitoringThresholdsQueryOptions");
+    expect(resourceSource).toContain("runtimeMonitoringTimeRange");
+    expect(resourceSource).toContain("refreshRuntimeMonitor");
     expect(projectSource).toContain('kind: "project"');
     expect(projectSource).toContain('kind: "environment"');
     expect(projectSource).toContain("runtimeMonitoringRollupQueryOptions");
@@ -101,7 +108,7 @@ describe("runtime usage console readback", () => {
     expect(projectSource).toContain("environmentRuntimeMonitoringRollupQuery");
   });
 
-  test("[RT-MON-005] Monitor links to logs events diagnostics and cleanup without storing log lines", async () => {
+  test("[RT-MON-005] Monitor links to logs diagnostics and cleanup without storing log lines", async () => {
     const [monitorSource, serverSource, resourceSource, samplesSpec, rollupSpec] =
       await Promise.all([
         readFile(
@@ -127,28 +134,26 @@ describe("runtime usage console readback", () => {
       ]);
 
     expect(monitorSource).toContain("logsHref?: string");
-    expect(monitorSource).toContain("eventsHref?: string");
     expect(monitorSource).toContain("diagnosticsHref?: string");
-    expect(monitorSource).toContain("capacityHref?: string");
     expect(monitorSource).toContain("cleanupHref?: string");
     expect(monitorSource).toContain("observationScope?: RuntimeUsageScope");
     expect(monitorSource).toContain("runtimeMonitoringObservationHref");
     expect(monitorSource).toContain("href={observationLinks.logs}");
-    expect(monitorSource).toContain("href={observationLinks.events}");
     expect(monitorSource).toContain("href={observationLinks.diagnostics}");
-    expect(monitorSource).toContain("href={observationLinks.capacity}");
     expect(monitorSource).toContain("href={observationLinks.cleanup}");
+    expect(monitorSource).not.toContain("eventsHref?: string");
+    expect(monitorSource).not.toContain("capacityHref?: string");
     expect(monitorSource).not.toContain("runtimeLogs");
     expect(monitorSource).not.toContain("deploymentLogs");
     expect(monitorSource).not.toContain("logLines");
 
-    expect(serverSource).toContain('eventsHref={serverTabHref("deployments")}');
-    expect(serverSource).toContain('capacityHref={serverTabHref("capacity")}');
+    expect(serverSource).not.toContain('eventsHref={serverTabHref("deployments")}');
+    expect(serverSource).not.toContain('capacityHref={serverTabHref("capacity")}');
     expect(serverSource).toContain("orpcClient.servers.capacity.inspect");
     expect(serverSource).toContain("orpcClient.servers.capacity.prune");
     expect(serverSource).toContain("capacityPruneBefore = handoff.to");
     expect(resourceSource).toContain('logsHref={resourceTabHref("logs")}');
-    expect(resourceSource).toContain('eventsHref={resourceTabHref("deployments")}');
+    expect(resourceSource).not.toContain('eventsHref={resourceTabHref("deployments")}');
     expect(resourceSource).toContain(
       'diagnosticsHref={resourceSettingsSectionHref("diagnostics")}',
     );

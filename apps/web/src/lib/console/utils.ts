@@ -33,7 +33,20 @@ export function readSessionIdentity(session: unknown): string | null {
 }
 
 export function formatTime(value: string): string {
-  return value.slice(0, 19).replace("T", " ");
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 export function initials(value: string | null | undefined): string {

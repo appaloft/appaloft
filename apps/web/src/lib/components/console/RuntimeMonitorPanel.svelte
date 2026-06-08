@@ -2,16 +2,14 @@
   import {
     Activity,
     ClipboardList,
+    Clock3,
     FileText,
     Gauge,
     RefreshCw,
     ShieldAlert,
     Trash2,
   } from "@lucide/svelte";
-  import { browser } from "$app/environment";
   import { createMutation } from "@tanstack/svelte-query";
-  import { AreaChart, Tooltip as LayerChartTooltip } from "layerchart";
-  import { onDestroy } from "svelte";
   import type {
     InspectRuntimeUsageResponse,
     RuntimeMonitoringRollupResponse,
@@ -23,7 +21,6 @@
   import { readErrorMessage } from "$lib/api/client";
   import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import { Button } from "$lib/components/ui/button";
-  import * as Chart from "$lib/components/ui/chart";
   import { Input } from "$lib/components/ui/input";
   import {
     appendRuntimeMonitoringSample,
@@ -42,11 +39,15 @@
     runtimeMonitoringScopeQueryKey,
     runtimeMonitoringThresholdSummary,
     runtimeMonitoringTopContributorItems,
-    runtimeUsageQueryKey,
     type RuntimeMonitoringThresholdConfigureInput,
     type RuntimeMonitoringSample,
     type RuntimeMonitoringSignalKey,
   } from "$lib/console/runtime-usage";
+  import {
+    runtimeMonitoringRefreshIntervalMs,
+    runtimeMonitoringTimeRangeOptions,
+    type RuntimeMonitoringTimeRangeId,
+  } from "$lib/console/runtime-usage-query";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -68,10 +69,12 @@
     thresholdsLoading?: boolean;
     thresholdsError?: string;
     logsHref?: string;
-    eventsHref?: string;
     diagnosticsHref?: string;
-    capacityHref?: string;
     cleanupHref?: string;
+    timeRange?: RuntimeMonitoringTimeRangeId;
+    refreshing?: boolean;
+    onTimeRangeChange?: (timeRange: RuntimeMonitoringTimeRangeId) => void;
+    onRefresh?: () => void;
   };
 
   let {
@@ -90,10 +93,12 @@
     thresholdsLoading = false,
     thresholdsError = "",
     logsHref = "",
-    eventsHref = "",
     diagnosticsHref = "",
-    capacityHref = "",
     cleanupHref = "",
+    timeRange = "1h",
+    refreshing = false,
+    onTimeRangeChange,
+    onRefresh,
   }: Props = $props();
 
   let samples = $state<RuntimeMonitoringSample[]>([]);
@@ -109,90 +114,8 @@
   let thresholdFeedback = $state<{ kind: "error" | "success"; title: string; detail: string } | null>(
     null,
   );
-  let streamUsage = $state<InspectRuntimeUsageResponse | null>(null);
-  let streamLoading = $state(false);
-  let streamError = $state("");
-  let runtimeUsageStream: AsyncIterator<InspectRuntimeUsageResponse, Record<string, never>, void> | null =
-    null;
-  let runtimeUsageStreamScopeKey = "";
-  let runtimeUsageInitialLoadingTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  function clearRuntimeUsageInitialLoadingTimeout(): void {
-    if (!runtimeUsageInitialLoadingTimeout) {
-      return;
-    }
-
-    clearTimeout(runtimeUsageInitialLoadingTimeout);
-    runtimeUsageInitialLoadingTimeout = null;
-  }
-
-  function stopRuntimeUsageStream(): void {
-    const stream = runtimeUsageStream;
-    runtimeUsageStream = null;
-    runtimeUsageStreamScopeKey = "";
-    clearRuntimeUsageInitialLoadingTimeout();
-    void stream?.return?.();
-  }
-
-  async function consumeRuntimeUsageStream(
-    currentScope: RuntimeUsageScope,
-    currentScopeKey: string,
-  ): Promise<void> {
-    stopRuntimeUsageStream();
-    runtimeUsageStreamScopeKey = currentScopeKey;
-    streamLoading = true;
-    streamError = "";
-    runtimeUsageInitialLoadingTimeout = setTimeout(() => {
-      if (runtimeUsageStreamScopeKey === currentScopeKey && !streamUsage) {
-        streamLoading = false;
-      }
-    }, 8_000);
-
-    try {
-      const stream = await orpcClient.runtimeUsage.inspectStream({
-        scope: currentScope,
-        mode: "current",
-        includeArtifacts: true,
-        includeWarnings: true,
-      });
-      runtimeUsageStream = stream;
-
-      let result = await stream.next();
-      while (runtimeUsageStream === stream && runtimeUsageStreamScopeKey === currentScopeKey && !result.done) {
-        streamUsage = result.value;
-        streamLoading = false;
-        clearRuntimeUsageInitialLoadingTimeout();
-        result = await stream.next();
-      }
-    } catch (error) {
-      if (runtimeUsageStreamScopeKey === currentScopeKey) {
-        streamError = readErrorMessage(error);
-      }
-    } finally {
-      clearRuntimeUsageInitialLoadingTimeout();
-      if (runtimeUsageStreamScopeKey === currentScopeKey) {
-        streamLoading = false;
-      }
-    }
-  }
-
   $effect(() => {
-    if (!browser) {
-      return;
-    }
-
-    const currentScopeKey = runtimeUsageQueryKey(scope).join(":");
-    if (runtimeUsageStreamScopeKey === currentScopeKey) {
-      return;
-    }
-
-    void consumeRuntimeUsageStream(scope, currentScopeKey);
-  });
-
-  onDestroy(stopRuntimeUsageStream);
-
-  $effect(() => {
-    const sample = runtimeMonitoringSampleFromUsage(streamUsage ?? usage);
+    const sample = runtimeMonitoringSampleFromUsage(usage);
     if (!sample || sample.observedAt === lastSampleObservedAt) {
       return;
     }
@@ -205,14 +128,9 @@
   const retainedChartSamples = $derived(retainedRuntimeMonitoringSamples(retainedSamples));
   const chartSamples = $derived(mergeRuntimeMonitoringSamples(retainedChartSamples, samples));
   const latestChartSample = $derived(chartSamples.at(-1) ?? latestSample);
-  const currentUsage = $derived(streamUsage ?? usage);
-  const currentLoading = $derived((streamLoading || loading) && !streamUsage && !usage);
-  const currentError = $derived(streamError || error);
-  const chartConfig = {
-    cpu: { label: "CPU", color: "hsl(217 91% 60%)" },
-    memory: { label: "Memory", color: "hsl(173 58% 39%)" },
-    disk: { label: "Disk", color: "hsl(38 92% 50%)" },
-  } satisfies Chart.ChartConfig;
+  const currentUsage = $derived(usage);
+  const currentLoading = $derived(loading && !usage);
+  const currentError = $derived(error);
   const rollupSummary = $derived(runtimeMonitoringRollupSummary(rollup));
   const deploymentMarkerItems = $derived(runtimeMonitoringDeploymentMarkerItems(rollup));
   const topContributorItems = $derived(runtimeMonitoringTopContributorItems(rollup));
@@ -223,17 +141,7 @@
       retainedSamples,
       rollup,
     }),
-    events: runtimeMonitoringObservationHref(eventsHref, {
-      scope: observationScope,
-      retainedSamples,
-      rollup,
-    }),
     diagnostics: runtimeMonitoringObservationHref(diagnosticsHref, {
-      scope: observationScope,
-      retainedSamples,
-      rollup,
-    }),
-    capacity: runtimeMonitoringObservationHref(capacityHref, {
       scope: observationScope,
       retainedSamples,
       rollup,
@@ -260,14 +168,77 @@
     return latestRuntimeMonitoringRollupValue(rollup, signal) ?? fallbackValue ?? null;
   }
   function formatChartAxisTime(value: unknown): string {
-    if (value instanceof Date) {
-      return value.toISOString().slice(11, 16);
+    const date = value instanceof Date ? value : new Date(String(value));
+    if (!Number.isFinite(date.getTime())) {
+      return String(value);
     }
 
-    return String(value).slice(0, 5);
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
   }
   function formatChartTooltipTime(value: string): string {
     return formatTime(value);
+  }
+  function timeRangeLabel(value: RuntimeMonitoringTimeRangeId): string {
+    switch (value) {
+      case "15m":
+        return $t(i18nKeys.console.runtimeUsage.timeRange15m);
+      case "1h":
+        return $t(i18nKeys.console.runtimeUsage.timeRange1h);
+      case "6h":
+        return $t(i18nKeys.console.runtimeUsage.timeRange6h);
+      case "24h":
+        return $t(i18nKeys.console.runtimeUsage.timeRange24h);
+    }
+  }
+  function refreshIntervalLabel(): string {
+    return $t(i18nKeys.console.runtimeUsage.refreshInterval, {
+      seconds: Math.round(runtimeMonitoringRefreshIntervalMs / 1000),
+    });
+  }
+  function selectTimeRange(nextTimeRange: RuntimeMonitoringTimeRangeId): void {
+    onTimeRangeChange?.(nextTimeRange);
+  }
+  function xTickPoints(data: { observedAt: Date }[]): { x: number; label: string }[] {
+    if (data.length === 0) {
+      return [];
+    }
+
+    const indexes = Array.from(new Set([0, Math.floor((data.length - 1) / 2), data.length - 1]));
+    return indexes.map((index) => ({
+      x: chartX(data[index].observedAt, data),
+      label: formatChartAxisTime(data[index].observedAt),
+    }));
+  }
+  function chartX(value: Date, data: { observedAt: Date }[]): number {
+    const min = data[0]?.observedAt.getTime() ?? value.getTime();
+    const max = data.at(-1)?.observedAt.getTime() ?? value.getTime();
+    const width = 298;
+    if (max <= min) {
+      return 42;
+    }
+
+    return 42 + ((value.getTime() - min) / (max - min)) * width;
+  }
+  function chartY(value: number): number {
+    return 116 - (Math.max(0, Math.min(100, value)) / 100) * 96;
+  }
+  function linePath(data: { observedAt: Date; value: number }[]): string {
+    return data
+      .map((point, index) => `${index === 0 ? "M" : "L"} ${chartX(point.observedAt, data).toFixed(1)} ${chartY(point.value).toFixed(1)}`)
+      .join(" ");
+  }
+  function areaPath(data: { observedAt: Date; value: number }[]): string {
+    if (data.length === 0) {
+      return "";
+    }
+
+    const startX = chartX(data[0].observedAt, data);
+    const endX = chartX(data.at(-1)?.observedAt ?? data[0].observedAt, data);
+    return `${linePath(data)} L ${endX.toFixed(1)} 116 L ${startX.toFixed(1)} 116 Z`;
   }
   const liveSignals = $derived.by(() => [
     {
@@ -275,21 +246,24 @@
       label: $t(i18nKeys.console.runtimeUsage.cpu),
       value: formatRuntimeMonitoringPercent(latestSignalValue("cpu", latestChartSample?.cpuLoadPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "cpu"),
-      color: "var(--color-cpu)",
+      color: "hsl(217 91% 60%)",
+      fillColor: "hsl(217 91% 60% / 0.14)",
     },
     {
       key: "memory",
       label: $t(i18nKeys.console.runtimeUsage.memory),
       value: formatRuntimeMonitoringPercent(latestSignalValue("memory", latestChartSample?.memoryPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "memory"),
-      color: "var(--color-memory)",
+      color: "hsl(173 58% 39%)",
+      fillColor: "hsl(173 58% 39% / 0.14)",
     },
     {
       key: "disk",
       label: $t(i18nKeys.console.runtimeUsage.disk),
       value: formatRuntimeMonitoringPercent(latestSignalValue("disk", latestChartSample?.diskPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "disk"),
-      color: "var(--color-disk)",
+      color: "hsl(38 92% 50%)",
+      fillColor: "hsl(38 92% 50% / 0.14)",
     },
   ]);
 
@@ -418,29 +392,38 @@
           {$t(i18nKeys.console.runtimeUsage.monitorDescription)}
         </p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="inline-flex items-center gap-2 text-sm text-muted-foreground" for="runtime-monitor-time-range">
+          <Clock3 class="size-4" />
+          <span class="sr-only">{$t(i18nKeys.console.runtimeUsage.timeRange)}</span>
+          <select
+            id="runtime-monitor-time-range"
+            class="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm"
+            value={timeRange}
+            onchange={(event) =>
+              selectTimeRange(event.currentTarget.value as RuntimeMonitoringTimeRangeId)}
+          >
+            {#each runtimeMonitoringTimeRangeOptions as option (option)}
+              <option value={option}>{timeRangeLabel(option)}</option>
+            {/each}
+          </select>
+        </label>
+        <Button type="button" variant="outline" onclick={() => onRefresh?.()} disabled={refreshing}>
+          <RefreshCw class="size-4" />
+          {refreshing
+            ? $t(i18nKeys.common.status.loading)
+            : $t(i18nKeys.console.runtimeUsage.refreshNow)}
+        </Button>
         {#if logsHref}
           <Button href={observationLinks.logs} variant="outline">
             <FileText class="size-4" />
             {$t(i18nKeys.console.runtimeUsage.openLogs)}
           </Button>
         {/if}
-        {#if eventsHref}
-          <Button href={observationLinks.events} variant="outline">
-            <Activity class="size-4" />
-            {$t(i18nKeys.console.runtimeUsage.openEvents)}
-          </Button>
-        {/if}
         {#if diagnosticsHref}
           <Button href={observationLinks.diagnostics} variant="outline">
             <ClipboardList class="size-4" />
             {$t(i18nKeys.console.runtimeUsage.openDiagnostics)}
-          </Button>
-        {/if}
-        {#if capacityHref}
-          <Button href={observationLinks.capacity} variant="outline">
-            <Gauge class="size-4" />
-            {$t(i18nKeys.console.runtimeUsage.openCapacity)}
           </Button>
         {/if}
         {#if cleanupHref}
@@ -464,61 +447,54 @@
                   : $t(i18nKeys.console.runtimeUsage.unavailable))}
             </p>
           </div>
-          <Chart.Container config={chartConfig} class="mt-3 h-32 w-full">
+          <div class="mt-3 h-36 w-full">
             {#if signal.data.length > 1}
-              <AreaChart
-                data={signal.data}
-                x="observedAt"
-                y="value"
-                axis
-                grid={{ x: false, y: true }}
-                points={false}
-                rule
-                series={[
-                  {
-                    key: "value",
-                    label: signal.label,
-                    color: signal.color,
-                  },
-                ]}
-                props={{
-                  area: {
-                    fillOpacity: 0.18,
-                    line: {
-                      strokeWidth: 2,
-                    },
-                  },
-                  xAxis: {
-                    format: formatChartAxisTime,
-                    ticks: 3,
-                  },
-                  yAxis: {
-                    format: (value: unknown) => `${Math.round(Number(value))}%`,
-                    ticks: 3,
-                  },
-                  tooltip: {
-                    root: {
-                      anchor: "top-left",
-                      x: "data",
-                      y: "data",
-                    },
-                  },
-                }}
+              <svg
+                aria-label={`${signal.label} ${signal.value ?? ""}`}
+                class="h-full w-full overflow-visible font-sans text-[11px] tabular-nums"
+                role="img"
+                viewBox="0 0 360 150"
               >
-                <svelte:fragment slot="tooltip">
-                  <LayerChartTooltip.Root anchor="top-left" x="data" y="data" let:data>
-                    <LayerChartTooltip.Header value={formatChartTooltipTime(data.observedAtIso)} />
-                    <LayerChartTooltip.List>
-                      <LayerChartTooltip.Item
-                        label={signal.label}
-                        value={formatRuntimeMonitoringPercent(data.value)}
-                        color={signal.color}
-                        valueAlign="right"
-                      />
-                    </LayerChartTooltip.List>
-                  </LayerChartTooltip.Root>
-                </svelte:fragment>
-              </AreaChart>
+                <title>
+                  {signal.label}
+                  {signal.value ? ` ${signal.value}` : ""}
+                  {signal.data.at(-1)?.observedAtIso
+                    ? ` · ${formatChartTooltipTime(signal.data.at(-1)?.observedAtIso ?? "")}`
+                    : ""}
+                </title>
+                <line x1="42" x2="340" y1="20" y2="20" class="stroke-border" />
+                <line x1="42" x2="340" y1="68" y2="68" class="stroke-border" stroke-dasharray="3 4" />
+                <line x1="42" x2="340" y1="116" y2="116" class="stroke-border" />
+                {#each [0, 50, 100] as tick (tick)}
+                  <text
+                    x="36"
+                    y={chartY(tick) + 4}
+                    class="fill-muted-foreground"
+                    text-anchor="end"
+                  >
+                    {tick}%
+                  </text>
+                {/each}
+                <path d={areaPath(signal.data)} fill={signal.fillColor} />
+                <path
+                  d={linePath(signal.data)}
+                  fill="none"
+                  stroke={signal.color}
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.2"
+                />
+                {#each xTickPoints(signal.data) as tick (tick.label + tick.x)}
+                  <text
+                    x={tick.x}
+                    y="140"
+                    class="fill-muted-foreground"
+                    text-anchor="middle"
+                  >
+                    {tick.label}
+                  </text>
+                {/each}
+              </svg>
             {:else}
               <div
                 class="flex h-full items-center justify-center border-y border-dashed border-border text-xs text-muted-foreground"
@@ -528,7 +504,7 @@
                   : $t(i18nKeys.console.runtimeUsage.unavailable)}
               </div>
             {/if}
-          </Chart.Container>
+          </div>
         </article>
       {/each}
     </div>
@@ -541,8 +517,9 @@
         {:else if retainedSamplesLoading}
           {$t(i18nKeys.console.runtimeUsage.retainedSamplesLoading)}
         {:else}
-          {$t(i18nKeys.console.runtimeUsage.liveSampleCount, { count: samples.length })}
+          {$t(i18nKeys.console.runtimeUsage.retainedSampleCount, { count: chartSamples.length })}
         {/if}
+        · {refreshIntervalLabel()}
       </p>
       {#if retainedSamplesError}
         <p>{retainedSamplesError}</p>
