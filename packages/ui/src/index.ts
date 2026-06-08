@@ -1,3 +1,4 @@
+export * as AlertDialogPrimitives from "./alert-dialog/index.js";
 export * as AppShellPrimitives from "./app-shell/index.js";
 export {
   AppShell,

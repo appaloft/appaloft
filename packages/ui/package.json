@@ -17,6 +17,11 @@
       "types": "./src/app-shell/index.ts",
       "default": "./src/app-shell/index.ts"
     },
+    "./alert-dialog": {
+      "svelte": "./src/alert-dialog/index.ts",
+      "types": "./src/alert-dialog/index.ts",
+      "default": "./src/alert-dialog/index.ts"
+    },
     "./avatar": {
       "svelte": "./src/avatar/index.ts",
       "types": "./src/avatar/index.ts",

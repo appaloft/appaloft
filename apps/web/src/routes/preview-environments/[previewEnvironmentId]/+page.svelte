@@ -12,6 +12,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import { requestConsoleConfirm } from "$lib/console/modal-interaction";
   import { formatTime, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -93,16 +94,17 @@
       !cleanupPreviewEnvironmentMutation.isPending,
   );
 
-  function requestCleanup(): void {
+  async function requestCleanup(): Promise<void> {
     if (!browser || !previewEnvironment || !canRequestCleanup) {
       return;
     }
 
-    const confirmed = window.confirm(
-      $t(i18nKeys.console.previewEnvironments.cleanupConfirm, {
+    const confirmed = await requestConsoleConfirm({
+      message: $t(i18nKeys.console.previewEnvironments.cleanupConfirm, {
         previewEnvironmentId: previewEnvironment.previewEnvironmentId,
       }),
-    );
+      destructive: true,
+    });
     if (!confirmed) {
       return;
     }
