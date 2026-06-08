@@ -315,6 +315,7 @@ import {
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
   PromoteEnvironmentCommand,
@@ -333,6 +334,7 @@ import {
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactCommand,
   PublishStaticArtifactPayloadCommand,
+  prepareServerRuntimeCommandInputSchema,
   promoteEnvironmentCommandInputSchema,
   provisionDependencyResourceCommandInputSchema,
   pruneAuditEventArchivesCommandInputSchema,
@@ -682,6 +684,7 @@ import {
   lockEnvironmentResponseSchema,
   markOperatorWorkRecoveredResponseSchema,
   organizationProfileResponseSchema,
+  prepareServerRuntimeResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   pruneAuditEventArchivesResponseSchema,
@@ -1221,6 +1224,10 @@ export const apiRouteDescriptions = {
   ),
   bootstrapServerProxy: routeDescription(
     "Repairs or bootstraps provider-owned edge proxy infrastructure.",
+    "server.proxy-readiness",
+  ),
+  prepareServerRuntime: routeDescription(
+    "Idempotently prepares Docker, edge proxy, and final deployability checks for a server.",
     "server.proxy-readiness",
   ),
   configureDefaultAccessDomainPolicy: routeDescription(
@@ -3659,6 +3666,19 @@ export const bootstrapServerProxyProcedure = base
     executeCommand(context, BootstrapServerProxyCommand.create(input)),
   );
 
+export const prepareServerRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/runtime/prepare",
+    description: apiRouteDescriptions.prepareServerRuntime,
+    successStatus: 200,
+  })
+  .input(prepareServerRuntimeCommandInputSchema)
+  .output(prepareServerRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PrepareServerRuntimeCommand.create(input)),
+  );
+
 export const listEnvironmentsProcedure = base
   .route({
     method: "GET",
@@ -6056,6 +6076,7 @@ export const appaloftOrpcRouter = {
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
     testDraftConnectivity: testDraftServerConnectivityProcedure,
+    prepareRuntime: prepareServerRuntimeProcedure,
     bootstrapProxy: bootstrapServerProxyProcedure,
   },
   runtimeUsage: {

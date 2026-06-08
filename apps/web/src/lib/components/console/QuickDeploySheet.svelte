@@ -3650,31 +3650,39 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       throw new Error($t(i18nKeys.console.servers.createCredentialValidationError));
     }
 
-    const createdServer = await registerServerMutation.mutateAsync(registerInput);
-    selectedServerId = createdServer.id;
-    const credential = createQuickDeployServerCredential(serverDraft, sshCredentials);
+    setWorkflowStepStatus("servers.register", "running");
 
-    if (credential?.mode === "create-ssh-and-configure") {
-      const createdCredential = await createSshCredentialMutation.mutateAsync(credential.input);
-      serverDraft.selectedSshCredentialId = createdCredential.id;
-      await sshCredentialsQuery.refetch();
-      await configureServerCredentialMutation.mutateAsync({
-        serverId: createdServer.id,
-        credential: {
-          kind: "stored-ssh-private-key",
-          credentialId: createdCredential.id,
-          ...(credential.input.username ? { username: credential.input.username } : {}),
-        },
-      });
-    } else if (credential?.mode === "configure") {
-      await configureServerCredentialMutation.mutateAsync({
-        serverId: createdServer.id,
-        credential: credential.credential,
-      });
+    try {
+      const createdServer = await registerServerMutation.mutateAsync(registerInput);
+      selectedServerId = createdServer.id;
+      const credential = createQuickDeployServerCredential(serverDraft, sshCredentials);
+
+      if (credential?.mode === "create-ssh-and-configure") {
+        const createdCredential = await createSshCredentialMutation.mutateAsync(credential.input);
+        serverDraft.selectedSshCredentialId = createdCredential.id;
+        await sshCredentialsQuery.refetch();
+        await configureServerCredentialMutation.mutateAsync({
+          serverId: createdServer.id,
+          credential: {
+            kind: "stored-ssh-private-key",
+            credentialId: createdCredential.id,
+            ...(credential.input.username ? { username: credential.input.username } : {}),
+          },
+        });
+      } else if (credential?.mode === "configure") {
+        await configureServerCredentialMutation.mutateAsync({
+          serverId: createdServer.id,
+          credential: credential.credential,
+        });
+      }
+
+      await serversQuery.refetch();
+      setWorkflowStepStatus("servers.register", "succeeded");
+      return createdServer.id;
+    } catch (error) {
+      setWorkflowStepStatus("servers.register", "failed");
+      throw error;
     }
-
-    await serversQuery.refetch();
-    return createdServer.id;
   }
 
   async function ensureBlueprintInstallServerId(): Promise<string> {
@@ -4048,25 +4056,38 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       return;
     }
 
-    setWorkflowStepStatus("servers.register", "running");
+    setWorkflowStepStatus("servers.prepareRuntime", "running");
 
     try {
-      await orpcClient.servers.bootstrapProxy({ serverId, reason: "post-connect" });
+      const prepareResult = await orpcClient.servers.prepareRuntime({
+        serverId,
+        mode: "prepare",
+      });
+      setWorkflowStepStatus(
+        "servers.prepareRuntime",
+        prepareResult.status === "ready" ? "succeeded" : "failed",
+      );
+      setWorkflowStepStatus(
+        "servers.testConnectivity",
+        prepareResult.status === "ready" ? "succeeded" : "failed",
+      );
       await serversQuery.refetch();
       server = await readServerSummary(serverId);
     } catch (error) {
-      setWorkflowStepStatus("servers.register", "failed");
+      setWorkflowStepStatus("servers.prepareRuntime", "failed");
+      setWorkflowStepStatus("servers.testConnectivity", "failed");
       throw new Error(`服务器初始化失败：${readErrorMessage(error)}`);
     }
 
     if (!serverIsRuntimeAvailable(server)) {
-      setWorkflowStepStatus("servers.register", "failed");
+      setWorkflowStepStatus("servers.prepareRuntime", "failed");
+      setWorkflowStepStatus("servers.testConnectivity", "failed");
       throw new Error(
-        `服务器还不能用于部署：${serverRuntimeAvailabilityLabel(server)}。请在服务器详情页运行连通性测试，或执行 appaloft server proxy repair ${serverId} 后再重试。`,
+        `服务器还不能用于部署：${serverRuntimeAvailabilityLabel(server)}。请执行 appaloft server runtime prepare ${serverId} 后再重试。`,
       );
     }
-
-    setWorkflowStepStatus("servers.register", "succeeded");
+    setWorkflowStepStatus("servers.prepareRuntime", "succeeded");
+    setWorkflowStepStatus("servers.testConnectivity", "succeeded");
   }
 
   async function installBlueprintFromQuickDeploy(): Promise<void> {
@@ -4348,6 +4369,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       case "servers.configureCredential": {
         await configureServerCredentialMutation.mutateAsync(step.input);
         await serversQuery.refetch();
+        return;
+      }
+      case "servers.prepareRuntime": {
+        await orpcClient.servers.prepareRuntime(step.input);
+        await serversQuery.refetch();
+        return;
+      }
+      case "servers.testConnectivity": {
+        await orpcClient.servers.testConnectivity(step.input);
         return;
       }
       case "environments.create": {

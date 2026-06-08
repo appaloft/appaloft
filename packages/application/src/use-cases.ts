@@ -230,6 +230,7 @@ export * from "./operations/servers/inspect-server-capacity.query-service";
 export * from "./operations/servers/list-scheduled-runtime-prune-policies.query-service";
 export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/list-ssh-credentials.query-service";
+export * from "./operations/servers/prepare-server-runtime.use-case";
 export * from "./operations/servers/prune-server-capacity.use-case";
 export * from "./operations/servers/register-server.use-case";
 export * from "./operations/servers/rename-server.use-case";

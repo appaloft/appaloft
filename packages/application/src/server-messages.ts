@@ -12,6 +12,7 @@ export * from "./operations/servers/inspect-server-capacity.query";
 export * from "./operations/servers/list-scheduled-runtime-prune-policies.query";
 export * from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.query";
+export * from "./operations/servers/prepare-server-runtime.command";
 export * from "./operations/servers/prune-server-capacity.command";
 export * from "./operations/servers/register-server.command";
 export * from "./operations/servers/rename-server.command";

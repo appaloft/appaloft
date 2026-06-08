@@ -276,6 +276,7 @@ export {
   listServersQueryInputSchema,
 } from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.schema";
+export * from "./operations/servers/prepare-server-runtime.schema";
 export {
   type PruneServerCapacityCommandInput,
   pruneServerCapacityCommandInputSchema,

@@ -26,6 +26,7 @@ import {
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
+  RuntimeServerRuntimePreparer,
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
   RuntimeTargetScheduledTaskRuntimePort,
@@ -945,6 +946,9 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
         ),
     ),
+  });
+  container.register(tokens.serverRuntimePreparer, {
+    useFactory: instanceCachingFactory(() => new RuntimeServerRuntimePreparer()),
   });
   container.register(tokens.runtimeTargetCapacityInspector, {
     useFactory: instanceCachingFactory(

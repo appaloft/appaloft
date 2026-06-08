@@ -409,6 +409,11 @@ export const cliCommandDescriptions = {
     "Repair provider-owned edge proxy infrastructure",
     "server.proxy-readiness",
   ),
+  serverRuntime: withDocs("Server runtime preparation operations", "server.proxy-readiness"),
+  serverRuntimePrepare: withDocs(
+    "Idempotently prepare Docker, edge proxy, and deployability checks for a server",
+    "server.proxy-readiness",
+  ),
   serverProxyConfigure: withDocs(
     "Configure desired edge proxy kind for future routes",
     "server.proxy-readiness",

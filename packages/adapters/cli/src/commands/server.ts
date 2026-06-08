@@ -12,7 +12,9 @@ import {
   ListServersQuery,
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
+  PrepareServerRuntimeCommand,
   PruneServerCapacityCommand,
+  prepareServerRuntimeModeSchema,
   RegisterServerCommand,
   RenameServerCommand,
   RotateSshCredentialCommand,
@@ -57,6 +59,10 @@ const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
 const attachTerminalOption = Options.boolean("attach").pipe(Options.withDefault(false));
 const scheduledRuntimePrunePolicyScopes = scheduledRuntimePrunePolicyScopeSchema.options;
+const prepareRuntimeModeOption = Options.choice(
+  "mode",
+  prepareServerRuntimeModeSchema.options,
+).pipe(Options.withDefault("prepare"));
 const policyIdArg = Args.text({ name: "policyId" });
 const policyIdOption = Options.text("policy-id").pipe(Options.optional);
 const policyVersionOption = Options.text("version").pipe(Options.optional);
@@ -465,6 +471,26 @@ const proxyCommand = EffectCommand.make("proxy").pipe(
   EffectCommand.withSubcommands([proxyRepairCommand]),
 );
 
+const runtimePrepareCommand = EffectCommand.make(
+  "prepare",
+  {
+    serverId: serverIdArg,
+    mode: prepareRuntimeModeOption,
+  },
+  ({ mode, serverId }) =>
+    runCommand(
+      PrepareServerRuntimeCommand.create({
+        serverId,
+        mode,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRuntimePrepare));
+
+const runtimeCommand = EffectCommand.make("runtime").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.serverRuntime),
+  EffectCommand.withSubcommands([runtimePrepareCommand]),
+);
+
 const terminalCommand = EffectCommand.make(
   "terminal",
   {
@@ -510,6 +536,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     testCommand,
     doctorCommand,
     capacityCommand,
+    runtimeCommand,
     terminalCommand,
     proxyCommand,
   ]),
