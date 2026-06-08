@@ -35,6 +35,16 @@ describe("console header switcher", () => {
     expect(shellSource).toContain("data-console-header-switcher-link");
     expect(shellSource).toContain("DropdownMenuTrigger");
     expect(shellSource).toContain("switcherItems(item).length > 0");
+    expect(shellSource).toContain(
+      'class="inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-1',
+    );
+    expect(shellSource).toContain(
+      'class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 px-1.5',
+    );
+    expect(shellSource).toContain(
+      'class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+    );
+    expect(shellSource).not.toContain("border-l border-border/70");
     expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
       shellSource.indexOf("data-console-header-switcher-trigger"),
     );
