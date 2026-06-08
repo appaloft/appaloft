@@ -3453,6 +3453,73 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function acceptConsoleConfirm(view: Bun.WebView): Promise<void> {
+  const accepted = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const dialog = document.querySelector('[role="alertdialog"]');
+          if (!(dialog instanceof HTMLElement)) {
+            return false;
+          }
+
+          const button = Array.from(dialog.querySelectorAll("button")).find((candidate) =>
+            candidate.textContent?.includes("Confirm") ||
+            candidate.textContent?.includes("确认")
+          );
+          if (!(button instanceof HTMLButtonElement) || button.disabled) {
+            return false;
+          }
+
+          button.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    "Expected shared confirm dialog action",
+  );
+
+  expect(accepted).toBe(true);
+}
+
+async function submitConsolePrompt(view: Bun.WebView, value: string): Promise<void> {
+  const submitted = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!(dialog instanceof HTMLElement)) {
+            return false;
+          }
+
+          const input = dialog.querySelector("input, textarea");
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
+            return false;
+          }
+
+          input.value = ${JSON.stringify(value)};
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+
+          const button = Array.from(dialog.querySelectorAll("button")).find((candidate) =>
+            candidate.textContent?.includes("Confirm") ||
+            candidate.textContent?.includes("确认")
+          );
+          if (!(button instanceof HTMLButtonElement) || button.disabled) {
+            return false;
+          }
+
+          button.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    "Expected shared prompt dialog action",
+  );
+
+  expect(submitted).toBe(true);
+}
+
 async function clickElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -3716,6 +3783,26 @@ async function expectLinkWithoutHrefByText(
       ),
     Boolean,
     `Expected link without href containing one of: ${texts.join(" | ")}`,
+  );
+}
+
+async function expectNoEnabledLinkByText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          return Array.from(document.querySelectorAll("a")).every((candidate) => {
+            const matches = texts.some((text) => candidate.textContent?.includes(text));
+            return !matches || !candidate.hasAttribute("href") || candidate.getAttribute("aria-disabled") === "true";
+          });
+        })()`,
+      ),
+    Boolean,
+    `Expected no enabled link containing one of: ${texts.join(" | ")}`,
   );
 }
 
@@ -4109,6 +4196,7 @@ describe("console e2e with Bun.WebView", () => {
         requirementId?: string;
         kind?: string;
         providerKey?: string;
+        capabilities?: unknown;
         target?: { serverId?: string };
       }>;
       target?: { projectName?: string; environmentName?: string; serverId?: string };
@@ -4133,6 +4221,9 @@ describe("console e2e with Bun.WebView", () => {
     expect(
       installInput.dependencyProvisioning?.every((item) => item.target?.serverId === "srv_demo"),
     ).toBe(true);
+    expect(installInput.dependencyProvisioning?.every((item) => !("capabilities" in item))).toBe(
+      true,
+    );
     expect(installInput.secretValues).toEqual([
       { key: "SECRET_KEY", value: "teable-web-secret-not-production" },
     ]);
@@ -4155,7 +4246,6 @@ describe("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}/dependency-resources`);
-    await view.evaluate("window.confirm = () => true");
 
     await expectAnyText(view, ["Dependency resources", "依赖资源"]);
     await expectText(view, "primary-postgres");
@@ -4419,7 +4509,6 @@ describe("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/instance?section=sessions`);
-      await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Active terminal sessions", "活跃终端会话"]);
       await expectText(view, "term_active");
@@ -4428,6 +4517,7 @@ describe("console e2e with Bun.WebView", () => {
       expect(await pageText(view)).not.toContain("SECRET_TOKEN=do-not-render");
 
       await clickButtonByAnyText(view, ["Expire old sessions", "过期旧会话"]);
+      await acceptConsoleConfirm(view);
       const expireRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/expire");
       const expireInput = readOrpcJsonPayload(expireRequest.body);
       expect(expireInput).toEqual({
@@ -4442,6 +4532,7 @@ describe("console e2e with Bun.WebView", () => {
       );
 
       await clickButtonByAnyText(view, ["Close terminal", "关闭终端"]);
+      await acceptConsoleConfirm(view);
       const closeRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/close");
       expect(readOrpcJsonPayload(closeRequest.body)).toEqual({
         sessionId: "term_active",
@@ -4491,7 +4582,6 @@ describe("console e2e with Bun.WebView", () => {
       name: "Customer API",
     });
 
-    await view.evaluate("window.confirm = () => true");
     const archiveClicked = await waitFor(
       () =>
         view.evaluate<boolean>(
@@ -4508,6 +4598,7 @@ describe("console e2e with Bun.WebView", () => {
       "Expected project archive button",
     );
     expect(archiveClicked).toBe(true);
+    await acceptConsoleConfirm(view);
 
     const archiveRequest = await waitForRecordedRequest("/api/rpc/projects/archive");
     expect(readOrpcJsonPayload(archiveRequest.body)).toEqual({
@@ -4554,7 +4645,7 @@ describe("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Archived", "已归档"]);
       await expectAnyText(view, ["new mutations are blocked", "新的变更会被阻止"]);
 
-      await expectLinkWithoutHrefByText(view, ["Create resource", "创建资源"]);
+      await expectNoEnabledLinkByText(view, ["Create resource", "创建资源"]);
 
       const renameDisabledRestoreAvailable = await waitFor(
         () =>
@@ -4573,7 +4664,6 @@ describe("console e2e with Bun.WebView", () => {
       );
       expect(renameDisabledRestoreAvailable).toBe(true);
 
-      await view.evaluate("window.confirm = () => true");
       const restoreClicked = await waitFor(
         () =>
           view.evaluate<boolean>(
@@ -4590,6 +4680,7 @@ describe("console e2e with Bun.WebView", () => {
         "Expected project restore button",
       );
       expect(restoreClicked).toBe(true);
+      await acceptConsoleConfirm(view);
 
       const restoreRequest = await waitForRecordedRequest("/api/rpc/projects/restore");
       expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
@@ -4641,7 +4732,6 @@ describe("console e2e with Bun.WebView", () => {
       );
       expect(deleteReady).toBe(true);
 
-      await view.evaluate("window.prompt = () => 'prj_demo'");
       const deleteClicked = await waitFor(
         () =>
           view.evaluate<boolean>(
@@ -4658,6 +4748,7 @@ describe("console e2e with Bun.WebView", () => {
         "Expected project delete button",
       );
       expect(deleteClicked).toBe(true);
+      await submitConsolePrompt(view, "prj_demo");
 
       const deleteCheckRequest = await waitForRecordedRequest("/api/rpc/projects/deleteCheck");
       expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
@@ -5231,7 +5322,6 @@ describe("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=dependencies`);
-      await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
       await expectText(view, "Managed DB");
@@ -5332,6 +5422,7 @@ describe("console e2e with Bun.WebView", () => {
       ]);
 
       await clickButtonByAnyText(view, ["Unbind", "Unbind"]);
+      await acceptConsoleConfirm(view);
       const unbindRequest = await waitForRecordedRequest(
         "/api/rpc/resources/dependencyBindings/unbind",
       );
@@ -5584,7 +5675,6 @@ describe("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=storage`);
-      await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
       await expectText(view, "uploads");
@@ -5626,6 +5716,7 @@ describe("console e2e with Bun.WebView", () => {
       await expectText(view, "appaloft_res_demo_uploads");
 
       await clickButtonByAnyText(view, ["Apply cleanup", "执行清理"]);
+      await acceptConsoleConfirm(view);
       await waitFor(
         async () => {
           const cleanupRequests = recordedApiRequests.filter(
@@ -5651,6 +5742,7 @@ describe("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Storage attached", "存储已挂载"]);
 
       await clickButtonByAnyText(view, ["Detach", "Detach"]);
+      await acceptConsoleConfirm(view);
       const detachRequest = await waitForRecordedRequest("/api/rpc/resources/detachStorage");
       expect(readOrpcJsonPayload(detachRequest.body)).toEqual({
         resourceId: "res_demo",
@@ -5771,7 +5863,6 @@ describe("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/resources/res_demo?tab=previews`);
-      await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Derived preview environments", "派生预览环境"]);
       await expectText(view, "prenv_demo_14");
@@ -5795,6 +5886,7 @@ describe("console e2e with Bun.WebView", () => {
       });
 
       await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
+      await acceptConsoleConfirm(view);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
         previewEnvironmentId: "prenv_demo_14",
@@ -6071,7 +6163,6 @@ describe("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/preview-environments`);
-      await view.evaluate("window.confirm = () => true");
 
       await expectAnyText(view, ["Preview environments", "预览环境"]);
       await expectText(view, "acme/platform");
@@ -6089,6 +6180,7 @@ describe("console e2e with Bun.WebView", () => {
       await expectText(view, "def5678");
 
       await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
+      await acceptConsoleConfirm(view);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
         previewEnvironmentId: "prenv_global_27",
@@ -7429,8 +7521,8 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
-    await view.evaluate("window.confirm = () => true");
     await clickButtonByAnyText(view, ["Archive", "归档"]);
+    await acceptConsoleConfirm(view);
 
     const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
     const archiveInput = readOrpcJsonPayload(archiveRequest.body);
@@ -7447,7 +7539,6 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/projects/prj_demo`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await view.evaluate("window.confirm = () => true");
     const clicked = await waitFor(
       () =>
         view.evaluate<boolean>(
@@ -7467,6 +7558,7 @@ describe("console e2e with Bun.WebView", () => {
       "Expected environment archive button",
     );
     expect(clicked).toBe(true);
+    await acceptConsoleConfirm(view);
 
     const archiveRequest = await waitForRecordedRequest("/api/rpc/environments/archive");
     const archiveInput = readOrpcJsonPayload(archiveRequest.body);
@@ -7521,7 +7613,6 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/projects/prj_demo`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await view.evaluate("window.confirm = () => true");
     const clicked = await waitFor(
       () =>
         view.evaluate<boolean>(
@@ -7541,6 +7632,7 @@ describe("console e2e with Bun.WebView", () => {
       "Expected environment lock button",
     );
     expect(clicked).toBe(true);
+    await acceptConsoleConfirm(view);
 
     const lockRequest = await waitForRecordedRequest("/api/rpc/environments/lock");
     const lockInput = readOrpcJsonPayload(lockRequest.body);
@@ -7626,7 +7718,6 @@ describe("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
       await expectAnyText(view, ["Archived", "已归档"]);
-      await view.evaluate("window.prompt = () => 'workspace'");
       const clicked = await waitFor(
         () =>
           view.evaluate<boolean>(
@@ -7643,6 +7734,7 @@ describe("console e2e with Bun.WebView", () => {
         "Expected archived resource delete action",
       );
       expect(clicked).toBe(true);
+      await submitConsolePrompt(view, "workspace");
 
       const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
       const deleteInput = readOrpcJsonPayload(deleteRequest.body);
