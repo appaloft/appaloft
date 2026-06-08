@@ -3,6 +3,8 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
+    Check,
+    ChevronDown,
     Database,
     FolderOpen,
     Gauge,
@@ -23,6 +25,14 @@
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "$lib/components/ui/dropdown-menu";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import ConsoleUserMenu from "$lib/components/console/ConsoleUserMenu.svelte";
@@ -58,6 +68,16 @@
   type BreadcrumbItem = {
     label: string;
     href?: string;
+    kind?: "home" | "project" | "environment" | "resource" | "deployment";
+    loading?: boolean;
+    switcherLabel?: string;
+    switcherItems?: BreadcrumbSwitcherItem[];
+  };
+
+  type BreadcrumbSwitcherItem = {
+    label: string;
+    href: string;
+    selected?: boolean;
   };
 
   type Props = {
@@ -270,6 +290,10 @@
   function toggleColorMode(): void {
     colorMode = colorMode === "dark" ? "light" : "dark";
   }
+
+  function switcherItems(item: BreadcrumbItem): BreadcrumbSwitcherItem[] {
+    return item.switcherItems ?? [];
+  }
 </script>
 
 <SidebarProvider
@@ -406,18 +430,72 @@
     >
       <div class="flex min-w-0 flex-1 items-center gap-3">
         <SidebarTrigger />
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           {#if visibleBreadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
               <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
                 {#each visibleBreadcrumbs as item, index (`${item.label}-${index}`)}
                   <Breadcrumb.Item class="min-w-0">
-                    {#if item.href && index < visibleBreadcrumbs.length - 1}
+                    {#if item.loading}
+                      <div
+                        class="flex h-8 min-w-24 items-center gap-2 rounded-md px-2"
+                        aria-hidden="true"
+                        data-console-header-breadcrumb-skeleton
+                      >
+                        <Skeleton class="size-4 shrink-0 rounded-sm" />
+                        <Skeleton class="h-4 w-24 min-w-0 sm:w-32" />
+                      </div>
+                    {:else if switcherItems(item).length > 0}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          data-console-header-switcher-trigger
+                          class="group inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-2 rounded-md border border-transparent px-2 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[16rem]"
+                        >
+                          {#if item.kind === "project"}
+                            <FolderOpen class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                          {:else if item.kind === "resource"}
+                            <Package class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                          {:else if item.kind === "deployment"}
+                            <Rocket class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                          {:else if item.kind === "environment"}
+                            <ServerCrash class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                          {/if}
+                          <span class="min-w-0 truncate">{item.label}</span>
+                          <ChevronDown class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          sideOffset={6}
+                          class="max-h-[min(24rem,calc(100vh-5rem))] min-w-56 max-w-72"
+                        >
+                          {#if item.switcherLabel}
+                            <DropdownMenuLabel class="truncate">{item.switcherLabel}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                          {/if}
+                          {#each switcherItems(item).slice(0, 20) as option (option.href)}
+                            <DropdownMenuItem
+                              class="min-w-0"
+                              onclick={() => navigateTo(option.href)}
+                              data-console-header-switcher-item
+                            >
+                              {#if option.selected}
+                                <Check class="size-4 shrink-0" />
+                              {:else}
+                                <span class="size-4 shrink-0" aria-hidden="true"></span>
+                              {/if}
+                              <span class="min-w-0 flex-1 truncate">{option.label}</span>
+                            </DropdownMenuItem>
+                          {/each}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    {:else if item.href && index < visibleBreadcrumbs.length - 1}
                       <Breadcrumb.Link class="truncate" href={item.href}>
                         {item.label}
                       </Breadcrumb.Link>
                     {:else}
-                      <Breadcrumb.Page class="truncate">{item.label}</Breadcrumb.Page>
+                      <Breadcrumb.Page class="inline-flex h-8 min-w-0 items-center truncate">
+                        {item.label}
+                      </Breadcrumb.Page>
                     {/if}
                   </Breadcrumb.Item>
                   {#if index < visibleBreadcrumbs.length - 1}

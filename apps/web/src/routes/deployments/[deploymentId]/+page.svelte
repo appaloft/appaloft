@@ -55,11 +55,16 @@
   } from "$lib/console/deployment-progress";
   import {
     deploymentDetailHref,
+    findDeployment,
+    findEnvironment,
+    findProject,
+    findResource,
     formatTime,
     projectDetailHref,
     resourceDetailHref,
     resourceTerminalHref,
   } from "$lib/console/utils";
+  import { createConsoleQueries } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -83,6 +88,17 @@
     };
 
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
+  const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
+    createConsoleQueries(browser, {
+      health: false,
+      readiness: false,
+      version: false,
+      servers: false,
+      domainBindings: false,
+      previewEnvironments: false,
+      certificates: false,
+      providers: false,
+    });
 
   let deploymentProgressDialogOpen = $state(false);
   let deploymentProgressRequestId = $state("");
@@ -192,6 +208,12 @@
   );
   const deploymentDetail = $derived(deploymentDetailQuery.data ?? null);
   const deployment = $derived(deploymentDetail?.deployment ?? null);
+  const projects = $derived(projectsQuery.data?.items ?? []);
+  const environments = $derived(environmentsQuery.data?.items ?? []);
+  const resources = $derived(resourcesQuery.data?.items ?? []);
+  const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const listedDeployment = $derived(findDeployment(deployments, deploymentId));
+  const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
   const deploymentLogs = $derived(deploymentLogsQuery.data?.logs ?? []);
   const replayDeploymentEventEnvelopes = $derived(deploymentEventsQuery.data?.envelopes ?? []);
@@ -230,10 +252,64 @@
     groupDeploymentProgressEvents(deploymentProgressEvents),
   );
   const sectionErrors = $derived(deploymentDetail?.sectionErrors ?? []);
-  const project = $derived(deploymentDetail?.relatedContext?.project ?? null);
-  const environment = $derived(deploymentDetail?.relatedContext?.environment ?? null);
-  const resource = $derived(deploymentDetail?.relatedContext?.resource ?? null);
+  const project = $derived(
+    deploymentDetail?.relatedContext?.project ??
+      (headerDeployment ? findProject(projects, headerDeployment.projectId) : null),
+  );
+  const environment = $derived(
+    deploymentDetail?.relatedContext?.environment ??
+      (headerDeployment ? findEnvironment(environments, headerDeployment.environmentId) : null),
+  );
+  const resource = $derived(
+    deploymentDetail?.relatedContext?.resource ??
+      (headerDeployment ? findResource(resources, headerDeployment.resourceId) : null),
+  );
   const server = $derived(deploymentDetail?.relatedContext?.server ?? null);
+  const projectHeaderLoading = $derived(
+    !project && (deploymentDetailQuery.isPending || projectsQuery.isPending),
+  );
+  const environmentHeaderLoading = $derived(
+    !environment && (deploymentDetailQuery.isPending || environmentsQuery.isPending),
+  );
+  const resourceHeaderLoading = $derived(
+    !resource && (deploymentDetailQuery.isPending || resourcesQuery.isPending),
+  );
+  const deploymentHeaderLoading = $derived(
+    !headerDeployment && (deploymentDetailQuery.isPending || deploymentsQuery.isPending),
+  );
+  const projectHeaderSwitchItems = $derived(
+    projects.map((projectItem) => ({
+      label: projectItem.name,
+      href: projectDetailHref(projectItem.id),
+      selected: projectItem.id === headerDeployment?.projectId,
+    })),
+  );
+  const resourceHeaderSwitchItems = $derived(
+    resources
+      .filter(
+        (resourceItem) =>
+          !headerDeployment ||
+          (resourceItem.projectId === headerDeployment.projectId &&
+            resourceItem.environmentId === headerDeployment.environmentId),
+      )
+      .map((resourceItem) => ({
+        label: resourceItem.name,
+        href: resourceDetailHref(resourceItem),
+        selected: resourceItem.id === headerDeployment?.resourceId,
+      })),
+  );
+  const deploymentHeaderSwitchItems = $derived(
+    deployments
+      .filter(
+        (deploymentItem) =>
+          !headerDeployment || deploymentItem.resourceId === headerDeployment.resourceId,
+      )
+      .map((deploymentItem) => ({
+        label: deploymentItem.runtimePlan.source.displayName,
+        href: deploymentDetailHref(deploymentItem),
+        selected: deploymentItem.id === deploymentId,
+      })),
+  );
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
   const activeTab = $derived(parseDeploymentDetailTab(page.url.searchParams.get("tab")));
@@ -944,20 +1020,38 @@
     { label: $t(i18nKeys.console.projects.pageTitle), href: "/projects" },
     {
       label: project?.name ?? $t(i18nKeys.common.domain.project),
+      kind: "project",
+      loading: projectHeaderLoading,
       href: project ? projectDetailHref(project.id) : undefined,
+      switcherLabel: $t(i18nKeys.console.projects.pageTitle),
+      switcherItems: projectHeaderSwitchItems,
     },
-    { label: environment?.name ?? $t(i18nKeys.common.domain.environment) },
+    {
+      label: environment?.name ?? $t(i18nKeys.common.domain.environment),
+      kind: "environment",
+      loading: environmentHeaderLoading,
+    },
     {
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
-      href: deployment
+      kind: "resource",
+      loading: resourceHeaderLoading,
+      href: headerDeployment
         ? resourceDetailHref({
-            id: deployment.resourceId,
-            projectId: deployment.projectId,
-            environmentId: deployment.environmentId,
+            id: headerDeployment.resourceId,
+            projectId: headerDeployment.projectId,
+            environmentId: headerDeployment.environmentId,
           })
         : undefined,
+      switcherLabel: $t(i18nKeys.console.resources.pageTitle),
+      switcherItems: resourceHeaderSwitchItems,
     },
-    { label: deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment) },
+    {
+      label: headerDeployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment),
+      kind: "deployment",
+      loading: deploymentHeaderLoading,
+      switcherLabel: $t(i18nKeys.console.deployments.pageTitle),
+      switcherItems: deploymentHeaderSwitchItems,
+    },
   ]}
 >
   {#if pageLoading}

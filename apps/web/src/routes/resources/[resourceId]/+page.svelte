@@ -128,6 +128,7 @@
     findServer,
     formatTime,
     projectDetailHref,
+    resourceDetailHref,
     resourcePreviewEnvironmentDetailHref,
     resourceNewDeploymentHref,
   } from "$lib/console/utils";
@@ -379,6 +380,7 @@
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
+  const resources = $derived(resourcesQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
@@ -533,6 +535,32 @@
   const project = $derived(resource ? findProject(projects, resource.projectId) : null);
   const environment = $derived(
     resource ? findEnvironment(environments, resource.environmentId) : null,
+  );
+  const projectHeaderLoading = $derived(!project && (resourceDetailQuery.isPending || projectsQuery.isPending));
+  const resourceHeaderLoading = $derived(resourceDetailQuery.isPending && !resource);
+  const environmentHeaderLoading = $derived(
+    !environment && (resourceDetailQuery.isPending || environmentsQuery.isPending),
+  );
+  const projectHeaderSwitchItems = $derived(
+    projects.map((projectItem) => ({
+      label: projectItem.name,
+      href: projectDetailHref(projectItem.id),
+      selected: projectItem.id === resource?.projectId,
+    })),
+  );
+  const resourceHeaderSwitchItems = $derived(
+    resources
+      .filter(
+        (resourceItem) =>
+          !resource ||
+          (resourceItem.projectId === resource.projectId &&
+            resourceItem.environmentId === resource.environmentId),
+      )
+      .map((resourceItem) => ({
+        label: resourceItem.name,
+        href: resourceDetailHref(resourceItem),
+        selected: resourceItem.id === resourceId,
+      })),
   );
   const isPreviewEnvironmentResource = $derived(environment?.kind === "preview");
   const latestDeployment = $derived(
@@ -4741,10 +4769,24 @@
     { label: $t(i18nKeys.console.projects.pageTitle), href: "/projects" },
     {
       label: project?.name ?? $t(i18nKeys.common.domain.project),
+      kind: "project",
+      loading: projectHeaderLoading,
       href: project ? projectDetailHref(project.id) : undefined,
+      switcherLabel: $t(i18nKeys.console.projects.pageTitle),
+      switcherItems: projectHeaderSwitchItems,
     },
-    { label: environment?.name ?? $t(i18nKeys.common.domain.environment) },
-    { label: resource?.name ?? $t(i18nKeys.common.domain.resource) },
+    {
+      label: environment?.name ?? $t(i18nKeys.common.domain.environment),
+      kind: "environment",
+      loading: environmentHeaderLoading,
+    },
+    {
+      label: resource?.name ?? $t(i18nKeys.common.domain.resource),
+      kind: "resource",
+      loading: resourceHeaderLoading,
+      switcherLabel: $t(i18nKeys.console.resources.pageTitle),
+      switcherItems: resourceHeaderSwitchItems,
+    },
   ]}
 >
   {#if pageLoading}
