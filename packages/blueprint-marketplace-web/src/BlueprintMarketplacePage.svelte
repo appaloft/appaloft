@@ -7,6 +7,7 @@
     BlueprintMarketplaceListResponse,
     BlueprintMarketplaceListing,
     BlueprintMarketplacePrimaryAction,
+    BlueprintMarketplaceSurface,
   } from "./types";
   import {
     createBlueprintDeployHandoffUrl,
@@ -46,6 +47,7 @@
     readonly pluginDisplayName?: string;
     readonly loading?: boolean;
     readonly chrome?: BlueprintMarketplaceChrome;
+    readonly surface?: BlueprintMarketplaceSurface;
     readonly primaryAction?: BlueprintMarketplacePrimaryAction;
     readonly actionLabel?: string;
     readonly selectedSlug?: string;
@@ -65,6 +67,7 @@
     pluginDisplayName = "",
     loading = false,
     chrome = "embedded",
+    surface = "page",
     primaryAction = "detail",
     actionLabel = primaryAction === "deploy" ? "部署" : primaryAction === "select" ? "选择" : "查看",
     selectedSlug = "",
@@ -287,6 +290,7 @@
   class:standalone={chrome === "standalone"}
   class:embedded={chrome === "embedded"}
   class="blueprint-marketplace"
+  data-marketplace-surface={surface}
   data-blueprint-marketplace-page
 >
   <header class="marketplace-hero">
@@ -312,22 +316,52 @@
     {/if}
   </header>
 
-  <div class="marketplace-toolbar">
-    <label class="search-field">
-      <span class="sr-only">搜索 Blueprint 目录</span>
-      <input
-        type="search"
-        placeholder="搜索应用、分类、依赖或标签"
-        bind:value={searchTerm}
-      />
-    </label>
-    <div class="catalog-count" aria-live="polite">
-      {#if marketplace}
-        {filteredListings.length} / {listings.length} 个 Blueprint
-      {:else}
-        正在加载 Blueprint
-      {/if}
+  <div class="marketplace-controls">
+    <div class="marketplace-toolbar">
+      <label class="search-field">
+        <span class="sr-only">搜索 Blueprint 目录</span>
+        <input
+          type="search"
+          placeholder="搜索应用、分类、依赖或标签"
+          bind:value={searchTerm}
+        />
+      </label>
+      <div class="catalog-count" aria-live="polite">
+        {#if marketplace}
+          {filteredListings.length} / {listings.length} 个 Blueprint
+        {:else}
+          正在加载 Blueprint
+        {/if}
+      </div>
     </div>
+
+    {#if !isLoading && !errorMessage}
+      <nav class="category-tabs" aria-label="Blueprint categories">
+        <button
+          type="button"
+          class:selected={selectedCategoryKey === "all"}
+          aria-pressed={selectedCategoryKey === "all"}
+          onclick={() => {
+            selectedCategoryKey = "all";
+          }}
+        >
+          全部 {listings.length}
+        </button>
+        {#each categories as category (category.key)}
+          <button
+            type="button"
+            class:selected={selectedCategoryKey === category.key}
+            aria-pressed={selectedCategoryKey === category.key}
+            title={category.description}
+            onclick={() => {
+              selectedCategoryKey = category.key;
+            }}
+          >
+            {categoryButtonLabel(category)}
+          </button>
+        {/each}
+      </nav>
+    {/if}
   </div>
 
   {#if isLoading}
@@ -374,32 +408,6 @@
       <button type="button" onclick={() => loadMarketplace()}>重试</button>
     </section>
   {:else}
-    <nav class="category-tabs" aria-label="Blueprint categories">
-      <button
-        type="button"
-        class:selected={selectedCategoryKey === "all"}
-        aria-pressed={selectedCategoryKey === "all"}
-        onclick={() => {
-          selectedCategoryKey = "all";
-        }}
-      >
-        全部 {listings.length}
-      </button>
-      {#each categories as category (category.key)}
-        <button
-          type="button"
-          class:selected={selectedCategoryKey === category.key}
-          aria-pressed={selectedCategoryKey === category.key}
-          title={category.description}
-          onclick={() => {
-            selectedCategoryKey = category.key;
-          }}
-        >
-          {categoryButtonLabel(category)}
-        </button>
-      {/each}
-    </nav>
-
     {#if selectedCategory}
       <p class="category-note">
         <strong>{selectedCategory.label}</strong>
@@ -621,6 +629,27 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 16px;
     align-items: center;
+  }
+
+  .marketplace-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .blueprint-marketplace[data-marketplace-surface="dialog"] .marketplace-controls,
+  .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .marketplace-controls {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    margin: -2px -2px 0;
+    border-bottom: 1px solid rgba(219, 226, 234, 0.82);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94)),
+      var(--marketplace-card);
+    padding: 2px 2px 14px;
+    box-shadow: 0 12px 24px rgba(20, 31, 47, 0.06);
+    backdrop-filter: blur(10px);
   }
 
   .search-field input {
@@ -969,6 +998,21 @@
     .hero-actions,
     .action-row {
       justify-content: flex-start;
+    }
+
+    .blueprint-marketplace[data-marketplace-surface="dialog"] .category-tabs,
+    .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .category-tabs {
+      flex-wrap: nowrap;
+      margin-inline: -2px;
+      overflow-x: auto;
+      padding-inline: 2px;
+      padding-bottom: 2px;
+      scrollbar-width: thin;
+    }
+
+    .blueprint-marketplace[data-marketplace-surface="dialog"] .category-tabs button,
+    .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .category-tabs button {
+      flex: 0 0 auto;
     }
 
     h1 {

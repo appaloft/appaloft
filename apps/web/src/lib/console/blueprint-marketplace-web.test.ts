@@ -110,12 +110,18 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).toContain("data-blueprint-marketplace-selector");
     expect(selectorSource).toContain("@appaloft/blueprint-marketplace-web");
     expect(selectorSource).toContain("BlueprintMarketplacePage");
+    expect(selectorSource).toContain("marketplaceSurface");
+    expect(selectorSource).toContain('page.url.searchParams.get("surface") === "quick-deploy"');
+    expect(selectorSource).toContain("surface={marketplaceSurface}");
     expect(selectorSource).toContain('title={catalogExtension?.title ?? "应用市场"}');
     expect(selectorSource).toContain('badgeLabel="蓝图目录"');
     expect(selectorSource).toContain("loading={webExtensionsQuery.isPending}");
     expect(selectorSource).not.toContain("pluginDisplayName={catalogExtension");
     expect(selectorSource).not.toContain("@appaloft-cloud");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
+    expect(sharedPackageSource).toContain("marketplace-controls");
+    expect(sharedPackageSource).toContain('data-marketplace-surface="dialog"');
+    expect(sharedPackageSource).toContain('data-marketplace-surface="quick-deploy"');
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
     expect(sharedPackageSource).toContain("marketplace-skeleton-group");
     expect(sharedPackageSource).toContain("readonly loading?: boolean");
