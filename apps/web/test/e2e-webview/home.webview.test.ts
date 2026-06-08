@@ -3798,6 +3798,28 @@ describe("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Access", "访问地址"]);
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
     await expectAnyText(view, ["Recent deployments", "最近部署"]);
+    const homeProjectLayout = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        cardCount: document.querySelectorAll('[data-home-project-row]').length,
+        firstCardHasHeader: Boolean(document.querySelector('[data-home-project-row] .nothing-project-card-header')),
+        firstCardHasMetrics: Boolean(document.querySelector('[data-home-project-row] .nothing-project-metrics')),
+        firstCardHasAccessRow: Boolean(document.querySelector('[data-home-project-row] .nothing-project-access-row')),
+      })`),
+    ) as {
+      clientWidth: number;
+      scrollWidth: number;
+      cardCount: number;
+      firstCardHasHeader: boolean;
+      firstCardHasMetrics: boolean;
+      firstCardHasAccessRow: boolean;
+    };
+    expect(homeProjectLayout.cardCount).toBeGreaterThan(0);
+    expect(homeProjectLayout.firstCardHasHeader).toBe(true);
+    expect(homeProjectLayout.firstCardHasMetrics).toBe(true);
+    expect(homeProjectLayout.firstCardHasAccessRow).toBe(true);
+    expect(homeProjectLayout.scrollWidth).toBeLessThanOrEqual(homeProjectLayout.clientWidth);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
