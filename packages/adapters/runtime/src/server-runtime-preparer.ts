@@ -29,6 +29,11 @@ interface PreparedSshArgs {
   cleanup(): void;
 }
 
+const shellParameterExpansion = {
+  ubuntuCodename: "${UBUNTU_CODENAME:-}",
+  versionCodename: "${VERSION_CODENAME:-}",
+} as const;
+
 const remoteDockerPrepareCommand = String.raw`
 set -eu
 if command -v docker >/dev/null 2>&1 && docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
@@ -81,9 +86,9 @@ if [ ! -s /etc/apt/keyrings/docker.gpg ]; then
 fi
 $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
 ARCH="$(dpkg --print-architecture)"
-CODENAME="\${VERSION_CODENAME:-}"
+CODENAME="${shellParameterExpansion.versionCodename}"
 if [ -z "$CODENAME" ]; then
-  CODENAME="$(. /etc/os-release && printf '%s' "\${UBUNTU_CODENAME:-}")"
+  CODENAME="$(. /etc/os-release && printf '%s' "${shellParameterExpansion.ubuntuCodename}")"
 fi
 if [ -z "$CODENAME" ]; then
   printf 'APPALOFT_DOCKER_UNSUPPORTED codename\n' >&2
