@@ -45,13 +45,17 @@ not a Project, not a Resource, and not a Catalog Listing. The Community boundary
 file-first, and local-registry friendly; see
 [ADR-065: Blueprint Format And Local Registry Boundary](./decisions/ADR-065-blueprint-format-and-local-registry-boundary.md).
 
-Within a Blueprint, a Component is a deployable runtime unit and a Dependency Resource is an
-external, managed, imported, shared, or separately bound dependency requirement. A Component
-Relation is a directed link from a consumer/dependent component to a provider/dependency component
-inside the same Blueprint installation. It can describe endpoint consumption, lifecycle ordering,
-private service discovery, network allowance, or telemetry attachment, but it does not create
-ownership and does not replace dependency-resource binding. See
-[ADR-078: Blueprint Component Relation Boundary](./decisions/ADR-078-blueprint-component-relation-boundary.md).
+Within a Blueprint, a Component is a deployable runtime unit. A Dependency Resource is a
+service-like external, managed, imported, shared, or separately bound dependency requirement. A
+`volume` requirement is storage intent, not a Dependency Resource; it compiles toward
+`StorageVolume` plus `ResourceStorageAttachment`. A Component Relation is a directed link from a
+consumer/dependent component to a provider/dependency component inside the same Blueprint
+installation. It can describe endpoint consumption, lifecycle ordering, private service discovery,
+network allowance, or telemetry attachment, but it does not create ownership and does not replace
+dependency-resource binding. See
+[ADR-078: Blueprint Component Relation Boundary](./decisions/ADR-078-blueprint-component-relation-boundary.md)
+and
+[ADR-083: Storage Volume, Dependency Resource, And Backup Boundary](./decisions/ADR-083-storage-volume-dependency-resource-and-backup-boundary.md).
 
 ## Core Principles
 
@@ -65,6 +69,8 @@ ownership and does not replace dependency-resource binding. See
 - storage volumes and resource storage attachments are explicit domain concepts; provider-native
   Docker/Compose/Swarm volume realization belongs behind runtime adapters and future deployment
   snapshot materialization
+- mounted storage and service dependencies are different concepts. `StorageVolume` backup/restore
+  must not be modeled as `DependencyResourceBackup`
 - core does not depend on Elysia, tsyringe, Kysely, PostgreSQL drivers, or UI frameworks
 - repositories exist only for aggregate roots
 - entities and value objects are persisted through the owning aggregate root, never through standalone repositories
@@ -584,6 +590,10 @@ Current scope:
 - governed by
   [ADR-036: Dependency Resource Backup And Restore Lifecycle](./decisions/ADR-036-dependency-resource-backup-restore-lifecycle.md)
   and [Dependency Resource Backup And Restore](./specs/039-dependency-resource-backup-restore/spec.md)
+- explicitly does not cover mounted SQLite/application files stored in `StorageVolume`; that
+  storage-owned operation family is governed by
+  [ADR-083](./decisions/ADR-083-storage-volume-dependency-resource-and-backup-boundary.md)
+  and [Storage Volume Backup And Restore](./specs/098-storage-volume-backup-restore/spec.md)
 
 ### Release Orchestration
 
@@ -1013,19 +1023,31 @@ Rules:
 - `bind-mount` stores a trusted source path as adapter/runtime boundary data after strict path
   validation
 - deletion is blocked while any active Resource attachment references the volume
-- backup relationship metadata is metadata-only in this slice, but it participates in delete safety
-- storage commands do not create deployments, provision provider-native volumes, run backup/restore,
-  prune runtime state, or mutate historical deployment snapshots
+- backup relationship metadata and StorageVolumeBackup records participate in delete/runtime cleanup
+  safety
+- storage volume lifecycle commands do not create deployments, provision provider-native volumes,
+  run backup/restore, prune runtime state, or mutate historical deployment snapshots; storage
+  backup/restore is exposed through the separate `storage-volumes.*backup*` command/query family
 - deployment execution, not `storage-volumes.create`, is the default runtime realization point for
   storage mounts
 - runtime volume cleanup belongs to the `storage-volumes.cleanup-runtime` command governed by
   [ADR-064: Storage Volume Runtime Realization And Cleanup](./decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md);
   it must not be hidden inside `storage-volumes.delete` or `servers.capacity.prune`
+- storage backup/restore is a storage-owned operation family governed by
+  [ADR-083: Storage Volume, Dependency Resource, And Backup Boundary](./decisions/ADR-083-storage-volume-dependency-resource-and-backup-boundary.md)
+  and [Storage Volume Backup And Restore](./specs/098-storage-volume-backup-restore/spec.md).
+  It must separate `BackupSourceAdapter` consistency from `BackupTargetProvider` artifact storage,
+  default restore to a new volume, label local-only backup as not disaster recovery, and fail
+  closed with blockers/errors when no safe source adapter or target provider is registered
 
 Current scope:
 - Phase 7 baseline aggregate implemented under
   [Storage Volume Lifecycle And Resource Attachment](./specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
 - feeds provider-neutral storage mount metadata into deployment snapshots and runtime adapters
+- Resource overview mounted-storage visibility is governed by
+  [Storage Volume Resource Visibility](./specs/096-storage-volume-resource-visibility/spec.md)
+- public application-bundle storage binding readback is governed by
+  [Application Bundle Storage Binding Boundary](./specs/097-application-bundle-storage-binding-boundary/spec.md)
 
 ### Release
 

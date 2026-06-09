@@ -54,6 +54,9 @@ import {
   type CreateResourceSecretReferenceCommandInput,
   type CreateScheduledTaskCommandInput,
   type CreateSshCredentialCommandInput,
+  type CreateStorageVolumeBackupCommandInput,
+  type CreateStorageVolumeBackupPlanQueryInput,
+  type CreateStorageVolumeRestorePlanQueryInput,
   type DeactivateServerCommandInput,
   type DeleteAccountCommandInput,
   type DeleteCertificateCommandInput,
@@ -113,6 +116,7 @@ import {
   type ListSourceLinksQueryInput,
   type ListSshCredentialsQueryInput,
   type ListStaticArtifactPublicationsQueryInput,
+  type ListStorageVolumeBackupsQueryInput,
   type ListTerminalSessionsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
@@ -123,6 +127,7 @@ import {
   type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
   type PruneSourceEventsCommandInput,
+  type PruneStorageVolumeBackupCommandInput,
   type PublishStaticArtifactArchiveCommandInput,
   type PublishStaticArtifactCommandInput,
   type PublishStaticArtifactPayloadCommandInput,
@@ -151,6 +156,7 @@ import {
   type RestartResourceRuntimeCommandInput,
   type RestoreDependencyResourceBackupCommandInput,
   type RestoreProjectCommandInput,
+  type RestoreStorageVolumeBackupCommandInput,
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
   type RetryDomainBindingVerificationCommandInput,
@@ -196,6 +202,7 @@ import {
   type ShowSourceEventQueryInput,
   type ShowSourceLinkQueryInput,
   type ShowSshCredentialQueryInput,
+  type ShowStorageVolumeBackupQueryInput,
   type ShowTerminalSessionQueryInput,
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
@@ -253,6 +260,7 @@ import {
   type CreateResourceResponse,
   type CreateResourceSecretReferenceResponse,
   type CreateSshCredentialResponse,
+  type CreateStorageVolumeBackupResponse,
   type CreateStorageVolumeInput,
   type CreateStorageVolumeResponse,
   type CurrentOrganizationContextResponse,
@@ -322,6 +330,7 @@ import {
   type ListSourceEventsResponse,
   type ListSshCredentialsResponse,
   type ListStaticArtifactPublicationsResponse,
+  type ListStorageVolumeBackupsResponse,
   type ListStorageVolumesInput,
   type ListStorageVolumesResponse,
   type ListTerminalSessionsResponse,
@@ -337,6 +346,7 @@ import {
   type PruneDeploymentsResponse,
   type PruneServerCapacityResponse,
   type PruneSourceEventsResponse,
+  type PruneStorageVolumeBackupResponse,
   type PublishStaticArtifactResponse,
   type ReactivateOrganizationMemberResponse,
   type RedeployDeploymentResponse,
@@ -360,6 +370,7 @@ import {
   type ResourceRuntimeLogsStreamResponse,
   type RestartResourceRuntimeResponse,
   type RestoreProjectResponse,
+  type RestoreStorageVolumeBackupResponse,
   type RetryCertificateResponse,
   type RetryDeploymentResponse,
   type RetryDomainBindingVerificationResponse,
@@ -399,11 +410,14 @@ import {
   type ShowServerResponse,
   type ShowSourceEventResponse,
   type ShowSshCredentialResponse,
+  type ShowStorageVolumeBackupResponse,
   type ShowStorageVolumeInput,
   type ShowStorageVolumeResponse,
   type ShowTerminalSessionResponse,
   type StartResourceRuntimeResponse,
   type StopResourceRuntimeResponse,
+  type StorageVolumeBackupPlanResponse,
+  type StorageVolumeRestorePlanResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
   type TransferOrganizationOwnerResponse,
@@ -1320,6 +1334,50 @@ export type AppaloftOrpcClientContract = {
       CleanupStorageVolumeRuntimeResponse,
       AppaloftClientError
     >;
+    backups: {
+      plan: Client<
+        AppaloftClientContext,
+        CreateStorageVolumeBackupPlanQueryInput,
+        StorageVolumeBackupPlanResponse,
+        AppaloftClientError
+      >;
+      create: Client<
+        AppaloftClientContext,
+        CreateStorageVolumeBackupCommandInput,
+        CreateStorageVolumeBackupResponse,
+        AppaloftClientError
+      >;
+      list: Client<
+        AppaloftClientContext,
+        ListStorageVolumeBackupsQueryInput,
+        ListStorageVolumeBackupsResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowStorageVolumeBackupQueryInput,
+        ShowStorageVolumeBackupResponse,
+        AppaloftClientError
+      >;
+      restorePlan: Client<
+        AppaloftClientContext,
+        CreateStorageVolumeRestorePlanQueryInput,
+        StorageVolumeRestorePlanResponse,
+        AppaloftClientError
+      >;
+      restore: Client<
+        AppaloftClientContext,
+        RestoreStorageVolumeBackupCommandInput,
+        RestoreStorageVolumeBackupResponse,
+        AppaloftClientError
+      >;
+      prune: Client<
+        AppaloftClientContext,
+        PruneStorageVolumeBackupCommandInput,
+        PruneStorageVolumeBackupResponse,
+        AppaloftClientError
+      >;
+    };
   };
   dependencyResources: {
     provisioning: {

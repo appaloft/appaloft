@@ -263,10 +263,17 @@ export * from "./operations/static-artifacts/publish-static-artifact-payload.han
 export * from "./operations/static-artifacts/static-artifact-publisher.service";
 export * from "./operations/storage-volumes/cleanup-storage-volume-runtime.use-case";
 export * from "./operations/storage-volumes/create-storage-volume.use-case";
+export * from "./operations/storage-volumes/create-storage-volume-backup.use-case";
+export * from "./operations/storage-volumes/create-storage-volume-backup-plan.query-service";
+export * from "./operations/storage-volumes/create-storage-volume-restore-plan.query-service";
 export * from "./operations/storage-volumes/delete-storage-volume.use-case";
+export * from "./operations/storage-volumes/list-storage-volume-backups.query-service";
 export * from "./operations/storage-volumes/list-storage-volumes.query-service";
+export * from "./operations/storage-volumes/prune-storage-volume-backup.use-case";
 export * from "./operations/storage-volumes/rename-storage-volume.use-case";
+export * from "./operations/storage-volumes/restore-storage-volume-backup.use-case";
 export * from "./operations/storage-volumes/show-storage-volume.query-service";
+export * from "./operations/storage-volumes/show-storage-volume-backup.query-service";
 export * from "./operations/system/apply-instance-upgrade.use-case";
 export * from "./operations/system/check-instance-upgrade.query-service";
 export * from "./operations/system/db-migrate.use-case";

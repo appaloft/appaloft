@@ -227,6 +227,16 @@ const storageDestinationPathOption = Options.text("destination-path");
 const storageMountModeOption = Options.choice("mount-mode", ["read-write", "read-only"]).pipe(
   Options.withDefault("read-write"),
 );
+const storageDataFormatOption = Options.choice("data-format", [
+  "sqlite",
+  "json-files",
+  "filesystem",
+  "application-export",
+  "unknown",
+]).pipe(Options.optional);
+const storageApplicationDataLabelOption = Options.text("application-data-label").pipe(
+  Options.optional,
+);
 const dependencyTargetNameOption = Options.text("target-name").pipe(
   Options.withDefault("DATABASE_URL"),
 );
@@ -1156,14 +1166,20 @@ const attachStorageCommand = EffectCommand.make(
     storageVolumeId: storageVolumeIdArg,
     destinationPath: storageDestinationPathOption,
     mountMode: storageMountModeOption,
+    dataFormat: storageDataFormatOption,
+    applicationDataLabel: storageApplicationDataLabelOption,
   },
-  ({ destinationPath, mountMode, resourceId, storageVolumeId }) =>
+  ({ applicationDataLabel, dataFormat, destinationPath, mountMode, resourceId, storageVolumeId }) =>
     runCommand(
       AttachResourceStorageCommand.create({
         resourceId,
         storageVolumeId,
         destinationPath,
         mountMode,
+        ...(optionalValue(dataFormat) ? { dataFormat: optionalValue(dataFormat) } : {}),
+        ...(optionalValue(applicationDataLabel)
+          ? { applicationDataLabel: optionalValue(applicationDataLabel) }
+          : {}),
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceAttachStorage));

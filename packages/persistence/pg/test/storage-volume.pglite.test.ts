@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createExecutionContext, toRepositoryContext } from "@appaloft/application";
 import {
   CreatedAt,
+  DescriptionText,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -113,6 +114,8 @@ describe("storage volume persistence", () => {
           storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
           destinationPath: StorageDestinationPath.rehydrate("/data"),
           mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+          dataFormat: "sqlite",
+          applicationDataLabel: DescriptionText.rehydrate("PocketBase data"),
           attachedAt: createdAt,
         })
         ._unsafeUnwrap();
@@ -133,6 +136,10 @@ describe("storage volume persistence", () => {
       expect(persistedResource?.toState().storageAttachments[0]?.storageVolumeKind.value).toBe(
         "named-volume",
       );
+      expect(persistedResource?.toState().storageAttachments[0]?.dataFormat).toBe("sqlite");
+      expect(persistedResource?.toState().storageAttachments[0]?.applicationDataLabel?.value).toBe(
+        "PocketBase data",
+      );
       expect(summary).toMatchObject({
         id: "stv_demo",
         attachmentCount: 1,
@@ -144,6 +151,8 @@ describe("storage volume persistence", () => {
             resourceSlug: "web",
             destinationPath: "/data",
             mountMode: "read-write",
+            dataFormat: "sqlite",
+            applicationDataLabel: "PocketBase data",
           },
         ],
       });

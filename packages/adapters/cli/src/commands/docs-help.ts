@@ -566,6 +566,35 @@ export const cliCommandDescriptions = {
     "Dry-run or explicitly remove safe runtime volume realizations",
     "storage.volume-lifecycle",
   ),
+  storageVolumeBackup: withDocs(
+    "Storage volume backup and restore operations",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupPlan: withDocs(
+    "Preview storage volume backup source, target, consistency, and retention blockers",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupCreate: withDocs(
+    "Create a storage volume backup through source and target provider ports",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupList: withDocs("List storage volume backups", "storage.volume-backup-restore"),
+  storageVolumeBackupShow: withDocs(
+    "Show one storage volume backup artifact",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupRestorePlan: withDocs(
+    "Preview storage volume restore safety and target mode",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupRestore: withDocs(
+    "Restore a storage volume backup to a new volume by default",
+    "storage.volume-backup-restore",
+  ),
+  storageVolumeBackupPrune: withDocs(
+    "Prune a storage volume backup artifact after provider retention handling",
+    "storage.volume-backup-restore",
+  ),
   deployToken: withDocs(
     "Self-hosted Action deploy-token management",
     "self-hosting.action-deploy-token-auth",

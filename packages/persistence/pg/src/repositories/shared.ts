@@ -188,6 +188,7 @@ import {
   StaticPublishDirectory,
   StorageBindSourcePath,
   StorageDestinationPath,
+  type StorageVolumeBackupDataFormat,
   StorageVolumeId,
   StorageVolumeKindValue,
   TargetKindValue,
@@ -1773,6 +1774,14 @@ export function rehydrateResourceRow(
       mountMode: ResourceStorageMountModeValue.rehydrate(
         attachment.mount_mode as Parameters<typeof ResourceStorageMountModeValue.rehydrate>[0],
       ),
+      ...(attachment.data_format
+        ? {
+            dataFormat: attachment.data_format as StorageVolumeBackupDataFormat,
+          }
+        : {}),
+      ...(attachment.application_data_label
+        ? { applicationDataLabel: DescriptionText.rehydrate(attachment.application_data_label) }
+        : {}),
       attachedAt: CreatedAt.rehydrate(
         normalizeTimestamp(attachment.attached_at) ?? attachment.attached_at,
       ),

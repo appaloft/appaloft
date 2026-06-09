@@ -51,7 +51,7 @@ generic Docker prune.
   - Runtime target adapters own target-specific realization evidence and deletion mechanics.
 - Upstream/downstream contexts:
   - Deployment recovery readiness supplies rollback candidate blockers.
-  - Dependency backup/restore and future storage backup/restore supply retention blockers.
+  - Dependency backup/restore and storage backup/restore supply retention blockers.
   - Runtime capacity prune remains separate and must not own storage cleanup.
 
 ## Public Surfaces
@@ -96,7 +96,7 @@ generic Docker prune.
 
 - No implicit provider-native provisioning during `storage-volumes.create`.
 - No implicit Swarm Compose stack rollout outside deployment execution.
-- No storage backup/restore implementation.
+- No storage backup/restore execution inside this runtime cleanup command.
 - No bind-mount host path deletion.
 - No cleanup through `servers.capacity.prune`.
 - No deployment admission input changes.
@@ -119,10 +119,11 @@ reachability, named-volume creation, and scoped cleanup when `APPALOFT_DOCKER_SW
 The explicit `storage-volumes.cleanup-runtime` command is implemented for local-shell and
 generic-SSH Docker named-volume inspection/cleanup through CLI, HTTP/oRPC, and Resource detail Web
 controls. Docker cleanup now consumes storage backup retention and in-flight backup/restore
-evidence through a safety reader; the default shell implementation returns no in-flight evidence
-until storage backup/restore operations are introduced. Provider-native storage handles beyond
-Docker runtime mounts, bind-mount path cleanup policy, and storage backup/restore operations remain
-governed provider/storage extensions outside the current runtime cleanup baseline. Real cleanup
+evidence through a safety reader; the default unsupported provider composition returns no in-flight
+evidence unless a concrete storage backup provider registers it. Provider-native storage handles
+beyond Docker runtime mounts, bind-mount path cleanup policy, and concrete storage backup provider
+smoke evidence remain governed provider/storage extensions outside the current runtime cleanup
+baseline. Real cleanup
 smoke commands exist as local explicit reproduction scripts:
 `bun run smoke:storage-cleanup:docker`, `bun run smoke:storage-cleanup:ssh`, and
 `bun run smoke:storage-cleanup`; they prove dry-run-first and destructive scoped Docker

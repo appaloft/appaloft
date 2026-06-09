@@ -417,6 +417,18 @@ Phase 7 storage operations:
 | Attach storage to resource | Command | `resources.attach-storage` | `AttachResourceStorageCommand` | `AttachResourceStorageCommandInput` | `appaloft resource storage attach <resourceId> <storageVolumeId> --destination-path <path>` | `POST /api/resources/{resourceId}/storage-attachments` |
 | Detach storage from resource | Command | `resources.detach-storage` | `DetachResourceStorageCommand` | `DetachResourceStorageCommandInput` | `appaloft resource storage detach <resourceId> <attachmentId>` | `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` |
 
+Storage volume backup operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Plan storage volume backup | Query | `storage-volumes.backup-plan` | `CreateStorageVolumeBackupPlanQuery` | `CreateStorageVolumeBackupPlanQueryInput` | `appaloft storage volume backup plan` | `POST /api/storage-volumes/{storageVolumeId}/backups/plan` |
+| Create storage volume backup | Command | `storage-volumes.create-backup` | `CreateStorageVolumeBackupCommand` | `CreateStorageVolumeBackupCommandInput` | `appaloft storage volume backup create` | `POST /api/storage-volumes/{storageVolumeId}/backups` |
+| List storage volume backups | Query | `storage-volumes.list-backups` | `ListStorageVolumeBackupsQuery` | `ListStorageVolumeBackupsQueryInput` | `appaloft storage volume backup list --storage-volume <storageVolumeId>` | `GET /api/storage-volumes/{storageVolumeId}/backups` |
+| Show storage volume backup | Query | `storage-volumes.show-backup` | `ShowStorageVolumeBackupQuery` | `ShowStorageVolumeBackupQueryInput` | `appaloft storage volume backup show <backupId>` | `GET /api/storage-volume-backups/{backupId}` |
+| Plan storage volume restore | Query | `storage-volumes.restore-plan` | `CreateStorageVolumeRestorePlanQuery` | `CreateStorageVolumeRestorePlanQueryInput` | `appaloft storage volume backup restore-plan <backupId>` | `POST /api/storage-volume-backups/{backupId}/restore-plan` |
+| Restore storage volume backup | Command | `storage-volumes.restore-backup` | `RestoreStorageVolumeBackupCommand` | `RestoreStorageVolumeBackupCommandInput` | `appaloft storage volume backup restore <backupId>` | `POST /api/storage-volume-backups/{backupId}/restore` |
+| Prune storage volume backups | Command | `storage-volumes.prune-backups` | `PruneStorageVolumeBackupCommand` | `PruneStorageVolumeBackupCommandInput` | `appaloft storage volume backup prune <backupId>` | `DELETE /api/storage-volume-backups/{backupId}` |
+
 Phase 7 scheduled task operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
@@ -764,7 +776,8 @@ Current boundary:
   cleanup implementation covers local-shell and generic-SSH Docker named volumes through CLI,
   HTTP/oRPC, and Resource detail Web controls, and requires matching Appaloft ownership labels
   before a named volume can match or be removed; bind-mount source paths, provider-native storage
-  handles, and storage backup/restore operations remain later governed slices outside the current
+  handles, and storage backup/restore execution remain separate governed slices outside the
+  provider-neutral create and runtime cleanup
   provider-neutral create boundary. GitHub Actions/local explicit Swarm and storage-cleanup gates
   prove generated overrides, named-volume creation, route reachability, dry-run-first cleanup, and
   scoped destructive cleanup without making target-mutating proofs part of default local checks.
@@ -772,8 +785,20 @@ Current boundary:
   cleanup during deployment execution. Retained deployment snapshot, rollback-candidate,
   backup-retention, and in-flight backup/restore safety evidence already block destructive cleanup
   for the selected
-  StorageVolume on the selected server; the shell default reports no in-flight storage
-  backup/restore work until that operation family exists.
+  StorageVolume on the selected server; default unsupported provider composition reports no
+  in-flight storage backup/restore work unless a concrete backup provider registers evidence.
+- mounted storage is not a Dependency Resource. Resource overview and downstream application-bundle
+  readback must expose storage attachments with storage language and must not send SQLite-on-volume
+  users to `dependency-resources.*` backup/restore. This boundary is governed by
+  [ADR-083](./decisions/ADR-083-storage-volume-dependency-resource-and-backup-boundary.md),
+  [Storage Volume Resource Visibility](./specs/096-storage-volume-resource-visibility/spec.md),
+  and
+  [Application Bundle Storage Binding Boundary](./specs/097-application-bundle-storage-binding-boundary/spec.md).
+  Storage backup/restore is governed by
+  [Storage Volume Backup And Restore](./specs/098-storage-volume-backup-restore/spec.md). The
+  active operation family exposes planning, creation, list/show, restore planning, restore to a new
+  volume, and prune through `storage-volumes.*`; unsupported source adapters or target providers
+  return blockers/errors instead of copying live volume data unsafely.
 
 - `.env` import is an operation-local parser for pasted content. It rejects malformed or unsafe
   variable keys, classifies secret-like keys as runtime secrets by default, rejects build-time

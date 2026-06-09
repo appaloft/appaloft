@@ -300,6 +300,14 @@ export * from "./operations/static-artifacts/list-static-artifact-publications.q
 export * from "./operations/static-artifacts/publish-static-artifact.command";
 export * from "./operations/static-artifacts/publish-static-artifact-archive.command";
 export * from "./operations/static-artifacts/publish-static-artifact-payload.command";
+export * from "./operations/storage-volumes/create-storage-volume-backup.command";
+export * from "./operations/storage-volumes/create-storage-volume-backup-plan.query";
+export * from "./operations/storage-volumes/create-storage-volume-restore-plan.query";
+export * from "./operations/storage-volumes/list-storage-volume-backups.query";
+export * from "./operations/storage-volumes/prune-storage-volume-backup.command";
+export * from "./operations/storage-volumes/restore-storage-volume-backup.command";
+export * from "./operations/storage-volumes/show-storage-volume-backup.query";
+export * from "./operations/storage-volumes/storage-volume-backup.schema";
 export * from "./operations/system/github-app-connection.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";

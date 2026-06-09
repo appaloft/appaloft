@@ -18,6 +18,8 @@ export class AttachResourceStorageCommand extends Command<{ id: string }> {
     public readonly storageVolumeId: string,
     public readonly destinationPath: string,
     public readonly mountMode: AttachResourceStorageCommandInput["mountMode"],
+    public readonly dataFormat?: AttachResourceStorageCommandInput["dataFormat"],
+    public readonly applicationDataLabel?: AttachResourceStorageCommandInput["applicationDataLabel"],
   ) {
     super();
   }
@@ -30,6 +32,8 @@ export class AttachResourceStorageCommand extends Command<{ id: string }> {
           parsed.storageVolumeId,
           parsed.destinationPath,
           parsed.mountMode,
+          parsed.dataFormat,
+          parsed.applicationDataLabel,
         ),
     );
   }

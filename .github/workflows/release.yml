@@ -37,6 +37,11 @@ on:
         required: false
         default: false
         type: boolean
+      require_storage_backup_e2e:
+        description: Fail the release if SSH storage-backup E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
       require_runtime_usage_e2e:
         description: Fail the release if SSH runtime-usage E2E secrets are missing.
         required: false
@@ -251,6 +256,16 @@ jobs:
       run_ssh: true
     secrets: inherit
 
+  storage-backup-e2e:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/storage-backup-e2e.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_storage_backup_e2e }}
+      run_local_docker: true
+      run_ssh: true
+    secrets: inherit
+
   runtime-usage-e2e:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
@@ -292,6 +307,7 @@ jobs:
       - framework-fixture-e2e
       - scheduled-task-e2e
       - storage-cleanup-e2e
+      - storage-backup-e2e
       - runtime-usage-e2e
       - capacity-prune-e2e
       - preview-provider-e2e

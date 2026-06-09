@@ -5703,15 +5703,45 @@ describe.serial("console e2e with Bun.WebView", () => {
     const previousStorageCreateRoute = apiResponses.dashboard["/api/rpc/storageVolumes/create"];
     const previousStorageCleanupRoute =
       apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"];
+    const previousStorageBackupPlanRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/backups/plan"];
+    const previousStorageBackupCreateRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/backups/create"];
+    const previousStorageBackupListRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/backups/list"];
+    const previousStorageBackupRestoreRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/backups/restore"];
+    const previousStorageBackupPruneRoute =
+      apiResponses.dashboard["/api/rpc/storageVolumes/backups/prune"];
     const previousAttachRoute = apiResponses.dashboard["/api/rpc/resources/attachStorage"];
     const previousDetachRoute = apiResponses.dashboard["/api/rpc/resources/detachStorage"];
+    let storageBackups = [
+      {
+        id: "svb_uploads",
+        storageVolumeId: "stv_uploads",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        storageVolumeKind: "named-volume",
+        sourceAdapterKey: "tar-volume",
+        targetProviderKey: "local-filesystem",
+        targetRef: "/var/lib/appaloft/backups",
+        consistency: "quiesced",
+        status: "ready",
+        attemptId: "sba_uploads",
+        requestedAt: "2026-01-01T00:04:00.000Z",
+        retentionStatus: "retained",
+        localOnly: true,
+        artifactHandle: "local://backups/svb_uploads.tar.zst",
+        createdAt: "2026-01-01T00:04:00.000Z",
+      },
+    ];
     const storageVolumes = [
       {
         id: "stv_uploads",
         projectId: "prj_demo",
         environmentId: "env_demo",
-        name: "uploads",
-        slug: "uploads",
+        name: "pocketbase-data",
+        slug: "pocketbase-data",
         kind: "named-volume",
         lifecycleStatus: "active",
         attachmentCount: 1,
@@ -5719,24 +5749,38 @@ describe.serial("console e2e with Bun.WebView", () => {
           {
             attachmentId: "att_existing",
             resourceId: "res_demo",
-            resourceName: "workspace",
-            resourceSlug: "workspace",
-            destinationPath: "/data",
+            resourceName: "PocketBase",
+            resourceSlug: "pocketbase",
+            destinationPath: "/pb_data",
             mountMode: "read-write",
+            dataFormat: "sqlite",
+            applicationDataLabel: "PocketBase data",
             attachedAt: "2026-01-01T00:00:00.000Z",
           },
         ],
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    let storageAttachments = [
+    let storageAttachments: Array<{
+      id: string;
+      storageVolumeId: string;
+      storageVolumeName: string;
+      storageVolumeKind: string;
+      destinationPath: string;
+      mountMode: string;
+      dataFormat?: string;
+      applicationDataLabel?: string;
+      attachedAt: string;
+    }> = [
       {
         id: "att_existing",
         storageVolumeId: "stv_uploads",
-        storageVolumeName: "uploads",
+        storageVolumeName: "pocketbase-data",
         storageVolumeKind: "named-volume",
-        destinationPath: "/data",
+        destinationPath: "/pb_data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
         attachedAt: "2026-01-01T00:00:00.000Z",
       },
     ];
@@ -5838,6 +5882,116 @@ describe.serial("console e2e with Bun.WebView", () => {
         },
       };
     };
+    apiResponses.dashboard["/api/rpc/storageVolumes/backups/plan"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        requestedConsistency?: string;
+        source?: { storageVolumeId?: string };
+        target?: { providerKey?: string; targetRef?: string };
+        retention?: { maxCount?: number; minFreeBytes?: number };
+      } | null;
+      return {
+        json: {
+          schemaVersion: "storage-volumes.backup-plan/v1",
+          storageVolumeId: input?.source?.storageVolumeId ?? "stv_uploads",
+          sourceAdapterKey: "tar-volume",
+          targetProviderKey: input?.target?.providerKey ?? "local-filesystem",
+          consistency: input?.requestedConsistency ?? "application-consistent",
+          localOnly: true,
+          retention: {
+            maxCount: input?.retention?.maxCount ?? 3,
+            minFreeBytes: input?.retention?.minFreeBytes ?? 1073741824,
+          },
+          blockers: [],
+          warnings: [],
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/backups/create"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        planRequest?: {
+          requestedConsistency?: string;
+          source?: { storageVolumeId?: string };
+          target?: { providerKey?: string; targetRef?: string };
+        };
+      } | null;
+      storageBackups = [
+        ...storageBackups,
+        {
+          id: "svb_created",
+          storageVolumeId: input?.planRequest?.source?.storageVolumeId ?? "stv_uploads",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          storageVolumeKind: "named-volume",
+          sourceAdapterKey: "tar-volume",
+          targetProviderKey: input?.planRequest?.target?.providerKey ?? "local-filesystem",
+          targetRef: input?.planRequest?.target?.targetRef ?? "/var/lib/appaloft/backups",
+          consistency: input?.planRequest?.requestedConsistency ?? "application-consistent",
+          status: "ready",
+          attemptId: "sba_created",
+          requestedAt: "2026-01-01T00:05:00.000Z",
+          retentionStatus: "retained",
+          localOnly: true,
+          artifactHandle: "local://backups/svb_created.tar.zst",
+          createdAt: "2026-01-01T00:05:00.000Z",
+        },
+      ];
+      return {
+        json: {
+          id: "svb_created",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/backups/list"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { storageVolumeId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "storage-volumes.backups.list/v1",
+          items: storageBackups.filter(
+            (backup) => backup.storageVolumeId === (input?.storageVolumeId ?? "stv_uploads"),
+          ),
+          generatedAt: "2026-01-01T00:05:30.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/backups/restore"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { backupId?: string } | null;
+      return {
+        json: {
+          id: input?.backupId ?? "svb_uploads",
+          restoredStorageVolumeId: "stv_restored",
+          restoreAttemptId: "sra_restored",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/storageVolumes/backups/prune"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { backupId?: string } | null;
+      storageBackups = storageBackups.map((backup) =>
+        backup.id === (input?.backupId ?? "svb_uploads")
+          ? { ...backup, status: "pruned", retentionStatus: "pruned" }
+          : backup,
+      );
+      return {
+        json: {
+          id: input?.backupId ?? "svb_uploads",
+          prunedAt: "2026-01-01T00:06:00.000Z",
+        },
+      };
+    };
     apiResponses.dashboard["/api/rpc/resources/attachStorage"] = (
       _request: Request,
       body: unknown,
@@ -5882,11 +6036,83 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await expectAnyText(view, ["Storage", "Mounted storage", "挂载存储"]);
+      await expectText(view, "PocketBase data");
+      await expectText(view, "/pb_data");
+      await expectAnyText(view, [
+        "Plan and manage backups from Storage settings; unsupported providers return blockers.",
+        "在 Storage 设置里预览和管理备份；不支持的 provider 会返回 blocker。",
+      ]);
+      const overviewLayout = JSON.parse(
+        await view.evaluate<string>(`(() => {
+          const section = document.querySelector('#resource-mounted-storage-overview');
+          const backupText = section?.textContent ?? '';
+          const desktop = {
+            innerWidth: window.innerWidth,
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            sectionVisible: Boolean(section),
+            backupTextVisible:
+              backupText.includes('Plan and manage backups from Storage settings') ||
+              backupText.includes('在 Storage 设置里预览和管理备份'),
+          };
+          window.resizeTo(390, 820);
+          return new Promise((resolve) => {
+            requestAnimationFrame(() => {
+              const mobileSection = document.querySelector('#resource-mounted-storage-overview');
+              const mobileText = mobileSection?.textContent ?? '';
+              resolve(JSON.stringify({
+                desktop,
+                mobile: {
+                  innerWidth: window.innerWidth,
+                  clientWidth: document.documentElement.clientWidth,
+                  scrollWidth: document.documentElement.scrollWidth,
+                  sectionVisible: Boolean(mobileSection),
+                  backupTextVisible:
+                    mobileText.includes('Plan and manage backups from Storage settings') ||
+                    mobileText.includes('在 Storage 设置里预览和管理备份'),
+                },
+              }));
+            });
+          });
+        })()`),
+      ) as {
+        desktop: {
+          innerWidth: number;
+          clientWidth: number;
+          scrollWidth: number;
+          sectionVisible: boolean;
+          backupTextVisible: boolean;
+        };
+        mobile: {
+          innerWidth: number;
+          clientWidth: number;
+          scrollWidth: number;
+          sectionVisible: boolean;
+          backupTextVisible: boolean;
+        };
+      };
+      expect(overviewLayout.desktop.sectionVisible).toBe(true);
+      expect(overviewLayout.desktop.backupTextVisible).toBe(true);
+      expect(overviewLayout.desktop.scrollWidth).toBeLessThanOrEqual(
+        overviewLayout.desktop.clientWidth,
+      );
+      expect(overviewLayout.mobile.sectionVisible).toBe(true);
+      expect(overviewLayout.mobile.backupTextVisible).toBe(true);
+      expect(overviewLayout.mobile.scrollWidth).toBeLessThanOrEqual(
+        overviewLayout.mobile.clientWidth,
+      );
+
       await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
 
-      await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
-      await expectText(view, "uploads");
-      await expectText(view, "/data");
+      await expectAnyText(view, ["Resource storage attachments", "资源存储挂载"]);
+      await expectText(view, "PocketBase data");
+      await expectText(view, "/pb_data");
+      await expectText(view, "sqlite");
+      await expectAnyText(view, ["Volume backups", "Volume 备份"]);
+      await expectText(view, "local://backups/svb_uploads.tar.zst");
 
       const listRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/list");
       expect(readOrpcJsonPayload(listRequest.body)).toEqual({
@@ -5905,7 +6131,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
 
-      await selectOptionByText(view, "#resource-storage-runtime-cleanup-volume-trigger", "uploads");
+      await selectOptionByText(
+        view,
+        "#resource-storage-runtime-cleanup-volume-trigger",
+        "pocketbase-data",
+      );
       await selectOptionByText(view, "#resource-storage-runtime-cleanup-server-trigger", "edge");
       await setInputValue(
         view,
@@ -5937,7 +6167,95 @@ describe.serial("console e2e with Bun.WebView", () => {
       );
       await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
 
-      await selectOptionByText(view, "#resource-storage-attachment-volume-trigger", "uploads");
+      await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
+      await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
+      await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
+      await setInputValue(view, "#resource-storage-backup-retention-count", "3");
+      await setInputValue(view, "#resource-storage-backup-min-free", "1073741824");
+      await clickButtonByAnyText(view, ["Plan backup", "预览备份"]);
+      const backupPlanRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/plan",
+      );
+      expect(readOrpcJsonPayload(backupPlanRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
+        source: {
+          storageVolumeId: "stv_uploads",
+          resourceId: "res_demo",
+          serverId: "srv_demo",
+          destinationPath: "/pb_data",
+          dataFormat: "sqlite",
+          liveWrites: true,
+        },
+        requestedConsistency: "application-consistent",
+        target: {
+          providerKey: "local-filesystem",
+          targetRef: "/var/lib/appaloft/backups",
+        },
+        retention: {
+          maxCount: 3,
+          minFreeBytes: 1073741824,
+        },
+      });
+      await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
+      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      const backupCreateRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/create",
+      );
+      expect(readOrpcJsonPayload(backupCreateRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
+        planRequest: {
+          storageVolumeId: "stv_uploads",
+          source: {
+            storageVolumeId: "stv_uploads",
+            resourceId: "res_demo",
+            serverId: "srv_demo",
+            destinationPath: "/pb_data",
+            dataFormat: "sqlite",
+            liveWrites: true,
+          },
+          requestedConsistency: "application-consistent",
+          target: {
+            providerKey: "local-filesystem",
+            targetRef: "/var/lib/appaloft/backups",
+          },
+          retention: {
+            maxCount: 3,
+            minFreeBytes: 1073741824,
+          },
+        },
+      });
+      await expectAnyText(view, ["Storage backup requested", "Storage backup 已请求"]);
+      const backupListRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/list",
+      );
+      expect(readOrpcJsonPayload(backupListRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
+      });
+      await setInputValue(view, "#storage-backup-restore-name-svb_uploads", "uploads-restored");
+      await clickButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
+      const backupRestoreRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/restore",
+      );
+      expect(readOrpcJsonPayload(backupRestoreRequest.body)).toEqual({
+        backupId: "svb_uploads",
+        targetMode: "new-volume",
+        restoredVolumeName: "uploads-restored",
+      });
+      await expectAnyText(view, ["Storage backup restored", "Storage backup 已恢复"]);
+      await clickButtonByAnyText(view, ["Prune", "清理"]);
+      const backupPruneRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/prune",
+      );
+      expect(readOrpcJsonPayload(backupPruneRequest.body)).toEqual({
+        backupId: "svb_uploads",
+      });
+      await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
+
+      await selectOptionByText(
+        view,
+        "#resource-storage-attachment-volume-trigger",
+        "pocketbase-data",
+      );
       await setInputValue(view, "#resource-storage-destination", "/var/lib/app/uploads");
       await clickFormSubmit(view, "#resource-storage-attachment-form");
       const attachRequest = await waitForRecordedRequest("/api/rpc/resources/attachStorage");
@@ -5980,6 +6298,36 @@ describe.serial("console e2e with Bun.WebView", () => {
       } else {
         apiResponses.dashboard["/api/rpc/storageVolumes/cleanupRuntime"] =
           previousStorageCleanupRoute;
+      }
+      if (previousStorageBackupPlanRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/backups/plan"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/backups/plan"] =
+          previousStorageBackupPlanRoute;
+      }
+      if (previousStorageBackupCreateRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/backups/create"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/backups/create"] =
+          previousStorageBackupCreateRoute;
+      }
+      if (previousStorageBackupListRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/backups/list"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/backups/list"] =
+          previousStorageBackupListRoute;
+      }
+      if (previousStorageBackupRestoreRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/backups/restore"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/backups/restore"] =
+          previousStorageBackupRestoreRoute;
+      }
+      if (previousStorageBackupPruneRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/storageVolumes/backups/prune"];
+      } else {
+        apiResponses.dashboard["/api/rpc/storageVolumes/backups/prune"] =
+          previousStorageBackupPruneRoute;
       }
       if (previousAttachRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/attachStorage"];

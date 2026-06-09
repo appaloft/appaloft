@@ -2846,6 +2846,8 @@ function attachRepositoryConfigStorage(input: {
   storageVolumeId: string;
   destinationPath: string;
   mountMode: DeploymentStorageSeed["mountMode"];
+  dataFormat?: "sqlite" | "json-files" | "filesystem" | "application-export" | "unknown";
+  applicationDataLabel?: string;
 }) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -2855,6 +2857,8 @@ function attachRepositoryConfigStorage(input: {
         storageVolumeId: input.storageVolumeId,
         destinationPath: input.destinationPath,
         mountMode: input.mountMode,
+        ...(input.dataFormat ? { dataFormat: input.dataFormat } : {}),
+        ...(input.applicationDataLabel ? { applicationDataLabel: input.applicationDataLabel } : {}),
       }),
     );
     const result = yield* Effect.promise(() => cli.executeCommand(message));

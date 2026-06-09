@@ -1,5 +1,6 @@
 import {
   CreatedAt,
+  DescriptionText,
   domainError,
   err,
   ok,
@@ -59,6 +60,9 @@ export class AttachResourceStorageUseCase {
       const storageVolumeId = yield* StorageVolumeId.create(input.storageVolumeId);
       const destinationPath = yield* StorageDestinationPath.create(input.destinationPath);
       const mountMode = yield* ResourceStorageMountModeValue.create(input.mountMode);
+      const applicationDataLabel = input.applicationDataLabel
+        ? yield* DescriptionText.create(input.applicationDataLabel)
+        : undefined;
       const attachedAt = yield* CreatedAt.create(clock.now());
 
       const resource = await resourceRepository.findOne(
@@ -106,6 +110,8 @@ export class AttachResourceStorageUseCase {
         ...(storageState.sourcePath ? { sourcePath: storageState.sourcePath } : {}),
         destinationPath,
         mountMode,
+        ...(input.dataFormat ? { dataFormat: input.dataFormat } : {}),
+        ...(applicationDataLabel ? { applicationDataLabel } : {}),
         attachedAt,
       });
 

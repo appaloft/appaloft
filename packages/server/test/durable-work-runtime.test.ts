@@ -373,4 +373,93 @@ describe("durable work server runtime", () => {
       await runner.stop();
     }
   });
+
+  test("[PROC-DELIVERY-WORKER-029] shutdown waits for an active drain tick", async () => {
+    const adapter = new InMemoryDurableWorkQueueAdapter();
+    const heartbeatStore = new InMemoryDurableWorkWorkerHeartbeatStore();
+    const workItem = durableWorkItem({
+      id: "dw_shutdown_drain",
+      kind: "blueprint-install",
+      operationKey: "blueprints.install",
+      subjectKind: "installed-application",
+      subjectId: "cia_shutdown",
+    });
+    adapter.items.set(workItem.id, workItem);
+
+    let releaseHandler: (() => void) | undefined;
+    const handlerStarted = Promise.withResolvers<void>();
+    const handlerRelease = new Promise<void>((resolve) => {
+      releaseHandler = resolve;
+    });
+    const blueprintInstallHandler: DurableWorkHandler = {
+      async handle() {
+        handlerStarted.resolve();
+        await handlerRelease;
+        return ok({
+          status: "succeeded",
+          phase: "install",
+          step: "finished",
+          safeDetails: { applicationId: "cia_shutdown" },
+        });
+      },
+    };
+
+    const runner = createDurableWorkRuntimeRunner({
+      topology: {
+        mode: "embedded",
+        queueBackend: "database",
+        expectedWorkerCount: 1,
+        coordinationRole: "coordinator",
+        workers: [
+          {
+            workerId: "appaloft-worker-1",
+            workerGroup: "appaloft-worker",
+            slot: 1,
+          },
+        ],
+      },
+      adapter,
+      heartbeatStore,
+      deploymentRepository: {} as never,
+      deploymentLifecycleService: {} as never,
+      executionBackend: {} as never,
+      eventBus: {} as never,
+      processAttemptRecorder: {} as never,
+      executionContextFactory,
+      logger,
+      handlerRegistry: {
+        resolve(item) {
+          return item.kind === "blueprint-install" ? blueprintInstallHandler : undefined;
+        },
+      },
+      intervalSeconds: 60,
+      batchSize: 5,
+      leaseDurationMs: 300_000,
+    });
+
+    await runner.start();
+    await handlerStarted.promise;
+
+    const stopped = runner.stop();
+    const earlyStop = await Promise.race([
+      stopped.then(() => "stopped" as const),
+      new Promise<"waiting">((resolve) => setTimeout(() => resolve("waiting"), 50)),
+    ]);
+    expect(earlyStop).toBe("waiting");
+
+    releaseHandler?.();
+    await stopped;
+
+    expect(adapter.items.get(workItem.id)).toMatchObject({
+      id: workItem.id,
+      status: "succeeded",
+      phase: "install",
+      step: "finished",
+      safeDetails: { applicationId: "cia_shutdown" },
+    });
+    expect(heartbeatStore.heartbeats.get("appaloft-worker-1")).toMatchObject({
+      workerId: "appaloft-worker-1",
+      status: "stopping",
+    });
+  });
 });

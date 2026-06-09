@@ -6,5 +6,7 @@ export * from "./source-binding";
 export * from "./specs";
 export * from "./static-artifact";
 export * from "./storage-volume";
+export * from "./storage-volume-backup";
+export * from "./storage-volume-backup-specifications";
 export * from "./storage-volume-specifications";
 export * from "./workload";

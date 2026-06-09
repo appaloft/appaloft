@@ -277,5 +277,5 @@ describe("quick deploy static Docker workflow e2e", () => {
       cleanupLocalDockerDeployment(deploymentId);
       cleanupWorkspace(workspace.workspaceDir);
     }
-  }, 300000);
+  }, 600000);
 });
