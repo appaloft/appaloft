@@ -122,6 +122,9 @@ async function createPreviewDeployCliHarness(
   const dependencyProvenanceWrites: unknown[] = [];
   const storageProvenanceWrites: unknown[] = [];
   const scheduledTaskProvenanceWrites: unknown[] = [];
+  const createdDeploymentSummaries: unknown[] = [];
+  let createdResourceCount = 0;
+  let createdDeploymentCount = 0;
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       operations.push(command.constructor.name);
@@ -150,7 +153,8 @@ async function createPreviewDeployCliHarness(
               ),
             );
           }
-          return ok({ id: "res_1" } as T);
+          createdResourceCount += 1;
+          return ok({ id: `res_${createdResourceCount}` } as T);
         case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
         case "ConfigureResourceAccessCommand":
@@ -233,7 +237,20 @@ async function createPreviewDeployCliHarness(
           } as T);
         }
         case "CreateDeploymentCommand":
-          return ok({ id: "dep_1" } as T);
+          createdDeploymentCount += 1;
+          {
+            const deploymentId = `dep_${createdDeploymentCount}`;
+            const deploymentInput = command as unknown as { resourceId?: string };
+            createdDeploymentSummaries.push({
+              id: deploymentId,
+              resourceId: deploymentInput.resourceId ?? "res_1",
+              status: "succeeded",
+              runtimePlan: {
+                execution: {},
+              },
+            });
+            return ok({ id: deploymentId } as T);
+          }
         default:
           return ok(null as T);
       }
@@ -244,7 +261,7 @@ async function createPreviewDeployCliHarness(
       operations.push(query.constructor.name);
       queries.push(query as AppQuery<unknown>);
       if (query.constructor.name === "ListDeploymentsQuery") {
-        return ok({ items: input.deploymentSummaries ?? [] } as T);
+        return ok({ items: input.deploymentSummaries ?? createdDeploymentSummaries } as T);
       }
       if (query.constructor.name === "ListResourcesQuery") {
         return ok({ items: input.resourceSummaries ?? [] } as T);
@@ -964,6 +981,173 @@ describe("CLI deployment config entry workflow", () => {
     ).toBeUndefined();
   });
 
+  test("[CONFIG-FILE-APPLICATION-GRAPH-004] config application graph expands into per-Resource deployments", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-application-graph-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "applications:",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "      kind: application",
+        "    source:",
+        "      type: git",
+        "      repository: https://github.com/acme/app",
+        "      baseDirectory: apps/api",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      buildCommand: bun run build:api",
+        "      startCommand: bun run start:api",
+        "      healthCheckPath: /ready",
+        "    network:",
+        "      internalPort: 3000",
+        "      exposureMode: reverse-proxy",
+        "    env:",
+        "      PUBLIC_APP: api",
+        "  worker:",
+        "    resource:",
+        "      name: Acme Worker",
+        "    source:",
+        "      type: git",
+        "      repository: https://github.com/acme/app",
+        "      baseDirectory: apps/worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "    services:",
+        "      worker:",
+        "        kind: worker",
+        "        runtime:",
+        "          strategy: workspace-commands",
+        "          startCommand: bun run worker",
+        "        network:",
+        "          exposureMode: none",
+        "        replicas: 4",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+        {
+          id: "dep_2",
+          resourceId: "res_2",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {},
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_HEAD_REF: undefined,
+          GITHUB_REF: undefined,
+          GITHUB_REPOSITORY: undefined,
+          GITHUB_REPOSITORY_ID: undefined,
+          GITHUB_SHA: undefined,
+          GITHUB_WORKSPACE: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--server-host",
+              "203.0.113.93",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resourceCommands = harness.commands.filter(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    ) as Record<string, unknown>[];
+    expect(resourceCommands).toHaveLength(2);
+    expect(resourceCommands[0]).toMatchObject({
+      name: "Acme API",
+      kind: "application",
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/acme/app",
+        baseDirectory: "apps/api",
+      },
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        buildCommand: "bun run build:api",
+        startCommand: "bun run start:api",
+        healthCheckPath: "/ready",
+      },
+      networkProfile: {
+        internalPort: 3000,
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(resourceCommands[1]).toMatchObject({
+      name: "Acme Worker",
+      kind: "application",
+      services: [
+        {
+          name: "worker",
+          kind: "worker",
+        },
+      ],
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/acme/app",
+        baseDirectory: "apps/worker",
+      },
+    });
+
+    const deployments = harness.commands.filter(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown>[];
+    expect(deployments).toEqual([
+      expect.objectContaining({
+        projectId: "proj_1",
+        serverId: "srv_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+      }),
+      expect.objectContaining({
+        projectId: "proj_1",
+        serverId: "srv_1",
+        environmentId: "env_1",
+        resourceId: "res_2",
+      }),
+    ]);
+    for (const deployment of deployments) {
+      expect(deployment).not.toHaveProperty("source");
+      expect(deployment).not.toHaveProperty("runtime");
+      expect(deployment).not.toHaveProperty("runtimeProfile");
+      expect(deployment).not.toHaveProperty("network");
+      expect(deployment).not.toHaveProperty("networkProfile");
+      expect(deployment).not.toHaveProperty("services");
+      expect(deployment).not.toHaveProperty("applications");
+    }
+    expect(harness.sourceLinkCalls.some((call) => call.includes("applications.api"))).toBe(true);
+    expect(harness.sourceLinkCalls.some((call) => call.includes("applications.worker"))).toBe(true);
+  });
+
   test("[CONFIG-FILE-IMAGE-SOURCE-003] config prebuilt image source creates Resource profile before deployment", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-image-source-config-"));
@@ -1482,6 +1666,21 @@ describe("CLI deployment config entry workflow", () => {
       execute: async <T>(_context: unknown, query: AppQuery<T>) => {
         operations.push(query.constructor.name);
         queries.push(query as AppQuery<unknown>);
+        if (query.constructor.name === "ListDeploymentsQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_1",
+                resourceId: "res_1",
+                status: "succeeded",
+                runtimePlan: {
+                  execution: {},
+                },
+              },
+            ],
+          } as T);
+        }
+
         return ok({ items: [] } as T);
       },
     } as unknown as QueryBus;

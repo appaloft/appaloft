@@ -88,6 +88,12 @@ entrypoints over this loop. A source-adjacent Appaloft config file is the non-in
 expression of the same Quick Deploy draft normalization, not a separate deployment command or a
 shortcut around the explicit operations.
 
+Repository config `applications.<key>` is an application graph workflow extension over the same
+Quick Deploy loop. It may expand one committed config into multiple Resource-specific workflow
+drafts and dispatch one ordinary ids-only `deployments.create` per application, but it is not a new
+deployment command, not a durable release group, and not a source of project/resource/server
+identity.
+
 For pure CLI and GitHub Actions deployments to an SSH server, Appaloft state is durable on that SSH
 server by default through the `ssh-pglite` backend governed by
 [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md). A config file may

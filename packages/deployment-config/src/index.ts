@@ -41,6 +41,7 @@ const storageKeyPattern = dependencyKeyPattern;
 const scheduledTaskKeyPattern = dependencyKeyPattern;
 const configProfileKeyPattern = dependencyKeyPattern;
 const serviceKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
+const applicationKeyPattern = serviceKeyPattern;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 const appaloftDeploymentMonitoringSignals = [
   "cpu",
@@ -911,6 +912,61 @@ export const appaloftDeploymentServiceConfigSchema = z
   })
   .describe("Provider-neutral named service/process declaration for repository config.");
 
+export const appaloftDeploymentApplicationResourceConfigSchema = z
+  .object({
+    name: nonEmptyStringSchema.describe("Resource name for this repository application entry."),
+    kind: z.enum(["application", "service", "worker", "static-site", "compose-stack"]).optional(),
+    description: z.string().trim().min(1).optional(),
+  })
+  .strict()
+  .describe("Resource draft for one repository application entry.");
+
+export const appaloftDeploymentApplicationConfigSchema = z
+  .object({
+    resource: appaloftDeploymentApplicationResourceConfigSchema,
+    source: appaloftDeploymentSourceConfigSchema.optional(),
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentAccessConfigSchema.optional(),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+    services: z
+      .record(
+        z
+          .string()
+          .regex(
+            serviceKeyPattern,
+            "config_service_resolution: service keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentServiceConfigSchema,
+      )
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.source?.type !== "image") {
+      return;
+    }
+
+    if (value.runtime?.type) {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "type"],
+        message: sourceImageRuntimeTypeError,
+      });
+    }
+
+    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceImageRuntimeStrategyError,
+      });
+    }
+  })
+  .describe("Provider-neutral application entry for repository config application graphs.");
+
 export const appaloftDeploymentDependencyBackupConfigSchema = z
   .object({
     enabled: z.boolean().optional().default(true),
@@ -1297,6 +1353,17 @@ export const appaloftDeploymentConfigSchema = z
         appaloftDeploymentServiceConfigSchema,
       )
       .optional(),
+    applications: z
+      .record(
+        z
+          .string()
+          .regex(
+            applicationKeyPattern,
+            "config_application_resolution: application keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentApplicationConfigSchema,
+      )
+      .optional(),
     dependencies: z
       .record(
         z
@@ -1484,6 +1551,38 @@ function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDe
           ),
         }
       : {}),
+    ...(config.applications
+      ? {
+          applications: Object.fromEntries(
+            Object.entries(config.applications).map(([key, application]) => [
+              key,
+              {
+                ...application,
+                ...(application.services
+                  ? {
+                      services: Object.fromEntries(
+                        Object.entries(application.services).map(([serviceKey, service]) => [
+                          serviceKey,
+                          {
+                            ...service,
+                            ...(service.network?.targetServiceName
+                              ? {
+                                  network: {
+                                    ...service.network,
+                                    targetServiceName: service.network.targetServiceName.trim(),
+                                  },
+                                }
+                              : {}),
+                          },
+                        ]),
+                      ),
+                    }
+                  : {}),
+              },
+            ]),
+          ),
+        }
+      : {}),
     ...(config.storage
       ? {
           storage: Object.fromEntries(
@@ -1520,6 +1619,11 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
   if (root === "controlPlane" && path[1] === "deploymentContext") {
     return false;
   }
+
+  if (root === "applications" && path.length === 2 && key === "resource") {
+    return false;
+  }
+
   return (
     root === "runtime" ||
     root === "deployment" ||
@@ -1527,6 +1631,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "source" ||
     root === "access" ||
     root === "services" ||
+    root === "applications" ||
     root === "dependencies" ||
     root === "storage" ||
     root === "scheduledTasks" ||
@@ -1565,6 +1670,15 @@ function shouldTreatSecretField(path: (string | number)[], key: string, value: u
 
 function shouldTreatUnsupportedField(path: (string | number)[], key: string): boolean {
   if (path.length === 2 && path[0] === "services" && key === "replicas") {
+    return false;
+  }
+
+  if (
+    path.length === 4 &&
+    path[0] === "applications" &&
+    path[2] === "services" &&
+    key === "replicas"
+  ) {
     return false;
   }
 

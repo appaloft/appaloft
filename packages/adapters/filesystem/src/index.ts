@@ -15,6 +15,8 @@ import {
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
+  type DeploymentConfiguredApplication,
+  type DeploymentConfiguredSource,
   type ExecutionContext,
   type ListStaticArtifactPublicationsInput,
   type RecordStaticArtifactPublicationInput,
@@ -1399,7 +1401,84 @@ function toDeploymentConfigSnapshot(
             .map(([name, service]) => toRequestedServiceConfig(name, service)),
         }
       : {}),
+    ...(config.applications
+      ? {
+          applications: Object.entries(config.applications)
+            .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+            .map(([key, application]) => toDeploymentConfiguredApplication(key, application)),
+        }
+      : {}),
     ...(runtimePrune ? { retention: { runtimePrune } } : {}),
+  };
+}
+
+function toDeploymentConfiguredApplication(
+  key: string,
+  application: NonNullable<AppaloftDeploymentConfig["applications"]>[string],
+): DeploymentConfiguredApplication {
+  const healthCheckPath =
+    application.runtime?.healthCheckPath ??
+    application.runtime?.healthCheck?.path ??
+    application.health?.path;
+  const deployment: NonNullable<DeploymentConfiguredApplication["deployment"]> = {
+    ...(application.runtime?.strategy ? { method: application.runtime.strategy } : {}),
+    ...(application.runtime?.installCommand
+      ? { installCommand: application.runtime.installCommand }
+      : {}),
+    ...(application.runtime?.buildCommand
+      ? { buildCommand: application.runtime.buildCommand }
+      : {}),
+    ...(application.runtime?.startCommand
+      ? { startCommand: application.runtime.startCommand }
+      : {}),
+    ...(application.runtime?.publishDirectory
+      ? { publishDirectory: application.runtime.publishDirectory }
+      : {}),
+    ...(application.network?.internalPort ? { port: application.network.internalPort } : {}),
+    ...(application.network?.upstreamProtocol
+      ? { upstreamProtocol: application.network.upstreamProtocol }
+      : {}),
+    ...(application.network?.exposureMode
+      ? { exposureMode: application.network.exposureMode }
+      : {}),
+    ...(application.network?.hostPort ? { hostPort: application.network.hostPort } : {}),
+    ...(healthCheckPath ? { healthCheckPath } : {}),
+  };
+
+  const services = application.services
+    ? Object.entries(application.services)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([name, service]) => toRequestedServiceConfig(name, service))
+    : undefined;
+
+  return {
+    key,
+    resource: {
+      name: application.resource.name,
+      ...(application.resource.kind ? { kind: application.resource.kind } : {}),
+      ...(application.resource.description
+        ? { description: application.resource.description }
+        : {}),
+      ...(services && services.length > 0 ? { services } : {}),
+    },
+    ...(application.source ? { source: toDeploymentConfiguredSource(application.source) } : {}),
+    ...(Object.keys(deployment).length > 0 ? { deployment } : {}),
+    ...(services && services.length > 0 ? { services } : {}),
+  };
+}
+
+function toDeploymentConfiguredSource(
+  source: NonNullable<NonNullable<AppaloftDeploymentConfig["applications"]>[string]["source"]>,
+): DeploymentConfiguredSource {
+  return {
+    ...(source.type ? { type: source.type } : {}),
+    ...(source.repository ? { repository: source.repository } : {}),
+    ...(source.image ? { image: source.image } : {}),
+    ...(source.gitRef ? { gitRef: source.gitRef } : {}),
+    ...(source.commitSha ? { commitSha: source.commitSha } : {}),
+    ...(source.baseDirectory ? { baseDirectory: source.baseDirectory } : {}),
+    ...(source.version ? { version: source.version } : {}),
+    ...(source.versionKind ? { versionKind: source.versionKind } : {}),
   };
 }
 

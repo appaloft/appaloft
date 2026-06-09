@@ -732,6 +732,13 @@ Current boundary:
   materialize workspace-command services as one generated Compose stack; and `deployments.create`
   remains ids-only for public transports. This is governed by
   [Repository Config Service Graph](./specs/096-repository-config-service-graph/spec.md).
+- repository config `applications.<key>` is the public-neutral application graph input for one
+  repository config workflow. Each application entry expands into a Resource-specific Quick Deploy
+  draft and one ordinary ids-only `deployments.create` admission; the graph does not add
+  cross-Resource fields to `deployments.create`, does not select durable identity from committed
+  config, and does not imply atomic release-group rollback or provider-specific orchestration. This
+  is governed by
+  [Repository Config Application Graph](./specs/097-repository-config-application-graph/spec.md).
 - storage volume lifecycle is implemented for Phase 7 through
   `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.
   Storage attachments are Resource profile state and new deployments snapshot them into

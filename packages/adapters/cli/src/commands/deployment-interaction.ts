@@ -897,6 +897,64 @@ export function deploymentPromptSeedFromConfig(
   };
 }
 
+function mergeDeploymentPromptSeeds(
+  base: DeploymentPromptSeed,
+  overlay: DeploymentPromptSeed,
+): DeploymentPromptSeed {
+  return {
+    ...base,
+    ...overlay,
+    sourceProfile: {
+      ...(base.sourceProfile ?? {}),
+      ...(overlay.sourceProfile ?? {}),
+    },
+  };
+}
+
+export function applicationDeploymentPromptSeedsFromConfig(
+  config: AppaloftDeploymentConfig,
+): Array<{ key: string; seed: DeploymentPromptSeed }> {
+  return Object.entries(config.applications ?? {})
+    .sort(compareConfigKeys)
+    .map(([key, application]) => {
+      const applicationConfig: AppaloftDeploymentConfig = {
+        source: application.source,
+        runtime: application.runtime,
+        network: application.network,
+        health: application.health,
+        access: application.access,
+        env: application.env,
+        secrets: application.secrets,
+        services: application.services,
+      };
+      const seed = deploymentPromptSeedFromConfig(applicationConfig);
+      const resourceServices = seed.services;
+
+      return {
+        key,
+        seed: mergeDeploymentPromptSeeds(seed, {
+          resource: {
+            name: application.resource.name,
+            kind:
+              application.resource.kind ??
+              (resourceServices && resourceServices.length > 1 ? "compose-stack" : "application"),
+            ...(application.resource.description
+              ? { description: application.resource.description }
+              : {}),
+            ...(resourceServices && resourceServices.length > 0
+              ? {
+                  services: resourceServices.map((service) => ({
+                    name: service.name,
+                    kind: service.kind,
+                  })),
+                }
+              : {}),
+          },
+        }),
+      };
+    });
+}
+
 function compareConfigKeys([leftKey]: [string, unknown], [rightKey]: [string, unknown]): number {
   return leftKey.localeCompare(rightKey);
 }

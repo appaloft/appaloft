@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
   ArchiveDeploymentCommand,
   CancelDeploymentCommand,
@@ -55,6 +55,7 @@ import {
   runQuery,
 } from "../runtime.js";
 import {
+  applicationDeploymentPromptSeedsFromConfig,
   type DeploymentEnvironmentVariableSeed,
   type DeploymentPromptSeed,
   type DeploymentServerAppliedRouteSeed,
@@ -860,6 +861,7 @@ function sourceFingerprintForConfigDeploy(input: {
   baseDirectory?: string;
   configResolution?: { config: AppaloftDeploymentConfig; configFilePath: string };
   previewContext?: PreviewDeployContext;
+  applicationKey?: string;
 }): string {
   const env = Bun.env;
   const repositoryLocator = env.GITHUB_REPOSITORY
@@ -867,6 +869,10 @@ function sourceFingerprintForConfigDeploy(input: {
     : input.sourceLocator;
   const sourceDirectory = resolveLocalSourceDirectory(input.sourceLocator) ?? process.cwd();
   const workspaceRoot = env.GITHUB_WORKSPACE ?? resolveGitRoot(sourceDirectory) ?? sourceDirectory;
+  const configFilePath = input.configResolution?.configFilePath ?? "appaloft.yml";
+  const applicationConfigPath = input.applicationKey
+    ? `${configPathForApplicationFingerprint(configFilePath, workspaceRoot)}#applications.${input.applicationKey}`
+    : undefined;
 
   return createSourceFingerprint({
     provider: env.GITHUB_REPOSITORY ? "github" : "local",
@@ -874,7 +880,7 @@ function sourceFingerprintForConfigDeploy(input: {
     repositoryLocator,
     baseDirectory:
       input.baseDirectory ?? input.configResolution?.config.source?.baseDirectory ?? ".",
-    configPath: input.configResolution?.configFilePath ?? "appaloft.yml",
+    configPath: applicationConfigPath ?? configFilePath,
     workspaceRoot,
     ...(env.GITHUB_REF ? { gitRef: env.GITHUB_REF } : {}),
     ...(env.GITHUB_SHA ? { commitSha: env.GITHUB_SHA } : {}),
@@ -883,6 +889,108 @@ function sourceFingerprintForConfigDeploy(input: {
       (env.GITHUB_REPOSITORY ? githubScopeFromEnv(env) : { kind: "default" }),
   }).key;
 }
+
+function configPathForApplicationFingerprint(
+  configFilePath: string,
+  workspaceRoot: string,
+): string {
+  if (!isAbsolute(configFilePath)) {
+    return configFilePath;
+  }
+
+  const resolvedConfigPath = resolve(configFilePath);
+  const resolvedWorkspaceRoot = resolve(workspaceRoot).replace(/\/+$/, "");
+  if (
+    resolvedWorkspaceRoot &&
+    (resolvedConfigPath === resolvedWorkspaceRoot ||
+      resolvedConfigPath.startsWith(`${resolvedWorkspaceRoot}/`))
+  ) {
+    const relativePath = relative(resolvedWorkspaceRoot, resolvedConfigPath);
+    return relativePath || basename(resolvedConfigPath);
+  }
+
+  return basename(resolvedConfigPath);
+}
+
+function applyCommonDeploymentSeed(input: {
+  seed: DeploymentPromptSeed;
+  projectId?: string;
+  serverId?: string;
+  serverSpec?: DeploymentPromptSeed["server"];
+  destinationId?: string;
+  environmentId?: string;
+  previewContext?: PreviewDeployContext;
+  resourceId?: string;
+  resourceSpec?: DeploymentPromptSeed["resource"];
+  deploymentMethod?: DeploymentPromptSeed["deploymentMethod"];
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  runtimeName?: string;
+  publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
+  port?: number;
+  upstreamProtocol?: DeploymentPromptSeed["upstreamProtocol"];
+  exposureMode?: DeploymentPromptSeed["exposureMode"];
+  targetServiceName?: string;
+  hostPort?: number;
+  healthCheckPath?: string;
+  healthCheck?: DeploymentPromptSeed["healthCheck"];
+  environmentVariables?: DeploymentPromptSeed["environmentVariables"];
+  sourceProfile?: DeploymentPromptSeed["sourceProfile"];
+  sourceFingerprint?: string;
+  stateBackendDecision?: DeploymentPromptSeed["stateBackend"];
+  profileDriftPreflight?: boolean;
+}): DeploymentPromptSeed {
+  return {
+    ...input.seed,
+    ...(input.sourceProfile && Object.keys(input.sourceProfile).length > 0
+      ? {
+          sourceProfile: {
+            ...(input.seed.sourceProfile ?? {}),
+            ...input.sourceProfile,
+          },
+        }
+      : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.serverId ? { serverId: input.serverId } : {}),
+    ...(input.serverSpec ? { server: input.serverSpec } : {}),
+    ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    ...(input.environmentId ? { environmentId: input.environmentId } : {}),
+    ...(input.previewContext && !input.environmentId
+      ? { environment: { name: input.previewContext.environmentName, kind: "preview" as const } }
+      : {}),
+    ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+    ...(input.resourceSpec ? { resource: input.resourceSpec } : {}),
+    ...(input.deploymentMethod ? { deploymentMethod: input.deploymentMethod } : {}),
+    ...(input.installCommand ? { installCommand: input.installCommand } : {}),
+    ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
+    ...(input.startCommand ? { startCommand: input.startCommand } : {}),
+    ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
+    ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+    ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
+    ...(input.dockerComposeFilePath ? { dockerComposeFilePath: input.dockerComposeFilePath } : {}),
+    ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
+    ...(input.port === undefined ? {} : { port: input.port }),
+    ...(input.upstreamProtocol ? { upstreamProtocol: input.upstreamProtocol } : {}),
+    ...(input.exposureMode ? { exposureMode: input.exposureMode } : {}),
+    ...(input.targetServiceName ? { targetServiceName: input.targetServiceName } : {}),
+    ...(input.hostPort === undefined ? {} : { hostPort: input.hostPort }),
+    ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+    ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
+    ...(input.environmentVariables && input.environmentVariables.length > 0
+      ? { environmentVariables: input.environmentVariables }
+      : {}),
+    ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+    ...(input.stateBackendDecision ? { stateBackend: input.stateBackendDecision } : {}),
+    ...(input.previewContext ? { isPullRequestPreview: true } : {}),
+    ...(input.profileDriftPreflight ? { profileDriftPreflight: true } : {}),
+  };
+}
+
+type CommonDeploymentSeedInput = Omit<Parameters<typeof applyCommonDeploymentSeed>[0], "seed">;
 
 function prepareDeploymentStateSessionIfNeeded(
   stateBackendDecision: ReturnType<typeof resolveDeploymentStateBackend> | undefined,
@@ -1708,19 +1816,34 @@ export const deployCommand = EffectCommand.make(
         ...configSeed.sourceProfile,
         ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
       };
-      const seed = {
-        ...configSeed,
-        ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
+
+      const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
+      const runResolvedDeploymentFromSeed = (inputSeed: DeploymentPromptSeed) =>
+        Effect.gen(function* () {
+          const sourceLocatorForSeed = inputSeed.sourceLocator ?? configuredSourceLocator;
+          const seed = {
+            ...inputSeed,
+            ...(stateSession ? { stateBackendPrepared: true } : {}),
+            ...(sourceLocatorForSeed ? { sourceLocator: sourceLocatorForSeed } : {}),
+          };
+          const input = yield* resolveInteractiveDeploymentInput(seed);
+
+          return yield* runCreateDeploymentCommand(input, {
+            appLogLines: parseAppLogLines(appLogLines),
+            requirePreviewUrl,
+            ...(previewOutputFilePath ? { previewOutputFile: previewOutputFilePath } : {}),
+            ...(previewContext?.previewId ? { previewId: previewContext.previewId } : {}),
+          });
+        });
+      const commonSeedInput = {
         ...(projectId ? { projectId } : {}),
         ...(serverId ? { serverId } : {}),
-        ...(serverSpec ? { server: serverSpec } : {}),
+        ...(serverSpec ? { serverSpec } : {}),
         ...(destinationId ? { destinationId } : {}),
         ...(environmentId ? { environmentId } : {}),
-        ...(previewContext && !environmentId
-          ? { environment: { name: previewContext.environmentName, kind: "preview" as const } }
-          : {}),
+        ...(previewContext ? { previewContext } : {}),
         ...(resourceId ? { resourceId } : {}),
-        ...(resourceSpec ? { resource: resourceSpec } : {}),
+        ...(resourceSpec ? { resourceSpec } : {}),
         ...(deploymentMethod ? { deploymentMethod } : {}),
         ...(installCommand ? { installCommand } : {}),
         ...(buildCommand ? { buildCommand } : {}),
@@ -1741,15 +1864,126 @@ export const deployCommand = EffectCommand.make(
         ...(healthCheck ? { healthCheck } : {}),
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
-        ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
-        ...(previewContext ? { isPullRequestPreview: true } : {}),
+        ...(stateBackendDecision ? { stateBackendDecision } : {}),
         ...(configResolution && !acknowledgeResourceProfileDrift
           ? { profileDriftPreflight: true }
           : {}),
-      };
-
-      const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
+      } satisfies CommonDeploymentSeedInput;
+      const applicationSeeds =
+        effectiveConfig && configResolution
+          ? applicationDeploymentPromptSeedsFromConfig(effectiveConfig).map((application) => ({
+              key: application.key,
+              seed: applyPreviewRoutePrecedence({
+                configSeed: application.seed,
+                configResolution,
+                ...(previewContext ? { previewContext } : {}),
+                ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
+              }),
+            }))
+          : [];
       const runResolvedDeployment = Effect.gen(function* () {
+        if (applicationSeeds.length > 0) {
+          if (!effectiveConfig || !configResolution) {
+            return yield* Effect.fail(
+              domainError.validation("Application graph deploy requires a resolved config file", {
+                phase: "config-application-resolution",
+                reason: "config_missing",
+              }),
+            );
+          }
+
+          if (resourceId || resourceNameValue || resourceKindValue || resourceDescriptionValue) {
+            return yield* Effect.fail(
+              domainError.validation(
+                "Application graph deploy cannot use a single Resource selector or Resource draft override",
+                {
+                  phase: "config-application-resolution",
+                  reason: "single_resource_override",
+                },
+              ),
+            );
+          }
+
+          const {
+            deploymentMethod: _topLevelDeploymentMethod,
+            environmentVariables: _topLevelEnvironmentVariables,
+            resourceId: _topLevelResourceId,
+            resourceSpec: _topLevelResourceSpec,
+            runtimeName: _topLevelRuntimeName,
+            sourceFingerprint: _topLevelSourceFingerprint,
+            ...applicationCommonSeedInput
+          } = commonSeedInput;
+          const applicationFlagSeedInput = {
+            ...applicationCommonSeedInput,
+            ...(requestedDeploymentMethod ? { deploymentMethod: requestedDeploymentMethod } : {}),
+          } satisfies CommonDeploymentSeedInput;
+
+          for (const application of applicationSeeds) {
+            const applicationSourceLocator =
+              application.seed.sourceLocator ?? configuredSourceLocator ?? configSourceLocator;
+            const applicationSourceProfile = {
+              ...(application.seed.sourceProfile ?? {}),
+              ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+            };
+            const applicationRuntimeName = yield* resultToEffect(
+              resolveRuntimeNameSeed({
+                ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
+                configSeed: application.seed,
+                ...(previewContext ? { previewContext } : {}),
+              }),
+            );
+            const applicationEnvironmentVariables = yield* resultToEffect(
+              deploymentEnvironmentVariablesFromConfig(
+                effectiveConfig.applications?.[application.key] ?? {},
+                {
+                  ...(previewContext
+                    ? {
+                        previewContext: {
+                          previewId: previewContext.previewId,
+                          pullRequestNumber: previewContext.pullRequestNumber,
+                        },
+                      }
+                    : {}),
+                },
+              ),
+            );
+            const applicationSourceFingerprint =
+              configResolution || requestedStateBackend || previewContext || stateBackendDecision
+                ? sourceFingerprintForConfigDeploy({
+                    sourceLocator: applicationSourceLocator,
+                    ...(applicationSourceProfile.baseDirectory
+                      ? { baseDirectory: applicationSourceProfile.baseDirectory }
+                      : {}),
+                    configResolution,
+                    ...(previewContext ? { previewContext } : {}),
+                    applicationKey: application.key,
+                  })
+                : undefined;
+            const applicationSeed = applyCommonDeploymentSeed({
+              ...applicationFlagSeedInput,
+              ...(applicationSourceFingerprint
+                ? { sourceFingerprint: applicationSourceFingerprint }
+                : {}),
+              seed: application.seed,
+              sourceProfile: applicationSourceProfile,
+              ...(applicationRuntimeName ? { runtimeName: applicationRuntimeName } : {}),
+              environmentVariables: [
+                ...applicationEnvironmentVariables,
+                ...flagEnvironmentVariables,
+              ],
+            });
+
+            yield* runResolvedDeploymentFromSeed(applicationSeed);
+          }
+
+          return;
+        }
+
+        const seed = applyCommonDeploymentSeed({
+          ...commonSeedInput,
+          seed: configSeed,
+          sourceProfile,
+        });
         const input = yield* resolveInteractiveDeploymentInput({
           ...seed,
           ...(stateSession ? { stateBackendPrepared: true } : {}),

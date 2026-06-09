@@ -25,7 +25,8 @@ source selection
   -> configure declared deployment-snapshot runtime prune policy through server capacity policy commands
   -> configure declared Resource health policy through resource commands when profile apply is explicit
   -> apply non-secret env values and resolved secret references through environment commands
-  -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
+  -> for a single Resource profile: deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
+     or, for `applications.<key>`: repeat the same Resource-specific workflow per application entry
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
      selected state/backend mode
 ```
@@ -78,6 +79,8 @@ The file exists to make source-adjacent deployment profile choices reproducible:
   runtime env targets;
 - user-facing storage graph declarations such as managed storage mounted at `/app/uploads`;
 - user-facing scheduled task graph declarations such as a nightly sync command;
+- user-facing application graph declarations such as an API, worker, admin UI, or internal service
+  deployed from one repository config;
 - product-grade pull request preview policy declarations for the selected Resource;
 - target-scoped runtime prune policy declarations for selected deployment-snapshot cleanup;
 - non-secret environment variable declarations and required secret references;
@@ -176,6 +179,13 @@ The config file is not a separate deploy API and does not introduce a hidden wor
 headless executor may skip prompts by using trusted action inputs, CLI flags, link state, or
 source-derived defaults, but it must still dispatch explicit operations and keep the final
 deployment admission ids-only.
+
+When `applications.<key>` is present, config-file bootstrap treats each application entry as a
+Resource-specific Quick Deploy draft. The workflow may iterate the entries in stable key order and
+dispatch one ordinary ids-only `deployments.create` per application. The application graph itself is
+not a cross-Resource transaction, not a release group, and not a new `deployments.create` input.
+Each application may also declare a `services.<key>` Resource service graph; those services remain
+inside that application's Resource profile and are governed by the repository service graph spec.
 
 Declared dependencies are reconciled as part of the same Quick Deploy entry workflow after the
 target Resource is known and before deployment admission. The workflow lists current dependency
