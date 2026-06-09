@@ -911,6 +911,7 @@ async function createDeploymentFixture(
     serverTargetKind?: "single-server" | "orchestrator-cluster";
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
+    deploymentConfigReader?: DeploymentConfigReader;
     processAttemptRecorder?: ProcessAttemptRecorder;
     durableWorkQueueAdapter?: DurableWorkQueueAdapter;
     operationGuardPort?: OperationGuardPort;
@@ -1023,7 +1024,7 @@ async function createDeploymentFixture(
     deployments,
     new DeploymentContextResolver(projects, servers, destinations, environments, resources),
     new DeploymentContextBootstrapService(
-      new NullDeploymentConfigReader(),
+      options.deploymentConfigReader ?? new NullDeploymentConfigReader(),
       projects,
       servers,
       destinations,
@@ -1578,6 +1579,25 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("[CONFIG-FILE-SERVICE-GRAPH-005] rejects service graph fields at command schema boundary", () => {
+    const command = CreateDeploymentCommand.create({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      services: [
+        {
+          name: "worker",
+          kind: "worker",
+        },
+      ],
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("[WF-PLAN-BOUND-001] rejects framework-specific deployment fields at command schema boundary", () => {
     const command = CreateDeploymentCommand.create({
       projectId: "prj_demo",
@@ -1896,6 +1916,77 @@ describe("CreateDeploymentUseCase", () => {
         storageVolumeKind: "named-volume",
         destinationPath: "/var/lib/app/data",
         mountMode: "read-write",
+      },
+    ]);
+  });
+
+  test("[CONFIG-FILE-SERVICE-GRAPH-005] passes repository service graphs into runtime planning", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new LocalEmbeddedDefaultsPolicy(), {
+        runtimePlanResolver,
+        deploymentConfigReader: new StaticDeploymentConfigReader({
+          configFilePath: "appaloft.yml",
+          services: [
+            {
+              name: "web",
+              kind: "web",
+              runtime: {
+                strategy: "workspace-commands",
+                startCommand: "bun run start:web",
+              },
+              network: {
+                internalPort: 3000,
+                exposureMode: "reverse-proxy",
+              },
+            },
+            {
+              name: "worker",
+              kind: "worker",
+              runtime: {
+                strategy: "workspace-commands",
+                startCommand: "bun run start:worker",
+              },
+              network: {
+                exposureMode: "none",
+              },
+              replicas: 4,
+            },
+          ],
+        }),
+      });
+
+    const result = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      sourceLocator: ".",
+      configFilePath: "appaloft.yml",
+    } as never);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment.services).toEqual([
+      {
+        name: "web",
+        kind: "web",
+        runtime: {
+          strategy: "workspace-commands",
+          startCommand: "bun run start:web",
+        },
+        network: {
+          internalPort: 3000,
+          exposureMode: "reverse-proxy",
+        },
+      },
+      {
+        name: "worker",
+        kind: "worker",
+        runtime: {
+          strategy: "workspace-commands",
+          startCommand: "bun run start:worker",
+        },
+        network: {
+          exposureMode: "none",
+        },
+        replicas: 4,
       },
     ]);
   });

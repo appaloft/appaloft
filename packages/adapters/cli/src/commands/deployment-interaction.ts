@@ -48,6 +48,7 @@ import {
   ProvisionDependencyResourceCommand,
   RegisterServerCommand,
   type RegisterServerCommandInput,
+  type RequestedDeploymentServiceConfig,
   type ResourceDependencyBindingSummary,
   type ResourceDetail,
   type ResourceDetailAutoDeployPolicy,
@@ -184,10 +185,7 @@ type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["ne
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
-export interface DeploymentServiceSeed {
-  name: string;
-  kind: NonNullable<CreateResourceInput["services"]>[number]["kind"];
-}
+export interface DeploymentServiceSeed extends RequestedDeploymentServiceConfig {}
 export interface DeploymentDependencySeed {
   key: string;
   kind: ManagedDependencyResourceKind;
@@ -533,6 +531,119 @@ function healthCheckFromConfig(
   });
 }
 
+function healthCheckFromServiceConfig(
+  service: NonNullable<AppaloftDeploymentConfig["services"]>[string],
+): DeploymentServiceSeed["healthCheck"] | undefined {
+  const healthCheck = service.runtime?.healthCheck ?? service.health;
+  const path = healthCheck?.path ?? service.runtime?.healthCheckPath;
+  if (!healthCheck && !path) {
+    return undefined;
+  }
+
+  const enabled = healthCheck?.enabled ?? true;
+  return {
+    enabled,
+    type: "http",
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+    startPeriodSeconds: 5,
+    ...(enabled
+      ? {
+          http: {
+            method: "GET",
+            scheme: "http",
+            host: "localhost",
+            path: path ?? "/",
+            expectedStatusCode: 200,
+          },
+        }
+      : {}),
+  };
+}
+
+function runtimeFromServiceConfig(
+  service: NonNullable<AppaloftDeploymentConfig["services"]>[string],
+): DeploymentServiceSeed["runtime"] | undefined {
+  const runtime = service.runtime;
+  if (!runtime) {
+    return undefined;
+  }
+  const buildCommand = runtime.buildCommand ?? runtime.build?.command;
+  const startCommand = runtime.startCommand ?? runtime.start?.command;
+
+  return {
+    ...(runtime.strategy ? { strategy: runtime.strategy } : {}),
+    ...(runtime.installCommand ? { installCommand: runtime.installCommand } : {}),
+    ...(buildCommand ? { buildCommand } : {}),
+    ...(startCommand ? { startCommand } : {}),
+    ...(runtime.publishDirectory ? { publishDirectory: runtime.publishDirectory } : {}),
+    ...(runtime.dockerfilePath ? { dockerfilePath: runtime.dockerfilePath } : {}),
+    ...(runtime.dockerComposeFilePath
+      ? { dockerComposeFilePath: runtime.dockerComposeFilePath }
+      : {}),
+    ...(runtime.buildTarget ? { buildTarget: runtime.buildTarget } : {}),
+    ...(runtime.healthCheckPath ? { healthCheckPath: runtime.healthCheckPath } : {}),
+  };
+}
+
+function sourceFromServiceConfig(
+  service: NonNullable<AppaloftDeploymentConfig["services"]>[string],
+): DeploymentServiceSeed["source"] | undefined {
+  const source = service.source;
+  if (!source) {
+    return undefined;
+  }
+
+  return {
+    ...(source.type ? { type: source.type } : {}),
+    ...(source.repository ? { repository: source.repository } : {}),
+    ...(source.image ? { image: source.image } : {}),
+    ...(source.gitRef ? { gitRef: source.gitRef } : {}),
+    ...(source.commitSha ? { commitSha: source.commitSha } : {}),
+    ...(source.baseDirectory ? { baseDirectory: source.baseDirectory } : {}),
+    ...(source.version ? { version: source.version } : {}),
+    ...(source.versionKind ? { versionKind: source.versionKind } : {}),
+  };
+}
+
+function networkFromServiceConfig(
+  service: NonNullable<AppaloftDeploymentConfig["services"]>[string],
+): DeploymentServiceSeed["network"] | undefined {
+  const network = service.network;
+  if (!network) {
+    return undefined;
+  }
+
+  return {
+    ...(network.internalPort ? { internalPort: network.internalPort } : {}),
+    ...(network.upstreamProtocol ? { upstreamProtocol: network.upstreamProtocol } : {}),
+    ...(network.exposureMode ? { exposureMode: network.exposureMode } : {}),
+    ...(network.targetServiceName ? { targetServiceName: network.targetServiceName } : {}),
+    ...(network.hostPort ? { hostPort: network.hostPort } : {}),
+  };
+}
+
+function secretsFromServiceConfig(
+  service: NonNullable<AppaloftDeploymentConfig["services"]>[string],
+): DeploymentServiceSeed["secrets"] | undefined {
+  const secrets = service.secrets;
+  if (!secrets) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(secrets).map(([key, reference]) => [
+      key,
+      {
+        from: reference.from,
+        ...(reference.required !== undefined ? { required: reference.required } : {}),
+        ...(reference.description ? { description: reference.description } : {}),
+      },
+    ]),
+  );
+}
+
 export function defaultHttpHealthCheckPolicy(input: {
   enabled?: boolean;
   path?: string;
@@ -644,13 +755,24 @@ export function deploymentPromptSeedFromConfig(
     );
   const services = Object.entries(config.services ?? {})
     .sort(compareConfigKeys)
-    .map(
-      ([name, service]) =>
-        ({
-          name,
-          kind: service.kind,
-        }) satisfies DeploymentServiceSeed,
-    );
+    .map(([name, service]) => {
+      const healthCheck = healthCheckFromServiceConfig(service);
+      const runtime = runtimeFromServiceConfig(service);
+      const source = sourceFromServiceConfig(service);
+      const network = networkFromServiceConfig(service);
+      const secrets = secretsFromServiceConfig(service);
+      return {
+        name,
+        kind: service.kind,
+        ...(source ? { source } : {}),
+        ...(runtime ? { runtime } : {}),
+        ...(network ? { network } : {}),
+        ...(healthCheck ? { healthCheck } : {}),
+        ...(service.replicas ? { replicas: service.replicas } : {}),
+        ...(service.env ? { env: { ...service.env } } : {}),
+        ...(secrets ? { secrets } : {}),
+      } satisfies DeploymentServiceSeed;
+    });
   const autoDeployPolicy = config.autoDeploy
     ? ({
         enabled: config.autoDeploy.enabled,
