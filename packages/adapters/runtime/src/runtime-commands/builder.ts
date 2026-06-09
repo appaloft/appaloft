@@ -60,6 +60,10 @@ export interface DockerBuildImageInput {
 export interface DockerComposeUpInput {
   composeFile: string;
   additionalComposeFiles?: readonly string[];
+  scales?: readonly {
+    serviceName: string;
+    replicas: number;
+  }[];
   projectName?: string;
   workingDirectory?: string;
   detach?: boolean;
@@ -128,6 +132,10 @@ export class DockerCommandBuilder {
       additionalComposeFiles: (input.additionalComposeFiles ?? []).map((composeFile) =>
         FilePathText.rehydrate(composeFile),
       ),
+      scales: (input.scales ?? []).map((scale) => ({
+        serviceName: DisplayNameText.rehydrate(scale.serviceName),
+        replicas: scale.replicas,
+      })),
       ...(input.projectName ? { projectName: DisplayNameText.rehydrate(input.projectName) } : {}),
       ...(input.workingDirectory
         ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }

@@ -123,6 +123,7 @@ import {
   ProjectSlug,
   ProviderKey,
   PublicDomainName,
+  ReplicaCount,
   ResourceAutoDeployPolicyBlockedReasonValue,
   ResourceAutoDeployPolicyStatusValue,
   ResourceAutoDeploySecretRef,
@@ -447,6 +448,7 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
+  replicas?: number;
   healthCheckPath?: string;
   healthCheck?: SerializedHealthCheckPolicy;
 }
@@ -1677,6 +1679,9 @@ export function rehydrateResourceRow(
               : {}),
             ...(runtimeProfile.buildTarget
               ? { buildTarget: DockerBuildTarget.rehydrate(runtimeProfile.buildTarget) }
+              : {}),
+            ...(runtimeProfile.replicas
+              ? { replicas: ReplicaCount.rehydrate(runtimeProfile.replicas) }
               : {}),
             ...(runtimeProfile.healthCheckPath
               ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }

@@ -152,6 +152,27 @@ export class HealthCheckRetryCount extends ScalarValueObject<number> {
   }
 }
 
+const replicaCountBrand: unique symbol = Symbol("ReplicaCount");
+export class ReplicaCount extends ScalarValueObject<number> {
+  private [replicaCountBrand]!: void;
+
+  private constructor(value: number) {
+    super(value);
+  }
+
+  static create(value: number): Result<ReplicaCount> {
+    return createPositiveIntegerValue(
+      value,
+      "Replica count",
+      (validated) => new ReplicaCount(validated),
+    );
+  }
+
+  static rehydrate(value: number): ReplicaCount {
+    return new ReplicaCount(value);
+  }
+}
+
 const healthCheckStartPeriodSecondsBrand: unique symbol = Symbol("HealthCheckStartPeriodSeconds");
 export class HealthCheckStartPeriodSeconds extends ScalarValueObject<number> {
   private [healthCheckStartPeriodSecondsBrand]!: void;

@@ -2604,6 +2604,7 @@ export const resourceRuntimeProfileInputSchema = z
     dockerfilePath: z.string().min(1).optional(),
     dockerComposeFilePath: z.string().min(1).optional(),
     buildTarget: z.string().min(1).optional(),
+    replicas: z.number().int().positive().optional(),
     healthCheckPath: z.string().min(1).optional(),
     healthCheck: resourceHealthCheckPolicySchema.optional(),
   })
@@ -2626,6 +2627,7 @@ export const resourceDetailRuntimeProfileSchema = z.object({
   dockerfilePath: z.string().optional(),
   dockerComposeFilePath: z.string().optional(),
   buildTarget: z.string().optional(),
+  replicas: z.number().int().positive().optional(),
   healthCheckPath: z.string().optional(),
   healthCheck: requestedDeploymentHealthCheckSchema.optional(),
 });

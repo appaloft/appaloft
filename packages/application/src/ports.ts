@@ -3190,6 +3190,7 @@ export interface ResourceDetailRuntimeProfile {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
+  replicas?: number;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;
 }
@@ -8772,6 +8773,7 @@ export interface RequestedDeploymentConfig {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
+  replicas?: number;
   port?: number;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;

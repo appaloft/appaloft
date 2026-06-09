@@ -26,6 +26,7 @@ import {
   type HealthCheckStartPeriodSeconds,
   type HealthCheckTimeoutSeconds,
   type PortNumber,
+  type ReplicaCount,
 } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import {
@@ -131,6 +132,7 @@ export interface ResourceRuntimeProfileState {
   dockerfilePath?: DockerfilePath;
   dockerComposeFilePath?: DockerComposeFilePath;
   buildTarget?: DockerBuildTarget;
+  replicas?: ReplicaCount;
   healthCheckPath?: HealthCheckPathText;
   healthCheck?: ResourceHealthCheckPolicyState;
 }
@@ -186,6 +188,7 @@ export interface ResourceDeploymentProfile {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
+  replicas?: number;
   port?: number;
   healthCheckPath?: string;
   healthCheck?: ResourceDeploymentHealthCheck;
@@ -693,6 +696,7 @@ function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<
       ? { dockerComposeFilePath: profile.dockerComposeFilePath.value }
       : {}),
     ...(profile.buildTarget ? { buildTarget: profile.buildTarget.value } : {}),
+    ...(profile.replicas ? { replicas: profile.replicas.value } : {}),
     ...(profile.healthCheckPath ? { healthCheckPath: profile.healthCheckPath.value } : {}),
     ...(profile.healthCheck
       ? { healthCheck: serializedHealthCheckPolicy(profile.healthCheck) }
@@ -1506,6 +1510,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath.value }
         : {}),
       ...(runtimeProfile?.buildTarget ? { buildTarget: runtimeProfile.buildTarget.value } : {}),
+      ...(runtimeProfile?.replicas ? { replicas: runtimeProfile.replicas.value } : {}),
       ...(internalPort ? { port: internalPort } : {}),
       ...(networkProfile
         ? {
@@ -1674,6 +1679,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(input.runtimeProfile.runtimeName
         ? { runtimeName: input.runtimeProfile.runtimeName.value }
         : {}),
+      ...(input.runtimeProfile.replicas ? { replicas: input.runtimeProfile.replicas.value } : {}),
       configuredAt: input.configuredAt.value,
     });
 

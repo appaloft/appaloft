@@ -562,6 +562,7 @@ describe("CLI deployment config entry workflow", () => {
         upstreamProtocol: "http",
         exposureMode: "reverse-proxy",
       },
+      replicas: 3,
       services: {
         web: {
           kind: "web",
@@ -653,6 +654,7 @@ describe("CLI deployment config entry workflow", () => {
       dockerComposeFilePath: "deploy/compose.yaml",
       buildTarget: "runner",
       runtimeNameTemplate: "www",
+      replicas: 3,
       port: 4310,
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
@@ -739,6 +741,7 @@ describe("CLI deployment config entry workflow", () => {
       dockerfilePath: "deploy/Dockerfile",
       dockerComposeFilePath: "deploy/compose.yaml",
       buildTarget: "runner",
+      replicas: 3,
       healthCheck: {
         http: {
           path: "/ready",
@@ -1010,6 +1013,8 @@ describe("CLI deployment config entry workflow", () => {
         "  worker:",
         "    resource:",
         "      name: Acme Worker",
+        "      kind: worker",
+        "    replicas: 4",
         "    source:",
         "      type: git",
         "      repository: https://github.com/acme/app",
@@ -1024,7 +1029,6 @@ describe("CLI deployment config entry workflow", () => {
         "          startCommand: bun run worker",
         "        network:",
         "          exposureMode: none",
-        "        replicas: 4",
         "",
       ].join("\n"),
     );
@@ -1104,7 +1108,7 @@ describe("CLI deployment config entry workflow", () => {
     });
     expect(resourceCommands[1]).toMatchObject({
       name: "Acme Worker",
-      kind: "application",
+      kind: "worker",
       services: [
         {
           name: "worker",
@@ -1115,6 +1119,10 @@ describe("CLI deployment config entry workflow", () => {
         kind: "git-public",
         locator: "https://github.com/acme/app",
         baseDirectory: "apps/worker",
+      },
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        replicas: 4,
       },
     });
 

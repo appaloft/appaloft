@@ -85,7 +85,10 @@ import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
 import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
-import { generatedServiceGraphComposeFile } from "./service-graph-compose";
+import {
+  generatedReplicatedWorkloadComposeFile,
+  generatedServiceGraphComposeFile,
+} from "./service-graph-compose";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
@@ -555,6 +558,31 @@ function serviceGraphMetadata(input: {
   };
 }
 
+function requestedReplicaCount(requestedDeployment: RequestedDeploymentConfig): number {
+  return requestedDeployment.replicas && requestedDeployment.replicas > 1
+    ? requestedDeployment.replicas
+    : 1;
+}
+
+function replicatedWorkloadMetadata(input: {
+  composeFile: string;
+  targetServiceName: string;
+  replicas: number;
+  dockerfilePath?: string;
+}): Record<string, string> {
+  return {
+    composeFile: input.composeFile,
+    "compose.file": input.composeFile,
+    "compose.projectNameSource": "runtime-instance-name",
+    "replicatedWorkload.enabled": "true",
+    "replicatedWorkload.composeFile": input.composeFile,
+    "replicatedWorkload.serviceName": input.targetServiceName,
+    "replicatedWorkload.replicas": String(input.replicas),
+    targetServiceName: input.targetServiceName,
+    ...(input.dockerfilePath ? { "replicatedWorkload.dockerfilePath": input.dockerfilePath } : {}),
+  };
+}
+
 function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
   return accessRoutes.some((route) => route.proxyKind !== "none");
 }
@@ -751,6 +779,49 @@ function chooseStrategies(input: {
 
     const port = dockerContainerPort(requestedDeployment);
     const image = normalizeDockerImage(source.locator);
+    const replicas = requestedReplicaCount(requestedDeployment);
+    if (replicas > 1) {
+      const targetServiceName = requestedDeployment.targetServiceName ?? "app";
+      const metadata = {
+        "image.reference": image,
+        "artifact.intent": "prebuilt-image",
+        ...replicatedWorkloadMetadata({
+          composeFile: generatedReplicatedWorkloadComposeFile,
+          targetServiceName,
+          replicas,
+        }),
+      };
+      const execution = RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        composeFile: FilePathText.rehydrate(generatedReplicatedWorkloadComposeFile),
+        ...runtimeHealthCheckFields(requestedDeployment),
+        port,
+        metadata,
+      });
+      return withRequestedAccessRoutes({
+        requestedDeployment,
+        buildStrategy: BuildStrategyKindValue.rehydrate("prebuilt-image"),
+        packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+        execution,
+        runtimeArtifact: composeRuntimeArtifact({
+          composeFile: generatedReplicatedWorkloadComposeFile,
+          metadata: {
+            sourceKind: source.kind,
+            image,
+            applicationShape: "container-native",
+            replicatedWorkload: "true",
+            targetServiceName,
+            replicas: String(replicas),
+          },
+        }),
+        steps: [
+          PlanStepText.rehydrate("Resolve image reference"),
+          PlanStepText.rehydrate("Prepare replicated workload compose"),
+          PlanStepText.rehydrate("Run docker compose"),
+          PlanStepText.rehydrate("Verify stack"),
+        ],
+      });
+    }
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       image: ImageReference.rehydrate(image),
@@ -875,6 +946,48 @@ function chooseStrategies(input: {
       source.inspection?.dockerfilePath ??
       source.metadata?.dockerfilePath ??
       "Dockerfile";
+    const replicas = requestedReplicaCount(requestedDeployment);
+    if (replicas > 1) {
+      const targetServiceName = requestedDeployment.targetServiceName ?? "app";
+      const metadata = replicatedWorkloadMetadata({
+        composeFile: generatedReplicatedWorkloadComposeFile,
+        targetServiceName,
+        replicas,
+        dockerfilePath,
+      });
+      const execution = RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        workingDirectory: FilePathText.rehydrate(source.locator),
+        composeFile: FilePathText.rehydrate(generatedReplicatedWorkloadComposeFile),
+        dockerfilePath: FilePathText.rehydrate(dockerfilePath),
+        ...runtimeHealthCheckFields(requestedDeployment),
+        port,
+        metadata,
+      });
+      return withRequestedAccessRoutes({
+        requestedDeployment,
+        buildStrategy: BuildStrategyKindValue.rehydrate("dockerfile"),
+        packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+        execution,
+        runtimeArtifact: composeRuntimeArtifact({
+          composeFile: generatedReplicatedWorkloadComposeFile,
+          metadata: {
+            sourceKind: source.kind,
+            dockerfilePath,
+            applicationShape: "container-native",
+            replicatedWorkload: "true",
+            targetServiceName,
+            replicas: String(replicas),
+          },
+        }),
+        steps: [
+          PlanStepText.rehydrate("Build docker image"),
+          PlanStepText.rehydrate("Prepare replicated workload compose"),
+          PlanStepText.rehydrate("Run docker compose"),
+          PlanStepText.rehydrate("Verify stack"),
+        ],
+      });
+    }
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
@@ -975,6 +1088,72 @@ function chooseStrategies(input: {
           PlanStepText.rehydrate("Resolve repository service graph"),
           PlanStepText.rehydrate("Build workspace image"),
           PlanStepText.rehydrate("Generate compose service graph"),
+          PlanStepText.rehydrate("Run docker compose"),
+          PlanStepText.rehydrate("Verify stack"),
+        ],
+      });
+    }
+
+    const replicas = requestedReplicaCount(requestedDeployment);
+    if (replicas > 1) {
+      const targetServiceName = requestedDeployment.targetServiceName ?? "app";
+      const metadata = {
+        "artifact.source": "workspace-commands",
+        "artifact.generatedDockerfile": "true",
+        ...plan.metadata,
+        ...replicatedWorkloadMetadata({
+          composeFile: generatedReplicatedWorkloadComposeFile,
+          targetServiceName,
+          replicas,
+          dockerfilePath: plan.dockerfilePath,
+        }),
+      };
+      const execution = RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        workingDirectory: FilePathText.rehydrate(source.locator),
+        composeFile: FilePathText.rehydrate(generatedReplicatedWorkloadComposeFile),
+        dockerfilePath: FilePathText.rehydrate(plan.dockerfilePath),
+        startCommand: CommandText.rehydrate(plan.startCommand),
+        ...(plan.installCommand
+          ? { installCommand: CommandText.rehydrate(plan.installCommand) }
+          : {}),
+        ...(plan.buildCommand ? { buildCommand: CommandText.rehydrate(plan.buildCommand) } : {}),
+        ...(plan.healthCheckPath
+          ? { healthCheckPath: HealthCheckPathText.rehydrate(plan.healthCheckPath) }
+          : {}),
+        ...runtimeHealthCheckFields(requestedDeployment),
+        port: dockerContainerPort(requestedDeployment),
+        metadata,
+      });
+
+      return withRequestedAccessRoutes({
+        requestedDeployment,
+        buildStrategy: BuildStrategyKindValue.rehydrate("workspace-commands"),
+        packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+        execution,
+        runtimeArtifact: composeRuntimeArtifact({
+          composeFile: generatedReplicatedWorkloadComposeFile,
+          metadata: {
+            sourceKind: source.kind,
+            dockerfilePath: plan.dockerfilePath,
+            generatedDockerfile: "true",
+            planner: plan.planner,
+            runtimeKind: plan.runtimeKind,
+            baseImage: plan.baseImage,
+            applicationShape: plan.applicationShape,
+            replicatedWorkload: "true",
+            targetServiceName,
+            replicas: String(replicas),
+            ...(plan.metadata.packageManager ? { packageManager: plan.metadata.packageManager } : {}),
+            ...(plan.metadata.framework ? { framework: plan.metadata.framework } : {}),
+            ...(plan.metadata.projectName ? { projectName: plan.metadata.projectName } : {}),
+          },
+        }),
+        steps: [
+          PlanStepText.rehydrate("Install workspace dependencies"),
+          PlanStepText.rehydrate("Build application bundle"),
+          PlanStepText.rehydrate("Build workspace image"),
+          PlanStepText.rehydrate("Prepare replicated workload compose"),
           PlanStepText.rehydrate("Run docker compose"),
           PlanStepText.rehydrate("Verify stack"),
         ],
