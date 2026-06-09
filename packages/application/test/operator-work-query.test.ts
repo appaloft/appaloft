@@ -13,6 +13,8 @@ import { createExecutionContext, type RepositoryContext } from "../src/execution
 import { ListOperatorWorkQuery } from "../src/operations/operator-work/list-operator-work.query";
 import { OperatorWorkQueryService } from "../src/operations/operator-work/operator-work.query-service";
 import { ShowOperatorWorkQuery } from "../src/operations/operator-work/show-operator-work.query";
+import { StreamOperatorWorkEventsQuery } from "../src/operations/operator-work/stream-operator-work-events.query";
+import { StreamOperatorWorkEventsQueryService } from "../src/operations/operator-work/stream-operator-work-events.query-service";
 import {
   type CertificateReadModel,
   type CertificateSummary,
@@ -382,6 +384,55 @@ function context() {
     requestId: "req_operator_work_test",
     entrypoint: "cli",
   });
+}
+
+function durableWorkItem(overrides: Partial<DurableWorkItemRecord> = {}): DurableWorkItemRecord {
+  return {
+    id: "wrk_blueprint_install",
+    kind: "blueprint-install",
+    status: "running",
+    operationKey: "blueprints.install",
+    queueBackend: "database",
+    projectId: "prj_demo",
+    resourceId: "res_web",
+    phase: "install",
+    step: "deploy-components",
+    priority: 0,
+    attemptCount: 2,
+    maxAttempts: 3,
+    availableAt: "2026-01-01T00:00:00.000Z",
+    leaseOwner: "worker_secret",
+    leaseExpiresAt: "2026-01-01T00:05:00.000Z",
+    startedAt: "2026-01-01T00:00:01.000Z",
+    updatedAt: "2026-01-01T00:00:04.000Z",
+    safeDetails: {
+      componentCount: 3,
+      workerId: "worker_secret",
+      commandLine: "TOKEN=raw appaloft internal",
+    },
+    ...overrides,
+  };
+}
+
+function durableWorkEvent(overrides: Partial<DurableWorkEventRecord> = {}): DurableWorkEventRecord {
+  return {
+    id: "evt_1",
+    workItemId: "wrk_blueprint_install",
+    sequence: 1,
+    kind: "accepted",
+    status: "pending",
+    phase: "accepted",
+    step: "queued",
+    message: "Work was accepted.",
+    workerId: "worker_secret",
+    workerGroup: "worker_group_secret",
+    occurredAt: "2026-01-01T00:00:00.000Z",
+    safeDetails: {
+      componentCount: 3,
+      privateKey: "raw-secret",
+    },
+    ...overrides,
+  };
 }
 
 describe("operator work query service", () => {
@@ -966,5 +1017,118 @@ describe("operator work query service", () => {
       },
     });
     expect(JSON.stringify(result)).not.toContain("id_ed25519");
+  });
+
+  test("[OP-WORK-STREAM-001][OP-WORK-STREAM-002] replays durable work parent status envelopes without worker details", async () => {
+    const ledger = new StaticDurableWorkLedger(
+      [
+        durableWorkItem({
+          status: "succeeded",
+          updatedAt: "2026-01-01T00:00:05.000Z",
+          finishedAt: "2026-01-01T00:00:05.000Z",
+        }),
+      ],
+      [
+        durableWorkEvent({
+          message: "commandLine TOKEN=raw appaloft internal",
+        }),
+        durableWorkEvent({
+          id: "evt_2",
+          sequence: 2,
+          kind: "progress",
+          status: "running",
+          phase: "install",
+          step: "deploy-components",
+          message: "Deploying components.",
+          occurredAt: "2026-01-01T00:00:03.000Z",
+          safeDetails: {
+            completedComponents: 1,
+            workerGroup: "worker_group_secret",
+          },
+        }),
+      ],
+    );
+    const service = new StreamOperatorWorkEventsQueryService(new FixedClock(), ledger);
+    const result = await service.execute(
+      context(),
+      StreamOperatorWorkEventsQuery.create({
+        workId: "wrk_blueprint_install",
+        follow: false,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw new Error(result.error.message);
+    expect(result.value.mode).toBe("bounded");
+    if (result.value.mode !== "bounded") throw new Error("Expected bounded result");
+    expect(result.value.envelopes.map((envelope) => envelope.kind)).toEqual([
+      "accepted",
+      "progress",
+      "succeeded",
+    ]);
+    expect(result.value.envelopes[0]).toMatchObject({
+      schemaVersion: "operator-work.stream-events/v1",
+      kind: "accepted",
+      event: {
+        workId: "wrk_blueprint_install",
+        operationKey: "blueprints.install",
+        workKind: "blueprint-install",
+        status: "pending",
+      },
+    });
+    const serialized = JSON.stringify(result.value.envelopes);
+    expect(serialized).not.toContain("worker_secret");
+    expect(serialized).not.toContain("worker_group_secret");
+    expect(serialized).not.toContain("commandLine");
+    expect(serialized).not.toContain("attemptCount");
+    expect(serialized).not.toContain("leaseOwner");
+    expect(serialized).not.toContain("raw-secret");
+    expect(serialized).not.toContain("TOKEN=raw");
+  });
+
+  test("[OP-WORK-STREAM-003] follow mode emits replay and closes after terminal durable work", async () => {
+    const ledger = new StaticDurableWorkLedger(
+      [
+        durableWorkItem({
+          status: "failed",
+          updatedAt: "2026-01-01T00:00:05.000Z",
+          finishedAt: "2026-01-01T00:00:05.000Z",
+          errorCode: "component_deploy_failed",
+          errorCategory: "async-processing",
+          retriable: true,
+        }),
+      ],
+      [durableWorkEvent()],
+    );
+    const service = new StreamOperatorWorkEventsQueryService(new FixedClock(), ledger);
+    const result = await service.execute(
+      context(),
+      StreamOperatorWorkEventsQuery.create({
+        workId: "wrk_blueprint_install",
+        follow: true,
+        pollIntervalMs: 50,
+      })._unsafeUnwrap(),
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw new Error(result.error.message);
+    expect(result.value.mode).toBe("stream");
+    if (result.value.mode !== "stream") throw new Error("Expected stream result");
+
+    const envelopes = [];
+    for await (const envelope of result.value.stream) {
+      envelopes.push(envelope);
+      if (envelope.kind === "closed") {
+        break;
+      }
+    }
+    await result.value.stream.close();
+
+    expect(envelopes.map((envelope) => envelope.kind)).toEqual(["accepted", "failed", "closed"]);
+    expect(envelopes.at(-1)).toMatchObject({
+      schemaVersion: "operator-work.stream-events/v1",
+      kind: "closed",
+      reason: "completed",
+    });
   });
 });

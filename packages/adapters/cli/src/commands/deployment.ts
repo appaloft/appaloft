@@ -909,7 +909,14 @@ interface PreviewAccessResolution {
   previewUrls: string[];
 }
 
-const unsuccessfulSynchronousDeploymentStatuses = new Set(["failed", "canceled", "rolled-back"]);
+const deploymentTerminalStatuses = new Set<DeploymentSummary["status"]>([
+  "succeeded",
+  "failed",
+  "canceled",
+  "rolled-back",
+]);
+const synchronousDeploymentPollIntervalMs = 250;
+const synchronousDeploymentTimeoutMs = 15 * 60 * 1000;
 
 function deploymentFailureLogTailDetails(deployment: DeploymentSummary) {
   const logs = deployment.logs ?? [];
@@ -975,13 +982,34 @@ function readDeploymentSummary(input: { deploymentId: string; resourceId: string
   });
 }
 
+function waitForSynchronousDeployment(input: { deploymentId: string; resourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    yield* Effect.promise(() => (cli.startWorkerRuntime ?? cli.startServer)());
+
+    const deadline = Date.now() + synchronousDeploymentTimeoutMs;
+    while (true) {
+      const deployment = yield* readDeploymentSummary(input);
+      if (deployment && deploymentTerminalStatuses.has(deployment.status)) {
+        return deployment;
+      }
+
+      if (Date.now() >= deadline) {
+        return deployment;
+      }
+
+      yield* Effect.promise(() => Bun.sleep(synchronousDeploymentPollIntervalMs));
+    }
+  });
+}
+
 function failIfSynchronousDeploymentDidNotSucceed(deployment: DeploymentSummary | undefined) {
   return Effect.gen(function* () {
-    if (!deployment || !unsuccessfulSynchronousDeploymentStatuses.has(deployment.status)) {
+    if (deployment?.status === "succeeded") {
       return;
     }
 
-    const details = deploymentFailureLogTailDetails(deployment);
+    const details = deployment ? deploymentFailureLogTailDetails(deployment) : {};
     const failureLogTail = Array.isArray(details.failureLogTail)
       ? details.failureLogTail.join("\n")
       : undefined;
@@ -989,10 +1017,14 @@ function failIfSynchronousDeploymentDidNotSucceed(deployment: DeploymentSummary 
     return yield* Effect.fail(
       domainError.infra("Deployment execution failed", {
         phase: "runtime-execution",
-        reason: "deployment_failed",
-        deploymentId: deployment.id,
-        resourceId: deployment.resourceId,
-        status: deployment.status,
+        reason: deployment ? "deployment_failed" : "deployment_not_observable",
+        ...(deployment
+          ? {
+              deploymentId: deployment.id,
+              resourceId: deployment.resourceId,
+              status: deployment.status,
+            }
+          : {}),
         ...(typeof details.failureLogCount === "number"
           ? { failureLogCount: details.failureLogCount }
           : {}),
@@ -1106,10 +1138,18 @@ function runCreateDeploymentCommand(
     const output = yield* runDeploymentCommandResult(CreateDeploymentCommand.create(input), {
       appLogLines: options.appLogLines,
     });
-    const deployment = yield* readDeploymentSummary({
-      deploymentId: output.id,
-      resourceId: input.resourceId,
-    });
+    let deployment: DeploymentSummary | undefined;
+    if (input.executionMode === "detached") {
+      deployment = yield* readDeploymentSummary({
+        deploymentId: output.id,
+        resourceId: input.resourceId,
+      });
+    } else {
+      deployment = yield* waitForSynchronousDeployment({
+        deploymentId: output.id,
+        resourceId: input.resourceId,
+      });
+    }
 
     if (options.requirePreviewUrl || options.previewOutputFile) {
       const resolution = yield* resolvePreviewAccessForDeployment({

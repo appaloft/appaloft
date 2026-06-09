@@ -121,6 +121,7 @@ export * from "./operations/operator-work/dead-letter-operator-work.use-case";
 export * from "./operations/operator-work/mark-operator-work-recovered.use-case";
 export * from "./operations/operator-work/prune-operator-work.use-case";
 export * from "./operations/operator-work/retry-operator-work.use-case";
+export * from "./operations/operator-work/stream-operator-work-events.query-service";
 export * from "./operations/organizations/change-organization-member-role.use-case";
 export * from "./operations/organizations/change-organization-profile.use-case";
 export * from "./operations/organizations/delete-organization.use-case";

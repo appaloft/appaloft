@@ -9,10 +9,16 @@ import {
   prunableProcessAttemptStatuses,
   RetryOperatorWorkCommand,
   ShowOperatorWorkQuery,
+  StreamOperatorWorkEventsQuery,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import {
+  optionalValue,
+  runCommand,
+  runOperatorWorkEventStreamQuery,
+  runQuery,
+} from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const workIdArg = Args.text({ name: "workId" });
@@ -23,11 +29,26 @@ const serverIdOption = Options.text("server-id").pipe(Options.optional);
 const deploymentIdOption = Options.text("deployment-id").pipe(Options.optional);
 const limitOption = Options.text("limit").pipe(Options.optional);
 const reasonOption = Options.text("reason").pipe(Options.optional);
+const workEventsCursorOption = Options.text("cursor").pipe(Options.optional);
+const workEventsHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
+const workEventsFollowOption = Options.boolean("follow").pipe(Options.withDefault(false));
+const workEventsJsonOption = Options.boolean("json").pipe(Options.withDefault(false));
+const workEventsIncludeHistoryOption = Options.choice("include-history", ["true", "false"]).pipe(
+  Options.withDefault("true"),
+);
+const workEventsUntilTerminalOption = Options.choice("until-terminal", ["true", "false"]).pipe(
+  Options.withDefault("true"),
+);
+const workEventsPollIntervalOption = Options.text("poll-interval-ms").pipe(
+  Options.withDefault("1000"),
+);
 const beforeOption = Options.text("before");
 const pruneStatusOption = Options.choice("status", prunableProcessAttemptStatuses).pipe(
   Options.repeated,
 );
 const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
+
+const booleanChoiceValue = (value: "true" | "false"): boolean => value === "true";
 
 function optionalLimit(value?: string): number | undefined {
   if (!value) {
@@ -76,6 +97,70 @@ const showCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.operatorWorkShow));
+
+const eventsCommand = EffectCommand.make(
+  "events",
+  {
+    workId: workIdArg,
+    cursor: workEventsCursorOption,
+    follow: workEventsFollowOption,
+    historyLimit: workEventsHistoryLimitOption,
+    includeHistory: workEventsIncludeHistoryOption,
+    json: workEventsJsonOption,
+    untilTerminal: workEventsUntilTerminalOption,
+    pollIntervalMs: workEventsPollIntervalOption,
+  },
+  ({
+    cursor,
+    follow,
+    historyLimit,
+    includeHistory,
+    json,
+    pollIntervalMs,
+    untilTerminal,
+    workId,
+  }) => {
+    void json;
+    return runOperatorWorkEventStreamQuery(
+      StreamOperatorWorkEventsQuery.create({
+        workId,
+        follow,
+        includeHistory: booleanChoiceValue(includeHistory),
+        historyLimit: Number(historyLimit),
+        untilTerminal: booleanChoiceValue(untilTerminal),
+        pollIntervalMs: Number(pollIntervalMs),
+        ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.operatorWorkEvents));
+
+const watchCommand = EffectCommand.make(
+  "watch",
+  {
+    workId: workIdArg,
+    cursor: workEventsCursorOption,
+    historyLimit: workEventsHistoryLimitOption,
+    includeHistory: workEventsIncludeHistoryOption,
+    json: workEventsJsonOption,
+    untilTerminal: workEventsUntilTerminalOption,
+    pollIntervalMs: workEventsPollIntervalOption,
+  },
+  ({ cursor, historyLimit, includeHistory, json, pollIntervalMs, untilTerminal, workId }) => {
+    void json;
+    return runOperatorWorkEventStreamQuery(
+      StreamOperatorWorkEventsQuery.create({
+        workId,
+        follow: true,
+        includeHistory: booleanChoiceValue(includeHistory),
+        historyLimit: Number(historyLimit),
+        untilTerminal: booleanChoiceValue(untilTerminal),
+        pollIntervalMs: Number(pollIntervalMs),
+        ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.operatorWorkEvents));
 
 const markRecoveredCommand = EffectCommand.make(
   "mark-recovered",
@@ -159,6 +244,8 @@ export const operatorWorkCommand = EffectCommand.make("work").pipe(
   EffectCommand.withSubcommands([
     listCommand,
     showCommand,
+    eventsCommand,
+    watchCommand,
     markRecoveredCommand,
     deadLetterCommand,
     cancelCommand,

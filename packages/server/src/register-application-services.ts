@@ -534,6 +534,8 @@ import {
   StopResourceRuntimeCommandHandler,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
+  StreamOperatorWorkEventsQueryHandler,
+  StreamOperatorWorkEventsQueryService,
   SwitchCurrentOrganizationCommandHandler,
   SwitchCurrentOrganizationUseCase,
   TerminalSessionLifecycleService,
@@ -2509,6 +2511,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowCertificateQueryHandler);
   container.registerSingleton(ListOperatorWorkQueryHandler);
   container.registerSingleton(ShowOperatorWorkQueryHandler);
+  container.registerSingleton(StreamOperatorWorkEventsQueryHandler);
   container.registerSingleton(ListTerminalSessionsQueryHandler);
   container.registerSingleton(ShowTerminalSessionQueryHandler);
   container.registerSingleton(CloseTerminalSessionCommandHandler);
@@ -3312,6 +3315,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.pruneOperatorWorkUseCase, PruneOperatorWorkUseCase);
   container.registerSingleton(tokens.retryOperatorWorkUseCase, RetryOperatorWorkUseCase);
+  container.registerSingleton(
+    tokens.streamOperatorWorkEventsQueryService,
+    StreamOperatorWorkEventsQueryService,
+  );
   container.registerSingleton(
     tokens.streamDeploymentEventsQueryService,
     StreamDeploymentEventsQueryService,

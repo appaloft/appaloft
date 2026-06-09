@@ -4934,6 +4934,48 @@ export const operatorWorkEventSchema = z.object({
   safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
 });
 
+export const operatorWorkEventStreamStatusKindSchema = z.enum([
+  "accepted",
+  "running",
+  "progress",
+  "retry-scheduled",
+  "succeeded",
+  "failed",
+  "canceled",
+  "dead-lettered",
+]);
+
+export const operatorWorkObservedEventSchema = z.object({
+  workId: z.string(),
+  sequence: z.number().int().positive(),
+  cursor: z.string(),
+  emittedAt: z.string(),
+  kind: operatorWorkEventStreamStatusKindSchema,
+  status: operatorWorkStatusSchema,
+  operationKey: z.string(),
+  workKind: operatorWorkKindSchema,
+  phase: z.string().optional(),
+  step: z.string().optional(),
+  message: z.string().optional(),
+  projectId: z.string().optional(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  serverId: z.string().optional(),
+  errorCode: z.string().optional(),
+  errorCategory: z.string().optional(),
+  retriable: z.boolean().optional(),
+  safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
+});
+
+export const operatorWorkEventStreamGapSchema = z.object({
+  code: z.string(),
+  phase: z.enum(["event-replay", "live-follow"]),
+  retriable: z.boolean(),
+  cursor: z.string().optional(),
+  lastSequence: z.number().int().positive().optional(),
+  recommendedAction: z.enum(["restart-stream", "open-work-detail"]).optional(),
+});
+
 export const listOperatorWorkResponseSchema = z.object({
   schemaVersion: z.literal("operator-work.list/v1"),
   items: z.array(operatorWorkItemSchema),
@@ -5631,6 +5673,53 @@ export const domainErrorResponseSchema = z.object({
   message: z.string(),
   retryable: z.boolean(),
   details: z.record(z.string(), domainErrorDetailValueSchema).optional(),
+});
+
+const operatorWorkEventStreamBaseSchema = z.object({
+  schemaVersion: z.literal("operator-work.stream-events/v1"),
+  event: operatorWorkObservedEventSchema,
+});
+
+export const operatorWorkEventStreamEnvelopeSchema = z.discriminatedUnion("kind", [
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("accepted") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("running") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("progress") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("retry-scheduled") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("succeeded") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("failed") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("canceled") }),
+  operatorWorkEventStreamBaseSchema.extend({ kind: z.literal("dead-lettered") }),
+  z.object({
+    schemaVersion: z.literal("operator-work.stream-events/v1"),
+    kind: z.literal("heartbeat"),
+    at: z.string(),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("operator-work.stream-events/v1"),
+    kind: z.literal("gap"),
+    gap: operatorWorkEventStreamGapSchema,
+  }),
+  z.object({
+    schemaVersion: z.literal("operator-work.stream-events/v1"),
+    kind: z.literal("closed"),
+    reason: z.enum(["completed", "cancelled", "source-ended", "idle-timeout"]),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("operator-work.stream-events/v1"),
+    kind: z.literal("error"),
+    error: domainErrorResponseSchema,
+  }),
+]);
+
+export const operatorWorkEventStreamResponseSchema = z.object({
+  workId: z.string(),
+  envelopes: z.array(operatorWorkEventStreamEnvelopeSchema),
+});
+
+export const operatorWorkEventStreamStreamResponseSchema = z.object({
+  workId: z.string(),
 });
 
 export const deploymentEventStreamGapSchema = z.object({
@@ -6767,6 +6856,16 @@ export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;
 export type OperatorWorkNextAction = z.infer<typeof operatorWorkNextActionSchema>;
 export type OperatorWorkItem = z.infer<typeof operatorWorkItemSchema>;
 export type OperatorWorkEvent = z.infer<typeof operatorWorkEventSchema>;
+export type OperatorWorkEventStreamStatusKind = z.infer<
+  typeof operatorWorkEventStreamStatusKindSchema
+>;
+export type OperatorWorkObservedEvent = z.infer<typeof operatorWorkObservedEventSchema>;
+export type OperatorWorkEventStreamGap = z.infer<typeof operatorWorkEventStreamGapSchema>;
+export type OperatorWorkEventStreamEnvelope = z.infer<typeof operatorWorkEventStreamEnvelopeSchema>;
+export type OperatorWorkEventStreamResponse = z.infer<typeof operatorWorkEventStreamResponseSchema>;
+export type OperatorWorkEventStreamStreamResponse = z.infer<
+  typeof operatorWorkEventStreamStreamResponseSchema
+>;
 export type ListOperatorWorkResponse = z.infer<typeof listOperatorWorkResponseSchema>;
 export type ShowOperatorWorkResponse = z.infer<typeof showOperatorWorkResponseSchema>;
 export type RetryOperatorWorkResponse = z.infer<typeof retryOperatorWorkResponseSchema>;

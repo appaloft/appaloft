@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import {
   type Command as AppCommand,
@@ -9,6 +11,8 @@ import {
   type ExecutionContextFactory,
   ListOperatorWorkQuery,
   MarkOperatorWorkRecoveredCommand,
+  type OperatorWorkEventStream,
+  type OperatorWorkEventStreamEnvelope,
   PruneOperatorWorkCommand,
   type QueryBus,
   RetryOperatorWorkCommand,
@@ -40,6 +44,22 @@ function createExecutionContextFactory(requestId: string): ExecutionContextFacto
         requestId,
       }),
   };
+}
+
+class CloseTrackingOperatorWorkEventStream implements OperatorWorkEventStream {
+  closed = false;
+
+  constructor(private readonly envelopes: OperatorWorkEventStreamEnvelope[]) {}
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<OperatorWorkEventStreamEnvelope> {
+    for (const envelope of this.envelopes) {
+      yield envelope;
+    }
+  }
 }
 
 describe("CLI operator work commands", () => {
@@ -150,6 +170,81 @@ describe("CLI operator work commands", () => {
     expect(queries[0]).toMatchObject({
       workId: "dep_failed",
     });
+  });
+
+  test("[OP-WORK-ENTRY-003A] work events --follow --json dispatches stream query and closes cleanly", async () => {
+    ensureReflectMetadata();
+    const { createCliProgram } = await import("../src");
+    const { StreamOperatorWorkEventsQuery } = await import("@appaloft/application");
+    const queries: AppQuery<unknown>[] = [];
+    const stream = new CloseTrackingOperatorWorkEventStream([
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "heartbeat",
+        at: "2026-01-01T00:00:00.000Z",
+        cursor: "wrk_blueprint_install:1",
+      },
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "closed",
+        reason: "completed",
+        cursor: "wrk_blueprint_install:2",
+      },
+    ]);
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          mode: "stream",
+          workId: "wrk_blueprint_install",
+          stream,
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: createExecutionContextFactory("req_cli_operator_work_events_test"),
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "work",
+        "events",
+        "wrk_blueprint_install",
+        "--follow",
+        "--json",
+        "--cursor",
+        "wrk_blueprint_install:1",
+        "--history-limit",
+        "25",
+        "--poll-interval-ms",
+        "50",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(StreamOperatorWorkEventsQuery);
+    expect(queries[0]).toMatchObject({
+      workId: "wrk_blueprint_install",
+      cursor: "wrk_blueprint_install:1",
+      follow: true,
+      includeHistory: true,
+      historyLimit: 25,
+      pollIntervalMs: 50,
+    });
+    expect(stream.closed).toBe(true);
   });
 
   test("[PROC-DELIVERY-009][OP-WORK-ENTRY-004] work mark-recovered dispatches the command", async () => {

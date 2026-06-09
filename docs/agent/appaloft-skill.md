@@ -66,7 +66,7 @@ The installable `appaloft` skill must include:
   business operation;
 - safety rules for secrets, credentials, local files, logs, and diagnostics;
 - local CLI profile/context guidance for default Appaloft Cloud login and remote control-plane use;
-- deploy, observe, recover, configure, administer, and maintenance workflows;
+- deploy, progress-watch, observe, recover, configure, administer, and maintenance workflows;
 - a deploy subprotocol equivalent to `appaloft-deploy` for first-deploy and URL-first outcomes.
 
 ## Safety Rules
@@ -102,11 +102,12 @@ Appaloft docs, workflows, testing matrices, and `packages/application/src/operat
 The eval suite must cover real Appaloft tasks, including project lifecycle, saving/registering and
 managing servers, server readiness/capacity/proxy maintenance, SSH credentials, environments,
 Resource profile configuration, Resource secrets/effective config, first deploy, deployment
-observation and recovery, domains/TLS, generated default access and route diagnostics, dependency
-resources and backups, storage, scheduled tasks, runtime usage and monitoring, runtime controls,
-terminal sessions, source links, preview cleanup, source-event auto-deploy diagnostics, static
-artifact publishing, audit/retention/operator work, organization/auth/deploy tokens, system
-capabilities/maintenance, default Cloud CLI context bootstrap, MCP usage, and secret/bypass refusal.
+progress observation and recovery, parent durable-work progress watching, domains/TLS, generated
+default access and route diagnostics, dependency resources and backups, storage, scheduled tasks,
+runtime usage and monitoring, runtime controls, terminal sessions, source links, preview cleanup,
+source-event auto-deploy diagnostics, static artifact publishing, audit/retention/operator work,
+organization/auth/deploy tokens, system capabilities/maintenance, default Cloud CLI context
+bootstrap, MCP usage, and secret/bypass refusal.
 When a new public operation family becomes a core user workflow, add or update an eval instead of
 expanding `SKILL.md` with exhaustive prose.
 

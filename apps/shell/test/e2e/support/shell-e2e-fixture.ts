@@ -66,6 +66,44 @@ export function createShellE2eWorkspace(
   };
 }
 
+function shellCliEnv(options: ShellCliOptions): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    OTEL_SDK_DISABLED: "true",
+    APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
+    APPALOFT_CONTROL_PLANE_MODE: "none",
+    APPALOFT_DATABASE_DRIVER: "pglite",
+    APPALOFT_DATA_DIR: options.dataDir,
+    APPALOFT_HTTP_HOST: "127.0.0.1",
+    APPALOFT_HTTP_PORT: options.httpPort ?? "0",
+    APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
+    APPALOFT_WEB_STATIC_DIR: "",
+  };
+
+  delete env.APPALOFT_CONTROL_PLANE_URL;
+  delete env.APPALOFT_DATABASE_URL;
+
+  return {
+    ...env,
+    ...options.env,
+  };
+}
+
+function captureStream(stream: ReadableStream<Uint8Array>, append: (chunk: string) => void): void {
+  void (async () => {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        append(decoder.decode());
+        return;
+      }
+      append(decoder.decode(chunk.value, { stream: true }));
+    }
+  })();
+}
+
 export function cleanupWorkspace(workspaceDir: string): void {
   rmSync(workspaceDir, { recursive: true, force: true });
 }
@@ -73,18 +111,7 @@ export function cleanupWorkspace(workspaceDir: string): void {
 export function runShellCli(args: string[], options: ShellCliOptions): CliResult {
   const result = Bun.spawnSync([process.execPath, "run", "src/index.ts", ...args], {
     cwd: shellRoot,
-    env: {
-      ...process.env,
-      OTEL_SDK_DISABLED: "true",
-      APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
-      APPALOFT_DATABASE_DRIVER: "pglite",
-      APPALOFT_DATA_DIR: options.dataDir,
-      APPALOFT_HTTP_HOST: "127.0.0.1",
-      APPALOFT_HTTP_PORT: options.httpPort ?? "0",
-      APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
-      APPALOFT_WEB_STATIC_DIR: "",
-      ...options.env,
-    },
+    env: shellCliEnv(options),
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -100,58 +127,131 @@ export function expectCliSuccess(result: CliResult, label: string): void {
   expect(result.exitCode, `${label}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`).toBe(0);
 }
 
-export function parseJson<T>(raw: string): T {
-  const objectStart = raw.indexOf("{");
-  const arrayStart = raw.indexOf("[");
-  const start =
-    objectStart < 0 ? arrayStart : arrayStart < 0 ? objectStart : Math.min(objectStart, arrayStart);
+function parseJsonPayloads(raw: string): unknown[] {
+  const payloads: unknown[] = [];
 
-  if (start < 0) {
+  for (let offset = 0; offset < raw.length; ) {
+    const objectStart = raw.indexOf("{", offset);
+    const arrayStart = raw.indexOf("[", offset);
+    const start =
+      objectStart < 0
+        ? arrayStart
+        : arrayStart < 0
+          ? objectStart
+          : Math.min(objectStart, arrayStart);
+
+    if (start < 0) {
+      return payloads;
+    }
+
+    const opening = raw[start];
+    const closing = opening === "{" ? "}" : "]";
+    let depth = 0;
+    let escaped = false;
+    let inString = false;
+
+    for (let index = start; index < raw.length; index += 1) {
+      const char = raw[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = inString;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === opening) {
+        depth += 1;
+        continue;
+      }
+
+      if (char === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            payloads.push(JSON.parse(raw.slice(start, index + 1)));
+          } catch {
+            // Ignore non-JSON fragments from structured application logs.
+          }
+          offset = index + 1;
+          break;
+        }
+      }
+    }
+
+    if (offset <= start) {
+      return payloads;
+    }
+  }
+
+  return payloads;
+}
+
+export function parseJson<T>(raw: string): T {
+  const [payload] = parseJsonPayloads(raw);
+  if (!payload) {
     throw new SyntaxError("No JSON payload found");
   }
 
-  const opening = raw[start];
-  const closing = opening === "{" ? "}" : "]";
-  let depth = 0;
-  let escaped = false;
-  let inString = false;
+  return payload as T;
+}
 
-  for (let index = start; index < raw.length; index += 1) {
-    const char = raw[index];
+type DeploymentShowPayload = {
+  deployment?: {
+    status?: string;
+  };
+  status?: {
+    current?: string;
+  };
+};
 
-    if (escaped) {
-      escaped = false;
-      continue;
+export async function waitForDeploymentSucceeded(
+  deploymentId: string,
+  options: ShellCliOptions,
+  waitOptions: {
+    attempts?: number;
+    intervalMs?: number;
+  } = {},
+): Promise<void> {
+  let lastShow: CliResult | undefined;
+  const attempts = waitOptions.attempts ?? 120;
+  const intervalMs = waitOptions.intervalMs ?? 500;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const show = runShellCli(["deployments", "show", deploymentId], options);
+    lastShow = show;
+    expectCliSuccess(show, `wait for deployment ${deploymentId} snapshot`);
+
+    const payload = parseJson<DeploymentShowPayload>(show.stdout);
+    const status = payload.deployment?.status ?? payload.status?.current;
+    if (status === "succeeded") {
+      return;
     }
 
-    if (char === "\\") {
-      escaped = inString;
-      continue;
+    if (status === "failed" || status === "canceled") {
+      throw new Error(
+        `Deployment ${deploymentId} finished with ${status} while waiting for success:\nstdout:\n${show.stdout}\nstderr:\n${show.stderr}`,
+      );
     }
 
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) {
-      continue;
-    }
-
-    if (char === opening) {
-      depth += 1;
-      continue;
-    }
-
-    if (char === closing) {
-      depth -= 1;
-      if (depth === 0) {
-        return JSON.parse(raw.slice(start, index + 1)) as T;
-      }
-    }
+    await Bun.sleep(intervalMs);
   }
 
-  throw new SyntaxError("Unterminated JSON payload");
+  throw new Error(
+    `Timed out waiting for deployment ${deploymentId} to succeed:\nstdout:\n${lastShow?.stdout ?? ""}\nstderr:\n${lastShow?.stderr ?? ""}`,
+  );
 }
 
 async function expectHttpStatus(response: Response, status: number): Promise<void> {
@@ -209,20 +309,6 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
   });
   let stdout = "";
   let stderr = "";
-  const captureStream = (stream: ReadableStream<Uint8Array>, append: (chunk: string) => void) => {
-    void (async () => {
-      const reader = stream.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) {
-          append(decoder.decode());
-          return;
-        }
-        append(decoder.decode(chunk.value, { stream: true }));
-      }
-    })();
-  };
   captureStream(serverProcess.stdout, (chunk) => {
     stdout += chunk;
   });

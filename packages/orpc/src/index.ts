@@ -313,6 +313,7 @@ import {
   MarkOperatorWorkRecoveredCommand,
   markOperatorWorkRecoveredCommandInputSchema,
   OpenTerminalSessionCommand,
+  type OperatorWorkEventStreamEnvelope,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
   PrepareServerRuntimeCommand,
@@ -490,6 +491,9 @@ import {
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
+  StreamOperatorWorkEventsQuery,
+  type StreamOperatorWorkEventsQueryInput,
+  type StreamOperatorWorkEventsResult,
   SwitchCurrentOrganizationCommand,
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
@@ -534,6 +538,7 @@ import {
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
   streamDeploymentEventsQueryInputSchema,
+  streamOperatorWorkEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   TestServerConnectivityCommand,
   TransferOrganizationOwnerCommand,
@@ -683,6 +688,9 @@ import {
   listTerminalSessionsResponseSchema,
   lockEnvironmentResponseSchema,
   markOperatorWorkRecoveredResponseSchema,
+  operatorWorkEventStreamEnvelopeSchema,
+  operatorWorkEventStreamResponseSchema,
+  operatorWorkEventStreamStreamResponseSchema,
   organizationProfileResponseSchema,
   prepareServerRuntimeResponseSchema,
   promoteEnvironmentResponseSchema,
@@ -2661,6 +2669,47 @@ function createDeploymentEventStream(
   })();
 }
 
+function createOperatorWorkEventStream(
+  context: AppaloftOrpcRequestContext,
+  input: StreamOperatorWorkEventsQueryInput,
+): AsyncGenerator<OperatorWorkEventStreamEnvelope, { workId: string }, void> {
+  return (async function* streamOperatorWorkEvents() {
+    const result: StreamOperatorWorkEventsResult = await executeQuery(
+      context,
+      StreamOperatorWorkEventsQuery.create({
+        ...input,
+        follow: true,
+      }),
+    );
+
+    if (result.mode === "bounded") {
+      for (const envelope of result.envelopes) {
+        yield envelope;
+      }
+
+      return {
+        workId: result.workId,
+      };
+    }
+
+    try {
+      for await (const envelope of result.stream) {
+        yield envelope;
+
+        if (envelope.kind === "closed" || envelope.kind === "error") {
+          break;
+        }
+      }
+
+      return {
+        workId: result.workId,
+      };
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
 function toDeploymentProgressStreamEvent(
   event: DeploymentProgressEvent,
 ): DeploymentProgressStreamEvent {
@@ -4543,6 +4592,53 @@ export const showOperatorWorkProcedure = base
     executeQuery(context, ShowOperatorWorkQuery.create(input)),
   );
 
+export const operatorWorkEventReplayProcedure = base
+  .route({
+    method: "GET",
+    path: "/operator-work/{workId}/events",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(streamOperatorWorkEventsQueryInputSchema)
+  .output(operatorWorkEventStreamResponseSchema)
+  .handler(async ({ input, context }) => {
+    const result: StreamOperatorWorkEventsResult = await executeQuery(
+      context,
+      StreamOperatorWorkEventsQuery.create({
+        ...input,
+        follow: false,
+      }),
+    );
+
+    if (result.mode !== "bounded") {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Operator work event query returned a stream for a bounded request",
+        status: 500,
+      });
+    }
+
+    return {
+      workId: result.workId,
+      envelopes: result.envelopes,
+    };
+  });
+
+export const operatorWorkEventStreamProcedure = base
+  .route({
+    method: "GET",
+    path: "/operator-work/{workId}/events/stream",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(streamOperatorWorkEventsQueryInputSchema)
+  .output(
+    eventIterator(
+      operatorWorkEventStreamEnvelopeSchema,
+      operatorWorkEventStreamStreamResponseSchema,
+    ),
+  )
+  .handler(({ input, context }) => createOperatorWorkEventStream(context, input));
+
 export const markOperatorWorkRecoveredProcedure = base
   .route({
     method: "POST",
@@ -6277,6 +6373,8 @@ export const appaloftOrpcRouter = {
   operatorWork: {
     list: listOperatorWorkProcedure,
     show: showOperatorWorkProcedure,
+    events: operatorWorkEventReplayProcedure,
+    eventsStream: operatorWorkEventStreamProcedure,
     markRecovered: markOperatorWorkRecoveredProcedure,
     deadLetter: deadLetterOperatorWorkProcedure,
     cancel: cancelOperatorWorkProcedure,
@@ -8876,6 +8974,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",
     "/api/operator-work/:workId",
+    "/api/operator-work/:workId/events",
+    "/api/operator-work/:workId/events/stream",
     "/api/operator-work/:workId/mark-recovered",
     "/api/operator-work/:workId/dead-letter",
     "/api/operator-work/:workId/cancel",

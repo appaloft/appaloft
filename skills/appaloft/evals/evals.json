@@ -231,6 +231,7 @@
         "deployments.plan",
         "deployments.create",
         "deployments.show",
+        "deployments.stream-events",
         "deployments.logs",
         "resources.diagnostic-summary",
         "deployments.recovery-readiness"
@@ -245,7 +246,8 @@
       "assertions": [
         "Performs safe source inspection without reading .env, keys, tokens, cookies, or provider credentials.",
         "Uses existing Appaloft operations and does not invent quick-deploy.create.",
-        "Returns URL/access state first, followed by ids, logs, diagnostics, and recovery readiness."
+        "Treats deployment progress observation as part of deploy and follows deployment events instead of relying only on a final snapshot.",
+        "Returns URL/access state first, followed by ids, progress stream, logs, diagnostics, and recovery readiness."
       ]
     },
     {
@@ -275,6 +277,36 @@
         "Does not guess the recovery action before reading structured state and readiness.",
         "Separates retry, redeploy, rollback, and cancel semantics.",
         "Includes logs and diagnostic commands or tool calls in the user-facing result."
+      ]
+    },
+    {
+      "id": "appaloft-skill-parent-work-progress-watch",
+      "family": "deployment-observation-and-recovery",
+      "prompt": "A Blueprint install returned parent work id work_123 and child deployment dep_456. Watch the parent install progress, stream deployment events, get logs, and tell me whether it succeeded or what failed.",
+      "expected_output": "A progress workflow that follows the durable parent work event stream for cross-resource status, follows the deployment event stream for the child attempt, reads logs, and reports stable parent and deployment outcomes without worker internals.",
+      "expected_operations": [
+        "operator-work.stream-events",
+        "operator-work.show",
+        "deployments.stream-events",
+        "deployments.show",
+        "deployments.logs",
+        "resources.diagnostic-summary",
+        "deployments.recovery-readiness"
+      ],
+      "source_documents": [
+        "docs/queries/operator-work.stream-events.md",
+        "docs/workflows/deployment-detail-and-observation.md",
+        "docs/testing/operator-work-ledger-test-matrix.md",
+        "docs/testing/deployments.stream-events-test-matrix.md",
+        "skills/appaloft/SKILL.md",
+        "skills/appaloft/references/deploy-protocol.md",
+        "skills/appaloft/references/cli-entrypoints.md"
+      ],
+      "assertions": [
+        "Uses appaloft work events or work watch for the parent durable work progress stream.",
+        "Keeps appaloft work show as a snapshot/detail read rather than a live log substitute.",
+        "Does not expose worker lease, workerId, heartbeat ownership, or internal attempt details.",
+        "Uses deployment events/logs for the child deployment attempt instead of conflating them with parent work progress."
       ]
     },
     {

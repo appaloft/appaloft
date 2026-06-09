@@ -5415,6 +5415,94 @@ export interface OperatorWorkEvent {
   safeDetails?: Record<string, string | number | boolean | null>;
 }
 
+export type OperatorWorkEventStreamStatusKind =
+  | "accepted"
+  | "running"
+  | "progress"
+  | "retry-scheduled"
+  | "succeeded"
+  | "failed"
+  | "canceled"
+  | "dead-lettered";
+
+export interface OperatorWorkObservedEvent {
+  workId: string;
+  sequence: number;
+  cursor: string;
+  emittedAt: string;
+  kind: OperatorWorkEventStreamStatusKind;
+  status: OperatorWorkStatus;
+  operationKey: string;
+  workKind: OperatorWorkKind;
+  phase?: string;
+  step?: string;
+  message?: string;
+  projectId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export type OperatorWorkEventStreamPhase = "event-replay" | "live-follow";
+
+export interface OperatorWorkEventStreamGap {
+  code: string;
+  phase: OperatorWorkEventStreamPhase;
+  retriable: boolean;
+  cursor?: string;
+  lastSequence?: number;
+  recommendedAction?: "restart-stream" | "open-work-detail";
+}
+
+export type OperatorWorkEventStreamEnvelope =
+  | {
+      schemaVersion: "operator-work.stream-events/v1";
+      kind: OperatorWorkEventStreamStatusKind;
+      event: OperatorWorkObservedEvent;
+    }
+  | {
+      schemaVersion: "operator-work.stream-events/v1";
+      kind: "heartbeat";
+      at: string;
+      cursor?: string;
+    }
+  | {
+      schemaVersion: "operator-work.stream-events/v1";
+      kind: "gap";
+      gap: OperatorWorkEventStreamGap;
+    }
+  | {
+      schemaVersion: "operator-work.stream-events/v1";
+      kind: "closed";
+      reason: "completed" | "cancelled" | "source-ended" | "idle-timeout";
+      cursor?: string;
+    }
+  | {
+      schemaVersion: "operator-work.stream-events/v1";
+      kind: "error";
+      error: DomainError;
+    };
+
+export interface OperatorWorkEventStream extends AsyncIterable<OperatorWorkEventStreamEnvelope> {
+  close(): Promise<void>;
+}
+
+export type StreamOperatorWorkEventsResult =
+  | {
+      mode: "bounded";
+      workId: string;
+      envelopes: OperatorWorkEventStreamEnvelope[];
+    }
+  | {
+      mode: "stream";
+      workId: string;
+      stream: OperatorWorkEventStream;
+    };
+
 export interface RouteRealizationWorkSummary {
   id: string;
   status: OperatorWorkStatus;

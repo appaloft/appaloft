@@ -10,7 +10,8 @@ For deployment work, use this Appaloft deploy protocol:
    scheduled tasks on the Resource profile.
 5. Run plan/preview when useful.
 6. Create or clean up deployment through Appaloft.
-7. Observe deployment detail, logs, resource health, diagnostics, and recovery readiness.
+7. Watch progress through the right stream, then observe detail, logs, resource health,
+   diagnostics, and recovery readiness.
 8. Return URL/access state first, then ids and next safe actions.
 
 For Cloud deployments to a registered SSH server, read the server readiness summary and run
@@ -144,14 +145,35 @@ Use this order:
    and dry-run planning. For Web quick deploy, use
    `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
    extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint
-   deploy command. Submit the install command once, then follow the returned deployment through
-   `appaloft deployments events`, deployment detail, and deployment logs.
+   deploy command. Submit the install command once, then follow any returned parent work id through
+   `appaloft work events <workId> --follow --json` or `appaloft work watch <workId> --json`; follow
+   any returned deployment id through `appaloft deployments events <deploymentId> --follow --json`,
+   deployment detail, and deployment logs.
+
+## Progress Streams
+
+Progress monitoring is part of deployment, not an optional afterthought.
+
+- Use `appaloft deployments events <deploymentId> --follow --json` for a single deployment
+  attempt. It is the user-level deployment event stream and remains paired with
+  `appaloft logs <deploymentId>` for deployment logs.
+- Use `appaloft work events <workId> --follow --json` or
+  `appaloft work watch <workId> --json` for a parent durable work item that coordinates multiple
+  resources, child deployments, retries, or long-running platform work such as Blueprint install.
+  Report stable parent states such as accepted, running, progress, retry-scheduled, succeeded,
+  failed, canceled, dead-lettered, closed, gap, or error; do not expose worker leases, worker ids,
+  heartbeat ownership, or internal attempt details.
+- Use `appaloft work show <workId>` only for a snapshot/detail read. Do not use repeated `work show`
+  polling as the live progress mechanism when the event stream is available.
 
 ## Follow-Up Commands
 
 - `appaloft deployments show <deploymentId>`
 - `appaloft logs <deploymentId>`
-- `appaloft deployments events <deploymentId>`
+- `appaloft deployments events <deploymentId> --follow --json`
+- `appaloft work events <workId> --follow --json`
+- `appaloft work watch <workId> --json`
+- `appaloft work show <workId>`
 - `appaloft resource health <resourceId>`
 - `appaloft resource diagnose <resourceId>`
 - `appaloft deployments recovery-readiness <deploymentId>`

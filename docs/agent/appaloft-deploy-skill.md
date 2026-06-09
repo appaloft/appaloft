@@ -18,7 +18,8 @@ source lives in this document and the installable full skill references it from
 1. Inspect the source safely.
 2. Choose the smallest supported entrypoint and state owner.
 3. Dispatch existing CLI, HTTP/API, or Web operations through the active Appaloft surface.
-4. Report the deployment outcome by URL, status, logs, diagnostics, and recovery commands.
+4. Watch deployment or parent durable-work progress through the proper event stream.
+5. Report the deployment outcome by URL, status, logs, diagnostics, and recovery commands.
 
 The skill remains useful with or without MCP because it guides the workflow. MCP is the active
 callable tool layer when configured; its descriptors expose the same operation keys and
@@ -135,12 +136,21 @@ context. Treat ids as bootstrap/advanced override/debug inputs, not the normal u
 
 ## Outcome Packet
 
+Progress monitoring is part of the deploy protocol. For one deployment attempt, follow
+`appaloft deployments events <deploymentId> --follow --json` and use
+`appaloft logs <deploymentId>` for logs. For a parent durable work item that coordinates multiple
+resources or child deployments, follow `appaloft work events <workId> --follow --json` or
+`appaloft work watch <workId> --json`; use `appaloft work show <workId>` only as a snapshot/detail
+read.
+
 At the end, report a compact outcome:
 
 - access URL or why it is not available yet;
 - deployment id;
+- parent work id when one was returned;
 - resource id;
 - lifecycle status;
+- progress stream command used;
 - `appaloft logs <deploymentId>`;
 - `appaloft resource diagnose <resourceId>`;
 - `appaloft deployments recovery-readiness <deploymentId>`.

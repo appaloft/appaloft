@@ -8,6 +8,7 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   StreamDeploymentEventsQuery,
@@ -32,8 +33,37 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_deployment_events",
+        label: "deployment-events@example.test",
+      },
+      email: "deployment-events@example.test",
+      organizationId: input.organizationId ?? "org_deployment_events_test",
+      role: input.requiredRole,
+      userId: "usr_deployment_events",
+    }),
+};
+
+function deploymentEventStreamRequest(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set(
+    "cookie",
+    headers.get("cookie") ?? "better-auth.session_token=deployment-events-test",
+  );
+
+  return new Request(url, {
+    ...init,
+    headers,
+  });
 }
 
 function deploymentEventReplay(): DeploymentEventStreamResponse {
@@ -85,11 +115,12 @@ describe("deployment event replay HTTP route", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
-      new Request(
+      deploymentEventStreamRequest(
         "http://localhost/api/deployments/dep_demo/events?historyLimit=25&includeHistory=true",
         {
           method: "GET",
