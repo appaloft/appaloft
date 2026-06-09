@@ -200,6 +200,7 @@ import {
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
   type StreamDeploymentEventsQueryInput,
+  type StreamOperatorWorkEventsQueryInput,
   type SwitchCurrentOrganizationCommandInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
@@ -325,6 +326,9 @@ import {
   type ListStorageVolumesResponse,
   type ListTerminalSessionsResponse,
   type LockEnvironmentResponse,
+  type OperatorWorkEventStreamEnvelope,
+  type OperatorWorkEventStreamResponse,
+  type OperatorWorkEventStreamStreamResponse,
   type OrganizationProfileResponse,
   type PrepareServerRuntimeResponse,
   type PromoteEnvironmentResponse,
@@ -1768,6 +1772,22 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowOperatorWorkQueryInput,
       ShowOperatorWorkResponse,
+      AppaloftClientError
+    >;
+    events: Client<
+      AppaloftClientContext,
+      StreamOperatorWorkEventsQueryInput,
+      OperatorWorkEventStreamResponse,
+      AppaloftClientError
+    >;
+    eventsStream: Client<
+      AppaloftClientContext,
+      StreamOperatorWorkEventsQueryInput,
+      AsyncIteratorClass<
+        OperatorWorkEventStreamEnvelope,
+        OperatorWorkEventStreamStreamResponse,
+        void
+      >,
       AppaloftClientError
     >;
   };

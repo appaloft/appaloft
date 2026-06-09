@@ -28,6 +28,23 @@ const nonStreamOperation: SdkOperationDescriptor = {
   streaming: false,
 };
 
+const workStreamOperation: SdkOperationDescriptor = {
+  operationKey: "operator-work.stream-events",
+  operationGroup: "operator-work",
+  operationMethod: "streamEvents",
+  operationId: "operatorWork.eventsStream",
+  kind: "query",
+  domain: "operator-work",
+  messageName: "StreamOperatorWorkEventsQuery",
+  route: {
+    method: "GET",
+    path: "/operator-work/{workId}/events/stream",
+  },
+  authPolicy: "product-session",
+  errorFamily: "structured-platform-error",
+  streaming: true,
+};
+
 describe("Appaloft SDK streaming helpers", () => {
   test("[TS-SDK-STREAM-001] streams typed JSON envelopes only for streaming operations", async () => {
     const client = createAppaloftSdkClient({
@@ -70,6 +87,52 @@ describe("Appaloft SDK streaming helpers", () => {
         kind: "closed",
         reason: "completed",
         cursor: "dep_demo:1",
+      },
+    ]);
+  });
+
+  test("[OP-WORK-ENTRY-003C] streams operator work envelopes as an AsyncIterable", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        new Response(
+          [
+            'data: {"schemaVersion":"operator-work.stream-events/v1","kind":"heartbeat","at":"2026-01-01T00:00:00.000Z","cursor":"wrk_blueprint_install:1"}',
+            "",
+            'data: {"schemaVersion":"operator-work.stream-events/v1","kind":"closed","reason":"completed","cursor":"wrk_blueprint_install:2"}',
+            "",
+          ].join("\n"),
+          {
+            headers: {
+              "content-type": "text/event-stream",
+            },
+          },
+        ),
+    });
+
+    const envelopes: unknown[] = [];
+
+    for await (const envelope of client.stream({
+      operation: workStreamOperation,
+      pathParams: {
+        workId: "wrk_blueprint_install",
+      },
+    })) {
+      envelopes.push(envelope);
+    }
+
+    expect(envelopes).toEqual([
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "heartbeat",
+        at: "2026-01-01T00:00:00.000Z",
+        cursor: "wrk_blueprint_install:1",
+      },
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "closed",
+        reason: "completed",
+        cursor: "wrk_blueprint_install:2",
       },
     ]);
   });

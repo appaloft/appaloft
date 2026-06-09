@@ -212,6 +212,10 @@ export const cliCommandDescriptions = {
     "Show one background work item without retrying or cleaning it up",
     "operator.work-ledger",
   ),
+  operatorWorkEvents: withDocs(
+    "Replay or follow one durable background work parent status stream",
+    "operator.work-ledger",
+  ),
   operatorWorkMarkRecovered: withDocs(
     "Mark one durable background work item as manually recovered",
     "operator.work-ledger",

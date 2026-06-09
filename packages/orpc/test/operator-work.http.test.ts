@@ -12,12 +12,15 @@ import {
   type ExecutionContextFactory,
   ListOperatorWorkQuery,
   MarkOperatorWorkRecoveredCommand,
+  type ProductSessionAuthorizationPort,
   PruneOperatorWorkCommand,
   type Query,
   type QueryBus,
   RetryOperatorWorkCommand,
   ShowOperatorWorkQuery,
+  StreamOperatorWorkEventsQuery,
 } from "@appaloft/application";
+import { type OperatorWorkEventStreamResponse } from "@appaloft/contracts";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
@@ -37,8 +40,76 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_operator",
+        label: "operator@example.test",
+      },
+      email: "operator@example.test",
+      organizationId: input.organizationId ?? "org_operator_work_test",
+      role: input.requiredRole,
+      userId: "usr_operator",
+    }),
+};
+
+function mountOperatorWorkRoutes(input: { commandBus: CommandBus; queryBus: QueryBus }): Elysia {
+  return mountAppaloftOrpcRoutes(new Elysia(), {
+    commandBus: input.commandBus,
+    executionContextFactory: new TestExecutionContextFactory(),
+    logger: new NoopLogger(),
+    productSessionAuthorizationPort,
+    queryBus: input.queryBus,
+  });
+}
+
+function operatorWorkRequest(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set("cookie", headers.get("cookie") ?? "better-auth.session_token=operator-work-test");
+
+  return new Request(url, {
+    ...init,
+    headers,
+  });
+}
+
+function operatorWorkEventReplay(): OperatorWorkEventStreamResponse {
+  return {
+    workId: "wrk_blueprint_install",
+    envelopes: [
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "progress",
+        event: {
+          workId: "wrk_blueprint_install",
+          sequence: 2,
+          cursor: "wrk_blueprint_install:2",
+          emittedAt: "2026-01-01T00:00:03.000Z",
+          kind: "progress",
+          status: "running",
+          operationKey: "blueprints.install",
+          workKind: "blueprint-install",
+          phase: "install",
+          step: "deploy-components",
+          message: "Deploying components.",
+          projectId: "prj_demo",
+        },
+      },
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "closed",
+        reason: "completed",
+        cursor: "wrk_blueprint_install:2",
+      },
+    ],
+  };
 }
 
 describe("operator work HTTP routes", () => {
@@ -70,15 +141,10 @@ describe("operator work HTTP routes", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request(
+      operatorWorkRequest(
         "http://localhost/api/operator-work?kind=deployment&status=failed&resourceId=res_web&serverId=srv_primary&deploymentId=dep_failed&limit=5",
         { method: "GET" },
       ),
@@ -129,15 +195,10 @@ describe("operator work HTTP routes", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/dep_failed", { method: "GET" }),
+      operatorWorkRequest("http://localhost/api/operator-work/dep_failed", { method: "GET" }),
     );
 
     expect(response.status).toBe(200);
@@ -151,6 +212,84 @@ describe("operator work HTTP routes", () => {
     expect(capturedQuery).toBeInstanceOf(ShowOperatorWorkQuery);
     expect(capturedQuery).toMatchObject({
       workId: "dep_failed",
+    });
+  });
+
+  test("[OP-WORK-ENTRY-003B] replays operator work parent status events through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          mode: "bounded",
+          workId: "wrk_blueprint_install",
+          envelopes: operatorWorkEventReplay().envelopes,
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      operatorWorkRequest(
+        "http://localhost/api/operator-work/wrk_blueprint_install/events?historyLimit=25&includeHistory=true",
+        { method: "GET" },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(operatorWorkEventReplay());
+    expect(capturedQuery).toBeInstanceOf(StreamOperatorWorkEventsQuery);
+    expect(capturedQuery).toMatchObject({
+      workId: "wrk_blueprint_install",
+      historyLimit: 25,
+      includeHistory: true,
+      follow: false,
+      untilTerminal: true,
+    });
+  });
+
+  test("[OP-WORK-ENTRY-003B] streams operator work parent status envelopes as SSE", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          mode: "bounded",
+          workId: "wrk_blueprint_install",
+          envelopes: operatorWorkEventReplay().envelopes,
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      operatorWorkRequest(
+        "http://localhost/api/operator-work/wrk_blueprint_install/events/stream?historyLimit=25&includeHistory=true",
+        { method: "GET" },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    const body = await response.text();
+    expect(body).toContain('"schemaVersion":"operator-work.stream-events/v1"');
+    expect(body).toContain('"kind":"progress"');
+    expect(body).toContain('"kind":"closed"');
+    expect(capturedQuery).toBeInstanceOf(StreamOperatorWorkEventsQuery);
+    expect(capturedQuery).toMatchObject({
+      workId: "wrk_blueprint_install",
+      historyLimit: 25,
+      includeHistory: true,
+      follow: true,
+      untilTerminal: true,
     });
   });
 
@@ -170,15 +309,10 @@ describe("operator work HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/wrk_failed/mark-recovered", {
+      operatorWorkRequest("http://localhost/api/operator-work/wrk_failed/mark-recovered", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -219,15 +353,10 @@ describe("operator work HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/wrk_failed/dead-letter", {
+      operatorWorkRequest("http://localhost/api/operator-work/wrk_failed/dead-letter", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -268,15 +397,10 @@ describe("operator work HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/wrk_pending/cancel", {
+      operatorWorkRequest("http://localhost/api/operator-work/wrk_pending/cancel", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -318,15 +442,10 @@ describe("operator work HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/wrk_failed/retry", {
+      operatorWorkRequest("http://localhost/api/operator-work/wrk_failed/retry", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -375,15 +494,10 @@ describe("operator work HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/operator-work/prune", {
+      operatorWorkRequest("http://localhost/api/operator-work/prune", {
         method: "POST",
         headers: {
           "content-type": "application/json",

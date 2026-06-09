@@ -1406,6 +1406,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | List operator work ledger | Query | `operator-work.list` | `ListOperatorWorkQuery` | `ListOperatorWorkQueryInput` | `appaloft work list` | `GET /api/operator-work` |
 | Show operator work item | Query | `operator-work.show` | `ShowOperatorWorkQuery` | `ShowOperatorWorkQueryInput` | `appaloft work show <workId>` | `GET /api/operator-work/{workId}` |
+| Stream operator work parent status | Query | `operator-work.stream-events` | `StreamOperatorWorkEventsQuery` | `StreamOperatorWorkEventsQueryInput` | `appaloft work events <workId>` | `GET /api/operator-work/{workId}/events` and `GET /api/operator-work/{workId}/events/stream` |
 | Mark operator work recovered | Command | `operator-work.mark-recovered` | `MarkOperatorWorkRecoveredCommand` | `MarkOperatorWorkRecoveredCommandInput` | `appaloft work mark-recovered <workId>` | `POST /api/operator-work/{workId}/mark-recovered` |
 | Dead-letter operator work | Command | `operator-work.dead-letter` | `DeadLetterOperatorWorkCommand` | `DeadLetterOperatorWorkCommandInput` | `appaloft work dead-letter <workId>` | `POST /api/operator-work/{workId}/dead-letter` |
 | Cancel operator work | Command | `operator-work.cancel` | `CancelOperatorWorkCommand` | `CancelOperatorWorkCommandInput` | `appaloft work cancel <workId>` | `POST /api/operator-work/{workId}/cancel` |

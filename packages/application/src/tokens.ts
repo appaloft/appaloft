@@ -586,6 +586,9 @@ export const tokens = {
   streamDeploymentEventsQueryService: Symbol.for("appaloft.stream_deployment_events_query_service"),
   logsQueryService: Symbol.for("appaloft.logs_query_service"),
   operatorWorkQueryService: Symbol.for("appaloft.operator_work_query_service"),
+  streamOperatorWorkEventsQueryService: Symbol.for(
+    "appaloft.stream_operator_work_events_query_service",
+  ),
   cancelOperatorWorkUseCase: Symbol.for("appaloft.cancel_operator_work_use_case"),
   deadLetterOperatorWorkUseCase: Symbol.for("appaloft.dead_letter_operator_work_use_case"),
   markOperatorWorkRecoveredUseCase: Symbol.for("appaloft.mark_operator_work_recovered_use_case"),

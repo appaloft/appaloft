@@ -132,6 +132,7 @@ export * from "./operations/operator-work/list-operator-work.schema";
 export * from "./operations/operator-work/prune-operator-work.schema";
 export * from "./operations/operator-work/retry-operator-work.schema";
 export * from "./operations/operator-work/show-operator-work.schema";
+export * from "./operations/operator-work/stream-operator-work-events.schema";
 export {
   type ChangeOrganizationMemberRoleCommandInput,
   changeOrganizationMemberRoleCommandInputSchema,

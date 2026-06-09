@@ -11,6 +11,7 @@ import {
   type ResourceRuntimeLogLine,
   type ResourceRuntimeLogsResult,
   type StreamDeploymentEventsResult,
+  type StreamOperatorWorkEventsResult,
   type TerminalSessionDescriptor,
   type TerminalSessionGateway,
 } from "@appaloft/application";
@@ -266,6 +267,17 @@ function deploymentEventStreamErrorFromUnknown(error: unknown): DomainError {
 
   return domainError.infra("Deployment event stream failed", {
     phase: "cli-deployment-event-stream",
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
+function operatorWorkEventStreamErrorFromUnknown(error: unknown): DomainError {
+  if (isDomainError(error)) {
+    return error;
+  }
+
+  return domainError.infra("Operator work event stream failed", {
+    phase: "cli-operator-work-event-stream",
     message: error instanceof Error ? error.message : String(error),
   });
 }
@@ -639,6 +651,45 @@ export const runDeploymentEventStreamQuery = (
         }
       },
       catch: deploymentEventStreamErrorFromUnknown,
+    });
+  });
+
+export const runOperatorWorkEventStreamQuery = (
+  message: Result<AppQuery<StreamOperatorWorkEventsResult>>,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+
+    if (output.mode === "bounded") {
+      yield* print({
+        workId: output.workId,
+        envelopes: output.envelopes,
+      });
+      return;
+    }
+
+    yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          for await (const envelope of output.stream) {
+            await Effect.runPromise(print(envelope));
+
+            if (envelope.kind === "error") {
+              throw envelope.error;
+            }
+
+            if (envelope.kind === "closed") {
+              break;
+            }
+          }
+        } finally {
+          await output.stream.close();
+        }
+      },
+      catch: operatorWorkEventStreamErrorFromUnknown,
     });
   });
 

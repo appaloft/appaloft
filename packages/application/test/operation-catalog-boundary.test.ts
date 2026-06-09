@@ -75,6 +75,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "deployments.recovery-readiness",
       "deployments.logs",
       "deployments.stream-events",
+      "operator-work.stream-events",
     ];
     const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
     const entriesByKey = new Map<string, OperationCatalogEntry>(
@@ -511,6 +512,9 @@ describe("operation catalog aggregate mutation boundary", () => {
   test("[OP-WORK-CATALOG-001] operator work ledger exposes queries and lifecycle commands", () => {
     const listEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.list");
     const showEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.show");
+    const streamEntry = operationCatalog.find(
+      (candidate) => candidate.key === "operator-work.stream-events",
+    );
     const markRecoveredEntry = operationCatalog.find(
       (candidate) => candidate.key === "operator-work.mark-recovered",
     );
@@ -547,6 +551,18 @@ describe("operation catalog aggregate mutation boundary", () => {
       transports: {
         cli: "appaloft work show <workId>",
         orpc: { method: "GET", path: "/api/operator-work/{workId}" },
+      },
+    });
+    expect(streamEntry).toMatchObject({
+      kind: "query",
+      domain: "operator-work",
+      messageName: "StreamOperatorWorkEventsQuery",
+      handlerName: "StreamOperatorWorkEventsQueryHandler",
+      serviceName: "StreamOperatorWorkEventsQueryService",
+      transports: {
+        cli: "appaloft work events <workId>",
+        orpc: { method: "GET", path: "/api/operator-work/{workId}/events" },
+        orpcStream: { method: "GET", path: "/api/operator-work/{workId}/events/stream" },
       },
     });
     expect(markRecoveredEntry).toMatchObject({
@@ -606,6 +622,7 @@ describe("operation catalog aggregate mutation boundary", () => {
     });
     expect(listEntry?.inputSchema).toBeDefined();
     expect(showEntry?.inputSchema).toBeDefined();
+    expect(streamEntry?.inputSchema).toBeDefined();
     expect(markRecoveredEntry?.inputSchema).toBeDefined();
     expect(deadLetterEntry?.inputSchema).toBeDefined();
     expect(cancelEntry?.inputSchema).toBeDefined();
