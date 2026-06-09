@@ -1,11 +1,74 @@
 import {
   createDurableWorkTopology,
+  type DurableWorkWorkerHeartbeatStore,
+  type ExecutionContextFactory,
   type MaintenanceWorkerActivation,
+  type MaintenanceWorkerRuntimeHeartbeat,
   type MaintenanceWorkerSafetyMode,
   type MaintenanceWorkerStatus,
   type MaintenanceWorkerStatusReader,
+  toRepositoryContext,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
+
+const DEFAULT_DURABLE_WORKER_HEARTBEAT_STALE_AFTER_SECONDS = 15;
+
+export type DurableWorkerHeartbeatSnapshotProvider = (
+  workerGroup: string,
+) => Promise<MaintenanceWorkerRuntimeHeartbeat | undefined>;
+
+export function createDurableWorkerHeartbeatSnapshotProvider(input: {
+  heartbeatStore: DurableWorkWorkerHeartbeatStore;
+  executionContextFactory: ExecutionContextFactory;
+  staleAfterSeconds?: number;
+  now?: () => string;
+}): DurableWorkerHeartbeatSnapshotProvider {
+  const staleAfterSeconds =
+    input.staleAfterSeconds ?? DEFAULT_DURABLE_WORKER_HEARTBEAT_STALE_AFTER_SECONDS;
+  return async (workerGroup) => {
+    const context = input.executionContextFactory.create({
+      entrypoint: "system",
+      actor: {
+        kind: "system",
+        id: "maintenance-worker-status-reader",
+        label: "Maintenance worker status reader",
+      },
+    });
+    const heartbeats = await input.heartbeatStore.listHeartbeats(toRepositoryContext(context), {
+      workerGroup,
+    });
+    if (heartbeats.isErr()) {
+      return undefined;
+    }
+
+    const nowMs = Date.parse(input.now?.() ?? new Date().toISOString());
+    const staleAfterMs = staleAfterSeconds * 1000;
+    const workers = heartbeats.value.map((heartbeat) => {
+      const lastSeenMs = Date.parse(heartbeat.lastSeenAt);
+      const online =
+        heartbeat.status === "online" &&
+        Number.isFinite(lastSeenMs) &&
+        Number.isFinite(nowMs) &&
+        nowMs - lastSeenMs <= staleAfterMs;
+      return {
+        workerId: heartbeat.workerId,
+        workerGroup: heartbeat.workerGroup,
+        slot: heartbeat.slot,
+        status: heartbeat.status,
+        online,
+        lastSeenAt: heartbeat.lastSeenAt,
+      };
+    });
+
+    return {
+      staleAfterSeconds,
+      onlineWorkerCount: workers.filter((worker) => worker.online).length,
+      staleWorkerCount: workers.filter((worker) => !worker.online).length,
+      ...(workers[0]?.lastSeenAt ? { lastSeenAt: workers[0].lastSeenAt } : {}),
+      workers,
+    };
+  };
+}
 
 function activation(enabled: boolean): MaintenanceWorkerActivation {
   return enabled ? "starts-with-backend-service" : "disabled-by-config";
@@ -45,7 +108,10 @@ function status(input: {
   };
 }
 
-function durableWorkerRuntimeStatus(config: AppConfig): MaintenanceWorkerStatus {
+async function durableWorkerRuntimeStatus(
+  config: AppConfig,
+  heartbeatProvider?: DurableWorkerHeartbeatSnapshotProvider,
+): Promise<MaintenanceWorkerStatus> {
   const { workerRuntime } = config;
   const topology = createDurableWorkTopology(workerRuntime);
   const workerIds = topology.isOk()
@@ -55,6 +121,8 @@ function durableWorkerRuntimeStatus(config: AppConfig): MaintenanceWorkerStatus 
         (_, index) => `${workerRuntime.workerGroup}-${index + 1}`,
       );
   const enabled = workerRuntime.mode !== "disabled";
+  const heartbeat =
+    enabled && heartbeatProvider ? await heartbeatProvider(workerRuntime.workerGroup) : undefined;
 
   return status({
     key: "durable-worker-runtime",
@@ -71,6 +139,7 @@ function durableWorkerRuntimeStatus(config: AppConfig): MaintenanceWorkerStatus 
       workerGroup: workerRuntime.workerGroup,
       workerIds,
       coordinationRole: topology.isOk() ? topology.value.coordinationRole : "disabled",
+      ...(heartbeat ? { heartbeat } : {}),
       ...(workerRuntime.externalBackendKind
         ? { externalBackendKind: workerRuntime.externalBackendKind }
         : {}),
@@ -92,9 +161,12 @@ function durableWorkerRuntimeStatus(config: AppConfig): MaintenanceWorkerStatus 
 }
 
 export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerStatusReader {
-  constructor(private readonly config: AppConfig) {}
+  constructor(
+    private readonly config: AppConfig,
+    private readonly heartbeatProvider?: DurableWorkerHeartbeatSnapshotProvider,
+  ) {}
 
-  list(): MaintenanceWorkerStatus[] {
+  async list(): Promise<MaintenanceWorkerStatus[]> {
     const {
       certificateRetryScheduler,
       previewExpiryCleanupScheduler,
@@ -106,7 +178,7 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
     } = this.config;
 
     return [
-      durableWorkerRuntimeStatus(this.config),
+      await durableWorkerRuntimeStatus(this.config, this.heartbeatProvider),
       status({
         key: "certificate-retry-scheduler",
         label: "Certificate retry scheduler",

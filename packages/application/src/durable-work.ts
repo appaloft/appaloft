@@ -42,6 +42,39 @@ export interface DurableWorkWorkerIdentity {
   readonly slot: number;
 }
 
+export type DurableWorkWorkerHeartbeatStatus = "online" | "stopping";
+
+export interface DurableWorkWorkerHeartbeatRecord {
+  readonly workerId: string;
+  readonly workerGroup: string;
+  readonly slot: number;
+  readonly mode: DurableWorkRuntimeMode;
+  readonly queueBackend: DurableWorkQueueBackend;
+  readonly processStartedAt: string;
+  readonly lastSeenAt: string;
+  readonly status: DurableWorkWorkerHeartbeatStatus;
+}
+
+export interface DurableWorkWorkerHeartbeatFilter {
+  readonly workerGroup?: string;
+  readonly limit?: number;
+}
+
+export interface DurableWorkWorkerHeartbeatStore {
+  recordHeartbeat(
+    context: RepositoryContext,
+    heartbeat: DurableWorkWorkerHeartbeatRecord,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord>>;
+  markStopped(
+    context: RepositoryContext,
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
+  ): Promise<Result<void>>;
+  listHeartbeats(
+    context: RepositoryContext,
+    filter?: DurableWorkWorkerHeartbeatFilter,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord[]>>;
+}
+
 export interface DurableWorkTopology {
   readonly mode: DurableWorkRuntimeMode;
   readonly queueBackend: DurableWorkQueueBackend;

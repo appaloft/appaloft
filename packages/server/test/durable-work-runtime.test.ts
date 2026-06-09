@@ -8,10 +8,13 @@ import {
   type CommandBus,
   CreateDeploymentCommand,
   type DeploymentRepository,
+  DoctorQuery,
   type DurableWorkHandler,
   type DurableWorkItemRecord,
   type DurableWorkQueueAdapter,
+  type DurableWorkWorkerHeartbeatStore,
   type ExecutionContext,
+  type QueryBus,
   type RuntimePlanResolver,
   type RuntimeTargetBackend,
   type RuntimeTargetBackendRegistry,
@@ -424,6 +427,42 @@ describe("durable work server runtime", () => {
       expect(pending.value).toHaveLength(1);
 
       await server.startWorkerRuntime();
+      const heartbeatStore = server.container.resolve<DurableWorkWorkerHeartbeatStore>(
+        tokens.durableWorkWorkerHeartbeatStore,
+      );
+      const heartbeat = await waitFor(
+        async () => {
+          const heartbeats = await heartbeatStore.listHeartbeats(repositoryContext, {
+            workerGroup: "appaloft-worker",
+          });
+          if (heartbeats.isErr() || heartbeats.value.length === 0) {
+            return null;
+          }
+          return heartbeats.value[0];
+        },
+        { timeoutMs: 5_000, intervalMs: 100 },
+      );
+      expect(heartbeat).toMatchObject({
+        workerId: "appaloft-worker-1",
+        workerGroup: "appaloft-worker",
+        status: "online",
+        queueBackend: "database",
+      });
+      const doctorQuery = DoctorQuery.create();
+      expect(doctorQuery.isOk()).toBe(true);
+      if (doctorQuery.isErr()) throw new Error(doctorQuery.error.message);
+      const doctor = await server.container
+        .resolve<QueryBus>(tokens.queryBus)
+        .execute(context, doctorQuery.value);
+      expect(doctor.isOk()).toBe(true);
+      if (doctor.isErr()) throw new Error(doctor.error.message);
+      const durableRuntimeStatus = doctor.value.maintenanceWorkers.find(
+        (worker) => worker.key === "durable-worker-runtime",
+      );
+      expect(durableRuntimeStatus?.runtimeTopology?.heartbeat).toMatchObject({
+        onlineWorkerCount: 1,
+        staleWorkerCount: 0,
+      });
       const completed = await waitFor(
         async () => {
           const items = await durableWork.listItems(repositoryContext, {

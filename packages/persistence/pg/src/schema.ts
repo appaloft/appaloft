@@ -1073,6 +1073,17 @@ export interface DurableWorkEventsTable {
   >;
 }
 
+export interface DurableWorkerHeartbeatsTable {
+  worker_id: string;
+  worker_group: string;
+  slot: number;
+  mode: string;
+  queue_backend: string;
+  process_started_at: string;
+  last_seen_at: string;
+  status: string;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -1126,6 +1137,7 @@ export interface Database {
   resource_health_observations: ResourceHealthObservationsTable;
   durable_work_items: DurableWorkItemsTable;
   durable_work_events: DurableWorkEventsTable;
+  durable_worker_heartbeats: DurableWorkerHeartbeatsTable;
   github_app_installations: GitHubAppInstallationsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;

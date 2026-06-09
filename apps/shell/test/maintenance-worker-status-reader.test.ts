@@ -7,10 +7,10 @@ import { resolveConfig } from "@appaloft/config";
 import { ConfigMaintenanceWorkerStatusReader } from "../src/maintenance-worker-status-reader";
 
 describe("ConfigMaintenanceWorkerStatusReader", () => {
-  test("[SCHED-MAINT-WORKER-001] exposes scheduled maintenance worker defaults to doctor", () => {
+  test("[SCHED-MAINT-WORKER-001] exposes scheduled maintenance worker defaults to doctor", async () => {
     const reader = new ConfigMaintenanceWorkerStatusReader(resolveConfig());
 
-    expect(reader.list()).toMatchObject([
+    expect(await reader.list()).toMatchObject([
       {
         key: "durable-worker-runtime",
         enabled: true,
@@ -142,11 +142,71 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     ]);
     const certificateRetryScheduler = reader
       .list()
-      .find((entry) => entry.key === "certificate-retry-scheduler");
-    expect(certificateRetryScheduler?.operationKeys).not.toContain("certificates.retry");
+      .then((workers) => workers.find((entry) => entry.key === "certificate-retry-scheduler"));
+    expect((await certificateRetryScheduler)?.operationKeys).not.toContain("certificates.retry");
   });
 
-  test("[SCHED-MAINT-WORKER-002] reflects environment-enabled runner status", () => {
+  test("[LONG-WORK-MON-006] includes durable worker heartbeat summary when available", async () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(
+      resolveConfig(),
+      async (workerGroup) => ({
+        staleAfterSeconds: 15,
+        onlineWorkerCount: 1,
+        staleWorkerCount: 1,
+        lastSeenAt: "2026-06-09T09:00:00.000Z",
+        workers: [
+          {
+            workerId: `${workerGroup}-1`,
+            workerGroup,
+            slot: 1,
+            status: "online",
+            online: true,
+            lastSeenAt: "2026-06-09T09:00:00.000Z",
+          },
+          {
+            workerId: `${workerGroup}-2`,
+            workerGroup,
+            slot: 2,
+            status: "stopping",
+            online: false,
+            lastSeenAt: "2026-06-09T08:59:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    const durableRuntime = (await reader.list()).find(
+      (entry) => entry.key === "durable-worker-runtime",
+    );
+
+    expect(durableRuntime?.runtimeTopology?.heartbeat).toMatchObject({
+      staleAfterSeconds: 15,
+      onlineWorkerCount: 1,
+      staleWorkerCount: 1,
+      workers: [
+        {
+          workerId: "appaloft-worker-1",
+          online: true,
+        },
+        {
+          workerId: "appaloft-worker-2",
+          online: false,
+        },
+      ],
+    });
+  });
+
+  test("[SCHED-MAINT-WORKER-001] exposes no heartbeat summary when unavailable", async () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(resolveConfig());
+
+    const durableRuntime = (await reader.list()).find(
+      (entry) => entry.key === "durable-worker-runtime",
+    );
+
+    expect(durableRuntime?.runtimeTopology?.heartbeat).toBeUndefined();
+  });
+
+  test("[SCHED-MAINT-WORKER-002] reflects environment-enabled runner status", async () => {
     const reader = new ConfigMaintenanceWorkerStatusReader(
       resolveConfig({
         env: {
@@ -171,7 +231,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
       }),
     );
 
-    const statuses = new Map(reader.list().map((entry) => [entry.key, entry]));
+    const statuses = new Map((await reader.list()).map((entry) => [entry.key, entry]));
 
     expect(statuses.get("durable-worker-runtime")).toMatchObject({
       enabled: true,
@@ -228,7 +288,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     });
   });
 
-  test("[PROC-DELIVERY-WORKER-012] reports disabled durable runtime without worker slots", () => {
+  test("[PROC-DELIVERY-WORKER-012] reports disabled durable runtime without worker slots", async () => {
     const reader = new ConfigMaintenanceWorkerStatusReader(
       resolveConfig({
         env: {
@@ -238,7 +298,9 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
       }),
     );
 
-    expect(reader.list().find((entry) => entry.key === "durable-worker-runtime")).toMatchObject({
+    expect(
+      (await reader.list()).find((entry) => entry.key === "durable-worker-runtime"),
+    ).toMatchObject({
       enabled: false,
       activation: "disabled-by-config",
       safetyMode: "durable-process-delivery",

@@ -172,6 +172,24 @@ export interface MaintenanceWorkerRuntimeTopology {
   workerIds: string[];
   coordinationRole: "coordinator" | "worker" | "disabled";
   externalBackendKind?: "kafka" | "temporal" | "custom";
+  heartbeat?: MaintenanceWorkerRuntimeHeartbeat;
+}
+
+export interface MaintenanceWorkerRuntimeHeartbeatWorker {
+  workerId: string;
+  workerGroup: string;
+  slot: number;
+  status: "online" | "stopping";
+  online: boolean;
+  lastSeenAt: string;
+}
+
+export interface MaintenanceWorkerRuntimeHeartbeat {
+  staleAfterSeconds: number;
+  onlineWorkerCount: number;
+  staleWorkerCount: number;
+  lastSeenAt?: string;
+  workers: MaintenanceWorkerRuntimeHeartbeatWorker[];
 }
 
 export interface MaintenanceWorkerStatus {
@@ -190,7 +208,7 @@ export interface MaintenanceWorkerStatus {
 }
 
 export interface MaintenanceWorkerStatusReader {
-  list(): MaintenanceWorkerStatus[];
+  list(): MaintenanceWorkerStatus[] | Promise<MaintenanceWorkerStatus[]>;
 }
 
 export type CoordinationScopeKind =

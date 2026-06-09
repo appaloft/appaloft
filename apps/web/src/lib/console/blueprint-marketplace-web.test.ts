@@ -25,6 +25,7 @@ const marketplaceExtension: SystemPluginWebExtension = {
     installPlanEndpointTemplate: "/example/blueprints/{slug}/install-plan",
     installEndpointTemplate: "/example/blueprints/{slug}/install",
     upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
+    installedApplicationEndpointTemplate: "/example/installed-applications/{applicationId}",
   },
 };
 const quickDeployExtension: SystemPluginWebExtension = {
@@ -59,6 +60,7 @@ describe("Blueprint marketplace console surface", () => {
       listEndpoint: "/example/blueprints",
       installEndpointTemplate: "/example/blueprints/{slug}/install",
       upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
+      installedApplicationEndpointTemplate: "/example/installed-applications/{applicationId}",
     });
     expect(endpointFromTemplate("/example/blueprints/{slug}/install-plan", "n8n")).toBe(
       "/example/blueprints/n8n/install-plan",
@@ -133,6 +135,16 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("部署方案");
     expect(detailPageSource).toContain("升级策略");
     expect(detailPageSource).toContain("upgradePlanEndpoint");
+    expect(detailPageSource).toContain("installEndpoint");
+    expect(detailPageSource).toContain("installedApplicationEndpoint");
+    expect(detailPageSource).toContain("acceptInstall");
+    expect(detailPageSource).toContain("refreshInstalledApplicationProgress");
+    expect(detailPageSource).toContain("data-blueprint-install-progress");
+    expect(detailPageSource).toContain("data-blueprint-install-secret-inputs");
+    expect(detailPageSource).toContain("secretValues: blueprintInstallSecretValueInput()");
+    expect(detailPageSource).toContain("progressBadgeLabel");
+    expect(detailPageSource).not.toContain("workerId");
+    expect(detailPageSource).not.toContain("leaseOwner");
     expect(detailPageSource).toContain("generateUpgradePlan");
     expect(detailPageSource).toContain("生成升级 dry-run");
     expect(detailPageSource).toContain("data-blueprint-upgrade-from-installed-application");

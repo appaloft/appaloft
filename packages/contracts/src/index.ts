@@ -6155,6 +6155,24 @@ export const maintenanceWorkerRuntimeTopologySchema = z.object({
   workerIds: z.array(z.string()),
   coordinationRole: z.enum(["coordinator", "worker", "disabled"]),
   externalBackendKind: z.enum(["kafka", "temporal", "custom"]).optional(),
+  heartbeat: z
+    .object({
+      staleAfterSeconds: z.number().int().positive(),
+      onlineWorkerCount: z.number().int().nonnegative(),
+      staleWorkerCount: z.number().int().nonnegative(),
+      lastSeenAt: z.string().optional(),
+      workers: z.array(
+        z.object({
+          workerId: z.string(),
+          workerGroup: z.string(),
+          slot: z.number().int().nonnegative(),
+          status: z.enum(["online", "stopping"]),
+          online: z.boolean(),
+          lastSeenAt: z.string(),
+        }),
+      ),
+    })
+    .optional(),
 });
 
 export const maintenanceWorkerStatusSchema = z.object({

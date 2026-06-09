@@ -1290,8 +1290,8 @@ describe("quick deploy workflow", () => {
         workId: "dw_deployment_dep_1",
         deploymentId: "dep_1",
         commands: {
-          showWork: "appaloft operator-work show dw_deployment_dep_1",
-          listByDeployment: "appaloft operator-work list --deployment-id dep_1",
+          showWork: "appaloft work show dw_deployment_dep_1",
+          listByDeployment: "appaloft work list --deployment-id dep_1",
           followDeploymentEvents: "appaloft deployments events dep_1 --follow",
         },
       },

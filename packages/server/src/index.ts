@@ -23,6 +23,7 @@ import {
   type DeployTokenRepository,
   type DurableWorkHandlerRegistry,
   type DurableWorkQueueAdapter,
+  type DurableWorkWorkerHeartbeatStore,
   type EnvironmentReadModel,
   type EventBus,
   type ExecutionBackend,
@@ -105,6 +106,10 @@ import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter"
 import { createDurableWorkRuntimeRunner } from "./durable-work-runtime-runner";
 import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
+import {
+  ConfigMaintenanceWorkerStatusReader,
+  createDurableWorkerHeartbeatSnapshotProvider,
+} from "./maintenance-worker-status-reader";
 import {
   createDisabledPreviewCleanupRetrySchedulerRunner,
   createPreviewCleanupRetrySchedulerRunner,
@@ -716,12 +721,31 @@ export async function createAppaloftServer(
     await extension.configureRuntime?.(containerContext);
   }
 
+  const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
+  const executionContextFactory = createExecutionContextFactory({
+    idGenerator,
+    tracer: telemetry.tracer,
+  });
+  const durableWorkHeartbeatStore = resolveToken<DurableWorkWorkerHeartbeatStore>(
+    childContainer,
+    tokens.durableWorkWorkerHeartbeatStore,
+  );
+  childContainer.registerInstance(
+    tokens.maintenanceWorkerStatusReader,
+    new ConfigMaintenanceWorkerStatusReader(
+      config,
+      createDurableWorkerHeartbeatSnapshotProvider({
+        heartbeatStore: durableWorkHeartbeatStore,
+        executionContextFactory,
+      }),
+    ),
+  );
+
   registerApplicationServices(childContainer, { dataDir: config.dataDir });
   for (const extension of extensions) {
     await extension.configureApplication?.(containerContext);
   }
 
-  const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
   const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
@@ -752,10 +776,6 @@ export async function createAppaloftServer(
           clock,
           repository: deployTokenRepository,
         });
-  const executionContextFactory = createExecutionContextFactory({
-    idGenerator,
-    tracer: telemetry.tracer,
-  });
   if (config.bootstrapDeployTokenOutputFile) {
     const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
       config,
@@ -935,6 +955,7 @@ export async function createAppaloftServer(
   const durableWorkRuntimeRunner = createDurableWorkRuntimeRunner({
     topology: durableWorkTopology.value,
     adapter: resolveToken<DurableWorkQueueAdapter>(childContainer, tokens.durableWorkQueueAdapter),
+    heartbeatStore: durableWorkHeartbeatStore,
     deploymentRepository: resolveToken<DeploymentRepository>(
       childContainer,
       tokens.deploymentRepository,
@@ -1064,7 +1085,7 @@ export async function createAppaloftServer(
       scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
       runtimeMonitoringCollectorRunner.stop();
-      durableWorkRuntimeRunner.stop();
+      await durableWorkRuntimeRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();

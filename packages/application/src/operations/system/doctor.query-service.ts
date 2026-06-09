@@ -36,7 +36,7 @@ export class DoctorQueryService {
       readiness: await this.diagnostics.readiness(),
       providers: this.providerRegistry.list(),
       plugins: this.pluginRegistry.list(),
-      maintenanceWorkers: this.maintenanceWorkerStatusReader.list(),
+      maintenanceWorkers: await this.maintenanceWorkerStatusReader.list(),
     };
   }
 }

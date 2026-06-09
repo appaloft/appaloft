@@ -211,8 +211,8 @@ export function createQuickDeployOutcomePacket(
       ...(result.workId ? { workId: result.workId } : {}),
       deploymentId: result.deploymentId,
       commands: {
-        ...(result.workId ? { showWork: `appaloft operator-work show ${result.workId}` } : {}),
-        listByDeployment: `appaloft operator-work list --deployment-id ${result.deploymentId}`,
+        ...(result.workId ? { showWork: `appaloft work show ${result.workId}` } : {}),
+        listByDeployment: `appaloft work list --deployment-id ${result.deploymentId}`,
         followDeploymentEvents: `appaloft deployments events ${result.deploymentId} --follow`,
       },
     },

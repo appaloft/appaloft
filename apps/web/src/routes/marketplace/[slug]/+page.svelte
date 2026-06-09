@@ -217,6 +217,46 @@
       applyCommandAvailable: false;
     };
   };
+  type InstalledApplicationProgress = {
+    schemaVersion: "appaloft.cloud.installed-application.progress/v1";
+    applicationId: string;
+    status: string;
+    userStatus: "running" | "succeeded" | "failed";
+    currentStep: string;
+    message: string;
+    deploymentIds: readonly string[];
+    componentDeployments: readonly {
+      componentId: string;
+      name: string;
+      deployment:
+        | { deploymentId: string; reason?: string }
+        | { status: "planned"; reason?: string };
+    }[];
+    failure?: {
+      reason: string;
+      code?: string;
+    };
+  };
+  type InstalledApplicationInstallResult = {
+    applicationId?: string;
+    executionStatus?: string;
+    installedApplication?: {
+      applicationId?: string;
+      status?: string;
+    };
+    progress?: InstalledApplicationProgress;
+  };
+  type InstalledApplicationShowResponse = {
+    applicationId?: string;
+    status?: string;
+    progress?: InstalledApplicationProgress;
+  };
+
+  const requiredInstallAcknowledgements = [
+    "accepts-blueprint-application-bundle",
+    "reviews-dependency-resource-bindings",
+    "preserves-user-owned-configuration",
+  ] as const;
 
   const slug = $derived(page.params.slug ?? "");
   const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
@@ -234,6 +274,11 @@
   let planPending = $state(false);
   let planError = $state("");
   let planOutput = $state<unknown>(null);
+  let secretValues = $state<Record<string, string>>({});
+  let installPending = $state(false);
+  let installRefreshPending = $state(false);
+  let installError = $state("");
+  let installResult = $state<InstalledApplicationInstallResult | null>(null);
   let upgradeApplicationId = $state(
     browser
       ? (page.url.searchParams.get("applicationId") ??
@@ -308,6 +353,26 @@
       return endpointFromTemplate(catalogMetadata.installPlanEndpointTemplate, slug);
     }
     return `${detailEndpoint}/install-plan`;
+  });
+  const installEndpoint = $derived.by(() => {
+    if (!catalogMetadata || !slug || !catalogMetadata.installEndpointTemplate) {
+      return "";
+    }
+    return endpointFromTemplate(catalogMetadata.installEndpointTemplate, slug);
+  });
+  const installedApplicationEndpoint = $derived.by(() => {
+    const applicationId =
+      installResult?.progress?.applicationId ??
+      installResult?.applicationId ??
+      installResult?.installedApplication?.applicationId ??
+      installedApplicationIdFromUrl;
+    if (!catalogMetadata?.installedApplicationEndpointTemplate || !applicationId) {
+      return "";
+    }
+    return catalogMetadata.installedApplicationEndpointTemplate.replace(
+      /\{applicationId\}/g,
+      encodeURIComponent(applicationId),
+    );
   });
   const upgradePlanEndpoint = $derived.by(() => {
     if (!catalogMetadata || !slug) {
@@ -549,6 +614,97 @@
       ...parameterValues,
       [key]: value,
     };
+  }
+
+  function updateSecretValue(key: string, value: string): void {
+    secretValues = {
+      ...secretValues,
+      [key]: value,
+    };
+  }
+
+  function blueprintInstallSecretValueInput(): { key: string; value: string }[] {
+    return Object.entries(secretValues)
+      .filter(([, value]) => value.length > 0)
+      .map(([key, value]) => ({ key, value }));
+  }
+
+  function installIdempotencyKey(): string {
+    const suffix = browser && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now());
+    return `install:${listing?.slug ?? slug}:web:${suffix}`;
+  }
+
+  async function acceptInstall(): Promise<void> {
+    if (!installEndpoint || !listing) {
+      return;
+    }
+
+    installPending = true;
+    installError = "";
+    try {
+      const result = await request<InstalledApplicationInstallResult>(installEndpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          ...(selectedVariant ? { variant: selectedVariant } : {}),
+          profile,
+          parameters: Object.fromEntries(
+            Object.entries(parameterValues).filter(([, value]) => value.trim() !== ""),
+          ),
+          target: {
+            projectName: listing.title,
+            environmentName: profile || "production",
+            resourceSlugPrefix: listing.slug,
+          },
+          idempotencyKey: installIdempotencyKey(),
+          acknowledgements: requiredInstallAcknowledgements,
+          secretValues: blueprintInstallSecretValueInput(),
+        }),
+      });
+      installResult = result;
+      secretValues = {};
+    } catch (error) {
+      installError = readErrorMessage(error);
+    } finally {
+      installPending = false;
+    }
+  }
+
+  async function refreshInstalledApplicationProgress(): Promise<void> {
+    if (!installedApplicationEndpoint) {
+      return;
+    }
+
+    installRefreshPending = true;
+    installError = "";
+    try {
+      const result = await request<InstalledApplicationShowResponse>(installedApplicationEndpoint);
+      installResult = {
+        ...installResult,
+        applicationId: result.applicationId ?? installResult?.applicationId,
+        installedApplication: {
+          applicationId: result.applicationId ?? installResult?.installedApplication?.applicationId,
+          status: result.status ?? installResult?.installedApplication?.status,
+        },
+        progress: result.progress ?? installResult?.progress,
+      };
+    } catch (error) {
+      installError = readErrorMessage(error);
+    } finally {
+      installRefreshPending = false;
+    }
+  }
+
+  function progressBadgeLabel(progress: InstalledApplicationProgress): string {
+    if (progress.userStatus === "succeeded") {
+      return "完成";
+    }
+    if (progress.userStatus === "failed") {
+      return "需要处理";
+    }
+    return "进行中";
   }
 
   async function generatePlan(): Promise<void> {
@@ -1067,6 +1223,32 @@
                 />
               </label>
             {/each}
+
+            {#if effectiveManifest.secrets.length > 0}
+              <div class="space-y-2" data-blueprint-install-secret-inputs>
+                <p class="text-sm font-medium">安装密钥</p>
+                <p class="text-xs leading-5 text-muted-foreground">
+                  只在接受安装时提交给运行时；安装进度和 dry-run 不会回显密钥值。
+                </p>
+                {#each effectiveManifest.secrets as secret (secret.key)}
+                  <label class="space-y-1.5">
+                    <span>
+                      {secret.label}
+                      {#if secret.required}
+                        <span class="text-destructive">*</span>
+                      {/if}
+                    </span>
+                    <Input
+                      value={secretValues[secret.key] ?? ""}
+                      type="password"
+                      autocomplete="new-password"
+                      oninput={(event) => updateSecretValue(secret.key, event.currentTarget.value)}
+                      placeholder={secret.key}
+                    />
+                  </label>
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
@@ -1082,6 +1264,21 @@
             </Button>
           </div>
 
+          {#if installEndpoint}
+            <Button
+              onclick={acceptInstall}
+              disabled={installPending}
+              variant="outline"
+              class="w-full"
+              data-blueprint-accept-install
+            >
+              {#if installPending}
+                <LoaderCircle class="size-4 animate-spin" />
+              {/if}
+              接受安装并查看进度
+            </Button>
+          {/if}
+
           {#if planError}
             <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
               {planError}
@@ -1093,6 +1290,88 @@
               <summary class="cursor-pointer text-sm font-medium">查看 dry-run plan JSON</summary>
               <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(planOutput, null, 2)}</pre>
             </details>
+          {/if}
+
+          {#if installError}
+            <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
+              {installError}
+            </div>
+          {/if}
+
+          {#if installResult?.progress}
+            <div class="console-subtle-panel space-y-3 p-3" data-blueprint-install-progress>
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-semibold">安装进度</p>
+                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                    {installResult.progress.message}
+                  </p>
+                </div>
+                <Badge variant={installResult.progress.userStatus === "failed" ? "destructive" : "outline"}>
+                  {progressBadgeLabel(installResult.progress)}
+                </Badge>
+              </div>
+
+              <div class="grid gap-2 rounded-md border bg-background p-3 text-xs">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">当前步骤</span>
+                  <span class="font-mono">{installResult.progress.currentStep}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">应用状态</span>
+                  <span class="font-mono">{installResult.progress.status}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">应用 ID</span>
+                  <span class="break-all font-mono">{installResult.progress.applicationId}</span>
+                </div>
+              </div>
+
+              {#if installResult.progress.componentDeployments.length > 0}
+                <div class="space-y-2">
+                  <p class="text-xs font-medium text-muted-foreground">组件部署</p>
+                  {#each installResult.progress.componentDeployments as component (component.componentId)}
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="font-medium">{component.name}</span>
+                        {#if "deploymentId" in component.deployment}
+                          <Button
+                            href={`/deployments/${component.deployment.deploymentId}`}
+                            variant="outline"
+                            size="sm"
+                          >
+                            查看部署
+                            <ArrowRight class="size-3.5" />
+                          </Button>
+                        {:else}
+                          <Badge variant="outline">planned</Badge>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if installResult.progress.failure}
+                <div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {installResult.progress.failure.reason}
+                </div>
+              {/if}
+
+              {#if installedApplicationEndpoint}
+                <Button
+                  onclick={refreshInstalledApplicationProgress}
+                  disabled={installRefreshPending}
+                  variant="outline"
+                  class="w-full"
+                >
+                  {#if installRefreshPending}
+                    <LoaderCircle class="size-4 animate-spin" />
+                  {/if}
+                  刷新安装进度
+                </Button>
+              {/if}
+            </div>
           {/if}
         </section>
 

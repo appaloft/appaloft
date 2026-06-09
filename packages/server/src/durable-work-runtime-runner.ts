@@ -8,16 +8,18 @@ import {
   type DurableWorkItemRecord,
   type DurableWorkQueueAdapter,
   type DurableWorkTopology,
+  type DurableWorkWorkerHeartbeatStore,
   drainDurableWorkOnce,
   type EventBus,
   type ExecutionBackend,
   type ExecutionContextFactory,
   type ProcessAttemptRecorder,
+  toRepositoryContext,
 } from "@appaloft/application";
 
 export interface DurableWorkRuntimeRunner {
   start(): void;
-  stop(): void;
+  stop(): Promise<void>;
 }
 
 export interface DurableWorkRuntimeRunnerInput {
@@ -31,6 +33,7 @@ export interface DurableWorkRuntimeRunnerInput {
   executionContextFactory: ExecutionContextFactory;
   logger: AppLogger;
   handlerRegistry?: DurableWorkHandlerRegistry;
+  heartbeatStore?: DurableWorkWorkerHeartbeatStore;
   intervalSeconds?: number;
   batchSize?: number;
   leaseDurationMs?: number;
@@ -69,8 +72,46 @@ export function createDurableWorkRuntimeRunner(
   const intervalSeconds = input.intervalSeconds ?? 2;
   const batchSize = input.batchSize ?? 5;
   const leaseDurationMs = input.leaseDurationMs ?? 300_000;
+  const processStartedAt = new Date().toISOString();
   const timers: ReturnType<typeof setInterval>[] = [];
   const runningWorkers = new Set<string>();
+
+  async function recordHeartbeat(workerId: string, lastSeenAt: string): Promise<void> {
+    if (!input.heartbeatStore) {
+      return;
+    }
+
+    const worker = input.topology.workers.find((candidate) => candidate.workerId === workerId);
+    if (!worker) {
+      return;
+    }
+
+    const context = input.executionContextFactory.create({
+      entrypoint: "system",
+      actor: {
+        kind: "system",
+        id: worker.workerId,
+        label: "Durable work runtime heartbeat",
+      },
+    });
+    const heartbeat = await input.heartbeatStore.recordHeartbeat(toRepositoryContext(context), {
+      workerId: worker.workerId,
+      workerGroup: worker.workerGroup,
+      slot: worker.slot,
+      mode: input.topology.mode,
+      queueBackend: input.topology.queueBackend,
+      processStartedAt,
+      lastSeenAt,
+      status: "online",
+    });
+    if (heartbeat.isErr()) {
+      input.logger.warn("durable_work_runtime.heartbeat_failed", {
+        workerId,
+        errorCode: heartbeat.error.code,
+        message: heartbeat.error.message,
+      });
+    }
+  }
 
   async function tick(workerId: string): Promise<void> {
     if (runningWorkers.has(workerId)) {
@@ -84,6 +125,8 @@ export function createDurableWorkRuntimeRunner(
 
     runningWorkers.add(workerId);
     try {
+      const now = new Date().toISOString();
+      await recordHeartbeat(workerId, now);
       const context = input.executionContextFactory.create({
         entrypoint: "system",
         actor: {
@@ -99,7 +142,7 @@ export function createDurableWorkRuntimeRunner(
         createCompositeDurableWorkHandlerRegistry(handler, input.handlerRegistry),
         {
           worker,
-          now: new Date().toISOString(),
+          now,
           leaseDurationMs,
           limit: batchSize,
         },
@@ -164,9 +207,35 @@ export function createDurableWorkRuntimeRunner(
         workerIds: input.topology.workers.map((worker) => worker.workerId),
       });
     },
-    stop(): void {
+    async stop(): Promise<void> {
       for (const timer of timers.splice(0)) {
         clearInterval(timer);
+      }
+      if (input.heartbeatStore) {
+        const stoppedAt = new Date().toISOString();
+        await Promise.all(
+          input.topology.workers.map(async (worker) => {
+            const context = input.executionContextFactory.create({
+              entrypoint: "system",
+              actor: {
+                kind: "system",
+                id: worker.workerId,
+                label: "Durable work runtime heartbeat",
+              },
+            });
+            const stopped = await input.heartbeatStore?.markStopped(toRepositoryContext(context), {
+              workerId: worker.workerId,
+              lastSeenAt: stoppedAt,
+            });
+            if (stopped?.isErr()) {
+              input.logger.warn("durable_work_runtime.heartbeat_stop_failed", {
+                workerId: worker.workerId,
+                errorCode: stopped.error.code,
+                message: stopped.error.message,
+              });
+            }
+          }),
+        );
       }
       runningWorkers.clear();
       input.logger.info("durable_work_runtime.drain_stopped");
@@ -177,6 +246,6 @@ export function createDurableWorkRuntimeRunner(
 export function createDisabledDurableWorkRuntimeRunner(): DurableWorkRuntimeRunner {
   return {
     start(): void {},
-    stop(): void {},
+    async stop(): Promise<void> {},
   };
 }
