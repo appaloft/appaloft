@@ -181,86 +181,43 @@ export function parseJson<T>(raw: string): T {
   return payload as T;
 }
 
-type DeploymentEventEnvelope = {
-  kind: string;
-  event?: {
-    eventType?: string;
-    summary?: string;
+type DeploymentShowPayload = {
+  deployment?: {
     status?: string;
   };
-  error?: {
-    message?: string;
+  status?: {
+    current?: string;
   };
 };
-
-type DeploymentEventReplayPayload = {
-  envelopes?: DeploymentEventEnvelope[];
-};
-
-function deploymentEventEnvelopesFromOutput(raw: string): DeploymentEventEnvelope[] {
-  const envelopes: DeploymentEventEnvelope[] = [];
-
-  for (const payload of parseJsonPayloads(raw)) {
-    if (typeof payload !== "object" || payload === null) {
-      continue;
-    }
-
-    const replay = payload as DeploymentEventReplayPayload;
-    if (Array.isArray(replay.envelopes)) {
-      envelopes.push(
-        ...replay.envelopes.filter(
-          (envelope): envelope is DeploymentEventEnvelope =>
-            typeof envelope === "object" && envelope !== null && typeof envelope.kind === "string",
-        ),
-      );
-      continue;
-    }
-
-    if ("kind" in payload && typeof (payload as DeploymentEventEnvelope).kind === "string") {
-      envelopes.push(payload as DeploymentEventEnvelope);
-    }
-  }
-
-  return envelopes;
-}
 
 export async function waitForDeploymentSucceeded(
   deploymentId: string,
   options: ShellCliOptions,
 ): Promise<void> {
-  let lastEvents: CliResult | undefined;
+  let lastShow: CliResult | undefined;
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    const events = runShellCli(["deployments", "events", deploymentId, "--json"], options);
-    lastEvents = events;
-    expectCliSuccess(events, `wait for deployment ${deploymentId} event replay`);
+    const show = runShellCli(["deployments", "show", deploymentId], options);
+    lastShow = show;
+    expectCliSuccess(show, `wait for deployment ${deploymentId} snapshot`);
 
-    const envelopes = deploymentEventEnvelopesFromOutput(events.stdout);
-    const failed = envelopes.find(
-      (envelope) => envelope.kind === "error" || envelope.event?.eventType === "deployment-failed",
-    );
-    if (failed) {
-      throw new Error(
-        `Deployment ${deploymentId} failed while waiting for event replay:\n${JSON.stringify(
-          failed,
-          null,
-          2,
-        )}\nstdout:\n${events.stdout}\nstderr:\n${events.stderr}`,
-      );
+    const payload = parseJson<DeploymentShowPayload>(show.stdout);
+    const status = payload.deployment?.status ?? payload.status?.current;
+    if (status === "succeeded") {
+      return;
     }
 
-    const succeeded = envelopes.some(
-      (envelope) => envelope.event?.eventType === "deployment-succeeded",
-    );
-    if (succeeded) {
-      return;
+    if (status === "failed" || status === "canceled") {
+      throw new Error(
+        `Deployment ${deploymentId} finished with ${status} while waiting for success:\nstdout:\n${show.stdout}\nstderr:\n${show.stderr}`,
+      );
     }
 
     await Bun.sleep(500);
   }
 
   throw new Error(
-    `Timed out waiting for deployment ${deploymentId} to emit deployment-succeeded:\nstdout:\n${lastEvents?.stdout ?? ""}\nstderr:\n${lastEvents?.stderr ?? ""}`,
+    `Timed out waiting for deployment ${deploymentId} to succeed:\nstdout:\n${lastShow?.stdout ?? ""}\nstderr:\n${lastShow?.stderr ?? ""}`,
   );
 }
 
