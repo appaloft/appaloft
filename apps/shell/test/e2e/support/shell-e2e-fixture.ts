@@ -66,6 +66,44 @@ export function createShellE2eWorkspace(
   };
 }
 
+function shellCliEnv(options: ShellCliOptions): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    OTEL_SDK_DISABLED: "true",
+    APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
+    APPALOFT_CONTROL_PLANE_MODE: "none",
+    APPALOFT_DATABASE_DRIVER: "pglite",
+    APPALOFT_DATA_DIR: options.dataDir,
+    APPALOFT_HTTP_HOST: "127.0.0.1",
+    APPALOFT_HTTP_PORT: options.httpPort ?? "0",
+    APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
+    APPALOFT_WEB_STATIC_DIR: "",
+  };
+
+  delete env.APPALOFT_CONTROL_PLANE_URL;
+  delete env.APPALOFT_DATABASE_URL;
+
+  return {
+    ...env,
+    ...options.env,
+  };
+}
+
+function captureStream(stream: ReadableStream<Uint8Array>, append: (chunk: string) => void): void {
+  void (async () => {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        append(decoder.decode());
+        return;
+      }
+      append(decoder.decode(chunk.value, { stream: true }));
+    }
+  })();
+}
+
 export function cleanupWorkspace(workspaceDir: string): void {
   rmSync(workspaceDir, { recursive: true, force: true });
 }
@@ -73,18 +111,7 @@ export function cleanupWorkspace(workspaceDir: string): void {
 export function runShellCli(args: string[], options: ShellCliOptions): CliResult {
   const result = Bun.spawnSync([process.execPath, "run", "src/index.ts", ...args], {
     cwd: shellRoot,
-    env: {
-      ...process.env,
-      OTEL_SDK_DISABLED: "true",
-      APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
-      APPALOFT_DATABASE_DRIVER: "pglite",
-      APPALOFT_DATA_DIR: options.dataDir,
-      APPALOFT_HTTP_HOST: "127.0.0.1",
-      APPALOFT_HTTP_PORT: options.httpPort ?? "0",
-      APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
-      APPALOFT_WEB_STATIC_DIR: "",
-      ...options.env,
-    },
+    env: shellCliEnv(options),
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -193,10 +220,16 @@ type DeploymentShowPayload = {
 export async function waitForDeploymentSucceeded(
   deploymentId: string,
   options: ShellCliOptions,
+  waitOptions: {
+    attempts?: number;
+    intervalMs?: number;
+  } = {},
 ): Promise<void> {
   let lastShow: CliResult | undefined;
+  const attempts = waitOptions.attempts ?? 120;
+  const intervalMs = waitOptions.intervalMs ?? 500;
 
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const show = runShellCli(["deployments", "show", deploymentId], options);
     lastShow = show;
     expectCliSuccess(show, `wait for deployment ${deploymentId} snapshot`);
@@ -213,7 +246,7 @@ export async function waitForDeploymentSucceeded(
       );
     }
 
-    await Bun.sleep(500);
+    await Bun.sleep(intervalMs);
   }
 
   throw new Error(
@@ -276,20 +309,6 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
   });
   let stdout = "";
   let stderr = "";
-  const captureStream = (stream: ReadableStream<Uint8Array>, append: (chunk: string) => void) => {
-    void (async () => {
-      const reader = stream.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) {
-          append(decoder.decode());
-          return;
-        }
-        append(decoder.decode(chunk.value, { stream: true }));
-      }
-    })();
-  };
   captureStream(serverProcess.stdout, (chunk) => {
     stdout += chunk;
   });

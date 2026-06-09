@@ -25,7 +25,7 @@ import {
   scheduledRuntimePrunePolicyScopeSchema,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
-import { deploymentTargetCredentialKinds, targetKinds } from "@appaloft/core";
+import { deploymentTargetCredentialKinds, edgeProxyKinds, targetKinds } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
@@ -36,6 +36,9 @@ const nameOption = Options.text("name");
 const hostOption = Options.text("host");
 const portOption = Options.text("port").pipe(Options.withDefault("22"));
 const providerOption = Options.text("provider").pipe(Options.withDefault("generic-ssh"));
+const proxyKindOption = Options.choice("proxy-kind", edgeProxyKinds).pipe(
+  Options.withDefault("traefik"),
+);
 const targetKindOption = Options.choice("target-kind", targetKinds).pipe(
   Options.withDefault("single-server"),
 );
@@ -79,15 +82,17 @@ const registerCommand = EffectCommand.make(
     host: hostOption,
     port: portOption,
     provider: providerOption,
+    proxyKind: proxyKindOption,
     targetKind: targetKindOption,
   },
-  ({ host, name, port, provider, targetKind }) =>
+  ({ host, name, port, provider, proxyKind, targetKind }) =>
     runCommand(
       RegisterServerCommand.create({
         name,
         host,
         port: Number(port),
         providerKey: provider,
+        proxyKind,
         targetKind,
       }),
     ),

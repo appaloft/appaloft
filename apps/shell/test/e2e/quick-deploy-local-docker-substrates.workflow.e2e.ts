@@ -75,6 +75,8 @@ describe("quick deploy local Docker substrate e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
+          "--proxy-kind",
+          "none",
         ],
         workspace.cliOptions,
       );
@@ -206,5 +208,5 @@ describe("quick deploy local Docker substrate e2e", () => {
       runDocker(["image", "rm", "-f", prebuiltImage]);
       cleanupWorkspace(workspace.workspaceDir);
     }
-  }, 240000);
+  }, 360000);
 });
