@@ -140,6 +140,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("acceptInstall");
     expect(detailPageSource).toContain("refreshInstalledApplicationProgress");
     expect(detailPageSource).toContain("data-blueprint-install-progress");
+    expect(detailPageSource).toContain("data-blueprint-install-operator-work");
+    expect(detailPageSource).toContain("progressSupportCommand");
+    expect(detailPageSource).toContain("appaloft work show");
+    expect(detailPageSource).toContain("installResult.progress.failure");
+    expect(detailPageSource).toContain("查看部署");
     expect(detailPageSource).toContain("data-blueprint-install-secret-inputs");
     expect(detailPageSource).toContain("secretValues: blueprintInstallSecretValueInput()");
     expect(detailPageSource).toContain("progressBadgeLabel");
