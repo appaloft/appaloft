@@ -106,6 +106,7 @@ import { markOperatorWorkRecoveredCommandInputSchema } from "./operations/operat
 import { pruneOperatorWorkCommandInputSchema } from "./operations/operator-work/prune-operator-work.command";
 import { retryOperatorWorkCommandInputSchema } from "./operations/operator-work/retry-operator-work.command";
 import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
+import { streamOperatorWorkEventsQueryInputSchema } from "./operations/operator-work/stream-operator-work-events.query";
 import { changeOrganizationMemberRoleCommandInputSchema } from "./operations/organizations/change-organization-member-role.command";
 import { changeOrganizationProfileCommandInputSchema } from "./operations/organizations/change-organization-profile.command";
 import { deleteOrganizationCommandInputSchema } from "./operations/organizations/delete-organization.command";
@@ -3103,6 +3104,21 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft work show <workId>",
       orpc: { method: "GET", path: "/api/operator-work/{workId}" },
+    },
+  },
+  {
+    key: "operator-work.stream-events",
+    kind: "query",
+    domain: "operator-work",
+    messageName: "StreamOperatorWorkEventsQuery",
+    handlerName: "StreamOperatorWorkEventsQueryHandler",
+    serviceName: "StreamOperatorWorkEventsQueryService",
+    inputSchema: streamOperatorWorkEventsQueryInputSchema,
+    serviceToken: tokens.streamOperatorWorkEventsQueryService,
+    transports: {
+      cli: "appaloft work events <workId>",
+      orpc: { method: "GET", path: "/api/operator-work/{workId}/events" },
+      orpcStream: { method: "GET", path: "/api/operator-work/{workId}/events/stream" },
     },
   },
   {

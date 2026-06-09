@@ -52,7 +52,12 @@ surface available in the session.
 ## Common Workflows
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
-  plan when useful, deploy, observe, and return URL plus diagnostics.
+  plan when useful, deploy, watch progress, and return URL plus diagnostics.
+- Deployment progress observation is a core deploy step. For one deployment attempt, follow
+  `appaloft deployments events <deploymentId> --follow --json` and use deployment logs for log
+  lines. For a parent durable work item that coordinates multiple resources or child deployments,
+  follow `appaloft work events <workId> --follow --json` or
+  `appaloft work watch <workId> --json`. Treat `work show` as a snapshot, not a live log.
 - Blueprint catalog deployment: use `appaloft blueprint list/show/plan-install` for neutral catalog
   discovery and dry-run planning, then use the Blueprint quick-deploy entrypoint when the source is
   an official or extension-provided Blueprint such as PocketBase. Do not invent a separate
@@ -64,8 +69,9 @@ surface available in the session.
   edge proxy are ready. If the control plane reports `Executable not found in $PATH: "ssh"` or
   `Docker is not available on the SSH target`, stop and report the server initialization blocker
   rather than manually SSHing around the Appaloft operation. Treat `blueprints.install` as a command:
-  submit it once, then observe the returned deployment through deployment events/logs; do not poll
-  progress by repeatedly calling install with the same idempotency key.
+  submit it once, then observe any returned parent `workId` through work events/watch and any
+  returned `deploymentId` through deployment events/logs; do not poll progress by repeatedly
+  calling install with the same idempotency key.
 - GitHub Action deploy: default to Pure SSH Action when the user supplies an SSH target and no
   control plane; use Self-hosted Server Action only when `control-plane-url` selects an Appaloft
   instance and a deploy token is available; treat product-grade previews as control-plane-owned,

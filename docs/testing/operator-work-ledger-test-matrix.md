@@ -10,6 +10,7 @@ background work state without exposing recovery mutations or secret-bearing deta
 - [Operator Work Ledger Spec](../specs/010-operator-work-ledger/spec.md)
 - [operator-work.list](../queries/operator-work.list.md)
 - [operator-work.show](../queries/operator-work.show.md)
+- [operator-work.stream-events](../queries/operator-work.stream-events.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Error Model](../errors/model.md)
 - [ADR-016](../decisions/ADR-016-deployment-command-surface-reset.md)
@@ -32,6 +33,9 @@ background work state without exposing recovery mutations or secret-bearing deta
 | OP-WORK-QRY-009 | application | Worker/job process status | Durable process attempts for scheduler, runtime-maintenance, worker, or job status are visible without synthesizing status from logs or in-memory state. |
 | OP-WORK-QRY-010 | application | Remote SSH state aggregation | Safe remote-state read-model rows become `kind = remote-state` work items for locks, migrations, backups, and recovery markers without acquiring locks, recovering stale locks, running migrations, restoring backups, exposing raw PGlite content, or exposing SSH private key paths. |
 | OP-WORK-QRY-011 | shell / CLI | Remote SSH diagnostics producer | The SSH remote-state diagnostics producer reads lock, migration journal, backup, and recovery marker metadata without mutating remote state, and the shell read model converts output into safe remote-state rows. |
+| OP-WORK-STREAM-001 | application | Durable work parent status replay | `operator-work.stream-events` returns stable accepted/running/progress/succeeded/failed/canceled/dead-lettered envelopes with safe parent work fields only. |
+| OP-WORK-STREAM-002 | application | Stream safety redaction | Work stream envelopes omit worker id, worker group, lease owner, heartbeat rows, internal attempt counters, command lines, credentials, and raw log payloads. |
+| OP-WORK-STREAM-003 | application | Follow close | Follow mode emits replay/history, then closes after terminal durable work status when `untilTerminal = true`. |
 | OP-WORK-JOURNAL-001 | application | Process attempt recorder contract | Recorder writes pending/running/terminal process attempt state with operation key, dedupe key, correlation/request ids, related ids, error fields, next actions, and safe details. |
 | OP-WORK-JOURNAL-002 | persistence/pg | Process attempt journal migration and adapter | Migration creates a durable process attempt table and the PG adapter can upsert, list, filter, show, and preserve only safe details. |
 | OP-WORK-JOURNAL-003 | persistence/pg | Process attempt retry candidates | PG journal lists due `retry-scheduled` attempts by optional kind and limit, skips future retries, and treats the latest row for a dedupe key as the retry authority, including skipping stale `retry-scheduled` rows superseded by newer terminal rows. |
@@ -58,7 +62,10 @@ background work state without exposing recovery mutations or secret-bearing deta
 | OP-WORK-REDAC-001 | application | No secret leakage | Work items do not include raw log messages, environment values, private keys, certificate material, or provider command lines. |
 | OP-WORK-ENTRY-001 | CLI | `appaloft work list` dispatches query | CLI dispatches `ListOperatorWorkQuery`. |
 | OP-WORK-ENTRY-002 | CLI | `appaloft work show <workId>` dispatches query | CLI dispatches `ShowOperatorWorkQuery`. |
+| OP-WORK-ENTRY-003A | CLI | `appaloft work events <workId> --follow --json` dispatches stream query | CLI consumes the stream, prints normalized envelopes, and exits after `closed`. |
 | OP-WORK-ENTRY-003 | HTTP/oRPC | HTTP list/show dispatch | HTTP routes dispatch the shared query schemas. |
+| OP-WORK-ENTRY-003B | HTTP/oRPC | HTTP stream dispatch | HTTP routes expose bounded and streaming operator-work event routes through the shared query schema. |
+| OP-WORK-ENTRY-003C | SDK | TypeScript SDK stream helper | Generated SDK metadata can wrap the streaming route as an `AsyncIterable` of operator-work envelopes. |
 | OP-WORK-ENTRY-004 | CLI | `appaloft work mark-recovered <workId>` dispatches command | CLI dispatches `MarkOperatorWorkRecoveredCommand` with optional safe reason. |
 | OP-WORK-ENTRY-005 | HTTP/oRPC | HTTP mark-recovered dispatch | HTTP route dispatches the shared command schema. |
 | OP-WORK-ENTRY-006 | CLI | `appaloft work dead-letter <workId>` dispatches command | CLI dispatches `DeadLetterOperatorWorkCommand` with required safe reason. |

@@ -12,6 +12,7 @@ import {
   reservePort,
   runDocker,
   runShellCli,
+  waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
 const dockerfileFixtureDir = fixturePath("docker-express-hello");
@@ -74,6 +75,8 @@ describe("quick deploy local Docker substrate e2e", () => {
           "127.0.0.1",
           "--provider",
           "local-shell",
+          "--proxy-kind",
+          "none",
         ],
         workspace.cliOptions,
       );
@@ -108,6 +111,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       );
       expectCliSuccess(dockerfileDeployment, "quick deploy Dockerfile");
       dockerfileDeploymentId = parseJson<{ id: string }>(dockerfileDeployment.stdout).id;
+      await waitForDeploymentSucceeded(dockerfileDeploymentId, workspace.cliOptions);
 
       const dockerfileLogs = runShellCli(["logs", dockerfileDeploymentId], workspace.cliOptions);
       expectCliSuccess(dockerfileLogs, "Dockerfile logs");
@@ -143,6 +147,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       );
       expectCliSuccess(prebuiltDeployment, "quick deploy prebuilt image");
       prebuiltDeploymentId = parseJson<{ id: string }>(prebuiltDeployment.stdout).id;
+      await waitForDeploymentSucceeded(prebuiltDeploymentId, workspace.cliOptions);
 
       const prebuiltLogs = runShellCli(["logs", prebuiltDeploymentId], workspace.cliOptions);
       expectCliSuccess(prebuiltLogs, "prebuilt image logs");
@@ -176,6 +181,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       );
       expectCliSuccess(composeDeployment, "quick deploy Docker Compose");
       composeDeploymentId = parseJson<{ id: string }>(composeDeployment.stdout).id;
+      await waitForDeploymentSucceeded(composeDeploymentId, workspace.cliOptions);
 
       const composeLogs = runShellCli(["logs", composeDeploymentId], workspace.cliOptions);
       expectCliSuccess(composeLogs, "Docker Compose logs");
@@ -202,5 +208,5 @@ describe("quick deploy local Docker substrate e2e", () => {
       runDocker(["image", "rm", "-f", prebuiltImage]);
       cleanupWorkspace(workspace.workspaceDir);
     }
-  }, 240000);
+  }, 360000);
 });
