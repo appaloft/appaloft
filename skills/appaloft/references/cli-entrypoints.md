@@ -56,6 +56,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft project restore <projectId>` - `projects.restore`
 - `appaloft project delete-check <projectId>` - `projects.delete-check`
 - `appaloft project delete <projectId> --confirm <projectId>` - `projects.delete`
+- `appaloft blueprint list` - `blueprints.list`
+- `appaloft blueprint show` - `blueprints.show`
+- `appaloft blueprint plan-install` - `blueprints.plan-install`
+- `appaloft blueprint install` - `blueprints.install`
+- `appaloft blueprint installation show` - `blueprints.installation.show`
 - `appaloft server register` - `servers.register`
 - `appaloft server credential <serverId>` - `servers.configure-credential`
 - `appaloft server credential-create` - `credentials.create-ssh`
@@ -83,6 +88,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server delete <serverId> --confirm <serverId>` - `servers.delete`
 - `appaloft server test <serverId>; appaloft server doctor <serverId>` - `servers.test-connectivity`
 - `appaloft server proxy repair <serverId>` - `servers.bootstrap-proxy`
+- `appaloft server runtime prepare <serverId>` - `servers.prepare-runtime`
 - `appaloft resource list` - `resources.list`
 - `appaloft resource count` - `resources.count`
 - `appaloft resource show <resourceId>` - `resources.show`

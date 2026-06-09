@@ -26,6 +26,7 @@ const zhTree: NavFolder[] = [
     name: "Deploy",
     children: [
       page("Overview", "deploy/overview"),
+      page("One-click deploy", "deploy/one-click"),
       page("Sources", "deploy/sources"),
       page("Lifecycle", "deploy/lifecycle"),
       page("Previews", "deploy/previews"),

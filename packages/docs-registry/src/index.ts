@@ -323,6 +323,39 @@ export const publicDocsHelpTopics = {
       "apps/web server list/detail and registration surfaces, including server detail rename, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
     ],
   },
+  "blueprint.deploy-handoff": {
+    id: "blueprint.deploy-handoff",
+    title: "Blueprint deploy handoff",
+    description:
+      "How Blueprint catalog discovery, install planning, install acceptance, installation readback, and README deploy buttons hand users into the same Blueprint deployment flow.",
+    page: {
+      "zh-CN": "deploy/one-click",
+      "en-US": "en/deploy/one-click",
+    },
+    anchor: "deploy-handoff-url",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "blueprints.list",
+    aliases: [
+      "blueprint catalog",
+      "blueprint install",
+      "deploy button",
+      "one click deploy",
+      "Deploy on Appaloft",
+      "一键部署",
+      "部署按钮",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-065-blueprint-format-and-local-registry-boundary.md",
+      "docs/specs/087-blueprint-component-relations/spec.md",
+    ],
+    webSurfaces: [
+      "apps/web Quick Deploy and marketplace Blueprint entrypoints carry Blueprint slug, variant, profile, and project defaults through deploy handoff URL state",
+    ],
+  },
   "server.docker-swarm-target": {
     id: "server.docker-swarm-target",
     title: "Docker Swarm runtime target",
@@ -2732,6 +2765,23 @@ export const publicDocsOperationCoverage = [
   { operationKey: "projects.restore", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.delete-check", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "projects.delete", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "blueprints.list", status: "documented", topicId: "blueprint.deploy-handoff" },
+  { operationKey: "blueprints.show", status: "documented", topicId: "blueprint.deploy-handoff" },
+  {
+    operationKey: "blueprints.plan-install",
+    status: "documented",
+    topicId: "blueprint.deploy-handoff",
+  },
+  {
+    operationKey: "blueprints.install",
+    status: "documented",
+    topicId: "blueprint.deploy-handoff",
+  },
+  {
+    operationKey: "blueprints.installation.show",
+    status: "documented",
+    topicId: "blueprint.deploy-handoff",
+  },
   { operationKey: "servers.register", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.configure-credential",
@@ -2968,6 +3018,11 @@ export const publicDocsOperationCoverage = [
     operationKey: "servers.bootstrap-proxy",
     status: "documented",
     topicId: "server.proxy-readiness",
+  },
+  {
+    operationKey: "servers.prepare-runtime",
+    status: "documented",
+    topicId: "server.deployment-target",
   },
   { operationKey: "resources.list", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.count", status: "documented", topicId: "resource.concept" },

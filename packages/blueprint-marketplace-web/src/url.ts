@@ -1,3 +1,4 @@
+import { createBlueprintDeployHandoffUrl as createPublicBlueprintDeployHandoffUrl } from "@appaloft/blueprints/deploy-handoff";
 import { type BlueprintMarketplaceDeployHandoffInput } from "./types";
 
 export const defaultBlueprintMarketplaceListEndpoint = "/api/blueprints";
@@ -21,22 +22,16 @@ export function createBlueprintMarketplaceEndpoint(baseUrl: string, endpoint: st
 export function createBlueprintDeployHandoffUrl(
   input: BlueprintMarketplaceDeployHandoffInput,
 ): string {
-  const deployBaseUrl = input.deployBaseUrl.trim();
-  const isAbsolute = /^https?:\/\//.test(deployBaseUrl);
-  const baseUrl = isAbsolute ? deployBaseUrl.replace(/\/+$/g, "") : "https://appaloft.local";
-  const url = new URL("/deploy", baseUrl);
-
-  url.searchParams.set("source", "blueprint");
-  if (input.sourceExtension) {
-    url.searchParams.set("sourceExtension", input.sourceExtension);
-  }
-  url.searchParams.set("blueprintSlug", input.slug);
-  url.searchParams.set("blueprintTitle", input.title);
-  url.searchParams.set("step", "project");
-  url.searchParams.set("projectMode", "new");
-  url.searchParams.set("projectName", input.projectName ?? input.title);
-
-  return isAbsolute ? url.href : `${url.pathname}${url.search}`;
+  return createPublicBlueprintDeployHandoffUrl({
+    deployBaseUrl: input.deployBaseUrl,
+    source: {
+      kind: "catalog",
+      slug: input.slug,
+      title: input.title,
+      ...(input.sourceExtension ? { sourceExtension: input.sourceExtension } : {}),
+    },
+    ...(input.projectName ? { projectName: input.projectName } : {}),
+  });
 }
 
 export function createBlueprintDetailHref(basePath: string, slug: string): string {
