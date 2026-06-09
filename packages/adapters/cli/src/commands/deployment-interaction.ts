@@ -1409,13 +1409,14 @@ function sourceProfilesMatch(input: {
   return JSON.stringify(current) === JSON.stringify(desired);
 }
 
-function shouldConfigureReusableResourceSource(input: {
+export function shouldConfigureReusableResourceSource(input: {
   seed: DeploymentPromptSeed;
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
 }): boolean {
   return Boolean(
     input.deploymentMethod === "prebuilt-image" ||
+      input.deploymentMethod === "docker-compose" ||
       isRemoteOrImageSource(input.sourceLocator) ||
       input.seed.sourceProfile?.gitRef ||
       input.seed.sourceProfile?.commitSha ||
