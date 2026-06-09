@@ -37,6 +37,21 @@ export function fixturePath(name: string): string {
   return new URL(`../../fixtures/${name}`, import.meta.url).pathname;
 }
 
+export function externalServerDatabaseEnv(): Record<string, string> {
+  if (!usesExternalServer() || !process.env.APPALOFT_DATABASE_URL) {
+    return {};
+  }
+
+  return {
+    APPALOFT_DATABASE_DRIVER: "postgres",
+    APPALOFT_DATABASE_URL: process.env.APPALOFT_DATABASE_URL,
+  };
+}
+
+export function usesExternalServer(): boolean {
+  return process.env.APPALOFT_E2E_EXTERNAL_SERVER === "true";
+}
+
 export function createShellE2eWorkspace(
   prefix: string,
   options: {
@@ -254,6 +269,38 @@ export async function waitForDeploymentSucceeded(
   );
 }
 
+export async function waitForDeploymentLogs(
+  deploymentId: string,
+  options: ShellCliOptions,
+  expectedMessages: string | string[],
+  config: {
+    intervalMs?: number;
+    label?: string;
+    timeoutMs?: number;
+  } = {},
+): Promise<CliResult> {
+  const timeoutMs = config.timeoutMs ?? 90_000;
+  const intervalMs = config.intervalMs ?? 1_000;
+  const expected = Array.isArray(expectedMessages) ? expectedMessages : [expectedMessages];
+  const startedAt = Date.now();
+  let lastResult: CliResult | undefined;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = runShellCli(["logs", deploymentId], options);
+    lastResult = result;
+
+    if (result.exitCode === 0 && expected.every((message) => result.stdout.includes(message))) {
+      return result;
+    }
+
+    await Bun.sleep(intervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${config.label ?? deploymentId} logs to contain ${expected.map((message) => JSON.stringify(message)).join(", ")}\nstdout:\n${lastResult?.stdout ?? ""}\nstderr:\n${lastResult?.stderr ?? ""}`,
+  );
+}
+
 async function expectHttpStatus(response: Response, status: number): Promise<void> {
   if (response.status === status) {
     return;
@@ -302,6 +349,7 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
       APPALOFT_HTTP_PORT: options.httpPort,
       APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
       APPALOFT_WEB_STATIC_DIR: "",
+      APPALOFT_CONTROL_PLANE_MODE: "none",
       ...options.env,
     },
     stderr: "pipe",

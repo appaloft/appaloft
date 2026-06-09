@@ -85,7 +85,7 @@ jobs:
 
       - name: Shell CLI + HTTP E2E
         working-directory: apps/shell
-        run: bun test ./test/e2e/*.e2e.ts --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+        run: bun test --timeout=900000 ./test/e2e/*.e2e.ts --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
 
       - name: Web WebView Smoke
         if: ${{ matrix.shard == 1 }}

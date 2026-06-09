@@ -131,4 +131,27 @@ describe("CLI quick deploy draft mapping", () => {
       exposureMode: "reverse-proxy",
     });
   });
+
+  test("[QUICK-DEPLOY-WF-044] updates reusable resource sources for docker compose deploys", async () => {
+    ensureReflectMetadata();
+    const { shouldConfigureReusableResourceSource } = await import(
+      "../src/commands/deployment-interaction"
+    );
+
+    expect(
+      shouldConfigureReusableResourceSource({
+        seed: {},
+        sourceLocator: "/workspace/compose.yml",
+        deploymentMethod: "docker-compose",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldConfigureReusableResourceSource({
+        seed: {},
+        sourceLocator: "/workspace/app",
+        deploymentMethod: "workspace-commands",
+      }),
+    ).toBe(false);
+  });
 });

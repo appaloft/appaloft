@@ -7,7 +7,7 @@
 
 ## Business Outcome
 
-Operators can use one resource detail/settings surface to manage resource-owned source, runtime,
+Operators can use one resource detail/profile surface to manage resource-owned source, runtime,
 network, access, health, and configuration profiles without accidentally creating deployment or
 routing side effects.
 
@@ -20,7 +20,7 @@ state, bind domains, issue certificates, or apply proxy routes.
 
 | Term | Meaning | Context | Compatibility aliases |
 | --- | --- | --- | --- |
-| Resource detail/profile editing closure | Phase 4 closure that the resource detail/settings surface manages each active resource-owned profile section through named operations. | Workload Delivery / Resource | Resource settings closure |
+| Resource detail/profile editing closure | Phase 4 closure that the resource detail profile surface manages each active resource-owned profile section through named operations. | Workload Delivery / Resource | Resource settings closure |
 | Resource-owned profile | Durable source, runtime, network, access, health, or configuration state stored on the resource side before deployment admission snapshots it. | Resource profile lifecycle | Resource settings |
 | Future-only profile edit | A resource-owned change consumed by later deployment or route planning without changing current runtime or historical snapshots. | Resource profile lifecycle | Durable profile edit |
 | Resource configuration override | One resource-scoped variable or secret entry resolved above environment scope for future deployment snapshots. | Configuration / Resource | Resource variable |
@@ -29,7 +29,7 @@ state, bind domains, issue certificates, or apply proxy routes.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| RDP-CLOSE-001 | Resource detail exposes every Phase 4 resource-owned profile section. | An operator opens resource detail/settings. | They review profile, configuration, and health sections. | Source, runtime, network, access, health, and configuration controls are reachable from resource detail. |
+| RDP-CLOSE-001 | Resource detail exposes every Phase 4 resource-owned profile section. | An operator opens resource detail. | They review overview/profile, environment variables, and health sections. | Source, runtime, network, access, health, and configuration controls are reachable from resource detail; configuration variables use the top-level Environment tab. |
 | RDP-CLOSE-002 | Profile saves use named operations. | An active resource is open in Web. | The operator saves source, runtime, network, access, health, or configuration changes. | Web dispatches the matching `resources.configure-*`, `resources.set-variable`, or `resources.unset-variable` operation and refetches the matching read path. |
 | RDP-CLOSE-003 | Entrypoints share schemas and operation names. | CLI, HTTP/oRPC, Web, docs help, and future tool metadata refer to resource profile editing. | The behavior is exposed or documented. | Each surface uses existing command/query schemas and operation keys; no generic `resources.update` or transport-only resource update shape exists. |
 | RDP-CLOSE-004 | Side effects are explicit. | The operator saves a resource-level profile or config change. | The change is accepted. | The UI/docs/specs make clear that the save does not create deployments, mutate historical snapshots, immediately affect current runtime/workload, bind domains, issue certificates, or apply proxy routes. |
@@ -52,7 +52,7 @@ state, bind domains, issue certificates, or apply proxy routes.
   `resources.effective-config`.
 - CLI: Existing `appaloft resource configure-*`, `set-variable`, `unset-variable`, `show`, and
   `effective-config` subcommands.
-- Web/UI: Resource detail/settings profile, configuration, and health sections.
+- Web/UI: Resource detail Overview profile sections, top-level Environment variables tab, and health sections.
 - Config: Repository config can seed or reconfigure profile values through existing entry workflows
   where specified; it does not create a broad resource update surface or choose Appaloft identity.
 - Events: Existing resource profile/configuration events remain unchanged.

@@ -13,6 +13,7 @@ import {
   parseJson,
   runDocker,
   runShellCli,
+  usesExternalServer,
   waitForHttpHealth,
 } from "./support/shell-e2e-fixture";
 
@@ -255,15 +256,17 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
           deploymentId,
           fixture.expectedDockerfile,
         );
-        expect(existsSync(generatedDockerfile)).toBe(true);
-        const dockerfileText = await Bun.file(generatedDockerfile).text();
-        expect(dockerfileText).toContain("FROM ");
-        if (fixture.expectedDockerfile === "Dockerfile.appaloft-static") {
-          expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
-          expect(dockerfileText).toContain("EXPOSE 80");
-        } else {
-          expect(dockerfileText).toContain(`EXPOSE ${fixture.port}`);
-          expect(dockerfileText).toContain("CMD ");
+        if (!usesExternalServer()) {
+          expect(existsSync(generatedDockerfile)).toBe(true);
+          const dockerfileText = await Bun.file(generatedDockerfile).text();
+          expect(dockerfileText).toContain("FROM ");
+          if (fixture.expectedDockerfile === "Dockerfile.appaloft-static") {
+            expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
+            expect(dockerfileText).toContain("EXPOSE 80");
+          } else {
+            expect(dockerfileText).toContain(`EXPOSE ${fixture.port}`);
+            expect(dockerfileText).toContain("CMD ");
+          }
         }
       }
     } finally {

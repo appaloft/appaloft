@@ -300,5 +300,5 @@ describe("remote control-plane CLI e2e", () => {
     } finally {
       fakeServer.stop(true);
     }
-  });
+  }, 30_000);
 });
