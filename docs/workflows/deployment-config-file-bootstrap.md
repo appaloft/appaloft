@@ -986,6 +986,8 @@ When invoked from deploy-action, install and verify the selected Appaloft CLI re
   -> create project/resource on first run when no trusted identity exists
   -> persist source fingerprint link state after first-run identity is created
   -> apply profile fields through resources.create or explicit resource/environment config commands
+  -> apply declared services through first-run resources.create, or block existing Resource service
+     drift until a service reconciliation operation exists
   -> dispatch environments.set-variable for config env and resolved CI secrets
   -> resolve config `access.domains[]` into server-applied route intent or managed domain intent
   -> dispatch deployments.create with ids only
@@ -1040,6 +1042,8 @@ project/resource/server identity or target bootstrap data.
 
 Current CLI deploy supports explicit `--config` and implicit source-root discovery. The CLI maps
 config source/runtime/network/health profile fields into quick-deploy resource creation input,
+maps `services.<key>` names/kinds into first-run Resource service metadata while keeping
+service-specific runtime execution deferred,
 supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
 plain `env` declarations and `ci-env:` secret references into environment variable commands,
 checks `resource-secret:` requirements through Resource secret readback,

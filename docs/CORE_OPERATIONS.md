@@ -724,6 +724,13 @@ Current boundary:
   precedence is resolved. The explicit secret-reference lifecycle returns only safe id/key/exposure
   metadata or masked `value = "****"` read models and is the public CRUD surface for Resource-owned
   secret references.
+- repository config `services.<key>` is the public-neutral service graph profile input for one
+  Resource. The first implemented slice parses service role, source/runtime/network/health,
+  service-local replicas, env, and secret references; first-run config bootstrap maps service
+  names/kinds into `resources.create`; existing Resource service drift blocks deployment until a
+  dedicated service reconciliation command exists; and `deployments.create` remains ids-only. This
+  is governed by
+  [Repository Config Service Graph](./specs/096-repository-config-service-graph/spec.md).
 - storage volume lifecycle is implemented for Phase 7 through
   `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.
   Storage attachments are Resource profile state and new deployments snapshot them into
