@@ -9051,6 +9051,25 @@ export interface DeploymentConfiguredResource {
   services?: RequestedDeploymentServiceConfig[];
 }
 
+export interface DeploymentConfiguredSource {
+  type?: "git" | "image";
+  repository?: string;
+  image?: string;
+  gitRef?: string;
+  commitSha?: string;
+  baseDirectory?: string;
+  version?: string;
+  versionKind?: string;
+}
+
+export interface DeploymentConfiguredApplication {
+  key: string;
+  resource: DeploymentConfiguredResource;
+  source?: DeploymentConfiguredSource;
+  deployment?: Partial<RequestedDeploymentConfig>;
+  services?: RequestedDeploymentServiceConfig[];
+}
+
 export interface DeploymentConfiguredDestination {
   name?: string;
   kind?: DestinationKind;
@@ -9091,6 +9110,7 @@ export interface DeploymentConfigSnapshot {
   environment?: DeploymentConfiguredEnvironment;
   resource?: DeploymentConfiguredResource;
   services?: RequestedDeploymentServiceConfig[];
+  applications?: DeploymentConfiguredApplication[];
   targets?: DeploymentConfiguredTarget[];
   deployment?: Partial<RequestedDeploymentConfig> & {
     targetKey?: string;
