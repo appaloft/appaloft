@@ -182,6 +182,24 @@ function inferResourceName(sourceLocator: string): string {
   return createQuickDeployGeneratedResourceName(segments.at(-1) ?? "app");
 }
 
+function withConfigServiceGraph(
+  resource: NonNullable<DeploymentPromptSeed["resource"]>,
+  services: DeploymentPromptSeed["services"],
+): NonNullable<DeploymentPromptSeed["resource"]> {
+  if (!services || services.length === 0) {
+    return resource;
+  }
+
+  return {
+    ...resource,
+    kind: services.length > 1 ? "compose-stack" : (resource.kind ?? "application"),
+    services: services.map((service) => ({
+      name: service.name,
+      kind: service.kind,
+    })),
+  };
+}
+
 function resolveLocalSourceDirectory(sourceLocator: string): string | null {
   const absolutePath = resolve(sourceLocator);
   if (existsSync(absolutePath) && statSync(absolutePath).isDirectory()) {
@@ -1600,17 +1618,20 @@ export const deployCommand = EffectCommand.make(
       const configuredSourceLocator = normalizedSourceLocator;
       const resourceSpec =
         !resourceId && (resourceNameValue || configuredSourceLocator)
-          ? {
-              name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
-              kind:
-                resourceKindValue ??
-                (deploymentMethod === "docker-compose"
-                  ? "compose-stack"
-                  : deploymentMethod === "static"
-                    ? "static-site"
-                    : "application"),
-              ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
-            }
+          ? withConfigServiceGraph(
+              {
+                name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
+                kind:
+                  resourceKindValue ??
+                  (deploymentMethod === "docker-compose"
+                    ? "compose-stack"
+                    : deploymentMethod === "static"
+                      ? "static-site"
+                      : "application"),
+                ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
+              },
+              configSeed.services,
+            )
           : undefined;
       const serverSshPrivateKey = serverSshPrivateKeyFileValue
         ? yield* Effect.promise(() => Bun.file(serverSshPrivateKeyFileValue).text())

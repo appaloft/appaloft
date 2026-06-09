@@ -1072,7 +1072,7 @@ export class CreateDeploymentUseCase {
         }),
       });
 
-      if (durableWorkQueueAdapter) {
+      if (durableWorkQueueAdapter && input.executionMode === "detached") {
         const deploymentState = deployment.toState();
         const targetState = deploymentState.target.toState();
         const scheduler = new DeploymentDurableWorkScheduler(durableWorkQueueAdapter);

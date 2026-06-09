@@ -7,6 +7,7 @@ import {
   type Result,
   resourceExposureModes,
   resourceNetworkProtocols,
+  resourceServiceKinds,
   runtimePlanStrategies,
   ScheduledTaskCommandIntent,
   ScheduledTaskScheduleExpression,
@@ -39,6 +40,7 @@ const dependencyKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const storageKeyPattern = dependencyKeyPattern;
 const scheduledTaskKeyPattern = dependencyKeyPattern;
 const configProfileKeyPattern = dependencyKeyPattern;
+const serviceKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/;
 const environmentVariableNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 const appaloftDeploymentMonitoringSignals = [
   "cpu",
@@ -217,7 +219,6 @@ const unsupportedConfigFields = new Set([
   "memoryMi",
   "namespace",
   "stack",
-  "service",
   "serviceName",
   "replicas",
   "scale",
@@ -870,6 +871,46 @@ export const appaloftDeploymentSecretReferenceSchema = z
   })
   .strict();
 
+export const appaloftDeploymentServiceConfigSchema = z
+  .object({
+    kind: z.enum(resourceServiceKinds).describe("Provider-neutral service role."),
+    source: appaloftDeploymentSourceConfigSchema.optional(),
+    runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
+    network: appaloftDeploymentNetworkConfigSchema.optional(),
+    health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    replicas: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Requested process replicas for this named service."),
+    env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
+    secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.source?.type !== "image") {
+      return;
+    }
+
+    if (value.runtime?.type) {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "type"],
+        message: sourceImageRuntimeTypeError,
+      });
+    }
+
+    if (value.runtime?.strategy && value.runtime.strategy !== "prebuilt-image") {
+      context.addIssue({
+        code: "custom",
+        path: ["runtime", "strategy"],
+        message: sourceImageRuntimeStrategyError,
+      });
+    }
+  })
+  .describe("Provider-neutral named service/process declaration for repository config.");
+
 export const appaloftDeploymentDependencyBackupConfigSchema = z
   .object({
     enabled: z.boolean().optional().default(true),
@@ -1245,6 +1286,17 @@ export const appaloftDeploymentConfigSchema = z
         appaloftDeploymentNamedProfileConfigSchema,
       )
       .optional(),
+    services: z
+      .record(
+        z
+          .string()
+          .regex(
+            serviceKeyPattern,
+            "config_service_resolution: service keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+        appaloftDeploymentServiceConfigSchema,
+      )
+      .optional(),
     dependencies: z
       .record(
         z
@@ -1412,6 +1464,26 @@ function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDe
           },
         }
       : {}),
+    ...(config.services
+      ? {
+          services: Object.fromEntries(
+            Object.entries(config.services).map(([key, service]) => [
+              key,
+              {
+                ...service,
+                ...(service.network?.targetServiceName
+                  ? {
+                      network: {
+                        ...service.network,
+                        targetServiceName: service.network.targetServiceName.trim(),
+                      },
+                    }
+                  : {}),
+              },
+            ]),
+          ),
+        }
+      : {}),
     ...(config.storage
       ? {
           storage: Object.fromEntries(
@@ -1454,6 +1526,7 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
     root === "network" ||
     root === "source" ||
     root === "access" ||
+    root === "services" ||
     root === "dependencies" ||
     root === "storage" ||
     root === "scheduledTasks" ||
@@ -1488,6 +1561,14 @@ function shouldTreatSecretField(path: (string | number)[], key: string, value: u
   }
 
   return !isAllowedSecretReference([...path, key], value);
+}
+
+function shouldTreatUnsupportedField(path: (string | number)[], key: string): boolean {
+  if (path.length === 2 && path[0] === "services" && key === "replicas") {
+    return false;
+  }
+
+  return unsupportedConfigFields.has(key);
 }
 
 function containsRawSecretMaterial(value: unknown): boolean {
@@ -1530,7 +1611,7 @@ function collectConfigViolations(
       continue;
     }
 
-    if (unsupportedConfigFields.has(key)) {
+    if (shouldTreatUnsupportedField(path, key)) {
       violations.push({
         code: "unsupported_config_field",
         path: entryPath,

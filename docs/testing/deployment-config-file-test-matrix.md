@@ -41,6 +41,9 @@ Canonical assertions:
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
   domain intent in control-plane mode, and never become `deployments.create` fields;
+- `services.<key>` declarations describe a provider-neutral Resource service graph, map service
+  names/kinds into first-run Resource creation, block existing Resource service drift until a
+  reconciliation operation exists, and never become `deployments.create` fields;
 - `controlPlane` declarations choose connection policy only, never durable identity or secrets;
 - HTTP remains strict unless a future workflow command is accepted by ADR.
 
@@ -80,6 +83,7 @@ This matrix inherits:
 - [Repository Config Runtime Monitoring Thresholds](../specs/081-repository-config-runtime-monitoring-thresholds/spec.md)
 - [Repository Config Prebuilt Image Source](../specs/085-repository-config-prebuilt-image-source/spec.md)
 - [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
+- [Repository Config Service Graph](../specs/096-repository-config-service-graph/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -100,6 +104,7 @@ This matrix inherits:
 | Remote state | SSH-server `ssh-pglite` default, local-only override, locking, migration, and source identity reuse. |
 | Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
+| Service graph | Repository service names/kinds seed first-run Resource service metadata; existing Resource drift blocks until a service reconciliation operation exists. |
 | Environment and secret reference commands | Non-secret variables, `ci-env:` secret values, and existing `resource-secret:` requirements are handled before deployment snapshot without leaking raw secret values. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
 | Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
@@ -162,6 +167,15 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration through explicit apply step | Existing resource profile differs and the entry workflow has an accepted explicit mode or step to apply profile changes | Relevant `resources.configure-*`, `resources.configure-health`, `resources.set-variable`, or `resources.unset-variable` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
 | CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |
 | CONFIG-FILE-PROFILE-009 | integration | Final deployment input is ids-only | Config contains valid source/runtime/network/health profile fields | Final command input contains only project/server/destination/environment/resource ids | None | Assert no source/runtime/network fields on `deployments.create` |
+
+## Service Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-SERVICE-GRAPH-001 | parser/schema | Named service graph accepted | Config declares `services.web` and `services.worker` with service kind, runtime, network, health, replicas, env, and secret references | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-SERVICE-GRAPH-002 | parser/schema | Unsafe service graph rejected | Config declares invalid service key, missing kind, raw secret material, unknown fields, or top-level/orchestrator sizing outside the service entry | Parser fails before mutation | `validation_error`, phase `config-schema`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-SERVICE-GRAPH-003 | integration | First-run Resource services created | Config declares multiple services and no existing Resource is selected | Config deploy creates a Resource with `kind = compose-stack` and declared service names/kinds; deployment remains ids-only | None | `resources.create(services)` -> `deployments.create(ids only)` |
+| CONFIG-FILE-SERVICE-GRAPH-004 | integration | Existing Resource service drift blocks deploy | Selected Resource declares different service metadata from config | Config deploy fails before deployment instead of ignoring the graph | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show`; no `deployments.create` |
 
 ## Secrets Matrix
 
@@ -406,6 +420,7 @@ Current implemented coverage:
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
   `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
+  `CONFIG-FILE-SERVICE-GRAPH-001` through `CONFIG-FILE-SERVICE-GRAPH-002`,
   `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
   `CONFIG-FILE-SCHED-TASK-001` through `CONFIG-FILE-SCHED-TASK-003`, and
@@ -417,6 +432,9 @@ Current implemented coverage:
   `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002`, and
   `CONFIG-FILE-NAMED-PROFILE-001` through `CONFIG-FILE-NAMED-PROFILE-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
+- `CONFIG-FILE-SERVICE-GRAPH-003` through `CONFIG-FILE-SERVICE-GRAPH-004` are covered in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving first-run Resource service
+  metadata creation and existing Resource service drift blocking.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
