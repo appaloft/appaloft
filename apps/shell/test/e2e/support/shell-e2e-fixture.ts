@@ -100,58 +100,134 @@ export function expectCliSuccess(result: CliResult, label: string): void {
   expect(result.exitCode, `${label}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`).toBe(0);
 }
 
-export function parseJson<T>(raw: string): T {
-  const objectStart = raw.indexOf("{");
-  const arrayStart = raw.indexOf("[");
-  const start =
-    objectStart < 0 ? arrayStart : arrayStart < 0 ? objectStart : Math.min(objectStart, arrayStart);
+function parseJsonPayloads(raw: string): unknown[] {
+  const payloads: unknown[] = [];
 
-  if (start < 0) {
+  for (let offset = 0; offset < raw.length; ) {
+    const objectStart = raw.indexOf("{", offset);
+    const arrayStart = raw.indexOf("[", offset);
+    const start =
+      objectStart < 0
+        ? arrayStart
+        : arrayStart < 0
+          ? objectStart
+          : Math.min(objectStart, arrayStart);
+
+    if (start < 0) {
+      return payloads;
+    }
+
+    const opening = raw[start];
+    const closing = opening === "{" ? "}" : "]";
+    let depth = 0;
+    let escaped = false;
+    let inString = false;
+
+    for (let index = start; index < raw.length; index += 1) {
+      const char = raw[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = inString;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === opening) {
+        depth += 1;
+        continue;
+      }
+
+      if (char === closing) {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            payloads.push(JSON.parse(raw.slice(start, index + 1)));
+          } catch {
+            // Ignore non-JSON fragments from structured application logs.
+          }
+          offset = index + 1;
+          break;
+        }
+      }
+    }
+
+    if (offset <= start) {
+      return payloads;
+    }
+  }
+
+  return payloads;
+}
+
+export function parseJson<T>(raw: string): T {
+  const [payload] = parseJsonPayloads(raw);
+  if (!payload) {
     throw new SyntaxError("No JSON payload found");
   }
 
-  const opening = raw[start];
-  const closing = opening === "{" ? "}" : "]";
-  let depth = 0;
-  let escaped = false;
-  let inString = false;
+  return payload as T;
+}
 
-  for (let index = start; index < raw.length; index += 1) {
-    const char = raw[index];
+type DeploymentEventEnvelope = {
+  kind: string;
+  event?: {
+    eventType?: string;
+    summary?: string;
+    status?: string;
+  };
+  error?: {
+    message?: string;
+  };
+};
 
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
+export async function waitForDeploymentSucceeded(
+  deploymentId: string,
+  options: ShellCliOptions,
+): Promise<void> {
+  const events = runShellCli(
+    ["deployments", "events", deploymentId, "--follow", "--json"],
+    options,
+  );
+  expectCliSuccess(events, `wait for deployment ${deploymentId} event stream`);
 
-    if (char === "\\") {
-      escaped = inString;
-      continue;
-    }
-
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) {
-      continue;
-    }
-
-    if (char === opening) {
-      depth += 1;
-      continue;
-    }
-
-    if (char === closing) {
-      depth -= 1;
-      if (depth === 0) {
-        return JSON.parse(raw.slice(start, index + 1)) as T;
-      }
-    }
+  const envelopes = parseJsonPayloads(events.stdout).filter(
+    (payload): payload is DeploymentEventEnvelope =>
+      typeof payload === "object" && payload !== null && "kind" in payload,
+  );
+  const failed = envelopes.find(
+    (envelope) => envelope.kind === "error" || envelope.event?.eventType === "deployment-failed",
+  );
+  if (failed) {
+    throw new Error(
+      `Deployment ${deploymentId} failed while waiting for event stream:\n${JSON.stringify(
+        failed,
+        null,
+        2,
+      )}\nstdout:\n${events.stdout}\nstderr:\n${events.stderr}`,
+    );
   }
 
-  throw new SyntaxError("Unterminated JSON payload");
+  const succeeded = envelopes.some(
+    (envelope) => envelope.event?.eventType === "deployment-succeeded",
+  );
+  if (!succeeded) {
+    throw new Error(
+      `Deployment ${deploymentId} event stream closed without deployment-succeeded:\nstdout:\n${events.stdout}\nstderr:\n${events.stderr}`,
+    );
+  }
 }
 
 async function expectHttpStatus(response: Response, status: number): Promise<void> {

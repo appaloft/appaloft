@@ -11,6 +11,7 @@ import {
   reservePort,
   runDocker,
   runShellCli,
+  waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
 const fixtureDir = fixturePath("workspace-http-app");
@@ -102,6 +103,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
       );
       expectCliSuccess(deployment, "quick deploy workspace commands");
       deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+      await waitForDeploymentSucceeded(deploymentId, workspace.cliOptions);
 
       const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
       expect(logs.exitCode, logs.stderr).toBe(0);

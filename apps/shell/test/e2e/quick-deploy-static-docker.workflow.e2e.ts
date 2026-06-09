@@ -10,6 +10,7 @@ import {
   parseJson,
   runDocker,
   runShellCli,
+  waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
 const fixtureDir = fixturePath("static-site");
@@ -98,6 +99,7 @@ describe("quick deploy static Docker workflow e2e", () => {
       );
       expectCliSuccess(deployment, "quick deploy static site");
       deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+      await waitForDeploymentSucceeded(deploymentId, workspace.cliOptions);
 
       const resources = runShellCli(
         ["resource", "list", "--project", projectId, "--environment", environmentId],
