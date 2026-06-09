@@ -148,19 +148,29 @@ type MaybePromise<T> = T | Promise<T>;
 
 export type AppaloftHttpApp = ReturnType<typeof createHttpApp>;
 type AppaloftHttpServerHandle = ReturnType<typeof Bun.serve>;
+type AppaloftHttpAppWithListenServer = AppaloftHttpApp & {
+  server?: AppaloftHttpServerHandle | null;
+};
 
 function startAppaloftHttpServer(input: {
-  readonly fetch: (request: Request) => Response | Promise<Response>;
+  readonly app: AppaloftHttpApp;
   readonly hostname: string;
   readonly idleTimeoutSeconds?: number;
   readonly port: number;
 }): AppaloftHttpServerHandle {
-  return Bun.serve({
+  const app = input.app as AppaloftHttpAppWithListenServer;
+  app.listen({
     hostname: input.hostname,
     port: input.port,
     ...(input.idleTimeoutSeconds ? { idleTimeout: input.idleTimeoutSeconds } : {}),
-    fetch: input.fetch,
   });
+
+  const server = app.server;
+  if (!server) {
+    throw new Error("Appaloft HTTP server did not expose a Bun server handle.");
+  }
+
+  return server;
 }
 
 export interface AppaloftServer {
@@ -1051,7 +1061,7 @@ export async function createAppaloftServer(
         ? { idleTimeoutSeconds: config.httpIdleTimeoutSeconds }
         : {}),
       port: config.httpPort,
-      fetch: (request) => httpApp.handle(request),
+      app: httpApp,
     });
     started = true;
     resourceAccessFailureRendererTarget = resourceAccessFailureRendererTargetForStartedServer({
