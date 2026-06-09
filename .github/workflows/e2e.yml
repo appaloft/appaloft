@@ -33,6 +33,11 @@ jobs:
   e2e:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        shard_total: [2]
     services:
       postgres:
         image: postgres:16
@@ -80,9 +85,10 @@ jobs:
 
       - name: Shell CLI + HTTP E2E
         working-directory: apps/shell
-        run: bun run test:e2e
+        run: bun test ./test/e2e/*.e2e.ts --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
 
       - name: Web WebView Smoke
+        if: ${{ matrix.shard == 1 }}
         working-directory: apps/web
         run: bun run test:e2e
 
@@ -97,7 +103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: appaloft-e2e-logs
+          name: appaloft-e2e-logs-shard-${{ matrix.shard }}
           path: |
             runtime/logs
             apps/web/playwright-report
