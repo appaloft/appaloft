@@ -17,7 +17,8 @@ import {
 } from "./support/shell-e2e-fixture";
 
 const dockerfileFixtureDir = fixturePath("docker-express-hello");
-const composeFixtureFile = join(fixturePath("docker-compose-hello"), "docker-compose.yml");
+const composeFixtureDir = fixturePath("docker-compose-hello");
+const composeFixtureFile = join(composeFixtureDir, "docker-compose.yml");
 
 async function waitForHealth(url: string): Promise<void> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -178,7 +179,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       const composeDeployment = runShellCli(
         [
           "deploy",
-          composeFixtureFile,
+          composeFixtureDir,
           "--project",
           projectId,
           "--server",
@@ -189,6 +190,8 @@ describe("quick deploy local Docker substrate e2e", () => {
           "docker-compose",
           "--state-backend",
           "local-pglite",
+          "--docker-compose-file-path",
+          "docker-compose.yml",
           "--port",
           "3000",
         ],
