@@ -3,15 +3,21 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  DeploymentTarget,
+  DeploymentTargetId,
+  DeploymentTargetName,
   domainError,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
   err,
+  HostAddress,
+  PortNumber,
   Project,
   ProjectId,
   ProjectName,
+  ProviderKey,
   StorageVolume,
   StorageVolumeByIdSpec,
   StorageVolumeId,
@@ -45,6 +51,11 @@ import {
   ShowStorageVolumeBackupQuery,
 } from "../src/messages";
 import {
+  type DeploymentReadModel,
+  type DeploymentSummary,
+  type ServerRepository,
+} from "../src/ports";
+import {
   CreateStorageVolumeBackupPlanQueryService,
   CreateStorageVolumeBackupUseCase,
   CreateStorageVolumeRestorePlanQueryService,
@@ -61,6 +72,60 @@ function createContext(): ExecutionContext {
   });
 }
 
+class EmptyDeploymentReadModel implements DeploymentReadModel {
+  async count(): Promise<number> {
+    return 0;
+  }
+
+  async list(): Promise<DeploymentSummary[]> {
+    return [];
+  }
+
+  async findOne(): Promise<DeploymentSummary | null> {
+    return null;
+  }
+
+  async findLogs(): Promise<[]> {
+    return [];
+  }
+}
+
+class EmptyServerRepository implements ServerRepository {
+  async findOne(): Promise<null> {
+    return null;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+class LatestDeploymentReadModel extends EmptyDeploymentReadModel {
+  async list(): Promise<DeploymentSummary[]> {
+    return [
+      {
+        resourceId: "res_pocketbase",
+        serverId: "srv_demo",
+      } as DeploymentSummary,
+    ];
+  }
+}
+
+class SingleServerRepository implements ServerRepository {
+  readonly server = DeploymentTarget.register({
+    id: DeploymentTargetId.rehydrate("srv_demo"),
+    name: DeploymentTargetName.rehydrate("PocketBase host"),
+    host: HostAddress.rehydrate("127.0.0.1"),
+    port: PortNumber.rehydrate(22),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  async findOne(): Promise<DeploymentTarget | null> {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
 async function createHarness() {
   const context = createContext();
   const repositoryContext = toRepositoryContext(context);
@@ -73,6 +138,8 @@ async function createHarness() {
   const eventBus = new CapturedEventBus();
   const logger = new NoopLogger();
   const idGenerator = new SequenceIdGenerator();
+  const deploymentReadModel = new EmptyDeploymentReadModel();
+  const serverRepository = new EmptyServerRepository();
   const sourceAdapter = new FakeStorageBackupSourceAdapter("tar-volume");
   const sqliteAdapter = new FakeStorageBackupSourceAdapter(
     "sqlite-online-backup",
@@ -127,6 +194,8 @@ async function createHarness() {
       storageVolumes,
       storageBackups,
       providerRegistry,
+      deploymentReadModel,
+      serverRepository,
       clock,
       idGenerator,
       eventBus,
@@ -149,6 +218,8 @@ async function createHarness() {
       storageVolumes,
       storageBackups,
       providerRegistry,
+      deploymentReadModel,
+      serverRepository,
       clock,
       idGenerator,
       eventBus,
@@ -191,6 +262,7 @@ describe("storage volume backup and restore application flow", () => {
     const result = await createPlan.execute(
       context,
       CreateStorageVolumeBackupPlanQuery.create({
+        storageVolumeId: "stv_data",
         ...backupPlanRequest(),
         target: {
           providerKey: "local-filesystem",
@@ -221,7 +293,10 @@ describe("storage volume backup and restore application flow", () => {
       targetProvider,
     } = await createHarness();
 
-    const result = await createBackup.execute(context, { planRequest: backupPlanRequest() });
+    const result = await createBackup.execute(context, {
+      storageVolumeId: "stv_data",
+      planRequest: backupPlanRequest(),
+    });
 
     expect(result.isOk()).toBe(true);
     expect(sourceAdapter.created).toHaveLength(1);
@@ -242,6 +317,40 @@ describe("storage volume backup and restore application flow", () => {
     ]);
   });
 
+  test("[STOR-BACKUP-CREATE-002] defaults runtime target to the latest deployment server", async () => {
+    const harness = await createHarness();
+    const createBackup = new CreateStorageVolumeBackupUseCase(
+      harness.storageVolumes,
+      harness.storageBackups,
+      new FakeStorageBackupProviderRegistry([harness.sourceAdapter], [harness.targetProvider]),
+      new LatestDeploymentReadModel(),
+      new SingleServerRepository(),
+      harness.clock,
+      new SequenceIdGenerator(),
+      harness.eventBus,
+      new NoopLogger(),
+    );
+
+    const result = await createBackup.execute(harness.context, {
+      storageVolumeId: "stv_data",
+      planRequest: {
+        ...backupPlanRequest(),
+        source: {
+          storageVolumeId: "stv_data",
+          resourceId: "res_pocketbase",
+          attachmentId: "rsa_data",
+          destinationPath: "/pb_data",
+          dataFormat: "filesystem" as const,
+          liveWrites: false,
+        },
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(harness.sourceAdapter.created[0]?.runtimeTarget?.id.value).toBe("srv_demo");
+    expect(harness.targetProvider.stored[0]?.runtimeTarget?.id.value).toBe("srv_demo");
+  });
+
   test("[STOR-BACKUP-SQLITE-001] blocks live SQLite copy when app-consistent adapter is unavailable", async () => {
     const clock = new FixedClock("2026-01-01T00:00:00.000Z");
     const context = createContext();
@@ -255,6 +364,7 @@ describe("storage volume backup and restore application flow", () => {
     const result = await service.execute(
       context,
       CreateStorageVolumeBackupPlanQuery.create({
+        storageVolumeId: "stv_data",
         ...backupPlanRequest(),
         source: {
           ...backupPlanRequest().source,
@@ -283,7 +393,10 @@ describe("storage volume backup and restore application flow", () => {
       targetProvider,
     } = await createHarness();
     const backupId = (
-      await createBackup.execute(context, { planRequest: backupPlanRequest() })
+      await createBackup.execute(context, {
+        storageVolumeId: "stv_data",
+        planRequest: backupPlanRequest(),
+      })
     )._unsafeUnwrap().id;
 
     const plan = await createRestorePlan.execute(
@@ -333,7 +446,10 @@ describe("storage volume backup and restore application flow", () => {
   test("[STOR-BACKUP-INPLACE-001] restore plan and execution block in-place destructive restore", async () => {
     const { context, createBackup, createRestorePlan, restoreBackup } = await createHarness();
     const backupId = (
-      await createBackup.execute(context, { planRequest: backupPlanRequest() })
+      await createBackup.execute(context, {
+        storageVolumeId: "stv_data",
+        planRequest: backupPlanRequest(),
+      })
     )._unsafeUnwrap().id;
 
     const plan = await createRestorePlan.execute(
@@ -365,7 +481,10 @@ describe("storage volume backup and restore application flow", () => {
     const { context, createBackup, pruneBackup, showBackup, targetProvider } =
       await createHarness();
     const backupId = (
-      await createBackup.execute(context, { planRequest: backupPlanRequest() })
+      await createBackup.execute(context, {
+        storageVolumeId: "stv_data",
+        planRequest: backupPlanRequest(),
+      })
     )._unsafeUnwrap().id;
 
     const pruned = await pruneBackup.execute(context, { backupId });
@@ -416,13 +535,18 @@ describe("storage volume backup and restore application flow", () => {
       storageVolumes,
       storageBackups,
       providerRegistry,
+      new EmptyDeploymentReadModel(),
+      new EmptyServerRepository(),
       clock,
       new SequenceIdGenerator(),
       new CapturedEventBus(),
       new NoopLogger(),
     );
 
-    const result = await useCase.execute(context, { planRequest: backupPlanRequest() });
+    const result = await useCase.execute(context, {
+      storageVolumeId: "stv_data",
+      planRequest: backupPlanRequest(),
+    });
 
     expect(result.isOk()).toBe(true);
     const listed = await new ListStorageVolumeBackupsQueryService(

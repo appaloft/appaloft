@@ -39,6 +39,7 @@ const dryRunOption = Options.choice("dry-run", ["true", "false"]).pipe(Options.o
 const backupIdArg = Args.text({ name: "backupId" });
 const backupStorageVolumeOption = Options.text("storage-volume");
 const backupResourceOption = Options.text("resource").pipe(Options.optional);
+const backupServerOption = Options.text("server").pipe(Options.optional);
 const backupAttachmentOption = Options.text("attachment").pipe(Options.optional);
 const backupDestinationPathOption = Options.text("destination-path").pipe(Options.optional);
 const backupDataFormatOption = Options.choice("data-format", [
@@ -102,6 +103,7 @@ const acknowledgeDestructiveRestoreOption = Options.boolean("acknowledge-destruc
 type StorageBackupCommandOptions = {
   storageVolume: string;
   resource: string | undefined;
+  server: string | undefined;
   attachment: string | undefined;
   destinationPath: string | undefined;
   dataFormat: string | undefined;
@@ -132,6 +134,7 @@ function createBackupPlanRequest(input: StorageBackupCommandOptions) {
     source: {
       storageVolumeId: input.storageVolume,
       ...(input.resource ? { resourceId: input.resource } : {}),
+      ...(input.server ? { serverId: input.server } : {}),
       ...(input.attachment ? { attachmentId: input.attachment } : {}),
       ...(input.destinationPath ? { destinationPath: input.destinationPath } : {}),
       ...(input.dataFormat
@@ -284,6 +287,7 @@ const backupPlanCommand = EffectCommand.make(
   {
     storageVolume: backupStorageVolumeOption,
     resource: backupResourceOption,
+    server: backupServerOption,
     attachment: backupAttachmentOption,
     destinationPath: backupDestinationPathOption,
     dataFormat: backupDataFormatOption,
@@ -301,10 +305,12 @@ const backupPlanCommand = EffectCommand.make(
   },
   (input) =>
     runQuery(
-      CreateStorageVolumeBackupPlanQuery.create(
-        createBackupPlanRequest({
+      CreateStorageVolumeBackupPlanQuery.create({
+        storageVolumeId: input.storageVolume,
+        ...createBackupPlanRequest({
           ...input,
           resource: optionalValue(input.resource),
+          server: optionalValue(input.server),
           attachment: optionalValue(input.attachment),
           destinationPath: optionalValue(input.destinationPath),
           dataFormat: optionalValue(input.dataFormat),
@@ -315,7 +321,7 @@ const backupPlanCommand = EffectCommand.make(
           retentionMaxBytes: optionalValue(input.retentionMaxBytes),
           retentionMinFreeBytes: optionalValue(input.retentionMinFreeBytes),
         }),
-      ),
+      }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.storageVolumeBackupPlan));
 
@@ -324,6 +330,7 @@ const backupCreateCommand = EffectCommand.make(
   {
     storageVolume: backupStorageVolumeOption,
     resource: backupResourceOption,
+    server: backupServerOption,
     attachment: backupAttachmentOption,
     destinationPath: backupDestinationPathOption,
     dataFormat: backupDataFormatOption,
@@ -342,9 +349,11 @@ const backupCreateCommand = EffectCommand.make(
   (input) =>
     runCommand(
       CreateStorageVolumeBackupCommand.create({
+        storageVolumeId: input.storageVolume,
         planRequest: createBackupPlanRequest({
           ...input,
           resource: optionalValue(input.resource),
+          server: optionalValue(input.server),
           attachment: optionalValue(input.attachment),
           destinationPath: optionalValue(input.destinationPath),
           dataFormat: optionalValue(input.dataFormat),

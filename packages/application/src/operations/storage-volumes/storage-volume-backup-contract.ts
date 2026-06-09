@@ -1,4 +1,5 @@
 import {
+  type DeploymentTargetState,
   type DomainError,
   domainError,
   ok,
@@ -18,6 +19,7 @@ export type {
 export interface StorageBackupSourceDescriptor {
   storageVolumeId: string;
   resourceId?: string | undefined;
+  serverId?: string | undefined;
   attachmentId?: string | undefined;
   destinationPath?: string | undefined;
   dataFormat?: StorageVolumeBackupDataFormat | undefined;
@@ -99,6 +101,7 @@ export interface StorageBackupExecutionRequest {
   requestedAt: string;
   plan: StorageBackupPlan;
   source: StorageBackupSourceDescriptor;
+  runtimeTarget?: DeploymentTargetState | undefined;
 }
 
 export interface StorageBackupSourceResult {
@@ -113,6 +116,7 @@ export interface StorageBackupTargetStoreRequest {
   plan: StorageBackupPlan;
   target: StorageBackupTargetDescriptor;
   sourceResult: StorageBackupSourceResult;
+  runtimeTarget?: DeploymentTargetState | undefined;
 }
 
 export interface StorageBackupTargetStoreResult {
@@ -129,6 +133,7 @@ export interface StorageBackupRestoreRequest {
   requestedAt: string;
   artifactHandle: string;
   targetStorageVolumeId: string;
+  runtimeTarget?: DeploymentTargetState | undefined;
 }
 
 export interface StorageBackupRestoreSourceResult {
@@ -141,6 +146,7 @@ export interface StorageBackupTargetRestoreRequest {
   requestedAt: string;
   artifactHandle: string;
   targetStorageVolumeId: string;
+  runtimeTarget?: DeploymentTargetState | undefined;
 }
 
 export interface StorageBackupTargetRestoreResult {

@@ -23,6 +23,9 @@ export class CreateStorageVolumeBackupCommandHandler
     context: ExecutionContext,
     command: CreateStorageVolumeBackupCommand,
   ): Promise<Result<CreateStorageVolumeBackupResult>> {
-    return this.useCase.execute(context, { planRequest: command.planRequest });
+    return this.useCase.execute(context, {
+      storageVolumeId: command.storageVolumeId,
+      planRequest: command.planRequest,
+    });
   }
 }

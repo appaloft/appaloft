@@ -93,6 +93,7 @@ import {
   type StaticArtifactStoredManifest,
   type StorageVolume,
   type StorageVolumeBackup,
+  type StorageVolumeBackupDataFormat,
   type StorageVolumeBackupMutationSpec,
   type StorageVolumeBackupSelectionSpec,
   type StorageVolumeBackupStatus,
@@ -2771,6 +2772,8 @@ export interface ResourceStorageAttachmentSummary {
   storageVolumeKind?: StorageVolumeKind;
   destinationPath: string;
   mountMode: "read-write" | "read-only";
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: string;
   attachedAt: string;
 }
 
@@ -3324,6 +3327,8 @@ export interface StorageVolumeAttachmentSummary {
   resourceSlug?: string;
   destinationPath: string;
   mountMode: "read-write" | "read-only";
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: string;
   attachedAt: string;
 }
 
@@ -8949,6 +8954,8 @@ export interface RequestedDeploymentStorageMount {
   sourcePath?: string;
   destinationPath: string;
   mountMode: "read-write" | "read-only";
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: string;
 }
 
 export interface RequestedDeploymentServiceSource {

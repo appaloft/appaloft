@@ -27,6 +27,7 @@ import {
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
   RuntimeServerRuntimePreparer,
+  RuntimeStorageBackupProviderRegistry,
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
   RuntimeTargetScheduledTaskRuntimePort,
@@ -96,7 +97,6 @@ import {
   type StorageRuntimeCleaner,
   tokens,
   toRepositoryContext,
-  UnsupportedStorageBackupProviderRegistry,
 } from "@appaloft/application";
 import { type AuthRuntime, BetterAuthDeployTokenMaterialIssuer } from "@appaloft/auth-better";
 import { LocalFileBlueprintRegistry } from "@appaloft/blueprints";
@@ -1032,7 +1032,7 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.storageVolumeBackupProviderRegistry, {
-    useFactory: instanceCachingFactory(() => new UnsupportedStorageBackupProviderRegistry()),
+    useFactory: instanceCachingFactory(() => new RuntimeStorageBackupProviderRegistry()),
   });
   container.register(tokens.staticArtifactPayloadReaderPort, {
     useFactory: instanceCachingFactory(() => new FileSystemStaticArtifactPayloadReader()),

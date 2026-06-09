@@ -5740,8 +5740,8 @@ describe.serial("console e2e with Bun.WebView", () => {
         id: "stv_uploads",
         projectId: "prj_demo",
         environmentId: "env_demo",
-        name: "uploads",
-        slug: "uploads",
+        name: "pocketbase-data",
+        slug: "pocketbase-data",
         kind: "named-volume",
         lifecycleStatus: "active",
         attachmentCount: 1,
@@ -5749,24 +5749,38 @@ describe.serial("console e2e with Bun.WebView", () => {
           {
             attachmentId: "att_existing",
             resourceId: "res_demo",
-            resourceName: "workspace",
-            resourceSlug: "workspace",
-            destinationPath: "/data",
+            resourceName: "PocketBase",
+            resourceSlug: "pocketbase",
+            destinationPath: "/pb_data",
             mountMode: "read-write",
+            dataFormat: "sqlite",
+            applicationDataLabel: "PocketBase data",
             attachedAt: "2026-01-01T00:00:00.000Z",
           },
         ],
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    let storageAttachments = [
+    let storageAttachments: Array<{
+      id: string;
+      storageVolumeId: string;
+      storageVolumeName: string;
+      storageVolumeKind: string;
+      destinationPath: string;
+      mountMode: string;
+      dataFormat?: string;
+      applicationDataLabel?: string;
+      attachedAt: string;
+    }> = [
       {
         id: "att_existing",
         storageVolumeId: "stv_uploads",
-        storageVolumeName: "uploads",
+        storageVolumeName: "pocketbase-data",
         storageVolumeKind: "named-volume",
-        destinationPath: "/data",
+        destinationPath: "/pb_data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
         attachedAt: "2026-01-01T00:00:00.000Z",
       },
     ];
@@ -6024,9 +6038,9 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/resources/res_demo`);
 
-      await expectAnyText(view, ["Mounted storage", "挂载存储"]);
-      await expectText(view, "uploads");
-      await expectText(view, "/data");
+      await expectAnyText(view, ["Storage", "Mounted storage", "挂载存储"]);
+      await expectText(view, "PocketBase data");
+      await expectText(view, "/pb_data");
       await expectAnyText(view, [
         "Plan and manage backups from Storage settings; unsupported providers return blockers.",
         "在 Storage 设置里预览和管理备份；不支持的 provider 会返回 blocker。",
@@ -6093,9 +6107,10 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
 
-      await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
-      await expectText(view, "uploads");
-      await expectText(view, "/data");
+      await expectAnyText(view, ["Resource storage attachments", "资源存储挂载"]);
+      await expectText(view, "PocketBase data");
+      await expectText(view, "/pb_data");
+      await expectText(view, "sqlite");
       await expectAnyText(view, ["Volume backups", "Volume 备份"]);
       await expectText(view, "local://backups/svb_uploads.tar.zst");
 
@@ -6116,7 +6131,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
 
-      await selectOptionByText(view, "#resource-storage-runtime-cleanup-volume-trigger", "uploads");
+      await selectOptionByText(
+        view,
+        "#resource-storage-runtime-cleanup-volume-trigger",
+        "pocketbase-data",
+      );
       await selectOptionByText(view, "#resource-storage-runtime-cleanup-server-trigger", "edge");
       await setInputValue(
         view,
@@ -6148,8 +6167,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       );
       await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
 
-      await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "uploads");
-      await setInputValue(view, "#resource-storage-backup-path", "/data");
+      await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
+      await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
       await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
       await setInputValue(view, "#resource-storage-backup-retention-count", "3");
       await setInputValue(view, "#resource-storage-backup-min-free", "1073741824");
@@ -6158,11 +6177,13 @@ describe.serial("console e2e with Bun.WebView", () => {
         "/api/rpc/storageVolumes/backups/plan",
       );
       expect(readOrpcJsonPayload(backupPlanRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
         source: {
           storageVolumeId: "stv_uploads",
           resourceId: "res_demo",
-          destinationPath: "/data",
-          dataFormat: "unknown",
+          serverId: "srv_demo",
+          destinationPath: "/pb_data",
+          dataFormat: "sqlite",
           liveWrites: true,
         },
         requestedConsistency: "application-consistent",
@@ -6181,12 +6202,15 @@ describe.serial("console e2e with Bun.WebView", () => {
         "/api/rpc/storageVolumes/backups/create",
       );
       expect(readOrpcJsonPayload(backupCreateRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
         planRequest: {
+          storageVolumeId: "stv_uploads",
           source: {
             storageVolumeId: "stv_uploads",
             resourceId: "res_demo",
-            destinationPath: "/data",
-            dataFormat: "unknown",
+            serverId: "srv_demo",
+            destinationPath: "/pb_data",
+            dataFormat: "sqlite",
             liveWrites: true,
           },
           requestedConsistency: "application-consistent",
@@ -6227,7 +6251,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
 
-      await selectOptionByText(view, "#resource-storage-attachment-volume-trigger", "uploads");
+      await selectOptionByText(
+        view,
+        "#resource-storage-attachment-volume-trigger",
+        "pocketbase-data",
+      );
       await setInputValue(view, "#resource-storage-destination", "/var/lib/app/uploads");
       await clickFormSubmit(view, "#resource-storage-attachment-form");
       const attachRequest = await waitForRecordedRequest("/api/rpc/resources/attachStorage");

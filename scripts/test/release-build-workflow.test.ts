@@ -74,6 +74,7 @@ describe("release build workflow", () => {
     const frameworkFixtureWorkflow = await readText(".github/workflows/framework-fixture-e2e.yml");
     const scheduledTaskWorkflow = await readText(".github/workflows/scheduled-task-e2e.yml");
     const storageCleanupWorkflow = await readText(".github/workflows/storage-cleanup-e2e.yml");
+    const storageBackupWorkflow = await readText(".github/workflows/storage-backup-e2e.yml");
     const runtimeUsageWorkflow = await readText(".github/workflows/runtime-usage-e2e.yml");
     const capacityPruneWorkflow = await readText(".github/workflows/capacity-prune-e2e.yml");
     const previewProviderWorkflow = await readText(".github/workflows/preview-provider-e2e.yml");
@@ -119,6 +120,15 @@ describe("release build workflow", () => {
     );
     expect(scripts["smoke:storage-cleanup"]).toBe(
       "bun run smoke:storage-cleanup:docker && bun run smoke:storage-cleanup:ssh",
+    );
+    expect(scripts["smoke:storage-backup:docker"]).toBe(
+      "APPALOFT_E2E_STORAGE_BACKUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-volume-backup-provider.test.ts",
+    );
+    expect(scripts["smoke:storage-backup:ssh"]).toBe(
+      "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_STORAGE_BACKUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-volume-backup-provider.test.ts",
+    );
+    expect(scripts["smoke:storage-backup"]).toBe(
+      "bun run smoke:storage-backup:docker && bun run smoke:storage-backup:ssh",
     );
     expect(scripts["smoke:runtime-usage:docker"]).toBe(
       "APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1 bun test --timeout=300000 packages/adapters/runtime/test/runtime-usage-smoke.test.ts",
@@ -187,6 +197,7 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("framework-fixture-e2e");
     expect(releaseWorkflow).toContain("scheduled-task-e2e");
     expect(releaseWorkflow).toContain("storage-cleanup-e2e");
+    expect(releaseWorkflow).toContain("storage-backup-e2e");
     expect(releaseWorkflow).toContain("runtime-usage-e2e");
     expect(releaseWorkflow).toContain("capacity-prune-e2e");
     expect(releaseWorkflow).toContain("preview-provider-e2e");
@@ -195,6 +206,7 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("require_framework_fixture_e2e");
     expect(releaseWorkflow).toContain("require_scheduled_task_e2e");
     expect(releaseWorkflow).toContain("require_storage_cleanup_e2e");
+    expect(releaseWorkflow).toContain("require_storage_backup_e2e");
     expect(releaseWorkflow).toContain("require_runtime_usage_e2e");
     expect(releaseWorkflow).toContain("require_capacity_prune_e2e");
     expect(releaseWorkflow).toContain("require_preview_provider_e2e");
@@ -203,6 +215,7 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/storage-backup-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/runtime-usage-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/capacity-prune-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/preview-provider-e2e.yml");
@@ -221,6 +234,7 @@ describe("release build workflow", () => {
         "      - framework-fixture-e2e",
         "      - scheduled-task-e2e",
         "      - storage-cleanup-e2e",
+        "      - storage-backup-e2e",
         "      - runtime-usage-e2e",
         "      - capacity-prune-e2e",
         "      - preview-provider-e2e",
@@ -266,6 +280,13 @@ describe("release build workflow", () => {
       [
         "required: ",
         "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_storage_backup_e2e }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
         "{{ github.event_name == 'workflow_dispatch' && inputs.require_runtime_usage_e2e }}",
       ].join(""),
     );
@@ -296,6 +317,8 @@ describe("release build workflow", () => {
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
     expect(nightlyWorkflow).toContain("storage-cleanup-e2e");
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
+    expect(nightlyWorkflow).toContain("storage-backup-e2e");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/storage-backup-e2e.yml");
     expect(nightlyWorkflow).toContain("runtime-usage-e2e");
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/runtime-usage-e2e.yml");
     expect(nightlyWorkflow).toContain("capacity-prune-e2e");
@@ -341,6 +364,16 @@ describe("release build workflow", () => {
       "Skipping SSH storage-cleanup E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
     );
     expect(storageCleanupWorkflow).toContain(
+      "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
+    );
+    expect(storageBackupWorkflow).toContain("name: Storage Backup E2E");
+    expect(storageBackupWorkflow).toContain("bun run smoke:storage-backup:docker");
+    expect(storageBackupWorkflow).toContain("bun run smoke:storage-backup:ssh");
+    expect(storageBackupWorkflow).toContain("HAS_SSH_STORAGE_BACKUP_SECRETS");
+    expect(storageBackupWorkflow).toContain(
+      "Skipping SSH storage-backup E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured.",
+    );
+    expect(storageBackupWorkflow).toContain(
       "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
     );
     expect(previewProviderWorkflow).toContain("name: Preview Provider E2E");
@@ -453,6 +486,7 @@ describe("release build workflow", () => {
     expect(releaseDocs).toContain("framework-fixture-e2e.yml");
     expect(releaseDocs).toContain("scheduled-task-e2e.yml");
     expect(releaseDocs).toContain("storage-cleanup-e2e.yml");
+    expect(releaseDocs).toContain("storage-backup-e2e.yml");
     expect(releaseDocs).toContain("runtime-usage-e2e.yml");
     expect(releaseDocs).toContain("capacity-prune-e2e.yml");
     expect(releaseDocs).toContain("preview-provider-e2e.yml");
@@ -464,6 +498,8 @@ describe("release build workflow", () => {
     expect(releaseDocs).toContain("bun run smoke:scheduled-task:ssh");
     expect(releaseDocs).toContain("bun run smoke:storage-cleanup:docker");
     expect(releaseDocs).toContain("bun run smoke:storage-cleanup:ssh");
+    expect(releaseDocs).toContain("bun run smoke:storage-backup:docker");
+    expect(releaseDocs).toContain("bun run smoke:storage-backup:ssh");
     expect(releaseDocs).toContain("bun run smoke:runtime-usage:docker");
     expect(releaseDocs).toContain("bun run smoke:runtime-usage:ssh");
     expect(releaseDocs).toContain("bun run smoke:capacity-prune:local");
@@ -472,6 +508,7 @@ describe("release build workflow", () => {
     expect(releaseDocs).toContain("require_framework_fixture_e2e=true");
     expect(releaseDocs).toContain("require_scheduled_task_e2e=true");
     expect(releaseDocs).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseDocs).toContain("require_storage_backup_e2e=true");
     expect(releaseDocs).toContain("require_runtime_usage_e2e=true");
     expect(releaseDocs).toContain("require_capacity_prune_e2e=true");
     expect(releaseDocs).toContain("require_preview_provider_e2e=true");
@@ -492,6 +529,7 @@ describe("release build workflow", () => {
     expect(releaseSkill).toContain("secrets fail the reusable workflow");
     expect(releaseSkill).toContain("require_scheduled_task_e2e=true");
     expect(releaseSkill).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseSkill).toContain("require_storage_backup_e2e=true");
     expect(releaseSkill).toContain("require_runtime_usage_e2e=true");
     expect(releaseSkill).toContain("require_capacity_prune_e2e=true");
     expect(releaseSkill).toContain("require_preview_provider_e2e=true");
@@ -510,6 +548,11 @@ describe("release build workflow", () => {
     expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_SSH_STORAGE_CLEANUP_DOCKER=true");
     expect(releaseHardeningMatrix).toContain("storage-cleanup-e2e.yml");
     expect(releaseHardeningMatrix).toContain("require_storage_cleanup_e2e=true");
+    expect(releaseHardeningMatrix).toContain("smoke:storage-backup:docker");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_STORAGE_BACKUP_DOCKER=true");
+    expect(releaseHardeningMatrix).toContain("APPALOFT_E2E_SSH_STORAGE_BACKUP_DOCKER=true");
+    expect(releaseHardeningMatrix).toContain("storage-backup-e2e.yml");
+    expect(releaseHardeningMatrix).toContain("require_storage_backup_e2e=true");
     expect(releaseHardeningMatrix).toContain("smoke:runtime-usage:docker");
     expect(releaseHardeningMatrix).toContain("APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1");
     expect(releaseHardeningMatrix).toContain("runtime-usage-e2e.yml");

@@ -345,6 +345,7 @@ describe("storage volume HTTP routes", () => {
         method: "POST",
         headers: { ...authHeaders, "content-type": "application/json" },
         body: JSON.stringify({
+          storageVolumeId: "stv_api",
           source: {
             storageVolumeId: "stv_api",
             resourceId: "res_web",
@@ -369,6 +370,7 @@ describe("storage volume HTTP routes", () => {
         method: "POST",
         headers: { ...authHeaders, "content-type": "application/json" },
         body: JSON.stringify({
+          storageVolumeId: "stv_api",
           planRequest: {
             source: {
               storageVolumeId: "stv_api",

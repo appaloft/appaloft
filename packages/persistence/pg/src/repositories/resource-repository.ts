@@ -225,6 +225,8 @@ class KyselyResourceMutationVisitor
         source_path: attachment.sourcePath?.value ?? null,
         destination_path: attachment.destinationPath.value,
         mount_mode: attachment.mountMode.value,
+        data_format: attachment.dataFormat ?? null,
+        application_data_label: attachment.applicationDataLabel?.value ?? null,
         attached_at: attachment.attachedAt.value,
       })),
     };

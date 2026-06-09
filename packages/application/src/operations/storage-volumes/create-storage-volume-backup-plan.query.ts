@@ -25,7 +25,8 @@ export class CreateStorageVolumeBackupPlanQuery extends Query<StorageBackupPlan>
     input: CreateStorageVolumeBackupPlanQueryInput,
   ): Result<CreateStorageVolumeBackupPlanQuery> {
     return parseOperationInput(createStorageVolumeBackupPlanQueryInputSchema, input).map(
-      (parsed) => new CreateStorageVolumeBackupPlanQuery(parsed),
+      ({ storageVolumeId: _storageVolumeId, ...request }) =>
+        new CreateStorageVolumeBackupPlanQuery(request),
     );
   }
 }

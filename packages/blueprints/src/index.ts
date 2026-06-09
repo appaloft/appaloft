@@ -208,12 +208,23 @@ const blueprintRouteSchema = z
   .strict();
 
 const blueprintStorageMountModeSchema = z.enum(["read-write", "read-only"]);
+const blueprintStorageMountDataFormatSchema = z.enum([
+  "sqlite",
+  "json-files",
+  "filesystem",
+  "application-export",
+  "unknown",
+]);
+
+export type BlueprintStorageMountDataFormat = z.infer<typeof blueprintStorageMountDataFormatSchema>;
 
 const blueprintStorageMountSchema = z
   .object({
     resource: slugSchema,
     mountPath: nonEmptyString,
     mountMode: blueprintStorageMountModeSchema.default("read-write"),
+    dataFormat: blueprintStorageMountDataFormatSchema.optional(),
+    applicationDataLabel: nonEmptyString.optional(),
   })
   .strict();
 
@@ -1560,6 +1571,8 @@ export type BlueprintInstallOperation =
       readonly requirementId: string;
       readonly mountPath: string;
       readonly mountMode: "read-write" | "read-only";
+      readonly dataFormat?: BlueprintStorageMountDataFormat;
+      readonly applicationDataLabel?: string;
     }
   | {
       readonly kind: "wait-dependency-readiness";
@@ -1669,6 +1682,8 @@ export interface BlueprintApplicationBundleComponentPlan {
     readonly requirementId: string;
     readonly mountPath: string;
     readonly mountMode: "read-write" | "read-only";
+    readonly dataFormat?: BlueprintStorageMountDataFormat;
+    readonly applicationDataLabel?: string;
   }[];
   readonly deploymentReason?: "blueprint-install";
 }
@@ -1693,6 +1708,8 @@ export interface BlueprintApplicationBundleStorageBindingPlan {
   readonly componentId: string;
   readonly mountPath: string;
   readonly mountMode: "read-write" | "read-only";
+  readonly dataFormat?: BlueprintStorageMountDataFormat;
+  readonly applicationDataLabel?: string;
   readonly scope: "storage-volume";
   readonly attachmentMode: "resource-storage-attachment";
 }
@@ -2411,6 +2428,10 @@ function appendComponentSetupOperations(
             requirementId: requirement.id,
             mountPath: storageMount.mountPath,
             mountMode: storageMount.mountMode,
+            ...(storageMount.dataFormat ? { dataFormat: storageMount.dataFormat } : {}),
+            ...(storageMount.applicationDataLabel
+              ? { applicationDataLabel: storageMount.applicationDataLabel }
+              : {}),
           });
         }
         continue;
@@ -2492,6 +2513,8 @@ type MutableBlueprintApplicationBundleComponentPlan = {
     readonly requirementId: string;
     readonly mountPath: string;
     readonly mountMode: "read-write" | "read-only";
+    readonly dataFormat?: BlueprintStorageMountDataFormat;
+    readonly applicationDataLabel?: string;
   }[];
   deploymentReason?: "blueprint-install";
 };
@@ -2626,6 +2649,10 @@ export function createBlueprintApplicationBundlePlan(
           requirementId: operation.requirementId,
           mountPath: operation.mountPath,
           mountMode: operation.mountMode,
+          ...(operation.dataFormat ? { dataFormat: operation.dataFormat } : {}),
+          ...(operation.applicationDataLabel
+            ? { applicationDataLabel: operation.applicationDataLabel }
+            : {}),
         });
         storageBindings.set(
           `${operation.componentId}:${operation.requirementId}:${operation.mountPath}`,
@@ -2636,6 +2663,10 @@ export function createBlueprintApplicationBundlePlan(
             componentId: operation.componentId,
             mountPath: operation.mountPath,
             mountMode: operation.mountMode,
+            ...(operation.dataFormat ? { dataFormat: operation.dataFormat } : {}),
+            ...(operation.applicationDataLabel
+              ? { applicationDataLabel: operation.applicationDataLabel }
+              : {}),
             scope: "storage-volume",
             attachmentMode: "resource-storage-attachment",
           },
@@ -2647,6 +2678,10 @@ export function createBlueprintApplicationBundlePlan(
           requirementId: operation.requirementId,
           mountPath: operation.mountPath,
           mountMode: operation.mountMode,
+          ...(operation.dataFormat ? { dataFormat: operation.dataFormat } : {}),
+          ...(operation.applicationDataLabel
+            ? { applicationDataLabel: operation.applicationDataLabel }
+            : {}),
         });
         break;
       }
@@ -3009,6 +3044,10 @@ export function createBlueprintComponentRuntimeProjection(
         dependencyRequirementId: storageMount.requirementId,
         mountPath: storageMount.mountPath,
         mountMode: storageMount.mountMode,
+        ...(storageMount.dataFormat ? { dataFormat: storageMount.dataFormat } : {}),
+        ...(storageMount.applicationDataLabel
+          ? { applicationDataLabel: storageMount.applicationDataLabel }
+          : {}),
         bindingRef: {
           kind: "storage-output",
           requirementId: storageMount.requirementId,

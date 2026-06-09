@@ -12,19 +12,18 @@ import { type StorageBackupPlanRequest } from "./storage-volume-backup-contract"
 export { type CreateStorageVolumeBackupCommandInput, createStorageVolumeBackupCommandInputSchema };
 
 export class CreateStorageVolumeBackupCommand extends Command<CreateStorageVolumeBackupResult> {
-  constructor(public readonly planRequest: StorageBackupPlanRequest) {
+  constructor(
+    public readonly storageVolumeId: string,
+    public readonly planRequest: StorageBackupPlanRequest,
+  ) {
     super();
-  }
-
-  get storageVolumeId(): string {
-    return this.planRequest.source.storageVolumeId;
   }
 
   static create(
     input: CreateStorageVolumeBackupCommandInput,
   ): Result<CreateStorageVolumeBackupCommand> {
     return parseOperationInput(createStorageVolumeBackupCommandInputSchema, input).map(
-      (parsed) => new CreateStorageVolumeBackupCommand(parsed.planRequest),
+      (parsed) => new CreateStorageVolumeBackupCommand(parsed.storageVolumeId, parsed.planRequest),
     );
   }
 }

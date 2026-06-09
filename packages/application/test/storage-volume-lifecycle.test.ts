@@ -281,6 +281,8 @@ describe("Storage volume lifecycle use cases", () => {
         storageVolumeId: volume.id,
         destinationPath: "/data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       })
     )._unsafeUnwrap();
 
@@ -449,6 +451,8 @@ describe("Storage volume lifecycle use cases", () => {
         storageVolumeId: volume.id,
         destinationPath: "/data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       })
     )._unsafeUnwrap();
 
@@ -482,6 +486,8 @@ describe("Storage volume lifecycle use cases", () => {
         storageVolumeId: volume.id,
         destinationPath: "/data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       })
     )._unsafeUnwrap();
     const resourceBeforeArchive = await resources.findOne(
@@ -532,6 +538,8 @@ describe("Storage volume lifecycle use cases", () => {
         storageVolumeId: volume.id,
         destinationPath: "/data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       })
       .then((result) => result._unsafeUnwrap());
 
@@ -618,6 +626,8 @@ describe("Storage volume lifecycle use cases", () => {
         storageVolumeId: volume.id,
         destinationPath: "/data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       })
       .then((result) => result._unsafeUnwrap());
 
@@ -635,6 +645,8 @@ describe("Storage volume lifecycle use cases", () => {
         resourceId: "res_web",
         resourceName: "Web",
         destinationPath: "/data",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
       }),
     ]);
     expect(list._unsafeUnwrap().items[0]?.attachmentCount).toBe(1);

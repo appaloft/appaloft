@@ -312,6 +312,8 @@ export interface ResourceStorageAttachmentsTable {
   source_path: string | null;
   destination_path: string;
   mount_mode: string;
+  data_format: string | null;
+  application_data_label: string | null;
   attached_at: TimestampColumn;
 }
 

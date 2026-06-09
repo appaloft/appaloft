@@ -1381,6 +1381,11 @@
   const selectedStorageBackupVolume = $derived(
     storageVolumes.find((volume) => volume.id === storageBackupVolumeId) ?? null,
   );
+  const selectedStorageBackupAttachment = $derived(
+    resourceStorageAttachments.find(
+      (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
+    ) ?? null,
+  );
   const selectedStorageRuntimeCleanupServer = $derived(
     findServer(servers, storageRuntimeCleanupServerId),
   );
@@ -3113,7 +3118,8 @@
     }
 
     if (!storageBackupVolumeId && storageVolumes.length > 0) {
-      storageBackupVolumeId = storageVolumes[0]?.id ?? "";
+      storageBackupVolumeId =
+        resourceStorageAttachments[0]?.storageVolumeId ?? storageVolumes[0]?.id ?? "";
     }
 
     if (
@@ -3128,9 +3134,28 @@
       storageBackupVolumeId &&
       !storageVolumes.some((volume) => volume.id === storageBackupVolumeId)
     ) {
-      storageBackupVolumeId = storageVolumes[0]?.id ?? "";
+      storageBackupVolumeId =
+        resourceStorageAttachments[0]?.storageVolumeId ?? storageVolumes[0]?.id ?? "";
       storageBackupPlan = null;
       storageBackupFeedback = null;
+    }
+
+    const backupAttachment = resourceStorageAttachments.find(
+      (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
+    );
+    if (backupAttachment) {
+      if (
+        backupAttachment.destinationPath &&
+        (!storageBackupDestinationPath || storageBackupDestinationPath === "/data")
+      ) {
+        storageBackupDestinationPath = backupAttachment.destinationPath;
+      }
+      if (
+        backupAttachment.dataFormat &&
+        (!storageBackupDataFormat || storageBackupDataFormat === "unknown")
+      ) {
+        storageBackupDataFormat = backupAttachment.dataFormat;
+      }
     }
 
     if (!storageRuntimeCleanupServerId) {
@@ -3909,9 +3934,11 @@
 
   function createStorageBackupPlanRequest(): CreateStorageVolumeBackupPlanInput {
     return {
+      storageVolumeId: storageBackupVolumeId,
       source: {
         storageVolumeId: storageBackupVolumeId,
         ...(resource ? { resourceId: resource.id } : {}),
+        ...(latestDeployment?.serverId ? { serverId: latestDeployment.serverId } : {}),
         ...(storageBackupDestinationPath.trim()
           ? { destinationPath: storageBackupDestinationPath.trim() }
           : {}),
@@ -3947,6 +3974,7 @@
 
     storageBackupFeedback = null;
     createStorageVolumeBackupMutation.mutate({
+      storageVolumeId: storageBackupVolumeId,
       planRequest: createStorageBackupPlanRequest(),
     });
   }
@@ -4757,6 +4785,12 @@
     attachment: ResourceStorageAttachmentSummary,
   ): string {
     return attachment.storageVolumeName ?? attachment.storageVolumeId;
+  }
+
+  function storageAttachmentApplicationDataLabel(
+    attachment: ResourceStorageAttachmentSummary,
+  ): string {
+    return attachment.applicationDataLabel ?? storageAttachmentVolumeLabel(attachment);
   }
 
   function storageBackupPlanSummary(plan: StorageVolumeBackupPlanResponse): string {
@@ -6202,10 +6236,10 @@
                           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div class="min-w-0">
                               <p class="break-all text-sm font-medium">
-                                {storageAttachmentVolumeLabel(attachment)}
+                                {storageAttachmentApplicationDataLabel(attachment)}
                               </p>
                               <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
-                                {attachment.storageVolumeId}
+                                {storageAttachmentVolumeLabel(attachment)} · {attachment.storageVolumeId}
                               </p>
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -7876,18 +7910,31 @@
                       <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
                       <Select.Root bind:value={storageBackupVolumeId} type="single">
                         <Select.Trigger id="resource-storage-backup-volume-trigger" class="w-full">
-                          {selectedStorageBackupVolume
-                            ? storageVolumeOptionLabel(selectedStorageBackupVolume)
-                            : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                          {selectedStorageBackupAttachment
+                            ? storageAttachmentApplicationDataLabel(selectedStorageBackupAttachment)
+                            : selectedStorageBackupVolume
+                              ? storageVolumeOptionLabel(selectedStorageBackupVolume)
+                              : $t(i18nKeys.console.resources.storageVolumeSelect)}
                         </Select.Trigger>
                         <Select.Content>
                           {#each storageVolumes as volume (volume.id)}
+                            {@const attachment = resourceStorageAttachments.find(
+                              (candidate) => candidate.storageVolumeId === volume.id,
+                            )}
                             <Select.Item value={volume.id}>
-                              {storageVolumeOptionLabel(volume)}
+                              {attachment
+                                ? `${storageAttachmentApplicationDataLabel(attachment)} (${attachment.destinationPath})`
+                                : storageVolumeOptionLabel(volume)}
                             </Select.Item>
                           {/each}
                         </Select.Content>
                       </Select.Root>
+                      {#if selectedStorageBackupAttachment?.dataFormat}
+                        <p class="text-xs text-muted-foreground">
+                          {selectedStorageBackupAttachment.destinationPath}
+                          · {selectedStorageBackupAttachment.dataFormat}
+                        </p>
+                      {/if}
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
@@ -8448,17 +8495,23 @@
                             <div class="min-w-0 space-y-2">
                               <div class="flex flex-wrap items-center gap-2">
                                 <p class="font-medium">
-                                  {storageAttachmentVolumeLabel(attachment)}
+                                  {storageAttachmentApplicationDataLabel(attachment)}
                                 </p>
                                 {#if attachment.storageVolumeKind}
                                   <Badge variant="outline">
                                     {storageVolumeKindLabel(attachment.storageVolumeKind)}
                                   </Badge>
                                 {/if}
+                                {#if attachment.dataFormat}
+                                  <Badge variant="outline">{attachment.dataFormat}</Badge>
+                                {/if}
                                 <Badge variant="secondary">
                                   {storageMountModeLabel(attachment.mountMode)}
                                 </Badge>
                               </div>
+                              <p class="text-sm text-muted-foreground">
+                                {storageAttachmentVolumeLabel(attachment)}
+                              </p>
                               <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
                                 {attachment.destinationPath}
                               </p>

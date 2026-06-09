@@ -37,6 +37,7 @@ export const storageBackupTargetProviderKeySchema = z.enum([
 export const storageBackupSourceDescriptorSchema = z.object({
   storageVolumeId: nonEmptyTrimmedString("Storage volume id"),
   resourceId: nonEmptyTrimmedString("Resource id").optional(),
+  serverId: nonEmptyTrimmedString("Server id").optional(),
   attachmentId: nonEmptyTrimmedString("Attachment id").optional(),
   destinationPath: nonEmptyTrimmedString("Destination path").optional(),
   dataFormat: storageBackupDataFormatSchema.optional(),

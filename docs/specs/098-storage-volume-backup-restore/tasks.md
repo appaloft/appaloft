@@ -23,7 +23,8 @@
 - [x] Add public backup source adapter and target provider ports.
 - [x] Add backup job/artifact/read model.
 - [x] Add plan/create/list/show/restore/prune command/query handlers.
-- [x] Add fake adapters for tests and unsupported default provider registry for runtime safety.
+- [x] Add fake adapters for tests and a runtime local-shell/generic-SSH Docker provider
+  registry for named-volume SQLite/tar backup/restore.
 - [x] Add Resource Storage UI backup plan/artifact surfaces.
 - [x] Record downstream provider selection and quota/retention overlays as deferred after public ports land.
 
@@ -38,7 +39,12 @@
 
 - [x] Run public storage backup unit/contract/integration tests.
 - [x] Mark downstream authorization/admission tests not applicable until downstream overlays are added.
-- [x] Mark local restore smoke deferred until a concrete local provider adapter lands.
+- [x] Add runtime unit coverage for local provider script rendering and SQLite unsafe-copy refusal.
+- [x] Add explicit real local Docker backup/restore smoke with disposable volume data.
+- [x] Add explicit real generic-SSH Docker backup/restore smoke with disposable PocketBase-style
+  volume data.
+- [x] Add a runtime command renderer/dialect boundary so OS/provider-specific command rendering
+  remains in runtime providers instead of application use cases.
 
 ## Post-Implementation Sync
 
@@ -49,8 +55,10 @@
 
 - Downstream provider selection, quota, entitlement, and commercial retention overlays belong to
   the distribution that registers concrete providers.
-- Local restore smoke with disposable volume data requires a real local source/target provider
-  adapter; this public slice ships fake providers for tests and an unsupported default runtime
-  registry so unsafe live copies stay blocked.
 - Production external provider apply remains blocked until an owner approves provider readback,
   credential handling, and recovery evidence.
+- Offsite target providers such as S3/WebDAV/restic remain deferred until their credential
+  handling, retention, restore readback, and provider-specific failure modes have concrete adapters.
+- Automatic OS/platform detection remains deferred until DeploymentTarget records carry a stable
+  platform/capability descriptor; current backup runtime supports local-shell and generic-SSH Docker
+  targets through the registered `posix-shell-docker` command renderer.

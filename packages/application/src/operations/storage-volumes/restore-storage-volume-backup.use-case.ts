@@ -1,5 +1,8 @@
 import {
   CreatedAt,
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  type DeploymentTargetState,
   DescriptionText,
   domainError,
   err,
@@ -21,16 +24,22 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type ExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../../execution-context";
 import { findOperationCatalogEntryByKey } from "../../operation-catalog";
 import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type DeploymentReadModel,
   type EventBus,
   type IdGenerator,
   type OperationGuardPort,
+  type ServerRepository,
   type StorageVolumeBackupRepository,
   type StorageVolumeRepository,
 } from "../../ports";
@@ -44,6 +53,44 @@ const restoreStorageVolumeBackupOperation = findOperationCatalogEntryByKey(
 );
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
+async function resolveStorageBackupRestoreRuntimeTarget(input: {
+  repositoryContext: RepositoryContext;
+  resourceId?: string;
+  fallbackServerId?: string;
+  deploymentReadModel: DeploymentReadModel;
+  serverRepository: ServerRepository;
+}): Promise<Result<DeploymentTargetState | undefined>> {
+  const serverId =
+    input.fallbackServerId ??
+    (input.resourceId && input.deploymentReadModel?.list
+      ? (
+          await input.deploymentReadModel.list(input.repositoryContext, {
+            resourceId: input.resourceId,
+            limit: 1,
+          })
+        )[0]?.serverId
+      : undefined);
+
+  if (!serverId) {
+    return ok(undefined);
+  }
+
+  const parsedServerId = DeploymentTargetId.create(serverId);
+  if (parsedServerId.isErr()) {
+    return err(parsedServerId.error);
+  }
+
+  const server = await input.serverRepository.findOne(
+    input.repositoryContext,
+    DeploymentTargetByIdSpec.create(parsedServerId.value),
+  );
+  if (!server) {
+    return err(domainError.notFound("server", parsedServerId.value.value));
+  }
+
+  return ok(server.toState());
+}
+
 @injectable()
 export class RestoreStorageVolumeBackupUseCase {
   constructor(
@@ -53,6 +100,10 @@ export class RestoreStorageVolumeBackupUseCase {
     private readonly storageVolumeBackupRepository: StorageVolumeBackupRepository,
     @inject(tokens.storageVolumeBackupProviderRegistry)
     private readonly providerRegistry: StorageBackupProviderRegistryPort,
+    @inject(tokens.deploymentReadModel)
+    private readonly deploymentReadModel: DeploymentReadModel,
+    @inject(tokens.serverRepository)
+    private readonly serverRepository: ServerRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -72,11 +123,13 @@ export class RestoreStorageVolumeBackupUseCase {
     const repositoryContext = toRepositoryContext(context);
     const {
       clock,
+      deploymentReadModel,
       eventBus,
       idGenerator,
       logger,
       operationGuardPort,
       providerRegistry,
+      serverRepository,
       storageVolumeBackupRepository,
       storageVolumeRepository,
     } = this;
@@ -183,12 +236,19 @@ export class RestoreStorageVolumeBackupUseCase {
           ),
         );
       }
+      const runtimeTarget = yield* await resolveStorageBackupRestoreRuntimeTarget({
+        repositoryContext,
+        ...(backupState.resourceId ? { resourceId: backupState.resourceId.value } : {}),
+        deploymentReadModel,
+        serverRepository,
+      });
       const restoreResult = await targetProvider.restore({
         backupId: backupId.value,
         restoreAttemptId: restoreAttemptId.value,
         requestedAt: requestedAt.value,
         artifactHandle: backupState.artifactHandle.value,
         targetStorageVolumeId: restoredVolumeId.value,
+        ...(runtimeTarget ? { runtimeTarget } : {}),
       });
       if (restoreResult.isOk()) {
         await storageVolumeRepository.upsert(

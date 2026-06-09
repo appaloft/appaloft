@@ -1311,6 +1311,84 @@ describe("Blueprint install plan", () => {
     }
   });
 
+  test("[APP-BUNDLE-STORAGE-METADATA-001] preserves storage data format metadata in application bundle plans", () => {
+    const manifest = validateBlueprintManifest({
+      schemaVersion: blueprintSchemaVersion,
+      id: "pocketbase-like",
+      name: "PocketBase Like",
+      version: "1.0.0",
+      summary: "A deployable app with SQLite data on a volume.",
+      resources: [{ id: "data", kind: "volume", label: "PocketBase data" }],
+      components: [
+        {
+          id: "pocketbase",
+          name: "PocketBase",
+          kind: "service",
+          runtime: {
+            strategy: "container-image",
+            image: "ghcr.io/muchobien/pocketbase:latest",
+          },
+          usesResources: ["data"],
+          storageMounts: [
+            {
+              resource: "data",
+              mountPath: "/pb_data",
+              mountMode: "read-write",
+              dataFormat: "sqlite",
+              applicationDataLabel: "PocketBase data",
+            },
+          ],
+        },
+      ],
+      profiles: {
+        production: { replicas: 1 },
+      },
+    });
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+
+    const plan = createBlueprintInstallPlan({
+      manifest: manifest.value,
+      profile: "production",
+      target: {
+        projectId: "prj_pb",
+        projectName: "PocketBase",
+        environmentId: "env_prod",
+        environmentName: "Production",
+      },
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    const bundle = createBlueprintApplicationBundlePlan({ plan: plan.value });
+    expect(bundle.ok).toBe(true);
+    if (!bundle.ok) return;
+    expect(bundle.value.components[0]?.storageMounts).toEqual([
+      {
+        storageRequirementId: "data",
+        requirementId: "data",
+        mountPath: "/pb_data",
+        mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
+      },
+    ]);
+
+    const runtimeProjection = createBlueprintComponentRuntimeProjection({
+      applicationBundle: bundle.value,
+    });
+    expect(runtimeProjection.components[0]?.storageMounts).toEqual([
+      expect.objectContaining({
+        storageRequirementId: "data",
+        dependencyRequirementId: "data",
+        mountPath: "/pb_data",
+        mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
+      }),
+    ]);
+  });
+
   test("[BP-DEP-VERSION-UPGRADE-001] reports dependency compatibility changes without executing dependency upgrades", () => {
     const current = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,

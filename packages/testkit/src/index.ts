@@ -1398,6 +1398,10 @@ export class MemoryStorageVolumeReadModel implements StorageVolumeReadModel {
             resourceSlug: resource.slug.value,
             destinationPath: attachment.destinationPath.value,
             mountMode: attachment.mountMode.value,
+            ...(attachment.dataFormat ? { dataFormat: attachment.dataFormat } : {}),
+            ...(attachment.applicationDataLabel
+              ? { applicationDataLabel: attachment.applicationDataLabel.value }
+              : {}),
             attachedAt: attachment.attachedAt.value,
           })),
       );

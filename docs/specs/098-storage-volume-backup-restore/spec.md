@@ -106,9 +106,19 @@ Current implementation note:
 
 - The operation family, command/query handlers, persistence read models, CLI, HTTP/oRPC, typed
   client contract, and Web Resource storage surface are active.
-- The default public runtime registers an unsupported provider registry unless a distribution or
-  test composition registers concrete source adapters and target providers. Unsupported plans and
-  create attempts must return blockers/errors instead of copying live data unsafely.
+- The default public runtime registers a local-shell/generic-SSH Docker named-volume backup
+  registry for `sqlite-online-backup`/`tar-volume` to `local-filesystem`. It stores verified tar
+  artifacts on the selected deployment target and restores to a new Docker named volume by default.
+  Local Docker and generic-SSH Docker smoke gates prove this path with PocketBase-style SQLite
+  data.
+- Runtime command differences are kept inside the runtime adapter/provider boundary. The current
+  executable renderer is `posix-shell-docker`; other OS/platform command families must register a
+  runtime command renderer/provider instead of changing application use cases or callers.
+- Live SQLite application-consistent backup uses the SQLite-aware source adapter; the runtime tar
+  adapter refuses that plan instead of copying live SQLite files unsafely.
+  Offsite targets such as S3/WebDAV/restic and automatic OS/platform target detection remain
+  provider/runtime extensions until concrete target providers and target capability descriptors are
+  registered.
 
 ## Consistency Levels
 

@@ -581,8 +581,10 @@ describe("ShowResourceQueryService", () => {
         attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
         storageVolumeId: StorageVolumeId.rehydrate("stv_data"),
         storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
-        destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
+        destinationPath: StorageDestinationPath.create("/pb_data")._unsafeUnwrap(),
         mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+        dataFormat: "sqlite",
+        applicationDataLabel: DescriptionText.rehydrate("PocketBase data"),
         attachedAt: CreatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
       })
       ._unsafeUnwrap();
@@ -612,8 +614,10 @@ describe("ShowResourceQueryService", () => {
         storageVolumeId: "stv_data",
         storageVolumeName: "PocketBase data",
         storageVolumeKind: "named-volume",
-        destinationPath: "/data",
+        destinationPath: "/pb_data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
         attachedAt: "2026-01-01T00:03:00.000Z",
       },
     ]);

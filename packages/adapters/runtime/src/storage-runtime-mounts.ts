@@ -15,6 +15,8 @@ interface RuntimeStorageMountMetadata {
   sourcePath?: string;
   destinationPath: string;
   mountMode: "read-write" | "read-only";
+  dataFormat?: "sqlite" | "json-files" | "filesystem" | "application-export" | "unknown";
+  applicationDataLabel?: string;
 }
 
 export interface DockerStorageVolumeRealization {
@@ -39,6 +41,16 @@ function isRuntimeStorageMountMetadata(value: unknown): value is RuntimeStorageM
     (typeof value.sourcePath === "string" || value.sourcePath === undefined) &&
     typeof value.destinationPath === "string" &&
     (value.mountMode === "read-write" || value.mountMode === "read-only")
+    &&
+    (
+      value.dataFormat === undefined ||
+      value.dataFormat === "sqlite" ||
+      value.dataFormat === "json-files" ||
+      value.dataFormat === "filesystem" ||
+      value.dataFormat === "application-export" ||
+      value.dataFormat === "unknown"
+    ) &&
+    (typeof value.applicationDataLabel === "string" || value.applicationDataLabel === undefined)
   );
 }
 

@@ -124,8 +124,20 @@ function createHarness() {
           slug: "data",
           kind: "named-volume",
           lifecycleStatus: "active",
-          attachmentCount: 0,
-          attachments: [],
+          attachmentCount: 1,
+          attachments: [
+            {
+              attachmentId: "rsa_cli",
+              resourceId: "res_pocketbase",
+              resourceName: "PocketBase",
+              resourceSlug: "pocketbase",
+              destinationPath: "/pb_data",
+              mountMode: "read-write",
+              dataFormat: "sqlite",
+              applicationDataLabel: "PocketBase data",
+              attachedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
           createdAt: "2026-01-01T00:00:00.000Z",
         },
         generatedAt: "2026-01-01T00:00:00.000Z",
@@ -228,6 +240,27 @@ describe("CLI storage volume commands", () => {
     expect(harness.queries[0]).toMatchObject({ projectId: "prj_demo" });
     expect(harness.queries[1]).toBeInstanceOf(ShowStorageVolumeQuery);
     expect(harness.queries[1]).toMatchObject({ storageVolumeId: "stv_cli" });
+    expect(
+      (
+        await harness.queryBus.execute(
+          createExecutionContext({
+            requestId: "req_cli_storage_volume_show_metadata",
+            entrypoint: "cli",
+          }),
+          ShowStorageVolumeQuery.create({ storageVolumeId: "stv_cli" })._unsafeUnwrap(),
+        )
+      )._unsafeUnwrap(),
+    ).toMatchObject({
+      storageVolume: {
+        attachments: [
+          {
+            destinationPath: "/pb_data",
+            dataFormat: "sqlite",
+            applicationDataLabel: "PocketBase data",
+          },
+        ],
+      },
+    });
     expect(harness.commands[1]).toBeInstanceOf(RenameStorageVolumeCommand);
     expect(harness.commands[1]).toMatchObject({
       storageVolumeId: "stv_cli",

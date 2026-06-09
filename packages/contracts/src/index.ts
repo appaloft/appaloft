@@ -2205,6 +2205,13 @@ export const resourceSummarySchema = z.object({
 });
 
 export const storageMountModeSchema = z.enum(["read-write", "read-only"]);
+export const storageBackupDataFormatSchema = z.enum([
+  "sqlite",
+  "json-files",
+  "filesystem",
+  "application-export",
+  "unknown",
+]);
 
 export const resourceStorageAttachmentSummarySchema = z.object({
   id: z.string(),
@@ -2213,6 +2220,8 @@ export const resourceStorageAttachmentSummarySchema = z.object({
   storageVolumeKind: z.enum(["named-volume", "bind-mount"]).optional(),
   destinationPath: z.string(),
   mountMode: storageMountModeSchema,
+  dataFormat: storageBackupDataFormatSchema.optional(),
+  applicationDataLabel: z.string().optional(),
   attachedAt: z.string(),
 });
 
@@ -2223,6 +2232,8 @@ export const storageVolumeAttachmentSummarySchema = z.object({
   resourceSlug: z.string().optional(),
   destinationPath: z.string(),
   mountMode: storageMountModeSchema,
+  dataFormat: storageBackupDataFormatSchema.optional(),
+  applicationDataLabel: z.string().optional(),
   attachedAt: z.string(),
 });
 
@@ -3588,6 +3599,8 @@ export const attachResourceStorageInputSchema = z.object({
   storageVolumeId: z.string().min(1),
   destinationPath: z.string().min(1),
   mountMode: storageMountModeSchema.default("read-write"),
+  dataFormat: storageBackupDataFormatSchema.optional(),
+  applicationDataLabel: z.string().min(1).optional(),
 });
 
 export const attachResourceStorageResponseSchema = z.object({

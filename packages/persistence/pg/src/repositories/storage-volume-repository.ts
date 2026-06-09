@@ -15,6 +15,7 @@ import {
   ProjectId,
   StorageBindSourcePath,
   StorageVolume,
+  type StorageVolumeBackupDataFormat,
   type StorageVolumeByEnvironmentAndSlugSpec,
   type StorageVolumeByIdSpec,
   StorageVolumeId,
@@ -53,6 +54,8 @@ type StorageAttachmentRow = {
   storage_volume_id: string;
   destination_path: string;
   mount_mode: string;
+  data_format: string | null;
+  application_data_label: string | null;
   attached_at: string;
 };
 
@@ -183,15 +186,24 @@ function toStorageVolumeSummary(
         }
       : {}),
     attachmentCount: storageAttachments.length,
-    attachments: storageAttachments.map((attachment) => ({
-      attachmentId: attachment.attachment_id,
-      resourceId: attachment.resource_id,
-      ...(attachment.resource_name ? { resourceName: attachment.resource_name } : {}),
-      ...(attachment.resource_slug ? { resourceSlug: attachment.resource_slug } : {}),
-      destinationPath: attachment.destination_path,
-      mountMode: attachment.mount_mode as StorageVolumeSummary["attachments"][number]["mountMode"],
-      attachedAt: normalizeTimestamp(attachment.attached_at) ?? attachment.attached_at,
-    })),
+    attachments: storageAttachments.map((attachment) => {
+      const dataFormat = attachment.data_format as StorageVolumeBackupDataFormat | null;
+
+      return {
+        attachmentId: attachment.attachment_id,
+        resourceId: attachment.resource_id,
+        ...(attachment.resource_name ? { resourceName: attachment.resource_name } : {}),
+        ...(attachment.resource_slug ? { resourceSlug: attachment.resource_slug } : {}),
+        destinationPath: attachment.destination_path,
+        mountMode:
+          attachment.mount_mode as StorageVolumeSummary["attachments"][number]["mountMode"],
+        ...(dataFormat ? { dataFormat } : {}),
+        ...(attachment.application_data_label
+          ? { applicationDataLabel: attachment.application_data_label }
+          : {}),
+        attachedAt: normalizeTimestamp(attachment.attached_at) ?? attachment.attached_at,
+      };
+    }),
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     ...(row.deleted_at ? { deletedAt: normalizeTimestamp(row.deleted_at) ?? row.deleted_at } : {}),
   };
@@ -216,6 +228,8 @@ async function loadAttachments(
       "resource_storage_attachments.storage_volume_id",
       "resource_storage_attachments.destination_path",
       "resource_storage_attachments.mount_mode",
+      "resource_storage_attachments.data_format",
+      "resource_storage_attachments.application_data_label",
       "resource_storage_attachments.attached_at",
     ])
     .where("resource_storage_attachments.storage_volume_id", "in", storageVolumeIds)

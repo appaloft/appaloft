@@ -30,7 +30,7 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.resources.detachStorage");
     expect(resourcePageSource).toContain("resourceStorageAttachments");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageTitle");
-    expect(resourcePageSource).toContain("sm:grid-cols-2 xl:grid-cols-5");
+    expect(resourcePageSource).toContain("storageAttachmentApplicationDataLabel(attachment)");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageOverviewTitle");
     expect(resourcePageSource).toContain("storageAttachmentVolumeLabel(attachment)");
     expect(resourcePageSource).toContain("attachment.storageVolumeId");

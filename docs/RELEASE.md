@@ -82,6 +82,15 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
   `bun run smoke:storage-cleanup:docker`, `bun run smoke:storage-cleanup:ssh`, and
   `bun run smoke:storage-cleanup`. These probes create scoped Appaloft-named Docker volumes and must
   not run broad Docker prune.
+- `storage-backup-e2e.yml`: storage backup/restore smoke gate used by nightly and release. It runs
+  `bun run smoke:storage-backup:docker` on the GitHub Docker runner and runs
+  `bun run smoke:storage-backup:ssh` after the shared SSH preflight when SSH target secrets exist. A
+  manual release can require the SSH storage-backup gate with `require_storage_backup_e2e=true`;
+  without SSH secrets, the workflow fails closed only when required. The package scripts remain
+  available for local reproduction: `bun run smoke:storage-backup:docker`,
+  `bun run smoke:storage-backup:ssh`, and `bun run smoke:storage-backup`. These probes create scoped
+  Appaloft-named Docker volumes, store local filesystem artifacts on the selected runtime target,
+  restore to a new volume, and verify PocketBase-style SQLite content.
 - `runtime-usage-e2e.yml`: runtime usage attribution smoke gate used by nightly and release. It
   runs `bun run smoke:runtime-usage:docker` on the GitHub Docker runner and runs
   `bun run smoke:runtime-usage:ssh` after the shared SSH preflight when SSH target secrets exist. A
@@ -220,7 +229,8 @@ flows.
    `require_scheduled_task_e2e=true` when the SSH target should also prove scheduled-task Docker
    runtime execution. Set `require_storage_cleanup_e2e=true` when the SSH target should also prove
    dry-run-first scoped storage runtime cleanup over generic SSH Docker. Set
-   `require_runtime_usage_e2e=true` when the SSH target should also prove read-only runtime usage
+   `require_storage_backup_e2e=true` when the SSH target should also prove storage volume
+   backup/restore over generic SSH Docker. Set `require_runtime_usage_e2e=true` when the SSH target should also prove read-only runtime usage
    attribution. Set `require_capacity_prune_e2e=true` when the SSH target should also prove
    dry-run-first scoped runtime workspace prune over generic SSH. Set
    `require_preview_provider_e2e=true` when the release should prove live GitHub PR-comment preview

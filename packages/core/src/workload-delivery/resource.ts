@@ -90,6 +90,7 @@ import {
   type StorageVolumeKind,
   type StorageVolumeKindValue,
 } from "./storage-volume";
+import { type StorageVolumeBackupDataFormat } from "./storage-volume-backup";
 
 export interface ResourceServiceState {
   name: ResourceServiceName;
@@ -447,6 +448,8 @@ export interface ResourceStorageAttachmentState {
   sourcePath?: StorageBindSourcePath;
   destinationPath: StorageDestinationPath;
   mountMode: ResourceStorageMountModeValue;
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: DescriptionText;
   attachedAt: CreatedAt;
 }
 
@@ -1245,6 +1248,8 @@ export class Resource extends AggregateRoot<ResourceState> {
     sourcePath?: StorageBindSourcePath;
     destinationPath: StorageDestinationPath;
     mountMode: ResourceStorageMountModeValue;
+    dataFormat?: StorageVolumeBackupDataFormat;
+    applicationDataLabel?: DescriptionText;
     attachedAt: CreatedAt;
   }): Result<void> {
     const lifecycleGuard = this.rejectInactiveResource("resources.attach-storage");
@@ -1296,6 +1301,8 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.sourcePath ? { sourcePath: input.sourcePath } : {}),
         destinationPath: input.destinationPath,
         mountMode: input.mountMode,
+        ...(input.dataFormat ? { dataFormat: input.dataFormat } : {}),
+        ...(input.applicationDataLabel ? { applicationDataLabel: input.applicationDataLabel } : {}),
         attachedAt: input.attachedAt,
       },
     ];
@@ -1310,6 +1317,10 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(input.sourcePath ? { sourcePath: input.sourcePath.value } : {}),
       destinationPath: input.destinationPath.value,
       mountMode: input.mountMode.value,
+      ...(input.dataFormat ? { dataFormat: input.dataFormat } : {}),
+      ...(input.applicationDataLabel
+        ? { applicationDataLabel: input.applicationDataLabel.value }
+        : {}),
       attachedAt: input.attachedAt.value,
     });
 
@@ -1551,6 +1562,10 @@ export class Resource extends AggregateRoot<ResourceState> {
               ...(attachment.sourcePath ? { sourcePath: attachment.sourcePath.value } : {}),
               destinationPath: attachment.destinationPath.value,
               mountMode: attachment.mountMode.value,
+              ...(attachment.dataFormat ? { dataFormat: attachment.dataFormat } : {}),
+              ...(attachment.applicationDataLabel
+                ? { applicationDataLabel: attachment.applicationDataLabel.value }
+                : {}),
             })),
           }
         : {}),

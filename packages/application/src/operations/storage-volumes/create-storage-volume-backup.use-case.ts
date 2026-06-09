@@ -1,5 +1,8 @@
 import {
   CreatedAt,
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  type DeploymentTargetState,
   DescriptionText,
   domainError,
   EnvironmentId,
@@ -25,16 +28,22 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type ExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "../../execution-context";
 import { findOperationCatalogEntryByKey } from "../../operation-catalog";
 import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type DeploymentReadModel,
   type EventBus,
   type IdGenerator,
   type OperationGuardPort,
+  type ServerRepository,
   type StorageVolumeBackupRepository,
   type StorageVolumeRepository,
 } from "../../ports";
@@ -44,6 +53,7 @@ import { type CreateStorageVolumeBackupCommandInput } from "./create-storage-vol
 import {
   planStorageVolumeBackup,
   type StorageBackupProviderRegistryPort,
+  type StorageBackupSourceDescriptor,
   storageBackupUnsupportedError,
 } from "./storage-volume-backup-contract";
 
@@ -51,6 +61,43 @@ const createStorageVolumeBackupOperation = findOperationCatalogEntryByKey(
   "storage-volumes.create-backup",
 );
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
+
+async function resolveStorageBackupRuntimeTarget(input: {
+  repositoryContext: RepositoryContext;
+  source: StorageBackupSourceDescriptor;
+  deploymentReadModel: DeploymentReadModel;
+  serverRepository: ServerRepository;
+}): Promise<Result<DeploymentTargetState | undefined>> {
+  const serverId =
+    input.source.serverId ??
+    (input.source.resourceId && input.deploymentReadModel?.list
+      ? (
+          await input.deploymentReadModel.list(input.repositoryContext, {
+            resourceId: input.source.resourceId,
+            limit: 1,
+          })
+        )[0]?.serverId
+      : undefined);
+
+  if (!serverId) {
+    return ok(undefined);
+  }
+
+  const parsedServerId = DeploymentTargetId.create(serverId);
+  if (parsedServerId.isErr()) {
+    return err(parsedServerId.error);
+  }
+
+  const server = await input.serverRepository.findOne(
+    input.repositoryContext,
+    DeploymentTargetByIdSpec.create(parsedServerId.value),
+  );
+  if (!server) {
+    return err(domainError.notFound("server", parsedServerId.value.value));
+  }
+
+  return ok(server.toState());
+}
 
 @injectable()
 export class CreateStorageVolumeBackupUseCase {
@@ -61,6 +108,10 @@ export class CreateStorageVolumeBackupUseCase {
     private readonly storageVolumeBackupRepository: StorageVolumeBackupRepository,
     @inject(tokens.storageVolumeBackupProviderRegistry)
     private readonly providerRegistry: StorageBackupProviderRegistryPort,
+    @inject(tokens.deploymentReadModel)
+    private readonly deploymentReadModel: DeploymentReadModel,
+    @inject(tokens.serverRepository)
+    private readonly serverRepository: ServerRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.idGenerator)
@@ -85,14 +136,26 @@ export class CreateStorageVolumeBackupUseCase {
       logger,
       operationGuardPort,
       providerRegistry,
+      deploymentReadModel,
+      serverRepository,
       storageVolumeBackupRepository,
       storageVolumeRepository,
     } = this;
 
     return safeTry(async function* () {
-      const storageVolumeId = yield* StorageVolumeId.create(
-        input.planRequest.source.storageVolumeId,
-      );
+      const storageVolumeId = yield* StorageVolumeId.create(input.storageVolumeId);
+      if (input.planRequest.source.storageVolumeId !== storageVolumeId.value) {
+        return err(
+          domainError.validation(
+            "Backup source storageVolumeId must match the route storageVolumeId",
+            {
+              phase: "storage-volume-backup-admission",
+              storageVolumeId: storageVolumeId.value,
+              sourceStorageVolumeId: input.planRequest.source.storageVolumeId,
+            },
+          ),
+        );
+      }
       const storageVolume = await storageVolumeRepository.findOne(
         repositoryContext,
         StorageVolumeByIdSpec.create(storageVolumeId),
@@ -148,6 +211,13 @@ export class CreateStorageVolumeBackupUseCase {
         return err(storageBackupUnsupportedError(plan));
       }
 
+      const runtimeTarget = yield* await resolveStorageBackupRuntimeTarget({
+        repositoryContext,
+        source: input.planRequest.source,
+        deploymentReadModel,
+        serverRepository,
+      });
+
       const backupId = StorageVolumeBackupId.rehydrate(idGenerator.next("svb"));
       const attemptId = StorageVolumeBackupAttemptId.rehydrate(idGenerator.next("sba"));
       const requestedAt = yield* OccurredAt.create(clock.now());
@@ -188,6 +258,7 @@ export class CreateStorageVolumeBackupUseCase {
         requestedAt: requestedAt.value,
         plan,
         source: input.planRequest.source,
+        ...(runtimeTarget ? { runtimeTarget } : {}),
       });
       if (sourceResult.isOk()) {
         const targetResult = await targetProvider.store({
@@ -197,6 +268,7 @@ export class CreateStorageVolumeBackupUseCase {
           plan,
           target: input.planRequest.target,
           sourceResult: sourceResult.value,
+          ...(runtimeTarget ? { runtimeTarget } : {}),
         });
         if (targetResult.isOk()) {
           const completedAt = yield* OccurredAt.create(targetResult.value.completedAt);
