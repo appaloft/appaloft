@@ -179,7 +179,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       const composeDeployment = runShellCli(
         [
           "deploy",
-          composeFixtureDir,
+          composeFixtureFile,
           "--project",
           projectId,
           "--server",
