@@ -6,10 +6,13 @@ import {
   cleanupWorkspace,
   createShellE2eWorkspace,
   expectCliSuccess,
+  externalServerDatabaseEnv,
   fixturePath,
   parseJson,
   runDocker,
   runShellCli,
+  usesExternalServer,
+  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
@@ -43,6 +46,7 @@ describe("quick deploy static Docker workflow e2e", () => {
 
     const workspace = createShellE2eWorkspace("appaloft-static-docker-", {
       appVersion: "0.1.0-quick-deploy-static-docker-e2e",
+      env: externalServerDatabaseEnv(),
     });
     const suffix = crypto.randomUUID().slice(0, 8);
     let deploymentId: string | undefined;
@@ -166,8 +170,12 @@ describe("quick deploy static Docker workflow e2e", () => {
         },
       });
 
-      const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
-      expect(logs.exitCode, logs.stderr).toBe(0);
+      const logs = await waitForDeploymentLogs(
+        deploymentId,
+        workspace.cliOptions,
+        ["Generated static site Dockerfile", "Container is reachable"],
+        { label: "static site deployment" },
+      );
       expect(logs.stdout).toContain("Generated static site Dockerfile");
       expect(logs.stdout).toContain("Container is reachable");
       const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/)/u.exec(
@@ -209,15 +217,18 @@ describe("quick deploy static Docker workflow e2e", () => {
         "static-server",
         "default.conf",
       );
-      expect(existsSync(generatedDockerfile)).toBe(true);
       expect(existsSync(generatedStaticConfigAsset)).toBe(false);
-      const dockerfileText = await Bun.file(generatedDockerfile).text();
-      expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
-      expect(dockerfileText).toContain('COPY ["dist/","/usr/share/nginx/html/"]');
-      expect(dockerfileText).toContain(
-        'COPY [".appaloft/docker-build/static-server/default.conf","/etc/nginx/conf.d/default.conf"]',
-      );
-      expect(dockerfileText).toContain("EXPOSE 80");
+
+      if (!usesExternalServer()) {
+        expect(existsSync(generatedDockerfile)).toBe(true);
+        const dockerfileText = await Bun.file(generatedDockerfile).text();
+        expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
+        expect(dockerfileText).toContain('COPY ["dist/","/usr/share/nginx/html/"]');
+        expect(dockerfileText).toContain(
+          'COPY [".appaloft/docker-build/static-server/default.conf","/etc/nginx/conf.d/default.conf"]',
+        );
+        expect(dockerfileText).toContain("EXPOSE 80");
+      }
 
       const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
       expect(deployments.exitCode, deployments.stderr).toBe(0);

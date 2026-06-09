@@ -3307,10 +3307,10 @@ async function teardownWebApp(): Promise<void> {
   Bun.WebView.closeAll();
 }
 
-function createWebView(): Bun.WebView {
+function createWebView(options: { width?: number; height?: number } = {}): Bun.WebView {
   return new Bun.WebView({
-    width: 1280,
-    height: 900,
+    width: options.width ?? 1280,
+    height: options.height ?? 900,
     ...(process.platform === "darwin" ? {} : { backend: "chrome" as const }),
     console: (type, ...args) => {
       if (type === "error") {
@@ -4888,6 +4888,111 @@ describe.serial("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[RES-DETAIL-IA-001] redirects removed resource settings URLs to their owning tabs", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectAnyText(view, ["Network profile", "网络配置"]);
+    const resourceNavigationState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify((() => {
+        const resourceLinks = Array.from(document.querySelectorAll("a"))
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
+          .filter((href) => href.startsWith("/resources/res_demo"));
+        const overviewRail = document.querySelector("aside");
+        const overviewRailLinks = Array.from(overviewRail?.querySelectorAll("a") ?? [])
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+
+        return {
+          hasRemovedSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
+          hasDependenciesTab: resourceLinks.includes("/resources/res_demo?tab=dependencies"),
+          hasEnvironmentTab: resourceLinks.includes("/resources/res_demo?tab=environment"),
+          hasPromotedSectionLink: overviewRailLinks.some((href) =>
+            href.includes("section=configuration") ||
+            href.includes("section=dependencies") ||
+            href.includes("section=domains") ||
+            href.includes("section=usage"),
+          ),
+          overviewRailClass: overviewRail?.getAttribute("class") ?? "",
+          overviewGridClass: overviewRail?.parentElement?.getAttribute("class") ?? "",
+          overviewContentClass: overviewRail?.nextElementSibling?.getAttribute("class") ?? "",
+        };
+      })())`),
+    ) as {
+      hasRemovedSettingsLink: boolean;
+      hasDependenciesTab: boolean;
+      hasEnvironmentTab: boolean;
+      hasPromotedSectionLink: boolean;
+      overviewRailClass: string;
+      overviewGridClass: string;
+      overviewContentClass: string;
+    };
+    expect(resourceNavigationState).toMatchObject({
+      hasRemovedSettingsLink: false,
+      hasDependenciesTab: true,
+      hasEnvironmentTab: true,
+      hasPromotedSectionLink: false,
+    });
+    expect(resourceNavigationState.overviewRailClass).toContain("lg:border-r");
+    expect(resourceNavigationState.overviewGridClass).toContain("grid");
+    expect(resourceNavigationState.overviewGridClass).toContain("min-w-0");
+    expect(resourceNavigationState.overviewGridClass).toContain("border-b");
+    expect(resourceNavigationState.overviewContentClass).toContain("p-5");
+
+    await using mobileView = createWebView({ width: 390, height: 900 });
+    await mobileView.navigate(`${previewUrl}/resources/res_demo`);
+    await expectAnyText(mobileView, ["Network profile", "网络配置"]);
+    const mobileNavigationState = JSON.parse(
+      await mobileView.evaluate<string>(`JSON.stringify((() => {
+        const resourceLinks = Array.from(document.querySelectorAll("a"))
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
+          .filter((href) => href.startsWith("/resources/res_demo"));
+        const overviewRail = document.querySelector("aside");
+        return {
+          bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+          hasRemovedSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
+          hasDependenciesTab: resourceLinks.includes("/resources/res_demo?tab=dependencies"),
+          hasEnvironmentTab: resourceLinks.includes("/resources/res_demo?tab=environment"),
+          overviewRailClass: overviewRail?.getAttribute("class") ?? "",
+          overviewContentClass: overviewRail?.nextElementSibling?.getAttribute("class") ?? "",
+        };
+      })())`),
+    ) as {
+      bodyOverflows: boolean;
+      hasRemovedSettingsLink: boolean;
+      hasDependenciesTab: boolean;
+      hasEnvironmentTab: boolean;
+      overviewRailClass: string;
+      overviewContentClass: string;
+    };
+    expect(mobileNavigationState).toMatchObject({
+      bodyOverflows: false,
+      hasRemovedSettingsLink: false,
+      hasDependenciesTab: true,
+      hasEnvironmentTab: true,
+    });
+    expect(mobileNavigationState.overviewRailClass).toContain("border-b");
+    expect(mobileNavigationState.overviewContentClass).toContain("p-5");
+
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=dependencies`);
+
+    await expectAnyText(view, ["Dependencies", "依赖资源"]);
+    await waitFor(
+      () => view.evaluate<string>("window.location.search"),
+      (search) => search === "?tab=dependencies",
+      "Expected legacy dependency settings URL to be replaced by the top-level dependencies tab",
+    );
+
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
+    await expectAnyText(view, ["Configuration", "配置变量"]);
+    await waitFor(
+      () => view.evaluate<string>("window.location.search"),
+      (search) => search === "?tab=environment",
+      "Expected legacy configuration settings URL to be replaced by the environment tab",
+    );
+  }, 15_000);
+
   test("[RES-DIAG-ENTRY-001] copies resource diagnostic JSON from resource detail", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
@@ -4974,7 +5079,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=diagnostics`);
+      await view.navigate(`${previewUrl}/resources/res_demo?section=diagnostics`);
       await view.evaluate<void>(`(() => {
         window.__appaloftCopiedText = "";
         window.appaloftDesktop = {
@@ -5424,7 +5529,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=dependencies`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=dependencies`);
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
       await expectText(view, "Managed DB");
@@ -5777,7 +5882,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=storage`);
+      await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
 
       await expectAnyText(view, ["Storage volumes", "Storage volumes"]);
       await expectText(view, "uploads");
@@ -6363,7 +6468,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=domains`);
 
       await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
       await setInputValue(
@@ -6417,7 +6522,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=health`);
+    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
 
     await expectAnyText(view, ["Durable profile edit", "持久资源配置编辑"]);
     await expectAnyText(view, [
@@ -6540,7 +6645,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+      await view.navigate(`${previewUrl}/resources/res_demo`);
 
       await expectAnyText(view, ["Latest access failure", "最近访问失败"]);
       await expectText(view, "req_access_web_route_meta");
@@ -6558,7 +6663,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+    await view.navigate(`${previewUrl}/resources/res_demo`);
 
     await expectAnyText(view, ["Network profile", "网络配置"]);
     await setInputValue(view, "#resource-network-internal-port", "8080");
@@ -6584,7 +6689,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+    await view.navigate(`${previewUrl}/resources/res_demo`);
 
     await expectAnyText(view, ["Access profile", "访问配置"]);
     await setInputValue(view, "#resource-access-path-prefix", "/internal");
@@ -6609,7 +6714,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+    await view.navigate(`${previewUrl}/resources/res_demo`);
 
     await expectAnyText(view, ["Source profile", "来源配置"]);
     await setInputValue(view, "#resource-source-locator", "workspace-updated");
@@ -6636,7 +6741,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+    await view.navigate(`${previewUrl}/resources/res_demo`);
 
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
     await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
@@ -6663,7 +6768,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
 
@@ -6733,7 +6838,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
+      await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
 
       await expectAnyText(view, ["Import .env variables", "导入 .env 变量"]);
       await setInputValue(view, "#resource-config-import-secret-keys", "DATABASE_URL, API_TOKEN");
@@ -6766,7 +6871,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=health`);
+    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
 
     await expectAnyText(view, ["Health policy", "健康策略"]);
     await setInputValue(view, "#resource-health-path", "/ready");
@@ -6807,7 +6912,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
 
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
     await clickButtonByAnyText(view, ["Unset", "移除"]);
@@ -7621,7 +7726,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+    await view.navigate(`${previewUrl}/resources/res_demo`);
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
     await clickButtonByAnyText(view, ["Archive", "归档"]);
     await acceptConsoleConfirm(view);
@@ -7818,7 +7923,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=settings`);
+      await view.navigate(`${previewUrl}/resources/res_demo`);
       await expectAnyText(view, ["Archived", "已归档"]);
       const clicked = await waitFor(
         () =>
