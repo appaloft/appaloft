@@ -19,4 +19,16 @@ describe("console sidebar project loading state", () => {
       shellSource.indexOf("i18nKeys.console.shell.noProjects"),
     );
   });
+
+  test("[SIDEBAR-PROJECT-MORE-001] exposes the full project list when the sidebar is capped", async () => {
+    const shellSource = await readFile(
+      new URL("../components/console/ConsoleShell.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(shellSource).toContain("filteredProjects.slice(0, 8)");
+    expect(shellSource).toContain("filteredProjects.length > 8");
+    expect(shellSource).toContain('href="/projects"');
+    expect(shellSource).toContain("i18nKeys.common.actions.viewAll");
+  });
 });

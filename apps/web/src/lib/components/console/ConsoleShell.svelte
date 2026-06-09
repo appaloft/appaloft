@@ -13,6 +13,7 @@
     Moon,
     Package,
     Play,
+    ArrowRight,
     Rocket,
     Server,
     ServerCrash,
@@ -401,6 +402,18 @@
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               {/each}
+              {#if filteredProjects.length > 8}
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltipContent={$t(i18nKeys.common.actions.viewAll)}>
+                    {#snippet child({ props })}
+                      <a href="/projects" {...props}>
+                        <ArrowRight class="size-4" />
+                        <span>{$t(i18nKeys.common.actions.viewAll)}</span>
+                      </a>
+                    {/snippet}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              {/if}
             {:else}
               <SidebarMenuItem>
                 <SidebarMenuButton tooltipContent={$t(i18nKeys.console.shell.noProjects)}>
