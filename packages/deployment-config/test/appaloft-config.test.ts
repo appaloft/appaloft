@@ -148,6 +148,104 @@ describe("Appaloft deployment config schema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-SERVICE-GRAPH-001] accepts named repository service graph declarations", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      services: {
+        web: {
+          kind: "web",
+          runtime: {
+            strategy: "workspace-commands",
+            startCommand: "bun run start:web",
+          },
+          network: {
+            internalPort: 3000,
+            upstreamProtocol: "http",
+            exposureMode: "reverse-proxy",
+          },
+          health: {
+            path: "/ready",
+          },
+        },
+        worker: {
+          kind: "worker",
+          runtime: {
+            strategy: "workspace-commands",
+            startCommand: "bun run start:worker",
+          },
+          network: {
+            exposureMode: "none",
+          },
+          replicas: 4,
+          env: {
+            QUEUE: "deployments",
+          },
+          secrets: {
+            WORKER_TOKEN: {
+              from: "ci-env:WORKER_TOKEN",
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.services?.web?.kind).toBe("web");
+      expect(parsed.data.services?.web?.network?.internalPort).toBe(3000);
+      expect(parsed.data.services?.worker?.kind).toBe("worker");
+      expect(parsed.data.services?.worker?.replicas).toBe(4);
+      expect(parsed.data.services?.worker?.network?.exposureMode).toBe("none");
+      expect(parsed.data.services?.worker?.secrets?.WORKER_TOKEN?.from).toBe("ci-env:WORKER_TOKEN");
+    }
+  });
+
+  test("[CONFIG-FILE-SERVICE-GRAPH-002] rejects unsafe service graph fields", () => {
+    const badKey = parseAppaloftDeploymentConfig({
+      services: {
+        Web: {
+          kind: "web",
+        },
+      },
+    });
+
+    expect(badKey.success).toBe(false);
+
+    const missingKind = parseAppaloftDeploymentConfig({
+      services: {
+        worker: {
+          runtime: {
+            strategy: "workspace-commands",
+          },
+        },
+      },
+    });
+
+    expect(missingKind.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      services: {
+        worker: {
+          kind: "worker",
+          token: "secret-token",
+        },
+      },
+    });
+
+    expect(rawSecret.success).toBe(false);
+
+    const topLevelReplicas = parseAppaloftDeploymentConfig({
+      replicas: 4,
+      services: {
+        worker: {
+          kind: "worker",
+          replicas: 4,
+        },
+      },
+    });
+
+    expect(topLevelReplicas.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-IMAGE-SOURCE-001] accepts prebuilt image source declarations", () => {
     const parsed = parseAppaloftDeploymentConfigText(
       [

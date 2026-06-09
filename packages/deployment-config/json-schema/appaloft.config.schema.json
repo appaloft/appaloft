@@ -148,6 +148,25 @@
           "description": "Immutable git commit SHA to record with the source profile.",
           "type": "string",
           "minLength": 1
+        },
+        "version": {
+          "description": "Version reference to record with the source profile.",
+          "type": "string",
+          "minLength": 1
+        },
+        "versionKind": {
+          "description": "Version reference kind for source.version.",
+          "type": "string",
+          "enum": [
+            "branch",
+            "tag",
+            "commit-sha",
+            "image-tag",
+            "image-digest",
+            "content-digest",
+            "release",
+            "literal"
+          ]
         }
       },
       "additionalProperties": false,
@@ -1232,6 +1251,307 @@
         },
         "additionalProperties": false,
         "description": "Trusted-entrypoint-selected named config profile overlay fields."
+      }
+    },
+    "services": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["web", "api", "worker", "database", "cache", "service"],
+            "description": "Provider-neutral service role."
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "description": "Repository source kind.",
+                "type": "string",
+                "enum": ["git", "image"]
+              },
+              "repository": {
+                "description": "Git repository URL to deploy from.",
+                "type": "string",
+                "minLength": 1
+              },
+              "image": {
+                "description": "Docker/OCI image reference to deploy as a prebuilt image.",
+                "type": "string",
+                "minLength": 1
+              },
+              "baseDirectory": {
+                "description": "Relative workspace directory to use as the deployable source root.",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+              },
+              "gitRef": {
+                "description": "Git ref to record with the source profile.",
+                "type": "string",
+                "minLength": 1
+              },
+              "commitSha": {
+                "description": "Immutable git commit SHA to record with the source profile.",
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "description": "Version reference to record with the source profile.",
+                "type": "string",
+                "minLength": 1
+              },
+              "versionKind": {
+                "description": "Version reference kind for source.version.",
+                "type": "string",
+                "enum": [
+                  "branch",
+                  "tag",
+                  "commit-sha",
+                  "image-tag",
+                  "image-digest",
+                  "content-digest",
+                  "release",
+                  "literal"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "description": "Source profile fields. This object must not choose projects or resources."
+          },
+          "runtime": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "description": "Application runtime type shorthand.",
+                "type": "string",
+                "const": "node"
+              },
+              "strategy": {
+                "description": "Requested runtime plan strategy.",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "dockerfile",
+                  "docker-compose",
+                  "prebuilt-image",
+                  "workspace-commands",
+                  "static"
+                ]
+              },
+              "installCommand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "buildCommand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "startCommand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "build": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["command"],
+                "additionalProperties": false
+              },
+              "start": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["command"],
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "publishDirectory": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+              },
+              "dockerfilePath": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+              },
+              "dockerComposeFilePath": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
+              },
+              "buildTarget": {
+                "type": "string",
+                "minLength": 1
+              },
+              "healthCheckPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "healthCheck": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "path": {
+                    "description": "HTTP path used for readiness checks.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "intervalSeconds": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutSeconds": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "retries": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Health-check profile fields."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Runtime profile fields copied into resource creation for quick deploy."
+          },
+          "network": {
+            "type": "object",
+            "properties": {
+              "internalPort": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "upstreamProtocol": {
+                "type": "string",
+                "enum": ["http", "tcp"]
+              },
+              "exposureMode": {
+                "type": "string",
+                "enum": ["none", "reverse-proxy", "direct-port"]
+              },
+              "targetServiceName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hostPort": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false,
+            "description": "Network profile fields copied into resource creation for quick deploy."
+          },
+          "health": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "path": {
+                "description": "HTTP path used for readiness checks.",
+                "type": "string",
+                "minLength": 1
+              },
+              "intervalSeconds": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "retries": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false,
+            "description": "Health-check profile fields."
+          },
+          "replicas": {
+            "description": "Requested process replicas for this named service.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "env": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          },
+          "secrets": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Secret reference, for example ci-env:APP_SECRET or resource-secret:APP_SECRET."
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["from"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["kind"],
+        "additionalProperties": false,
+        "description": "Provider-neutral named service/process declaration for repository config."
       }
     },
     "dependencies": {

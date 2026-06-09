@@ -1634,7 +1634,10 @@ describe("CreateDeploymentUseCase", () => {
       executionBackend,
     });
 
-    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const result = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
 
     expect(result.isOk()).toBe(true);
     if (result.isErr()) throw new Error(result.error.message);
@@ -1693,7 +1696,10 @@ describe("CreateDeploymentUseCase", () => {
       executionBackend,
       processAttemptRecorder,
     });
-    const accepted = await createDeploymentUseCase.execute(context, createDeploymentInput);
+    const accepted = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
     expect(accepted.isOk()).toBe(true);
     if (accepted.isErr()) throw new Error(accepted.error.message);
 
@@ -1752,6 +1758,34 @@ describe("CreateDeploymentUseCase", () => {
       status: "succeeded",
       operationKey: "deployments.create",
     });
+  });
+
+  test("[PROC-DELIVERY-WORKER-026] keeps default deployment execution synchronous with durable work enabled", async () => {
+    const durableWork = new RecordingDurableWorkAdapter();
+    const executionBackend = new CountingExecutionBackend();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(undefined, {
+      durableWorkQueueAdapter: durableWork,
+      executionBackend,
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw new Error(result.error.message);
+    expect(executionBackend.calls).toBe(1);
+    expect(durableWork.items.size).toBe(0);
+    expect(durableWork.events).toHaveLength(0);
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(result.value.id)),
+    );
+    expect(deployment?.toState().status.value).toBe("succeeded");
   });
 
   test("[DEP-CREATE-ASYNC-001] admits detached deployment execution before runtime completion", async () => {

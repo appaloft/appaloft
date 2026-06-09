@@ -545,6 +545,30 @@ describe("CLI deployment config entry workflow", () => {
         upstreamProtocol: "http",
         exposureMode: "reverse-proxy",
       },
+      services: {
+        web: {
+          kind: "web",
+          runtime: {
+            strategy: "workspace-commands",
+            startCommand: "bun run start:web",
+          },
+          network: {
+            internalPort: 4310,
+            exposureMode: "reverse-proxy",
+          },
+        },
+        worker: {
+          kind: "worker",
+          runtime: {
+            strategy: "workspace-commands",
+            startCommand: "bun run start:worker",
+          },
+          network: {
+            exposureMode: "none",
+          },
+          replicas: 4,
+        },
+      },
       access: {
         domains: [
           {
@@ -616,6 +640,16 @@ describe("CLI deployment config entry workflow", () => {
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
       healthCheckPath: "/ready",
+      services: [
+        {
+          name: "web",
+          kind: "web",
+        },
+        {
+          name: "worker",
+          kind: "worker",
+        },
+      ],
       serverAppliedRoutes: [
         {
           host: "www.example.com",
@@ -760,6 +794,174 @@ describe("CLI deployment config entry workflow", () => {
         expectedStatusCode: 200,
       },
     });
+  });
+
+  test("[CONFIG-FILE-SERVICE-GRAPH-003] config service graph seeds first-run Resource services", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-service-graph-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: docker-compose",
+        "  dockerComposeFilePath: compose.yaml",
+        "network:",
+        "  internalPort: 3000",
+        "  targetServiceName: web",
+        "services:",
+        "  web:",
+        "    kind: web",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      startCommand: bun run start:web",
+        "    network:",
+        "      internalPort: 3000",
+        "      exposureMode: reverse-proxy",
+        "  worker:",
+        "    kind: worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      startCommand: bun run start:worker",
+        "    network:",
+        "      exposureMode: none",
+        "    replicas: 4",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.93",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(resource).toMatchObject({
+      kind: "compose-stack",
+      services: [
+        {
+          name: "web",
+          kind: "web",
+        },
+        {
+          name: "worker",
+          kind: "worker",
+        },
+      ],
+      runtimeProfile: {
+        strategy: "docker-compose",
+        dockerComposeFilePath: "compose.yaml",
+      },
+      networkProfile: {
+        internalPort: 3000,
+        targetServiceName: "web",
+      },
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown> | undefined;
+    expect(deployment).not.toHaveProperty("services");
+    expect(deployment).not.toHaveProperty("runtime");
+    expect(deployment).not.toHaveProperty("network");
+  });
+
+  test("[CONFIG-FILE-SERVICE-GRAPH-004] existing resource service graph drift blocks config deploy", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-service-graph-drift-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: docker-compose",
+        "  dockerComposeFilePath: compose.yaml",
+        "network:",
+        "  internalPort: 3000",
+        "  targetServiceName: web",
+        "services:",
+        "  web:",
+        "    kind: web",
+        "  worker:",
+        "    kind: worker",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        resource: {
+          services: [{ name: "web", kind: "web" }],
+        },
+        runtimeProfile: {
+          strategy: "docker-compose",
+          dockerComposeFilePath: "compose.yaml",
+        },
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+          targetServiceName: "web",
+        },
+      },
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        const result = await harness.program
+          .parseAsync([
+            "node",
+            "appaloft",
+            "deploy",
+            workspace,
+            "--config",
+            configPath,
+            "--server-host",
+            "203.0.113.93",
+            "--server-provider",
+            "generic-ssh",
+          ])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          const errorText = String(result.error);
+          expect(errorText).toContain("resource_profile_drift");
+          expect(errorText).toContain("deployment.services");
+          expect(errorText).toContain("blocksDeploymentAdmission");
+        }
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toBeUndefined();
   });
 
   test("[CONFIG-FILE-IMAGE-SOURCE-003] config prebuilt image source creates Resource profile before deployment", async () => {

@@ -159,6 +159,7 @@ export interface DeploymentPromptSeed {
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
+  services?: DeploymentServiceSeed[];
   dependencyGraph?: DeploymentDependencySeed[];
   storageGraph?: DeploymentStorageSeed[];
   scheduledTaskGraph?: DeploymentScheduledTaskSeed[];
@@ -183,6 +184,10 @@ type ConfigurableResourceNetworkProfileInput = ConfigureResourceNetworkInput["ne
 type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
+export interface DeploymentServiceSeed {
+  name: string;
+  kind: NonNullable<CreateResourceInput["services"]>[number]["kind"];
+}
 export interface DeploymentDependencySeed {
   key: string;
   kind: ManagedDependencyResourceKind;
@@ -386,6 +391,24 @@ function inferResourceFromSource(
   return {
     name: inferGeneratedResourceNameFromSource(sourceLocator),
     kind: resourceKindForDeploymentMethod(deploymentMethod),
+  };
+}
+
+function resourceDraftWithConfigServices(
+  resource: ResourceDraftInput,
+  services: DeploymentServiceSeed[] | undefined,
+): ResourceDraftInput {
+  if (!services || services.length === 0) {
+    return resource;
+  }
+
+  return {
+    ...resource,
+    kind: services.length > 1 ? "compose-stack" : (resource.kind ?? "application"),
+    services: services.map((service) => ({
+      name: service.name,
+      kind: service.kind,
+    })),
   };
 }
 
@@ -619,6 +642,15 @@ export function deploymentPromptSeedFromConfig(
           ...(task.preview?.lifecycle ? { previewLifecycle: task.preview.lifecycle } : {}),
         }) satisfies DeploymentScheduledTaskSeed,
     );
+  const services = Object.entries(config.services ?? {})
+    .sort(compareConfigKeys)
+    .map(
+      ([name, service]) =>
+        ({
+          name,
+          kind: service.kind,
+        }) satisfies DeploymentServiceSeed,
+    );
   const autoDeployPolicy = config.autoDeploy
     ? ({
         enabled: config.autoDeploy.enabled,
@@ -730,6 +762,7 @@ export function deploymentPromptSeedFromConfig(
     ...(healthCheckPath ? { healthCheckPath } : {}),
     ...(healthCheck ? { healthCheck } : {}),
     ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
+    ...(services.length > 0 ? { services } : {}),
     ...(dependencyGraph.length > 0 ? { dependencyGraph } : {}),
     ...(storageGraph.length > 0 ? { storageGraph } : {}),
     ...(scheduledTaskGraph.length > 0 ? { scheduledTaskGraph } : {}),
@@ -3834,7 +3867,11 @@ function resolveResource(input: {
       }
 
       const sourceResource =
-        input.seed.resource ?? inferResourceFromSource(input.sourceLocator, input.deploymentMethod);
+        input.seed.resource ??
+        resourceDraftWithConfigServices(
+          inferResourceFromSource(input.sourceLocator, input.deploymentMethod),
+          input.seed.services,
+        );
       const sourceResourceLabel = `${sourceResource.name} (${sourceResource.kind ?? "application"})`;
       const resources =
         input.projectId && input.environmentId
@@ -4276,6 +4313,47 @@ function profileDriftAdmissionError(
   } as const;
 }
 
+function normalizedServiceDriftValue(
+  services: readonly { name: string; kind: string }[] | undefined,
+): string {
+  return JSON.stringify(
+    [...(services ?? [])]
+      .map((service) => ({ name: service.name, kind: service.kind }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+  );
+}
+
+function serviceDriftDiagnostic(input: {
+  current: readonly { name: string; kind: string }[] | undefined;
+  desired: readonly { name: string; kind: string }[];
+}): ResourceDetailProfileDiagnostic[] {
+  if (normalizedServiceDriftValue(input.current) === normalizedServiceDriftValue(input.desired)) {
+    return [];
+  }
+
+  return [
+    {
+      code: "resource_profile_drift",
+      severity: "blocking",
+      message: "Resource services differ from the deployment config service graph",
+      path: "services",
+      section: "runtime",
+      fieldPath: "services",
+      comparison: "resource-vs-entry-profile",
+      resourceValue: {
+        state: "present",
+        displayValue: normalizedServiceDriftValue(input.current),
+      },
+      entryProfileValue: {
+        state: "present",
+        displayValue: normalizedServiceDriftValue(input.desired),
+      },
+      configPointer: "deployment.services",
+      blocksDeploymentAdmission: true,
+    },
+  ];
+}
+
 function rejectExistingResourceProfileDriftIfNeeded(input: {
   seed: DeploymentPromptSeed;
   resource: ResolvedWorkflowResourceReference;
@@ -4339,12 +4417,20 @@ function rejectExistingResourceProfileDriftIfNeeded(input: {
       blocksDeploymentAdmission: true,
       configPointerPrefix: "deployment",
     });
+    const serviceDrift = input.seed.services
+      ? serviceDriftDiagnostic({
+          current: detail.resource.services,
+          desired: input.seed.services,
+        })
+      : [];
 
-    if (diagnostics.length > 0) {
+    if (diagnostics.length > 0 || serviceDrift.length > 0) {
       yield* Effect.sync(() => {
         process.exitCode = 1;
       });
-      return yield* Effect.fail(profileDriftAdmissionError(diagnostics, resourceId));
+      return yield* Effect.fail(
+        profileDriftAdmissionError([...serviceDrift, ...diagnostics], resourceId),
+      );
     }
   });
 }
