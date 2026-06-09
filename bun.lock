@@ -206,6 +206,9 @@
         "zod": "^4.4.3",
       },
     },
+    "packages/ash": {
+      "name": "@appaloft/ash",
+    },
     "packages/auth/better": {
       "name": "@appaloft/auth-better",
       "dependencies": {
@@ -610,6 +613,8 @@
     "@appaloft/ai-mcp": ["@appaloft/ai-mcp@workspace:packages/ai/mcp"],
 
     "@appaloft/application": ["@appaloft/application@workspace:packages/application"],
+
+    "@appaloft/ash": ["@appaloft/ash@workspace:packages/ash"],
 
     "@appaloft/auth-better": ["@appaloft/auth-better@workspace:packages/auth/better"],
 
