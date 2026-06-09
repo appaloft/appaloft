@@ -3,12 +3,15 @@ import "reflect-metadata";
 import { afterEach, describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   type CommandBus,
   operationCatalog,
   PublishStaticArtifactCommand,
+  type TerminalSession,
+  type TerminalSessionGateway,
   tokens,
 } from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
@@ -267,7 +270,120 @@ describe("createAppaloftServer", () => {
       await server.shutdown();
     }
   });
+
+  test("[TERM-SESSION-ENTRY-006] started server passes Bun websocket handle to terminal attach routes", async () => {
+    const dataDir = await createTempDataDir();
+    const httpPort = await reserveLocalPort();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpHost: "127.0.0.1",
+        httpPort,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+        workerRuntime: {
+          mode: "disabled",
+        },
+      },
+      authRuntime: createTestAuthRuntime(),
+      extensions: [
+        {
+          name: "terminal-session-test-gateway",
+          configureRuntime({ container }) {
+            container.registerInstance(
+              tokens.terminalSessionGateway,
+              new TestTerminalSessionGateway(),
+            );
+          },
+        },
+      ],
+    });
+    let socket: WebSocket | undefined;
+
+    try {
+      await server.startServer();
+      socket = new WebSocket(`ws://127.0.0.1:${httpPort}/api/terminal-sessions/term_test/attach`);
+      await waitForOpen(socket);
+      const frame = JSON.parse(await waitForMessage(socket)) as {
+        readonly kind?: string;
+        readonly sessionId?: string;
+      };
+
+      expect(frame).toMatchObject({
+        kind: "ready",
+        sessionId: "term_test",
+      });
+    } finally {
+      socket?.close();
+      await server.shutdown();
+    }
+  }, 15_000);
 });
+
+function waitForOpen(socket: WebSocket): Promise<void> {
+  if (socket.readyState === WebSocket.OPEN) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("WebSocket did not open"));
+    }, 1_000);
+
+    socket.addEventListener(
+      "open",
+      () => {
+        clearTimeout(timeout);
+        resolve();
+      },
+      { once: true },
+    );
+    socket.addEventListener(
+      "error",
+      () => {
+        clearTimeout(timeout);
+        reject(new Error("WebSocket failed to open"));
+      },
+      { once: true },
+    );
+  });
+}
+
+function waitForMessage(socket: WebSocket): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("WebSocket message was not received"));
+    }, 1_000);
+
+    socket.addEventListener(
+      "message",
+      (event) => {
+        clearTimeout(timeout);
+        resolve(String(event.data));
+      },
+      { once: true },
+    );
+  });
+}
+
+async function reserveLocalPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Local port reservation failed")));
+        return;
+      }
+
+      server.close(() => resolve(address.port));
+    });
+  });
+}
 
 function createTestAuthRuntime(
   authorizationRequests: Parameters<AuthRuntime["authorizeProductSession"]>[1][] = [],
@@ -319,6 +435,71 @@ function createTestAuthRuntime(
       return new Response(null, { status: 404 });
     },
   } as AuthRuntime;
+}
+
+class TestTerminalSessionGateway implements TerminalSessionGateway {
+  private readonly session = new TestTerminalSession();
+
+  async open() {
+    return ok({
+      sessionId: "term_test",
+      scope: "server" as const,
+      serverId: "srv_test",
+      providerKey: "local-shell",
+      transport: {
+        kind: "websocket" as const,
+        path: "/api/terminal-sessions/term_test/attach",
+      },
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+  }
+
+  attach() {
+    return ok(this.session);
+  }
+
+  list() {
+    return [];
+  }
+
+  show() {
+    return ok({
+      sessionId: "term_test",
+      scope: "server" as const,
+      serverId: "srv_test",
+      providerKey: "local-shell",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      status: "active" as const,
+    });
+  }
+
+  async close() {
+    return ok({
+      sessionId: "term_test",
+      status: "closed" as const,
+    });
+  }
+
+  async expire() {
+    return ok({
+      expired: [],
+    });
+  }
+}
+
+class TestTerminalSession implements TerminalSession {
+  async *[Symbol.asyncIterator]() {
+    yield {
+      kind: "ready" as const,
+      sessionId: "term_test",
+    };
+  }
+
+  async write() {}
+
+  async resize() {}
+
+  async close() {}
 }
 
 function createZipArchive(entries: readonly { path: string; content: string }[]): Uint8Array {
