@@ -94,6 +94,10 @@ type LegacyDeploymentBootstrapInput = CreateDeploymentCommandInput & {
   resource?: DeploymentConfiguredResource | undefined;
 };
 
+export type BootstrappedDeploymentInput = CreateDeploymentCommandInput & {
+  requestedDeploymentProfile?: Partial<RequestedDeploymentConfig> | undefined;
+};
+
 function normalizeProviderKey(providerKey: string): string {
   switch (providerKey.trim()) {
     case "local":
@@ -192,7 +196,7 @@ export class DeploymentContextBootstrapService {
   async bootstrap(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
-  ): Promise<Result<CreateDeploymentCommandInput>> {
+  ): Promise<Result<BootstrappedDeploymentInput>> {
     const self = this;
 
     return safeTry(async function* () {
@@ -235,7 +239,7 @@ export class DeploymentContextBootstrapService {
     context: ExecutionContext,
     input: LegacyDeploymentBootstrapInput,
     config: DeploymentConfigSnapshot | null,
-  ): Promise<Result<LegacyDeploymentBootstrapInput>> {
+  ): Promise<Result<BootstrappedDeploymentInput>> {
     const self = this;
 
     return safeTry(async function* () {
@@ -304,6 +308,13 @@ export class DeploymentContextBootstrapService {
         ...(resourceId ? { resourceId } : {}),
         ...(selectedServerId ? { serverId: selectedServerId } : {}),
         ...(selectedDestinationId ? { destinationId: selectedDestinationId } : {}),
+        ...(config?.services && config.services.length > 0
+          ? {
+              requestedDeploymentProfile: {
+                services: config.services,
+              },
+            }
+          : {}),
       });
     });
   }

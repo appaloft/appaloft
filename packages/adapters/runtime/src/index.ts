@@ -85,6 +85,7 @@ import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
 import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
+import { generatedServiceGraphComposeFile } from "./service-graph-compose";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
@@ -525,6 +526,35 @@ function selectedPlannerMetadata(
   return selected;
 }
 
+function exposedServiceNames(requestedDeployment: RequestedDeploymentConfig): string[] {
+  return (requestedDeployment.services ?? [])
+    .filter((service) => service.network?.exposureMode && service.network.exposureMode !== "none")
+    .map((service) => service.name);
+}
+
+function serviceGraphMetadata(input: {
+  requestedDeployment: RequestedDeploymentConfig;
+  dockerfilePath: string;
+  composeFile: string;
+  targetServiceName?: string;
+}): Record<string, string> {
+  const services = input.requestedDeployment.services ?? [];
+  const exposedServices = exposedServiceNames(input.requestedDeployment);
+
+  return {
+    "serviceGraph.enabled": "true",
+    "serviceGraph.source": "repository-config",
+    "serviceGraph.composeFile": input.composeFile,
+    "serviceGraph.dockerfilePath": input.dockerfilePath,
+    "serviceGraph.services": JSON.stringify(services),
+    "serviceGraph.serviceNames": services.map((service) => service.name).join(","),
+    ...(exposedServices.length > 0
+      ? { "serviceGraph.exposedServices": exposedServices.join(",") }
+      : {}),
+    ...(input.targetServiceName ? { targetServiceName: input.targetServiceName } : {}),
+  };
+}
+
 function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
   return accessRoutes.some((route) => route.proxyKind !== "none");
 }
@@ -885,6 +915,72 @@ function chooseStrategies(input: {
     }
 
     const plan = workspacePlan.value;
+    const serviceGraph = requestedDeployment.services ?? [];
+    if (serviceGraph.length > 0) {
+      const serviceGraphDockerfilePath = ".appaloft/Dockerfile.appaloft";
+      const targetServiceName =
+        requestedDeployment.targetServiceName ??
+        serviceGraph.find((service) => service.network?.exposureMode === "reverse-proxy")?.name ??
+        serviceGraph.find((service) => service.network?.exposureMode === "direct-port")?.name;
+      const metadata = {
+        "artifact.source": "workspace-commands",
+        "artifact.generatedDockerfile": "true",
+        ...plan.metadata,
+        ...serviceGraphMetadata({
+          requestedDeployment,
+          dockerfilePath: serviceGraphDockerfilePath,
+          composeFile: generatedServiceGraphComposeFile,
+          ...(targetServiceName ? { targetServiceName } : {}),
+        }),
+      };
+      const execution = RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        workingDirectory: FilePathText.rehydrate(source.locator),
+        composeFile: FilePathText.rehydrate(generatedServiceGraphComposeFile),
+        dockerfilePath: FilePathText.rehydrate(serviceGraphDockerfilePath),
+        startCommand: CommandText.rehydrate(plan.startCommand),
+        ...(plan.installCommand
+          ? { installCommand: CommandText.rehydrate(plan.installCommand) }
+          : {}),
+        ...(plan.buildCommand ? { buildCommand: CommandText.rehydrate(plan.buildCommand) } : {}),
+        ...(plan.healthCheckPath
+          ? { healthCheckPath: HealthCheckPathText.rehydrate(plan.healthCheckPath) }
+          : {}),
+        ...runtimeHealthCheckFields(requestedDeployment),
+        port: dockerContainerPort(requestedDeployment),
+        metadata,
+      });
+
+      return ok({
+        buildStrategy: BuildStrategyKindValue.rehydrate("workspace-commands"),
+        packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+        execution,
+        runtimeArtifact: composeRuntimeArtifact({
+          composeFile: generatedServiceGraphComposeFile,
+          metadata: {
+            sourceKind: source.kind,
+            dockerfilePath: serviceGraphDockerfilePath,
+            generatedDockerfile: "true",
+            generatedComposeFile: "true",
+            planner: plan.planner,
+            runtimeKind: plan.runtimeKind,
+            baseImage: plan.baseImage,
+            applicationShape: plan.applicationShape,
+            serviceGraphSource: "repository-config",
+            serviceNames: serviceGraph.map((service) => service.name).join(","),
+            ...(targetServiceName ? { targetServiceName } : {}),
+          },
+        }),
+        steps: [
+          PlanStepText.rehydrate("Resolve repository service graph"),
+          PlanStepText.rehydrate("Build workspace image"),
+          PlanStepText.rehydrate("Generate compose service graph"),
+          PlanStepText.rehydrate("Run docker compose"),
+          PlanStepText.rehydrate("Verify stack"),
+        ],
+      });
+    }
+
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),

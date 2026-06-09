@@ -83,6 +83,11 @@ import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./w
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 import {
+  renderServiceGraphCompose,
+  serviceGraphComposeFileFromMetadata,
+  serviceGraphComposeServicesFromMetadata,
+} from "./service-graph-compose";
+import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
@@ -3076,6 +3081,134 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
   }
 
+  private async prepareRemoteGeneratedServiceGraphCompose(input: {
+    context: ExecutionContext;
+    deployment: Deployment;
+    logs: DeploymentLogEntry[];
+    runtimeDir: string;
+    target: SshTarget;
+    env: NodeJS.ProcessEnv;
+    remoteWorkdir: string;
+    image: string;
+  }): Promise<
+    Result<{ prepared: true; composeFile?: string } | { prepared: false; deployment: Deployment }>
+  > {
+    const state = input.deployment.toState();
+    const composeFile = serviceGraphComposeFileFromMetadata(state.runtimePlan.execution.metadata);
+    if (!composeFile) {
+      return ok({ prepared: true });
+    }
+
+    const services = serviceGraphComposeServicesFromMetadata(state.runtimePlan.execution.metadata);
+    if (services.length === 0) {
+      const message = "Repository service graph metadata is missing services";
+      input.logs.push(phaseLog("package", message, "error"));
+      return ok({
+        prepared: false,
+        deployment: this.applyFailure(input.deployment, {
+          logs: input.logs,
+          errorCode: "ssh_service_graph_metadata_missing",
+          retryable: false,
+          metadata: {
+            host: input.target.host,
+            remoteWorkdir: input.remoteWorkdir,
+            composeFile,
+          },
+        }),
+      });
+    }
+
+    const dockerBuild = generateWorkspaceDockerBuild({
+      execution: state.runtimePlan.execution,
+      ...(state.runtimePlan.source.inspection
+        ? { sourceInspection: state.runtimePlan.source.inspection }
+        : {}),
+    });
+    if (!dockerBuild) {
+      const message = "Start command is required for workspace service graph image generation";
+      input.logs.push(phaseLog("package", message, "error"));
+      return ok({
+        prepared: false,
+        deployment: this.applyFailure(input.deployment, {
+          logs: input.logs,
+          errorCode: "workspace_start_command_missing",
+          retryable: false,
+          metadata: {
+            host: input.target.host,
+            remoteWorkdir: input.remoteWorkdir,
+            composeFile,
+          },
+        }),
+      });
+    }
+
+    const dockerfilePath =
+      state.runtimePlan.execution.dockerfilePath ?? ".appaloft/Dockerfile.appaloft";
+    const remoteDockerfilePath = dockerfilePath.startsWith("/")
+      ? dockerfilePath
+      : `${input.remoteWorkdir}/${dockerfilePath}`;
+    const remoteComposeFile = composeFile.startsWith("/")
+      ? composeFile
+      : `${input.remoteWorkdir}/${composeFile}`;
+    const generatedFiles = [
+      {
+        path: remoteDockerfilePath,
+        contents: dockerBuild.dockerfile,
+      },
+      ...dockerBuild.contextAssets.map((asset) => ({
+        path: remoteGeneratedDockerBuildAssetPath(input.remoteWorkdir, asset.relativePath),
+        contents: asset.contents,
+      })),
+      {
+        path: remoteComposeFile,
+        contents: renderServiceGraphCompose({
+          image: input.image,
+          dockerfilePath,
+          services,
+          defaultPort: state.runtimePlan.execution.port ?? 3000,
+        }),
+      },
+    ];
+
+    const writeServiceGraphFiles = await this.runRemoteCommand({
+      target: input.target,
+      command: remoteWriteTextFilesCommand(generatedFiles),
+      cwd: input.runtimeDir,
+      env: input.env,
+    });
+
+    if (writeServiceGraphFiles.failed) {
+      const message = "SSH repository service graph asset write failed";
+      input.logs.push(phaseLog("package", message, "error"));
+      return ok({
+        prepared: false,
+        deployment: this.applyFailure(input.deployment, {
+          logs: input.logs,
+          errorCode: "ssh_service_graph_compose_write_failed",
+          retryable: true,
+          metadata: {
+            host: input.target.host,
+            remoteWorkdir: input.remoteWorkdir,
+            composeFile: remoteComposeFile,
+            dockerfilePath: remoteDockerfilePath,
+          },
+        }),
+      });
+    }
+
+    input.logs.push(
+      phaseLog("package", `Generated repository service graph compose file ${composeFile}`),
+    );
+    this.report(input.context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "succeeded",
+      message: "Generated repository service graph compose file",
+    });
+
+    return ok({ prepared: true, composeFile });
+  }
+
   private async executeDockerCompose(
     context: ExecutionContext,
     deployment: Deployment,
@@ -3155,7 +3288,26 @@ export class SshExecutionBackend implements ExecutionBackend {
         deploymentId: state.id.value,
         metadata: state.runtimePlan.execution.metadata,
       });
-      const composeFile = state.runtimePlan.execution.composeFile ?? "docker-compose.yml";
+      const generatedCompose = await this.prepareRemoteGeneratedServiceGraphCompose({
+        context,
+        deployment,
+        logs,
+        runtimeDir,
+        target,
+        env,
+        remoteWorkdir,
+        image: runtimeInstanceNames.imageName,
+      });
+      if (generatedCompose.isErr()) {
+        return err(generatedCompose.error);
+      }
+      if (!generatedCompose.value.prepared) {
+        return ok({ deployment: generatedCompose.value.deployment });
+      }
+      const composeFile =
+        generatedCompose.value.composeFile ??
+        state.runtimePlan.execution.composeFile ??
+        "docker-compose.yml";
       const remoteComposeFile = composeFile.startsWith("/")
         ? composeFile
         : `${remoteWorkdir}/${composeFile}`;

@@ -90,6 +90,80 @@ describe("FileSystemDeploymentConfigReader", () => {
     expect(snapshot?.targets).toBeUndefined();
   });
 
+  test("[CONFIG-FILE-SERVICE-GRAPH-005] preserves service graph runtime planning details", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemDeploymentConfigReader }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const { root, source } = await createGitWorkspace();
+    await Bun.write(
+      join(root, "appaloft.yml"),
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  buildCommand: bun run build",
+        "  startCommand: bun run start:web",
+        "network:",
+        "  internalPort: 3000",
+        "  targetServiceName: web",
+        "services:",
+        "  web:",
+        "    kind: web",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      startCommand: bun run start:web",
+        "    network:",
+        "      internalPort: 3000",
+        "      exposureMode: reverse-proxy",
+        "  worker:",
+        "    kind: worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      startCommand: bun run start:worker",
+        "    network:",
+        "      exposureMode: none",
+        "    replicas: 4",
+      ].join("\n"),
+    );
+
+    const result = await new FileSystemDeploymentConfigReader().read(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_service_graph_config" }),
+      {
+        sourceLocator: source,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    const snapshot = result._unsafeUnwrap();
+    expect(snapshot?.services).toEqual([
+      expect.objectContaining({
+        name: "web",
+        kind: "web",
+        runtime: expect.objectContaining({
+          strategy: "workspace-commands",
+          startCommand: "bun run start:web",
+        }),
+        network: expect.objectContaining({
+          internalPort: 3000,
+          exposureMode: "reverse-proxy",
+        }),
+      }),
+      expect.objectContaining({
+        name: "worker",
+        kind: "worker",
+        runtime: expect.objectContaining({
+          strategy: "workspace-commands",
+          startCommand: "bun run start:worker",
+        }),
+        network: expect.objectContaining({
+          exposureMode: "none",
+        }),
+        replicas: 4,
+      }),
+    ]);
+  });
+
   test("[CONFIG-FILE-ID-002] refuses config files that contain project or target identity", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemDeploymentConfigReader }] = await Promise.all([

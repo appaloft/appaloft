@@ -8778,6 +8778,7 @@ export interface RequestedDeploymentConfig {
   exposureMode?: ResourceExposureMode;
   hostPort?: number;
   upstreamProtocol?: ResourceNetworkProtocol;
+  targetServiceName?: string;
   accessContext?: RequestedDeploymentAccessContext;
   runtimeMetadata?: Record<string, string>;
   accessRouteMetadata?: Record<string, string>;
@@ -8787,6 +8788,7 @@ export interface RequestedDeploymentConfig {
   tlsMode?: TlsMode;
   accessRoutes?: RequestedAccessRouteConfig[];
   storageMounts?: RequestedDeploymentStorageMount[];
+  services?: RequestedDeploymentServiceConfig[];
 }
 
 export interface RequestedDeploymentHealthCheck {
@@ -8829,6 +8831,56 @@ export interface RequestedDeploymentStorageMount {
   sourcePath?: string;
   destinationPath: string;
   mountMode: "read-write" | "read-only";
+}
+
+export interface RequestedDeploymentServiceSource {
+  type?: "git" | "image";
+  repository?: string;
+  image?: string;
+  gitRef?: string;
+  commitSha?: string;
+  baseDirectory?: string;
+  version?: string;
+  versionKind?: string;
+}
+
+export interface RequestedDeploymentServiceRuntime {
+  strategy?: RequestedDeploymentMethod;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
+  healthCheckPath?: string;
+}
+
+export interface RequestedDeploymentServiceNetwork {
+  internalPort?: number;
+  upstreamProtocol?: ResourceNetworkProtocol;
+  exposureMode?: ResourceExposureMode;
+  targetServiceName?: string;
+  hostPort?: number;
+}
+
+export interface RequestedDeploymentServiceConfig {
+  name: string;
+  kind: ResourceServiceKind;
+  source?: RequestedDeploymentServiceSource;
+  runtime?: RequestedDeploymentServiceRuntime;
+  network?: RequestedDeploymentServiceNetwork;
+  healthCheck?: RequestedDeploymentHealthCheck;
+  replicas?: number;
+  env?: Record<string, string | number | boolean>;
+  secrets?: Record<
+    string,
+    {
+      from: string;
+      required?: boolean;
+      description?: string;
+    }
+  >;
 }
 
 export type DefaultAccessRoutePurpose = "default-resource-access" | "preview-access";
@@ -8996,10 +9048,7 @@ export interface DeploymentConfiguredResource {
   name: string;
   kind?: ResourceKind;
   description?: string;
-  services?: Array<{
-    name: string;
-    kind: ResourceServiceKind;
-  }>;
+  services?: RequestedDeploymentServiceConfig[];
 }
 
 export interface DeploymentConfiguredDestination {
@@ -9041,6 +9090,7 @@ export interface DeploymentConfigSnapshot {
   project?: DeploymentConfiguredProject;
   environment?: DeploymentConfiguredEnvironment;
   resource?: DeploymentConfiguredResource;
+  services?: RequestedDeploymentServiceConfig[];
   targets?: DeploymentConfiguredTarget[];
   deployment?: Partial<RequestedDeploymentConfig> & {
     targetKey?: string;

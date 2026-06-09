@@ -1,0 +1,52 @@
+import { describe, expect, test } from "bun:test";
+import { renderServiceGraphCompose } from "../src/service-graph-compose";
+
+describe("repository service graph compose rendering", () => {
+  test("[CONFIG-FILE-SERVICE-GRAPH-005] renders one generated image as multiple compose services", () => {
+    const compose = renderServiceGraphCompose({
+      image: "appaloft-runtime-dep_123",
+      dockerfilePath: ".appaloft/Dockerfile.appaloft",
+      defaultPort: 3000,
+      services: [
+        {
+          name: "web",
+          kind: "web",
+          runtime: {
+            startCommand: "bun run start:web",
+          },
+          network: {
+            internalPort: 3000,
+            exposureMode: "reverse-proxy",
+          },
+          env: {
+            NODE_ENV: "production",
+          },
+        },
+        {
+          name: "worker",
+          kind: "worker",
+          runtime: {
+            startCommand: "bun run start:worker",
+          },
+          network: {
+            exposureMode: "none",
+          },
+          replicas: 4,
+        },
+      ],
+    });
+
+    expect(compose).toContain('"web":');
+    expect(compose).toContain('image: "appaloft-runtime-dep_123"');
+    expect(compose).toContain("build:");
+    expect(compose).toContain("context: ..");
+    expect(compose).toContain('dockerfile: ".appaloft/Dockerfile.appaloft"');
+    expect(compose).toContain('command: "bun run start:web"');
+    expect(compose).toContain("expose:");
+    expect(compose).toContain('- "3000"');
+    expect(compose).toContain('"worker":');
+    expect(compose).toContain('command: "bun run start:worker"');
+    expect(compose).toContain("replicas: 4");
+    expect(compose).not.toContain("ports:");
+  });
+});

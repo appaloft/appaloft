@@ -330,6 +330,96 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Run docker container");
   });
 
+  test("[CONFIG-FILE-SERVICE-GRAPH-005] plans workspace service graphs as generated compose stacks", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_service_graph",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/service-graph",
+        displayName: "service-graph",
+      }),
+      server: {
+        id: "srv_service_graph",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_service_graph"),
+      detectedReasoning: ["repository config service graph"],
+      requestedDeployment: {
+        method: "workspace-commands",
+        buildCommand: "bun run build",
+        startCommand: "bun run start:web",
+        port: 3000,
+        targetServiceName: "web",
+        services: [
+          {
+            name: "web",
+            kind: "web",
+            runtime: {
+              strategy: "workspace-commands",
+              startCommand: "bun run start:web",
+            },
+            network: {
+              internalPort: 3000,
+              exposureMode: "reverse-proxy",
+            },
+          },
+          {
+            name: "worker",
+            kind: "worker",
+            runtime: {
+              strategy: "workspace-commands",
+              startCommand: "bun run start:worker",
+            },
+            network: {
+              exposureMode: "none",
+            },
+            replicas: 4,
+          },
+        ],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.packagingMode).toBe("compose-bundle");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        composeFile: ".appaloft/service-graph.compose.yml",
+        metadata: expect.objectContaining({
+          generatedComposeFile: "true",
+          serviceGraphSource: "repository-config",
+          serviceNames: "web,worker",
+          targetServiceName: "web",
+        }),
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        composeFile: ".appaloft/service-graph.compose.yml",
+        dockerfilePath: ".appaloft/Dockerfile.appaloft",
+        port: 3000,
+        metadata: expect.objectContaining({
+          "serviceGraph.enabled": "true",
+          "serviceGraph.exposedServices": "web",
+          targetServiceName: "web",
+        }),
+      }),
+    );
+    expect(plan.execution.metadata?.["serviceGraph.services"]).toContain("start:worker");
+    expect(plan.execution.metadata?.["serviceGraph.services"]).toContain('"replicas":4');
+    expect(plan.steps).toContain("Generate compose service graph");
+  });
+
   test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-001] classifies Next.js workspace plans as SSR", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
