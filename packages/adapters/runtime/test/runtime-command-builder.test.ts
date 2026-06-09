@@ -154,12 +154,13 @@ describe("runtime command builder", () => {
     const spec = RuntimeCommandBuilder.docker().composeUp({
       composeFile: "/srv/app/docker-compose.yml",
       additionalComposeFiles: ["/srv/app/.appaloft.compose.labels.override.yml"],
+      scales: [{ serviceName: "worker", replicas: 4 }],
       projectName: "preview-123-dep-1",
       workingDirectory: "/srv/app",
     });
 
     expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
-      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
+      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build --scale 'worker=4'",
     );
   });
 });

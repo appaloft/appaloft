@@ -127,6 +127,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
         strategy: "static",
         runtimeName: "preview-123",
         publishDirectory: "dist",
+        replicas: 2,
       },
     });
 
@@ -139,6 +140,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
     expect(runtimeProfile?.strategy.value).toBe("static");
     expect(runtimeProfile?.runtimeName?.value).toBe("preview-123");
     expect(runtimeProfile?.publishDirectory?.value).toBe("/dist");
+    expect(runtimeProfile?.replicas?.value).toBe(2);
     expect(runtimeProfile?.healthCheckPath?.value).toBe("/health");
     expect(runtimeProfile?.healthCheck?.http?.path.value).toBe("/health");
 
@@ -150,6 +152,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
       environmentId: "env_demo",
       runtimePlanStrategy: "static",
       runtimeName: "preview-123",
+      replicas: 2,
       configuredAt: "2026-01-01T00:00:10.000Z",
     });
   });

@@ -124,6 +124,7 @@ export const createResourceRuntimeProfileInputSchema = z
     dockerfilePath: z.string().trim().min(1).optional(),
     dockerComposeFilePath: z.string().trim().min(1).optional(),
     buildTarget: z.string().trim().min(1).optional(),
+    replicas: z.number().int().positive().optional(),
     healthCheckPath: z.string().trim().min(1).optional(),
     healthCheck: resourceHealthCheckPolicyInputSchema.optional(),
   })
@@ -134,7 +135,6 @@ export const configureResourceRuntimeProfileInputSchema =
     kubernetesNamespace: z.unknown().optional(),
     helmChart: z.unknown().optional(),
     swarmService: z.unknown().optional(),
-    replicas: z.unknown().optional(),
     nodeSelector: z.unknown().optional(),
     ingressClass: z.unknown().optional(),
     providerOptions: z.unknown().optional(),

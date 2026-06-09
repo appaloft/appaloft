@@ -85,6 +85,10 @@ import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./w
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 import {
+  replicatedWorkloadComposeFileFromMetadata,
+  replicatedWorkloadReplicasFromMetadata,
+  replicatedWorkloadServiceNameFromMetadata,
+  renderReplicatedWorkloadCompose,
   renderServiceGraphCompose,
   serviceGraphComposeFileFromMetadata,
   serviceGraphComposeServicesFromMetadata,
@@ -104,6 +108,15 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogSource = "appaloft" | "application";
 
 const persistedOutputLineLimit = 50;
+
+function composeScaleFromRuntimeMetadata(
+  metadata: Record<string, string> | undefined,
+): Array<{ serviceName: string; replicas: number }> {
+  const serviceName = replicatedWorkloadServiceNameFromMetadata(metadata);
+  const replicas = replicatedWorkloadReplicasFromMetadata(metadata);
+
+  return serviceName && replicas ? [{ serviceName, replicas }] : [];
+}
 
 function phaseLog(
   phase: LogPhase,
@@ -2425,6 +2438,66 @@ export class LocalExecutionBackend implements ExecutionBackend {
     image: string;
   }): Promise<Result<{ composeFile?: string }>> {
     const state = input.deployment.toState();
+    const replicatedComposeFile = replicatedWorkloadComposeFileFromMetadata(
+      state.runtimePlan.execution.metadata,
+    );
+    if (replicatedComposeFile) {
+      const serviceName = replicatedWorkloadServiceNameFromMetadata(
+        state.runtimePlan.execution.metadata,
+      );
+      const replicas = replicatedWorkloadReplicasFromMetadata(state.runtimePlan.execution.metadata);
+      if (!serviceName || !replicas) {
+        const message = "Replicated workload metadata is incomplete";
+        input.logs.push(phaseLog("package", message, "error"));
+        return ok({ composeFile: replicatedComposeFile });
+      }
+
+      const dockerfilePath =
+        state.runtimePlan.execution.dockerfilePath ?? state.runtimePlan.runtimeArtifact?.metadata?.dockerfilePath;
+      const defaultPort = state.runtimePlan.execution.port;
+      if (dockerfilePath) {
+        const dockerBuild = generateWorkspaceDockerBuild({
+          execution: state.runtimePlan.execution,
+          ...(state.runtimePlan.source.inspection
+            ? { sourceInspection: state.runtimePlan.source.inspection }
+            : {}),
+        });
+        if (dockerBuild) {
+          const absoluteDockerfilePath = resolve(input.workdir, dockerfilePath);
+          mkdirSync(dirname(absoluteDockerfilePath), { recursive: true });
+          await Bun.write(absoluteDockerfilePath, dockerBuild.dockerfile);
+          await writeGeneratedDockerBuildAssets(input.workdir, dockerBuild.contextAssets);
+        }
+      }
+
+      const composeFilePath = resolve(input.workdir, replicatedComposeFile);
+      mkdirSync(dirname(composeFilePath), { recursive: true });
+      writeFileSync(
+        composeFilePath,
+        renderReplicatedWorkloadCompose({
+          image: input.image,
+          ...(dockerfilePath ? { dockerfilePath } : {}),
+          serviceName,
+          ...(defaultPort ? { defaultPort } : {}),
+          replicas,
+          ...(state.runtimePlan.execution.startCommand
+            ? { command: state.runtimePlan.execution.startCommand }
+            : {}),
+          includeBuild: Boolean(dockerfilePath),
+        }),
+      );
+
+      input.logs.push(phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`));
+      this.report(input.context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "succeeded",
+        message: "Generated replicated workload compose file",
+      });
+
+      return ok({ composeFile: composeFilePath });
+    }
+
     const composeFile = serviceGraphComposeFileFromMetadata(state.runtimePlan.execution.metadata);
     if (!composeFile) {
       return ok({});
@@ -2651,6 +2724,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         composeFile,
         additionalComposeFiles: [composeOwnershipOverrideFile],
         projectName: runtimeInstanceNames.composeProjectName,
+        scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
       }),
       { quote: shellQuote },
     );

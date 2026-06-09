@@ -76,6 +76,7 @@ const profileFieldDefinitions: ProfileFieldDefinition[] = [
   runtimeField("runtimeProfile.dockerfilePath", "dockerfilePath"),
   runtimeField("runtimeProfile.dockerComposeFilePath", "dockerComposeFilePath"),
   runtimeField("runtimeProfile.buildTarget", "buildTarget"),
+  runtimeField("runtimeProfile.replicas", "replicas"),
   healthRuntimeField("runtimeProfile.healthCheckPath", "healthCheckPath"),
   healthRuntimeField("runtimeProfile.healthCheck.http.path", "healthCheck.http.path"),
   networkField("networkProfile.internalPort", "internalPort"),
@@ -364,6 +365,9 @@ export function resourceProfileFromDeploymentSnapshot(
       ...(execution.healthCheck ? { healthCheck: execution.healthCheck } : {}),
       ...(execution.dockerfilePath ? { dockerfilePath: execution.dockerfilePath } : {}),
       ...(execution.composeFile ? { dockerComposeFilePath: execution.composeFile } : {}),
+      ...(execution.metadata?.["replicatedWorkload.replicas"]
+        ? { replicas: Number(execution.metadata["replicatedWorkload.replicas"]) }
+        : {}),
     },
     networkProfile: {
       ...(execution.port ? { internalPort: execution.port } : {}),

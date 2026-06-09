@@ -83,6 +83,10 @@ import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./w
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
 import {
+  replicatedWorkloadComposeFileFromMetadata,
+  replicatedWorkloadReplicasFromMetadata,
+  replicatedWorkloadServiceNameFromMetadata,
+  renderReplicatedWorkloadCompose,
   renderServiceGraphCompose,
   serviceGraphComposeFileFromMetadata,
   serviceGraphComposeServicesFromMetadata,
@@ -100,6 +104,15 @@ import {
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogSource = "appaloft" | "application";
+
+function composeScaleFromRuntimeMetadata(
+  metadata: Record<string, string> | undefined,
+): Array<{ serviceName: string; replicas: number }> {
+  const serviceName = replicatedWorkloadServiceNameFromMetadata(metadata);
+  const replicas = replicatedWorkloadReplicasFromMetadata(metadata);
+
+  return serviceName && replicas ? [{ serviceName, replicas }] : [];
+}
 
 function classifyOutputLogLevel(line: string, fallback: LogLevel): LogLevel {
   const normalized = line.toLowerCase();
@@ -3094,6 +3107,115 @@ export class SshExecutionBackend implements ExecutionBackend {
     Result<{ prepared: true; composeFile?: string } | { prepared: false; deployment: Deployment }>
   > {
     const state = input.deployment.toState();
+    const replicatedComposeFile = replicatedWorkloadComposeFileFromMetadata(
+      state.runtimePlan.execution.metadata,
+    );
+    if (replicatedComposeFile) {
+      const serviceName = replicatedWorkloadServiceNameFromMetadata(
+        state.runtimePlan.execution.metadata,
+      );
+      const replicas = replicatedWorkloadReplicasFromMetadata(state.runtimePlan.execution.metadata);
+      if (!serviceName || !replicas) {
+        const message = "Replicated workload metadata is incomplete";
+        input.logs.push(phaseLog("package", message, "error"));
+        return ok({
+          prepared: false,
+          deployment: this.applyFailure(input.deployment, {
+            logs: input.logs,
+            errorCode: "ssh_replicated_workload_metadata_missing",
+            retryable: false,
+            metadata: {
+              host: input.target.host,
+              remoteWorkdir: input.remoteWorkdir,
+              composeFile: replicatedComposeFile,
+            },
+          }),
+        });
+      }
+
+      const dockerfilePath =
+        state.runtimePlan.execution.dockerfilePath ?? state.runtimePlan.runtimeArtifact?.metadata?.dockerfilePath;
+      const defaultPort = state.runtimePlan.execution.port;
+      const remoteComposeFile = replicatedComposeFile.startsWith("/")
+        ? replicatedComposeFile
+        : `${input.remoteWorkdir}/${replicatedComposeFile}`;
+      const generatedFiles = [
+        {
+          path: remoteComposeFile,
+          contents: renderReplicatedWorkloadCompose({
+            image: input.image,
+            ...(dockerfilePath ? { dockerfilePath } : {}),
+            serviceName,
+            ...(defaultPort ? { defaultPort } : {}),
+            replicas,
+            ...(state.runtimePlan.execution.startCommand
+              ? { command: state.runtimePlan.execution.startCommand }
+              : {}),
+            includeBuild: Boolean(dockerfilePath),
+          }),
+        },
+      ];
+
+      const dockerBuild = generateWorkspaceDockerBuild({
+        execution: state.runtimePlan.execution,
+        ...(state.runtimePlan.source.inspection
+          ? { sourceInspection: state.runtimePlan.source.inspection }
+          : {}),
+      });
+      if (dockerBuild && dockerfilePath) {
+        const remoteDockerfilePath = dockerfilePath.startsWith("/")
+          ? dockerfilePath
+          : `${input.remoteWorkdir}/${dockerfilePath}`;
+        generatedFiles.unshift(
+          {
+            path: remoteDockerfilePath,
+            contents: dockerBuild.dockerfile,
+          },
+          ...dockerBuild.contextAssets.map((asset) => ({
+            path: remoteGeneratedDockerBuildAssetPath(input.remoteWorkdir, asset.relativePath),
+            contents: asset.contents,
+          })),
+        );
+      }
+
+      const writeReplicatedWorkloadFiles = await this.runRemoteCommand({
+        target: input.target,
+        command: remoteWriteTextFilesCommand(generatedFiles),
+        cwd: input.runtimeDir,
+        env: input.env,
+      });
+
+      if (writeReplicatedWorkloadFiles.failed) {
+        const message = "SSH replicated workload asset write failed";
+        input.logs.push(phaseLog("package", message, "error"));
+        return ok({
+          prepared: false,
+          deployment: this.applyFailure(input.deployment, {
+            logs: input.logs,
+            errorCode: "ssh_replicated_workload_compose_write_failed",
+            retryable: true,
+            metadata: {
+              host: input.target.host,
+              remoteWorkdir: input.remoteWorkdir,
+              composeFile: remoteComposeFile,
+            },
+          }),
+        });
+      }
+
+      input.logs.push(
+        phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`),
+      );
+      this.report(input.context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "succeeded",
+        message: "Generated replicated workload compose file",
+      });
+
+      return ok({ prepared: true, composeFile: replicatedComposeFile });
+    }
+
     const composeFile = serviceGraphComposeFileFromMetadata(state.runtimePlan.execution.metadata);
     if (!composeFile) {
       return ok({ prepared: true });
@@ -3416,6 +3538,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           additionalComposeFiles: [remoteComposeOwnershipOverrideFile],
           projectName: runtimeInstanceNames.composeProjectName,
           workingDirectory: remoteWorkdir,
+          scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
         }),
         { quote: shellQuote },
       );

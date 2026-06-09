@@ -929,6 +929,12 @@ export const appaloftDeploymentApplicationConfigSchema = z
     network: appaloftDeploymentNetworkConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
     access: appaloftDeploymentAccessConfigSchema.optional(),
+    replicas: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Requested runtime replicas for this named application."),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
     services: z
@@ -1331,6 +1337,12 @@ export const appaloftDeploymentConfigSchema = z
     access: appaloftDeploymentAccessConfigSchema.optional(),
     monitoring: appaloftDeploymentMonitoringConfigSchema.optional(),
     preview: appaloftDeploymentPreviewConfigSchema.optional(),
+    replicas: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Requested runtime replicas for the default deployment resource."),
     profiles: z
       .record(
         z
@@ -1669,7 +1681,15 @@ function shouldTreatSecretField(path: (string | number)[], key: string, value: u
 }
 
 function shouldTreatUnsupportedField(path: (string | number)[], key: string): boolean {
+  if (path.length === 0 && key === "replicas") {
+    return false;
+  }
+
   if (path.length === 2 && path[0] === "services" && key === "replicas") {
+    return false;
+  }
+
+  if (path.length === 2 && path[0] === "applications" && key === "replicas") {
     return false;
   }
 

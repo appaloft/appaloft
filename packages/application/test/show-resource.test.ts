@@ -26,6 +26,7 @@ import {
   ok,
   PortNumber,
   ProjectId,
+  ReplicaCount,
   Resource,
   ResourceAutoDeployTriggerKindValue,
   ResourceExposureModeValue,
@@ -215,6 +216,7 @@ function detailedResource(): Resource {
       installCommand: CommandText.rehydrate("bun install"),
       buildCommand: CommandText.rehydrate("bun run build"),
       startCommand: CommandText.rehydrate("bun run start"),
+      replicas: ReplicaCount.rehydrate(4),
       healthCheckPath: HealthCheckPathText.rehydrate("/health"),
       healthCheck: {
         enabled: true,
@@ -459,6 +461,7 @@ describe("ShowResourceQueryService", () => {
       installCommand: "bun install",
       buildCommand: "bun run build",
       startCommand: "bun run start",
+      replicas: 4,
       healthCheckPath: "/health",
     });
     expect(detail.networkProfile).toEqual({
