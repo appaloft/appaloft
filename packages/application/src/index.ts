@@ -26,6 +26,7 @@ export * from "./domain-binding-handlers";
 export * from "./domain-binding-messages";
 export * from "./domain-event-handlers";
 export * from "./domain-event-messages";
+export * from "./durable-work";
 export * from "./edge-proxy-provider-registry";
 export * from "./entitlement-handlers";
 export * from "./entitlement-messages";

@@ -151,8 +151,14 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("orpcClient.system.doctor");
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
+    expect(instancePageSource).toContain("i18nKeys.console.instance.workerDurableRuntime");
+    expect(instancePageSource).toContain("worker.runtimeTopology");
+    expect(instancePageSource).toContain("worker.runtimeTopology.heartbeat");
+    expect(instancePageSource).toContain("workerRuntimeHeartbeat");
+    expect(instancePageSource).toContain("workerRuntimeTopology");
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(contractsSource).toContain("currentCommitSha: z.string().optional()");
+    expect(contractsSource).toContain("heartbeat");
     expect(zhLocaleSource).toContain('pageTitle: "实例"');
     expect(zhLocaleSource).toContain('instance: "实例"');
   });

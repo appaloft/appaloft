@@ -108,6 +108,15 @@ export const serveCommand = EffectCommand.make("serve", {}, () =>
   }),
 ).pipe(EffectCommand.withDescription("Start the Appaloft backend service"));
 
+export const workerCommand = EffectCommand.make("worker", {}, () =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+
+    yield* Effect.promise(() => (cli.startWorkerRuntime ?? cli.startServer)());
+    yield* Effect.never;
+  }),
+).pipe(EffectCommand.withDescription("Start the Appaloft worker runtime without HTTP serving"));
+
 export const initCommand = EffectCommand.make(
   "init",
   {

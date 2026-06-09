@@ -66,6 +66,7 @@ export interface CliProgram {
 export interface CliProgramInput {
   version: string;
   startServer(): Promise<void>;
+  startWorkerRuntime?(): Promise<void>;
   commandBus: CommandBus;
   queryBus: QueryBus;
   executionContextFactory: ExecutionContextFactory;
@@ -124,6 +125,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
   {
     readonly version: string;
     readonly startServer: () => Promise<void>;
+    readonly startWorkerRuntime?: () => Promise<void>;
     readonly executeCommand: <T>(
       message: AppCommand<T>,
       options?: ExecuteCommandOptions,
@@ -143,6 +145,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
   Layer.succeed(CliRuntime, {
     version: input.version,
     startServer: input.startServer,
+    ...(input.startWorkerRuntime ? { startWorkerRuntime: input.startWorkerRuntime } : {}),
     executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {
       const locale = readCliLocale();
       const auth = readCliAuth();

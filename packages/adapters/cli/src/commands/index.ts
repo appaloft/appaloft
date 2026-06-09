@@ -14,7 +14,13 @@ import { domainBindingCommand } from "./domain-binding.js";
 import { domainEventCommand } from "./domain-event.js";
 import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
-import { doctorCommand, initCommand, serveCommand, versionCommand } from "./lifecycle.js";
+import {
+  doctorCommand,
+  initCommand,
+  serveCommand,
+  versionCommand,
+  workerCommand,
+} from "./lifecycle.js";
 import { operatorWorkCommand } from "./operator-work.js";
 import { organizationCommand } from "./organization.js";
 import { projectCommand } from "./project.js";
@@ -38,6 +44,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
   EffectCommand.withSubcommands([
     versionCommand,
     serveCommand,
+    workerCommand,
     initCommand,
     doctorCommand,
     loginCommand,

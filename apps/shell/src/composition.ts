@@ -267,6 +267,7 @@ export async function createAppComposition(
   const cliProgram = createCliProgram({
     version: server.config.appVersion,
     startServer: server.startServer,
+    startWorkerRuntime: server.startWorkerRuntime,
     commandBus,
     queryBus,
     executionContextFactory: server.executionContextFactory,

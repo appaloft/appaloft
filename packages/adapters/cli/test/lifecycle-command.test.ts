@@ -52,6 +52,45 @@ async function parseCliWithOutput(
 }
 
 describe("CLI lifecycle commands", () => {
+  test("[PROC-DELIVERY-WORKER-013] worker command starts worker runtime without HTTP server", async () => {
+    ensureReflectMetadata();
+    const { createCliProgram } = await import("../src");
+    let workerRuntimeStarted = 0;
+    let serverStarted = 0;
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_worker_runtime_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {
+        serverStarted += 1;
+      },
+      startWorkerRuntime: async () => {
+        workerRuntimeStarted += 1;
+        throw new Error("worker runtime sentinel");
+      },
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    await expect(program.parseAsync(["node", "appaloft", "worker"])).rejects.toThrow(
+      "worker runtime sentinel",
+    );
+    expect(workerRuntimeStarted).toBe(1);
+    expect(serverStarted).toBe(0);
+  });
+
   test("[SYSTEM-DIAG-004] doctor prints configured maintenance worker activation", async () => {
     ensureReflectMetadata();
     const { DoctorQuery } = await import("@appaloft/application");

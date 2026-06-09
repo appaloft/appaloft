@@ -89,6 +89,8 @@ import { authPendingVerificationIntentMigration } from "./migrations/080_auth_pe
 import { dependencyResourceCapabilitiesMigration } from "./migrations/081_dependency_resource_capabilities";
 import { memberLifecycleStatusMigration } from "./migrations/082_member_lifecycle_status";
 import * as deploymentTargetVariantsMigration from "./migrations/083_deployment_target_variants";
+import { durableWorkLedgerMigration } from "./migrations/084_durable_work_ledger";
+import { durableWorkerHeartbeatsMigration } from "./migrations/085_durable_worker_heartbeats";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -268,6 +270,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "081_dependency_resource_capabilities": dependencyResourceCapabilitiesMigration,
       "082_member_lifecycle_status": memberLifecycleStatusMigration,
       "083_deployment_target_variants": deploymentTargetVariantsMigration,
+      "084_durable_work_ledger": durableWorkLedgerMigration,
+      "085_durable_worker_heartbeats": durableWorkerHeartbeatsMigration,
     };
   }
 }

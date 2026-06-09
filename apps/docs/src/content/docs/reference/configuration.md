@@ -26,6 +26,28 @@ sidebar:
 
 `APPALOFT_DOCS_STATIC_DIR` 覆盖 public docs 静态资源，不覆盖 Web console。
 
+<h2 id="reference-durable-worker-runtime">Durable worker runtime</h2>
+
+Durable worker runtime 配置控制已经 accepted 的长耗时工作在请求返回 id 之后如何被 claim、执行和监控。
+默认 `embedded` 模式会随 `appaloft serve` 一起启动 worker slots，降低自托管部署难度。operator 也可以运行
+`appaloft worker` 启动专用 worker 进程；Cloud 这类部署可以配置多个 standalone workers，共享同一个
+durable queue backend。
+
+默认 queue backend 是 `database`，使用专门的 durable work item 和 event 表作为 durable state
+authority。Temporal、Kafka 或其他外部 workflow engine 必须通过 adapter 接入，并继续为
+`operator-work.*` query 投影安全的 durable-work 和 process-attempt 进度。
+
+`appaloft doctor`、`GET /api/system/doctor` 和 Web Instance 页面会报告配置的 mode、queue backend、
+worker group、worker ids 和 coordinator role。
+
+| 变量 | 默认值 | 含义 |
+| --- | --- | --- |
+| `APPALOFT_WORKER_RUNTIME_MODE` | `embedded` | `embedded` 随 `appaloft serve` 启动 worker slots；`standalone` 预期由专用 `appaloft worker` 进程启动；`disabled` 不启动 durable work slots。 |
+| `APPALOFT_WORKER_QUEUE_BACKEND` | `database` | Durable queue backend。`database` 使用 process-attempt journal；`external` 需要 adapter kind。 |
+| `APPALOFT_WORKER_COUNT` | `1` | 配置的 worker slots 数。启用模式至少需要 1 个；`disabled` 可设为 `0`。 |
+| `APPALOFT_WORKER_GROUP` | `appaloft-worker` | 稳定 worker group，用来生成 worker ids 并协调容量。 |
+| `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | `APPALOFT_WORKER_QUEUE_BACKEND=external` 时必填；public 支持值为 `kafka`、`temporal`、`custom`。 |
+
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>
 
 除非另有说明，scheduled worker 默认关闭。只在应拥有周期性工作的实例上启用它们。

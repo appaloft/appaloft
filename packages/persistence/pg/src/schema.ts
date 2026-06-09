@@ -1012,6 +1012,78 @@ export interface GitHubAppInstallationsTable {
   updated_at: string;
 }
 
+export interface DurableWorkItemsTable {
+  id: string;
+  kind: string;
+  status: string;
+  operation_key: string;
+  queue_backend: ColumnType<string, string | undefined, string>;
+  dedupe_key: string | null;
+  correlation_id: string | null;
+  request_id: string | null;
+  project_id: string | null;
+  environment_id: string | null;
+  resource_id: string | null;
+  deployment_id: string | null;
+  server_id: string | null;
+  subject_kind: string | null;
+  subject_id: string | null;
+  phase: string | null;
+  step: string | null;
+  priority: ColumnType<number, number | undefined, number>;
+  attempt_count: ColumnType<number, number | undefined, number>;
+  max_attempts: ColumnType<number, number | undefined, number>;
+  available_at: string;
+  lease_owner: string | null;
+  lease_expires_at: string | null;
+  started_at: string | null;
+  updated_at: UpdatableTimestampColumn;
+  finished_at: string | null;
+  error_code: string | null;
+  error_category: string | null;
+  retriable: boolean | null;
+  safe_input: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown> | undefined,
+    Record<string, unknown>
+  >;
+  safe_details: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown> | undefined,
+    Record<string, unknown>
+  >;
+}
+
+export interface DurableWorkEventsTable {
+  id: string;
+  work_item_id: string;
+  sequence: number;
+  kind: string;
+  status: string | null;
+  phase: string | null;
+  step: string | null;
+  message: string | null;
+  worker_id: string | null;
+  worker_group: string | null;
+  occurred_at: string;
+  safe_details: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown> | undefined,
+    Record<string, unknown>
+  >;
+}
+
+export interface DurableWorkerHeartbeatsTable {
+  worker_id: string;
+  worker_group: string;
+  slot: number;
+  mode: string;
+  queue_backend: string;
+  process_started_at: string;
+  last_seen_at: string;
+  status: string;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -1063,6 +1135,9 @@ export interface Database {
   runtime_monitoring_samples: RuntimeMonitoringSamplesTable;
   runtime_monitoring_threshold_policies: RuntimeMonitoringThresholdPoliciesTable;
   resource_health_observations: ResourceHealthObservationsTable;
+  durable_work_items: DurableWorkItemsTable;
+  durable_work_events: DurableWorkEventsTable;
+  durable_worker_heartbeats: DurableWorkerHeartbeatsTable;
   github_app_installations: GitHubAppInstallationsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;

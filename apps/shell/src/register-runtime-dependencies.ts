@@ -148,6 +148,7 @@ import {
   PgDomainEventStreamRetentionStore,
   PgDomainRouteBindingReader,
   PgDomainRouteFailureCandidateReader,
+  PgDurableWorkerHeartbeatStore,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgMutationCoordinator,
@@ -1529,6 +1530,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => input.processAttemptCompleter ?? new PgProcessAttemptJournal(input.database.db),
     ),
+  });
+  container.register(tokens.durableWorkWorkerHeartbeatStore, {
+    useFactory: instanceCachingFactory(() => new PgDurableWorkerHeartbeatStore(input.database.db)),
   });
 
   container.register(tokens.sourceDetector, {

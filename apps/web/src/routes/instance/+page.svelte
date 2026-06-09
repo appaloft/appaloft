@@ -269,13 +269,21 @@ server-config-deploy: true`);
         return i18nKeys.console.instance.workerScheduledTask;
       case "runtime-monitoring-collector-runner":
         return i18nKeys.console.instance.workerRuntimeMonitoringCollector;
+      case "durable-worker-runtime":
+        return i18nKeys.console.instance.workerDurableRuntime;
     }
   }
 
   function workerActivationLabelKey(worker: MaintenanceWorkerStatus) {
-    return worker.activation === "starts-with-backend-service"
-      ? i18nKeys.console.instance.workerActivationStarts
-      : i18nKeys.console.instance.workerActivationDisabled;
+    if (worker.activation === "starts-as-standalone-process") {
+      return i18nKeys.console.instance.workerActivationStandalone;
+    }
+
+    if (worker.activation === "starts-with-backend-service") {
+      return i18nKeys.console.instance.workerActivationStarts;
+    }
+
+    return i18nKeys.console.instance.workerActivationDisabled;
   }
 
   function workerSafetyLabelKey(worker: MaintenanceWorkerStatus) {
@@ -294,6 +302,8 @@ server-config-deploy: true`);
         return i18nKeys.console.instance.workerSafetyReadOnlyCollection;
       case "runtime-execution":
         return i18nKeys.console.instance.workerSafetyRuntimeExecution;
+      case "durable-process-delivery":
+        return i18nKeys.console.instance.workerSafetyDurableProcessDelivery;
     }
   }
 
@@ -713,6 +723,55 @@ server-config-deploy: true`);
                         {worker.configurationKeys.join(", ")}
                       </p>
                       <p class="break-words font-mono text-xs">{worker.operationKeys.join(", ")}</p>
+                      {#if worker.runtimeTopology}
+                        <div class="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                          <p class="font-medium text-foreground">
+                            {$t(i18nKeys.console.instance.workerRuntimeTopology)}
+                          </p>
+                          <p class="break-words font-mono">
+                            {$t(i18nKeys.console.instance.workerRuntimeMode)}:
+                            {worker.runtimeTopology.mode}
+                            · {$t(i18nKeys.console.instance.workerRuntimeBackend)}:
+                            {worker.runtimeTopology.queueBackend}
+                          </p>
+                          <p class="break-words font-mono">
+                            {$t(i18nKeys.console.instance.workerRuntimeGroup)}:
+                            {worker.runtimeTopology.workerGroup}
+                            · {$t(i18nKeys.console.instance.workerRuntimeRole)}:
+                            {worker.runtimeTopology.coordinationRole}
+                          </p>
+                          <p class="break-words font-mono">
+                            {$t(i18nKeys.console.instance.workerRuntimeWorkers)}:
+                            {worker.runtimeTopology.workerIds.join(", ") || "-"}
+                          </p>
+                          {#if worker.runtimeTopology.heartbeat}
+                            <div class="mt-3 space-y-1 border-t pt-3">
+                              <p class="font-medium text-foreground">
+                                {$t(i18nKeys.console.instance.workerRuntimeHeartbeat)}
+                              </p>
+                              <p class="break-words font-mono">
+                                {$t(i18nKeys.console.instance.workerRuntimeOnlineWorkers)}:
+                                {worker.runtimeTopology.heartbeat.onlineWorkerCount}
+                                · {$t(i18nKeys.console.instance.workerRuntimeStaleWorkers)}:
+                                {worker.runtimeTopology.heartbeat.staleWorkerCount}
+                                {#if worker.runtimeTopology.heartbeat.lastSeenAt}
+                                  · {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}:
+                                  {worker.runtimeTopology.heartbeat.lastSeenAt}
+                                {/if}
+                              </p>
+                              {#if worker.runtimeTopology.heartbeat.workers.length > 0}
+                                <p class="break-words font-mono">
+                                  {worker.runtimeTopology.heartbeat.workers
+                                    .map((runtimeWorker) =>
+                                      `${runtimeWorker.workerId}:${runtimeWorker.online ? "online" : "stale"}@${runtimeWorker.lastSeenAt}`,
+                                    )
+                                    .join(", ")}
+                                </p>
+                              {/if}
+                            </div>
+                          {/if}
+                        </div>
+                      {/if}
                     </div>
                   </div>
                 {/each}

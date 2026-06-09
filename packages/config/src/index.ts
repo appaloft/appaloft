@@ -64,6 +64,18 @@ export interface RuntimeMonitoringCollectorRunnerConfig {
   rawRetentionHours: number;
 }
 
+export type WorkerRuntimeMode = "embedded" | "standalone" | "disabled";
+export type WorkerQueueBackend = "database" | "external";
+export type ExternalWorkerBackendKind = "kafka" | "temporal" | "custom";
+
+export interface WorkerRuntimeConfig {
+  mode: WorkerRuntimeMode;
+  queueBackend: WorkerQueueBackend;
+  workerCount: number;
+  workerGroup: string;
+  externalBackendKind?: ExternalWorkerBackendKind;
+}
+
 export interface PreviewCleanupRetrySchedulerConfig {
   enabled: boolean;
   intervalSeconds: number;
@@ -185,6 +197,7 @@ export interface AppConfig {
   scheduledDependencyBackupRunner: ScheduledDependencyBackupRunnerConfig;
   scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
   runtimeMonitoringCollectorRunner: RuntimeMonitoringCollectorRunnerConfig;
+  workerRuntime: WorkerRuntimeConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -285,6 +298,12 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     batchSize: 25,
     rawRetentionHours: 24,
   },
+  workerRuntime: {
+    mode: "embedded",
+    queueBackend: "database",
+    workerCount: 1,
+    workerGroup: "appaloft-worker",
+  },
   enabledSystemPlugins: [],
 };
 
@@ -370,6 +389,41 @@ function parsePositiveInteger(value: string | number | undefined): number | unde
 
   const normalized = Math.trunc(numberValue);
   return normalized > 0 ? normalized : undefined;
+}
+
+function parseNonNegativeInteger(value: string | number | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return undefined;
+  }
+
+  const normalized = Math.trunc(numberValue);
+  return normalized >= 0 ? normalized : undefined;
+}
+
+function parseWorkerRuntimeMode(value: string | undefined): WorkerRuntimeMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "embedded" || normalized === "standalone" || normalized === "disabled"
+    ? normalized
+    : undefined;
+}
+
+function parseWorkerQueueBackend(value: string | undefined): WorkerQueueBackend | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "database" || normalized === "external" ? normalized : undefined;
+}
+
+function parseExternalWorkerBackendKind(
+  value: string | undefined,
+): ExternalWorkerBackendKind | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "kafka" || normalized === "temporal" || normalized === "custom"
+    ? normalized
+    : undefined;
 }
 
 function parseStringList(value: readonly string[] | string | undefined): string[] | undefined {
@@ -565,6 +619,8 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.runtimeMonitoringCollectorRunner ??
     fileConfig.runtimeMonitoringCollectorRunner ??
     defaults.runtimeMonitoringCollectorRunner;
+  const workerRuntime =
+    source.flags?.workerRuntime ?? fileConfig.workerRuntime ?? defaults.workerRuntime;
   const dockerSwarmExecution =
     source.flags?.dockerSwarmExecution ??
     fileConfig.dockerSwarmExecution ??
@@ -659,6 +715,23 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_RUNTIME_MONITORING_RAW_RETENTION_HOURS) ??
     parsePositiveInteger(runtimeMonitoringCollectorRunner.rawRetentionHours) ??
     defaults.runtimeMonitoringCollectorRunner.rawRetentionHours;
+  const workerRuntimeMode =
+    parseWorkerRuntimeMode(env.APPALOFT_WORKER_RUNTIME_MODE) ??
+    workerRuntime.mode ??
+    defaults.workerRuntime.mode;
+  const workerRuntimeQueueBackend =
+    parseWorkerQueueBackend(env.APPALOFT_WORKER_QUEUE_BACKEND) ??
+    workerRuntime.queueBackend ??
+    defaults.workerRuntime.queueBackend;
+  const workerRuntimeWorkerCount =
+    parseNonNegativeInteger(env.APPALOFT_WORKER_COUNT) ??
+    parseNonNegativeInteger(workerRuntime.workerCount) ??
+    defaults.workerRuntime.workerCount;
+  const workerRuntimeWorkerGroup =
+    env.APPALOFT_WORKER_GROUP ?? workerRuntime.workerGroup ?? defaults.workerRuntime.workerGroup;
+  const workerRuntimeExternalBackendKind =
+    parseExternalWorkerBackendKind(env.APPALOFT_WORKER_EXTERNAL_BACKEND_KIND) ??
+    workerRuntime.externalBackendKind;
   const dockerSwarmExecutionEnabled =
     parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
   const dockerSwarmExecutionCommandTimeoutMs =
@@ -1210,6 +1283,15 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       intervalSeconds: runtimeMonitoringCollectorRunnerIntervalSeconds,
       batchSize: runtimeMonitoringCollectorRunnerBatchSize,
       rawRetentionHours: runtimeMonitoringCollectorRunnerRawRetentionHours,
+    },
+    workerRuntime: {
+      mode: workerRuntimeMode,
+      queueBackend: workerRuntimeQueueBackend,
+      workerCount: workerRuntimeWorkerCount,
+      workerGroup: workerRuntimeWorkerGroup,
+      ...(workerRuntimeExternalBackendKind
+        ? { externalBackendKind: workerRuntimeExternalBackendKind }
+        : {}),
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

@@ -164,6 +164,7 @@ export type QuickDeployWorkflowResult = {
   environmentId: string;
   resourceId: string;
   deploymentId: string;
+  workId?: string;
 };
 
 export type QuickDeployOutcomeAccess =
@@ -179,6 +180,15 @@ export type QuickDeployOutcomeAccess =
 
 export type QuickDeployOutcomePacket = QuickDeployWorkflowResult & {
   access: QuickDeployOutcomeAccess;
+  monitoring: {
+    workId?: string;
+    deploymentId: string;
+    commands: {
+      showWork?: string;
+      listByDeployment: string;
+      followDeploymentEvents: string;
+    };
+  };
   commands: {
     openDeployment: string;
     openResource: string;
@@ -197,6 +207,15 @@ export function createQuickDeployOutcomePacket(
   return {
     ...result,
     access: input.access ?? { status: "unknown" },
+    monitoring: {
+      ...(result.workId ? { workId: result.workId } : {}),
+      deploymentId: result.deploymentId,
+      commands: {
+        ...(result.workId ? { showWork: `appaloft work show ${result.workId}` } : {}),
+        listByDeployment: `appaloft work list --deployment-id ${result.deploymentId}`,
+        followDeploymentEvents: `appaloft deployments events ${result.deploymentId} --follow`,
+      },
+    },
     commands: {
       openDeployment: `appaloft deployments show ${result.deploymentId}`,
       openResource: `appaloft resource show ${result.resourceId}`,
