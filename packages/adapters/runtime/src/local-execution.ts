@@ -1,5 +1,14 @@
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readSync, rmSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import {
@@ -75,6 +84,11 @@ import {
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { renderComposeOwnershipLabelOverrideScript } from "./compose-label-overrides";
+import {
+  renderServiceGraphCompose,
+  serviceGraphComposeFileFromMetadata,
+  serviceGraphComposeServicesFromMetadata,
+} from "./service-graph-compose";
 import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
@@ -2403,6 +2417,75 @@ export class LocalExecutionBackend implements ExecutionBackend {
     return ok({ deployment });
   }
 
+  private async prepareGeneratedServiceGraphCompose(input: {
+    context: ExecutionContext;
+    deployment: Deployment;
+    logs: DeploymentLogEntry[];
+    workdir: string;
+    image: string;
+  }): Promise<Result<{ composeFile?: string }>> {
+    const state = input.deployment.toState();
+    const composeFile = serviceGraphComposeFileFromMetadata(state.runtimePlan.execution.metadata);
+    if (!composeFile) {
+      return ok({});
+    }
+
+    const services = serviceGraphComposeServicesFromMetadata(state.runtimePlan.execution.metadata);
+    if (services.length === 0) {
+      const message = "Repository service graph metadata is missing services";
+      input.logs.push(phaseLog("package", message, "error"));
+      return ok({
+        composeFile,
+      });
+    }
+
+    const dockerBuild = generateWorkspaceDockerBuild({
+      execution: state.runtimePlan.execution,
+      ...(state.runtimePlan.source.inspection
+        ? { sourceInspection: state.runtimePlan.source.inspection }
+        : {}),
+    });
+    if (!dockerBuild) {
+      return err(
+        domainError.validation("Workspace service graph requires generated Docker build metadata", {
+          phase: "runtime-plan-resolution",
+          runtimePlanStrategy: state.runtimePlan.buildStrategy,
+        }),
+      );
+    }
+
+    const dockerfilePath = resolve(
+      input.workdir,
+      state.runtimePlan.execution.dockerfilePath ?? ".appaloft/Dockerfile.appaloft",
+    );
+    const relativeDockerfilePath = state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.appaloft";
+    mkdirSync(dirname(dockerfilePath), { recursive: true });
+    await Bun.write(dockerfilePath, dockerBuild.dockerfile);
+    await writeGeneratedDockerBuildAssets(input.workdir, dockerBuild.contextAssets);
+
+    const composeFilePath = resolve(input.workdir, composeFile);
+    mkdirSync(dirname(composeFilePath), { recursive: true });
+    writeFileSync(
+      composeFilePath,
+      renderServiceGraphCompose({
+        image: input.image,
+        dockerfilePath: relativeDockerfilePath,
+        services,
+        defaultPort: state.runtimePlan.execution.port ?? 3000,
+      }),
+    );
+
+    input.logs.push(phaseLog("package", `Generated repository service graph compose file ${composeFile}`));
+    this.report(input.context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "succeeded",
+      message: "Generated repository service graph compose file",
+    });
+
+    return ok({ composeFile: composeFilePath });
+  }
+
   private async executeDockerCompose(
     context: ExecutionContext,
     deployment: Deployment,
@@ -2440,12 +2523,23 @@ export class LocalExecutionBackend implements ExecutionBackend {
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
     });
+    const generatedCompose = await this.prepareGeneratedServiceGraphCompose({
+      context,
+      deployment,
+      logs,
+      workdir,
+      image: runtimeInstanceNames.imageName,
+    });
+    if (generatedCompose.isErr()) {
+      return err(generatedCompose.error);
+    }
     const composeFile =
-      isRemoteGitSourceKind(state.runtimePlan.source.kind) &&
+      generatedCompose.value.composeFile ??
+      (isRemoteGitSourceKind(state.runtimePlan.source.kind) &&
       (!state.runtimePlan.execution.composeFile ||
         state.runtimePlan.execution.composeFile === state.runtimePlan.source.locator)
         ? resolve(workdir, "docker-compose.yml")
-        : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator);
+        : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator));
     const composeOwnershipOverrideFile = resolve(workdir, ".appaloft.compose.labels.override.yml");
     logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
     const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {

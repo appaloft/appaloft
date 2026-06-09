@@ -66,7 +66,10 @@ import {
   dependencyRuntimeSecretResolutionReason,
 } from "./dependency-binding-snapshot-references";
 import { type DeploymentFactory } from "./deployment.factory";
-import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
+import {
+  type BootstrappedDeploymentInput,
+  type DeploymentContextBootstrapService,
+} from "./deployment-config-bootstrap.service";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { DeploymentDurableWorkScheduler } from "./deployment-durable-work";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
@@ -93,6 +96,39 @@ function shouldEnrichSourceFromDetector(resource: Resource): boolean {
 
 function requestedDeploymentFromResource(resource: Resource): Result<RequestedDeploymentConfig> {
   return resource.resolveDeploymentProfile();
+}
+
+function requestedDeploymentWithBootstrappedProfile(
+  requestedDeployment: RequestedDeploymentConfig,
+  input: BootstrappedDeploymentInput,
+): RequestedDeploymentConfig {
+  if (!input.requestedDeploymentProfile) {
+    return requestedDeployment;
+  }
+
+  const merged: RequestedDeploymentConfig = {
+    ...requestedDeployment,
+    ...input.requestedDeploymentProfile,
+    runtimeMetadata: {
+      ...(requestedDeployment.runtimeMetadata ?? {}),
+      ...(input.requestedDeploymentProfile.runtimeMetadata ?? {}),
+    },
+    accessRouteMetadata: {
+      ...(requestedDeployment.accessRouteMetadata ?? {}),
+      ...(input.requestedDeploymentProfile.accessRouteMetadata ?? {}),
+    },
+    ...((input.requestedDeploymentProfile.services ?? requestedDeployment.services)
+      ? { services: input.requestedDeploymentProfile.services ?? requestedDeployment.services }
+      : {}),
+    ...((input.requestedDeploymentProfile.storageMounts ?? requestedDeployment.storageMounts)
+      ? {
+          storageMounts:
+            input.requestedDeploymentProfile.storageMounts ?? requestedDeployment.storageMounts,
+        }
+      : {}),
+  };
+
+  return merged;
 }
 
 function compactMetadata(input: Record<string, string | undefined>): Record<string, string> {
@@ -839,7 +875,10 @@ export class CreateDeploymentUseCase {
       const dependencyBindingReferences = yield* createDependencyBindingSnapshotReferences(
         dependencyBindingSummaries,
       );
-      const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
+      const requestedDeploymentBase = requestedDeploymentWithBootstrappedProfile(
+        yield* requestedDeploymentFromResource(resource),
+        effectiveInput,
+      );
       const targetContext = {
         projectId: project.toState().id.value,
         environmentId: environment.toState().id.value,

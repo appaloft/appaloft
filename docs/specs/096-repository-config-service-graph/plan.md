@@ -11,12 +11,17 @@
    service-cardinality invariants.
 5. During existing Resource config deploy, block service graph drift with `resource_profile_drift`
    until a service reconciliation command/spec exists.
-6. Update source-of-truth docs and test matrix rows.
-7. Run targeted parser and CLI config workflow tests.
+6. Carry a safe repository config service graph snapshot into deployment planning for the config
+   entry workflow, while keeping `deployments.create` ids-only for public transports.
+7. Resolve workspace-command service graphs to generated Compose-stack runtime plans with
+   service-local command, environment, port, exposure, and replica metadata.
+8. Update source-of-truth docs and test matrix rows.
+9. Run targeted parser, CLI config workflow, application, and runtime planner tests.
 
 ## Deferred Work
 
-- Service-specific runtime planning and deployment snapshot materialization.
+- Provider-native and orchestrator-specific service graph execution beyond generated Docker Compose
+  stacks.
 - A dedicated service graph reconciliation command for existing Resources.
 - Web editing/readback designed for service-level runtime/network/replica details.
 - Cross-Resource multi-application release orchestration.
