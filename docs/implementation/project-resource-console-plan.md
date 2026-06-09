@@ -50,9 +50,13 @@ Expected Web implementation scope:
   - make project-level new deployment enter Quick Deploy or resource selection;
   - keep create-resource as a primary project-scoped affordance.
 - resource detail page:
-  - make the first top-level tab the resource configuration/overview surface;
+  - make the first top-level tab the resource overview/profile surface;
   - make configuration subsections use nested tab/route state that replaces the right-side content
     panel, not hash-anchor jumps through one long page;
+  - remove the overloaded resource `settings` top-level tab: source/runtime/network/access,
+    auto-deploy, storage, health, proxy, diagnostics, and danger zone stay under the first
+    Overview tab, while configuration variables, dependency resources, domains, and usage use the
+    existing top-level Environment, Dependencies, Domains, and Monitor tabs;
   - omit inner sidebars from top-level tabs that have only one content panel, including deployment
     history and runtime logs;
   - keep the persistent header compact with resource name/kind, compact health, and the primary
@@ -141,9 +145,11 @@ Required coverage follows [Project Resource Console Test Matrix](../testing/proj
 - project page deployment rollup remains read-only;
 - resource detail new deployment dispatches with `resourceId`;
 - resource detail deployment history filters by `resourceId`;
-- resource detail defaults to configuration/overview and puts deployments/logs behind later tabs;
+- resource detail defaults to overview/profile and puts deployments/logs behind later tabs;
 - resource detail configuration subsection navigation changes the rendered content panel and URL
   state without hash-anchor jumps;
+- resource detail has no top-level Settings tab; legacy `tab=settings` URLs redirect to the
+  canonical Overview, Environment, Dependencies, Domains, or Monitor locations;
 - resource detail deployment/log tabs do not show a redundant inner sidebar when they contain only
   one panel;
 - resource detail header omits open-project, view-deployments, open-access, bind-domain, and

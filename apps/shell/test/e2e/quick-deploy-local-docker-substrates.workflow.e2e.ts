@@ -7,11 +7,13 @@ import {
   createShellE2eWorkspace,
   dockerName,
   expectCliSuccess,
+  externalServerDatabaseEnv,
   fixturePath,
   parseJson,
   reservePort,
   runDocker,
   runShellCli,
+  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
@@ -45,6 +47,7 @@ describe("quick deploy local Docker substrate e2e", () => {
     const workspace = createShellE2eWorkspace("appaloft-local-docker-substrates-", {
       appVersion: "0.1.0-quick-deploy-local-docker-substrates-e2e",
       env: {
+        ...externalServerDatabaseEnv(),
         APPALOFT_COMPOSE_SMOKE_IMAGE: prebuiltImage,
       },
     });
@@ -113,8 +116,12 @@ describe("quick deploy local Docker substrate e2e", () => {
       dockerfileDeploymentId = parseJson<{ id: string }>(dockerfileDeployment.stdout).id;
       await waitForDeploymentSucceeded(dockerfileDeploymentId, workspace.cliOptions);
 
-      const dockerfileLogs = runShellCli(["logs", dockerfileDeploymentId], workspace.cliOptions);
-      expectCliSuccess(dockerfileLogs, "Dockerfile logs");
+      const dockerfileLogs = await waitForDeploymentLogs(
+        dockerfileDeploymentId,
+        workspace.cliOptions,
+        ["Using local docker-container execution", "Container is reachable"],
+        { label: "Dockerfile deployment" },
+      );
       expect(dockerfileLogs.stdout).toContain("Using local docker-container execution");
       expect(dockerfileLogs.stdout).toContain("Container is reachable");
       const dockerfileHealthUrl =
@@ -149,8 +156,12 @@ describe("quick deploy local Docker substrate e2e", () => {
       prebuiltDeploymentId = parseJson<{ id: string }>(prebuiltDeployment.stdout).id;
       await waitForDeploymentSucceeded(prebuiltDeploymentId, workspace.cliOptions);
 
-      const prebuiltLogs = runShellCli(["logs", prebuiltDeploymentId], workspace.cliOptions);
-      expectCliSuccess(prebuiltLogs, "prebuilt image logs");
+      const prebuiltLogs = await waitForDeploymentLogs(
+        prebuiltDeploymentId,
+        workspace.cliOptions,
+        ["Using local docker-container execution", "Container is reachable"],
+        { label: "prebuilt image deployment" },
+      );
       expect(prebuiltLogs.stdout).toContain("Using local docker-container execution");
       expect(prebuiltLogs.stdout).toContain("Container is reachable");
       const prebuiltHealthUrl =
@@ -183,8 +194,12 @@ describe("quick deploy local Docker substrate e2e", () => {
       composeDeploymentId = parseJson<{ id: string }>(composeDeployment.stdout).id;
       await waitForDeploymentSucceeded(composeDeploymentId, workspace.cliOptions);
 
-      const composeLogs = runShellCli(["logs", composeDeploymentId], workspace.cliOptions);
-      expectCliSuccess(composeLogs, "Docker Compose logs");
+      const composeLogs = await waitForDeploymentLogs(
+        composeDeploymentId,
+        workspace.cliOptions,
+        ["Using local docker-compose-stack execution", "Compose stack started successfully"],
+        { label: "Docker Compose deployment" },
+      );
       expect(composeLogs.stdout).toContain("Using local docker-compose-stack execution");
       expect(composeLogs.stdout).toContain("Compose stack started successfully");
       expect(composeLogs.stdout).toContain("docker-compose.yml");

@@ -50,11 +50,11 @@ Target route family: `/resources/[resourceId]` and canonical nested project reso
 | Logs | `tab=logs` | Runtime logs with follow/search/copy and precise loading/error states. |
 | Domains | `tab=domains` | Resource-scoped domain/DNS/TLS flow and attached domains. |
 | Environment | `tab=environment` | Dense environment variable editor, secret masking, validation, save state. |
+| Dependencies | `tab=dependencies` | Resource-scoped dependency resources, bindings, backups, and secret rotation. |
 | Metrics / Health | `tab=monitor` | Usage, diagnostics, proxy/readiness/health details. |
-| Settings | `tab=settings` | Source, runtime/build, network, storage, dependencies, advanced configuration, danger zone. |
 | Terminal | `tab=terminal` | Operator shell when a deployment exists. |
 
-First implementation slice: add `overview` as the default resource tab, keep existing deeper tabs operational, and use the overview to answer the main operator questions before configuration.
+First implementation slice: add `overview` as the default resource tab, keep existing deeper tabs operational, remove the overloaded `settings` top-level tab, and use canonical top-level tabs for environment variables, dependencies, domains, and monitoring while source/runtime/network/access, auto-deploy, storage, health, proxy, diagnostics, and danger zone remain reachable from Overview.
 
 ### Deployment Detail
 
@@ -100,7 +100,7 @@ The current tabbed structure is close to the target model:
 | Bind domain | Resource-scoped guided flow | DNS and TLS are staged, risky, and resource-specific. | Global page becomes rollup/troubleshooting. |
 | Verify DNS / issue TLS | Guided status panel | Requires exact records, current state, retry, and troubleshooting. | Show pending/failed/active separately. |
 | Configure environment variables | Dedicated tab or dense inline editor | Repeated task with validation and secret handling. | Use table-like editor, save state, masked values. |
-| Configure runtime/build | Configure/settings tab sections | Important but not always sequential after create. | Keep advanced options progressive. |
+| Configure runtime/build | Overview profile sections | Important but not always sequential after create. | Keep advanced options progressive. |
 | Connect server | Full-page wizard/checklist | Identity, credential, connectivity, and readiness are sequential. | Current page is good base. |
 | Inspect server health | Overview plus Health/Connectivity tabs | Health spans multiple signals. | Surface current readiness at top. |
 | Rotate SSH credential | Modal or drawer | Focused sensitive operation with limited fields. | Current modal is acceptable after visual alignment. |
@@ -255,7 +255,7 @@ The complete redesign is larger than one safe pass. Phase 3 should implement a c
 | Dark progress/log modal body | `OperationProgressPanel` with neutral surface and compact timeline. |
 | Text-only empty strips in resource/project lists | `ConsoleStatePanel` with specific CTA. |
 | Project-local resource rows | `ResourceListTable` with consistent status, type, latest deployment, endpoint, updated metadata. |
-| Resource detail defaulting to `settings` | `overview` tab with settings retained as a secondary tab. |
+| Resource detail overloaded `settings` tab | `overview` tab with a left profile/configuration navigation, plus promoted top-level Environment, Dependencies, Domains, and Monitor tabs. |
 
 ### Data Dependencies
 

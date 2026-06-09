@@ -6,11 +6,14 @@ import {
   cleanupWorkspace,
   createShellE2eWorkspace,
   expectCliSuccess,
+  externalServerDatabaseEnv,
   fixturePath,
   parseJson,
   reservePort,
   runDocker,
   runShellCli,
+  usesExternalServer,
+  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
 } from "./support/shell-e2e-fixture";
 
@@ -42,6 +45,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
 
     const workspace = createShellE2eWorkspace("appaloft-workspace-docker-", {
       appVersion: "0.1.0-quick-deploy-workspace-docker-e2e",
+      env: externalServerDatabaseEnv(),
     });
     const appPort = await reservePort();
     const suffix = crypto.randomUUID().slice(0, 8);
@@ -107,8 +111,12 @@ describe("quick deploy workspace Docker workflow e2e", () => {
       deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
       await waitForDeploymentSucceeded(deploymentId, workspace.cliOptions);
 
-      const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
-      expect(logs.exitCode, logs.stderr).toBe(0);
+      const logs = await waitForDeploymentLogs(
+        deploymentId,
+        workspace.cliOptions,
+        ["Generated workspace Dockerfile", "Container is reachable"],
+        { label: "workspace Docker deployment" },
+      );
       expect(logs.stdout).toContain("Generated workspace Dockerfile");
       expect(logs.stdout).toContain("Container is reachable");
       const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/health)/u.exec(
@@ -135,11 +143,14 @@ describe("quick deploy workspace Docker workflow e2e", () => {
         deploymentId,
         "Dockerfile.appaloft",
       );
-      expect(existsSync(generatedDockerfile)).toBe(true);
-      const dockerfileText = await Bun.file(generatedDockerfile).text();
-      expect(dockerfileText).toContain("FROM node:22-alpine");
-      expect(dockerfileText).toContain('RUN ["sh","-lc","node build.mjs"]');
-      expect(dockerfileText).toContain('CMD ["sh","-lc","node dist/server.js"]');
+
+      if (!usesExternalServer()) {
+        expect(existsSync(generatedDockerfile)).toBe(true);
+        const dockerfileText = await Bun.file(generatedDockerfile).text();
+        expect(dockerfileText).toContain("FROM node:22-alpine");
+        expect(dockerfileText).toContain('RUN ["sh","-lc","node build.mjs"]');
+        expect(dockerfileText).toContain('CMD ["sh","-lc","node dist/server.js"]');
+      }
 
       const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
       expect(deployments.exitCode, deployments.stderr).toBe(0);
