@@ -219,6 +219,7 @@
       "name": "@appaloft/blueprint-marketplace-web",
       "version": "0.0.0",
       "dependencies": {
+        "@appaloft/blueprints": "workspace:*",
         "@appaloft/ui": "workspace:*",
       },
       "devDependencies": {

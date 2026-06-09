@@ -2,6 +2,8 @@ import { basename } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
+export * from "./deploy-handoff";
+
 export const blueprintSchemaVersion = "appaloft.blueprint/v1" as const;
 export const blueprintInstallPlanSchemaVersion = "appaloft.blueprint.install-plan/v1" as const;
 export const blueprintUpgradePlanSchemaVersion = "appaloft.blueprint.upgrade-plan/v1" as const;
