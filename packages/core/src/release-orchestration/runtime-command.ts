@@ -96,10 +96,16 @@ export interface DockerComposeUpCommandSpec {
   kind: "docker-compose-up";
   composeFile: FilePathText;
   additionalComposeFiles: readonly FilePathText[];
+  scales: readonly DockerComposeScaleSpec[];
   projectName?: DisplayNameText;
   workingDirectory?: FilePathText;
   detach: boolean;
   build: boolean;
+}
+
+export interface DockerComposeScaleSpec {
+  serviceName: DisplayNameText;
+  replicas: number;
 }
 
 export interface DockerRemoveContainerCommandSpec {

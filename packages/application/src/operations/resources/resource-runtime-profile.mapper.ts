@@ -7,6 +7,7 @@ import {
   err,
   HealthCheckPathText,
   ok,
+  ReplicaCount,
   type ResourceRuntimeProfileState,
   type Result,
   RuntimeNameText,
@@ -28,7 +29,6 @@ const unsupportedRuntimeTargetFields = [
   "kubernetesNamespace",
   "helmChart",
   "swarmService",
-  "replicas",
   "nodeSelector",
   "ingressClass",
   "providerOptions",
@@ -138,6 +138,12 @@ export function resourceRuntimeProfileFromInput(
     const buildTarget = DockerBuildTarget.create(input.buildTarget);
     if (buildTarget.isErr()) return err(buildTarget.error);
     profile.buildTarget = buildTarget.value;
+  }
+
+  if (input.replicas) {
+    const replicas = ReplicaCount.create(input.replicas);
+    if (replicas.isErr()) return err(replicas.error);
+    profile.replicas = replicas.value;
   }
 
   if (allowHealthPolicy && input.healthCheckPath) {

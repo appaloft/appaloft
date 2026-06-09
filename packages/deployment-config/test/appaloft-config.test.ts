@@ -243,7 +243,11 @@ describe("Appaloft deployment config schema", () => {
       },
     });
 
-    expect(topLevelReplicas.success).toBe(false);
+    expect(topLevelReplicas.success).toBe(true);
+    if (topLevelReplicas.success) {
+      expect(topLevelReplicas.data.replicas).toBe(4);
+      expect(topLevelReplicas.data.services?.worker?.replicas).toBe(4);
+    }
   });
 
   test("[CONFIG-FILE-APPLICATION-GRAPH-001] accepts named repository application graph declarations", () => {
@@ -283,7 +287,9 @@ describe("Appaloft deployment config schema", () => {
         worker: {
           resource: {
             name: "Acme Worker",
+            kind: "worker",
           },
+          replicas: 4,
           runtime: {
             strategy: "workspace-commands",
           },
@@ -310,6 +316,7 @@ describe("Appaloft deployment config schema", () => {
       expect(parsed.data.applications?.api?.source?.baseDirectory).toBe("apps/api");
       expect(parsed.data.applications?.api?.network?.internalPort).toBe(3000);
       expect(parsed.data.applications?.worker?.resource.name).toBe("Acme Worker");
+      expect(parsed.data.applications?.worker?.replicas).toBe(4);
       expect(parsed.data.applications?.worker?.services?.worker?.replicas).toBe(4);
     }
   });

@@ -135,6 +135,9 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.buildTarget
             ? { buildTarget: spec.state.runtimeProfile.buildTarget.value }
             : {}),
+          ...(spec.state.runtimeProfile.replicas
+            ? { replicas: spec.state.runtimeProfile.replicas.value }
+            : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
             : {}),

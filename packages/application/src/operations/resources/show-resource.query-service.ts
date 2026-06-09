@@ -201,6 +201,7 @@ function runtimeProfileFromState(
       ? { dockerComposeFilePath: profile.dockerComposeFilePath.value }
       : {}),
     ...(profile.buildTarget ? { buildTarget: profile.buildTarget.value } : {}),
+    ...(profile.replicas ? { replicas: profile.replicas.value } : {}),
     ...(profile.healthCheckPath ? { healthCheckPath: profile.healthCheckPath.value } : {}),
     ...(healthCheck ? { healthCheck } : {}),
   };

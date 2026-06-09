@@ -137,6 +137,9 @@ function renderDockerComposeUpCommand(
     "up",
     spec.detach ? "-d" : "",
     spec.build ? "--build" : "",
+    ...spec.scales.map((scale) =>
+      `--scale ${options.quote(`${scale.serviceName.value}=${scale.replicas}`)}`,
+    ),
   ]
     .filter((part) => part.length > 0)
     .join(" ");

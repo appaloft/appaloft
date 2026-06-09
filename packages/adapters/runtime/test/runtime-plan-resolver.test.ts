@@ -1846,6 +1846,72 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[CONFIG-FILE-APPLICATION-REPLICAS-001] resolves Dockerfile replicas into a compose-backed workload", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_dockerfile_replicas",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/worker-app",
+        displayName: "worker-app",
+        inspection: createSourceInspection({
+          detectedFiles: ["dockerfile"],
+          dockerfilePath: "Dockerfile.worker",
+        }),
+      }),
+      server: {
+        id: "srv_dockerfile_replicas",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_dockerfile_replicas"),
+      detectedReasoning: ["configured worker replicas"],
+      requestedDeployment: {
+        method: "dockerfile",
+        dockerfilePath: "Dockerfile.worker",
+        targetServiceName: "worker",
+        exposureMode: "none",
+        replicas: 4,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("dockerfile");
+    expect(plan.packagingMode).toBe("compose-bundle");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        composeFile: ".appaloft/replicated-workload.compose.yml",
+        metadata: expect.objectContaining({
+          dockerfilePath: "Dockerfile.worker",
+          replicatedWorkload: "true",
+          targetServiceName: "worker",
+          replicas: "4",
+        }),
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        composeFile: ".appaloft/replicated-workload.compose.yml",
+        dockerfilePath: "Dockerfile.worker",
+        metadata: expect.objectContaining({
+          "replicatedWorkload.enabled": "true",
+          "replicatedWorkload.replicas": "4",
+          targetServiceName: "worker",
+        }),
+      }),
+    );
+    expect(plan.steps).toContain("Prepare replicated workload compose");
+    expect(plan.steps).toContain("Run docker compose");
+  });
+
   test("[DEP-CREATE-SMOKE-003] rejects prebuilt image planning for non-image sources with structured details", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

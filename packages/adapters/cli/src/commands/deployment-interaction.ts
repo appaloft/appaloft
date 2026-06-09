@@ -153,6 +153,7 @@ export interface DeploymentPromptSeed {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   buildTarget?: string;
+  replicas?: number;
   sourceProfile?: Partial<
     Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory" | "version" | "versionKind">
   >;
@@ -472,6 +473,7 @@ export function runtimeProfileFromDeploymentInput(
         ? { dockerComposeFilePath: input.dockerComposeFilePath }
         : {}),
       ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
+      ...(input.replicas ? { replicas: input.replicas } : {}),
       ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
       ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
     };
@@ -487,6 +489,7 @@ export function runtimeProfileFromDeploymentInput(
     ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
     ...(input.dockerComposeFilePath ? { dockerComposeFilePath: input.dockerComposeFilePath } : {}),
     ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
+    ...(input.replicas ? { replicas: input.replicas } : {}),
     ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
     ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
   };
@@ -872,6 +875,7 @@ export function deploymentPromptSeedFromConfig(
       ? { dockerComposeFilePath: config.runtime.dockerComposeFilePath }
       : {}),
     ...(config.runtime?.buildTarget ? { buildTarget: config.runtime.buildTarget } : {}),
+    ...(config.replicas ? { replicas: config.replicas } : {}),
     ...(config.network?.internalPort ? { port: config.network.internalPort } : {}),
     ...(config.network?.upstreamProtocol
       ? { upstreamProtocol: config.network.upstreamProtocol }
@@ -923,6 +927,7 @@ export function applicationDeploymentPromptSeedsFromConfig(
         network: application.network,
         health: application.health,
         access: application.access,
+        replicas: application.replicas,
         env: application.env,
         secrets: application.secrets,
         services: application.services,
@@ -4168,6 +4173,7 @@ function resolveAdvancedDeploymentConfig(input: {
         input.seed.dockerfilePath ||
         input.seed.dockerComposeFilePath ||
         input.seed.buildTarget ||
+        input.seed.replicas ||
         input.seed.port ||
         input.seed.upstreamProtocol ||
         input.seed.exposureMode ||
@@ -4191,6 +4197,7 @@ function resolveAdvancedDeploymentConfig(input: {
           input.seed.port ??
           (isStatic ? defaultStaticInternalPort : defaultApplicationInternalPort),
         ...(input.seed.runtimeName ? { runtimeName: input.seed.runtimeName } : {}),
+        ...(input.seed.replicas ? { replicas: input.seed.replicas } : {}),
         ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
         ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),
         ...(input.seed.targetServiceName
@@ -4297,6 +4304,7 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(dockerfilePath ? { dockerfilePath } : {}),
       ...(dockerComposeFilePath ? { dockerComposeFilePath } : {}),
       ...(buildTarget ? { buildTarget } : {}),
+      ...(input.seed.replicas ? { replicas: input.seed.replicas } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
       ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),

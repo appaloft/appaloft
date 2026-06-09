@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { renderServiceGraphCompose } from "../src/service-graph-compose";
+import {
+  renderReplicatedWorkloadCompose,
+  renderServiceGraphCompose,
+} from "../src/service-graph-compose";
 
 describe("repository service graph compose rendering", () => {
   test("[CONFIG-FILE-SERVICE-GRAPH-005] renders one generated image as multiple compose services", () => {
@@ -46,6 +49,24 @@ describe("repository service graph compose rendering", () => {
     expect(compose).toContain('- "3000"');
     expect(compose).toContain('"worker":');
     expect(compose).toContain('command: "bun run start:worker"');
+    expect(compose).toContain("replicas: 4");
+    expect(compose).not.toContain("ports:");
+  });
+
+  test("[CONFIG-FILE-APPLICATION-REPLICAS-001] renders a single workload as replicated compose service", () => {
+    const compose = renderReplicatedWorkloadCompose({
+      image: "appaloft-runtime-dep_456",
+      dockerfilePath: "Dockerfile.worker",
+      serviceName: "worker",
+      replicas: 4,
+      includeBuild: true,
+    });
+
+    expect(compose).toContain('"worker":');
+    expect(compose).toContain('image: "appaloft-runtime-dep_456"');
+    expect(compose).toContain("build:");
+    expect(compose).toContain("context: ..");
+    expect(compose).toContain('dockerfile: "Dockerfile.worker"');
     expect(compose).toContain("replicas: 4");
     expect(compose).not.toContain("ports:");
   });
