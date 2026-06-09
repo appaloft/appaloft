@@ -49,6 +49,17 @@ function firstFailedStepMessage(steps: readonly ServerRuntimePrepareStep[]): str
   return steps.find((step) => step.status === "failed")?.message ?? "Server runtime is not ready";
 }
 
+function finalPrepareStatus(
+  steps: readonly ServerRuntimePrepareStep[],
+): PrepareServerRuntimeResult["status"] {
+  const finalConnectivity = steps.find((step) => step.phase === "connectivity-after");
+  if (finalConnectivity) {
+    return finalConnectivity.status === "succeeded" ? "ready" : "failed";
+  }
+
+  return steps.some((step) => step.status === "failed") ? "failed" : "ready";
+}
+
 @injectable()
 export class PrepareServerRuntimeUseCase {
   constructor(
@@ -148,8 +159,8 @@ export class PrepareServerRuntimeUseCase {
         }),
       );
 
-      const failed = steps.some((step) => step.status === "failed");
-      const status: PrepareServerRuntimeResult["status"] = failed ? "failed" : "ready";
+      const status = finalPrepareStatus(steps);
+      const failed = status === "failed";
       return ok({
         serverId: input.serverId,
         status,
