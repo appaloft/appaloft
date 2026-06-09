@@ -21,11 +21,36 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.rename");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.delete");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.cleanupRuntime");
+    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.plan");
+    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.create");
+    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.list");
+    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.restore");
+    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.prune");
     expect(resourcePageSource).toContain("orpcClient.resources.attachStorage");
     expect(resourcePageSource).toContain("orpcClient.resources.detachStorage");
     expect(resourcePageSource).toContain("resourceStorageAttachments");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageTitle");
+    expect(resourcePageSource).toContain("sm:grid-cols-2 xl:grid-cols-5");
+    expect(resourcePageSource).toContain("i18nKeys.console.resources.storageOverviewTitle");
+    expect(resourcePageSource).toContain("storageAttachmentVolumeLabel(attachment)");
+    expect(resourcePageSource).toContain("attachment.storageVolumeId");
+    expect(resourcePageSource).toContain("attachment.destinationPath");
+    expect(resourcePageSource).toContain("storageMountModeLabel(attachment.mountMode)");
+    expect(resourcePageSource).toContain(
+      "i18nKeys.console.resources.storageOverviewBackupManageAction",
+    );
+    expect(resourcePageSource).toContain('id="resource-mounted-storage-overview"');
+    expect(resourcePageSource).toContain('resourceSettingsSectionHref("storage")');
+    const mountedStorageOverviewSource = resourcePageSource.slice(
+      resourcePageSource.indexOf('id="resource-mounted-storage-overview"'),
+      resourcePageSource.indexOf('<aside class="space-y-5">'),
+    );
+    expect(mountedStorageOverviewSource).not.toContain("dependency-resources.create-backup");
+    expect(mountedStorageOverviewSource).not.toContain("dependencyResources.createBackup");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageVolumeManagementTitle");
+    expect(resourcePageSource).toContain("i18nKeys.console.resources.storageBackupTitle");
+    expect(resourcePageSource).toContain("storageBackupPlan");
+    expect(resourcePageSource).toContain("storageVolumeBackups");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageRuntimeCleanupTitle");
     expect(resourcePageSource).toContain("cleanupStorageRuntimeMutation");
     expect(resourcePageSource).toContain("cleanupStorageRuntime(true)");
@@ -35,6 +60,8 @@ describe("storage volume Web console surface", () => {
     expect(clientContractSource).toContain("rename: Client");
     expect(clientContractSource).toContain("delete: Client");
     expect(clientContractSource).toContain("cleanupRuntime: Client");
+    expect(clientContractSource).toContain("backups: {");
+    expect(clientContractSource).toContain("restorePlan: Client");
     expect(clientContractSource).toContain("attachStorage: Client");
     expect(clientContractSource).toContain("detachStorage: Client");
     expect(clientContractSource).toContain("storageVolumes: {");

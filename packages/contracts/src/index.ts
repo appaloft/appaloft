@@ -3678,6 +3678,125 @@ export const showStorageVolumeResponseSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const storageBackupPlanBlockerSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+});
+
+export const storageBackupRetentionPolicySchema = z.object({
+  maxCount: z.number().int(),
+  maxAgeDays: z.number().int().positive().optional(),
+  maxBytes: z.number().int().positive().optional(),
+  minFreeBytes: z.number().int().positive().optional(),
+});
+
+export const storageVolumeBackupPlanResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.backup-plan/v1"),
+  storageVolumeId: z.string(),
+  sourceAdapterKey: z.string(),
+  targetProviderKey: z.enum([
+    "local-filesystem",
+    "s3-compatible",
+    "webdav",
+    "restic-repository",
+    "provider-volume-snapshot",
+  ]),
+  consistency: z.enum([
+    "crash-consistent",
+    "quiesced",
+    "application-consistent",
+    "provider-snapshot-consistent",
+  ]),
+  localOnly: z.boolean(),
+  retention: storageBackupRetentionPolicySchema,
+  blockers: z.array(storageBackupPlanBlockerSchema),
+});
+
+export const createStorageVolumeBackupResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const storageVolumeBackupRestoreAttemptSummarySchema = z.object({
+  attemptId: z.string(),
+  status: z.enum(["pending", "completed", "failed"]),
+  requestedAt: z.string(),
+  target: z.object({
+    storageVolumeId: z.string(),
+    restoredVolumeId: z.string().optional(),
+    destructiveInPlace: z.boolean(),
+  }),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+});
+
+export const storageVolumeBackupSummarySchema = z.object({
+  id: z.string(),
+  storageVolumeId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string().optional(),
+  storageVolumeKind: z.enum(["named-volume", "bind-mount"]),
+  sourceAdapterKey: z.string(),
+  targetProviderKey: z.enum([
+    "local-filesystem",
+    "s3-compatible",
+    "webdav",
+    "restic-repository",
+    "provider-volume-snapshot",
+  ]),
+  targetRef: z.string(),
+  consistency: z.string(),
+  status: z.enum(["pending", "ready", "failed", "pruned"]),
+  attemptId: z.string(),
+  requestedAt: z.string(),
+  retentionStatus: z.enum(["retained", "none", "pruned"]),
+  localOnly: z.boolean(),
+  artifactHandle: z.string().optional(),
+  sizeBytes: z.number().optional(),
+  checksum: z.string().optional(),
+  completedAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  failureCode: z.string().optional(),
+  failureMessage: z.string().optional(),
+  latestRestoreAttempt: storageVolumeBackupRestoreAttemptSummarySchema.optional(),
+  createdAt: z.string(),
+});
+
+export const listStorageVolumeBackupsResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.backups.list/v1"),
+  items: z.array(storageVolumeBackupSummarySchema),
+  generatedAt: z.string(),
+});
+
+export const showStorageVolumeBackupResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.backups.show/v1"),
+  backup: storageVolumeBackupSummarySchema,
+  generatedAt: z.string(),
+});
+
+export const storageVolumeRestorePlanResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volumes.restore-plan/v1"),
+  backupId: z.string(),
+  sourceStorageVolumeId: z.string(),
+  targetMode: z.enum(["new-volume", "in-place"]),
+  destructive: z.boolean(),
+  targetStorageVolumeId: z.string().optional(),
+  defaultRestoredVolumeName: z.string().optional(),
+  blockers: z.array(storageBackupPlanBlockerSchema),
+});
+
+export const restoreStorageVolumeBackupResponseSchema = z.object({
+  id: z.string(),
+  restoredStorageVolumeId: z.string().optional(),
+});
+
+export const pruneStorageVolumeBackupResponseSchema = z.object({
+  id: z.string(),
+  prunedAt: z.string(),
+});
+
 export const renameStorageVolumeInputSchema = z.object({
   storageVolumeId: z.string().min(1),
   name: z.string().min(1),
@@ -6697,6 +6816,24 @@ export type ListStorageVolumesInput = z.infer<typeof listStorageVolumesInputSche
 export type ListStorageVolumesResponse = z.infer<typeof listStorageVolumesResponseSchema>;
 export type ShowStorageVolumeInput = z.infer<typeof showStorageVolumeInputSchema>;
 export type ShowStorageVolumeResponse = z.infer<typeof showStorageVolumeResponseSchema>;
+export type StorageVolumeBackupPlanResponse = z.infer<typeof storageVolumeBackupPlanResponseSchema>;
+export type CreateStorageVolumeBackupResponse = z.infer<
+  typeof createStorageVolumeBackupResponseSchema
+>;
+export type StorageVolumeBackupSummary = z.infer<typeof storageVolumeBackupSummarySchema>;
+export type ListStorageVolumeBackupsResponse = z.infer<
+  typeof listStorageVolumeBackupsResponseSchema
+>;
+export type ShowStorageVolumeBackupResponse = z.infer<typeof showStorageVolumeBackupResponseSchema>;
+export type StorageVolumeRestorePlanResponse = z.infer<
+  typeof storageVolumeRestorePlanResponseSchema
+>;
+export type RestoreStorageVolumeBackupResponse = z.infer<
+  typeof restoreStorageVolumeBackupResponseSchema
+>;
+export type PruneStorageVolumeBackupResponse = z.infer<
+  typeof pruneStorageVolumeBackupResponseSchema
+>;
 export type RenameStorageVolumeInput = z.infer<typeof renameStorageVolumeInputSchema>;
 export type RenameStorageVolumeResponse = z.infer<typeof renameStorageVolumeResponseSchema>;
 export type DeleteStorageVolumeInput = z.infer<typeof deleteStorageVolumeInputSchema>;

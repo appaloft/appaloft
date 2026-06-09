@@ -59,4 +59,5 @@ export * from "./source-event-retention-store";
 export * from "./source-link-repository";
 export * from "./ssh-credential-read-model";
 export * from "./ssh-credential-repository";
+export * from "./storage-volume-backup-repository";
 export * from "./storage-volume-repository";

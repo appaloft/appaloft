@@ -92,6 +92,11 @@ import {
   type StaticArtifactRouteActivation,
   type StaticArtifactStoredManifest,
   type StorageVolume,
+  type StorageVolumeBackup,
+  type StorageVolumeBackupMutationSpec,
+  type StorageVolumeBackupSelectionSpec,
+  type StorageVolumeBackupStatus,
+  type StorageVolumeBackupTargetProviderKey,
   type StorageVolumeKind,
   type StorageVolumeMutationSpec,
   type StorageVolumeSelectionSpec,
@@ -113,6 +118,7 @@ import {
   type RepositoryContext,
   type TraceAttributes,
 } from "./execution-context";
+import { type StorageBackupProviderRegistryPort } from "./operations/storage-volumes/storage-volume-backup-contract";
 import {
   type AppliedRouteContextMetadata,
   type ResourceAccessFailureDiagnostic,
@@ -706,6 +712,22 @@ export interface StorageVolumeRepository {
     context: RepositoryContext,
     storageVolume: StorageVolume,
     spec: StorageVolumeMutationSpec,
+  ): Promise<void>;
+}
+
+export interface StorageVolumeBackupRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackup | null>;
+  findMany(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackup[]>;
+  upsert(
+    context: RepositoryContext,
+    backup: StorageVolumeBackup,
+    spec: StorageVolumeBackupMutationSpec,
   ): Promise<void>;
 }
 
@@ -3335,6 +3357,88 @@ export interface ShowStorageVolumeResult {
   schemaVersion: "storage-volumes.show/v1";
   storageVolume: StorageVolumeSummary;
   generatedAt: string;
+}
+
+export interface StorageVolumeBackupRestoreAttemptSummary {
+  attemptId: string;
+  status: "pending" | "completed" | "failed";
+  requestedAt: string;
+  target: {
+    storageVolumeId: string;
+    restoredVolumeId?: string;
+    destructiveInPlace: boolean;
+  };
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+}
+
+export interface StorageVolumeBackupSummary {
+  id: string;
+  storageVolumeId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId?: string;
+  storageVolumeKind: StorageVolumeKind;
+  sourceAdapterKey: string;
+  targetProviderKey: StorageVolumeBackupTargetProviderKey;
+  targetRef: string;
+  consistency: string;
+  status: StorageVolumeBackupStatus;
+  attemptId: string;
+  requestedAt: string;
+  retentionStatus: "retained" | "none" | "pruned";
+  localOnly: boolean;
+  artifactHandle?: string;
+  sizeBytes?: number;
+  checksum?: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  latestRestoreAttempt?: StorageVolumeBackupRestoreAttemptSummary;
+  createdAt: string;
+}
+
+export interface CreateStorageVolumeBackupResult {
+  id: string;
+}
+
+export interface ListStorageVolumeBackupsResult {
+  schemaVersion: "storage-volumes.backups.list/v1";
+  items: StorageVolumeBackupSummary[];
+  generatedAt: string;
+}
+
+export interface ShowStorageVolumeBackupResult {
+  schemaVersion: "storage-volumes.backups.show/v1";
+  backup: StorageVolumeBackupSummary;
+  generatedAt: string;
+}
+
+export interface StorageVolumeRestorePlan {
+  schemaVersion: "storage-volumes.restore-plan/v1";
+  backupId: string;
+  sourceStorageVolumeId: string;
+  targetMode: "new-volume" | "in-place";
+  destructive: boolean;
+  targetStorageVolumeId?: string;
+  defaultRestoredVolumeName?: string;
+  blockers: Array<{
+    code: string;
+    message: string;
+  }>;
+}
+
+export interface CreateStorageVolumeRestoreResult {
+  id: string;
+  restoredStorageVolumeId?: string;
+}
+
+export interface PruneStorageVolumeBackupResult {
+  id: string;
+  prunedAt: string;
 }
 
 export const dependencyResourceKinds = [
@@ -8408,6 +8512,20 @@ export interface StorageVolumeReadModel {
     spec: StorageVolumeSelectionSpec,
   ): Promise<StorageVolumeSummary | null>;
   countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number>;
+}
+
+export interface StorageVolumeBackupReadModel {
+  list(
+    context: RepositoryContext,
+    input: {
+      storageVolumeId: string;
+      status?: StorageVolumeBackupSummary["status"];
+    },
+  ): Promise<StorageVolumeBackupSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackupSummary | null>;
 }
 
 export interface DependencyResourceReadModel {

@@ -698,7 +698,7 @@ describe("Blueprint install plan", () => {
     }
   });
 
-  test("[CLOUD-BLUEPRINT-INSTALLED-APPLICATION-040] groups multi-component plans into one neutral application bundle", () => {
+  test("[CLOUD-BLUEPRINT-INSTALLED-APPLICATION-040] [APP-BUNDLE-STORAGE-PLAN-002] groups multi-component plans into one neutral application bundle", () => {
     const manifest = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
       id: "multi-component-app",
@@ -779,6 +779,7 @@ describe("Blueprint install plan", () => {
       "postgres",
       "redis",
     ]);
+    expect(bundlePlan.value.storageBindings).toEqual([]);
     expect(bundlePlan.value.relationships).toEqual(
       expect.arrayContaining([
         {
@@ -1014,7 +1015,7 @@ describe("Blueprint install plan", () => {
     );
   });
 
-  test("[BLUEPRINT-STORAGE-MOUNT-001] projects volume mounts into install, bundle, and runtime plans", () => {
+  test("[BLUEPRINT-STORAGE-MOUNT-001] [APP-BUNDLE-STORAGE-PLAN-001] [APP-BUNDLE-STORAGE-PLAN-003] [APP-BUNDLE-STORAGE-RUNTIME-001] projects volume mounts as storage bindings without dependency readback", () => {
     const manifest = validateBlueprintManifest({
       schemaVersion: blueprintSchemaVersion,
       id: "volume-app",
@@ -1075,6 +1076,14 @@ describe("Blueprint install plan", () => {
         },
       ]),
     );
+    expect(
+      installPlan.value.operations.some((operation) => operation.kind === "bind-dependency"),
+    ).toBe(false);
+    expect(
+      installPlan.value.operations.some(
+        (operation) => operation.kind === "wait-dependency-readiness",
+      ),
+    ).toBe(false);
 
     const bundle = createBlueprintApplicationBundlePlan({ plan: installPlan.value });
     expect(bundle.ok).toBe(true);
@@ -1084,9 +1093,24 @@ describe("Blueprint install plan", () => {
 
     expect(bundle.value.components[0]?.storageMounts).toEqual([
       {
+        storageRequirementId: "data",
         requirementId: "data",
         mountPath: "/app/data",
         mountMode: "read-write",
+      },
+    ]);
+    expect(bundle.value.components[0]?.dependencyBindings).toEqual([]);
+    expect(bundle.value.dependencies).toEqual([]);
+    expect(bundle.value.storageBindings).toEqual([
+      {
+        storageRequirementId: "data",
+        requirementId: "data",
+        kind: "volume",
+        componentId: "app",
+        mountPath: "/app/data",
+        mountMode: "read-write",
+        scope: "storage-volume",
+        attachmentMode: "resource-storage-attachment",
       },
     ]);
     expect(bundle.value.relationships).toEqual(
@@ -1094,6 +1118,7 @@ describe("Blueprint install plan", () => {
         {
           kind: "component-attaches-storage",
           componentId: "app",
+          storageRequirementId: "data",
           requirementId: "data",
           mountPath: "/app/data",
           mountMode: "read-write",
@@ -1106,16 +1131,20 @@ describe("Blueprint install plan", () => {
     });
     expect(projection.components[0]?.storageMounts).toEqual([
       {
+        storageRequirementId: "data",
         dependencyRequirementId: "data",
         mountPath: "/app/data",
         mountMode: "read-write",
         bindingRef: {
-          kind: "dependency-output",
+          kind: "storage-output",
           requirementId: "data",
+          storageRequirementId: "data",
           output: "mountPath",
         },
       },
     ]);
+    expect(projection.components[0]?.dependencyEnv).toEqual([]);
+    expect(projection.components[0]?.dependencyReadinessGates).toEqual([]);
   });
 
   test("[BLUEPRINT-STORAGE-MOUNT-002] rejects storage mounts that do not target volume resources", () => {

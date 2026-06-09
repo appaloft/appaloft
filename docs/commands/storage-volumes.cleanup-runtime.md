@@ -99,12 +99,12 @@ generic-SSH Docker named volumes. The runtime script inspects only the determini
 Appaloft-owned Docker volume name for the selected StorageVolume, blocks active containers and
 active attachment, retained deployment snapshot, rollback-candidate, backup-retention, or in-flight
 backup/restore safety evidence, defaults CLI/API/Web preview requests to dry-run, and never runs
-broad Docker prune commands. The shell default currently reports no storage backup/restore work
-because storage-volume backup/restore operations are outside this cleanup slice; future storage
-backup/restore adapters must feed the same safety reader.
+broad Docker prune commands. The default unsupported provider composition reports no in-flight
+storage backup/restore work unless a concrete storage backup provider registers safety evidence;
+storage backup/restore adapters must feed the same safety reader.
 
-Remaining governed extensions: storage backup/restore work itself, provider-native storage handles
-beyond Docker runtime mounts, and bind-mount source path cleanup policy. GitHub Actions/local
+Remaining governed extensions: concrete storage backup provider smoke evidence, provider-native
+storage handles beyond Docker runtime mounts, and bind-mount source path cleanup policy. GitHub Actions/local
 explicit Swarm and storage-cleanup gates provide real target confidence without making
 target-mutating proofs default local checks. Swarm Compose stack realization and superseded
 stack/service cleanup happen during deployment execution, not through this command.

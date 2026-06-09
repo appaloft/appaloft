@@ -19,6 +19,13 @@ relatedOperations:
   - storage-volumes.rename
   - storage-volumes.delete
   - storage-volumes.cleanup-runtime
+  - storage-volumes.backup-plan
+  - storage-volumes.create-backup
+  - storage-volumes.list-backups
+  - storage-volumes.show-backup
+  - storage-volumes.restore-plan
+  - storage-volumes.restore-backup
+  - storage-volumes.prune-backups
   - resources.attach-storage
   - resources.detach-storage
 sidebar:
@@ -74,11 +81,64 @@ bind-mount source path、provider-native storage handle、备份数据或 broad 
 的 storage mount realization 发生在 deployment execution 里：Appaloft 会为明确 target service 的
 Compose workload 生成 stack override，部署候选 stack，验证后再清理 superseded Appaloft stack/service。
 
+<h2 id="storage-volume-backup-restore">Storage volume 备份和恢复</h2>
+
+Storage volume backup 用来保护挂载在 Resource 上的应用数据，例如 PocketBase 的 `/pb_data`、
+上传目录、JSON 文件或 SQLite 文件。它不是 DependencyResource backup：Postgres、Redis 这类服务依赖
+继续走 `dependency-resources.*`，而 volume 上的 SQLite/application files 走 `storage-volumes.*`
+backup/restore。
+
+备份先预览再执行。预览会选择 source adapter 和 target provider，返回一致性、local-only 提示、
+retention 影响和 blocker；没有安全 adapter/provider 时会 fail closed，不会退回到 live file copy：
+
+```bash title="预览 volume 备份"
+appaloft storage volume backup plan \
+  --storage-volume vol_uploads \
+  --resource res_pocketbase \
+  --destination-path /pb_data \
+  --data-format sqlite \
+  --consistency application-consistent \
+  --target-provider local-filesystem \
+  --target-ref /var/lib/appaloft/backups \
+  --retention-max-count 3 \
+  --retention-min-free-bytes 1073741824
+```
+
+如果 plan 没有 blocker，再创建备份：
+
+```bash title="创建 volume 备份"
+appaloft storage volume backup create \
+  --storage-volume vol_uploads \
+  --destination-path /pb_data \
+  --data-format sqlite \
+  --consistency application-consistent \
+  --target-provider local-filesystem \
+  --target-ref /var/lib/appaloft/backups \
+  --retention-max-count 3 \
+  --retention-min-free-bytes 1073741824
+```
+
+查看、恢复和清理 restore point：
+
+```bash title="管理 volume restore points"
+appaloft storage volume backup list --storage-volume vol_uploads
+appaloft storage volume backup show svb_123
+appaloft storage volume backup restore-plan svb_123
+appaloft storage volume backup restore svb_123 --restored-volume-name pb-data-restored
+appaloft storage volume backup prune svb_123
+```
+
+默认恢复到新的 StorageVolume。把恢复出来的新 volume 挂回 Resource 或替换现有 mount，是单独的显式
+operator 操作。Local filesystem target 只能说明本机/同 failure domain 有一份恢复点，不能当作灾备；
+S3-compatible、WebDAV、Restic repository 或 provider snapshot 需要由 distribution/runtime 注册对应
+target provider 和 secret refs。
+
 <h2 id="storage-volume-surfaces">入口差异</h2>
 
 CLI 适合创建、查看、重命名、删除和 attach/detach。HTTP API 使用相同 command/query schema。
 Web Resource detail 的 Storage 区域可以列出当前项目/环境下可用的 storage volumes，展示安全的
 attachment summaries，创建、重命名、删除 provider-neutral storage volume 记录，并把 storage
 attach/detach 到 Resource profile。Web 也可以对一个 storage volume 和一个 server 执行 dry-run-first
-runtime cleanup：先预览候选项和 blocker，再通过确认操作发送破坏性清理。Web 仍不会
+runtime cleanup：先预览候选项和 blocker，再通过确认操作发送破坏性清理。Web 的 Storage 设置也可以预览
+volume backup、显示 blocker、列出 restore points、恢复到新 volume、清理指定备份。Web 仍不会
 provider-provision storage volume，也不会执行 broad Docker prune。

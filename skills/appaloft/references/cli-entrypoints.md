@@ -46,6 +46,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft preview environment list` - `preview-environments.list`
 - `appaloft preview environment show` - `preview-environments.show`
 - `appaloft preview environment delete` - `preview-environments.delete`
+- `appaloft blueprint list` - `blueprints.list`
+- `appaloft blueprint show` - `blueprints.show`
+- `appaloft blueprint plan-install` - `blueprints.plan-install`
+- `appaloft blueprint install` - `blueprints.install`
+- `appaloft blueprint installation show` - `blueprints.installation.show`
 - `appaloft project create` - `projects.create`
 - `appaloft project list` - `projects.list`
 - `appaloft project count` - `projects.count`
@@ -166,6 +171,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft storage volume rename <storageVolumeId>` - `storage-volumes.rename`
 - `appaloft storage volume delete <storageVolumeId>` - `storage-volumes.delete`
 - `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso> [--dry-run false]` - `storage-volumes.cleanup-runtime`
+- `appaloft storage volume backup plan` - `storage-volumes.backup-plan`
+- `appaloft storage volume backup create` - `storage-volumes.create-backup`
+- `appaloft storage volume backup list --storage-volume <storageVolumeId>` - `storage-volumes.list-backups`
+- `appaloft storage volume backup show <backupId>` - `storage-volumes.show-backup`
+- `appaloft storage volume backup restore-plan <backupId>` - `storage-volumes.restore-plan`
+- `appaloft storage volume backup restore <backupId>` - `storage-volumes.restore-backup`
+- `appaloft storage volume backup prune <backupId>` - `storage-volumes.prune-backups`
 - `appaloft env create` - `environments.create`
 - `appaloft env list` - `environments.list`
 - `appaloft env count` - `environments.count`

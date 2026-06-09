@@ -14,6 +14,7 @@ import {
   type ResourceState,
   type Result,
   SourceBindingFingerprint,
+  StorageVolumeByIdSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
@@ -36,6 +37,7 @@ import {
   type ResourceRepository,
   type ResourceStorageAttachmentSummary,
   type ResourceSummary,
+  type StorageVolumeReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
@@ -246,7 +248,7 @@ function configurationFromResourceState(state: ResourceState): ResourceProfileCo
   }));
 }
 
-function storageAttachmentsFromState(state: ResourceState): ResourceStorageAttachmentSummary[] {
+function baseStorageAttachmentsFromState(state: ResourceState): ResourceStorageAttachmentSummary[] {
   return state.storageAttachments.map((attachment) => ({
     id: attachment.id.value,
     storageVolumeId: attachment.storageVolumeId.value,
@@ -255,6 +257,39 @@ function storageAttachmentsFromState(state: ResourceState): ResourceStorageAttac
     mountMode: attachment.mountMode.value,
     attachedAt: attachment.attachedAt.value,
   }));
+}
+
+async function storageAttachmentsFromState(
+  repositoryContext: ReturnType<typeof toRepositoryContext>,
+  state: ResourceState,
+  storageVolumeReadModel: StorageVolumeReadModel | undefined,
+): Promise<ResourceStorageAttachmentSummary[]> {
+  const attachments = baseStorageAttachmentsFromState(state);
+  if (!storageVolumeReadModel || attachments.length === 0) {
+    return attachments;
+  }
+
+  const attachmentStatesById = new Map(
+    state.storageAttachments.map((attachment) => [attachment.id.value, attachment]),
+  );
+
+  return Promise.all(
+    attachments.map(async (attachment) => {
+      const attachmentState = attachmentStatesById.get(attachment.id);
+      if (!attachmentState) {
+        return attachment;
+      }
+
+      const storageVolume = await storageVolumeReadModel
+        .findOne(repositoryContext, StorageVolumeByIdSpec.create(attachmentState.storageVolumeId))
+        .catch(() => null);
+
+      return {
+        ...attachment,
+        ...(storageVolume?.name ? { storageVolumeName: storageVolume.name } : {}),
+      };
+    }),
+  );
 }
 
 function identityFromState(
@@ -385,6 +420,8 @@ export class ShowResourceQueryService {
     private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.storageVolumeReadModel, { isOptional: true })
+    private readonly storageVolumeReadModel?: StorageVolumeReadModel,
   ) {}
 
   async execute(
@@ -430,7 +467,11 @@ export class ShowResourceQueryService {
       const runtimeProfile = runtimeProfileFromState(state.runtimeProfile);
       const networkProfile = networkProfileFromState(state.networkProfile);
       const accessProfile = accessProfileFromState(state.accessProfile);
-      const storageAttachments = storageAttachmentsFromState(state);
+      const storageAttachments = await storageAttachmentsFromState(
+        repositoryContext,
+        state,
+        this.storageVolumeReadModel,
+      );
       const healthPolicy = healthCheckFromState(state.runtimeProfile?.healthCheck);
       const accessSummary: ResourceAccessSummary | undefined = query.includeAccessSummary
         ? summary?.accessSummary

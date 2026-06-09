@@ -91,6 +91,7 @@ import { memberLifecycleStatusMigration } from "./migrations/082_member_lifecycl
 import * as deploymentTargetVariantsMigration from "./migrations/083_deployment_target_variants";
 import { durableWorkLedgerMigration } from "./migrations/084_durable_work_ledger";
 import { durableWorkerHeartbeatsMigration } from "./migrations/085_durable_worker_heartbeats";
+import { storageVolumeBackupsMigration } from "./migrations/086_storage_volume_backups";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -272,6 +273,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "083_deployment_target_variants": deploymentTargetVariantsMigration,
       "084_durable_work_ledger": durableWorkLedgerMigration,
       "085_durable_worker_heartbeats": durableWorkerHeartbeatsMigration,
+      "086_storage_volume_backups": storageVolumeBackupsMigration,
     };
   }
 }

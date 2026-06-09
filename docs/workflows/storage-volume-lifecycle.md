@@ -118,8 +118,9 @@ Cleanup must be dry-run-first, storage-volume plus server scoped, and must prese
 attachments, active runtimes, retained deployment snapshots, rollback candidates, backup/restore
 blockers, Appaloft state roots, and bind mount source paths. Cleanup safety reads storage backup
 retention and in-flight backup/restore evidence through an application safety reader; the default
-shell implementation reports no such work until storage backup/restore exists. The first runtime
-implementation covers local-shell and generic-SSH Docker named-volume inspection/cleanup. It must
+shell composition reports no such work unless a concrete storage backup provider registers
+evidence. The first runtime implementation covers local-shell and generic-SSH Docker named-volume
+inspection/cleanup. It must
 not run through `servers.capacity.prune`, and it must not be implied by
 `storage-volumes.delete`.
 
@@ -129,7 +130,7 @@ not run through `servers.capacity.prune`, and it must not be implied by
 | --- | --- |
 | CLI | Separate `appaloft storage volume ...` and `appaloft resource storage attach/detach` commands. No generic `storage update`. |
 | oRPC / HTTP | Routes reuse command/query schemas and dispatch through bus. |
-| Web | Resource detail Storage section reads `resources.show.storageAttachments`, lists project/environment storage volumes through `storage-volumes.list`, dispatches `storage-volumes.create/rename/delete`, dispatches `resources.attach-storage` / `resources.detach-storage`, and exposes `storage-volumes.cleanup-runtime` as a dry-run-first server-scoped control with destructive confirmation. |
+| Web | Resource detail Storage section reads `resources.show.storageAttachments`, lists project/environment storage volumes through `storage-volumes.list`, dispatches `storage-volumes.create/rename/delete`, dispatches `resources.attach-storage` / `resources.detach-storage`, exposes `storage-volumes.cleanup-runtime` as a dry-run-first server-scoped control with destructive confirmation, and exposes storage backup plan/artifact/restore-to-new-volume/prune controls through `storageVolumes.backups.*`. |
 | Repository config | `appaloft.yaml` top-level `storage` may declare managed named volumes and workload mount paths. Config deploy dispatches existing storage/query and Resource attachment operations before ids-only `deployments.create`; preview cleanup deletes only provenance-owned ephemeral config storage. |
 | Automation / MCP | Generated tool descriptors map one-to-one to operation keys. |
 

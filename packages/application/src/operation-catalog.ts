@@ -237,10 +237,17 @@ import { publishStaticArtifactArchiveCommandInputSchema } from "./operations/sta
 import { publishStaticArtifactPayloadCommandInputSchema } from "./operations/static-artifacts/publish-static-artifact-payload.command";
 import { cleanupStorageVolumeRuntimeCommandInputSchema } from "./operations/storage-volumes/cleanup-storage-volume-runtime.command";
 import { createStorageVolumeCommandInputSchema } from "./operations/storage-volumes/create-storage-volume.command";
+import { createStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/create-storage-volume-backup.command";
+import { createStorageVolumeBackupPlanQueryInputSchema } from "./operations/storage-volumes/create-storage-volume-backup-plan.query";
+import { createStorageVolumeRestorePlanQueryInputSchema } from "./operations/storage-volumes/create-storage-volume-restore-plan.query";
 import { deleteStorageVolumeCommandInputSchema } from "./operations/storage-volumes/delete-storage-volume.command";
+import { listStorageVolumeBackupsQueryInputSchema } from "./operations/storage-volumes/list-storage-volume-backups.query";
 import { listStorageVolumesQueryInputSchema } from "./operations/storage-volumes/list-storage-volumes.query";
+import { pruneStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/prune-storage-volume-backup.command";
 import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volumes/rename-storage-volume.command";
+import { restoreStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/restore-storage-volume-backup.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
+import { showStorageVolumeBackupQueryInputSchema } from "./operations/storage-volumes/show-storage-volume-backup.query";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
@@ -2609,6 +2616,104 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso> [--dry-run false]",
       orpc: { method: "POST", path: "/api/storage-volumes/{storageVolumeId}/runtime-cleanup" },
+    },
+  },
+  {
+    key: "storage-volumes.backup-plan",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "CreateStorageVolumeBackupPlanQuery",
+    handlerName: "CreateStorageVolumeBackupPlanQueryHandler",
+    serviceName: "CreateStorageVolumeBackupPlanQueryService",
+    inputSchema: createStorageVolumeBackupPlanQueryInputSchema,
+    serviceToken: tokens.createStorageVolumeBackupPlanQueryService,
+    transports: {
+      cli: "appaloft storage volume backup plan",
+      orpc: { method: "POST", path: "/api/storage-volumes/{storageVolumeId}/backups/plan" },
+    },
+  },
+  {
+    key: "storage-volumes.create-backup",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "CreateStorageVolumeBackupCommand",
+    handlerName: "CreateStorageVolumeBackupCommandHandler",
+    serviceName: "CreateStorageVolumeBackupUseCase",
+    inputSchema: createStorageVolumeBackupCommandInputSchema,
+    serviceToken: tokens.createStorageVolumeBackupUseCase,
+    transports: {
+      cli: "appaloft storage volume backup create",
+      orpc: { method: "POST", path: "/api/storage-volumes/{storageVolumeId}/backups" },
+    },
+  },
+  {
+    key: "storage-volumes.list-backups",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ListStorageVolumeBackupsQuery",
+    handlerName: "ListStorageVolumeBackupsQueryHandler",
+    serviceName: "ListStorageVolumeBackupsQueryService",
+    inputSchema: listStorageVolumeBackupsQueryInputSchema,
+    serviceToken: tokens.listStorageVolumeBackupsQueryService,
+    transports: {
+      cli: "appaloft storage volume backup list --storage-volume <storageVolumeId>",
+      orpc: { method: "GET", path: "/api/storage-volumes/{storageVolumeId}/backups" },
+    },
+  },
+  {
+    key: "storage-volumes.show-backup",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ShowStorageVolumeBackupQuery",
+    handlerName: "ShowStorageVolumeBackupQueryHandler",
+    serviceName: "ShowStorageVolumeBackupQueryService",
+    inputSchema: showStorageVolumeBackupQueryInputSchema,
+    serviceToken: tokens.showStorageVolumeBackupQueryService,
+    transports: {
+      cli: "appaloft storage volume backup show <backupId>",
+      orpc: { method: "GET", path: "/api/storage-volume-backups/{backupId}" },
+    },
+  },
+  {
+    key: "storage-volumes.restore-plan",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "CreateStorageVolumeRestorePlanQuery",
+    handlerName: "CreateStorageVolumeRestorePlanQueryHandler",
+    serviceName: "CreateStorageVolumeRestorePlanQueryService",
+    inputSchema: createStorageVolumeRestorePlanQueryInputSchema,
+    serviceToken: tokens.createStorageVolumeRestorePlanQueryService,
+    transports: {
+      cli: "appaloft storage volume backup restore-plan <backupId>",
+      orpc: { method: "POST", path: "/api/storage-volume-backups/{backupId}/restore-plan" },
+    },
+  },
+  {
+    key: "storage-volumes.restore-backup",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "RestoreStorageVolumeBackupCommand",
+    handlerName: "RestoreStorageVolumeBackupCommandHandler",
+    serviceName: "RestoreStorageVolumeBackupUseCase",
+    inputSchema: restoreStorageVolumeBackupCommandInputSchema,
+    serviceToken: tokens.restoreStorageVolumeBackupUseCase,
+    transports: {
+      cli: "appaloft storage volume backup restore <backupId>",
+      orpc: { method: "POST", path: "/api/storage-volume-backups/{backupId}/restore" },
+    },
+  },
+  {
+    key: "storage-volumes.prune-backups",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "PruneStorageVolumeBackupCommand",
+    handlerName: "PruneStorageVolumeBackupCommandHandler",
+    serviceName: "PruneStorageVolumeBackupUseCase",
+    inputSchema: pruneStorageVolumeBackupCommandInputSchema,
+    serviceToken: tokens.pruneStorageVolumeBackupUseCase,
+    transports: {
+      cli: "appaloft storage volume backup prune <backupId>",
+      orpc: { method: "DELETE", path: "/api/storage-volume-backups/{backupId}" },
     },
   },
   {

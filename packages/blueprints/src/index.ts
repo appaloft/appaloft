@@ -1177,6 +1177,12 @@ function isDependencyReadinessCompatible(
   return readinessType === engineFamily;
 }
 
+function isServiceDependencyRequirement(
+  requirement: BlueprintResourceRequirement,
+): requirement is BlueprintResourceRequirement & { readonly kind: BlueprintServiceDependencyKind } {
+  return requirement.kind !== "volume";
+}
+
 function dependencyTemplateOutputNames(
   template: string | undefined,
 ): readonly BlueprintDependencyOutputName[] {
@@ -1229,6 +1235,7 @@ export type BlueprintSecretSource = BlueprintSecretPlaceholder["source"];
 export type BlueprintGeneratedSecretPolicy = NonNullable<BlueprintSecretPlaceholder["generation"]>;
 export type BlueprintResourceRequirement = BlueprintManifest["resources"][number];
 export type BlueprintDependencyKind = BlueprintResourceRequirement["kind"];
+export type BlueprintServiceDependencyKind = Exclude<BlueprintDependencyKind, "volume">;
 export type BlueprintDependencyEngine = NonNullable<BlueprintResourceRequirement["engine"]>;
 export type BlueprintDependencyEngineFamily = (typeof blueprintDependencyEngineFamilies)[number];
 export type BlueprintDependencyVersionRequirement = NonNullable<
@@ -1538,7 +1545,7 @@ export type BlueprintInstallOperation =
       readonly kind: "bind-dependency";
       readonly componentId: string;
       readonly requirementId: string;
-      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly requirementKind: BlueprintServiceDependencyKind;
       readonly engine: BlueprintDependencyEngine;
       readonly version?: BlueprintDependencyVersionRequirement;
       readonly capabilities: readonly BlueprintDependencyCapability[];
@@ -1558,7 +1565,7 @@ export type BlueprintInstallOperation =
       readonly kind: "wait-dependency-readiness";
       readonly componentId: string;
       readonly requirementId: string;
-      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly requirementKind: BlueprintServiceDependencyKind;
       readonly engine: BlueprintDependencyEngine;
       readonly readiness: BlueprintDependencyReadinessRequirement;
       readonly required: boolean;
@@ -1648,7 +1655,7 @@ export interface BlueprintApplicationBundleComponentPlan {
   }[];
   readonly dependencyBindings: readonly {
     readonly requirementId: string;
-    readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly requirementKind: BlueprintServiceDependencyKind;
     readonly engine: BlueprintDependencyEngine;
     readonly version?: BlueprintDependencyVersionRequirement;
     readonly capabilities: readonly BlueprintDependencyCapability[];
@@ -1658,6 +1665,7 @@ export interface BlueprintApplicationBundleComponentPlan {
     readonly env: readonly BlueprintDependencyEnvPlan[];
   }[];
   readonly storageMounts: readonly {
+    readonly storageRequirementId: string;
     readonly requirementId: string;
     readonly mountPath: string;
     readonly mountMode: "read-write" | "read-only";
@@ -1667,7 +1675,7 @@ export interface BlueprintApplicationBundleComponentPlan {
 
 export interface BlueprintApplicationBundleDependencyPlan {
   readonly requirementId: string;
-  readonly kind: BlueprintResourceRequirement["kind"];
+  readonly kind: BlueprintServiceDependencyKind;
   readonly engine: BlueprintDependencyEngine;
   readonly version?: BlueprintDependencyVersionRequirement;
   readonly capabilities: readonly BlueprintDependencyCapability[];
@@ -1676,6 +1684,17 @@ export interface BlueprintApplicationBundleDependencyPlan {
   readonly provisioning?: BlueprintDependencyProvisioningConstraints;
   readonly scope: "dependency-resource";
   readonly bindingMode: "bind-existing-or-provisioned";
+}
+
+export interface BlueprintApplicationBundleStorageBindingPlan {
+  readonly storageRequirementId: string;
+  readonly requirementId: string;
+  readonly kind: "volume";
+  readonly componentId: string;
+  readonly mountPath: string;
+  readonly mountMode: "read-write" | "read-only";
+  readonly scope: "storage-volume";
+  readonly attachmentMode: "resource-storage-attachment";
 }
 
 export type BlueprintApplicationBundleRelationship =
@@ -1692,7 +1711,7 @@ export type BlueprintApplicationBundleRelationship =
       readonly kind: "component-binds-dependency";
       readonly componentId: string;
       readonly requirementId: string;
-      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly requirementKind: BlueprintServiceDependencyKind;
       readonly engine: BlueprintDependencyEngine;
       readonly version?: BlueprintDependencyVersionRequirement;
       readonly capabilities: readonly BlueprintDependencyCapability[];
@@ -1704,6 +1723,7 @@ export type BlueprintApplicationBundleRelationship =
   | {
       readonly kind: "component-attaches-storage";
       readonly componentId: string;
+      readonly storageRequirementId: string;
       readonly requirementId: string;
       readonly mountPath: string;
       readonly mountMode: "read-write" | "read-only";
@@ -1712,7 +1732,7 @@ export type BlueprintApplicationBundleRelationship =
       readonly kind: "component-waits-for-dependency-readiness";
       readonly componentId: string;
       readonly requirementId: string;
-      readonly requirementKind: BlueprintResourceRequirement["kind"];
+      readonly requirementKind: BlueprintServiceDependencyKind;
       readonly engine: BlueprintDependencyEngine;
       readonly readiness: BlueprintDependencyReadinessRequirement;
       readonly required: boolean;
@@ -1734,6 +1754,7 @@ export interface BlueprintApplicationBundlePlan {
   readonly application: BlueprintApplicationBundleIdentity;
   readonly components: readonly BlueprintApplicationBundleComponentPlan[];
   readonly dependencies: readonly BlueprintApplicationBundleDependencyPlan[];
+  readonly storageBindings: readonly BlueprintApplicationBundleStorageBindingPlan[];
   readonly relationships: readonly BlueprintApplicationBundleRelationship[];
   readonly execution: {
     readonly mode: "dry-run-only";
@@ -1802,12 +1823,14 @@ export interface BlueprintComponentRuntimeTelemetryAttachment {
 }
 
 export interface BlueprintComponentRuntimeStorageMount {
+  readonly storageRequirementId: string;
   readonly dependencyRequirementId: string;
   readonly mountPath: string;
   readonly mountMode: "read-write" | "read-only";
   readonly bindingRef: {
-    readonly kind: "dependency-output";
+    readonly kind: "storage-output";
     readonly requirementId: string;
+    readonly storageRequirementId: string;
     readonly output: "mountPath";
   };
 }
@@ -2378,6 +2401,21 @@ function appendComponentSetupOperations(
   for (const requirementId of component.usesResources) {
     const requirement = manifest.resources.find((candidate) => candidate.id === requirementId);
     if (requirement) {
+      if (!isServiceDependencyRequirement(requirement)) {
+        for (const storageMount of component.storageMounts.filter(
+          (mount) => mount.resource === requirement.id,
+        )) {
+          operations.push({
+            kind: "attach-storage",
+            componentId: component.id,
+            requirementId: requirement.id,
+            mountPath: storageMount.mountPath,
+            mountMode: storageMount.mountMode,
+          });
+        }
+        continue;
+      }
+
       const engine = { family: dependencyEngineFamily(requirement), ...(requirement.engine ?? {}) };
       const env = component.dependencyEnv
         .filter((dependencyEnv) => dependencyEnv.resource === requirement.id)
@@ -2402,17 +2440,6 @@ function appendComponentSetupOperations(
         ...(requirement.provisioning ? { provisioning: requirement.provisioning } : {}),
         env,
       });
-      for (const storageMount of component.storageMounts.filter(
-        (mount) => mount.resource === requirement.id,
-      )) {
-        operations.push({
-          kind: "attach-storage",
-          componentId: component.id,
-          requirementId: requirement.id,
-          mountPath: storageMount.mountPath,
-          mountMode: storageMount.mountMode,
-        });
-      }
       for (const readiness of requirement.readiness) {
         dependencyReadinessOperations.push({
           kind: "wait-dependency-readiness",
@@ -2451,7 +2478,7 @@ type MutableBlueprintApplicationBundleComponentPlan = {
   }[];
   dependencyBindings: {
     readonly requirementId: string;
-    readonly requirementKind: BlueprintResourceRequirement["kind"];
+    readonly requirementKind: BlueprintServiceDependencyKind;
     readonly engine: BlueprintDependencyEngine;
     readonly version?: BlueprintDependencyVersionRequirement;
     readonly capabilities: readonly BlueprintDependencyCapability[];
@@ -2461,6 +2488,7 @@ type MutableBlueprintApplicationBundleComponentPlan = {
     readonly env: readonly BlueprintDependencyEnvPlan[];
   }[];
   storageMounts: {
+    readonly storageRequirementId: string;
     readonly requirementId: string;
     readonly mountPath: string;
     readonly mountMode: "read-write" | "read-only";
@@ -2473,6 +2501,7 @@ export function createBlueprintApplicationBundlePlan(
 ): BlueprintApplicationBundlePlanResult {
   const components = new Map<string, MutableBlueprintApplicationBundleComponentPlan>();
   const dependencies = new Map<string, BlueprintApplicationBundleDependencyPlan>();
+  const storageBindings = new Map<string, BlueprintApplicationBundleStorageBindingPlan>();
   const relationships: BlueprintApplicationBundleRelationship[] = [];
 
   for (const operation of input.plan.operations) {
@@ -2593,13 +2622,28 @@ export function createBlueprintApplicationBundlePlan(
         const component = requireApplicationBundleComponent(operation, components);
         if (!component.ok) return component;
         component.value.storageMounts.push({
+          storageRequirementId: operation.requirementId,
           requirementId: operation.requirementId,
           mountPath: operation.mountPath,
           mountMode: operation.mountMode,
         });
+        storageBindings.set(
+          `${operation.componentId}:${operation.requirementId}:${operation.mountPath}`,
+          {
+            storageRequirementId: operation.requirementId,
+            requirementId: operation.requirementId,
+            kind: "volume",
+            componentId: operation.componentId,
+            mountPath: operation.mountPath,
+            mountMode: operation.mountMode,
+            scope: "storage-volume",
+            attachmentMode: "resource-storage-attachment",
+          },
+        );
         relationships.push({
           kind: "component-attaches-storage",
           componentId: operation.componentId,
+          storageRequirementId: operation.requirementId,
           requirementId: operation.requirementId,
           mountPath: operation.mountPath,
           mountMode: operation.mountMode,
@@ -2683,6 +2727,7 @@ export function createBlueprintApplicationBundlePlan(
         storageMounts: [...(component.storageMounts ?? [])],
       })),
       dependencies: [...dependencies.values()],
+      storageBindings: [...storageBindings.values()],
       relationships,
       execution: {
         mode: "dry-run-only",
@@ -2779,13 +2824,15 @@ const blueprintComponentRuntimeTelemetryAttachmentSchema = z
 
 const blueprintComponentRuntimeStorageMountSchema = z
   .object({
+    storageRequirementId: z.string(),
     dependencyRequirementId: z.string(),
     mountPath: z.string(),
     mountMode: blueprintStorageMountModeSchema,
     bindingRef: z
       .object({
-        kind: z.literal("dependency-output"),
+        kind: z.literal("storage-output"),
         requirementId: z.string(),
+        storageRequirementId: z.string(),
         output: z.literal("mountPath"),
       })
       .strict(),
@@ -2958,12 +3005,14 @@ export function createBlueprintComponentRuntimeProjection(
     }
     for (const storageMount of component.storageMounts ?? []) {
       plan.storageMounts.push({
+        storageRequirementId: storageMount.storageRequirementId,
         dependencyRequirementId: storageMount.requirementId,
         mountPath: storageMount.mountPath,
         mountMode: storageMount.mountMode,
         bindingRef: {
-          kind: "dependency-output",
+          kind: "storage-output",
           requirementId: storageMount.requirementId,
+          storageRequirementId: storageMount.storageRequirementId,
           output: "mountPath",
         },
       });
@@ -2985,7 +3034,7 @@ export function createBlueprintComponentRuntimeProjection(
       networkAllows: sortByRelationAndProvider(plan.networkAllows),
       readinessGates: sortByRelationAndProvider(plan.readinessGates),
       telemetryAttachments: sortByRelationAndProvider(plan.telemetryAttachments),
-      storageMounts: sortByDependencyAndMountPath(plan.storageMounts),
+      storageMounts: sortByStorageAndMountPath(plan.storageMounts),
     })),
     warnings,
   };
@@ -3278,14 +3327,12 @@ function sortByDependencyAndReadiness<
   });
 }
 
-function sortByDependencyAndMountPath<
-  T extends { readonly dependencyRequirementId: string; readonly mountPath: string },
+function sortByStorageAndMountPath<
+  T extends { readonly storageRequirementId: string; readonly mountPath: string },
 >(values: readonly T[]): readonly T[] {
   return [...values].sort((left, right) => {
-    const dependencyOrder = left.dependencyRequirementId.localeCompare(
-      right.dependencyRequirementId,
-    );
-    return dependencyOrder === 0 ? left.mountPath.localeCompare(right.mountPath) : dependencyOrder;
+    const storageOrder = left.storageRequirementId.localeCompare(right.storageRequirementId);
+    return storageOrder === 0 ? left.mountPath.localeCompare(right.mountPath) : storageOrder;
   });
 }
 

@@ -10,6 +10,13 @@ This matrix covers Phase 7 storage volume lifecycle and resource attachment base
 - `storage-volumes.rename`
 - `storage-volumes.delete`
 - `storage-volumes.cleanup-runtime`
+- `storage-volumes.backup-plan`
+- `storage-volumes.create-backup`
+- `storage-volumes.list-backups`
+- `storage-volumes.show-backup`
+- `storage-volumes.restore-plan`
+- `storage-volumes.restore-backup`
+- `storage-volumes.prune-backups`
 - `resources.attach-storage`
 - `resources.detach-storage`
 - `resources.show` storage attachment summaries
@@ -17,8 +24,12 @@ This matrix covers Phase 7 storage volume lifecycle and resource attachment base
 ## Global References
 
 - [Storage Volume Lifecycle Workflow](../workflows/storage-volume-lifecycle.md)
+- [ADR-083: Storage Volume, Dependency Resource, And Backup Boundary](../decisions/ADR-083-storage-volume-dependency-resource-and-backup-boundary.md)
 - [Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
 - [Storage Volume Runtime Realization And Cleanup](../specs/070-storage-volume-runtime-realization-and-cleanup/spec.md)
+- [Storage Volume Resource Visibility](../specs/096-storage-volume-resource-visibility/spec.md)
+- [Application Bundle Storage Binding Boundary](../specs/097-application-bundle-storage-binding-boundary/spec.md)
+- [Storage Volume Backup And Restore](../specs/098-storage-volume-backup-restore/spec.md)
 - [Repository Config Storage Graph](../specs/076-repository-config-storage-graph/spec.md)
 - [ADR-064: Storage Volume Runtime Realization And Cleanup](../decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md)
 - [ADR-067: Repository Config Storage Graph](../decisions/ADR-067-repository-config-storage-graph.md)
@@ -64,6 +75,23 @@ This matrix covers Phase 7 storage volume lifecycle and resource attachment base
 | STOR-WEB-001 | Web Resource detail | Entrypoint | Operator opens the Resource Overview storage section. | Web lists project/environment storage volumes, displays current `resources.show` storage attachments, dispatches `resources.attach-storage` and `resources.detach-storage` through shared oRPC clients, and links the public storage-volume docs anchor. It does not provision provider-native volumes or delete provider-native storage. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
 | STOR-WEB-002 | Web Resource detail | Entrypoint | Operator manages provider-neutral storage volume records from the Resource storage section. | Web dispatches `storage-volumes.create`, `storage-volumes.rename`, and `storage-volumes.delete` through shared oRPC clients with i18n text and keeps provider-native provisioning out of the UI. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` covers create route behavior. |
 | STOR-WEB-003 | Web Resource detail | Entrypoint | Operator runs storage runtime cleanup from the Resource storage section. | Web dispatches `storage-volumes.cleanup-runtime` through the shared oRPC client, defaults the operator flow to dry-run preview, and requires destructive confirmation before sending `dryRun = false`. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
+| STOR-VIS-OVERVIEW-001 | Web Resource detail | Entrypoint | Operator opens Resource overview for a Resource with storage attachments such as PocketBase `/pb_data`. | Overview shows mounted storage count, storage volume id/kind, destination path, mount mode, and a Storage settings action. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
+| STOR-VIS-OVERVIEW-002 | `resources.show` | Query/read model | A Resource attachment references a known StorageVolume. | Resource detail returns attachment id, storage volume id/kind/name when available, destination path, mount mode, and attached timestamp; missing volume name does not hide the attachment. | `packages/application/test/show-resource.test.ts` |
+| STOR-VIS-BACKUP-001 | Web Resource detail | Entrypoint | Resource has mounted storage and operator opens Resource storage settings. | UI exposes StorageVolume backup plan, blocker readback, artifact list, restore-to-new-volume, and prune controls through `storageVolumes.backups.*`; it does not route the user to DependencyResource backup actions. | `apps/web/src/lib/console/storage-volume-web.test.ts`; `apps/web/test/e2e-webview/home.webview.test.ts` |
+| STOR-VIS-DEPENDENCY-001 | Docs/i18n | Static | Blueprint or application bundle has a `volume` requirement. | Public docs and UI wording keep volume-backed data under StorageVolume/ResourceStorageAttachment instead of DependencyResource backup. | `docs/specs/096-storage-volume-resource-visibility/spec.md`; `packages/i18n/src/locales/*.ts` |
+| STOR-VIS-MOBILE-001 | Web Resource detail | Browser/manual | Resource overview is opened at a narrow viewport with long storage ids or paths. | Mounted storage rows wrap safely without horizontal overflow. | manual/browser verification when UI layout changes are visually checked |
+| APP-BUNDLE-STORAGE-PLAN-001 | `@appaloft/blueprints` | Package/unit | Blueprint component declares a `volume` requirement and storage mount. | Application bundle exposes storage binding readback separately from dependency bindings. | `packages/blueprints/test/blueprint-install-plan.test.ts` |
+| APP-BUNDLE-STORAGE-PLAN-002 | `@appaloft/blueprints` | Package/unit | Blueprint component declares service dependencies such as Postgres and Redis. | Service requirements remain dependency bindings and do not become StorageBindings. | `packages/blueprints/test/blueprint-install-plan.test.ts` |
+| APP-BUNDLE-STORAGE-PLAN-003 | `@appaloft/blueprints` | Package/unit | Blueprint component lists a `volume` under `usesResources`. | Install plan and bundle plan do not produce `bind-dependency`, dependency readback, dependency readiness wait, or dependency env for the volume. | `packages/blueprints/test/blueprint-install-plan.test.ts` |
+| APP-BUNDLE-STORAGE-RUNTIME-001 | `@appaloft/blueprints` | Package/unit | Runtime projection is generated from a bundle with storage mounts. | Runtime storage mounts expose canonical `storageRequirementId` and storage binding refs while retaining deprecated compatibility aliases. | `packages/blueprints/test/blueprint-install-plan.test.ts` |
+| STOR-BACKUP-PLAN-001 | Storage backup contract | Application/unit + entrypoints | A storage backup plan request declares a source adapter class, target provider, consistency level, and retention policy. | Safe plan reports source adapter, target provider, consistency, local-only status, retention impact, and no secret values through application, CLI, HTTP/oRPC, typed client, and Web surfaces. | `packages/application/test/storage-volume-backup-contract.test.ts`; `packages/application/test/storage-volume-backup-restore.test.ts`; `packages/adapters/cli/test/storage-volume-command.test.ts`; `packages/orpc/test/storage-volume.http.test.ts`; `apps/web/src/lib/console/storage-volume-web.test.ts` |
+| STOR-BACKUP-PLAN-002 | Storage backup contract | Application/unit | Operator requests application-consistent backup for live SQLite data and no compatible source adapter exists. | Plan returns an unsupported consistency blocker instead of falling back to unsafe live file copy. | `packages/application/test/storage-volume-backup-contract.test.ts` |
+| STOR-BACKUP-SQLITE-001 | Storage backup contract | Application/unit | A live SQLite source has an application-consistent source adapter available. | Plan selects the SQLite-aware source adapter and does not silently use generic file copy. | `packages/application/test/storage-volume-backup-contract.test.ts` |
+| STOR-BACKUP-RETENTION-001 | Storage backup contract | Application/unit | Local backup target lacks bounded retention or a free-disk guard. | Plan returns retention/free-disk blockers so local backup cannot grow without guardrails. | `packages/application/test/storage-volume-backup-contract.test.ts` |
+| STOR-BACKUP-CREATE-001 | Storage backup command | Application/unit | Backup execution has compatible fake source and target providers. | Source adapter creates a consistent source result, target provider stores a verified artifact, and the read model returns a ready restore point. | `packages/application/test/storage-volume-backup-restore.test.ts` |
+| STOR-BACKUP-RESTORE-001 | Storage restore command | Application/unit | Operator restores a storage volume backup. | Restore defaults to a new StorageVolume and requires explicit attach/switch before replacing runtime mount. | `packages/application/test/storage-volume-backup-restore.test.ts` |
+| STOR-BACKUP-INPLACE-001 | Storage restore command/query | Application/unit | Operator requests in-place restore. | Restore plan and execution are blocked unless a future destructive restore strategy is explicitly enabled. | `packages/application/test/storage-volume-backup-restore.test.ts` |
+| STOR-BACKUP-ENTRY-001 | CLI/API/Web | Entrypoint | Storage backup commands and routes submitted. | Entrypoints dispatch the shared storage backup command/query schemas and do not call dependency backup APIs. | `packages/adapters/cli/test/storage-volume-command.test.ts`; `packages/orpc/test/storage-volume.http.test.ts`; `apps/web/src/lib/console/storage-volume-web.test.ts` |
 
 ## Required Non-Coverage Assertions
 
@@ -78,7 +106,8 @@ Tests must assert storage commands do not:
 - accept host bind source paths, provider-native handles, or provider accounts from repository
   config;
 - bind or unbind dependency resources;
-- perform backup or restore;
+- perform backup or restore through the current lifecycle operations;
+- route mounted SQLite/application files through DependencyResource backup/restore;
 - expose secrets, credentials, auth headers, cookies, provider tokens, or private keys.
 
 ## Current Implementation Notes And Governed Follow-Ups
@@ -116,9 +145,10 @@ preflight.
 `.github/workflows/storage-cleanup-e2e.yml` runs the same probes from nightly and release; release
 dispatch can set `require_storage_cleanup_e2e=true` to fail closed when the SSH storage-cleanup gate
 is required but target secrets are absent.
-Cleanup safety now has an application-level storage backup safety reader and runtime blocker for
-backup retention or in-flight backup/restore evidence, while the shell default reports no such work
-until storage backup/restore operations exist. Storage backup/restore work itself, bind-mount path
-cleanup policy, and provider-native storage handles beyond Docker runtime mounts are later governed
-provider/storage extensions outside the current provider-neutral create and Docker runtime cleanup
-baseline.
+Cleanup safety now has an application-level and Postgres-backed storage backup safety reader and
+runtime blocker for backup retention or in-flight backup/restore evidence. Storage backup/restore
+operations are active with provider/source extension ports, durable backup artifact readback,
+CLI/API/Web entrypoints, and a safe unsupported default registry. Concrete production providers,
+bind-mount path cleanup policy, and provider-native storage handles beyond Docker runtime mounts
+remain governed provider/storage extensions outside the current provider-neutral create, Docker
+runtime cleanup, and manual backup/restore baseline.
