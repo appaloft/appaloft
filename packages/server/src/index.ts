@@ -1029,7 +1029,7 @@ export async function createAppaloftServer(
         : {}),
     });
 
-    durableWorkRuntimeRunner.start();
+    await durableWorkRuntimeRunner.start();
     certificateRetrySchedulerRunner.start();
     previewExpiryCleanupSchedulerRunner.start();
     previewCleanupRetrySchedulerRunner.start();

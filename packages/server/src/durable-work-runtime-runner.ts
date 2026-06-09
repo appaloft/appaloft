@@ -18,7 +18,7 @@ import {
 } from "@appaloft/application";
 
 export interface DurableWorkRuntimeRunner {
-  start(): void;
+  start(): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -178,7 +178,7 @@ export function createDurableWorkRuntimeRunner(
   }
 
   return {
-    start(): void {
+    async start(): Promise<void> {
       if (input.topology.mode === "disabled" || input.topology.queueBackend !== "database") {
         input.logger.info("durable_work_runtime.drain_skipped", {
           mode: input.topology.mode,
@@ -245,7 +245,7 @@ export function createDurableWorkRuntimeRunner(
 
 export function createDisabledDurableWorkRuntimeRunner(): DurableWorkRuntimeRunner {
   return {
-    start(): void {},
+    async start(): Promise<void> {},
     async stop(): Promise<void> {},
   };
 }

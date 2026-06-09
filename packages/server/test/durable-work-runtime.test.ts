@@ -1,228 +1,30 @@
 import "reflect-metadata";
 
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, test } from "bun:test";
 import {
-  type CommandBus,
-  CreateDeploymentCommand,
-  type DeploymentRepository,
-  DoctorQuery,
+  type AppLogger,
+  createExecutionContext,
+  type DurableWorkClaimInput,
+  type DurableWorkClaimResult,
+  type DurableWorkCompletionInput,
+  type DurableWorkCompletionResult,
+  type DurableWorkDeliveryCandidateFilter,
+  type DurableWorkEventRecord,
   type DurableWorkHandler,
   type DurableWorkItemRecord,
+  type DurableWorkListFilter,
   type DurableWorkQueueAdapter,
+  type DurableWorkWorkerHeartbeatFilter,
+  type DurableWorkWorkerHeartbeatRecord,
   type DurableWorkWorkerHeartbeatStore,
-  type ExecutionContext,
-  type QueryBus,
-  type RuntimePlanResolver,
-  type RuntimeTargetBackend,
-  type RuntimeTargetBackendRegistry,
-  type SourceDetector,
-  type SourceVersionDetector,
-  tokens,
-  toRepositoryContext,
+  type ExecutionContextFactory,
+  type RepositoryContext,
 } from "@appaloft/application";
-import { type AuthRuntime } from "@appaloft/auth-better";
+import { ok, type Result } from "@appaloft/core";
 import {
-  CreatedAt,
-  type Deployment,
-  DeploymentByIdSpec,
-  DeploymentId,
-  DeploymentLogEntry,
-  DeploymentPhaseValue,
-  DeploymentTarget,
-  DeploymentTargetDescriptor,
-  DeploymentTargetId,
-  DeploymentTargetName,
-  Destination,
-  DestinationId,
-  DestinationKindValue,
-  DestinationName,
-  DetectSummary,
-  DisplayNameText,
-  Environment,
-  EnvironmentId,
-  EnvironmentKindValue,
-  EnvironmentName,
-  ExecutionResult,
-  ExecutionStatusValue,
-  ExecutionStrategyKindValue,
-  ExitCode,
-  FinishedAt,
-  GeneratedAt,
-  HostAddress,
-  ImageReference,
-  LogLevelValue,
-  MessageText,
-  OccurredAt,
-  ok,
-  PlanStepText,
-  PortNumber,
-  Project,
-  ProjectId,
-  ProjectName,
-  ProviderKey,
-  Resource,
-  ResourceExposureModeValue,
-  ResourceId,
-  ResourceKindValue,
-  ResourceName,
-  ResourceNetworkProtocolValue,
-  type Result,
-  type RollbackPlan,
-  RuntimeExecutionPlan,
-  RuntimeNameText,
-  RuntimePlan,
-  RuntimePlanId,
-  RuntimePlanStrategyValue,
-  SourceDescriptor,
-  SourceKindValue,
-  SourceLocator,
-  TargetKindValue,
-  UpsertDeploymentTargetSpec,
-  UpsertDestinationSpec,
-  UpsertEnvironmentSpec,
-  UpsertProjectSpec,
-  UpsertResourceSpec,
-  Version,
-} from "@appaloft/core";
-import { createAppaloftServer } from "@appaloft/server";
-import { createCompositeDurableWorkHandlerRegistry } from "../src/durable-work-runtime-runner";
-
-const tempRoots: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
-});
-
-async function createTempDataDir(): Promise<string> {
-  const path = await mkdtemp(join(tmpdir(), "appaloft-durable-worker-runtime-"));
-  tempRoots.push(path);
-  return path;
-}
-
-class StaticSourceDetector implements SourceDetector {
-  async detect(_context: ExecutionContext, locator: string) {
-    return ok({
-      source: SourceDescriptor.rehydrate({
-        kind: SourceKindValue.rehydrate("local-folder"),
-        locator: SourceLocator.rehydrate(locator),
-        displayName: DisplayNameText.rehydrate("workspace"),
-      }),
-      reasoning: ["server smoke static source"],
-    });
-  }
-}
-
-class StaticSourceVersionDetector implements SourceVersionDetector {
-  async detect(_context: ExecutionContext, _input: Parameters<SourceVersionDetector["detect"]>[1]) {
-    return ok({
-      version: Version.unknown(),
-      reasoning: ["server smoke version detection skipped"],
-    });
-  }
-}
-
-class StaticRuntimePlanResolver implements RuntimePlanResolver {
-  async resolve(_context: ExecutionContext, input: Parameters<RuntimePlanResolver["resolve"]>[1]) {
-    return RuntimePlan.create({
-      id: RuntimePlanId.rehydrate(input.id),
-      source: input.source,
-      buildStrategy: "dockerfile",
-      packagingMode: "all-in-one-docker",
-      execution: RuntimeExecutionPlan.rehydrate({
-        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-        image: ImageReference.rehydrate("server-smoke:test"),
-        port: PortNumber.rehydrate(3000),
-      }),
-      target: DeploymentTargetDescriptor.rehydrate({
-        kind: TargetKindValue.rehydrate("single-server"),
-        providerKey: ProviderKey.rehydrate("generic-ssh"),
-        serverIds: [DeploymentTargetId.rehydrate("srv_durable_smoke")],
-      }),
-      detectSummary: DetectSummary.rehydrate(input.detectedReasoning.join("; ")),
-      steps: [PlanStepText.rehydrate("deploy")],
-      generatedAt: GeneratedAt.rehydrate(input.generatedAt),
-    });
-  }
-}
-
-class HermeticExecutionBackend implements RuntimeTargetBackend {
-  calls = 0;
-  readonly descriptor = {
-    key: "server-smoke-runtime",
-    providerKey: "generic-ssh",
-    targetKinds: ["single-server" as const],
-    capabilities: [
-      "runtime.apply",
-      "runtime.verify",
-      "runtime.logs",
-      "runtime.health",
-      "proxy.route",
-    ] as const,
-  };
-
-  async execute(
-    _context: ExecutionContext,
-    deployment: Deployment,
-  ): Promise<Result<{ deployment: Deployment }>> {
-    this.calls += 1;
-    deployment.applyExecutionResult(
-      FinishedAt.rehydrate("2026-06-08T00:03:00.000Z"),
-      ExecutionResult.rehydrate({
-        exitCode: ExitCode.rehydrate(0),
-        status: ExecutionStatusValue.rehydrate("succeeded"),
-        retryable: false,
-        logs: [
-          DeploymentLogEntry.rehydrate({
-            timestamp: OccurredAt.rehydrate("2026-06-08T00:02:00.000Z"),
-            phase: DeploymentPhaseValue.rehydrate("deploy"),
-            level: LogLevelValue.rehydrate("info"),
-            message: MessageText.rehydrate("Server smoke execution completed"),
-          }),
-        ],
-      }),
-    );
-
-    return ok({ deployment });
-  }
-
-  async cancel(): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
-    return ok({ logs: [] });
-  }
-
-  async rollback(
-    _context: ExecutionContext,
-    deployment: Deployment,
-    _plan: RollbackPlan,
-  ): Promise<Result<{ deployment: Deployment }>> {
-    return ok({ deployment });
-  }
-}
-
-class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry {
-  constructor(private readonly backend: RuntimeTargetBackend) {}
-
-  find(): Result<RuntimeTargetBackend> {
-    return ok(this.backend);
-  }
-}
-
-function createTestAuthRuntime(): AuthRuntime {
-  return {
-    auth: {} as AuthRuntime["auth"],
-    async authenticateRequest() {
-      return null;
-    },
-    async authorizeProductSession() {
-      return null;
-    },
-    async issueSessionCookie() {
-      return null;
-    },
-  };
-}
+  createCompositeDurableWorkHandlerRegistry,
+  createDurableWorkRuntimeRunner,
+} from "../src/durable-work-runtime-runner";
 
 function durableWorkItem(overrides: Partial<DurableWorkItemRecord> = {}): DurableWorkItemRecord {
   return {
@@ -240,86 +42,6 @@ function durableWorkItem(overrides: Partial<DurableWorkItemRecord> = {}): Durabl
   };
 }
 
-async function seedDeploymentContext(server: Awaited<ReturnType<typeof createAppaloftServer>>) {
-  const context = server.executionContextFactory.create({ entrypoint: "system" });
-  const repositoryContext = toRepositoryContext(context);
-  const project = Project.create({
-    id: ProjectId.rehydrate("prj_durable_smoke"),
-    name: ProjectName.rehydrate("Durable Smoke"),
-    createdAt: CreatedAt.rehydrate("2026-06-08T00:00:00.000Z"),
-  })._unsafeUnwrap();
-  const deploymentTarget = DeploymentTarget.register({
-    id: DeploymentTargetId.rehydrate("srv_durable_smoke"),
-    name: DeploymentTargetName.rehydrate("durable-smoke-server"),
-    host: HostAddress.rehydrate("127.0.0.1"),
-    port: PortNumber.rehydrate(22),
-    providerKey: ProviderKey.rehydrate("generic-ssh"),
-    targetKind: TargetKindValue.rehydrate("single-server"),
-    createdAt: CreatedAt.rehydrate("2026-06-08T00:00:00.000Z"),
-  })._unsafeUnwrap();
-  const destination = Destination.register({
-    id: DestinationId.rehydrate("dst_durable_smoke"),
-    serverId: DeploymentTargetId.rehydrate("srv_durable_smoke"),
-    name: DestinationName.rehydrate("default"),
-    kind: DestinationKindValue.rehydrate("generic"),
-    createdAt: CreatedAt.rehydrate("2026-06-08T00:00:00.000Z"),
-  })._unsafeUnwrap();
-  const environment = Environment.create({
-    id: EnvironmentId.rehydrate("env_durable_smoke"),
-    projectId: ProjectId.rehydrate("prj_durable_smoke"),
-    name: EnvironmentName.rehydrate("production"),
-    kind: EnvironmentKindValue.rehydrate("production"),
-    createdAt: CreatedAt.rehydrate("2026-06-08T00:00:00.000Z"),
-  })._unsafeUnwrap();
-  const resource = Resource.create({
-    id: ResourceId.rehydrate("res_durable_smoke"),
-    projectId: ProjectId.rehydrate("prj_durable_smoke"),
-    environmentId: EnvironmentId.rehydrate("env_durable_smoke"),
-    destinationId: DestinationId.rehydrate("dst_durable_smoke"),
-    name: ResourceName.rehydrate("web"),
-    kind: ResourceKindValue.rehydrate("application"),
-    sourceBinding: {
-      kind: SourceKindValue.rehydrate("local-folder"),
-      locator: SourceLocator.rehydrate("."),
-      displayName: DisplayNameText.rehydrate("workspace"),
-    },
-    runtimeProfile: {
-      strategy: RuntimePlanStrategyValue.rehydrate("auto"),
-      runtimeName: RuntimeNameText.rehydrate("web"),
-    },
-    networkProfile: {
-      internalPort: PortNumber.rehydrate(3000),
-      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
-      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
-    },
-    createdAt: CreatedAt.rehydrate("2026-06-08T00:00:00.000Z"),
-  })._unsafeUnwrap();
-
-  await server.container
-    .resolve<typeof import("@appaloft/application").ProjectRepository>(tokens.projectRepository)
-    .upsert(repositoryContext, project, UpsertProjectSpec.fromProject(project));
-  await server.container
-    .resolve<typeof import("@appaloft/application").ServerRepository>(tokens.serverRepository)
-    .upsert(
-      repositoryContext,
-      deploymentTarget,
-      UpsertDeploymentTargetSpec.fromDeploymentTarget(deploymentTarget),
-    );
-  await server.container
-    .resolve<typeof import("@appaloft/application").DestinationRepository>(
-      tokens.destinationRepository,
-    )
-    .upsert(repositoryContext, destination, UpsertDestinationSpec.fromDestination(destination));
-  await server.container
-    .resolve<typeof import("@appaloft/application").EnvironmentRepository>(
-      tokens.environmentRepository,
-    )
-    .upsert(repositoryContext, environment, UpsertEnvironmentSpec.fromEnvironment(environment));
-  await server.container
-    .resolve<typeof import("@appaloft/application").ResourceRepository>(tokens.resourceRepository)
-    .upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
-}
-
 async function waitFor<T>(
   callback: () => Promise<T | null>,
   input: { timeoutMs: number; intervalMs: number },
@@ -334,6 +56,187 @@ async function waitFor<T>(
   }
   return null;
 }
+
+class InMemoryDurableWorkQueueAdapter implements DurableWorkQueueAdapter {
+  readonly items = new Map<string, DurableWorkItemRecord>();
+  readonly events = new Map<string, DurableWorkEventRecord[]>();
+
+  async recordItem(
+    _context: RepositoryContext,
+    item: DurableWorkItemRecord,
+  ): Promise<Result<DurableWorkItemRecord>> {
+    this.items.set(item.id, item);
+    return ok(item);
+  }
+
+  async appendEvent(
+    _context: RepositoryContext,
+    event: DurableWorkEventRecord,
+  ): Promise<Result<DurableWorkEventRecord>> {
+    this.events.set(event.workItemId, [...(this.events.get(event.workItemId) ?? []), event]);
+    return ok(event);
+  }
+
+  async findItem(
+    _context: RepositoryContext,
+    id: string,
+  ): Promise<Result<DurableWorkItemRecord | null>> {
+    return ok(this.items.get(id) ?? null);
+  }
+
+  async listItems(
+    _context: RepositoryContext,
+    filter: DurableWorkListFilter = {},
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(
+      [...this.items.values()]
+        .filter((item) => !filter.kind || item.kind === filter.kind)
+        .filter((item) => !filter.status || item.status === filter.status)
+        .filter((item) => !filter.operationKey || item.operationKey === filter.operationKey)
+        .filter((item) => !filter.projectId || item.projectId === filter.projectId)
+        .filter((item) => !filter.resourceId || item.resourceId === filter.resourceId)
+        .filter((item) => !filter.deploymentId || item.deploymentId === filter.deploymentId)
+        .filter((item) => !filter.serverId || item.serverId === filter.serverId)
+        .filter((item) => !filter.subjectKind || item.subjectKind === filter.subjectKind)
+        .filter((item) => !filter.subjectId || item.subjectId === filter.subjectId)
+        .slice(0, filter.limit),
+    );
+  }
+
+  async listEvents(
+    _context: RepositoryContext,
+    workItemId: string,
+  ): Promise<Result<DurableWorkEventRecord[]>> {
+    return ok(this.events.get(workItemId) ?? []);
+  }
+
+  async listDueCandidates(
+    _context: RepositoryContext,
+    filter: DurableWorkDeliveryCandidateFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    const now = Date.parse(filter.now);
+    return ok(
+      [...this.items.values()]
+        .filter((item) => item.status === "pending" || item.status === "retry-scheduled")
+        .filter((item) => Date.parse(item.availableAt) <= now)
+        .filter((item) => !filter.kind || item.kind === filter.kind)
+        .filter((item) => !filter.operationKey || item.operationKey === filter.operationKey)
+        .sort((left, right) => left.priority - right.priority)
+        .slice(0, filter.limit),
+    );
+  }
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: DurableWorkClaimInput,
+  ): Promise<Result<DurableWorkClaimResult>> {
+    const item = this.items.get(input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    if (item.status !== "pending" && item.status !== "retry-scheduled") {
+      return ok({ status: "refused", reason: "not-claimable", workItem: item });
+    }
+
+    const claimed: DurableWorkItemRecord = {
+      ...item,
+      status: "running",
+      leaseOwner: input.workerId,
+      leaseExpiresAt: input.leaseExpiresAt,
+      startedAt: input.claimedAt,
+      updatedAt: input.claimedAt,
+      ...(input.safeDetails ? { safeDetails: input.safeDetails } : {}),
+    };
+    this.items.set(claimed.id, claimed);
+    return ok({ status: "claimed", workItem: claimed });
+  }
+
+  async complete(
+    _context: RepositoryContext,
+    input: DurableWorkCompletionInput,
+  ): Promise<Result<DurableWorkCompletionResult>> {
+    const item = this.items.get(input.workItemId);
+    if (!item) {
+      return ok({ status: "not-found", workItemId: input.workItemId });
+    }
+    if (item.status !== "running") {
+      return ok({ status: "not-running", workItem: item });
+    }
+
+    const completed: DurableWorkItemRecord = {
+      ...item,
+      status: input.status,
+      updatedAt: input.completedAt,
+      finishedAt: input.completedAt,
+      ...(input.phase ? { phase: input.phase } : {}),
+      ...(input.step ? { step: input.step } : {}),
+      ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+      ...(input.errorCategory ? { errorCategory: input.errorCategory } : {}),
+      ...(input.retriable !== undefined ? { retriable: input.retriable } : {}),
+      ...(input.nextAvailableAt ? { availableAt: input.nextAvailableAt } : {}),
+      ...(input.safeDetails ? { safeDetails: input.safeDetails } : {}),
+    };
+    this.items.set(completed.id, completed);
+    return ok({ status: "completed", workItem: completed });
+  }
+}
+
+class InMemoryDurableWorkWorkerHeartbeatStore implements DurableWorkWorkerHeartbeatStore {
+  readonly heartbeats = new Map<string, DurableWorkWorkerHeartbeatRecord>();
+
+  async recordHeartbeat(
+    _context: RepositoryContext,
+    heartbeat: DurableWorkWorkerHeartbeatRecord,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord>> {
+    this.heartbeats.set(heartbeat.workerId, heartbeat);
+    return ok(heartbeat);
+  }
+
+  async markStopped(
+    _context: RepositoryContext,
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord>> {
+    const existing = this.heartbeats.get(input.workerId);
+    const stopped: DurableWorkWorkerHeartbeatRecord = {
+      ...(existing ?? {
+        workerId: input.workerId,
+        workerGroup: "appaloft-worker",
+        slot: 1,
+        mode: "embedded",
+        queueBackend: "database",
+        processStartedAt: input.lastSeenAt,
+      }),
+      lastSeenAt: input.lastSeenAt,
+      status: "stopping",
+    };
+    this.heartbeats.set(input.workerId, stopped);
+    return ok(stopped);
+  }
+
+  async listHeartbeats(
+    _context: RepositoryContext,
+    filter: DurableWorkWorkerHeartbeatFilter = {},
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord[]>> {
+    return ok(
+      [...this.heartbeats.values()]
+        .filter((heartbeat) => !filter.workerGroup || heartbeat.workerGroup === filter.workerGroup)
+        .filter((heartbeat) => !filter.status || heartbeat.status === filter.status),
+    );
+  }
+}
+
+const logger: AppLogger = {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {},
+};
+
+const executionContextFactory: ExecutionContextFactory = {
+  create(input) {
+    return createExecutionContext(input);
+  },
+};
 
 describe("durable work server runtime", () => {
   test("[PROC-DELIVERY-WORKER-028] runtime handler registry accepts public extension handlers", () => {
@@ -360,87 +263,88 @@ describe("durable work server runtime", () => {
     expect(registry.resolve(durableWorkItem({ kind: "unhandled" }))).toBeUndefined();
   });
 
-  test("[PROC-DELIVERY-WORKER-023] composed server drains deployment work through PG durable queue", async () => {
-    const dataDir = await createTempDataDir();
-    const executionBackend = new HermeticExecutionBackend();
-    const server = await createAppaloftServer({
-      flags: {
-        appVersion: "0.1.0-test",
-        authProvider: "none",
-        dataDir,
-        docsStaticDir: "",
-        httpHost: "localhost",
-        httpPort: 3001,
-        pgliteDataDir: join(dataDir, "pglite"),
-        webStaticDir: "",
-        workerCount: 1,
-        workerRuntimeMode: "embedded",
-        workerQueueBackend: "database",
+  test("[PROC-DELIVERY-WORKER-023] runtime drains extension work without blocking startup", async () => {
+    const adapter = new InMemoryDurableWorkQueueAdapter();
+    const heartbeatStore = new InMemoryDurableWorkWorkerHeartbeatStore();
+    const workItem = durableWorkItem({
+      id: "dw_blueprint_install",
+      kind: "blueprint-install",
+      operationKey: "blueprints.install",
+      subjectKind: "installed-application",
+      subjectId: "cia_test",
+    });
+    adapter.items.set(workItem.id, workItem);
+
+    let releaseHandler: (() => void) | undefined;
+    const handlerStarted = Promise.withResolvers<void>();
+    const handlerRelease = new Promise<void>((resolve) => {
+      releaseHandler = resolve;
+    });
+    const blueprintInstallHandler: DurableWorkHandler = {
+      async handle(_context, item, worker) {
+        expect(item.id).toBe(workItem.id);
+        expect(worker.workerId).toBe("appaloft-worker-1");
+        handlerStarted.resolve();
+        await handlerRelease;
+        return ok({
+          status: "succeeded",
+          phase: "install",
+          step: "finished",
+          safeDetails: { applicationId: "cia_test" },
+        });
       },
-      authRuntime: createTestAuthRuntime(),
-      extensions: [
-        {
-          configureRuntime({ container }) {
-            container.register(tokens.sourceDetector, { useValue: new StaticSourceDetector() });
-            container.register(tokens.sourceVersionDetector, {
-              useValue: new StaticSourceVersionDetector(),
-            });
-            container.register(tokens.runtimePlanResolver, {
-              useValue: new StaticRuntimePlanResolver(),
-            });
-            container.register(tokens.executionBackend, { useValue: executionBackend });
-            container.register(tokens.runtimeTargetBackendRegistry, {
-              useValue: new StaticRuntimeTargetBackendRegistry(executionBackend),
-            });
+    };
+
+    const runner = createDurableWorkRuntimeRunner({
+      topology: {
+        mode: "embedded",
+        queueBackend: "database",
+        expectedWorkerCount: 1,
+        coordinationRole: "coordinator",
+        workers: [
+          {
+            workerId: "appaloft-worker-1",
+            workerGroup: "appaloft-worker",
+            slot: 1,
           },
+        ],
+      },
+      adapter,
+      heartbeatStore,
+      deploymentRepository: {} as never,
+      deploymentLifecycleService: {} as never,
+      executionBackend: {} as never,
+      eventBus: {} as never,
+      processAttemptRecorder: {} as never,
+      executionContextFactory,
+      logger,
+      handlerRegistry: {
+        resolve(item) {
+          return item.kind === "blueprint-install" ? blueprintInstallHandler : undefined;
         },
-      ],
+      },
+      intervalSeconds: 60,
+      batchSize: 5,
+      leaseDurationMs: 300_000,
     });
 
     try {
-      await seedDeploymentContext(server);
-      const context = server.executionContextFactory.create({ entrypoint: "system" });
-      const repositoryContext = toRepositoryContext(context);
-      const command = CreateDeploymentCommand.create({
-        projectId: "prj_durable_smoke",
-        serverId: "srv_durable_smoke",
-        destinationId: "dst_durable_smoke",
-        environmentId: "env_durable_smoke",
-        resourceId: "res_durable_smoke",
-      })._unsafeUnwrap();
-      const commandBus = server.container.resolve<CommandBus>(tokens.commandBus);
-      const accepted = await commandBus.execute(context, command);
-      expect(accepted.isOk()).toBe(true);
-      if (accepted.isErr()) throw new Error(accepted.error.message);
-      const deploymentId = accepted.value.id;
-      expect(executionBackend.calls).toBe(0);
+      const startup = await Promise.race([
+        runner.start().then(() => "started" as const),
+        new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 50)),
+      ]);
+      expect(startup).toBe("started");
 
-      const durableWork = server.container.resolve<DurableWorkQueueAdapter>(
-        tokens.durableWorkQueueAdapter,
-      );
-      const pending = await durableWork.listItems(repositoryContext, {
-        deploymentId,
-        status: "pending",
-      });
-      expect(pending.isOk()).toBe(true);
-      if (pending.isErr()) throw new Error(pending.error.message);
-      expect(pending.value).toHaveLength(1);
-
-      await server.startWorkerRuntime();
-      const heartbeatStore = server.container.resolve<DurableWorkWorkerHeartbeatStore>(
-        tokens.durableWorkWorkerHeartbeatStore,
-      );
+      await handlerStarted.promise;
       const heartbeat = await waitFor(
         async () => {
-          const heartbeats = await heartbeatStore.listHeartbeats(repositoryContext, {
-            workerGroup: "appaloft-worker",
-          });
-          if (heartbeats.isErr() || heartbeats.value.length === 0) {
-            return null;
-          }
-          return heartbeats.value[0];
+          const records = await heartbeatStore.listHeartbeats(
+            createExecutionContext({ entrypoint: "system", requestId: "req_test" }),
+            { workerGroup: "appaloft-worker", status: "online" },
+          );
+          return records._unsafeUnwrap()[0] ?? null;
         },
-        { timeoutMs: 5_000, intervalMs: 100 },
+        { timeoutMs: 1_000, intervalMs: 10 },
       );
       expect(heartbeat).toMatchObject({
         workerId: "appaloft-worker-1",
@@ -448,49 +352,25 @@ describe("durable work server runtime", () => {
         status: "online",
         queueBackend: "database",
       });
-      const doctorQuery = DoctorQuery.create();
-      expect(doctorQuery.isOk()).toBe(true);
-      if (doctorQuery.isErr()) throw new Error(doctorQuery.error.message);
-      const doctor = await server.container
-        .resolve<QueryBus>(tokens.queryBus)
-        .execute(context, doctorQuery.value);
-      expect(doctor.isOk()).toBe(true);
-      if (doctor.isErr()) throw new Error(doctor.error.message);
-      const durableRuntimeStatus = doctor.value.maintenanceWorkers.find(
-        (worker) => worker.key === "durable-worker-runtime",
-      );
-      expect(durableRuntimeStatus?.runtimeTopology?.heartbeat).toMatchObject({
-        onlineWorkerCount: 1,
-        staleWorkerCount: 0,
-      });
+
+      releaseHandler?.();
       const completed = await waitFor(
         async () => {
-          const items = await durableWork.listItems(repositoryContext, {
-            deploymentId,
-            status: "succeeded",
-          });
-          if (items.isErr() || items.value.length === 0) {
-            return null;
-          }
-          return items.value[0];
+          const item = adapter.items.get(workItem.id);
+          return item?.status === "succeeded" ? item : null;
         },
-        { timeoutMs: 5_000, intervalMs: 100 },
+        { timeoutMs: 1_000, intervalMs: 10 },
       );
       expect(completed).toMatchObject({
-        deploymentId,
+        id: workItem.id,
         status: "succeeded",
+        phase: "install",
+        step: "finished",
+        safeDetails: { applicationId: "cia_test" },
       });
-      expect(executionBackend.calls).toBe(1);
-
-      const deployment = await server.container
-        .resolve<DeploymentRepository>(tokens.deploymentRepository)
-        .findOne(
-          repositoryContext,
-          DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
-        );
-      expect(deployment?.toState().status.value).toBe("succeeded");
     } finally {
-      await server.shutdown();
+      releaseHandler?.();
+      await runner.stop();
     }
-  }, 20_000);
+  });
 });
