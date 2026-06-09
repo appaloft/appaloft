@@ -193,8 +193,11 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft logs <deploymentId>` - `deployments.logs`
 - `appaloft deployments logs prune --before <iso>` - `deployments.logs.prune`
 - `appaloft deployments events <deploymentId>` - `deployments.stream-events`
+- `appaloft deployments events <deploymentId> --follow --json` - `deployments.stream-events`
 - `appaloft work list` - `operator-work.list`
 - `appaloft work show <workId>` - `operator-work.show`
+- `appaloft work events <workId> --follow --json` - `operator-work.stream-events`
+- `appaloft work watch <workId> --json` - `operator-work.stream-events`
 - `appaloft work mark-recovered <workId>` - `operator-work.mark-recovered`
 - `appaloft work dead-letter <workId>` - `operator-work.dead-letter`
 - `appaloft work cancel <workId>` - `operator-work.cancel`

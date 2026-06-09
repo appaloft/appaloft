@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +28,9 @@ async function collectProcessOutput(child: ReturnType<typeof spawn>) {
 
 describe("Appaloft skill eval suite", () => {
   test("[APPALOFT-SKILL-EVAL-001] evals cover core Appaloft docs and operation families", () => {
+    const suite = JSON.parse(readFileSync("skills/appaloft/evals/evals.json", "utf8")) as {
+      evals: unknown[];
+    };
     const result = spawnSync("bun", ["run", "scripts/validate-appaloft-skill-evals.ts"], {
       cwd: repositoryRoot,
       encoding: "utf8",
@@ -34,7 +38,7 @@ describe("Appaloft skill eval suite", () => {
 
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Validated 24 Appaloft skill evals");
+    expect(result.stdout).toContain(`Validated ${suite.evals.length} Appaloft skill evals`);
   });
 
   test("[APPALOFT-SKILL-EVAL-002] eval suite is grounded in current operation catalog keys", async () => {
