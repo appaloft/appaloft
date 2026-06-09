@@ -69,6 +69,8 @@ describe("RuntimeServerRuntimePreparer", () => {
     expect(calls[0]?.args.join(" ")).toContain("docker version");
     expect(calls[0]?.args.join(" ")).toContain("APPALOFT_DOCKER_PREPARE apt-bootstrap");
     expect(calls[0]?.args.join(" ")).toContain("install -y docker-ce");
+    expect(calls[0]?.args.join(" ")).toContain('CODENAME="${VERSION_CODENAME:-}"');
+    expect(calls[0]?.args.join(" ")).not.toContain("\\${VERSION_CODENAME:-}");
   });
 
   test("marks unsupported providers as failed instead of pretending readiness", async () => {
