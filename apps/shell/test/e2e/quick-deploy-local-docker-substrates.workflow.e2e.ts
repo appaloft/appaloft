@@ -7,7 +7,6 @@ import {
   createShellE2eWorkspace,
   dockerName,
   expectCliSuccess,
-  externalServerDatabaseEnv,
   fixturePath,
   parseJson,
   reservePort,
@@ -47,7 +46,6 @@ describe("quick deploy local Docker substrate e2e", () => {
     const workspace = createShellE2eWorkspace("appaloft-local-docker-substrates-", {
       appVersion: "0.1.0-quick-deploy-local-docker-substrates-e2e",
       env: {
-        ...externalServerDatabaseEnv(),
         APPALOFT_COMPOSE_SMOKE_IMAGE: prebuiltImage,
       },
     });
