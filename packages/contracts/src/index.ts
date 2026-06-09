@@ -4867,6 +4867,8 @@ export const listDeploymentsResponseSchema = z.object({
 
 export const operatorWorkKindSchema = z.enum([
   "deployment",
+  "quick-deploy",
+  "blueprint-install",
   "proxy-bootstrap",
   "certificate",
   "remote-state",
@@ -4918,6 +4920,20 @@ export const operatorWorkItemSchema = z.object({
   safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
 });
 
+export const operatorWorkEventSchema = z.object({
+  id: z.string(),
+  sequence: z.number().int().positive(),
+  kind: z.string(),
+  status: operatorWorkStatusSchema.optional(),
+  phase: z.string().optional(),
+  step: z.string().optional(),
+  message: z.string().optional(),
+  workerId: z.string().optional(),
+  workerGroup: z.string().optional(),
+  occurredAt: z.string(),
+  safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
+});
+
 export const listOperatorWorkResponseSchema = z.object({
   schemaVersion: z.literal("operator-work.list/v1"),
   items: z.array(operatorWorkItemSchema),
@@ -4927,6 +4943,7 @@ export const listOperatorWorkResponseSchema = z.object({
 export const showOperatorWorkResponseSchema = z.object({
   schemaVersion: z.literal("operator-work.show/v1"),
   item: operatorWorkItemSchema,
+  events: z.array(operatorWorkEventSchema).optional(),
   generatedAt: z.string(),
 });
 
@@ -6116,10 +6133,12 @@ export const listPluginsResponseSchema = z.object({
 export const maintenanceWorkerActivationSchema = z.enum([
   "disabled-by-config",
   "starts-with-backend-service",
+  "starts-as-standalone-process",
 ]);
 
 export const maintenanceWorkerSafetyModeSchema = z.enum([
   "certificate-retry",
+  "durable-process-delivery",
   "preview-expiry-cleanup",
   "preview-cleanup-retry",
   "runtime-execution",
@@ -6128,9 +6147,38 @@ export const maintenanceWorkerSafetyModeSchema = z.enum([
   "read-only-collection",
 ]);
 
+export const maintenanceWorkerRuntimeTopologySchema = z.object({
+  mode: z.enum(["embedded", "standalone", "disabled"]),
+  queueBackend: z.enum(["database", "external"]),
+  workerCount: z.number().int().nonnegative(),
+  workerGroup: z.string(),
+  workerIds: z.array(z.string()),
+  coordinationRole: z.enum(["coordinator", "worker", "disabled"]),
+  externalBackendKind: z.enum(["kafka", "temporal", "custom"]).optional(),
+  heartbeat: z
+    .object({
+      staleAfterSeconds: z.number().int().positive(),
+      onlineWorkerCount: z.number().int().nonnegative(),
+      staleWorkerCount: z.number().int().nonnegative(),
+      lastSeenAt: z.string().optional(),
+      workers: z.array(
+        z.object({
+          workerId: z.string(),
+          workerGroup: z.string(),
+          slot: z.number().int().nonnegative(),
+          status: z.enum(["online", "stopping"]),
+          online: z.boolean(),
+          lastSeenAt: z.string(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
 export const maintenanceWorkerStatusSchema = z.object({
   key: z.enum([
     "certificate-retry-scheduler",
+    "durable-worker-runtime",
     "preview-expiry-cleanup-scheduler",
     "preview-cleanup-retry-scheduler",
     "scheduled-task-runner",
@@ -6142,10 +6190,11 @@ export const maintenanceWorkerStatusSchema = z.object({
   enabled: z.boolean(),
   activation: maintenanceWorkerActivationSchema,
   safetyMode: maintenanceWorkerSafetyModeSchema,
-  intervalSeconds: z.number().int().positive(),
+  intervalSeconds: z.number().int().nonnegative(),
   batchSize: z.number().int().positive().optional(),
   defaultRetryDelaySeconds: z.number().int().positive().optional(),
   rawRetentionHours: z.number().int().positive().optional(),
+  runtimeTopology: maintenanceWorkerRuntimeTopologySchema.optional(),
   configurationKeys: z.array(z.string()),
   operationKeys: z.array(z.string()),
 });
@@ -6717,6 +6766,7 @@ export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
 export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;
 export type OperatorWorkNextAction = z.infer<typeof operatorWorkNextActionSchema>;
 export type OperatorWorkItem = z.infer<typeof operatorWorkItemSchema>;
+export type OperatorWorkEvent = z.infer<typeof operatorWorkEventSchema>;
 export type ListOperatorWorkResponse = z.infer<typeof listOperatorWorkResponseSchema>;
 export type ShowOperatorWorkResponse = z.infer<typeof showOperatorWorkResponseSchema>;
 export type RetryOperatorWorkResponse = z.infer<typeof retryOperatorWorkResponseSchema>;

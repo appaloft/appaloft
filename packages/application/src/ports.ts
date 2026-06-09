@@ -141,6 +141,7 @@ export interface EventBus {
 
 export type MaintenanceWorkerKey =
   | "certificate-retry-scheduler"
+  | "durable-worker-runtime"
   | "preview-expiry-cleanup-scheduler"
   | "preview-cleanup-retry-scheduler"
   | "scheduled-task-runner"
@@ -148,16 +149,48 @@ export type MaintenanceWorkerKey =
   | "scheduled-history-retention-runner"
   | "runtime-monitoring-collector-runner";
 
-export type MaintenanceWorkerActivation = "disabled-by-config" | "starts-with-backend-service";
+export type MaintenanceWorkerActivation =
+  | "disabled-by-config"
+  | "starts-with-backend-service"
+  | "starts-as-standalone-process";
 
 export type MaintenanceWorkerSafetyMode =
   | "certificate-retry"
+  | "durable-process-delivery"
   | "preview-expiry-cleanup"
   | "preview-cleanup-retry"
   | "runtime-execution"
   | "policy-gated-prune"
   | "policy-gated-retention"
   | "read-only-collection";
+
+export interface MaintenanceWorkerRuntimeTopology {
+  mode: "embedded" | "standalone" | "disabled";
+  queueBackend: "database" | "external";
+  workerCount: number;
+  workerGroup: string;
+  workerIds: string[];
+  coordinationRole: "coordinator" | "worker" | "disabled";
+  externalBackendKind?: "kafka" | "temporal" | "custom";
+  heartbeat?: MaintenanceWorkerRuntimeHeartbeat;
+}
+
+export interface MaintenanceWorkerRuntimeHeartbeatWorker {
+  workerId: string;
+  workerGroup: string;
+  slot: number;
+  status: "online" | "stopping";
+  online: boolean;
+  lastSeenAt: string;
+}
+
+export interface MaintenanceWorkerRuntimeHeartbeat {
+  staleAfterSeconds: number;
+  onlineWorkerCount: number;
+  staleWorkerCount: number;
+  lastSeenAt?: string;
+  workers: MaintenanceWorkerRuntimeHeartbeatWorker[];
+}
 
 export interface MaintenanceWorkerStatus {
   key: MaintenanceWorkerKey;
@@ -169,12 +202,13 @@ export interface MaintenanceWorkerStatus {
   batchSize?: number;
   defaultRetryDelaySeconds?: number;
   rawRetentionHours?: number;
+  runtimeTopology?: MaintenanceWorkerRuntimeTopology;
   configurationKeys: string[];
   operationKeys: string[];
 }
 
 export interface MaintenanceWorkerStatusReader {
-  list(): MaintenanceWorkerStatus[];
+  list(): MaintenanceWorkerStatus[] | Promise<MaintenanceWorkerStatus[]>;
 }
 
 export type CoordinationScopeKind =
@@ -5310,6 +5344,8 @@ export interface DeploymentDetail {
 
 export const operatorWorkKinds = [
   "deployment",
+  "quick-deploy",
+  "blueprint-install",
   "proxy-bootstrap",
   "certificate",
   "remote-state",
@@ -5362,6 +5398,20 @@ export interface OperatorWorkItem {
   errorCategory?: string;
   retriable?: boolean;
   nextActions: OperatorWorkNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface OperatorWorkEvent {
+  id: string;
+  sequence: number;
+  kind: string;
+  status?: OperatorWorkStatus;
+  phase?: string;
+  step?: string;
+  message?: string;
+  workerId?: string;
+  workerGroup?: string;
+  occurredAt: string;
   safeDetails?: Record<string, string | number | boolean | null>;
 }
 
@@ -5438,6 +5488,7 @@ export interface OperatorWorkList {
 export interface OperatorWorkDetail {
   schemaVersion: "operator-work.show/v1";
   item: OperatorWorkItem;
+  events?: OperatorWorkEvent[];
   generatedAt: string;
 }
 

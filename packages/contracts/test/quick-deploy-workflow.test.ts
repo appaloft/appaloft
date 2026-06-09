@@ -1274,6 +1274,7 @@ describe("quick deploy workflow", () => {
           environmentId: "env_1",
           resourceId: "res_web",
           deploymentId: "dep_1",
+          workId: "dw_deployment_dep_1",
         },
         { access: { status: "available", url: "https://web.example.com" } },
       ),
@@ -1283,7 +1284,17 @@ describe("quick deploy workflow", () => {
       environmentId: "env_1",
       resourceId: "res_web",
       deploymentId: "dep_1",
+      workId: "dw_deployment_dep_1",
       access: { status: "available", url: "https://web.example.com" },
+      monitoring: {
+        workId: "dw_deployment_dep_1",
+        deploymentId: "dep_1",
+        commands: {
+          showWork: "appaloft work show dw_deployment_dep_1",
+          listByDeployment: "appaloft work list --deployment-id dep_1",
+          followDeploymentEvents: "appaloft deployments events dep_1 --follow",
+        },
+      },
       commands: {
         openDeployment: "appaloft deployments show dep_1",
         openResource: "appaloft resource show res_web",

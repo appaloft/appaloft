@@ -25,6 +25,30 @@ Runtime configuration controls Appaloft serve, databases, static asset directori
 
 `APPALOFT_DOCS_STATIC_DIR` overrides public docs static assets without replacing the Web console.
 
+<h2 id="reference-durable-worker-runtime">Durable worker runtime</h2>
+
+Durable worker runtime configuration controls how accepted long-running work is claimed and
+monitored after a request returns an id. The default `embedded` mode keeps self-hosted deployment
+simple by starting worker slots with `appaloft serve`. Operators can run `appaloft worker` for a
+dedicated worker process, and Cloud-style installations can configure multiple standalone workers
+that share one durable queue backend.
+
+The default queue backend is `database`, which uses dedicated durable work item and event tables as
+the durable state authority. External workflow engines such as Temporal or Kafka must be introduced
+through an adapter while still projecting safe durable-work and process-attempt progress for
+`operator-work.*` queries.
+
+`appaloft doctor`, `GET /api/system/doctor`, and the Web Instance page report the configured mode,
+queue backend, worker group, worker ids, and coordinator role.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `APPALOFT_WORKER_RUNTIME_MODE` | `embedded` | `embedded` starts worker slots with `appaloft serve`; `standalone` expects dedicated `appaloft worker` processes; `disabled` starts no durable work slots. |
+| `APPALOFT_WORKER_QUEUE_BACKEND` | `database` | Durable queue backend. `database` uses the process-attempt journal; `external` requires an adapter kind. |
+| `APPALOFT_WORKER_COUNT` | `1` | Number of configured worker slots. Enabled modes require at least one; `disabled` can use `0`. |
+| `APPALOFT_WORKER_GROUP` | `appaloft-worker` | Stable worker group used to derive worker ids and coordinate capacity. |
+| `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | Required when `APPALOFT_WORKER_QUEUE_BACKEND=external`; supported public values are `kafka`, `temporal`, and `custom`. |
+
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>
 
 Scheduled workers are disabled by default unless noted otherwise. Enable them only on the instance

@@ -23,6 +23,8 @@ export * from "./domain-binding-repository";
 export * from "./domain-event-stream-retention-store";
 export * from "./domain-route-binding-reader";
 export * from "./domain-route-failure-candidate-reader";
+export * from "./durable-work-ledger";
+export * from "./durable-worker-heartbeat-store";
 export * from "./environment-read-model";
 export * from "./environment-repository";
 export * from "./github-app-installation-repository";

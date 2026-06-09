@@ -343,7 +343,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     const currentExitCode = readExitCode();
     exitCode = currentExitCode !== 0 ? currentExitCode : 1;
   } finally {
-    if (!cliArgv.includes("serve")) {
+    if (!cliArgv.includes("serve") && !cliArgv.includes("worker")) {
       await app.shutdown();
     }
 

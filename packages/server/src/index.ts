@@ -16,9 +16,17 @@ import {
   type CertificateRetryScheduler,
   type Clock,
   type CommandBus,
+  createDurableWorkTopology,
   type DependencyResourceBackupPolicyRepository,
+  type DeploymentLifecycleService,
+  type DeploymentRepository,
   type DeployTokenRepository,
+  type DurableWorkHandlerRegistry,
+  type DurableWorkQueueAdapter,
+  type DurableWorkWorkerHeartbeatStore,
   type EnvironmentReadModel,
+  type EventBus,
+  type ExecutionBackend,
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionProviderAccessTokens,
@@ -32,6 +40,7 @@ import {
   type PreviewCleanupRetryScheduler,
   type PreviewExpiryCleanupScheduler,
   type ProcessAttemptDeliveryCandidateReader,
+  type ProcessAttemptRecorder,
   type ProcessAttemptRetryCandidateReader,
   type ProcessAttemptRetryGenerator,
   type ProjectReadModel,
@@ -94,8 +103,13 @@ import {
 } from "./certificate-retry-scheduler-runner";
 import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
+import { createDurableWorkRuntimeRunner } from "./durable-work-runtime-runner";
 import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
+import {
+  ConfigMaintenanceWorkerStatusReader,
+  createDurableWorkerHeartbeatSnapshotProvider,
+} from "./maintenance-worker-status-reader";
 import {
   createDisabledPreviewCleanupRetrySchedulerRunner,
   createPreviewCleanupRetrySchedulerRunner,
@@ -156,6 +170,7 @@ export interface AppaloftServer {
   executionContextFactory: ExecutionContextFactory;
   httpApp: AppaloftHttpApp;
   startServer(): Promise<void>;
+  startWorkerRuntime(): Promise<void>;
   shutdown(): Promise<void>;
 }
 
@@ -246,6 +261,15 @@ interface RequestContextRunner extends IntegrationAuthPort {
 
 function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol): T {
   return dependencyContainer.resolve(token as never) as T;
+}
+
+function resolveOptionalToken<T>(
+  dependencyContainer: DependencyContainer,
+  token: symbol,
+): T | undefined {
+  return dependencyContainer.isRegistered(token as never, true)
+    ? (dependencyContainer.resolve(token as never) as T)
+    : undefined;
 }
 
 function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLinkStore {
@@ -697,12 +721,31 @@ export async function createAppaloftServer(
     await extension.configureRuntime?.(containerContext);
   }
 
+  const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
+  const executionContextFactory = createExecutionContextFactory({
+    idGenerator,
+    tracer: telemetry.tracer,
+  });
+  const durableWorkHeartbeatStore = resolveToken<DurableWorkWorkerHeartbeatStore>(
+    childContainer,
+    tokens.durableWorkWorkerHeartbeatStore,
+  );
+  childContainer.registerInstance(
+    tokens.maintenanceWorkerStatusReader,
+    new ConfigMaintenanceWorkerStatusReader(
+      config,
+      createDurableWorkerHeartbeatSnapshotProvider({
+        heartbeatStore: durableWorkHeartbeatStore,
+        executionContextFactory,
+      }),
+    ),
+  );
+
   registerApplicationServices(childContainer, { dataDir: config.dataDir });
   for (const extension of extensions) {
     await extension.configureApplication?.(containerContext);
   }
 
-  const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
   const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
@@ -733,10 +776,6 @@ export async function createAppaloftServer(
           clock,
           repository: deployTokenRepository,
         });
-  const executionContextFactory = createExecutionContextFactory({
-    idGenerator,
-    tracer: telemetry.tracer,
-  });
   if (config.bootstrapDeployTokenOutputFile) {
     const bootstrapDeployTokenOutput = await writeBootstrapDeployTokenOutput({
       config,
@@ -905,6 +944,36 @@ export async function createAppaloftServer(
         logger,
       })
     : createDisabledRuntimeMonitoringCollectorRunner();
+  const durableWorkTopology = createDurableWorkTopology(config.workerRuntime);
+  if (durableWorkTopology.isErr()) {
+    throw new Error(durableWorkTopology.error.message);
+  }
+  const durableWorkHandlerRegistry = resolveOptionalToken<DurableWorkHandlerRegistry>(
+    childContainer,
+    tokens.durableWorkHandlerRegistry,
+  );
+  const durableWorkRuntimeRunner = createDurableWorkRuntimeRunner({
+    topology: durableWorkTopology.value,
+    adapter: resolveToken<DurableWorkQueueAdapter>(childContainer, tokens.durableWorkQueueAdapter),
+    heartbeatStore: durableWorkHeartbeatStore,
+    deploymentRepository: resolveToken<DeploymentRepository>(
+      childContainer,
+      tokens.deploymentRepository,
+    ),
+    deploymentLifecycleService: resolveToken<DeploymentLifecycleService>(
+      childContainer,
+      tokens.deploymentLifecycleService,
+    ),
+    executionBackend: resolveToken<ExecutionBackend>(childContainer, tokens.executionBackend),
+    eventBus: resolveToken<EventBus>(childContainer, tokens.eventBus),
+    processAttemptRecorder: resolveToken<ProcessAttemptRecorder>(
+      childContainer,
+      tokens.processAttemptRecorder,
+    ),
+    executionContextFactory,
+    logger,
+    ...(durableWorkHandlerRegistry ? { handlerRegistry: durableWorkHandlerRegistry } : {}),
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 
@@ -939,7 +1008,37 @@ export async function createAppaloftServer(
   });
 
   let started = false;
+  let workerRuntimeStarted = false;
   let serverHandle: AppaloftHttpServerHandle | null = null;
+
+  const startWorkerRuntime = async (): Promise<void> => {
+    if (workerRuntimeStarted) {
+      return;
+    }
+
+    workerRuntimeStarted = true;
+    logger.info("durable_worker_runtime.started", {
+      mode: config.workerRuntime.mode,
+      queueBackend: config.workerRuntime.queueBackend,
+      workerCount: durableWorkTopology.value.expectedWorkerCount,
+      workerGroup: config.workerRuntime.workerGroup,
+      workerIds: durableWorkTopology.value.workers.map((worker) => worker.workerId),
+      coordinationRole: durableWorkTopology.value.coordinationRole,
+      ...(config.workerRuntime.externalBackendKind
+        ? { externalBackendKind: config.workerRuntime.externalBackendKind }
+        : {}),
+    });
+
+    await durableWorkRuntimeRunner.start();
+    certificateRetrySchedulerRunner.start();
+    previewExpiryCleanupSchedulerRunner.start();
+    previewCleanupRetrySchedulerRunner.start();
+    scheduledTaskRunner.start();
+    scheduledRuntimePruneRunner.start();
+    scheduledDependencyBackupRunner.start();
+    scheduledHistoryRetentionRunner.start();
+    runtimeMonitoringCollectorRunner.start();
+  };
 
   const startServer = async (): Promise<void> => {
     if (started) {
@@ -966,14 +1065,7 @@ export async function createAppaloftServer(
       webOrigin: config.webOrigin,
     });
 
-    certificateRetrySchedulerRunner.start();
-    previewExpiryCleanupSchedulerRunner.start();
-    previewCleanupRetrySchedulerRunner.start();
-    scheduledTaskRunner.start();
-    scheduledRuntimePruneRunner.start();
-    scheduledDependencyBackupRunner.start();
-    scheduledHistoryRetentionRunner.start();
-    runtimeMonitoringCollectorRunner.start();
+    await startWorkerRuntime();
   };
 
   const server: AppaloftServer = {
@@ -983,6 +1075,7 @@ export async function createAppaloftServer(
     executionContextFactory,
     httpApp,
     startServer,
+    startWorkerRuntime,
     async shutdown(): Promise<void> {
       certificateRetrySchedulerRunner.stop();
       previewExpiryCleanupSchedulerRunner.stop();
@@ -992,6 +1085,7 @@ export async function createAppaloftServer(
       scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
       runtimeMonitoringCollectorRunner.stop();
+      await durableWorkRuntimeRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();
