@@ -79,6 +79,6 @@ targets to the public contract.
 - Runtime execution support initially targets generated Compose-stack planning for workspace command
   service graphs. Cross-resource multi-application orchestration, provider-native process groups,
   and service graph reconciliation remain later work.
-- Non-Compose multi-process execution needs a later ADR/spec to decide whether Appaloft models the
-  service graph as one Resource with multiple runtime services, multiple Resources coordinated by a
-  release workflow, or both.
+- Cross-Resource repository application graphs are governed separately by
+  [Repository Config Application Graph](../097-repository-config-application-graph/spec.md).
+  Atomic release-group ordering, health gates, and rollback policies remain later work.

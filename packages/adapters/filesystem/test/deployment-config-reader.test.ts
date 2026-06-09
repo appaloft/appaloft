@@ -164,6 +164,116 @@ describe("FileSystemDeploymentConfigReader", () => {
     ]);
   });
 
+  test("[CONFIG-FILE-APPLICATION-GRAPH-003] preserves application graph entries", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemDeploymentConfigReader }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+    const { root, source } = await createGitWorkspace();
+    await Bun.write(
+      join(root, "appaloft.yml"),
+      [
+        "applications:",
+        "  worker:",
+        "    resource:",
+        "      name: Acme Worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      startCommand: bun run worker",
+        "    services:",
+        "      worker:",
+        "        kind: worker",
+        "        runtime:",
+        "          strategy: workspace-commands",
+        "          startCommand: bun run worker",
+        "        network:",
+        "          exposureMode: none",
+        "        replicas: 4",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "      kind: application",
+        "    source:",
+        "      type: git",
+        "      repository: https://github.com/acme/app",
+        "      baseDirectory: apps/api",
+        "      gitRef: main",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "      buildCommand: bun run build:api",
+        "      startCommand: bun run start:api",
+        "      healthCheckPath: /ready",
+        "    network:",
+        "      internalPort: 3000",
+        "      exposureMode: reverse-proxy",
+      ].join("\n"),
+    );
+
+    const result = await new FileSystemDeploymentConfigReader().read(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_application_graph_config" }),
+      {
+        sourceLocator: source,
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    const snapshot = result._unsafeUnwrap();
+    expect(snapshot?.applications).toEqual([
+      {
+        key: "api",
+        resource: {
+          name: "Acme API",
+          kind: "application",
+        },
+        source: {
+          type: "git",
+          repository: "https://github.com/acme/app",
+          baseDirectory: "apps/api",
+          gitRef: "main",
+        },
+        deployment: {
+          method: "workspace-commands",
+          buildCommand: "bun run build:api",
+          startCommand: "bun run start:api",
+          port: 3000,
+          exposureMode: "reverse-proxy",
+          healthCheckPath: "/ready",
+        },
+      },
+      {
+        key: "worker",
+        resource: {
+          name: "Acme Worker",
+          services: [
+            expect.objectContaining({
+              name: "worker",
+              kind: "worker",
+              replicas: 4,
+            }),
+          ],
+        },
+        deployment: {
+          method: "workspace-commands",
+          startCommand: "bun run worker",
+        },
+        services: [
+          expect.objectContaining({
+            name: "worker",
+            kind: "worker",
+            runtime: expect.objectContaining({
+              startCommand: "bun run worker",
+            }),
+            network: expect.objectContaining({
+              exposureMode: "none",
+            }),
+            replicas: 4,
+          }),
+        ],
+      },
+    ]);
+  });
+
   test("[CONFIG-FILE-ID-002] refuses config files that contain project or target identity", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemDeploymentConfigReader }] = await Promise.all([

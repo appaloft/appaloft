@@ -44,6 +44,9 @@ Canonical assertions:
 - `services.<key>` declarations describe a provider-neutral Resource service graph, map service
   names/kinds into first-run Resource creation, block existing Resource service drift until a
   reconciliation operation exists, and never become `deployments.create` fields;
+- `applications.<key>` declarations describe a provider-neutral repository application graph,
+  expand through entry workflows into one Resource-specific ids-only `deployments.create` input per
+  application, and never become a multi-Resource deployment command field;
 - `controlPlane` declarations choose connection policy only, never durable identity or secrets;
 - HTTP remains strict unless a future workflow command is accepted by ADR.
 
@@ -84,6 +87,7 @@ This matrix inherits:
 - [Repository Config Prebuilt Image Source](../specs/085-repository-config-prebuilt-image-source/spec.md)
 - [Repository Config Preview Policy](../specs/086-repository-config-preview-policy/spec.md)
 - [Repository Config Service Graph](../specs/096-repository-config-service-graph/spec.md)
+- [Repository Config Application Graph](../specs/097-repository-config-application-graph/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -105,6 +109,7 @@ This matrix inherits:
 | Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
 | Service graph | Repository service names/kinds seed first-run Resource service metadata; existing Resource drift blocks until a service reconciliation operation exists. |
+| Application graph | Repository application entries expand into Resource-specific workflow inputs while preserving ids-only deployment admission. |
 | Environment and secret reference commands | Non-secret variables, `ci-env:` secret values, and existing `resource-secret:` requirements are handled before deployment snapshot without leaking raw secret values. |
 | Dependency graph | Managed application dependencies are listed/provisioned/reused/bound before deployment admission, with preview provenance when ephemeral. |
 | Dependency backup policy | Managed dependency backup policy is created, updated, disabled, or rejected before deployment admission without touching manual policies. |
@@ -177,6 +182,15 @@ This matrix inherits:
 | CONFIG-FILE-SERVICE-GRAPH-003 | integration | First-run Resource services created | Config declares multiple services and no existing Resource is selected | Config deploy creates a Resource with `kind = compose-stack` and declared service names/kinds; deployment remains ids-only | None | `resources.create(services)` -> `deployments.create(ids only)` |
 | CONFIG-FILE-SERVICE-GRAPH-004 | integration | Existing Resource service drift blocks deploy | Selected Resource declares different service metadata from config | Config deploy fails before deployment instead of ignoring the graph | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show`; no `deployments.create` |
 | CONFIG-FILE-SERVICE-GRAPH-005 | integration | Workspace services plan as one Compose stack | Config declares `services.web` and `services.worker` with `workspace-commands`, exposed web network profile, private worker profile, and worker replicas | Runtime planning produces `buildStrategy = workspace-commands`, `execution.kind = docker-compose-stack`, generated Compose metadata, exposed-service route metadata, and private service metadata for workers | None | config entry workflow -> `deployments.create(ids only + internal service graph planning snapshot)` -> runtime planner |
+
+## Application Graph Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-APPLICATION-GRAPH-001 | parser/schema | Named application graph accepted | Config declares `applications.api` and `applications.worker` with resource, source, runtime, network, health, env, secret references, and optional service graph fields | Parser accepts the declaration and JSON schema exposes it | None | Parse only |
+| CONFIG-FILE-APPLICATION-GRAPH-002 | parser/schema | Unsafe application graph rejected | Config declares invalid application key, missing `resource.name`, identity fields, raw secret material, or unsupported orchestration fields under an application entry | Parser fails before mutation | `validation_error`, phase `config-schema`, `config-identity`, `config-secret-validation`, or `config-capability-resolution` | No write commands |
+| CONFIG-FILE-APPLICATION-GRAPH-003 | integration | Config snapshot preserves application graph | Filesystem reader discovers an appaloft config with multiple applications | Snapshot contains sorted application entries with Resource draft and requested profile details | None | Config read -> profile normalization |
+| CONFIG-FILE-APPLICATION-GRAPH-004 | integration | CLI expands application graph into per-Resource deployments | Config deploy runs with `applications.api` and `applications.worker` and trusted project/environment/server context | Workflow resolves and dispatches one ids-only `deployments.create` per application | None | per application: Resource resolution -> optional profile operations -> `deployments.create(ids only)` |
 
 ## Secrets Matrix
 

@@ -246,6 +246,134 @@ describe("Appaloft deployment config schema", () => {
     expect(topLevelReplicas.success).toBe(false);
   });
 
+  test("[CONFIG-FILE-APPLICATION-GRAPH-001] accepts named repository application graph declarations", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      applications: {
+        api: {
+          resource: {
+            name: "Acme API",
+            kind: "application",
+            description: "Public API",
+          },
+          source: {
+            type: "git",
+            repository: "https://github.com/acme/app",
+            baseDirectory: "apps/api",
+            gitRef: "main",
+          },
+          runtime: {
+            strategy: "workspace-commands",
+            buildCommand: "bun run build:api",
+            startCommand: "bun run start:api",
+            healthCheckPath: "/ready",
+          },
+          network: {
+            internalPort: 3000,
+            exposureMode: "reverse-proxy",
+          },
+          env: {
+            PUBLIC_APP: "api",
+          },
+          secrets: {
+            DATABASE_URL: {
+              from: "resource-secret:DATABASE_URL",
+            },
+          },
+        },
+        worker: {
+          resource: {
+            name: "Acme Worker",
+          },
+          runtime: {
+            strategy: "workspace-commands",
+          },
+          services: {
+            worker: {
+              kind: "worker",
+              runtime: {
+                strategy: "workspace-commands",
+                startCommand: "bun run worker",
+              },
+              network: {
+                exposureMode: "none",
+              },
+              replicas: 4,
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.applications?.api?.resource.name).toBe("Acme API");
+      expect(parsed.data.applications?.api?.source?.baseDirectory).toBe("apps/api");
+      expect(parsed.data.applications?.api?.network?.internalPort).toBe(3000);
+      expect(parsed.data.applications?.worker?.resource.name).toBe("Acme Worker");
+      expect(parsed.data.applications?.worker?.services?.worker?.replicas).toBe(4);
+    }
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-002] rejects unsafe application graph declarations", () => {
+    const badKey = parseAppaloftDeploymentConfig({
+      applications: {
+        API: {
+          resource: {
+            name: "Acme API",
+          },
+        },
+      },
+    });
+    expect(badKey.success).toBe(false);
+
+    const missingResourceName = parseAppaloftDeploymentConfig({
+      applications: {
+        api: {
+          resource: {},
+        },
+      },
+    });
+    expect(missingResourceName.success).toBe(false);
+
+    const identity = parseAppaloftDeploymentConfig({
+      applications: {
+        api: {
+          resource: {
+            name: "Acme API",
+            resourceId: "res_123",
+          },
+        },
+      },
+    });
+    expect(identity.success).toBe(false);
+
+    const rawSecret = parseAppaloftDeploymentConfig({
+      applications: {
+        worker: {
+          resource: {
+            name: "Acme Worker",
+          },
+          env: {
+            SSH_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+          },
+        },
+      },
+    });
+    expect(rawSecret.success).toBe(false);
+
+    const unsupportedField = parseAppaloftDeploymentConfig({
+      applications: {
+        api: {
+          resource: {
+            name: "Acme API",
+          },
+          dependencies: {},
+        },
+      },
+    });
+    expect(unsupportedField.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-IMAGE-SOURCE-001] accepts prebuilt image source declarations", () => {
     const parsed = parseAppaloftDeploymentConfigText(
       [
