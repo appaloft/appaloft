@@ -82,7 +82,10 @@ import {
   CreateResourceSecretReferenceCommand,
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
+  CreateStorageVolumeBackupCommand,
+  CreateStorageVolumeBackupPlanQuery,
   CreateStorageVolumeCommand,
+  CreateStorageVolumeRestorePlanQuery,
   cancelDeploymentCommandInputSchema,
   cancelOperatorWorkCommandInputSchema,
   changeAccountProfileCommandInputSchema,
@@ -132,7 +135,10 @@ import {
   createResourceSecretReferenceCommandInputSchema,
   createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
+  createStorageVolumeBackupCommandInputSchema,
+  createStorageVolumeBackupPlanQueryInputSchema,
   createStorageVolumeCommandInputSchema,
+  createStorageVolumeRestorePlanQueryInputSchema,
   DeactivateServerCommand,
   DeadLetterOperatorWorkCommand,
   DeleteAccountCommand,
@@ -264,6 +270,7 @@ import {
   ListSourceLinksQuery,
   ListSshCredentialsQuery,
   ListStaticArtifactPublicationsQuery,
+  ListStorageVolumeBackupsQuery,
   ListStorageVolumesQuery,
   ListTerminalSessionsQuery,
   ListUsageIntentRecordsQuery,
@@ -305,6 +312,7 @@ import {
   listSourceLinksQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   listStaticArtifactPublicationsQueryInputSchema,
+  listStorageVolumeBackupsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   listTerminalSessionsQueryInputSchema,
   listUsageIntentRecordsInputSchema,
@@ -332,6 +340,7 @@ import {
   PruneResourceRuntimeLogArchivesCommand,
   PruneServerCapacityCommand,
   PruneSourceEventsCommand,
+  PruneStorageVolumeBackupCommand,
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactCommand,
   PublishStaticArtifactPayloadCommand,
@@ -349,6 +358,7 @@ import {
   pruneResourceRuntimeLogArchivesCommandInputSchema,
   pruneServerCapacityCommandInputSchema,
   pruneSourceEventsCommandInputSchema,
+  pruneStorageVolumeBackupCommandInputSchema,
   publishStaticArtifactArchiveCommandInputSchema,
   publishStaticArtifactCommandInputSchema,
   publishStaticArtifactPayloadCommandInputSchema,
@@ -391,6 +401,7 @@ import {
   RestartResourceRuntimeCommand,
   RestoreDependencyResourceBackupCommand,
   RestoreProjectCommand,
+  RestoreStorageVolumeBackupCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
@@ -430,6 +441,7 @@ import {
   restartResourceRuntimeCommandInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
   restoreProjectCommandInputSchema,
+  restoreStorageVolumeBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
@@ -482,6 +494,7 @@ import {
   ShowSourceEventQuery,
   ShowSourceLinkQuery,
   ShowSshCredentialQuery,
+  ShowStorageVolumeBackupQuery,
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
   type SourceEventVerificationPort,
@@ -533,6 +546,7 @@ import {
   showSourceEventQueryInputSchema,
   showSourceLinkQueryInputSchema,
   showSshCredentialQueryInputSchema,
+  showStorageVolumeBackupQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
   startResourceRuntimeCommandInputSchema,
@@ -609,6 +623,7 @@ import {
   createResourceResponseSchema,
   createResourceSecretReferenceResponseSchema,
   createSshCredentialResponseSchema,
+  createStorageVolumeBackupResponseSchema,
   createStorageVolumeResponseSchema,
   currentOrganizationContextResponseSchema,
   deactivateServerResponseSchema,
@@ -684,6 +699,7 @@ import {
   listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
   listStaticArtifactPublicationsResponseSchema,
+  listStorageVolumeBackupsResponseSchema,
   listStorageVolumesResponseSchema,
   listTerminalSessionsResponseSchema,
   lockEnvironmentResponseSchema,
@@ -706,6 +722,7 @@ import {
   pruneResourceRuntimeLogArchivesResponseSchema,
   pruneServerCapacityResponseSchema,
   pruneSourceEventsResponseSchema,
+  pruneStorageVolumeBackupResponseSchema,
   publishStaticArtifactResponseSchema,
   reactivateOrganizationMemberResponseSchema,
   redeployDeploymentResponseSchema,
@@ -728,6 +745,7 @@ import {
   resourceRuntimeLogsStreamResponseSchema,
   restartResourceRuntimeResponseSchema,
   restoreProjectResponseSchema,
+  restoreStorageVolumeBackupResponseSchema,
   retryCertificateResponseSchema,
   retryDeploymentResponseSchema,
   retryDomainBindingVerificationResponseSchema,
@@ -773,10 +791,13 @@ import {
   showServerResponseSchema,
   showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
+  showStorageVolumeBackupResponseSchema,
   showStorageVolumeResponseSchema,
   showTerminalSessionResponseSchema,
   startResourceRuntimeResponseSchema,
   stopResourceRuntimeResponseSchema,
+  storageVolumeBackupPlanResponseSchema,
+  storageVolumeRestorePlanResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   transferOrganizationOwnerResponseSchema,
@@ -1316,6 +1337,34 @@ export const apiRouteDescriptions = {
   ),
   cleanupStorageVolumeRuntime: routeDescription(
     "Dry-runs or explicitly removes safe Appaloft-owned runtime volume realizations for one storage volume on one server.",
+    "storage.volume-lifecycle",
+  ),
+  createStorageVolumeBackupPlan: routeDescription(
+    "Previews storage volume backup source adapter, target provider, retention, and consistency blockers without exposing secrets.",
+    "storage.volume-lifecycle",
+  ),
+  createStorageVolumeBackup: routeDescription(
+    "Creates a storage volume backup through storage source and target provider ports.",
+    "storage.volume-lifecycle",
+  ),
+  listStorageVolumeBackups: routeDescription(
+    "Lists storage volume backup artifacts and restore attempt readback.",
+    "storage.volume-lifecycle",
+  ),
+  showStorageVolumeBackup: routeDescription(
+    "Reads one storage volume backup artifact and restore attempt readback.",
+    "storage.volume-lifecycle",
+  ),
+  createStorageVolumeRestorePlan: routeDescription(
+    "Previews a storage volume restore and defaults to restore-to-new-volume safety.",
+    "storage.volume-lifecycle",
+  ),
+  restoreStorageVolumeBackup: routeDescription(
+    "Restores a storage volume backup to a new storage volume by default.",
+    "storage.volume-lifecycle",
+  ),
+  pruneStorageVolumeBackup: routeDescription(
+    "Prunes one storage volume backup artifact after provider retention handling.",
     "storage.volume-lifecycle",
   ),
   createDependencyResourceProvisioningPlan: routeDescription(
@@ -5665,6 +5714,97 @@ export const cleanupStorageVolumeRuntimeProcedure = base
     executeCommand(context, CleanupStorageVolumeRuntimeCommand.create(input)),
   );
 
+export const createStorageVolumeBackupPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes/{storageVolumeId}/backups/plan",
+    description: apiRouteDescriptions.createStorageVolumeBackupPlan,
+    successStatus: 200,
+  })
+  .input(createStorageVolumeBackupPlanQueryInputSchema)
+  .output(storageVolumeBackupPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CreateStorageVolumeBackupPlanQuery.create(input)),
+  );
+
+export const createStorageVolumeBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes/{storageVolumeId}/backups",
+    description: apiRouteDescriptions.createStorageVolumeBackup,
+    successStatus: 201,
+  })
+  .input(createStorageVolumeBackupCommandInputSchema)
+  .output(createStorageVolumeBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateStorageVolumeBackupCommand.create(input)),
+  );
+
+export const listStorageVolumeBackupsProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volumes/{storageVolumeId}/backups",
+    description: apiRouteDescriptions.listStorageVolumeBackups,
+    successStatus: 200,
+  })
+  .input(listStorageVolumeBackupsQueryInputSchema)
+  .output(listStorageVolumeBackupsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListStorageVolumeBackupsQuery.create(input)),
+  );
+
+export const showStorageVolumeBackupProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volume-backups/{backupId}",
+    description: apiRouteDescriptions.showStorageVolumeBackup,
+    successStatus: 200,
+  })
+  .input(showStorageVolumeBackupQueryInputSchema)
+  .output(showStorageVolumeBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowStorageVolumeBackupQuery.create(input)),
+  );
+
+export const createStorageVolumeRestorePlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volume-backups/{backupId}/restore-plan",
+    description: apiRouteDescriptions.createStorageVolumeRestorePlan,
+    successStatus: 200,
+  })
+  .input(createStorageVolumeRestorePlanQueryInputSchema)
+  .output(storageVolumeRestorePlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CreateStorageVolumeRestorePlanQuery.create(input)),
+  );
+
+export const restoreStorageVolumeBackupProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volume-backups/{backupId}/restore",
+    description: apiRouteDescriptions.restoreStorageVolumeBackup,
+    successStatus: 200,
+  })
+  .input(restoreStorageVolumeBackupCommandInputSchema)
+  .output(restoreStorageVolumeBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestoreStorageVolumeBackupCommand.create(input)),
+  );
+
+export const pruneStorageVolumeBackupProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/storage-volume-backups/{backupId}",
+    description: apiRouteDescriptions.pruneStorageVolumeBackup,
+    successStatus: 200,
+  })
+  .input(pruneStorageVolumeBackupCommandInputSchema)
+  .output(pruneStorageVolumeBackupResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PruneStorageVolumeBackupCommand.create(input)),
+  );
+
 export const createDependencyResourceProvisioningPlanProcedure = base
   .route({
     method: "POST",
@@ -6289,6 +6429,15 @@ export const appaloftOrpcRouter = {
     rename: renameStorageVolumeProcedure,
     delete: deleteStorageVolumeProcedure,
     cleanupRuntime: cleanupStorageVolumeRuntimeProcedure,
+    backups: {
+      plan: createStorageVolumeBackupPlanProcedure,
+      create: createStorageVolumeBackupProcedure,
+      list: listStorageVolumeBackupsProcedure,
+      show: showStorageVolumeBackupProcedure,
+      restorePlan: createStorageVolumeRestorePlanProcedure,
+      restore: restoreStorageVolumeBackupProcedure,
+      prune: pruneStorageVolumeBackupProcedure,
+    },
   },
   scheduledTasks: {
     list: listScheduledTasksProcedure,
@@ -8910,6 +9059,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/storage-volumes/:storageVolumeId",
     "/api/storage-volumes/:storageVolumeId/rename",
     "/api/storage-volumes/:storageVolumeId/runtime-cleanup",
+    "/api/storage-volumes/:storageVolumeId/backups/plan",
+    "/api/storage-volumes/:storageVolumeId/backups",
+    "/api/storage-volume-backups/:backupId",
+    "/api/storage-volume-backups/:backupId/restore-plan",
+    "/api/storage-volume-backups/:backupId/restore",
     "/api/scheduled-tasks",
     "/api/scheduled-tasks/:taskId",
     "/api/scheduled-tasks/:taskId/runs",

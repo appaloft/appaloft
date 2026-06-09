@@ -99,7 +99,11 @@ export const tokens = {
     "appaloft.dependency_resource_delete_safety_reader",
   ),
   storageVolumeRepository: Symbol.for("appaloft.storage_volume_repository"),
+  storageVolumeBackupRepository: Symbol.for("appaloft.storage_volume_backup_repository"),
   storageVolumeBackupSafetyReader: Symbol.for("appaloft.storage_volume_backup_safety_reader"),
+  storageVolumeBackupProviderRegistry: Symbol.for(
+    "appaloft.storage_volume_backup_provider_registry",
+  ),
   resourceDeletionBlockerReader: Symbol.for("appaloft.resource_deletion_blocker_reader"),
   deploymentRepository: Symbol.for("appaloft.deployment_repository"),
   domainBindingRepository: Symbol.for("appaloft.domain_binding_repository"),
@@ -130,6 +134,7 @@ export const tokens = {
   dependencyResourceBackupReadModel: Symbol.for("appaloft.dependency_resource_backup_read_model"),
   resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
+  storageVolumeBackupReadModel: Symbol.for("appaloft.storage_volume_backup_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(
     "appaloft.resource_access_failure_evidence_recorder",
   ),
@@ -433,8 +438,23 @@ export const tokens = {
   cleanupStorageVolumeRuntimeUseCase: Symbol.for(
     "appaloft.cleanup_storage_volume_runtime_use_case",
   ),
+  createStorageVolumeBackupUseCase: Symbol.for("appaloft.create_storage_volume_backup_use_case"),
+  restoreStorageVolumeBackupUseCase: Symbol.for("appaloft.restore_storage_volume_backup_use_case"),
+  pruneStorageVolumeBackupUseCase: Symbol.for("appaloft.prune_storage_volume_backup_use_case"),
   listStorageVolumesQueryService: Symbol.for("appaloft.list_storage_volumes_query_service"),
   showStorageVolumeQueryService: Symbol.for("appaloft.show_storage_volume_query_service"),
+  createStorageVolumeBackupPlanQueryService: Symbol.for(
+    "appaloft.create_storage_volume_backup_plan_query_service",
+  ),
+  listStorageVolumeBackupsQueryService: Symbol.for(
+    "appaloft.list_storage_volume_backups_query_service",
+  ),
+  showStorageVolumeBackupQueryService: Symbol.for(
+    "appaloft.show_storage_volume_backup_query_service",
+  ),
+  createStorageVolumeRestorePlanQueryService: Symbol.for(
+    "appaloft.create_storage_volume_restore_plan_query_service",
+  ),
   resourceEffectiveConfigQueryService: Symbol.for(
     "appaloft.resource_effective_config_query_service",
   ),

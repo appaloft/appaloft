@@ -34,7 +34,8 @@ metadata:
 - SSH release-readiness inputs: `require_ssh_remote_state_e2e=true`,
   `require_ssh_quick_deploy_e2e=true`, `require_framework_fixture_e2e=true`,
   `require_scheduled_task_e2e=true`, `require_storage_cleanup_e2e=true`,
-  `require_runtime_usage_e2e=true`, and `require_capacity_prune_e2e=true`, used when the selected
+  `require_storage_backup_e2e=true`, `require_runtime_usage_e2e=true`, and
+  `require_capacity_prune_e2e=true`, used when the selected
   roadmap target should require GitHub Actions SSH smoke evidence. Preview provider release
   readiness uses `require_preview_provider_e2e=true` to require the live GitHub PR-comment feedback
   gate. When one of these inputs is set, missing SSH target secrets or GitHub preview provider smoke
@@ -138,7 +139,7 @@ Create or update a Release Please PR for a roadmap-approved `0.11.0` release and
 fail-closed SSH release-readiness gates:
 
 ```bash
-gh workflow run release.yml -R appaloft/appaloft -f release_as=0.11.0 -f prerelease=false -f require_ssh_remote_state_e2e=true -f require_ssh_quick_deploy_e2e=true -f require_framework_fixture_e2e=true -f require_scheduled_task_e2e=true -f require_storage_cleanup_e2e=true -f require_runtime_usage_e2e=true -f require_capacity_prune_e2e=true -f require_preview_provider_e2e=true
+gh workflow run release.yml -R appaloft/appaloft -f release_as=0.11.0 -f prerelease=false -f require_ssh_remote_state_e2e=true -f require_ssh_quick_deploy_e2e=true -f require_framework_fixture_e2e=true -f require_scheduled_task_e2e=true -f require_storage_cleanup_e2e=true -f require_storage_backup_e2e=true -f require_runtime_usage_e2e=true -f require_capacity_prune_e2e=true -f require_preview_provider_e2e=true
 ```
 
 Publish with prerelease npm tagging only when the user asks for prerelease behavior:

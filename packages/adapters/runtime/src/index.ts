@@ -164,6 +164,24 @@ export {
   StorageRuntimeCleanerAdapter,
 } from "./storage-runtime-cleanup";
 export {
+  DockerSqliteOnlineStorageBackupSourceAdapter,
+  DockerTarStorageBackupSourceAdapter,
+  LocalFilesystemStorageBackupTargetProvider,
+  PosixShellDockerStorageBackupRuntimeCommandRenderer,
+  renderDockerVolumeTarBackupScript,
+  renderDockerVolumeSqliteOnlineBackupScript,
+  renderLocalFilesystemRestoreBackupScript,
+  renderLocalFilesystemStoreBackupScript,
+  RuntimeStorageBackupProviderRegistry,
+  type DockerVolumeSqliteOnlineBackupScriptInput,
+  type DockerVolumeTarBackupScriptInput,
+  type LocalFilesystemRestoreBackupScriptInput,
+  type LocalFilesystemStoreBackupScriptInput,
+  type StorageBackupRuntimeCommandDialect,
+  type StorageBackupRuntimeCommandRenderer,
+  type StorageBackupRuntimeProviderOptions,
+} from "./storage-volume-backup-provider";
+export {
   RuntimeUsageCapacityInspectorAdapter,
   translateCapacityInspectionToRuntimeUsage,
   type RuntimeUsageServerResolver,

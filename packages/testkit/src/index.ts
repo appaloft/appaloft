@@ -84,6 +84,18 @@ import {
   type ServerReadModel,
   type ServerRepository,
   type ServerSummary,
+  type StorageBackupPlanRequest,
+  type StorageBackupProviderRegistryPort,
+  type StorageBackupRestoreSourceResult,
+  type StorageBackupSourceAdapterPort,
+  type StorageBackupSourceResult,
+  type StorageBackupTargetProviderPort,
+  type StorageBackupTargetRestoreResult,
+  type StorageBackupTargetStoreResult,
+  type StorageVolumeBackupReadModel,
+  type StorageVolumeBackupRepository,
+  type StorageVolumeBackupSafetyReader,
+  type StorageVolumeBackupSummary,
   type StorageVolumeReadModel,
   type StorageVolumeRepository,
   type StorageVolumeSummary,
@@ -155,8 +167,14 @@ import {
   type ResourceSelectionSpec,
   type Result,
   StorageVolume,
+  StorageVolumeBackup,
+  StorageVolumeBackupByIdSpec,
+  type StorageVolumeBackupMutationSpec,
+  type StorageVolumeBackupSelectionSpec,
+  StorageVolumeBackupsByStorageVolumeSpec,
   StorageVolumeByEnvironmentAndSlugSpec,
   StorageVolumeByIdSpec,
+  StorageVolumeId,
   type StorageVolumeMutationSpec,
   type StorageVolumeSelectionSpec,
 } from "@appaloft/core";
@@ -1380,6 +1398,10 @@ export class MemoryStorageVolumeReadModel implements StorageVolumeReadModel {
             resourceSlug: resource.slug.value,
             destinationPath: attachment.destinationPath.value,
             mountMode: attachment.mountMode.value,
+            ...(attachment.dataFormat ? { dataFormat: attachment.dataFormat } : {}),
+            ...(attachment.applicationDataLabel
+              ? { applicationDataLabel: attachment.applicationDataLabel.value }
+              : {}),
             attachedAt: attachment.attachedAt.value,
           })),
       );
@@ -1447,6 +1469,255 @@ export class MemoryStorageVolumeReadModel implements StorageVolumeReadModel {
   async countAttachments(context: RepositoryContext, storageVolumeId: string): Promise<number> {
     void context;
     return this.attachments(storageVolumeId).length;
+  }
+}
+
+export class MemoryStorageVolumeBackupRepository implements StorageVolumeBackupRepository {
+  readonly items = new Map<string, StorageVolumeBackup>();
+
+  async upsert(
+    context: RepositoryContext,
+    backup: StorageVolumeBackup,
+    spec: StorageVolumeBackupMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(backup.toState().id.value, StorageVolumeBackup.rehydrate(backup.toState()));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackup | null> {
+    void context;
+    if (spec instanceof StorageVolumeBackupByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+    for (const backup of this.items.values()) {
+      if (spec.isSatisfiedBy(backup)) {
+        return backup;
+      }
+    }
+    return null;
+  }
+
+  async findMany(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackup[]> {
+    void context;
+    return [...this.items.values()].filter((backup) => spec.isSatisfiedBy(backup));
+  }
+}
+
+function memoryStorageVolumeBackupSummary(backup: StorageVolumeBackup): StorageVolumeBackupSummary {
+  const state = backup.toState();
+  return {
+    id: state.id.value,
+    storageVolumeId: state.storageVolumeId.value,
+    projectId: state.projectId.value,
+    environmentId: state.environmentId.value,
+    ...(state.resourceId ? { resourceId: state.resourceId.value } : {}),
+    storageVolumeKind: state.storageVolumeKind.value,
+    sourceAdapterKey: state.sourceAdapterKey.value,
+    targetProviderKey: state.targetProviderKey.value,
+    targetRef: state.targetRef.value,
+    consistency: state.consistency.value,
+    status: state.status.value,
+    attemptId: state.attemptId.value,
+    requestedAt: state.requestedAt.value,
+    retentionStatus: state.retentionStatus.value,
+    localOnly: state.localOnly,
+    ...(state.artifactHandle ? { artifactHandle: state.artifactHandle.value } : {}),
+    ...(state.sizeBytes !== undefined ? { sizeBytes: state.sizeBytes } : {}),
+    ...(state.checksum ? { checksum: state.checksum.value } : {}),
+    ...(state.completedAt ? { completedAt: state.completedAt.value } : {}),
+    ...(state.failedAt ? { failedAt: state.failedAt.value } : {}),
+    ...(state.failureCode ? { failureCode: state.failureCode.value } : {}),
+    ...(state.failureMessage ? { failureMessage: state.failureMessage.value } : {}),
+    ...(state.latestRestoreAttempt
+      ? {
+          latestRestoreAttempt: {
+            attemptId: state.latestRestoreAttempt.attemptId.value,
+            status: state.latestRestoreAttempt.status.value,
+            requestedAt: state.latestRestoreAttempt.requestedAt.value,
+            target: {
+              storageVolumeId: state.latestRestoreAttempt.target.storageVolumeId.value,
+              ...(state.latestRestoreAttempt.target.restoredVolumeId
+                ? {
+                    restoredVolumeId: state.latestRestoreAttempt.target.restoredVolumeId.value,
+                  }
+                : {}),
+              destructiveInPlace: state.latestRestoreAttempt.target.destructiveInPlace,
+            },
+            ...(state.latestRestoreAttempt.completedAt
+              ? { completedAt: state.latestRestoreAttempt.completedAt.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failedAt
+              ? { failedAt: state.latestRestoreAttempt.failedAt.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failureCode
+              ? { failureCode: state.latestRestoreAttempt.failureCode.value }
+              : {}),
+            ...(state.latestRestoreAttempt.failureMessage
+              ? { failureMessage: state.latestRestoreAttempt.failureMessage.value }
+              : {}),
+          },
+        }
+      : {}),
+    createdAt: state.createdAt.value,
+  };
+}
+
+export class MemoryStorageVolumeBackupReadModel implements StorageVolumeBackupReadModel {
+  constructor(private readonly repository: MemoryStorageVolumeBackupRepository) {}
+
+  async list(
+    context: RepositoryContext,
+    input: { storageVolumeId: string; status?: StorageVolumeBackupSummary["status"] },
+  ): Promise<StorageVolumeBackupSummary[]> {
+    void context;
+    return [...this.repository.items.values()]
+      .filter((backup) => backup.toState().storageVolumeId.value === input.storageVolumeId)
+      .filter((backup) => (input.status ? backup.toState().status.value === input.status : true))
+      .map(memoryStorageVolumeBackupSummary);
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: StorageVolumeBackupSelectionSpec,
+  ): Promise<StorageVolumeBackupSummary | null> {
+    const backup = await this.repository.findOne(context, spec);
+    return backup ? memoryStorageVolumeBackupSummary(backup) : null;
+  }
+}
+
+export class MemoryStorageVolumeBackupSafetyReader implements StorageVolumeBackupSafetyReader {
+  constructor(private readonly repository: MemoryStorageVolumeBackupRepository) {}
+
+  async findSafetyEvidence(
+    context: RepositoryContext,
+    input: { storageVolumeId: string },
+  ): Promise<Result<{ backupRetentionRequired: boolean; backupRestoreInFlightCount: number }>> {
+    const backups = await this.repository.findMany(
+      context,
+      StorageVolumeBackupsByStorageVolumeSpec.create(
+        StorageVolumeId.rehydrate(input.storageVolumeId),
+      ),
+    );
+    return ok({
+      backupRetentionRequired: backups.some((backup) => backup.blocksStorageVolumeDelete()),
+      backupRestoreInFlightCount: backups.filter(
+        (backup) => backup.toState().latestRestoreAttempt?.status.value === "pending",
+      ).length,
+    });
+  }
+}
+
+export class FakeStorageBackupSourceAdapter implements StorageBackupSourceAdapterPort {
+  readonly created: Parameters<NonNullable<StorageBackupSourceAdapterPort["createBackup"]>>[0][] =
+    [];
+  readonly restored: Parameters<NonNullable<StorageBackupSourceAdapterPort["restoreBackup"]>>[0][] =
+    [];
+
+  constructor(
+    public readonly key: StorageBackupSourceAdapterPort["key"] = "tar-volume",
+    private readonly predicate: (input: StorageBackupPlanRequest) => boolean = () => true,
+    private readonly result: Result<StorageBackupSourceResult, DomainError> = ok({
+      sourceRef: "source://storage-volume-backup/test",
+    }),
+    private readonly restoreResult: Result<StorageBackupRestoreSourceResult, DomainError> = ok({
+      restoredAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ) {}
+
+  supports(input: StorageBackupPlanRequest): boolean {
+    return this.predicate(input);
+  }
+
+  async createBackup(
+    input: Parameters<NonNullable<StorageBackupSourceAdapterPort["createBackup"]>>[0],
+  ): Promise<Result<StorageBackupSourceResult, DomainError>> {
+    this.created.push(input);
+    return this.result;
+  }
+
+  async restoreBackup(
+    input: Parameters<NonNullable<StorageBackupSourceAdapterPort["restoreBackup"]>>[0],
+  ): Promise<Result<StorageBackupRestoreSourceResult, DomainError>> {
+    this.restored.push(input);
+    return this.restoreResult;
+  }
+}
+
+export class FakeStorageBackupTargetProvider implements StorageBackupTargetProviderPort {
+  readonly stored: Parameters<NonNullable<StorageBackupTargetProviderPort["store"]>>[0][] = [];
+  readonly restored: Parameters<NonNullable<StorageBackupTargetProviderPort["restore"]>>[0][] = [];
+  readonly pruned: Parameters<NonNullable<StorageBackupTargetProviderPort["prune"]>>[0][] = [];
+
+  constructor(
+    public readonly key: StorageBackupTargetProviderPort["key"] = "local-filesystem",
+    private readonly predicate: (input: StorageBackupPlanRequest) => boolean = () => true,
+    private readonly storeResult: Result<StorageBackupTargetStoreResult, DomainError> = ok({
+      artifactHandle: "artifact://storage-volume-backup/test",
+      completedAt: "2026-01-01T00:00:00.000Z",
+      retentionStatus: "retained",
+      sizeBytes: 128,
+      checksum: "sha256:test",
+    }),
+    private readonly restoreResult: Result<StorageBackupTargetRestoreResult, DomainError> = ok({
+      restoredAt: "2026-01-01T00:00:00.000Z",
+    }),
+    private readonly localOnlyResult = true,
+  ) {}
+
+  localOnly(input: StorageBackupPlanRequest): boolean {
+    void input;
+    return this.localOnlyResult;
+  }
+
+  supports(input: StorageBackupPlanRequest): boolean {
+    return this.predicate(input);
+  }
+
+  async store(
+    input: Parameters<NonNullable<StorageBackupTargetProviderPort["store"]>>[0],
+  ): Promise<Result<StorageBackupTargetStoreResult, DomainError>> {
+    this.stored.push(input);
+    return this.storeResult;
+  }
+
+  async restore(
+    input: Parameters<NonNullable<StorageBackupTargetProviderPort["restore"]>>[0],
+  ): Promise<Result<StorageBackupTargetRestoreResult, DomainError>> {
+    this.restored.push(input);
+    return this.restoreResult;
+  }
+
+  async prune(
+    input: Parameters<NonNullable<StorageBackupTargetProviderPort["prune"]>>[0],
+  ): Promise<Result<{ prunedAt: string }, DomainError>> {
+    this.pruned.push(input);
+    return ok({ prunedAt: input.requestedAt });
+  }
+}
+
+export class FakeStorageBackupProviderRegistry implements StorageBackupProviderRegistryPort {
+  constructor(
+    private readonly sources: StorageBackupSourceAdapterPort[] = [
+      new FakeStorageBackupSourceAdapter(),
+    ],
+    private readonly targets: StorageBackupTargetProviderPort[] = [
+      new FakeStorageBackupTargetProvider(),
+    ],
+  ) {}
+
+  sourceAdapters(): readonly StorageBackupSourceAdapterPort[] {
+    return this.sources;
+  }
+
+  targetProviders(): readonly StorageBackupTargetProviderPort[] {
+    return this.targets;
   }
 }
 

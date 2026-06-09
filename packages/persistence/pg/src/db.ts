@@ -91,6 +91,8 @@ import { memberLifecycleStatusMigration } from "./migrations/082_member_lifecycl
 import * as deploymentTargetVariantsMigration from "./migrations/083_deployment_target_variants";
 import { durableWorkLedgerMigration } from "./migrations/084_durable_work_ledger";
 import { durableWorkerHeartbeatsMigration } from "./migrations/085_durable_worker_heartbeats";
+import { storageVolumeBackupsMigration } from "./migrations/086_storage_volume_backups";
+import { resourceStorageAttachmentBackupMetadataMigration } from "./migrations/087_resource_storage_attachment_backup_metadata";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -176,8 +178,8 @@ export async function createDatabase(input: CreateDatabaseInput): Promise<Databa
       location: input.databaseUrl,
     },
     async close(): Promise<void> {
-      await db.destroy();
-      await connection.end();
+      // kysely-postgres-js delegates destroy to postgres.end() without a timeout.
+      await connection.end({ timeout: 5 });
     },
   };
 }
@@ -272,6 +274,9 @@ class StaticMigrationProvider implements MigrationProvider {
       "083_deployment_target_variants": deploymentTargetVariantsMigration,
       "084_durable_work_ledger": durableWorkLedgerMigration,
       "085_durable_worker_heartbeats": durableWorkerHeartbeatsMigration,
+      "086_storage_volume_backups": storageVolumeBackupsMigration,
+      "087_resource_storage_attachment_backup_metadata":
+        resourceStorageAttachmentBackupMetadataMigration,
     };
   }
 }

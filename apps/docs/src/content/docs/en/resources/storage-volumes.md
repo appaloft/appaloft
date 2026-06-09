@@ -18,6 +18,13 @@ relatedOperations:
   - storage-volumes.rename
   - storage-volumes.delete
   - storage-volumes.cleanup-runtime
+  - storage-volumes.backup-plan
+  - storage-volumes.create-backup
+  - storage-volumes.list-backups
+  - storage-volumes.show-backup
+  - storage-volumes.restore-plan
+  - storage-volumes.restore-backup
+  - storage-volumes.prune-backups
   - resources.attach-storage
   - resources.detach-storage
 sidebar:
@@ -104,6 +111,60 @@ Swarm Compose stack storage mount realization happens during deployment executio
 a stack override for Compose workloads with explicit target service metadata, deploys a candidate
 stack, verifies it, then cleans superseded Appaloft stacks/services.
 
+<h2 id="storage-volume-backup-restore">Storage volume backup and restore</h2>
+
+Storage volume backup protects application data mounted into a Resource, such as PocketBase
+`/pb_data`, upload directories, JSON files, or SQLite files. It is not DependencyResource backup:
+Postgres and Redis-style service dependencies still use `dependency-resources.*`, while SQLite or
+application files stored on a volume use `storage-volumes.*` backup and restore operations.
+
+Plan before execution. The plan selects a source adapter and target provider, reports consistency,
+local-only status, retention impact, and blockers. When no safe adapter/provider exists, Appaloft
+fails closed instead of falling back to unsafe live file copy:
+
+```bash title="Plan a volume backup"
+appaloft storage volume backup plan \
+  --storage-volume vol_uploads \
+  --resource res_pocketbase \
+  --destination-path /pb_data \
+  --data-format sqlite \
+  --consistency application-consistent \
+  --target-provider local-filesystem \
+  --target-ref /var/lib/appaloft/backups \
+  --retention-max-count 3 \
+  --retention-min-free-bytes 1073741824
+```
+
+When the plan has no blockers, create the backup:
+
+```bash title="Create a volume backup"
+appaloft storage volume backup create \
+  --storage-volume vol_uploads \
+  --destination-path /pb_data \
+  --data-format sqlite \
+  --consistency application-consistent \
+  --target-provider local-filesystem \
+  --target-ref /var/lib/appaloft/backups \
+  --retention-max-count 3 \
+  --retention-min-free-bytes 1073741824
+```
+
+Inspect, restore, and prune restore points:
+
+```bash title="Manage volume restore points"
+appaloft storage volume backup list --storage-volume vol_uploads
+appaloft storage volume backup show svb_123
+appaloft storage volume backup restore-plan svb_123
+appaloft storage volume backup restore svb_123 --restored-volume-name pb-data-restored
+appaloft storage volume backup prune svb_123
+```
+
+Restore defaults to a new StorageVolume. Attaching that restored volume back to a Resource, or
+switching an existing mount, is a separate explicit operator action. A local filesystem target is
+only a same-host or same-failure-domain restore point, not disaster recovery. S3-compatible,
+WebDAV, Restic repository, or provider snapshot targets require the distribution/runtime to
+register the matching target provider and secret refs.
+
 <h2 id="storage-volume-surfaces">Entrypoint differences</h2>
 
 The CLI fits create, inspect, rename, delete, attach, and detach workflows. The HTTP API uses the
@@ -112,4 +173,6 @@ storage volumes for the current project/environment, shows safe attachment summa
 renames, and deletes provider-neutral storage volume records, and can attach or detach storage from
 the Resource profile. Web can also run dry-run-first runtime cleanup for one storage volume on one
 server: it previews candidates and blockers first, then sends destructive cleanup only after
-confirmation. Web still does not provider-provision storage volumes or run broad Docker prune.
+confirmation. Web Storage settings can also plan volume backups, display blockers, list restore
+points, restore to a new volume, and prune selected backups. Web still does not
+provider-provision storage volumes or run broad Docker prune.

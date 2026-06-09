@@ -24,6 +24,7 @@ import {
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
+  RuntimeStorageBackupProviderRegistry,
   RuntimeTargetCapacityInspectorAdapter,
   RuntimeTargetCapacityPrunerAdapter,
   RuntimeTargetScheduledTaskRuntimePort,
@@ -91,7 +92,6 @@ import {
   type StaticArtifactRouteProviderPort,
   type StaticArtifactStorePort,
   type StorageRuntimeCleaner,
-  type StorageVolumeBackupSafetyReader,
   tokens,
   toRepositoryContext,
 } from "@appaloft/application";
@@ -199,6 +199,9 @@ import {
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
   PgSshCredentialUsageReader,
+  PgStorageVolumeBackupReadModel,
+  PgStorageVolumeBackupRepository,
+  PgStorageVolumeBackupSafetyReader,
   PgStorageVolumeReadModel,
   PgStorageVolumeRepository,
 } from "@appaloft/persistence-pg";
@@ -731,15 +734,6 @@ class NoopServerAppliedRouteStateRepository implements ServerAppliedRouteStateRe
   }
 }
 
-class EmptyStorageVolumeBackupSafetyReader implements StorageVolumeBackupSafetyReader {
-  async findSafetyEvidence() {
-    return ok({
-      backupRetentionRequired: false,
-      backupRestoreInFlightCount: 0,
-    });
-  }
-}
-
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   private readonly storage = new AsyncLocalStorage<{
     context: ExecutionContext;
@@ -1031,7 +1025,12 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.storageVolumeBackupSafetyReader, {
-    useFactory: instanceCachingFactory(() => new EmptyStorageVolumeBackupSafetyReader()),
+    useFactory: instanceCachingFactory(
+      () => new PgStorageVolumeBackupSafetyReader(input.database.db),
+    ),
+  });
+  container.register(tokens.storageVolumeBackupProviderRegistry, {
+    useFactory: instanceCachingFactory(() => new RuntimeStorageBackupProviderRegistry()),
   });
   container.register(tokens.staticArtifactPayloadReaderPort, {
     useFactory: instanceCachingFactory(() => new FileSystemStaticArtifactPayloadReader()),
@@ -1179,6 +1178,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.dependencyResourceBackupRepository, {
     useFactory: instanceCachingFactory(
       () => new PgDependencyResourceBackupRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.storageVolumeBackupRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgStorageVolumeBackupRepository(input.database.db),
     ),
   });
   container.register(tokens.resourceDependencyBindingRepository, {
@@ -1472,6 +1476,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.storageVolumeReadModel, {
     useFactory: instanceCachingFactory(() => new PgStorageVolumeReadModel(input.database.db)),
+  });
+  container.register(tokens.storageVolumeBackupReadModel, {
+    useFactory: instanceCachingFactory(() => new PgStorageVolumeBackupReadModel(input.database.db)),
   });
   container.register(tokens.resourceAccessFailureEvidenceRecorder, {
     useFactory: instanceCachingFactory(

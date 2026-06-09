@@ -15,9 +15,18 @@ searchAliases:
   - "DATABASE_URL"
   - "依赖资源"
 relatedOperations:
+  - blueprints.list
+  - blueprints.show
+  - blueprints.plan-install
+  - blueprints.install
+  - blueprints.installation.show
   - dependency-resources.provision
   - dependency-resources.import
+  - dependency-resources.provisioning.plan
+  - dependency-resources.provisioning.accept
+  - dependency-resources.provisioning.status
   - dependency-resources.list
+  - dependency-resources.count
   - dependency-resources.show
   - dependency-resources.rename
   - dependency-resources.delete
@@ -61,6 +70,25 @@ secret；不会保存真实密码或连接串。包含密码的 `url` 或 templa
 
 MariaDB 使用 `kind: mysql` + `engine.family: mariadb`。这样 dependency 仍保持 MySQL-compatible 的供给和绑定
 primitive，同时由 engine family 决定 provider 选择、readiness、version matching 和输出语义。
+
+<h2 id="blueprint-catalog-installation">Blueprint catalog 和安装</h2>
+
+Blueprint catalog 是中性的 Blueprint 发现和安装入口，不等同于 Cloud marketplace 策略。List/show 只展示
+portable manifest、组件、dependency requirements、storage requirements 和 safe metadata；install plan
+会预览 Resource、DependencyResource、StorageVolume、绑定和部署意图；install 接受计划后创建对应资源。
+
+```bash title="查看和安装 Blueprint"
+appaloft blueprint list
+appaloft blueprint show pocketbase
+appaloft blueprint plan-install pocketbase
+appaloft blueprint install pocketbase
+appaloft blueprint installation show app_123
+```
+
+Application bundle readback 必须把 dependency bindings 和 storage bindings 分开展示。数据库、Redis、
+object storage、OpenSearch 等服务依赖走 DependencyResource；PocketBase SQLite 文件、uploads、
+模型缓存和其他 mounted application data 走 StorageVolume。Blueprint 安装不能把 volume 当成依赖资源，也不能
+通过 dependency backup/restore 处理 volume 数据。
 
 <h2 id="dependency-resource-binding">绑定到 Resource</h2>
 

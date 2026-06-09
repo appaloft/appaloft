@@ -74,7 +74,7 @@ export function createDurableWorkRuntimeRunner(
   const leaseDurationMs = input.leaseDurationMs ?? 300_000;
   const processStartedAt = new Date().toISOString();
   const timers: ReturnType<typeof setInterval>[] = [];
-  const runningWorkers = new Set<string>();
+  const activeWorkerTicks = new Map<string, Promise<void>>();
 
   async function recordHeartbeat(workerId: string, lastSeenAt: string): Promise<void> {
     if (!input.heartbeatStore) {
@@ -114,16 +114,11 @@ export function createDurableWorkRuntimeRunner(
   }
 
   async function tick(workerId: string): Promise<void> {
-    if (runningWorkers.has(workerId)) {
-      return;
-    }
-
     const worker = input.topology.workers.find((candidate) => candidate.workerId === workerId);
     if (!worker) {
       return;
     }
 
-    runningWorkers.add(workerId);
     try {
       const now = new Date().toISOString();
       await recordHeartbeat(workerId, now);
@@ -173,8 +168,16 @@ export function createDurableWorkRuntimeRunner(
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      runningWorkers.delete(workerId);
+      activeWorkerTicks.delete(workerId);
     }
+  }
+
+  function startTick(workerId: string): void {
+    if (activeWorkerTicks.has(workerId)) {
+      return;
+    }
+
+    activeWorkerTicks.set(workerId, tick(workerId));
   }
 
   return {
@@ -192,10 +195,10 @@ export function createDurableWorkRuntimeRunner(
       }
 
       for (const worker of input.topology.workers) {
-        void tick(worker.workerId);
+        startTick(worker.workerId);
         timers.push(
           setInterval(() => {
-            void tick(worker.workerId);
+            startTick(worker.workerId);
           }, intervalSeconds * 1000),
         );
       }
@@ -211,6 +214,7 @@ export function createDurableWorkRuntimeRunner(
       for (const timer of timers.splice(0)) {
         clearInterval(timer);
       }
+      await Promise.allSettled([...activeWorkerTicks.values()]);
       if (input.heartbeatStore) {
         const stoppedAt = new Date().toISOString();
         await Promise.all(
@@ -237,7 +241,6 @@ export function createDurableWorkRuntimeRunner(
           }),
         );
       }
-      runningWorkers.clear();
       input.logger.info("durable_work_runtime.drain_stopped");
     },
   };

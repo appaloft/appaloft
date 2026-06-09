@@ -50,8 +50,10 @@ import {
   SourceKindValue,
   SourceLocator,
   StorageDestinationPath,
+  StorageVolumeByIdSpec,
   StorageVolumeId,
   StorageVolumeKindValue,
+  type StorageVolumeSelectionSpec,
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
@@ -70,6 +72,8 @@ import {
   type ResourceRepository,
   type ResourceSummary,
   type ServerRepository,
+  type StorageVolumeReadModel,
+  type StorageVolumeSummary,
 } from "../src/ports";
 import { ListResourcesQueryService, ShowResourceQueryService } from "../src/use-cases";
 
@@ -149,6 +153,28 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   async findOne(): Promise<DeploymentSummary | null> {
     return null;
+  }
+}
+
+class StaticStorageVolumeReadModel implements StorageVolumeReadModel {
+  constructor(private readonly volumes: StorageVolumeSummary[] = []) {}
+
+  async list(): Promise<StorageVolumeSummary[]> {
+    return this.volumes;
+  }
+
+  async findOne(
+    _context: ReturnType<typeof toRepositoryContext>,
+    spec: StorageVolumeSelectionSpec,
+  ): Promise<StorageVolumeSummary | null> {
+    if (!(spec instanceof StorageVolumeByIdSpec)) {
+      return null;
+    }
+    return this.volumes.find((volume) => volume.id === spec.id.value) ?? null;
+  }
+
+  async countAttachments(): Promise<number> {
+    return 0;
   }
 }
 
@@ -398,6 +424,7 @@ function createService(input?: {
   resources?: Resource[];
   summaries?: ResourceSummary[];
   deployments?: DeploymentSummary[];
+  storageVolumes?: StorageVolumeSummary[];
 }): ShowResourceQueryService {
   const listResourcesQueryService = new ListResourcesQueryService(
     new StaticResourceReadModel(input?.summaries ?? [resourceSummary()]),
@@ -411,6 +438,7 @@ function createService(input?: {
     listResourcesQueryService,
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
     new FixedClock(),
+    input?.storageVolumes ? new StaticStorageVolumeReadModel(input.storageVolumes) : undefined,
   );
 }
 
@@ -549,21 +577,37 @@ describe("ShowResourceQueryService", () => {
     expect(detail.lifecycle.status).toBe("active");
   });
 
-  test("[STOR-READ-002] returns storage attachment summaries from resources.show", async () => {
+  test("[STOR-READ-002] [STOR-VIS-OVERVIEW-002] returns storage attachment summaries from resources.show", async () => {
     const resource = detailedResource();
     resource
       .attachStorage({
         attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_demo"),
         storageVolumeId: StorageVolumeId.rehydrate("stv_data"),
         storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
-        destinationPath: StorageDestinationPath.create("/data")._unsafeUnwrap(),
+        destinationPath: StorageDestinationPath.create("/pb_data")._unsafeUnwrap(),
         mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+        dataFormat: "sqlite",
+        applicationDataLabel: DescriptionText.rehydrate("PocketBase data"),
         attachedAt: CreatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
       })
       ._unsafeUnwrap();
 
     const result = await createService({
       resources: [resource],
+      storageVolumes: [
+        {
+          id: "stv_data",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          name: "PocketBase data",
+          slug: "pocketbase-data",
+          kind: "named-volume",
+          lifecycleStatus: "active",
+          attachmentCount: 1,
+          attachments: [],
+          createdAt: "2026-01-01T00:02:00.000Z",
+        },
+      ],
     }).execute(createTestContext(), createQuery());
 
     const detail = unwrap(result);
@@ -571,9 +615,12 @@ describe("ShowResourceQueryService", () => {
       {
         id: "rsa_demo",
         storageVolumeId: "stv_data",
+        storageVolumeName: "PocketBase data",
         storageVolumeKind: "named-volume",
-        destinationPath: "/data",
+        destinationPath: "/pb_data",
         mountMode: "read-write",
+        dataFormat: "sqlite",
+        applicationDataLabel: "PocketBase data",
         attachedAt: "2026-01-01T00:03:00.000Z",
       },
     ]);

@@ -241,6 +241,37 @@ export interface DependencyResourceBackupsTable {
   created_at: TimestampColumn;
 }
 
+export interface StorageVolumeBackupsTable {
+  id: string;
+  storage_volume_id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string | null;
+  storage_volume_kind: string;
+  source_adapter_key: string;
+  target_provider_key: string;
+  target_ref: string;
+  consistency: string;
+  status: string;
+  attempt_id: string;
+  requested_at: TimestampColumn;
+  retention_status: string;
+  local_only: boolean;
+  artifact_handle: string | null;
+  size_bytes: ColumnType<number | null, number | null | undefined, number | null>;
+  checksum: string | null;
+  completed_at: NullableUpdatableTimestampColumn;
+  failed_at: NullableUpdatableTimestampColumn;
+  failure_code: string | null;
+  failure_message: string | null;
+  latest_restore_attempt: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  created_at: TimestampColumn;
+}
+
 export interface DependencyResourceBackupPoliciesTable {
   id: string;
   version: string;
@@ -281,6 +312,8 @@ export interface ResourceStorageAttachmentsTable {
   source_path: string | null;
   destination_path: string;
   mount_mode: string;
+  data_format: string | null;
+  application_data_label: string | null;
   attached_at: TimestampColumn;
 }
 
@@ -1096,6 +1129,7 @@ export interface Database {
   resource_variables: ResourceVariablesTable;
   dependency_resources: DependencyResourcesTable;
   dependency_resource_backups: DependencyResourceBackupsTable;
+  storage_volume_backups: StorageVolumeBackupsTable;
   dependency_resource_backup_policies: DependencyResourceBackupPoliciesTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
   resource_runtime_log_archives: ResourceRuntimeLogArchivesTable;

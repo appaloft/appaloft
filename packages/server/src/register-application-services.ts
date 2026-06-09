@@ -126,7 +126,13 @@ import {
   CreateScheduledTaskCommandHandler,
   CreateScheduledTaskUseCase,
   CreateSshCredentialUseCase,
+  CreateStorageVolumeBackupCommandHandler,
+  CreateStorageVolumeBackupPlanQueryHandler,
+  CreateStorageVolumeBackupPlanQueryService,
+  CreateStorageVolumeBackupUseCase,
   CreateStorageVolumeCommandHandler,
+  CreateStorageVolumeRestorePlanQueryHandler,
+  CreateStorageVolumeRestorePlanQueryService,
   CreateStorageVolumeUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
@@ -291,6 +297,8 @@ import {
   ListSourceLinksQueryHandler,
   ListSshCredentialsQueryService,
   ListStaticArtifactPublicationsQueryHandler,
+  ListStorageVolumeBackupsQueryHandler,
+  ListStorageVolumeBackupsQueryService,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
   ListTerminalSessionsQueryHandler,
@@ -360,6 +368,8 @@ import {
   PruneServerCapacityUseCase,
   PruneSourceEventsCommandHandler,
   PruneSourceEventsUseCase,
+  PruneStorageVolumeBackupCommandHandler,
+  PruneStorageVolumeBackupUseCase,
   PublishStaticArtifactArchiveCommandHandler,
   PublishStaticArtifactCommandHandler,
   PublishStaticArtifactPayloadCommandHandler,
@@ -418,6 +428,8 @@ import {
   RestoreDependencyResourceBackupUseCase,
   RestoreProjectCommandHandler,
   RestoreProjectUseCase,
+  RestoreStorageVolumeBackupCommandHandler,
+  RestoreStorageVolumeBackupUseCase,
   RetryCertificateCommandHandler,
   RetryCertificateUseCase,
   RetryDeploymentCommandHandler,
@@ -526,6 +538,8 @@ import {
   ShowSourceLinkQueryHandler,
   ShowSshCredentialQueryHandler,
   ShowSshCredentialQueryService,
+  ShowStorageVolumeBackupQueryHandler,
+  ShowStorageVolumeBackupQueryService,
   ShowStorageVolumeQueryHandler,
   ShowStorageVolumeQueryService,
   ShowTerminalSessionQueryHandler,
@@ -2558,6 +2572,13 @@ export function registerApplicationServices(
   container.registerSingleton(RenameStorageVolumeCommandHandler);
   container.registerSingleton(DeleteStorageVolumeCommandHandler);
   container.registerSingleton(CleanupStorageVolumeRuntimeCommandHandler);
+  container.registerSingleton(CreateStorageVolumeBackupPlanQueryHandler);
+  container.registerSingleton(CreateStorageVolumeBackupCommandHandler);
+  container.registerSingleton(ListStorageVolumeBackupsQueryHandler);
+  container.registerSingleton(ShowStorageVolumeBackupQueryHandler);
+  container.registerSingleton(CreateStorageVolumeRestorePlanQueryHandler);
+  container.registerSingleton(RestoreStorageVolumeBackupCommandHandler);
+  container.registerSingleton(PruneStorageVolumeBackupCommandHandler);
   container.registerSingleton(ListStorageVolumesQueryHandler);
   container.registerSingleton(ShowStorageVolumeQueryHandler);
   container.registerSingleton(BootstrapFirstAdminCommandHandler);
@@ -3049,6 +3070,34 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.cleanupStorageVolumeRuntimeUseCase,
     CleanupStorageVolumeRuntimeUseCase,
+  );
+  container.registerSingleton(
+    tokens.createStorageVolumeBackupPlanQueryService,
+    CreateStorageVolumeBackupPlanQueryService,
+  );
+  container.registerSingleton(
+    tokens.createStorageVolumeBackupUseCase,
+    CreateStorageVolumeBackupUseCase,
+  );
+  container.registerSingleton(
+    tokens.listStorageVolumeBackupsQueryService,
+    ListStorageVolumeBackupsQueryService,
+  );
+  container.registerSingleton(
+    tokens.showStorageVolumeBackupQueryService,
+    ShowStorageVolumeBackupQueryService,
+  );
+  container.registerSingleton(
+    tokens.createStorageVolumeRestorePlanQueryService,
+    CreateStorageVolumeRestorePlanQueryService,
+  );
+  container.registerSingleton(
+    tokens.restoreStorageVolumeBackupUseCase,
+    RestoreStorageVolumeBackupUseCase,
+  );
+  container.registerSingleton(
+    tokens.pruneStorageVolumeBackupUseCase,
+    PruneStorageVolumeBackupUseCase,
   );
   container.registerSingleton(
     tokens.listStorageVolumesQueryService,

@@ -14,9 +14,18 @@ searchAliases:
   - "runtime injection"
   - "DATABASE_URL"
 relatedOperations:
+  - blueprints.list
+  - blueprints.show
+  - blueprints.plan-install
+  - blueprints.install
+  - blueprints.installation.show
   - dependency-resources.provision
   - dependency-resources.import
+  - dependency-resources.provisioning.plan
+  - dependency-resources.provisioning.accept
+  - dependency-resources.provisioning.status
   - dependency-resources.list
+  - dependency-resources.count
   - dependency-resources.show
   - dependency-resources.rename
   - dependency-resources.delete
@@ -117,6 +126,28 @@ dependencyEnv:
 Use `kind: mysql` with `engine.family: mariadb` for MariaDB. The dependency remains a
 MySQL-compatible provisioning and binding primitive, while the engine family drives provider
 selection, readiness, version matching, and generated output semantics.
+
+<h2 id="blueprint-catalog-installation">Blueprint catalog and installation</h2>
+
+The Blueprint catalog is the neutral Blueprint discovery and installation entrypoint. It is not the
+same as Cloud marketplace policy. List/show expose portable manifests, components, dependency
+requirements, storage requirements, and safe metadata. Install plan previews the Resource,
+DependencyResource, StorageVolume, binding, and deployment intents. Install accepts the plan and
+creates the corresponding resources.
+
+```bash title="Inspect and install a Blueprint"
+appaloft blueprint list
+appaloft blueprint show pocketbase
+appaloft blueprint plan-install pocketbase
+appaloft blueprint install pocketbase
+appaloft blueprint installation show app_123
+```
+
+Application bundle readback must show dependency bindings separately from storage bindings.
+Databases, Redis, object storage, OpenSearch, and similar service dependencies use
+DependencyResource. PocketBase SQLite files, uploads, model caches, and other mounted application
+data use StorageVolume. Blueprint installation must not turn volumes into dependency resources, and
+volume data must not be handled through dependency backup/restore.
 
 <h2 id="dependency-resource-binding">Bind to a Resource</h2>
 
