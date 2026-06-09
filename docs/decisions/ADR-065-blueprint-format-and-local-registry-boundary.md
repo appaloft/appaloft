@@ -21,6 +21,12 @@ Community Appaloft must keep this capability open, neutral, and local-first. Use
 - Blueprint install planning preserves dependency readiness metadata and emits explicit dependency readiness gates before component deployment operations. Real provider execution may still be adapter-specific, but plan, bundle, and runtime projection must not drop readiness metadata or replace it with one default probe.
 - Runtime/provider-specific rendering remains behind existing adapters, providers, plugins, and runtime target backends. Blueprint definitions must not expose Docker, Swarm, Kubernetes, DNS, object storage, or other provider-specific details as the public contract when a portable Appaloft concept exists.
 - A local registry or catalog entry may reference a BlueprintVersion, but discovery metadata is not the Blueprint itself.
+- One-click deploy buttons are deploy handoff affordances, not Blueprint definitions and not a
+  second manifest format. A button may link to `/deploy?source=blueprint&blueprintSlug=...` for a
+  registered catalog entry, or reserve a `blueprintUrl` handoff for runtimes that support remote
+  Blueprint import. The portable topology remains `appaloft.blueprint/v1`; deploy handoff URLs must
+  not carry real secret values, provider tokens, database passwords, or private repository
+  credentials.
 - `McpServerBlueprint` means a deployable Blueprint that includes an MCP server component. `McpToolListing` or gateway registration is a separate tool interface concept. Installing a server Blueprint may later produce gateway integration metadata, but gateway calls must still dispatch through accepted Appaloft command/query paths.
 
 ## Consequences
