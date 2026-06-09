@@ -75,6 +75,8 @@ apt_run() {
     attempt="$((attempt + 1))"
   done
 }
+printf 'APPALOFT_DOCKER_PREPARE docker-repository-reset\n'
+$SUDO rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.list.save
 printf 'APPALOFT_DOCKER_PREPARE apt-bootstrap\n'
 apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 update
 apt_run $SUDO dpkg --configure -a
