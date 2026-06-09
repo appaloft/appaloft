@@ -77,6 +77,8 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("nothing-side-stack");
     expect(homePageSource).toContain("i18nKeys.console.home.operationContextTitle");
     expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsTitle");
+    expect(homePageSource).toContain("deployments.slice(0, 5)");
+    expect(homePageSource).toContain('class="nothing-side-link"');
     expect(homePageSource).toContain("orpcClient.servers.count({})");
     expect(homePageSource).toContain("orpcClient.deployments.count({})");
     expect(homePageSource).not.toContain("nothing-dashboard-grid");

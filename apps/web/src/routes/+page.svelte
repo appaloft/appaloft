@@ -489,6 +489,10 @@
                   </a>
                 {/each}
               </div>
+              <a href="/deployments" class="nothing-side-link">
+                <span>{$t(i18nKeys.common.actions.viewAll)}</span>
+                <ArrowRight class="size-3.5" />
+              </a>
             {:else}
               <div class="nothing-side-empty">
                 {$t(i18nKeys.console.home.latestDeploymentEmpty)}
@@ -1051,6 +1055,23 @@
     color: var(--text-secondary);
   }
 
+  .nothing-side-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+
+  .nothing-side-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .nothing-side-empty {
     border: 1px dashed var(--input);
     border-radius: var(--radius-md);
@@ -1069,6 +1090,7 @@
   .nothing-project-open:focus-visible,
   .nothing-context-cell:focus-visible,
   .nothing-activity-row:focus-visible,
+  .nothing-side-link:focus-visible,
   .nothing-next-row:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
