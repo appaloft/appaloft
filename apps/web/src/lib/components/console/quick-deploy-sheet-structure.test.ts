@@ -128,7 +128,7 @@ describe("QuickDeploySheet structure", () => {
       'parseDeploymentStep(params.get("step")) !== "source"',
     );
     expect(quickDeploySheetSource).toContain(
-      'blueprintSourceLockedByEntry && sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim())',
+      "Boolean(selectedBlueprintSlug.trim()) || Boolean(selectedBlueprintUrl.trim())",
     );
     expect(quickDeploySheetSource).toContain('if (kind !== "blueprint")');
     expect(quickDeploySheetSource).toContain("blueprintSourceLockedByEntry = false");
