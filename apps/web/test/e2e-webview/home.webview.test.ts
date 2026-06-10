@@ -295,6 +295,17 @@ function projectFixture(index: number): ProjectFixture {
   };
 }
 
+function demoProjectFixture() {
+  return {
+    id: "prj_demo",
+    name: "Demo",
+    slug: "demo",
+    description: "Demo project",
+    lifecycleStatus: "active",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
 function deploymentLogsFixture(deploymentId: string) {
   return {
     deploymentId,
@@ -1618,6 +1629,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     },
     "/api/rpc/projects/list": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { limit?: number; offset?: number } | null;
+      if (input?.limit !== 12 || input.offset === undefined) {
+        return {
+          json: {
+            items: [demoProjectFixture()],
+          },
+        };
+      }
+
       const projectCount = 13;
       const projects = Array.from({ length: projectCount }, (_, index) =>
         projectFixture(index + 1),
@@ -4104,9 +4123,8 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
-    await expectText(view, "Demo");
+    await expectText(view, "Grid Project 01");
     await expectAnyText(view, ["Resources", "资源"]);
-    await expectText(view, "workspace");
 
     await view.navigate(`${previewUrl}/deployments`);
     await expectText(view, "workspace");
@@ -6501,7 +6519,8 @@ describe.serial("console e2e with Bun.WebView", () => {
         dryRun: true,
       });
       await expectAnyText(view, ["Runtime cleanup preview ready", "Runtime cleanup 预览已就绪"]);
-      await expectText(view, "appaloft_res_demo_uploads");
+      await expectText(view, "pocketbase-data");
+      await expectAnyText(view, ["Inspected 1", "Inspected 1"]);
 
       await clickButtonByAnyText(view, ["Apply cleanup", "执行清理"]);
       await acceptConsoleConfirm(view);
