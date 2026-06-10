@@ -145,6 +145,7 @@ import {
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
   type ReorderProjectsCommandInput,
+  type ReorderServersCommandInput,
   type ReplaySourceEventCommandInput,
   type ResetResourceHealthCommandInput,
   type ResourceAccessFailureEvidenceLookupQueryInput,
@@ -359,6 +360,7 @@ import {
   type RenameStorageVolumeInput,
   type RenameStorageVolumeResponse,
   type ReorderProjectsResponse,
+  type ReorderServersResponse,
   type ReplaySourceEventResponse,
   type ResetResourceHealthResponse,
   type ResourceAccessFailureEvidenceLookup,
@@ -834,6 +836,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RenameServerCommandInput,
       RenameServerResponse,
+      AppaloftClientError
+    >;
+    reorder: Client<
+      AppaloftClientContext,
+      ReorderServersCommandInput,
+      ReorderServersResponse,
       AppaloftClientError
     >;
     configureEdgeProxy: Client<

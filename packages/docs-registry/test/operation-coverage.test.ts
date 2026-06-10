@@ -131,6 +131,11 @@ describe("public docs operation coverage", () => {
       status: "documented",
       topicId: "server.deployment-target",
     });
+    expect(getPublicDocsOperationCoverage("servers.reorder")).toMatchObject({
+      operationKey: "servers.reorder",
+      status: "documented",
+      topicId: "server.deployment-target",
+    });
     expect(getPublicDocsOperationCoverage("servers.deactivate")).toMatchObject({
       operationKey: "servers.deactivate",
       status: "documented",
@@ -149,6 +154,7 @@ describe("public docs operation coverage", () => {
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/commands/servers.rename.md",
+        "docs/commands/servers.reorder.md",
         "docs/commands/servers.deactivate.md",
         "docs/commands/servers.configure-edge-proxy.md",
         "docs/queries/servers.delete-check.md",
@@ -156,6 +162,7 @@ describe("public docs operation coverage", () => {
         "docs/testing/deployment-target-lifecycle-test-matrix.md",
       ]),
     );
+    expect(topic.webSurfaces?.join("\n")).toContain("server list card reorder");
     expect(topic.webSurfaces?.join("\n")).toContain("server detail rename");
     expect(topic.webSurfaces?.join("\n")).toContain("edge proxy configuration");
     expect(topic.webSurfaces?.join("\n")).toContain("typed deactivate");

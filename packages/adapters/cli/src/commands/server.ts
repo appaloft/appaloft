@@ -17,6 +17,7 @@ import {
   prepareServerRuntimeModeSchema,
   RegisterServerCommand,
   RenameServerCommand,
+  ReorderServersCommand,
   RotateSshCredentialCommand,
   runtimeTargetPruneCategories,
   ShowScheduledRuntimePrunePolicyQuery,
@@ -74,6 +75,8 @@ const optionalPolicyScopeOption = Options.choice("scope", scheduledRuntimePruneP
   Options.optional,
 );
 const optionalServerIdOption = Options.text("server-id").pipe(Options.optional);
+const serverIdsOption = Options.text("server-ids");
+const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
 
 const registerCommand = EffectCommand.make(
   "register",
@@ -129,6 +132,24 @@ const renameCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRename));
+
+const reorderCommand = EffectCommand.make(
+  "reorder",
+  {
+    serverIds: serverIdsOption,
+    startOffset: startOffsetOption,
+  },
+  ({ serverIds, startOffset }) =>
+    runCommand(
+      ReorderServersCommand.create({
+        serverIds: serverIds
+          .split(",")
+          .map((serverId) => serverId.trim())
+          .filter(Boolean),
+        startOffset: optionalValue(startOffset),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverReorder));
 
 const deactivateCommand = EffectCommand.make(
   "deactivate",
@@ -529,6 +550,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     listCommand,
     showCommand,
     renameCommand,
+    reorderCommand,
     deactivateCommand,
     deleteCheckCommand,
     deleteCommand,

@@ -356,6 +356,8 @@ import {
   RenameStorageVolumeUseCase,
   ReorderProjectsCommandHandler,
   ReorderProjectsUseCase,
+  ReorderServersCommandHandler,
+  ReorderServersUseCase,
   ReplaySourceEventCommandHandler,
   ReplaySourceEventUseCase,
   ResetResourceHealthCommandHandler,
@@ -1689,6 +1691,7 @@ export function registerApplicationServices(
   container.registerSingleton(ResolveActionServerConfigDeploymentTargetCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ReorderProjectsCommandHandler);
+  container.registerSingleton(ReorderServersCommandHandler);
   container.registerSingleton(SetProjectDescriptionCommandHandler);
   container.registerSingleton(CancelOperatorWorkCommandHandler);
   container.registerSingleton(DeadLetterOperatorWorkCommandHandler);
@@ -2323,6 +2326,7 @@ export function registerApplicationServices(
     ),
   });
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
+  container.registerSingleton(tokens.reorderServersUseCase, ReorderServersUseCase);
   container.registerSingleton(
     tokens.configureServerEdgeProxyUseCase,
     ConfigureServerEdgeProxyUseCase,

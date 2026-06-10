@@ -45,6 +45,7 @@ export interface ServersTable {
   credential_username: string | null;
   credential_public_key: string | null;
   credential_private_key: string | null;
+  display_order: ColumnType<number, number | undefined, number>;
   created_at: TimestampColumn;
 }
 

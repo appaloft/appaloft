@@ -637,7 +637,7 @@ describe("product auth gate HTTP/oRPC routes", () => {
       execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
         queryBusHit = true;
         capturedQuery = query as Query<unknown>;
-        return ok({ items: [] } as T);
+        return ok({ items: [], total: 0, limit: 50, offset: 0 } as T);
       },
     } as QueryBus;
     const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
@@ -673,7 +673,7 @@ describe("product auth gate HTTP/oRPC routes", () => {
     const text = await response.text();
     expect(queryBusHit, text).toBe(true);
     expect(response.status, text).toBe(200);
-    expect(JSON.parse(text)).toEqual({ items: [] });
+    expect(JSON.parse(text)).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
     expect(capturedAuthorizationRequest).toMatchObject({
       path: "/api/projects",
       requiredRole: "member",
@@ -693,7 +693,7 @@ describe("product auth gate HTTP/oRPC routes", () => {
     const readQueryBus = {
       execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
         capturedQuery = query as Query<unknown>;
-        return ok({ items: [] } as T);
+        return ok({ items: [], total: 0, limit: 50, offset: 0 } as T);
       },
     } as QueryBus;
     const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
@@ -752,7 +752,11 @@ describe("product auth gate HTTP/oRPC routes", () => {
         response.status,
         `${testCase.routePath} ${capturedQuery?.constructor.name ?? "no-query"} ${text}`,
       ).toBe(200);
-      expect(JSON.parse(text)).toEqual({ items: [] });
+      const expectedResponse =
+        testCase.queryType === ListServersQuery
+          ? { items: [], total: 0, limit: 50, offset: 0 }
+          : { items: [] };
+      expect(JSON.parse(text)).toEqual(expectedResponse);
       expect(capturedAuthorizationRequest).toMatchObject({
         path: testCase.routePath,
         requiredRole: "member",
@@ -1020,9 +1024,8 @@ describe("product auth gate HTTP/oRPC routes", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
-      code: "NOT_FOUND",
-      data: {
-        domainCode: "first_admin_bootstrap_disabled",
+      error: {
+        code: "first_admin_bootstrap_disabled",
       },
     });
     expect(commandDispatched).toBe(false);

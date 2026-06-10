@@ -48,6 +48,7 @@ import {
   DeploymentStatusValue,
   DeploymentTargetCredentialKindValue,
   DeploymentTargetDescriptor,
+  DeploymentTargetDisplayOrder,
   DeploymentTargetId,
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
@@ -1184,6 +1185,7 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
           },
         }
       : {}),
+    displayOrder: DeploymentTargetDisplayOrder.rehydrate(row.display_order ?? 0),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
   };
 }

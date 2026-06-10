@@ -3751,6 +3751,23 @@ export const generatedSdkOperations = [
     streaming: false,
   },
   {
+    operationKey: "servers.reorder",
+    operationGroup: "servers",
+    operationMethod: "reorder",
+    operationId: "servers.reorder",
+    kind: "command",
+    domain: "servers",
+    messageName: "ReorderServersCommand",
+    route: {
+      method: "POST",
+      path: "/servers/reorder",
+    },
+    docsHref: "/docs/servers/register-connect/#server-deployment-target",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
     operationKey: "servers.show",
     operationGroup: "servers",
     operationMethod: "show",

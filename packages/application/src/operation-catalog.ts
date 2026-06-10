@@ -218,6 +218,7 @@ import { prepareServerRuntimeCommandInputSchema } from "./operations/servers/pre
 import { pruneServerCapacityCommandInputSchema } from "./operations/servers/prune-server-capacity.command";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
+import { reorderServersCommandInputSchema } from "./operations/servers/reorder-servers.command";
 import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rotate-ssh-credential.command";
 import { showScheduledRuntimePrunePolicyQueryInputSchema } from "./operations/servers/show-scheduled-runtime-prune-policy.query";
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
@@ -1437,6 +1438,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server rename <serverId> --name <name>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/rename" },
+    },
+  },
+  {
+    key: "servers.reorder",
+    kind: "command",
+    domain: "servers",
+    messageName: "ReorderServersCommand",
+    handlerName: "ReorderServersCommandHandler",
+    serviceName: "ReorderServersUseCase",
+    inputSchema: reorderServersCommandInputSchema,
+    serviceToken: tokens.reorderServersUseCase,
+    transports: {
+      cli: "appaloft server reorder --server-ids <ids>",
+      orpc: { method: "POST", path: "/api/servers/reorder" },
     },
   },
   {

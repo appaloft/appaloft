@@ -303,6 +303,8 @@ export const publicDocsHelpTopics = {
       "ssh host",
       "server rename",
       "rename server",
+      "server reorder",
+      "reorder server",
       "runtime prepare",
       "prepare runtime",
       "edge proxy",
@@ -313,6 +315,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/deployment-target-lifecycle.md",
       "docs/queries/servers.show.md",
       "docs/commands/servers.rename.md",
+      "docs/commands/servers.reorder.md",
       "docs/commands/servers.configure-edge-proxy.md",
       "docs/commands/servers.register-or-connect.md",
       "docs/commands/servers.deactivate.md",
@@ -326,7 +329,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/server-bootstrap-and-proxy.md",
     ],
     webSurfaces: [
-      "apps/web server list/detail and registration surfaces, including server detail rename, runtime preparation/readiness, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
+      "apps/web server list/detail and registration surfaces, including server list card reorder, server detail rename, runtime preparation/readiness, edge proxy configuration, typed deactivate, delete safety, and typed delete confirmation",
     ],
   },
   "blueprint.deploy-handoff": {
@@ -3079,6 +3082,7 @@ export const publicDocsOperationCoverage = [
     topicId: "operator.domain-events",
   },
   { operationKey: "servers.rename", status: "documented", topicId: "server.deployment-target" },
+  { operationKey: "servers.reorder", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.configure-edge-proxy",
     status: "documented",

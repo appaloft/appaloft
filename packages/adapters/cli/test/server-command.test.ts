@@ -653,6 +653,60 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[SRV-LIFE-REORDER-001] server reorder dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { ReorderServersCommand, createExecutionContext } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ reorderedServerIds: ["srv_secondary", "srv_primary"] } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_reorder_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "reorder",
+        "--server-ids",
+        "srv_secondary, srv_primary",
+        "--start-offset",
+        "12",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ReorderServersCommand);
+    expect(commands[0]).toMatchObject({
+      serverIds: ["srv_secondary", "srv_primary"],
+      startOffset: 12,
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-017] server proxy repair dispatches the application command", async () => {
     ensureReflectMetadata();
     const { BootstrapServerProxyCommand, createExecutionContext } = await import(

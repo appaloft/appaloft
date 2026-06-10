@@ -13,10 +13,12 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   InspectServerCapacityQuery,
+  type ProductSessionAuthorizationPort,
   PruneServerCapacityCommand,
   type Query,
   type QueryBus,
   RenameServerCommand,
+  ReorderServersCommand,
   ShowServerQuery,
 } from "@appaloft/application";
 import { type ServerDetail } from "@appaloft/contracts";
@@ -39,8 +41,44 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_server_show",
+        label: "server-show@example.test",
+      },
+      email: "server-show@example.test",
+      organizationId: input.organizationId ?? "org_server_show_test",
+      role: input.requiredRole,
+      userId: "usr_server_show",
+    }),
+};
+
+function mountServerShowRoutes(input: { commandBus: CommandBus; queryBus: QueryBus }) {
+  return mountAppaloftOrpcRoutes(new Elysia(), {
+    commandBus: input.commandBus,
+    executionContextFactory: new TestExecutionContextFactory(),
+    logger: new NoopLogger(),
+    productSessionAuthorizationPort,
+    queryBus: input.queryBus,
+  });
+}
+
+function serverShowRequest(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set("cookie", headers.get("cookie") ?? "better-auth.session_token=server-show-test");
+
+  return new Request(url, {
+    ...init,
+    headers,
+  });
 }
 
 function serverDetail(): ServerDetail {
@@ -95,15 +133,10 @@ describe("server show HTTP route", () => {
         return ok(serverDetail() as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary?includeRollups=true", {
+      serverShowRequest("http://localhost/api/servers/srv_primary?includeRollups=true", {
         method: "GET",
       }),
     );
@@ -217,15 +250,10 @@ describe("server show HTTP route", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/capacity", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/capacity", {
         method: "GET",
       }),
     );
@@ -291,15 +319,10 @@ describe("server show HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/capacity/prune", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/capacity/prune", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -345,15 +368,10 @@ describe("server show HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/deactivate", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/deactivate", {
         method: "POST",
       }),
     );
@@ -378,15 +396,10 @@ describe("server show HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/rename", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/rename", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -403,6 +416,43 @@ describe("server show HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       serverId: "srv_primary",
       name: "Primary SSH server",
+    });
+  });
+
+  test("[SRV-LIFE-REORDER-002] dispatches ReorderServersCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ reorderedServerIds: ["srv_secondary", "srv_primary"] } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountServerShowRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      serverShowRequest("http://localhost/api/servers/reorder", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=server-reorder-test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          serverIds: ["srv_secondary", "srv_primary"],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      reorderedServerIds: ["srv_secondary", "srv_primary"],
+    });
+    expect(capturedCommand).toBeInstanceOf(ReorderServersCommand);
+    expect(capturedCommand).toMatchObject({
+      serverIds: ["srv_secondary", "srv_primary"],
     });
   });
 
@@ -424,15 +474,10 @@ describe("server show HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/edge-proxy/configuration", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/edge-proxy/configuration", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -477,15 +522,10 @@ describe("server show HTTP route", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary/delete-check", {
+      serverShowRequest("http://localhost/api/servers/srv_primary/delete-check", {
         method: "GET",
       }),
     );
@@ -514,15 +554,10 @@ describe("server show HTTP route", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountServerShowRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/servers/srv_primary", {
+      serverShowRequest("http://localhost/api/servers/srv_primary", {
         method: "DELETE",
         headers: {
           "content-type": "application/json",

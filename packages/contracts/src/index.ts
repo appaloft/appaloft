@@ -594,6 +594,7 @@ export const serverSummarySchema = z.object({
       message: z.string().optional(),
     })
     .optional(),
+  displayOrder: z.number().int().nonnegative().optional(),
   credential: z
     .object({
       kind: z.enum(["local-ssh-agent", "ssh-private-key"]),
@@ -635,6 +636,15 @@ export const renameServerInputSchema = z.object({
 
 export const renameServerResponseSchema = z.object({
   id: z.string(),
+});
+
+export const reorderServersInputSchema = z.object({
+  serverIds: z.array(z.string().min(1)).min(1).max(500),
+  startOffset: z.number().int().nonnegative().optional(),
+});
+
+export const reorderServersResponseSchema = z.object({
+  reorderedServerIds: z.array(z.string()),
 });
 
 export const configureServerEdgeProxyInputSchema = z.object({
@@ -828,6 +838,9 @@ export const registerServerResponseSchema = z.object({
 
 export const listServersResponseSchema = z.object({
   items: z.array(serverSummarySchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
 });
 
 const serverDeploymentStatusSchema = z.enum([
@@ -6534,6 +6547,7 @@ export type SshCredentialDetail = z.infer<typeof sshCredentialDetailSchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type ShowServerInput = z.infer<typeof showServerInputSchema>;
 export type RenameServerInput = z.infer<typeof renameServerInputSchema>;
+export type ReorderServersInput = z.infer<typeof reorderServersInputSchema>;
 export type ConfigureServerEdgeProxyInput = z.infer<typeof configureServerEdgeProxyInputSchema>;
 export type DeactivateServerInput = z.infer<typeof deactivateServerInputSchema>;
 export type DeleteServerInput = z.infer<typeof deleteServerInputSchema>;
@@ -6544,6 +6558,7 @@ export type DeleteSshCredentialInput = z.infer<typeof deleteSshCredentialInputSc
 export type RotateSshCredentialInput = z.infer<typeof rotateSshCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
+export type ReorderServersResponse = z.infer<typeof reorderServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
 export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
 export type InspectServerCapacityResponse = z.infer<typeof inspectServerCapacityResponseSchema>;

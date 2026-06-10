@@ -326,6 +326,7 @@ export const cliCommandDescriptions = {
   serverList: withDocs("List servers", "server.deployment-target"),
   serverShow: withDocs("Show server detail", "server.deployment-target"),
   serverRename: withDocs("Rename a server deployment target", "server.deployment-target"),
+  serverReorder: withDocs("Reorder servers for server list display", "server.deployment-target"),
   serverDeactivate: withDocs("Deactivate a server deployment target", "server.deployment-target"),
   serverDeleteCheck: withDocs(
     "Check whether a server can be safely deleted",

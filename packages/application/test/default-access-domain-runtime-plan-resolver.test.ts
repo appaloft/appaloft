@@ -4,6 +4,7 @@ import {
   ConfigScopeValue,
   CreatedAt,
   DeploymentTargetDescriptor,
+  DeploymentTargetDisplayOrder,
   DeploymentTargetId,
   DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
@@ -111,6 +112,7 @@ function createServer(): DeploymentTargetState {
       kind: EdgeProxyKindValue.rehydrate("traefik"),
       status: EdgeProxyStatusValue.rehydrate("ready"),
     },
+    displayOrder: DeploymentTargetDisplayOrder.rehydrate(0),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   };
 }
