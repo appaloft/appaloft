@@ -22,6 +22,8 @@ const marketplaceExtension: SystemPluginWebExtension = {
     renderer: "blueprint-catalog",
     listEndpoint: "/example/blueprints",
     detailEndpointTemplate: "/example/blueprints/{slug}",
+    remoteDetailEndpoint: "/example/blueprints/remote",
+    remoteInstallEndpoint: "/example/blueprints/remote/install",
     installPlanEndpointTemplate: "/example/blueprints/{slug}/install-plan",
     installEndpointTemplate: "/example/blueprints/{slug}/install",
     upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
@@ -58,6 +60,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(readBlueprintCatalogExtensionMetadata(marketplaceExtension)).toMatchObject({
       renderer: "blueprint-catalog",
       listEndpoint: "/example/blueprints",
+      remoteDetailEndpoint: "/example/blueprints/remote",
+      remoteInstallEndpoint: "/example/blueprints/remote/install",
       installEndpointTemplate: "/example/blueprints/{slug}/install",
       upgradePlanEndpointTemplate: "/example/blueprints/{slug}/upgrade-plan",
       installedApplicationEndpointTemplate: "/example/installed-applications/{applicationId}",
@@ -160,6 +164,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).not.toContain("currentVersion:");
     expect(detailPageSource).toContain("<details");
     expect(quickDeploySource).toContain("blueprintSlug");
+    expect(quickDeploySource).toContain("blueprintUrl");
+    expect(quickDeploySource).toContain("remoteDetailEndpoint");
+    expect(quickDeploySource).toContain("remoteInstallEndpoint");
+    expect(quickDeploySource).toContain("selectedBlueprintSourceIsRemoteUrl");
+    expect(quickDeploySource).toContain("自定义 Blueprint URL");
     expect(quickDeploySource).toContain("blueprintVariant");
     expect(quickDeploySource).toContain("selectedBlueprintVariantLabel");
     expect(quickDeploySource).toContain("Dialog.Root bind:open={blueprintSelectorDialogOpen}");

@@ -6,6 +6,8 @@ export interface BlueprintCatalogExtensionMetadata {
   readonly renderer: typeof blueprintCatalogRenderer;
   readonly listEndpoint: string;
   readonly detailEndpointTemplate?: string;
+  readonly remoteDetailEndpoint?: string;
+  readonly remoteInstallEndpoint?: string;
   readonly installPlanEndpointTemplate?: string;
   readonly installEndpointTemplate?: string;
   readonly upgradePlanEndpointTemplate?: string;
@@ -58,6 +60,12 @@ export function readBlueprintCatalogExtensionMetadata(
     listEndpoint: metadata.listEndpoint,
     ...(typeof metadata.detailEndpointTemplate === "string"
       ? { detailEndpointTemplate: metadata.detailEndpointTemplate }
+      : {}),
+    ...(typeof metadata.remoteDetailEndpoint === "string"
+      ? { remoteDetailEndpoint: metadata.remoteDetailEndpoint }
+      : {}),
+    ...(typeof metadata.remoteInstallEndpoint === "string"
+      ? { remoteInstallEndpoint: metadata.remoteInstallEndpoint }
       : {}),
     ...(typeof metadata.installPlanEndpointTemplate === "string"
       ? { installPlanEndpointTemplate: metadata.installPlanEndpointTemplate }

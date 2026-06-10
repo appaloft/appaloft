@@ -42,6 +42,12 @@ README 示例：
 [![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&step=project&projectMode=new&projectName=PocketBase)
 ```
 
+远程 Blueprint URL 示例：
+
+```md title="README.md"
+[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fone-click-deploy-docker-demo%2Fmain%2Fappaloft.blueprint.yaml&blueprintTitle=One-Click+Docker+Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click+Docker+Demo)
+```
+
 也可以打开 [One-click deploy 生成器](https://appaloft.com/deploy/one-click) 生成 Markdown。
 
 <h2 id="deploy-handoff-url">Deploy handoff URL</h2>
@@ -51,14 +57,14 @@ README 示例：
 | 参数 | 说明 |
 | --- | --- |
 | `source=blueprint` | 固定值，表示从 Blueprint 进入部署。 |
-| `blueprintSlug` | 已注册 catalog 中的 Blueprint slug。 |
+| `blueprintSlug` | 已注册 catalog 中的 Blueprint slug；与 `blueprintUrl` 二选一。 |
 | `blueprintTitle` | UI 展示名称，可选。 |
-| `sourceExtension` | 提供 catalog endpoint 的 Web extension key，可选。 |
+| `sourceExtension` | 提供 catalog endpoint 的 Web extension key。使用 `blueprintSlug` 时可选；使用 `blueprintUrl` 时通常省略，由 runtime 选择默认远程导入入口。 |
 | `blueprintVariant` | 选择 Blueprint variant，可选。 |
 | `blueprintProfile` | 选择 profile，例如 `production`，可选。 |
 | `projectMode=new` | 默认创建新项目；用户仍可在 UI 中调整。 |
 | `projectName` | 新项目默认名称，可选。 |
-| `blueprintUrl` | 预留给远程 Blueprint URL 导入；直接执行能力取决于当前 Appaloft runtime 是否启用对应 registry/import surface。 |
+| `blueprintUrl` | 公开可读取的远程 Blueprint manifest URL；与 `blueprintSlug` 二选一。直接执行能力取决于当前 Appaloft runtime 是否启用远程导入 surface。 |
 
 不要在 URL 中放真实 secret、数据库密码、provider token 或私有仓库凭据。Secret 应在部署向导里由用户输入，或者通过 Appaloft 的 secret/resource binding 机制引用。
 
