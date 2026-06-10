@@ -117,6 +117,7 @@ import {
   PackagingModeValue,
   PlanStepText,
   PortNumber,
+  ProjectDisplayOrder,
   ProjectId,
   ProjectLifecycleStatusValue,
   ProjectName,
@@ -1100,6 +1101,7 @@ export function rehydrateProject(row: Selectable<Database["projects"]>) {
     ...(row.deleted_at
       ? { deletedAt: DeletedAt.rehydrate(normalizeTimestamp(row.deleted_at) ?? row.deleted_at) }
       : {}),
+    displayOrder: ProjectDisplayOrder.rehydrate(row.display_order ?? 0),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };

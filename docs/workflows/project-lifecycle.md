@@ -10,6 +10,7 @@ The active project lifecycle operations are:
 
 - `projects.show`
 - `projects.rename`
+- `projects.reorder`
 - `projects.set-description`
 - `projects.archive`
 - `projects.restore`
@@ -24,6 +25,7 @@ Generic `projects.update` remains forbidden by ADR-026.
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [projects.show Query Spec](../queries/projects.show.md)
 - [projects.rename Command Spec](../commands/projects.rename.md)
+- [projects.reorder Command Spec](../commands/projects.reorder.md)
 - [projects.archive Command Spec](../commands/projects.archive.md)
 - [Project Lifecycle Error Spec](../errors/projects.lifecycle.md)
 - [Project Lifecycle Test Matrix](../testing/project-lifecycle-test-matrix.md)
@@ -34,7 +36,7 @@ Project lifecycle status is value-object backed.
 
 | Status | Meaning | Allowed public mutations |
 | --- | --- | --- |
-| `active` | Project can be used for project-scoped child creation and deployment admission. | `projects.rename`, `projects.set-description`, `projects.archive`, `projects.restore` idempotently, child operations where their own specs allow. |
+| `active` | Project can be used for project-scoped child creation and deployment admission. | `projects.rename`, `projects.reorder`, `projects.set-description`, `projects.archive`, `projects.restore` idempotently, child operations where their own specs allow. |
 | `archived` | Project identity and history are retained, but new project-scoped mutations are blocked. | Read queries, `projects.restore`, `projects.delete-check`, and guarded `projects.delete` only when no retained blockers exist. |
 | `deleted` | Project is tombstoned and omitted from normal project read paths. | Idempotent write-side retry of `projects.delete` only when the tombstone is resolvable. |
 
@@ -44,6 +46,12 @@ Project lifecycle status is value-object backed.
 
 `projects.rename` changes only project display name and derived slug. It must reject archived
 projects and slug conflicts.
+
+`projects.reorder` changes only active project list display order within one organization. It must
+reject duplicate project ids, missing or invisible projects, archived projects, and project id sets
+that cross organization boundaries. It must not change project names, slugs, descriptions,
+lifecycle state, child resources, environments, deployments, source links, domains, certificates,
+logs, audit retention, or runtime state.
 
 `projects.set-description` changes only project description metadata. Empty or omitted description
 clears the description. It must reject archived projects and must not change name, slug, lifecycle,

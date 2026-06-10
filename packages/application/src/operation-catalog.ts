@@ -131,6 +131,7 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { deleteProjectCommandInputSchema } from "./operations/projects/delete-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
+import { reorderProjectsCommandInputSchema } from "./operations/projects/reorder-projects.command";
 import { restoreProjectCommandInputSchema } from "./operations/projects/restore-project.command";
 import { setProjectDescriptionCommandInputSchema } from "./operations/projects/set-project-description.command";
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
@@ -1048,6 +1049,25 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project rename <projectId> --name <name>",
       orpc: { method: "POST", path: "/api/projects/{projectId}/rename" },
+    },
+  },
+  {
+    key: "projects.reorder",
+    kind: "command",
+    domain: "projects",
+    messageName: "ReorderProjectsCommand",
+    handlerName: "ReorderProjectsCommandHandler",
+    serviceName: "ReorderProjectsUseCase",
+    inputSchema: reorderProjectsCommandInputSchema,
+    serviceToken: tokens.reorderProjectsUseCase,
+    transportAccess: {
+      productSession: {
+        minRole: "admin",
+      },
+    },
+    transports: {
+      cli: "appaloft project reorder --project-ids <ids>",
+      orpc: { method: "POST", path: "/api/projects/reorder" },
     },
   },
   {
