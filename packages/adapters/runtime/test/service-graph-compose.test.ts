@@ -59,6 +59,11 @@ describe("repository service graph compose rendering", () => {
       dockerfilePath: "Dockerfile.worker",
       serviceName: "worker",
       replicas: 4,
+      environment: {
+        APPALOFT_DATABASE_URL: "${APPALOFT_DATABASE_URL}",
+        APPALOFT_DEPLOYMENT_ID: "${APPALOFT_DEPLOYMENT_ID}",
+        PORT: "${PORT}",
+      },
       includeBuild: true,
     });
 
@@ -67,6 +72,11 @@ describe("repository service graph compose rendering", () => {
     expect(compose).toContain("build:");
     expect(compose).toContain("context: ..");
     expect(compose).toContain('dockerfile: "Dockerfile.worker"');
+    expect(compose).toContain("environment:");
+    expect(compose).toContain('"APPALOFT_DATABASE_URL": "${APPALOFT_DATABASE_URL}"');
+    expect(compose).toContain('"APPALOFT_DEPLOYMENT_ID": "${APPALOFT_DEPLOYMENT_ID}"');
+    expect(compose).toContain('"PORT": "${PORT}"');
+    expect(compose).not.toContain("postgres://");
     expect(compose).toContain("replicas: 4");
     expect(compose).not.toContain("ports:");
   });

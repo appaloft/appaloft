@@ -17,6 +17,7 @@ interface RenderReplicatedWorkloadComposeInput {
   defaultPort?: number;
   replicas: number;
   command?: string;
+  environment?: Record<string, string>;
   includeBuild: boolean;
 }
 
@@ -125,6 +126,15 @@ export function renderReplicatedWorkloadCompose(input: RenderReplicatedWorkloadC
 
   if (input.defaultPort) {
     lines.push("    expose:", `      - ${yamlQuoted(String(input.defaultPort))}`);
+  }
+
+  if (input.environment && Object.keys(input.environment).length > 0) {
+    lines.push(
+      "    environment:",
+      ...Object.entries(input.environment)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([key, value]) => `      ${yamlQuoted(key)}: ${yamlQuoted(value)}`),
+    );
   }
 
   lines.push("    deploy:", `      replicas: ${input.replicas}`, "");
