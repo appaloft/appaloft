@@ -112,6 +112,21 @@ describe("generated SDK operation metadata", () => {
     });
   });
 
+  test("[SRV-LIFE-REORDER-001][TS-SDK-GEN-001] exposes server reorder metadata", () => {
+    expect(
+      generatedSdkOperations.find((operation) => operation.operationKey === "servers.reorder"),
+    ).toMatchObject({
+      operationGroup: "servers",
+      operationMethod: "reorder",
+      kind: "command",
+      route: {
+        method: "POST",
+        path: "/servers/reorder",
+      },
+      docsHref: "/docs/servers/register-connect/#server-deployment-target",
+    });
+  });
+
   test("[DEP-CANCEL-ENTRY-003][TS-SDK-GEN-001] exposes deployment cancel metadata", () => {
     expect(
       generatedSdkOperations.find((operation) => operation.operationKey === "deployments.cancel"),

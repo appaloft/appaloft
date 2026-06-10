@@ -383,6 +383,7 @@ import {
   RenameServerCommand,
   RenameStorageVolumeCommand,
   ReorderProjectsCommand,
+  ReorderServersCommand,
   ReplaySourceEventCommand,
   ResetResourceHealthCommand,
   ResolveActionServerConfigDeploymentTargetCommand,
@@ -431,6 +432,7 @@ import {
   renameServerCommandInputSchema,
   renameStorageVolumeCommandInputSchema,
   reorderProjectsCommandInputSchema,
+  reorderServersCommandInputSchema,
   replaySourceEventCommandInputSchema,
   resetResourceHealthCommandInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
@@ -735,6 +737,7 @@ import {
   renameServerResponseSchema,
   renameStorageVolumeResponseSchema,
   reorderProjectsResponseSchema,
+  reorderServersResponseSchema,
   replaySourceEventResponseSchema,
   resetResourceHealthResponseSchema,
   resourceAccessFailureEvidenceLookupSchema,
@@ -1212,6 +1215,10 @@ export const apiRouteDescriptions = {
   ),
   renameServer: routeDescription(
     "Renames the display label for one deployment target without changing its identity.",
+    "server.deployment-target",
+  ),
+  reorderServers: routeDescription(
+    "Reorders deployment targets for server list display without changing runtime placement.",
     "server.deployment-target",
   ),
   configureServerEdgeProxy: routeDescription(
@@ -3597,6 +3604,19 @@ export const renameServerProcedure = base
   .output(renameServerResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, RenameServerCommand.create(input)),
+  );
+
+export const reorderServersProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/reorder",
+    description: apiRouteDescriptions.reorderServers,
+    successStatus: 200,
+  })
+  .input(reorderServersCommandInputSchema)
+  .output(reorderServersResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReorderServersCommand.create(input)),
   );
 
 export const configureServerEdgeProxyProcedure = base
@@ -6321,6 +6341,7 @@ export const appaloftOrpcRouter = {
       },
     },
     rename: renameServerProcedure,
+    reorder: reorderServersProcedure,
     configureEdgeProxy: configureServerEdgeProxyProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
@@ -9019,6 +9040,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/runtime-monitoring/rollup",
     "/api/runtime-monitoring/thresholds",
     "/api/servers/:serverId/rename",
+    "/api/servers/reorder",
     "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/deactivate",
     "/api/servers/:serverId/delete-check",

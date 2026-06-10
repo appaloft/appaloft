@@ -28,6 +28,29 @@ import {
   type SshPublicKeyText,
 } from "../shared/text-values";
 
+const deploymentTargetDisplayOrderBrand: unique symbol = Symbol("DeploymentTargetDisplayOrder");
+export class DeploymentTargetDisplayOrder {
+  private [deploymentTargetDisplayOrderBrand]!: void;
+
+  private constructor(public readonly value: number) {}
+
+  static create(value: number): Result<DeploymentTargetDisplayOrder> {
+    if (!Number.isInteger(value) || value < 0) {
+      return err(domainError.validation("Server display order must be a non-negative integer"));
+    }
+
+    return ok(new DeploymentTargetDisplayOrder(value));
+  }
+
+  static rehydrate(value: number): DeploymentTargetDisplayOrder {
+    return new DeploymentTargetDisplayOrder(Math.max(0, Math.trunc(value)));
+  }
+
+  equals(other: DeploymentTargetDisplayOrder): boolean {
+    return this.value === other.value;
+  }
+}
+
 export interface DeploymentTargetCredentialState {
   kind: DeploymentTargetCredentialKindValue;
   credentialId?: SshCredentialId;
@@ -58,6 +81,7 @@ export interface DeploymentTargetState {
   deactivationReason?: DeactivationReason;
   credential?: DeploymentTargetCredentialState;
   edgeProxy?: DeploymentTargetEdgeProxyState;
+  displayOrder: DeploymentTargetDisplayOrder;
   createdAt: CreatedAt;
 }
 
@@ -73,12 +97,12 @@ export type DeploymentTargetEdgeProxyRouteSelection =
 
 export type DeploymentTargetRehydrateState = Omit<
   DeploymentTargetState,
-  "deactivatedAt" | "deletedAt" | "deactivationReason" | "lifecycleStatus"
+  "deactivatedAt" | "deletedAt" | "deactivationReason" | "displayOrder" | "lifecycleStatus"
 > &
   Partial<
     Pick<
       DeploymentTargetState,
-      "deactivatedAt" | "deletedAt" | "deactivationReason" | "lifecycleStatus"
+      "deactivatedAt" | "deletedAt" | "deactivationReason" | "displayOrder" | "lifecycleStatus"
     >
   >;
 
@@ -118,6 +142,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
             },
           }
         : {}),
+      displayOrder: DeploymentTargetDisplayOrder.rehydrate(0),
       createdAt: input.createdAt,
     });
 
@@ -201,6 +226,37 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
       previousName: previousName.value,
       name: input.name.value,
       renamedAt: input.renamedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
+  reorder(input: {
+    displayOrder: DeploymentTargetDisplayOrder;
+    reorderedAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return err(
+        domainError.invariant("Deleted deployment targets cannot be reordered", {
+          phase: "server-lifecycle-guard",
+          serverId: this.state.id.value,
+          lifecycleStatus: this.state.lifecycleStatus.value,
+        }),
+      );
+    }
+
+    if (this.state.displayOrder.equals(input.displayOrder)) {
+      return ok({ changed: false });
+    }
+
+    const previousDisplayOrder = this.state.displayOrder;
+    this.state.displayOrder = input.displayOrder;
+
+    this.recordDomainEvent("server-reordered", input.reorderedAt, {
+      serverId: this.state.id.value,
+      previousDisplayOrder: previousDisplayOrder.value,
+      nextDisplayOrder: input.displayOrder.value,
+      reorderedAt: input.reorderedAt.value,
     });
 
     return ok({ changed: true });
@@ -433,6 +489,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return new DeploymentTarget({
       ...state,
       lifecycleStatus: state.lifecycleStatus ?? DeploymentTargetLifecycleStatusValue.active(),
+      displayOrder: state.displayOrder ?? DeploymentTargetDisplayOrder.rehydrate(0),
     });
   }
 

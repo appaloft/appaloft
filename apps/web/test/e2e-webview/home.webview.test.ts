@@ -23,6 +23,16 @@ type ProjectFixture = {
   lifecycleStatus: "active";
   createdAt: string;
 };
+type ServerFixture = {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  providerKey: string;
+  targetKind: "single-server";
+  lifecycleStatus: "active";
+  createdAt: string;
+};
 type DependencyResourceFixtureKind = "postgres" | "redis";
 type DependencyProvisioningPlanFixtureInput = {
   id: string;
@@ -303,6 +313,20 @@ function demoProjectFixture() {
     description: "Demo project",
     lifecycleStatus: "active",
     createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function serverFixture(index: number): ServerFixture {
+  const padded = String(index).padStart(2, "0");
+  return {
+    id: index === 1 ? "srv_demo" : `srv_grid_${padded}`,
+    name: index === 1 ? "edge" : `Grid Server ${padded}`,
+    host: `203.0.113.${index}`,
+    port: 22,
+    providerKey: "generic-ssh",
+    targetKind: "single-server",
+    lifecycleStatus: "active",
+    createdAt: `2026-01-${padded}T00:00:00.000Z`,
   };
 }
 
@@ -1736,21 +1760,28 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       };
     },
-    "/api/rpc/servers/list": {
-      json: {
-        items: [
-          {
-            id: "srv_demo",
-            name: "edge",
-            host: "127.0.0.1",
-            port: 22,
-            providerKey: "generic-ssh",
-            targetKind: "single-server",
-            lifecycleStatus: "active",
-            createdAt: "2026-01-01T00:00:00.000Z",
-          },
-        ],
-      },
+    "/api/rpc/servers/list": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { limit?: number; offset?: number } | null;
+      const serverCount = 13;
+      const servers = Array.from({ length: serverCount }, (_, index) => serverFixture(index + 1));
+      const offset = input?.offset ?? 0;
+      const limit = input?.limit ?? serverCount;
+      return {
+        json: {
+          items: servers.slice(offset, offset + limit),
+          total: serverCount,
+          limit,
+          offset,
+        },
+      };
+    },
+    "/api/rpc/servers/reorder": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverIds?: string[] } | null;
+      return {
+        json: {
+          reorderedServerIds: input?.serverIds ?? [],
+        },
+      };
     },
     "/api/rpc/servers/show": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
@@ -4237,6 +4268,121 @@ describe.serial("console e2e with Bun.WebView", () => {
     const mobileLayout = JSON.parse(
       await mobileView.evaluate<string>(`(() => {
         const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
+        const firstRowCards = cards.filter((card) =>
+          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        );
+        return JSON.stringify({
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          cardCount: cards.length,
+          firstRowCount: firstRowCards.length,
+        });
+      })()`),
+    ) as {
+      clientWidth: number;
+      scrollWidth: number;
+      cardCount: number;
+      firstRowCount: number;
+    };
+    expect(mobileLayout.cardCount).toBe(12);
+    expect(mobileLayout.firstRowCount).toBe(1);
+    expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
+  }, 45_000);
+
+  test("[SRV-LIFE-REORDER-003] renders paginated draggable server cards", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView({ width: 1536, height: 900 });
+    await view.navigate(`${previewUrl}/servers`);
+    await expectText(view, "edge");
+    await expectText(view, "Grid Server 12");
+    await waitFor(
+      () =>
+        view.evaluate<string>(
+          `document.querySelector('[data-server-pagination]')?.textContent ?? ''`,
+        ),
+      (text) => text.includes("1-12") && text.includes("13"),
+      "Expected server pagination to show the current range and total",
+    );
+
+    const desktopLayout = JSON.parse(
+      await view.evaluate<string>(`(() => {
+        const cards = Array.from(document.querySelectorAll('[data-server-card]'));
+        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
+        const firstRowCards = cards.filter((card) =>
+          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        );
+        return JSON.stringify({
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          cardCount: cards.length,
+          firstRowCount: firstRowCards.length,
+          hasGrid: Boolean(document.querySelector('[data-server-grid]')),
+          handleCount: document.querySelectorAll('[data-server-reorder-handle]').length,
+          hasPagination: Boolean(document.querySelector('[data-server-pagination]')),
+        });
+      })()`),
+    ) as {
+      clientWidth: number;
+      scrollWidth: number;
+      cardCount: number;
+      firstRowCount: number;
+      hasGrid: boolean;
+      handleCount: number;
+      hasPagination: boolean;
+    };
+    expect(desktopLayout.hasGrid).toBe(true);
+    expect(desktopLayout.hasPagination).toBe(true);
+    expect(desktopLayout.cardCount).toBe(12);
+    expect(desktopLayout.handleCount).toBe(12);
+    expect(desktopLayout.firstRowCount).toBeGreaterThanOrEqual(3);
+    expect(desktopLayout.firstRowCount).toBeLessThanOrEqual(4);
+    expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.clientWidth);
+
+    const dragged = await view.evaluate<boolean>(`(() => {
+      const cards = Array.from(document.querySelectorAll('[data-server-card]'));
+      const source = cards[0];
+      const target = cards[2];
+      if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      const dragStart = new DragEvent('dragstart', {
+        bubbles: true,
+        dataTransfer: new DataTransfer(),
+      });
+      source.dispatchEvent(dragStart);
+      target.dispatchEvent(new DragEvent('dragover', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: dragStart.dataTransfer,
+      }));
+      target.dispatchEvent(new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: dragStart.dataTransfer,
+      }));
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
+      return true;
+    })()`);
+    expect(dragged).toBe(true);
+
+    const reorderRequest = await waitForRecordedRequest("/api/rpc/servers/reorder");
+    const reorderInput = readOrpcJsonPayload(reorderRequest.body) as {
+      serverIds?: string[];
+      startOffset?: number;
+    };
+    expect(reorderInput.startOffset).toBe(0);
+    expect(reorderInput.serverIds?.slice(0, 3)).toEqual(["srv_grid_02", "srv_grid_03", "srv_demo"]);
+
+    await using mobileView = createWebView({ width: 390, height: 844 });
+    await mobileView.navigate(`${previewUrl}/servers`);
+    await expectText(mobileView, "edge");
+    const mobileLayout = JSON.parse(
+      await mobileView.evaluate<string>(`(() => {
+        const cards = Array.from(document.querySelectorAll('[data-server-card]'));
         const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
         const firstRowCards = cards.filter((card) =>
           Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
@@ -7817,11 +7963,11 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await view.evaluate<void>(
       `(() => {
-        const row = document.querySelector("[data-server-row='srv_demo']");
-        if (!(row instanceof HTMLElement)) {
-          throw new Error("Expected demo server row to be clickable");
+        const link = document.querySelector("[data-server-card][data-server-id='srv_demo'] a[href='/servers/srv_demo']");
+        if (!(link instanceof HTMLElement)) {
+          throw new Error("Expected demo server detail link to be clickable");
         }
-        row.click();
+        link.click();
       })()`,
     );
     await expectLocation(view, "/servers/srv_demo");

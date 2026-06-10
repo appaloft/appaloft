@@ -288,6 +288,10 @@ export {
 } from "./operations/servers/prune-server-capacity.schema";
 export * from "./operations/servers/register-server.schema";
 export * from "./operations/servers/rename-server.schema";
+export {
+  type ReorderServersCommandInput,
+  reorderServersCommandInputSchema,
+} from "./operations/servers/reorder-servers.command";
 export * from "./operations/servers/rotate-ssh-credential.schema";
 export * from "./operations/servers/show-server.schema";
 export * from "./operations/servers/show-ssh-credential.schema";

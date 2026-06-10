@@ -109,6 +109,7 @@ function toServerSummary(
           },
         }
       : {}),
+    displayOrder: row.display_order ?? 0,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
   };
 }
@@ -141,7 +142,7 @@ export class PgServerReadModel implements ServerReadModel {
     );
   }
 
-  async list(context: RepositoryContext, input?: { limit?: number }) {
+  async list(context: RepositoryContext, input?: { limit?: number; offset?: number }) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("server", "list"),
@@ -157,13 +158,17 @@ export class PgServerReadModel implements ServerReadModel {
           .selectAll("servers")
           .select("ssh_credentials.name as credential_name")
           .where("servers.lifecycle_status", "!=", "deleted")
-          .orderBy("created_at", "desc");
+          .orderBy("servers.display_order", "asc")
+          .orderBy("servers.created_at", "desc");
         const organizationId = resolveRepositoryContextOrganizationId(context);
         if (organizationId) {
           query = query.where("servers.organization_id", "=", organizationId);
         }
 
         query = query.limit(input?.limit ?? defaultReadModelListLimit);
+        if (input?.offset) {
+          query = query.offset(input.offset);
+        }
 
         return query.execute().then((rows) => rows.map(toServerSummary));
       },

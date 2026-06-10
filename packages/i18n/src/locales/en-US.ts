@@ -2531,6 +2531,7 @@ export const enUS = {
       focusTitle: "Server targets and runtime state",
       listDescription:
         "All deployment targets by creation time. Open details to run a connectivity test.",
+      listRange: "{{start}}-{{end}} of {{total}}",
       listTitle: "Server list",
       lifecycleInactiveDescription:
         "Inactive servers stay visible but are blocked from new deployments, scheduling, and proxy work.",
@@ -2542,6 +2543,7 @@ export const enUS = {
       overviewTab: "Overview",
       pageTitle: "Servers",
       proxyAccessTab: "Proxy & Access",
+      reorderHandle: "Drag to reorder",
       renameFailed: "Unable to rename server",
       renameLabel: "Display name",
       renameSucceeded: "Server name saved",
