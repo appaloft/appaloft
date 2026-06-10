@@ -1171,6 +1171,8 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             renderer: "blueprint-catalog",
             listEndpoint: "/api/blueprint-catalog/blueprints",
             detailEndpointTemplate: "/api/blueprint-catalog/blueprints/{slug}",
+            remoteDetailEndpoint: "/api/blueprint-catalog/remote",
+            remoteInstallEndpoint: "/api/blueprint-catalog/remote/install",
           },
         },
         {
@@ -1187,6 +1189,8 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             renderer: "blueprint-catalog",
             listEndpoint: "/api/blueprint-catalog/blueprints",
             detailEndpointTemplate: "/api/blueprint-catalog/blueprints/{slug}",
+            remoteDetailEndpoint: "/api/blueprint-catalog/remote",
+            remoteInstallEndpoint: "/api/blueprint-catalog/remote/install",
           },
         },
         {
@@ -1281,6 +1285,48 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             summary: "Default Baserow deployment.",
           },
         ],
+      },
+    },
+    "/api/blueprint-catalog/remote": {
+      manifest: {
+        schemaVersion: "appaloft.blueprint/v1",
+        id: "remote-docker-demo",
+        name: "One-Click Docker Demo",
+        version: "0.1.0",
+        summary: "Remote Dockerfile Blueprint loaded from a one-click URL.",
+        description: "A remote Blueprint fixture.",
+        tags: ["demo"],
+        parameters: [],
+        secrets: [],
+        resources: [],
+        components: [
+          {
+            id: "web",
+            name: "One-Click Docker Demo",
+            kind: "service",
+            runtime: {
+              strategy: "dockerfile",
+              dockerfilePath: "Dockerfile",
+            },
+            ports: [{ name: "http", containerPort: 3000, protocol: "http", public: true }],
+            routes: [{ port: "http", pathPrefix: "/" }],
+            variables: [],
+            usesSecrets: [],
+            usesResources: [],
+          },
+        ],
+        componentRelations: [],
+        profiles: {
+          production: { label: "Production" },
+        },
+        variants: {},
+      },
+      install: {
+        profiles: ["production"],
+        defaultProfile: "production",
+        parameters: [],
+        secrets: [],
+        variants: [],
       },
     },
     "/api/blueprints": {
@@ -4048,6 +4094,61 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(renderedState.baserowIconImages[0]?.height).toBeGreaterThan(0);
     expect(renderedState.summaryBaserowIconImages[0]?.width).toBeGreaterThan(0);
     expect(renderedState.summaryBaserowIconImages[0]?.height).toBeGreaterThan(0);
+  }, 45_000);
+
+  test("[QUICK-DEPLOY-UX-004] locks remote Blueprint URL entries without showing Marketplace selection", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const blueprintUrl =
+      "https://raw.githubusercontent.com/appaloft/one-click-deploy-docker-demo/main/appaloft.blueprint.yaml";
+
+    await using view = createWebView();
+    await view.navigate(
+      `${previewUrl}/deploy?source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
+    );
+
+    await expectText(view, "One-Click Docker Demo");
+    await expectText(view, "自定义 Blueprint URL");
+
+    const renderedStateJson = await waitFor(
+      () =>
+        view.evaluate<string>(`JSON.stringify({
+        sourcePickerCount: document.querySelectorAll('[data-quick-deploy-source-picker]').length,
+        normalizedBodyText: document.body.innerText.replace(/\\s+/g, ' '),
+        blueprintUrl: new URL(window.location.href).searchParams.get('blueprintUrl'),
+        sourceExtension: new URL(window.location.href).searchParams.get('sourceExtension'),
+      })`),
+      (stateJson) => {
+        const state = JSON.parse(stateJson) as {
+          sourcePickerCount: number;
+          normalizedBodyText: string;
+          blueprintUrl: string | null;
+        };
+        return (
+          state.sourcePickerCount === 0 &&
+          state.normalizedBodyText.includes("已从自定义 Blueprint URL 进入") &&
+          state.normalizedBodyText.includes("自定义 Blueprint URL") &&
+          state.blueprintUrl === blueprintUrl
+        );
+      },
+      "Expected remote Blueprint entry to stay locked and preserve blueprintUrl",
+    );
+    const renderedState = JSON.parse(renderedStateJson) as {
+      sourcePickerCount: number;
+      normalizedBodyText: string;
+      blueprintUrl: string | null;
+      sourceExtension: string | null;
+    };
+
+    expect(renderedState.sourcePickerCount).toBe(0);
+    expect(renderedState.normalizedBodyText).toContain("已从自定义 Blueprint URL 进入");
+    expect(renderedState.normalizedBodyText).not.toContain("尚未选择蓝图");
+    expect(renderedState.normalizedBodyText).not.toContain("访问方式 蓝图市场");
+    expect(renderedState.normalizedBodyText).not.toContain("Access 蓝图市场");
+    expect(renderedState.normalizedBodyText).toContain("自定义 Blueprint URL");
+    expect(renderedState.blueprintUrl).toBe(blueprintUrl);
+    expect(renderedState.sourceExtension).toBe(null);
   }, 45_000);
 
   test("[QUICK-DEPLOY-UX-004] keeps source choices visible when a Blueprint is selected inside quick deploy", async () => {

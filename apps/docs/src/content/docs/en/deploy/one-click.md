@@ -40,6 +40,12 @@ README example:
 [![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&step=project&projectMode=new&projectName=PocketBase)
 ```
 
+Remote Blueprint URL example:
+
+```md title="README.md"
+[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fone-click-deploy-docker-demo%2Fmain%2Fappaloft.blueprint.yaml&blueprintTitle=One-Click+Docker+Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click+Docker+Demo)
+```
+
 You can also use the [One-click deploy generator](https://appaloft.com/deploy/one-click).
 
 <h2 id="deploy-handoff-url">Deploy handoff URL</h2>
@@ -49,14 +55,14 @@ The standard entry is `/deploy`. Query parameters describe the Blueprint to open
 | Parameter | Meaning |
 | --- | --- |
 | `source=blueprint` | Fixed value for a Blueprint deploy entry. |
-| `blueprintSlug` | Blueprint slug in a registered catalog. |
+| `blueprintSlug` | Blueprint slug in a registered catalog; mutually exclusive with `blueprintUrl`. |
 | `blueprintTitle` | Optional UI display title. |
-| `sourceExtension` | Optional Web extension key that provides catalog endpoints. |
+| `sourceExtension` | Web extension key that provides catalog endpoints. Optional for `blueprintSlug`; usually omitted for `blueprintUrl` so the runtime can choose its default remote import entry. |
 | `blueprintVariant` | Optional Blueprint variant. |
 | `blueprintProfile` | Optional profile, for example `production`. |
 | `projectMode=new` | Default to creating a project; users can still adjust in the UI. |
 | `projectName` | Optional default project name. |
-| `blueprintUrl` | Reserved for remote Blueprint URL import; direct execution depends on whether the current Appaloft runtime enables the matching registry/import surface. |
+| `blueprintUrl` | Publicly readable remote Blueprint manifest URL; mutually exclusive with `blueprintSlug`. Direct execution depends on whether the current Appaloft runtime enables a remote import surface. |
 
 Do not put real secrets, database passwords, provider tokens, or private repository credentials in the URL. Secrets should be entered in the deploy wizard or referenced through Appaloft secret/resource binding mechanisms.
 

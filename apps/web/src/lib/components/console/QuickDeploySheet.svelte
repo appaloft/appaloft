@@ -821,7 +821,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     browser ? (page.url.searchParams.get("sourceExtension") ?? "") : "",
   );
   let selectedBlueprintSlug = $state(browser ? (page.url.searchParams.get("blueprintSlug") ?? "") : "");
+  let selectedBlueprintUrl = $state(browser ? (page.url.searchParams.get("blueprintUrl") ?? "") : "");
   let selectedBlueprintTitle = $state(browser ? (page.url.searchParams.get("blueprintTitle") ?? "") : "");
+  let selectedBlueprintProfile = $state(
+    browser ? (page.url.searchParams.get("blueprintProfile") ?? "") : "",
+  );
   let selectedBlueprintVariant = $state(
     browser ? (page.url.searchParams.get("blueprintVariant") ?? "") : "",
   );
@@ -1104,17 +1108,50 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       .filter((extension) => extension.placement === "quick-deploy-source")
       .toSorted((a, b) => a.title.localeCompare(b.title)),
   );
-  const selectedBlueprintSourceExtension = $derived(
-    quickDeploySourceExtensions.find(
+  const selectedBlueprintSourceExtension = $derived.by(() => {
+    const selected = quickDeploySourceExtensions.find(
       (extension) => extension.key === selectedBlueprintSourceExtensionKey,
-    ) ??
-      quickDeploySourceExtensions[0] ??
-      null,
+    );
+    if (selected) {
+      return selected;
+    }
+    if (sourceKind === "blueprint" && selectedBlueprintUrl.trim()) {
+      return quickDeploySourceExtensions.find((extension) => {
+        const metadata = readBlueprintCatalogExtensionMetadata(extension);
+        return Boolean(metadata?.remoteDetailEndpoint && metadata.remoteInstallEndpoint);
+      }) ?? quickDeploySourceExtensions[0] ?? null;
+    }
+    return quickDeploySourceExtensions[0] ?? null;
+  });
+  const selectedBlueprintSourceMetadata = $derived(
+    readBlueprintCatalogExtensionMetadata(selectedBlueprintSourceExtension),
+  );
+  const selectedBlueprintSourceIsRemoteUrl = $derived(
+    sourceKind === "blueprint" && Boolean(selectedBlueprintUrl.trim()),
+  );
+  const selectedBlueprintIdentity = $derived.by(() =>
+    selectedBlueprintSourceIsRemoteUrl ? selectedBlueprintUrl.trim() : selectedBlueprintSlug.trim(),
   );
   const selectedBlueprintDetailEndpointValue = $derived.by(() => {
+    const metadata = selectedBlueprintSourceMetadata;
+    if (!metadata) {
+      return "";
+    }
+
+    if (selectedBlueprintSourceIsRemoteUrl) {
+      if (!metadata.remoteDetailEndpoint) {
+        return "";
+      }
+
+      const params = new URLSearchParams({ blueprintUrl: selectedBlueprintUrl.trim() });
+      if (selectedBlueprintTitle.trim()) {
+        params.set("blueprintTitle", selectedBlueprintTitle.trim());
+      }
+      return `${metadata.remoteDetailEndpoint}${metadata.remoteDetailEndpoint.includes("?") ? "&" : "?"}${params}`;
+    }
+
     const slug = blueprintDetailSlug.trim() || selectedBlueprintSlug.trim();
-    const metadata = readBlueprintCatalogExtensionMetadata(selectedBlueprintSourceExtension);
-    if (!slug || !metadata) {
+    if (!slug) {
       return "";
     }
 
@@ -1135,7 +1172,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         browser &&
         enabled &&
         (blueprintDetailDialogOpen ||
-          (sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()))) &&
+          (sourceKind === "blueprint" && Boolean(selectedBlueprintIdentity))) &&
         Boolean(selectedBlueprintDetailEndpointValue),
       staleTime: 30_000,
     }),
@@ -1369,13 +1406,22 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   );
   const selectedSourceGroupKey = $derived(sourceGroupForSourceKind(sourceKind));
   const selectedBlueprintSourceLocked = $derived(
-    blueprintSourceLockedByEntry && sourceKind === "blueprint" && Boolean(selectedBlueprintSlug.trim()),
+    blueprintSourceLockedByEntry &&
+      sourceKind === "blueprint" &&
+      (Boolean(selectedBlueprintSlug.trim()) || Boolean(selectedBlueprintUrl.trim())),
+  );
+  const selectedBlueprintSourceAccessLabel = $derived.by(() =>
+    selectedBlueprintSourceIsRemoteUrl
+      ? "自定义 Blueprint URL"
+      : $t(i18nKeys.console.quickDeploy.sourceAccessBlueprintCatalog),
   );
   const selectedBlueprintDisplayTitle = $derived.by(
     () =>
       selectedBlueprintListing?.title ||
       selectedBlueprintTitle.trim() ||
       selectedBlueprintSlug.trim() ||
+      selectedBlueprintManifest?.name ||
+      selectedBlueprintUrl.trim() ||
       $t(i18nKeys.console.quickDeploy.sourceBlueprint),
   );
   const sourceSummary = $derived.by(() => {
@@ -1386,6 +1432,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     if (sourceKind === "blueprint") {
       return selectedBlueprintTitle.trim() ||
         selectedBlueprintSlug.trim() ||
+        selectedBlueprintManifest?.name ||
+        selectedBlueprintUrl.trim() ||
         (selectedBlueprintSourceExtension?.title ??
           $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector));
     }
@@ -1443,14 +1491,20 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
 
     if (sourceKind === "blueprint") {
-      const selectedBlueprintValue = selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
+      const selectedBlueprintValue =
+        selectedBlueprintTitle.trim() ||
+        selectedBlueprintSlug.trim() ||
+        selectedBlueprintManifest?.name ||
+        selectedBlueprintUrl.trim();
       return [
         {
           label: $t(i18nKeys.console.quickDeploy.sourceAccess),
-          value: $t(i18nKeys.console.quickDeploy.sourceAccessBlueprintCatalog),
+          value: selectedBlueprintSourceAccessLabel,
         },
         {
-          label: $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector),
+          label: selectedBlueprintSourceIsRemoteUrl
+            ? "自定义蓝图"
+            : $t(i18nKeys.console.quickDeploy.sourceBlueprintSelector),
           value: selectedBlueprintValue ||
             (selectedBlueprintSourceExtension?.title ??
               $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)),
@@ -1461,6 +1515,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               {
                 label: $t(i18nKeys.console.quickDeploy.sourceBlueprint),
                 value: selectedBlueprintSlug.trim(),
+                mono: true,
+              },
+            ]
+          : []),
+        ...(selectedBlueprintUrl.trim()
+          ? [
+              {
+                label: "Blueprint URL",
+                value: selectedBlueprintUrl.trim(),
                 mono: true,
               },
             ]
@@ -1598,6 +1661,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   const inferredSourceName = $derived.by(() => {
     if (sourceKind === "github" && selectedGitHubRepository) {
       return selectedGitHubRepository.name;
+    }
+
+    if (sourceKind === "blueprint" && selectedBlueprintManifest?.name) {
+      return selectedBlueprintManifest.name;
     }
 
     if (sourceKind === "blueprint" && selectedBlueprintSlug.trim()) {
@@ -2119,7 +2186,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   function isLockedBlueprintSourceEntry(params: URLSearchParams): boolean {
     return (
       params.get("source") === "blueprint" &&
-      Boolean(params.get("blueprintSlug")?.trim()) &&
+      (Boolean(params.get("blueprintSlug")?.trim()) ||
+        Boolean(params.get("blueprintUrl")?.trim())) &&
       parseDeploymentStep(params.get("step")) !== "source"
     );
   }
@@ -2296,8 +2364,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
     if (!stepIsComplete("source")) {
       if (sourceKind === "blueprint") {
-        if (!selectedBlueprintSlug.trim()) {
+        if (!selectedBlueprintSlug.trim() && !selectedBlueprintUrl.trim()) {
           issues.push("来源：请选择一个蓝图");
+        } else if (selectedBlueprintUrl.trim() && !selectedBlueprintSourceMetadata?.remoteDetailEndpoint) {
+          issues.push("来源：当前运行时不支持自定义 Blueprint URL");
         } else if (selectedBlueprintDetailQuery.isError) {
           issues.push("来源：蓝图详情读取失败");
         } else if (!selectedBlueprintManifest) {
@@ -2449,6 +2519,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   function selectedBlueprintDetailHref(): string {
+    if (selectedBlueprintUrl.trim()) {
+      return "#remote-blueprint-detail";
+    }
+
     const slug = selectedBlueprintSlug.trim();
     if (!slug) {
       return sourceExtensionHref(selectedBlueprintSourceExtension);
@@ -2520,6 +2594,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   function openSelectedBlueprintDetailDialog(): void {
+    if (selectedBlueprintUrl.trim()) {
+      blueprintDetailSlug = "";
+      blueprintDetailTitle = selectedBlueprintTitle.trim();
+      blueprintDetailDialogOpen = true;
+      return;
+    }
+
     if (!selectedBlueprintSlug.trim()) {
       openBlueprintSelectorDialog();
       return;
@@ -2538,10 +2619,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   function selectBlueprintSourceExtension(extension: SystemPluginWebExtension): void {
     const previousKey = selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey;
     selectedBlueprintSourceExtensionKey = extension.key;
-    if (selectedBlueprintSlug.trim() && previousKey && previousKey !== extension.key) {
+    if ((selectedBlueprintSlug.trim() || selectedBlueprintUrl.trim()) && previousKey && previousKey !== extension.key) {
       selectedBlueprintSlug = "";
+      selectedBlueprintUrl = "";
       selectedBlueprintTitle = "";
       selectedBlueprintVariant = "";
+      selectedBlueprintProfile = "";
       blueprintDependencyProvisioningDrafts = {};
       blueprintSecretValues = {};
       blueprintSecretInputModes = {};
@@ -2557,8 +2640,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       blueprintSecretValueVisible = {};
     }
     selectedBlueprintSlug = item.slug;
+    selectedBlueprintUrl = "";
     selectedBlueprintTitle = item.title;
     selectedBlueprintVariant = item.defaultVariant ?? item.variants?.[0]?.id ?? "";
+    selectedBlueprintProfile = "";
     if (selectedBlueprintSourceExtension && !selectedBlueprintSourceExtensionKey) {
       selectedBlueprintSourceExtensionKey = selectedBlueprintSourceExtension.key;
     }
@@ -2614,10 +2699,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       setSearchParam(
         params,
         "sourceExtension",
-        selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey,
+        selectedBlueprintSourceIsRemoteUrl
+          ? selectedBlueprintSourceExtensionKey
+          : selectedBlueprintSourceExtension?.key ?? selectedBlueprintSourceExtensionKey,
       );
       setSearchParam(params, "blueprintSlug", selectedBlueprintSlug);
+      setSearchParam(params, "blueprintUrl", selectedBlueprintUrl);
       setSearchParam(params, "blueprintTitle", selectedBlueprintTitle);
+      setSearchParam(params, "blueprintProfile", selectedBlueprintProfile);
       setSearchParam(params, "blueprintVariant", selectedBlueprintVariant);
     }
 
@@ -2776,7 +2865,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       selectedProjectId = lockedProjectId;
       projectContextEnabled = true;
     }
-    if (selectedBlueprintSlug !== (params.get("blueprintSlug") ?? "")) {
+    if (
+      selectedBlueprintSlug !== (params.get("blueprintSlug") ?? "") ||
+      selectedBlueprintUrl !== (params.get("blueprintUrl") ?? "")
+    ) {
       blueprintDependencyProvisioningDrafts = {};
       blueprintSecretValues = {};
       blueprintSecretInputModes = {};
@@ -2784,7 +2876,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
     selectedBlueprintSourceExtensionKey = params.get("sourceExtension") ?? "";
     selectedBlueprintSlug = params.get("blueprintSlug") ?? "";
+    selectedBlueprintUrl = params.get("blueprintUrl") ?? "";
     selectedBlueprintTitle = params.get("blueprintTitle") ?? "";
+    selectedBlueprintProfile = params.get("blueprintProfile") ?? "";
     selectedBlueprintVariant = params.get("blueprintVariant") ?? "";
 
     localFolderLocator = nextSourceKind === "local-folder" || nextSourceKind === "dockerfile" ? nextSourceLocator || "." : localFolderLocator;
@@ -2840,6 +2934,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
     if (kind !== "blueprint") {
       blueprintSourceLockedByEntry = false;
+      selectedBlueprintUrl = "";
     }
     if (kind === "static-site") {
       resourceKind = "static-site";
@@ -3180,7 +3275,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       case "source":
         if (sourceKind === "blueprint") {
           return (
-            Boolean(selectedBlueprintSlug.trim()) &&
+            (Boolean(selectedBlueprintSlug.trim()) || Boolean(selectedBlueprintUrl.trim())) &&
+            (!selectedBlueprintUrl.trim() || Boolean(selectedBlueprintSourceMetadata?.remoteDetailEndpoint)) &&
             Boolean(selectedBlueprintManifest) &&
             blueprintDependencySelectionsComplete() &&
             blueprintSecretValuesComplete()
@@ -3801,12 +3897,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       (response.entry
         ? blueprintRegistryEntryToListing(response.entry, manifest)
         : {
-            slug: manifest.id ?? selectedBlueprintSlug.trim(),
-            title: manifest.name ?? selectedBlueprintTitle.trim() ?? manifest.id ?? "",
+            slug: selectedBlueprintSlug.trim() || manifest.id || selectedBlueprintUrl.trim(),
+            title:
+              selectedBlueprintTitle.trim() ||
+              manifest.name ||
+              manifest.id ||
+              selectedBlueprintUrl.trim(),
             subtitle: manifest.summary,
             category: "Blueprints",
             blueprint: {
-              id: manifest.id ?? selectedBlueprintSlug.trim(),
+              id: manifest.id || selectedBlueprintSlug.trim() || selectedBlueprintUrl.trim(),
               version: manifest.version ?? "1.0.0",
               summary: manifest.summary,
               tags: [],
@@ -3855,7 +3955,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       }
     }
 
-    const appName = selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
+    const appName =
+      selectedBlueprintTitle.trim() ||
+      selectedBlueprintManifest?.name ||
+      selectedBlueprintSlug.trim() ||
+      selectedBlueprintUrl.trim();
     if (appName && (!("APP_NAME" in parameters) || !String(parameters.APP_NAME).trim())) {
       parameters.APP_NAME = appName;
     }
@@ -3895,7 +3999,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     const projectTargetName =
       projectMode === "existing"
         ? selectedProject?.name
-        : projectName.trim() || selectedBlueprintTitle.trim() || selectedBlueprintSlug.trim();
+        : projectName.trim() ||
+          selectedBlueprintTitle.trim() ||
+          selectedBlueprintManifest?.name ||
+          selectedBlueprintSlug.trim();
     const environmentTargetName =
       environmentContextEnabled && environmentMode === "existing"
         ? selectedEnvironment?.name
@@ -3929,7 +4036,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       projectName: target.projectName,
       environmentId: target.environmentId,
       environmentName: target.environmentName,
-      resourceSlugPrefix: selectedBlueprintSlug.trim(),
+      resourceSlugPrefix:
+        selectedBlueprintSlug.trim() ||
+        normalizeQuickDeployGeneratedNameBase(
+          selectedBlueprintManifest?.id ||
+            selectedBlueprintManifest?.name ||
+            selectedBlueprintTitle.trim() ||
+            "remote-blueprint",
+        ),
       serverId: target.serverId,
     };
   }
@@ -4091,13 +4205,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   async function installBlueprintFromQuickDeploy(): Promise<void> {
-    if (!selectedBlueprintSlug.trim()) {
+    if (!selectedBlueprintSlug.trim() && !selectedBlueprintUrl.trim()) {
       const href = sourceExtensionHref(selectedBlueprintSourceExtension);
       if (href !== "#") {
         await goto(href);
         return;
       }
       throw new Error($t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable));
+    }
+
+    if (selectedBlueprintUrl.trim() && !selectedBlueprintSourceMetadata?.remoteInstallEndpoint) {
+      throw new Error("当前运行时不支持自定义 Blueprint URL。");
     }
 
     if (!selectedBlueprintManifest) {
@@ -4108,7 +4226,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       throw new Error("请完成 Blueprint 依赖资源的 create/reuse 选择。");
     }
 
-    const slug = selectedBlueprintSlug.trim();
+    const slug =
+      selectedBlueprintSlug.trim() ||
+      selectedBlueprintManifest.id ||
+      normalizeQuickDeployGeneratedNameBase(selectedBlueprintDisplayTitle);
     blueprintInstallInFlight = true;
     workflowProgressDialogOpen = true;
     setWorkflowStepStatus("deployments.create", "running");
@@ -4120,7 +4241,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       const installInput: BlueprintInstallInput = {
         slug,
         ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
-        profile: "production",
+        profile: selectedBlueprintProfile.trim() || "production",
         parameters: blueprintInstallParameters(),
         dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
         target: blueprintInstallTarget(target),
@@ -4133,7 +4254,19 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         ],
         secretValues: blueprintInstallSecretValueInput(),
       };
-      const installResult = await orpcClient.blueprints.install(installInput);
+      const installResult = selectedBlueprintUrl.trim()
+        ? await request<BlueprintInstallResult>(
+            selectedBlueprintSourceMetadata?.remoteInstallEndpoint ?? "",
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                ...installInput,
+                blueprintUrl: selectedBlueprintUrl.trim(),
+              }),
+            },
+          )
+        : await orpcClient.blueprints.install(installInput);
       const status = readBlueprintInstallStatus(installResult);
 
       lastAccessUrl = readBlueprintInstallAccessUrl(installResult);
@@ -4723,7 +4856,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           <h2 class="text-lg font-semibold">部署入口</h2>
           <p class="text-sm text-muted-foreground">
             {selectedBlueprintSourceLocked
-              ? "已从蓝图市场选择应用，在同一页确认项目、服务器与运行配置。"
+              ? selectedBlueprintSourceIsRemoteUrl
+                ? "已从自定义 Blueprint URL 进入，在同一页确认项目、服务器与运行配置。"
+                : "已从蓝图市场选择应用，在同一页确认项目、服务器与运行配置。"
               : "选择来源，并在同一页确认项目、服务器与运行配置。"}
           </p>
         </div>
@@ -4905,10 +5040,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
                     <p class="text-sm font-medium">
-                      {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogs)}
+                      {selectedBlueprintSourceIsRemoteUrl
+                        ? "自定义蓝图"
+                        : $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogs)}
                     </p>
                     <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogsHint)}
+                      {selectedBlueprintSourceIsRemoteUrl
+                        ? "这个 Blueprint 来自 one-click deploy URL，不需要从市场重新选择。"
+                        : $t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogsHint)}
                     </p>
                   </div>
                 </div>
@@ -4918,7 +5057,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     <Skeleton class="h-20 w-full" />
                   </div>
                 {:else if quickDeploySourceExtensions.length > 0}
-                  {#if selectedBlueprintSlug.trim()}
+                  {#if selectedBlueprintIdentity}
                     <div class="console-subtle-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div class="flex min-w-0 items-center gap-3">
                         <BlueprintProductIcon
@@ -4932,7 +5071,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                             {selectedBlueprintDisplayTitle}
                           </p>
                           <p class="truncate font-mono text-xs text-muted-foreground">
-                            {selectedBlueprintSlug.trim()}
+                            {selectedBlueprintSourceIsRemoteUrl
+                              ? selectedBlueprintUrl.trim()
+                              : selectedBlueprintSlug.trim()}
                           </p>
                         </div>
                       </div>
@@ -4946,14 +5087,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                           <Eye class="size-4" />
                           查看详情
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onclick={openBlueprintSelectorDialog}
-                        >
-                          更换
-                        </Button>
+                        {#if !selectedBlueprintSourceIsRemoteUrl}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onclick={openBlueprintSelectorDialog}
+                          >
+                            更换
+                          </Button>
+                        {/if}
                       </div>
                     </div>
                   {:else}
@@ -4970,7 +5113,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                       </Button>
                     </div>
                   {/if}
-                  {#if selectedBlueprintSlug.trim() && selectedBlueprintVariantOptions.length > 0}
+                  {#if selectedBlueprintIdentity && selectedBlueprintVariantOptions.length > 0}
                     <label class="block space-y-1.5">
                       <span class="text-xs font-medium text-muted-foreground">部署方案</span>
                       <select
@@ -4987,7 +5130,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                       </span>
                     </label>
                   {/if}
-                  {#if selectedBlueprintSlug.trim()}
+                  {#if selectedBlueprintIdentity}
                     <div class="space-y-3" data-blueprint-dependency-provisioning>
                       <div class="flex items-center justify-between gap-3">
                         <div class="min-w-0">
@@ -6105,7 +6248,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
               </span>
-              {#if sourceKind === "blueprint" && selectedBlueprintSlug.trim()}
+              {#if sourceKind === "blueprint" && selectedBlueprintIdentity}
                 <Button
                   type="button"
                   size="sm"
@@ -6147,7 +6290,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
             <span class="min-w-0 break-words text-right font-medium">{projectSummary}</span>
           </div>
-          {#if sourceKind === "blueprint" && selectedBlueprintSlug.trim()}
+          {#if sourceKind === "blueprint" && selectedBlueprintIdentity}
             {#if selectedBlueprintVariant}
               <div class="console-subtle-panel flex min-w-0 items-center justify-between gap-3 px-3 py-2">
                 <span class="shrink-0 text-muted-foreground">部署方案</span>
