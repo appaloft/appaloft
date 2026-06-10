@@ -469,6 +469,116 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
   });
 
+  test("[AUTH-SESSION-005] keeps configured providers visible when session read fails", async () => {
+    const runtime = new BetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      githubClientId: "github-client-id",
+      githubClientSecret: "github-client-secret",
+      githubRedirectUri: "http://localhost:3721/api/auth/callback/github",
+      trustedOrigins: ["http://localhost:3721"],
+    });
+    (runtime as unknown as { auth: unknown }).auth = {
+      api: {
+        async getSession() {
+          throw new Error("session-read-failed");
+        },
+      },
+    };
+
+    const status = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: "better-auth.session_token=stale-session",
+        },
+      }),
+    );
+
+    expect(status).toMatchObject({
+      accountSecurity: {
+        enabled: true,
+        passwordState: "unknown",
+      },
+      enabled: true,
+      loginRequired: true,
+      provider: "better-auth",
+      session: null,
+    });
+    expect(status.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "github",
+          configured: true,
+          connected: false,
+        }),
+      ]),
+    );
+  });
+
+  test("[AUTH-SESSION-006] keeps provider status usable when connected account read fails", async () => {
+    const runtime = new BetterAuthRuntime({
+      enabled: true,
+      baseURL: "http://localhost:3721",
+      secret: "test-secret-at-least-long-enough",
+      githubClientId: "github-client-id",
+      githubClientSecret: "github-client-secret",
+      githubRedirectUri: "http://localhost:3721/api/auth/callback/github",
+      trustedOrigins: ["http://localhost:3721"],
+    });
+    (runtime as unknown as { auth: unknown }).auth = {
+      api: {
+        async getSession() {
+          return {
+            session: {
+              activeOrganizationId: "org_test",
+              userId: "usr_test",
+            },
+            user: {
+              email: "owner@appaloft.test",
+              id: "usr_test",
+              name: "Owner",
+            },
+          };
+        },
+        async listUserAccounts() {
+          throw new Error("account-read-failed");
+        },
+        async listOrganizations() {
+          throw new Error("organization-read-failed");
+        },
+      },
+    };
+
+    const status = await runtime.getSessionStatus(
+      new Request("http://localhost:3721/api/auth/session", {
+        headers: {
+          cookie: "better-auth.session_token=current-session",
+        },
+      }),
+    );
+
+    expect(status).toMatchObject({
+      accountSecurity: {
+        enabled: true,
+        passwordState: "not-set",
+      },
+      enabled: true,
+      loginRequired: false,
+      provider: "better-auth",
+    });
+    expect(status.currentUserOrganizationCount).toBeUndefined();
+    expect(status.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "github",
+          configured: true,
+          connected: false,
+        }),
+      ]),
+    );
+  });
+
   test("[AUTH-SESSION-004] reuses session and active role reads inside one execution context", async () => {
     const runtime = new BetterAuthRuntime({
       enabled: true,
