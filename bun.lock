@@ -178,6 +178,7 @@
       "name": "@appaloft/adapter-runtime",
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@appaloft/blueprints": "workspace:*",
         "@appaloft/core": "workspace:*",
         "@appaloft/i18n": "workspace:*",

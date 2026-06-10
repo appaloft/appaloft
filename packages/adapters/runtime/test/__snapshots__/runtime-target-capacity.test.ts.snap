@@ -1,0 +1,175 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`runtime target capacity diagnostics [RUNTIME-CAPACITY-INSPECT-001] renders a read-only SSH diagnostic script 1`] = `
+"set +e
+APPALOFT_RUNTIME_ROOT='/var/lib/appaloft/runtime'
+APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
+APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
+APPALOFT_CAPACITY_PROFILE='full'
+printf 'APPALOFT_CAPACITY_V1\\n'
+if command -v docker >/dev/null 2>&1; then
+  APPALOFT_DOCKER_AVAILABLE=1
+  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
+    [ -n "$container_id" ] || continue
+    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER\\t{{.Id}}\\t{{.Name}}\\t{{.State.Running}}\\t{{.State.Status}}\\t{{.SizeRw}}\\t{{ index .Config.Labels "appaloft.deployment-id" }}\\t{{ index .Config.Labels "appaloft.project-id" }}\\t{{ index .Config.Labels "appaloft.environment-id" }}\\t{{ index .Config.Labels "appaloft.resource-id" }}\\t{{ index .Config.Labels "appaloft.server-id" }}\\t{{ index .Config.Labels "appaloft.destination-id" }}\\t{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
+  done
+else
+  APPALOFT_DOCKER_AVAILABLE=0
+  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'
+fi
+if [ "$APPALOFT_CAPACITY_PROFILE" = "attribution" ]; then
+  if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+    find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+      name=$(basename "$workspace")
+      active_marker=false
+      rollback_marker=false
+      [ -e "$workspace/.appaloft-active" ] && active_marker=true
+      [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+      printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$name" "$workspace" "" "$active_marker" "$rollback_marker"
+    done
+  fi
+  exit 0
+fi
+emit_disk() {
+  target_path="$1"
+  df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $2, $3, $4, $5}'
+}
+emit_inodes() {
+  target_path="$1"
+  df -P -i "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_INODES\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $3, $4, $5}'
+}
+emit_du() {
+  kind="$1"
+  target_path="$2"
+  if [ -e "$target_path" ]; then
+    du -sk "$target_path" 2>/dev/null | awk -v kind="$kind" -v p="$target_path" '{printf "CAPACITY_DU\\t%s\\t%s\\t%s\\n", kind, p, $1}'
+  else
+    printf 'CAPACITY_DU\\t%s\\t%s\\tmissing\\n' "$kind" "$target_path"
+  fi
+}
+for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT" "$APPALOFT_STATE_ROOT" "$APPALOFT_SOURCE_WORKSPACE_ROOT"; do
+  emit_disk "$target_path"
+  emit_inodes "$target_path"
+done
+emit_du runtimeRoot "$APPALOFT_RUNTIME_ROOT"
+emit_du stateRoot "$APPALOFT_STATE_ROOT"
+emit_du sourceWorkspace "$APPALOFT_SOURCE_WORKSPACE_ROOT"
+if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+  find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+    name=$(basename "$workspace")
+    size_bytes=$(du -sk "$workspace" 2>/dev/null | awk '{print $1 * 1024}')
+    active_marker=false
+    rollback_marker=false
+    [ -e "$workspace/.appaloft-active" ] && active_marker=true
+    [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+    printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$name" "$workspace" "\${size_bytes:-}" "$active_marker" "$rollback_marker"
+  done
+fi
+if [ -r /proc/meminfo ]; then
+  awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\\t%s\\t%s\\n", total, available}' /proc/meminfo
+fi
+cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+if [ -r /proc/loadavg ]; then
+  read load1 load5 load15 rest < /proc/loadavg
+  printf 'CAPACITY_CPU\\t%s\\t%s\\t%s\\t%s\\n' "\${cores:-}" "$load1" "$load5" "$load15"
+else
+  printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' "\${cores:-}"
+fi
+if [ "$APPALOFT_DOCKER_AVAILABLE" = "1" ]; then
+  docker_system_df_output=$(docker system df 2>&1)
+  docker_status=$?
+  if [ "$docker_status" = "0" ]; then
+    printf '%s\\n' "$docker_system_df_output" | sed 's/^/CAPACITY_DOCKER_DF\\t/'
+  else
+    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker system df failed\\n'
+  fi
+fi
+"
+`;
+
+exports[`runtime target capacity diagnostics [RT-USAGE-002][RT-USAGE-004] renders a bounded attribution profile before expensive capacity checks 1`] = `
+"set +e
+APPALOFT_RUNTIME_ROOT='/var/lib/appaloft/runtime'
+APPALOFT_STATE_ROOT='/var/lib/appaloft/runtime/state'
+APPALOFT_SOURCE_WORKSPACE_ROOT='/var/lib/appaloft/runtime/ssh-deployments'
+APPALOFT_CAPACITY_PROFILE='attribution'
+printf 'APPALOFT_CAPACITY_V1\\n'
+if command -v docker >/dev/null 2>&1; then
+  APPALOFT_DOCKER_AVAILABLE=1
+  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
+    [ -n "$container_id" ] || continue
+    docker inspect --size --format 'CAPACITY_APPALOFT_CONTAINER\\t{{.Id}}\\t{{.Name}}\\t{{.State.Running}}\\t{{.State.Status}}\\t{{.SizeRw}}\\t{{ index .Config.Labels "appaloft.deployment-id" }}\\t{{ index .Config.Labels "appaloft.project-id" }}\\t{{ index .Config.Labels "appaloft.environment-id" }}\\t{{ index .Config.Labels "appaloft.resource-id" }}\\t{{ index .Config.Labels "appaloft.server-id" }}\\t{{ index .Config.Labels "appaloft.destination-id" }}\\t{{ index .Config.Labels "appaloft.artifact-kind" }}' "$container_id" 2>/dev/null
+  done
+else
+  APPALOFT_DOCKER_AVAILABLE=0
+  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'
+fi
+if [ "$APPALOFT_CAPACITY_PROFILE" = "attribution" ]; then
+  if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+    find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+      name=$(basename "$workspace")
+      active_marker=false
+      rollback_marker=false
+      [ -e "$workspace/.appaloft-active" ] && active_marker=true
+      [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+      printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$name" "$workspace" "" "$active_marker" "$rollback_marker"
+    done
+  fi
+  exit 0
+fi
+emit_disk() {
+  target_path="$1"
+  df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $2, $3, $4, $5}'
+}
+emit_inodes() {
+  target_path="$1"
+  df -P -i "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_INODES\\t%s\\t%s\\t%s\\t%s\\t%s\\n", p, $6, $3, $4, $5}'
+}
+emit_du() {
+  kind="$1"
+  target_path="$2"
+  if [ -e "$target_path" ]; then
+    du -sk "$target_path" 2>/dev/null | awk -v kind="$kind" -v p="$target_path" '{printf "CAPACITY_DU\\t%s\\t%s\\t%s\\n", kind, p, $1}'
+  else
+    printf 'CAPACITY_DU\\t%s\\t%s\\tmissing\\n' "$kind" "$target_path"
+  fi
+}
+for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT" "$APPALOFT_STATE_ROOT" "$APPALOFT_SOURCE_WORKSPACE_ROOT"; do
+  emit_disk "$target_path"
+  emit_inodes "$target_path"
+done
+emit_du runtimeRoot "$APPALOFT_RUNTIME_ROOT"
+emit_du stateRoot "$APPALOFT_STATE_ROOT"
+emit_du sourceWorkspace "$APPALOFT_SOURCE_WORKSPACE_ROOT"
+if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+  find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+    name=$(basename "$workspace")
+    size_bytes=$(du -sk "$workspace" 2>/dev/null | awk '{print $1 * 1024}')
+    active_marker=false
+    rollback_marker=false
+    [ -e "$workspace/.appaloft-active" ] && active_marker=true
+    [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+    printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$name" "$workspace" "\${size_bytes:-}" "$active_marker" "$rollback_marker"
+  done
+fi
+if [ -r /proc/meminfo ]; then
+  awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\\t%s\\t%s\\n", total, available}' /proc/meminfo
+fi
+cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+if [ -r /proc/loadavg ]; then
+  read load1 load5 load15 rest < /proc/loadavg
+  printf 'CAPACITY_CPU\\t%s\\t%s\\t%s\\t%s\\n' "\${cores:-}" "$load1" "$load5" "$load15"
+else
+  printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' "\${cores:-}"
+fi
+if [ "$APPALOFT_DOCKER_AVAILABLE" = "1" ]; then
+  docker_system_df_output=$(docker system df 2>&1)
+  docker_status=$?
+  if [ "$docker_status" = "0" ]; then
+    printf '%s\\n' "$docker_system_df_output" | sed 's/^/CAPACITY_DOCKER_DF\\t/'
+  else
+    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker system df failed\\n'
+  fi
+fi
+"
+`;
