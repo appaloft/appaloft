@@ -169,6 +169,7 @@ export interface AppConfig {
   databaseDriver: "postgres" | "pglite";
   autoMigrate: boolean;
   databaseUrl?: string;
+  databasePoolMax?: number;
   dataDir: string;
   pgliteDataDir: string;
   remoteRuntimeRoot: string;
@@ -210,7 +211,7 @@ export interface ConfigSource<TValue> {
 
 const defaultDockerSwarmEdgeNetworkName = "appaloft-edge";
 
-const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
+const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> & { databasePoolMax: number } = {
   appName: "Appaloft",
   appVersion: readSourceCheckoutAppVersion(),
   runtimeMode: "self-hosted",
@@ -223,6 +224,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   databaseDriver: "pglite",
   autoMigrate: false,
   databaseUrl: "postgres://postgres:postgres@localhost:5432/appaloft",
+  databasePoolMax: 10,
   remoteRuntimeRoot: "/var/lib/appaloft/runtime",
   remotePgliteSyncBackupRetentionDays: 7,
   remotePgliteSyncBackupMaxCount: 20,
@@ -537,6 +539,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   );
   const databaseUrl =
     configuredDatabaseUrl ?? (databaseDriver === "postgres" ? defaults.databaseUrl : undefined);
+  const databasePoolMax =
+    parsePositiveInteger(source.flags?.databasePoolMax) ??
+    parsePositiveInteger(env.APPALOFT_DATABASE_POOL_MAX) ??
+    parsePositiveInteger(fileConfig.databasePoolMax) ??
+    defaults.databasePoolMax;
   const enabledSystemPlugins = (
     source.flags?.enabledSystemPlugins ??
     (env.APPALOFT_SYSTEM_PLUGINS
@@ -1097,6 +1104,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       fileConfig.autoMigrate ??
       defaults.autoMigrate,
     ...(databaseUrl ? { databaseUrl } : {}),
+    databasePoolMax,
     dataDir,
     pgliteDataDir,
     remoteRuntimeRoot:

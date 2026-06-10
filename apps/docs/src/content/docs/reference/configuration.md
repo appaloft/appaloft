@@ -47,6 +47,7 @@ worker group、worker ids 和 coordinator role。
 | `APPALOFT_WORKER_COUNT` | `1` | 配置的 worker slots 数。启用模式至少需要 1 个；`disabled` 可设为 `0`。 |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | 稳定 worker group，用来生成 worker ids 并协调容量。 |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | `APPALOFT_WORKER_QUEUE_BACKEND=external` 时必填；public 支持值为 `kafka`、`temporal`、`custom`。 |
+| `APPALOFT_DATABASE_POOL_MAX` | `10` | PostgreSQL runtime 每个进程最多保留的连接数。多 Web/worker 进程共享较小 session pool 时应按进程数降低这个值。 |
 
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>
 

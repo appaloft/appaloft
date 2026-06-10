@@ -112,6 +112,7 @@ export interface DatabaseConnection {
 export interface CreateDatabaseInput {
   driver: "postgres" | "pglite";
   databaseUrl?: string;
+  databasePoolMax?: number;
   pgliteDataDir?: string;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
 }
@@ -155,7 +156,7 @@ export async function createDatabase(input: CreateDatabaseInput): Promise<Databa
   }
 
   const connection = postgres(input.databaseUrl, {
-    max: 10,
+    max: input.databasePoolMax ?? 10,
   });
 
   const db = new Kysely<Database>({
