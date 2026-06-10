@@ -176,11 +176,14 @@ describe("runtime command builder", () => {
 
     const command = renderRuntimeCommandString(spec, { quote: shellQuote });
 
-    expect(command).toContain("appaloft_docker_compose() {");
-    expect(command).toContain("docker compose \"$@\"");
-    expect(command).toContain("docker-compose \"$@\"");
     expect(command).toContain(
-      "appaloft_docker_compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml'",
+      "docker compose -f '/srv/app/docker-compose.yml' config --services >/dev/null 2>&1",
+    );
+    expect(command).toContain(
+      "docker-compose -f '/srv/app/docker-compose.yml' config --services >/dev/null 2>&1",
+    );
+    expect(command).toContain(
+      "$appaloft_docker_compose_cmd -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml'",
     );
     expect(command).toContain("--scale 'worker=4'");
   });

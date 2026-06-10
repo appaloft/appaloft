@@ -129,7 +129,7 @@ function renderDockerComposeUpCommand(
   options: RuntimeCommandRenderOptions,
 ): string {
   const composeInvocation = [
-    spec.portableDockerCompose === true ? "appaloft_docker_compose" : "docker compose",
+    spec.portableDockerCompose === true ? "$appaloft_docker_compose_cmd" : "docker compose",
     spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
     "-f",
     options.quote(spec.composeFile.value),
@@ -150,11 +150,10 @@ function renderDockerComposeUpCommand(
 
   return [
     "{",
-    "appaloft_docker_compose() {",
-    "if docker compose version >/dev/null 2>&1; then docker compose \"$@\";",
-    "elif command -v docker-compose >/dev/null 2>&1; then docker-compose \"$@\";",
-    "else docker compose \"$@\"; fi",
-    "};",
+    "appaloft_docker_compose_cmd='';",
+    `if docker compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker compose';`,
+    `elif command -v docker-compose >/dev/null 2>&1 && docker-compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker-compose';`,
+    "else appaloft_docker_compose_cmd='docker compose'; fi;",
     composeInvocation,
     ";",
     "}",
