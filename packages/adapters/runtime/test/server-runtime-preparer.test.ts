@@ -67,6 +67,9 @@ describe("RuntimeServerRuntimePreparer", () => {
     expect(calls[0]?.command).toBe("ssh");
     expect(calls[0]?.timeoutMs).toBe(900_000);
     expect(calls[0]?.args.join(" ")).toContain("docker version");
+    expect(calls[0]?.args.join(" ")).toContain("docker compose version");
+    expect(calls[0]?.args.join(" ")).toContain("APPALOFT_DOCKER_PREPARE docker-compose-plugin");
+    expect(calls[0]?.args.join(" ")).toContain("install -y docker-compose-plugin");
     expect(calls[0]?.args.join(" ")).toContain("APPALOFT_DOCKER_PREPARE docker-repository-reset");
     expect(calls[0]?.args.join(" ")).toContain("rm -f /etc/apt/sources.list.d/docker.list");
     expect(calls[0]?.args.join(" ")).toContain("APPALOFT_DOCKER_PREPARE apt-bootstrap");

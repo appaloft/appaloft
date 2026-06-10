@@ -34,9 +34,9 @@ const shellParameterExpansion = {
   versionCodename: "${VERSION_CODENAME:-}",
 } as const;
 
-const remoteDockerPrepareCommand = String.raw`
+export const remoteDockerPrepareCommand = String.raw`
 set -eu
-if command -v docker >/dev/null 2>&1 && docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
+if command -v docker >/dev/null 2>&1 && docker version --format '{{.Server.Version}}' >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   printf 'APPALOFT_DOCKER_READY already-installed\n'
   exit 0
 fi
@@ -99,12 +99,23 @@ fi
 printf 'APPALOFT_DOCKER_PREPARE docker-repository %s %s %s\n' "$ID" "$CODENAME" "$ARCH"
 printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/%s %s stable\n' "$ARCH" "$ID" "$CODENAME" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
 apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 update
+if command -v docker >/dev/null 2>&1 && docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
+  printf 'APPALOFT_DOCKER_PREPARE docker-compose-plugin\n'
+  apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 install -y docker-compose-plugin
+  if docker compose version >/dev/null 2>&1; then
+    docker version --format '{{.Server.Version}}'
+    docker compose version
+    printf '\nAPPALOFT_DOCKER_READY installed-compose-plugin\n'
+    exit 0
+  fi
+fi
 printf 'APPALOFT_DOCKER_PREPARE docker-packages\n'
 apt_run $SUDO apt-get -o DPkg::Lock::Timeout=120 install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 if command -v systemctl >/dev/null 2>&1; then
   $SUDO systemctl enable --now docker || true
 fi
 docker version --format '{{.Server.Version}}'
+docker compose version
 printf '\nAPPALOFT_DOCKER_READY installed\n'
 `;
 

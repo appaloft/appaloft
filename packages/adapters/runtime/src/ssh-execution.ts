@@ -94,6 +94,7 @@ import {
 import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
+import { remoteDockerPrepareCommand } from "./server-runtime-preparer";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
 import {
   dockerStorageMountsFromRuntimeMetadata,
@@ -3397,6 +3398,34 @@ export class SshExecutionBackend implements ExecutionBackend {
           deployment: this.applyFailure(deployment, {
             logs,
             errorCode: "ssh_docker_unavailable",
+            retryable: false,
+            metadata: {
+              host: target.host,
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+
+      const dockerComposeReady = await this.runRemoteCommandStreaming({
+        target,
+        command: remoteDockerPrepareCommand,
+        cwd: runtimeDir,
+        env,
+        redactions,
+        onOutput: this.createStreamingOutputSink(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "package",
+        }),
+      });
+      if (dockerComposeReady.failed) {
+        const message = "Docker Compose is not available on the SSH target";
+        logs.push(phaseLog("package", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_compose_unavailable",
             retryable: false,
             metadata: {
               host: target.host,
