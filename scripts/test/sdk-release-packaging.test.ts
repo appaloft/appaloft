@@ -59,7 +59,21 @@ describe("TypeScript SDK release packaging", () => {
     expect(prepareScript).toContain(
       'await run(["bun", "run", "--cwd", sdkPackageDir, "build"], root);',
     );
+    expect(prepareScript).toContain('"dist/index.js"');
+    expect(prepareScript).toContain('"dist/index.d.ts"');
+    expect(prepareScript).toContain('"dist/internal.js"');
     expect(prepareScript).toContain('"dist/generated-operations.js"');
-    expect(prepareScript).toContain('"dist/generated-operations.d.ts"');
+  });
+
+  test("[TS-SDK-RELEASE-001] public declarations expose only the typed facade", async () => {
+    const declaration = await Bun.file(join(root, "packages", "sdk", "dist", "index.d.ts")).text();
+
+    expect(declaration).toContain("createAppaloftClient");
+    expect(declaration).toContain("AppaloftClient");
+    expect(declaration).not.toContain("createAppaloftSdkClient");
+    expect(declaration).not.toContain("generatedSdkOperations");
+    expect(declaration).not.toContain("SdkOperationDescriptor");
+    expect(declaration).not.toContain("request:");
+    expect(declaration).not.toContain("stream:");
   });
 });

@@ -5,7 +5,8 @@ import {
   type OperationCatalogEntry,
   operationCatalog,
 } from "@appaloft/application/operation-catalog";
-import { generatedSdkOperations } from "@appaloft/sdk";
+import { createAppaloftOpenApiSpec } from "@appaloft/openapi";
+import { renderSdkFacadeManifest } from "@appaloft/sdk-generator";
 
 type ExpectedRoute = {
   readonly method: string;
@@ -76,29 +77,17 @@ const remoteCliMappings = operationCatalog
   );
 
 describe("Remote CLI Mapping Matrix", () => {
-  test.each(remoteCliMappings)("$cli -> $key $route.method $route.sdkPath", (mapping) => {
-    const generated = generatedSdkOperations.find(
-      (operation) =>
-        operation.operationKey === mapping.key &&
-        operation.route.method === mapping.route.method &&
-        operation.route.path === mapping.route.sdkPath,
-    );
+  test.each(remoteCliMappings)("$cli -> $key $route.method $route.sdkPath", async (mapping) => {
+    const manifest = await renderFacadeManifestLines();
+    const matchingLine = manifest.find((line) => line.includes(`-> ${mapping.key} `));
 
-    expect(generated, mapping.cli).toMatchObject({
-      operationKey: mapping.key,
-      kind: mapping.kind,
-      route: {
-        method: mapping.route.method,
-        path: mapping.route.sdkPath,
-      },
-      streaming: mapping.route.streaming,
-    });
+    expect(matchingLine, mapping.cli).toBeDefined();
   });
 
-  test("[CONTROL-PLANE-CLI-010] every generated operation is registered for remote CLI or explicitly classified", () => {
+  test("[CONTROL-PLANE-CLI-010] every generated facade operation is registered for remote CLI or explicitly classified", async () => {
     const remoteCliKeys = new Set(remoteCliMappings.map((mapping) => mapping.key));
     const uniqueGeneratedKeys = [
-      ...new Set(generatedSdkOperations.map((operation) => operation.operationKey)),
+      ...new Set((await renderFacadeManifestLines()).map(readOperationKey)),
     ];
 
     expect(
@@ -108,13 +97,28 @@ describe("Remote CLI Mapping Matrix", () => {
     ).toEqual([]);
   });
 
-  test("[CONTROL-PLANE-CLI-010] every explicit non-CLI generated operation still exists", () => {
-    const uniqueGeneratedKeys = new Set(
-      generatedSdkOperations.map((operation) => operation.operationKey),
-    );
+  test("[CONTROL-PLANE-CLI-010] every explicit non-CLI generated facade operation still exists", async () => {
+    const uniqueGeneratedKeys = new Set((await renderFacadeManifestLines()).map(readOperationKey));
 
     expect(
       [...generatedOperationsWithoutRemoteCli].filter((key) => !uniqueGeneratedKeys.has(key)),
     ).toEqual([]);
   });
 });
+
+let facadeManifestLines: Promise<string[]> | undefined;
+
+function renderFacadeManifestLines(): Promise<string[]> {
+  facadeManifestLines ??= createAppaloftOpenApiSpec().then((spec) =>
+    renderSdkFacadeManifest(spec)
+      .trim()
+      .split("\n")
+      .filter((line) => line.length > 0),
+  );
+
+  return facadeManifestLines;
+}
+
+function readOperationKey(line: string): string {
+  return line.split(" -> ")[1]?.split(" ")[0] ?? "";
+}

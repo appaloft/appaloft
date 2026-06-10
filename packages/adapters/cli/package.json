@@ -17,6 +17,10 @@
     "@effect/platform-node": "^0.106.0",
     "effect": "^3.21.2"
   },
+  "devDependencies": {
+    "@appaloft/openapi": "workspace:*",
+    "@appaloft/sdk-generator": "workspace:*"
+  },
   "scripts": {
     "lint": "biome check .",
     "test": "bun test",
