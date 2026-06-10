@@ -1242,7 +1242,9 @@ export const enUS = {
       pageTitle: "Projects",
       projectListDescription:
         "A project owns deployment records, environment variables, and target relationships.",
+      projectListRange: "{{start}}-{{end}} of {{total}}",
       projectListTitle: "Project list",
+      reorderHandle: "Drag to reorder",
       recentDeploymentsDescription:
         "Only recent deployment events are shown here. Use deployments for full history.",
       recentDeploymentsTitle: "Recent deployments",

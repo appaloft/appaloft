@@ -400,6 +400,8 @@ import {
   RenameServerUseCase,
   RenameStorageVolumeCommandHandler,
   RenameStorageVolumeUseCase,
+  ReorderProjectsCommandHandler,
+  ReorderProjectsUseCase,
   ReplaySourceEventCommandHandler,
   ReplaySourceEventUseCase,
   ResetResourceHealthCommandHandler,
@@ -2497,6 +2499,7 @@ export function registerApplicationServices(
   container.registerSingleton(PublishStaticArtifactArchiveCommandHandler);
   container.registerSingleton(PublishStaticArtifactPayloadCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
+  container.registerSingleton(ReorderProjectsCommandHandler);
   container.registerSingleton(CancelOperatorWorkCommandHandler);
   container.registerSingleton(DeadLetterOperatorWorkCommandHandler);
   container.registerSingleton(MarkOperatorWorkRecoveredCommandHandler);
@@ -2736,6 +2739,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.countProjectsQueryService, CountProjectsQueryService);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
+  container.registerSingleton(tokens.reorderProjectsUseCase, ReorderProjectsUseCase);
   container.registerSingleton(tokens.setProjectDescriptionUseCase, SetProjectDescriptionUseCase);
   container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);
   container.registerSingleton(

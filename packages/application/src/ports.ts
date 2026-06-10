@@ -1495,6 +1495,7 @@ export interface ProjectSummary {
   lifecycleStatus: "active" | "archived";
   archivedAt?: string;
   archiveReason?: string;
+  displayOrder?: number;
   createdAt: string;
 }
 
@@ -8431,6 +8432,7 @@ export interface ProjectReadModel {
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      offset?: number;
       lifecycleStatus?: ProjectListLifecycleStatus;
     },
   ): Promise<ProjectSummary[]>;

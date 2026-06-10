@@ -18,6 +18,7 @@ export interface ProjectsTable {
   archived_at: ColumnType<string | null, string | null | undefined, string | null>;
   archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
   deleted_at: ColumnType<string | null, string | null | undefined, string | null>;
+  display_order: ColumnType<number, number | undefined, number>;
   created_at: TimestampColumn;
 }
 

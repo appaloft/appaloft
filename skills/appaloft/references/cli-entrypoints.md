@@ -56,6 +56,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft project count` - `projects.count`
 - `appaloft project show <projectId>` - `projects.show`
 - `appaloft project rename <projectId> --name <name>` - `projects.rename`
+- `appaloft project reorder --project-ids <ids>` - `projects.reorder`
 - `appaloft project set-description <projectId> --description <description>` - `projects.set-description`
 - `appaloft project archive <projectId>` - `projects.archive`
 - `appaloft project restore <projectId>` - `projects.restore`

@@ -5,6 +5,7 @@ import {
   DeleteProjectCommand,
   ListProjectsQuery,
   RenameProjectCommand,
+  ReorderProjectsCommand,
   RestoreProjectCommand,
   SetProjectDescriptionCommand,
   ShowProjectQuery,
@@ -23,6 +24,10 @@ const lifecycleStatusOption = Options.choice("lifecycle-status", [
   "archived",
   "all",
 ]).pipe(Options.optional);
+const limitOption = Options.integer("limit").pipe(Options.optional);
+const offsetOption = Options.integer("offset").pipe(Options.optional);
+const projectIdsOption = Options.text("project-ids");
+const startOffsetOption = Options.integer("start-offset").pipe(Options.optional);
 
 const createCommand = EffectCommand.make(
   "create",
@@ -43,11 +48,15 @@ const listCommand = EffectCommand.make(
   "list",
   {
     lifecycleStatus: lifecycleStatusOption,
+    limit: limitOption,
+    offset: offsetOption,
   },
-  ({ lifecycleStatus }) =>
+  ({ lifecycleStatus, limit, offset }) =>
     runQuery(
       ListProjectsQuery.create({
         lifecycleStatus: optionalValue(lifecycleStatus),
+        limit: optionalValue(limit),
+        offset: optionalValue(offset),
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectList));
@@ -64,6 +73,24 @@ const renameCommand = EffectCommand.make(
   },
   ({ name, projectId }) => runCommand(RenameProjectCommand.create({ projectId, name })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectRename));
+
+const reorderCommand = EffectCommand.make(
+  "reorder",
+  {
+    projectIds: projectIdsOption,
+    startOffset: startOffsetOption,
+  },
+  ({ projectIds, startOffset }) =>
+    runCommand(
+      ReorderProjectsCommand.create({
+        projectIds: projectIds
+          .split(",")
+          .map((projectId) => projectId.trim())
+          .filter(Boolean),
+        startOffset: optionalValue(startOffset),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.projectReorder));
 
 const setDescriptionCommand = EffectCommand.make(
   "set-description",
@@ -133,6 +160,7 @@ export const projectCommand = EffectCommand.make("project").pipe(
     listCommand,
     showCommand,
     renameCommand,
+    reorderCommand,
     setDescriptionCommand,
     archiveCommand,
     restoreCommand,

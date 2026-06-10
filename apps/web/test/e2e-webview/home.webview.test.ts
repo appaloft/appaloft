@@ -15,6 +15,14 @@ type RecordedApiRequest = {
   pathname: string;
   body: unknown;
 };
+type ProjectFixture = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  lifecycleStatus: "active";
+  createdAt: string;
+};
 type DependencyResourceFixtureKind = "postgres" | "redis";
 type DependencyProvisioningPlanFixtureInput = {
   id: string;
@@ -272,6 +280,18 @@ function deploymentDetailFixture(input: {
     nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
     sectionErrors: input.sectionErrors ?? [],
     generatedAt: "2026-01-01T00:00:04.000Z",
+  };
+}
+
+function projectFixture(index: number): ProjectFixture {
+  const padded = String(index).padStart(2, "0");
+  return {
+    id: `prj_grid_${padded}`,
+    name: `Grid Project ${padded}`,
+    slug: `grid-project-${padded}`,
+    description: `Grid project ${padded} description`,
+    lifecycleStatus: "active",
+    createdAt: `2026-01-${padded}T00:00:00.000Z`,
   };
 }
 
@@ -1550,19 +1570,24 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         items: [],
       },
     },
-    "/api/rpc/projects/list": {
-      json: {
-        items: [
-          {
-            id: "prj_demo",
-            name: "Demo",
-            slug: "demo",
-            description: "Demo project",
-            lifecycleStatus: "active",
-            createdAt: "2026-01-01T00:00:00.000Z",
-          },
-        ],
-      },
+    "/api/rpc/projects/list": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { limit?: number; offset?: number } | null;
+      const projectCount = 13;
+      const projects = Array.from({ length: projectCount }, (_, index) =>
+        projectFixture(index + 1),
+      );
+      const offset = input?.offset ?? 0;
+      const limit = input?.limit ?? projects.length;
+      const items = projects.slice(offset, offset + limit);
+
+      return {
+        json: {
+          items,
+          total: projectCount,
+          limit,
+          offset,
+        },
+      };
     },
     "/api/rpc/capabilities/query": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as {
@@ -1598,6 +1623,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       return {
         json: {
           id: input?.projectId ?? "prj_demo",
+        },
+      };
+    },
+    "/api/rpc/projects/reorder": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectIds?: string[] } | null;
+      return {
+        json: {
+          reorderedProjectIds: input?.projectIds ?? [],
         },
       };
     },
@@ -3971,6 +4004,125 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Public Git URL", "公开 GitHub 仓库"]);
     await clickButtonByAnyText(view, ["GitHub App", "GitHub App"]);
     await expectAnyText(view, ["GitHub URL", "GitHub URL"]);
+  }, 45_000);
+
+  test("[PROJ-LIFE-REORDER-005] renders paginated draggable project cards", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView({ width: 1536, height: 900 });
+    await view.navigate(`${previewUrl}/projects`);
+    await expectText(view, "Grid Project 01");
+    await expectText(view, "Grid Project 12");
+    await waitFor(
+      () =>
+        view.evaluate<string>(
+          `document.querySelector('[data-project-pagination]')?.textContent ?? ''`,
+        ),
+      (text) => text.includes("1-12") && text.includes("13"),
+      "Expected project pagination to show the current range and total",
+    );
+
+    const desktopLayout = JSON.parse(
+      await view.evaluate<string>(`(() => {
+        const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
+        const firstRowCards = cards.filter((card) =>
+          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        );
+        return JSON.stringify({
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          cardCount: cards.length,
+          firstRowCount: firstRowCards.length,
+          hasGrid: Boolean(document.querySelector('[data-project-grid]')),
+          handleCount: document.querySelectorAll('[data-project-reorder-handle]').length,
+          hasPagination: Boolean(document.querySelector('[data-project-pagination]')),
+        });
+      })()`),
+    ) as {
+      clientWidth: number;
+      scrollWidth: number;
+      cardCount: number;
+      firstRowCount: number;
+      hasGrid: boolean;
+      handleCount: number;
+      hasPagination: boolean;
+    };
+    expect(desktopLayout.hasGrid).toBe(true);
+    expect(desktopLayout.hasPagination).toBe(true);
+    expect(desktopLayout.cardCount).toBe(12);
+    expect(desktopLayout.handleCount).toBe(12);
+    expect(desktopLayout.firstRowCount).toBeGreaterThanOrEqual(3);
+    expect(desktopLayout.firstRowCount).toBeLessThanOrEqual(4);
+    expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.clientWidth);
+
+    const dragged = await view.evaluate<boolean>(`(() => {
+      const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+      const source = cards[0];
+      const target = cards[2];
+      if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      const dragStart = new DragEvent('dragstart', {
+        bubbles: true,
+        dataTransfer: new DataTransfer(),
+      });
+      source.dispatchEvent(dragStart);
+      target.dispatchEvent(new DragEvent('dragover', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: dragStart.dataTransfer,
+      }));
+      target.dispatchEvent(new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: dragStart.dataTransfer,
+      }));
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
+      return true;
+    })()`);
+    expect(dragged).toBe(true);
+
+    const reorderRequest = await waitForRecordedRequest("/api/rpc/projects/reorder");
+    const reorderInput = readOrpcJsonPayload(reorderRequest.body) as {
+      projectIds?: string[];
+      startOffset?: number;
+    };
+    expect(reorderInput.startOffset).toBe(0);
+    expect(reorderInput.projectIds?.slice(0, 3)).toEqual([
+      "prj_grid_02",
+      "prj_grid_03",
+      "prj_grid_01",
+    ]);
+
+    await using mobileView = createWebView({ width: 390, height: 844 });
+    await mobileView.navigate(`${previewUrl}/projects`);
+    await expectText(mobileView, "Grid Project 01");
+    const mobileLayout = JSON.parse(
+      await mobileView.evaluate<string>(`(() => {
+        const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
+        const firstRowCards = cards.filter((card) =>
+          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        );
+        return JSON.stringify({
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          cardCount: cards.length,
+          firstRowCount: firstRowCards.length,
+        });
+      })()`),
+    ) as {
+      clientWidth: number;
+      scrollWidth: number;
+      cardCount: number;
+      firstRowCount: number;
+    };
+    expect(mobileLayout.cardCount).toBe(12);
+    expect(mobileLayout.firstRowCount).toBe(1);
+    expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
   }, 45_000);
 
   test("[QUICK-DEPLOY-UX-004][QUICK-DEPLOY-UX-005] locks selected Blueprint source and renders its icon", async () => {

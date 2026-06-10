@@ -16,6 +16,29 @@ import {
   ProjectSlug,
 } from "../shared/text-values";
 
+const projectDisplayOrderBrand: unique symbol = Symbol("ProjectDisplayOrder");
+export class ProjectDisplayOrder {
+  private [projectDisplayOrderBrand]!: void;
+
+  private constructor(public readonly value: number) {}
+
+  static create(value: number): Result<ProjectDisplayOrder> {
+    if (!Number.isInteger(value) || value < 0) {
+      return err(domainError.validation("Project display order must be a non-negative integer"));
+    }
+
+    return ok(new ProjectDisplayOrder(value));
+  }
+
+  static rehydrate(value: number): ProjectDisplayOrder {
+    return new ProjectDisplayOrder(Math.max(0, Math.trunc(value)));
+  }
+
+  equals(other: ProjectDisplayOrder): boolean {
+    return this.value === other.value;
+  }
+}
+
 export interface ProjectState {
   id: ProjectId;
   organizationId?: OrganizationId;
@@ -26,6 +49,7 @@ export interface ProjectState {
   archivedAt?: ArchivedAt;
   archiveReason?: ArchiveReason;
   deletedAt?: DeletedAt;
+  displayOrder: ProjectDisplayOrder;
   createdAt: CreatedAt;
 }
 
@@ -71,6 +95,7 @@ export class Project extends AggregateRoot<ProjectState> {
         name: input.name,
         slug,
         lifecycleStatus: ProjectLifecycleStatusValue.active(),
+        displayOrder: ProjectDisplayOrder.rehydrate(0),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
@@ -90,10 +115,38 @@ export class Project extends AggregateRoot<ProjectState> {
       organizationId:
         state.organizationId ?? OrganizationId.rehydrate(defaultSelfHostedOrganizationId),
       lifecycleStatus: state.lifecycleStatus ?? ProjectLifecycleStatusValue.active(),
+      displayOrder: state.displayOrder ?? ProjectDisplayOrder.rehydrate(0),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
       ...(state.deletedAt ? { deletedAt: state.deletedAt } : {}),
     });
+  }
+
+  reorder(input: {
+    displayOrder: ProjectDisplayOrder;
+    reorderedAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("projects.reorder");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (this.state.displayOrder.equals(input.displayOrder)) {
+      return ok({ changed: false });
+    }
+
+    const previousDisplayOrder = this.state.displayOrder;
+    this.state.displayOrder = input.displayOrder;
+
+    this.recordDomainEvent("project-reordered", input.reorderedAt, {
+      projectId: this.state.id.value,
+      projectSlug: this.state.slug.value,
+      previousDisplayOrder: previousDisplayOrder.value,
+      nextDisplayOrder: input.displayOrder.value,
+      reorderedAt: input.reorderedAt.value,
+    });
+
+    return ok({ changed: true });
   }
 
   accept<TContext, TResult>(
