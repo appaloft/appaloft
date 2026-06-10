@@ -83,6 +83,11 @@ jobs:
       - name: Wait For Backend
         run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3101/api/health 60000
 
+      - name: Web WebView Smoke
+        if: ${{ matrix.shard == 1 }}
+        working-directory: apps/web
+        run: bun run test:e2e
+
       - name: Select Shell E2E Shard
         id: shell-e2e-shard
         run: |
@@ -94,11 +99,6 @@ jobs:
       - name: Shell CLI + HTTP E2E
         working-directory: apps/shell
         run: bun test --timeout=900000 ${{ steps.shell-e2e-shard.outputs.files }}
-
-      - name: Web WebView Smoke
-        if: ${{ matrix.shard == 1 }}
-        working-directory: apps/web
-        run: bun run test:e2e
 
       - name: Stop Backend
         if: always()

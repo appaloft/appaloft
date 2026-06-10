@@ -60,4 +60,7 @@ test("e2e workflow uses weighted shell shards and runs WebView on the lighter sh
   expect(workflow).not.toContain("./test/e2e/*.e2e.ts --shard=");
   expect(workflow).toContain(`if: ${expression("matrix.shard == 1")}`);
   expect(workflow).toContain("run: bun run test:e2e");
+  expect(workflow.indexOf("name: Web WebView Smoke")).toBeLessThan(
+    workflow.indexOf("name: Shell CLI + HTTP E2E"),
+  );
 });
