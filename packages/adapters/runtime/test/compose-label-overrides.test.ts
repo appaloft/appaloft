@@ -45,7 +45,10 @@ describe("compose ownership label overrides", () => {
       quote: shellQuote,
     });
 
-    expect(script).toContain("docker compose -f \"$compose_file\" config --services");
+    expect(script).toContain("appaloft_docker_compose() {");
+    expect(script).toContain("docker compose \"$@\"");
+    expect(script).toContain("docker-compose \"$@\"");
+    expect(script).toContain('appaloft_docker_compose -f "$compose_file" config --services');
     expect(script).toContain("services:");
     expect(script).toContain('"appaloft.managed": "true"');
     expect(script).toContain('"appaloft.resource-id": "res_www"');

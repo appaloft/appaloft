@@ -128,8 +128,8 @@ function renderDockerComposeUpCommand(
   spec: DockerComposeUpCommandSpec,
   options: RuntimeCommandRenderOptions,
 ): string {
-  return [
-    "docker compose",
+  const composeInvocation = [
+    spec.portableDockerCompose === true ? "appaloft_docker_compose" : "docker compose",
     spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
     "-f",
     options.quote(spec.composeFile.value),
@@ -143,6 +143,22 @@ function renderDockerComposeUpCommand(
   ]
     .filter((part) => part.length > 0)
     .join(" ");
+
+  if (spec.portableDockerCompose !== true) {
+    return composeInvocation;
+  }
+
+  return [
+    "{",
+    "appaloft_docker_compose() {",
+    "if docker compose version >/dev/null 2>&1; then docker compose \"$@\";",
+    "elif command -v docker-compose >/dev/null 2>&1; then docker-compose \"$@\";",
+    "else docker compose \"$@\"; fi",
+    "};",
+    composeInvocation,
+    ";",
+    "}",
+  ].join(" ");
 }
 
 function renderDockerRemoveContainerCommand(
