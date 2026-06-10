@@ -92,6 +92,7 @@
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Popover from "$lib/components/ui/popover";
   import * as Select from "$lib/components/ui/select";
@@ -217,6 +218,7 @@
     typeof orpcClient.storageVolumes.backups.restore
   >[0];
   type StorageRuntimeCleanupCandidate = CleanupStorageVolumeRuntimeResponse["candidates"][number];
+  type StorageVolumeCardAttachment = ResourceStorageAttachmentSummary | StorageVolumeSummary["attachments"][number];
   type ProvisionDependencyResourceInput = Parameters<
     typeof orpcClient.dependencyResources.provision
   >[0];
@@ -1072,6 +1074,7 @@
   let storageAttachmentVolumeId = $state("");
   let storageAttachmentDestinationPath = $state("/data");
   let storageAttachmentMountMode = $state<AttachResourceStorageInput["mountMode"]>("read-write");
+  let storageAttachDialogOpen = $state(false);
   let storageAttachmentFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1082,6 +1085,9 @@
   let storageVolumeDescription = $state("");
   let storageVolumeSourcePath = $state("");
   let storageVolumeRenameNames = $state<Record<string, string>>({});
+  let storageCreateDialogOpen = $state(false);
+  let storageRenameDialogOpen = $state(false);
+  let storageRenameVolumeId = $state("");
   let storageVolumeFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1091,6 +1097,8 @@
   let storageRuntimeCleanupServerId = $state("");
   let storageRuntimeCleanupBefore = $state("");
   let storageRuntimeCleanupObservationHandoffKey = $state("");
+  let storageRuntimeCleanupHandoffOpenedKey = $state("");
+  let storageRuntimeCleanupDialogOpen = $state(false);
   let storageRuntimeCleanupResult = $state<CleanupStorageVolumeRuntimeResponse | null>(null);
   let storageRuntimeCleanupFeedback = $state<{
     kind: "success" | "error";
@@ -1109,6 +1117,7 @@
   let storageBackupTargetRef = $state("/var/lib/appaloft/backups");
   let storageBackupRetentionMaxCount = $state("3");
   let storageBackupRetentionMinFreeBytes = $state("1073741824");
+  let storageBackupDialogOpen = $state(false);
   let storageBackupPlan = $state<StorageVolumeBackupPlanResponse | null>(null);
   let storageBackupRestoreNames = $state<Record<string, string>>({});
   let storageBackupFeedback = $state<{
@@ -1388,6 +1397,9 @@
   );
   const selectedStorageRuntimeCleanupServer = $derived(
     findServer(servers, storageRuntimeCleanupServerId),
+  );
+  const selectedStorageRenameVolume = $derived(
+    storageVolumes.find((volume) => volume.id === storageRenameVolumeId) ?? null,
   );
   const canAttachStorage = $derived(
     Boolean(
@@ -1989,6 +2001,7 @@
         detail: result.id,
       };
       storageAttachmentDestinationPath = "/data";
+      storageAttachDialogOpen = false;
       void invalidateStorageAttachmentQueries();
     },
     onError: (error) => {
@@ -2028,6 +2041,7 @@
       storageVolumeName = "";
       storageVolumeDescription = "";
       storageVolumeSourcePath = "";
+      storageCreateDialogOpen = false;
       void invalidateStorageAttachmentQueries();
     },
     onError: (error) => {
@@ -2046,6 +2060,8 @@
         title: $t(i18nKeys.console.resources.storageVolumeRenameSucceeded),
         detail: result.id,
       };
+      storageRenameDialogOpen = false;
+      storageRenameVolumeId = "";
       void invalidateStorageAttachmentQueries();
     },
     onError: (error) => {
@@ -3093,6 +3109,7 @@
       storageRuntimeCleanupServerId = "";
       storageRuntimeCleanupBefore = new Date().toISOString();
       storageRuntimeCleanupObservationHandoffKey = "";
+      storageRuntimeCleanupHandoffOpenedKey = "";
       storageRuntimeCleanupResult = null;
       storageRuntimeCleanupFeedback = null;
       storageBackupVolumeId = "";
@@ -3171,6 +3188,14 @@
       storageRuntimeCleanupBefore = observationHandoff.to;
       storageRuntimeCleanupResult = null;
       storageRuntimeCleanupFeedback = null;
+    }
+    if (
+      observationHandoff &&
+      activeSettingsSection === "storage" &&
+      storageRuntimeCleanupHandoffOpenedKey !== observationHandoffKey
+    ) {
+      storageRuntimeCleanupHandoffOpenedKey = observationHandoffKey;
+      openStorageRuntimeCleanupDialog();
     }
   });
 
@@ -3827,6 +3852,58 @@
       destinationPath: storageAttachmentDestinationPath.trim(),
       mountMode: storageAttachmentMountMode,
     });
+  }
+
+  function openStorageCreateDialog(): void {
+    storageVolumeFeedback = null;
+    storageVolumeName = "";
+    storageVolumeKind = "named-volume";
+    storageVolumeDescription = "";
+    storageVolumeSourcePath = "";
+    storageCreateDialogOpen = true;
+  }
+
+  function openStorageRenameDialog(volume: StorageVolumeSummary): void {
+    storageVolumeFeedback = null;
+    storageRenameVolumeId = volume.id;
+    storageVolumeRenameNames = {
+      ...storageVolumeRenameNames,
+      [volume.id]: storageVolumeRenameNames[volume.id] ?? volume.name,
+    };
+    storageRenameDialogOpen = true;
+  }
+
+  function openStorageAttachDialog(volume?: StorageVolumeSummary): void {
+    storageAttachmentFeedback = null;
+    storageAttachmentVolumeId = volume?.id ?? storageAttachmentVolumeId ?? storageVolumes[0]?.id ?? "";
+    storageAttachmentDestinationPath = "/data";
+    storageAttachmentMountMode = "read-write";
+    storageAttachDialogOpen = true;
+  }
+
+  function openStorageBackupDialog(volume?: StorageVolumeSummary): void {
+    const targetVolumeId =
+      volume?.id ?? storageBackupVolumeId ?? resourceStorageAttachments[0]?.storageVolumeId ?? "";
+    const attachment = resourceStorageAttachments.find(
+      (candidate) => candidate.storageVolumeId === targetVolumeId,
+    );
+
+    storageBackupVolumeId = targetVolumeId;
+    storageBackupDestinationPath = attachment?.destinationPath ?? "/data";
+    storageBackupDataFormat = attachment?.dataFormat ?? "unknown";
+    storageBackupFeedback = null;
+    storageBackupPlan = null;
+    storageBackupDialogOpen = true;
+  }
+
+  function openStorageRuntimeCleanupDialog(volume?: StorageVolumeSummary): void {
+    storageRuntimeCleanupVolumeId = volume?.id ?? storageRuntimeCleanupVolumeId ?? storageVolumes[0]?.id ?? "";
+    storageRuntimeCleanupServerId =
+      storageRuntimeCleanupServerId || latestDeployment?.serverId || servers[0]?.id || "";
+    storageRuntimeCleanupBefore = storageRuntimeCleanupBefore || new Date().toISOString();
+    storageRuntimeCleanupFeedback = null;
+    storageRuntimeCleanupResult = null;
+    storageRuntimeCleanupDialogOpen = true;
   }
 
   function createStorageVolume(event: SubmitEvent): void {
@@ -4763,6 +4840,39 @@
 
   function storageVolumeOptionLabel(volume: StorageVolumeSummary): string {
     return `${volume.name} (${storageVolumeKindLabel(volume.kind)})`;
+  }
+
+  function storageVolumeCurrentResourceAttachments(
+    volume: StorageVolumeSummary,
+  ): ResourceStorageAttachmentSummary[] {
+    return resourceStorageAttachments.filter((attachment) => attachment.storageVolumeId === volume.id);
+  }
+
+  function storageVolumeDisplayAttachments(
+    volume: StorageVolumeSummary,
+  ): StorageVolumeCardAttachment[] {
+    const currentAttachments = storageVolumeCurrentResourceAttachments(volume);
+    return currentAttachments.length > 0 ? currentAttachments : volume.attachments;
+  }
+
+  function storageVolumeAttachmentDisplayLabel(attachment: StorageVolumeCardAttachment): string {
+    return "storageVolumeId" in attachment
+      ? storageAttachmentApplicationDataLabel(attachment)
+      : (attachment.applicationDataLabel ?? attachment.resourceName ?? attachment.resourceSlug ?? attachment.resourceId);
+  }
+
+  function storageVolumeBackupPolicyLabel(volume: StorageVolumeSummary): string {
+    return volume.backupRelationship?.retentionRequired
+      ? $t(i18nKeys.console.resources.storageBackupRetentionRequired)
+      : $t(i18nKeys.console.resources.storageBackupPolicyOptional);
+  }
+
+  function storageVolumeLatestBackup(volume: StorageVolumeSummary): StorageVolumeBackupSummary | null {
+    if (storageBackupVolumeId !== volume.id || storageVolumeBackups.length === 0) {
+      return null;
+    }
+
+    return storageVolumeBackups[0] ?? null;
   }
 
   function storageRuntimeCleanupSummary(result: CleanupStorageVolumeRuntimeResponse): string {
@@ -7731,94 +7841,46 @@
                       {$t(i18nKeys.console.resources.storageDescription)}
                     </p>
                   </div>
-                  <Badge variant="outline">{resourceStorageAttachments.length}</Badge>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">
+                      {$t(i18nKeys.console.resources.storageVolumeCount, {
+                        count: String(storageVolumes.length),
+                      })}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onclick={() => void invalidateStorageAttachmentQueries()}
+                    >
+                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.storageAttachmentsRefresh)}
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={isResourceArchived}
+                      onclick={openStorageCreateDialog}
+                    >
+                      <Plus class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.storageVolumeCreateAction)}
+                    </Button>
+                    {#if storageVolumes.length === 0}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onclick={() => openStorageRuntimeCleanupDialog()}
+                      >
+                        <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                        {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
+                      </Button>
+                    {/if}
+                  </div>
                 </div>
 
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
-                        </h3>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{storageVolumes.length}</Badge>
-                  </div>
-
-                  <form class="mt-4 space-y-4" onsubmit={createStorageVolume}>
-                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)]">
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-name">
-                        <span>{$t(i18nKeys.console.resources.storageVolumeName)}</span>
-                        <Input
-                          id="resource-storage-volume-name"
-                          bind:value={storageVolumeName}
-                          autocomplete="off"
-                          placeholder="uploads"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium">
-                        <span>{$t(i18nKeys.console.resources.storageVolumeKind)}</span>
-                        <Select.Root bind:value={storageVolumeKind} type="single">
-                          <Select.Trigger class="w-full">
-                            {storageVolumeKindLabel(storageVolumeKind)}
-                          </Select.Trigger>
-                          <Select.Content>
-                            <Select.Item value="named-volume">
-                              {$t(i18nKeys.console.resources.storageKindNamedVolume)}
-                            </Select.Item>
-                            <Select.Item value="bind-mount">
-                              {$t(i18nKeys.console.resources.storageKindBindMount)}
-                            </Select.Item>
-                          </Select.Content>
-                        </Select.Root>
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-description">
-                        <span>{$t(i18nKeys.console.resources.storageVolumeDescription)}</span>
-                        <Input
-                          id="resource-storage-volume-description"
-                          bind:value={storageVolumeDescription}
-                          autocomplete="off"
-                          placeholder={$t(i18nKeys.console.resources.storageVolumeDescriptionPlaceholder)}
-                        />
-                      </label>
-                    </div>
-
-                    {#if storageVolumeKind === "bind-mount"}
-                      <label class="block space-y-1.5 text-sm font-medium" for="resource-storage-volume-source">
-                        <span>{$t(i18nKeys.console.resources.storageVolumeSourcePath)}</span>
-                        <Input
-                          id="resource-storage-volume-source"
-                          bind:value={storageVolumeSourcePath}
-                          autocomplete="off"
-                          placeholder="/srv/appaloft/storage/uploads"
-                        />
-                      </label>
-                    {/if}
-
-                    <div class="flex justify-end">
-                      <Button
-                        type="submit"
-                        disabled={!canCreateStorageVolume || createStorageVolumeMutation.isPending}
-                      >
-                        <Plus class="mr-2 size-4" aria-hidden="true" />
-                        {createStorageVolumeMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.storageVolumeCreateAction)}
-                      </Button>
-                    </div>
-                  </form>
-
+                <div class="space-y-2">
                   {#if storageVolumeFeedback}
                     <div
                       class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        "rounded-md border px-3 py-2 text-sm",
                         storageVolumeFeedback.kind === "success"
                           ? "border-primary/25 bg-primary/5"
                           : "border-destructive/30 bg-destructive/5 text-destructive",
@@ -7828,44 +7890,194 @@
                       <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
                     </div>
                   {/if}
+                  {#if storageAttachmentFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        storageAttachmentFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageAttachmentFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
+                    </div>
+                  {/if}
+                  {#if storageRuntimeCleanupFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        storageRuntimeCleanupFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
+                    </div>
+                  {/if}
+                  {#if storageBackupFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        storageBackupFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageBackupFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
+                    </div>
+                  {/if}
+                </div>
 
-                  <div class="mt-4 space-y-3">
-                    {#if storageVolumes.length > 0}
+                {#if storageVolumesQuery.isPending}
+                  <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.storageVolumesLoading)}
+                  </div>
+                {:else if storageVolumesQuery.error}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {readErrorMessage(storageVolumesQuery.error)}
+                  </div>
+                {:else if storageVolumes.length === 0}
+                  <section class="rounded-md border border-dashed bg-muted/15 px-4 py-8 text-center">
+                    <HardDrive class="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
+                    <h3 class="mt-3 text-base font-semibold">
+                      {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
+                    </h3>
+                    <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                    </p>
+                    <Button
+                      type="button"
+                      class="mt-4"
+                      disabled={isResourceArchived}
+                      onclick={openStorageCreateDialog}
+                    >
+                      <Plus class="mr-2 size-4" aria-hidden="true" />
+                      {$t(i18nKeys.console.resources.storageVolumeCreateAction)}
+                    </Button>
+                  </section>
+                {:else}
+                  <section class="rounded-md border bg-background">
+                    <div class="border-b p-4">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2">
+                            <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
+                            <h3 class="text-base font-semibold">
+                              {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
+                            </h3>
+                          </div>
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{storageVolumes.length}</Badge>
+                      </div>
+                    </div>
+
+                    <div class="divide-y">
                       {#each storageVolumes as volume (volume.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                            <div class="min-w-0 space-y-2">
+                        {@const displayAttachments = storageVolumeDisplayAttachments(volume)}
+                        {@const currentAttachments = storageVolumeCurrentResourceAttachments(volume)}
+                        {@const latestBackup = storageVolumeLatestBackup(volume)}
+                        <article class="p-4" data-storage-volume-card={volume.id}>
+                          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div class="min-w-0 flex-1 space-y-3">
                               <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">{volume.name}</p>
+                                <p class="min-w-0 truncate text-base font-semibold">{volume.name}</p>
                                 <Badge variant="outline">{storageVolumeKindLabel(volume.kind)}</Badge>
                                 <Badge variant="secondary">
                                   {$t(i18nKeys.console.resources.storageVolumeAttachmentCount, {
                                     count: String(volume.attachmentCount),
                                   })}
                                 </Badge>
+                                {#if volume.backupRelationship?.retentionRequired}
+                                  <Badge variant="secondary">
+                                    {$t(i18nKeys.console.resources.storageBackupRetentionRequired)}
+                                  </Badge>
+                                {/if}
                               </div>
+
+                              {#if volume.description}
+                                <p class="text-sm leading-6 text-muted-foreground">{volume.description}</p>
+                              {/if}
+
+                              <dl class="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                                <div>
+                                  <dt class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.storageVolumeKind)}
+                                  </dt>
+                                  <dd class="mt-1 font-medium">{storageVolumeKindLabel(volume.kind)}</dd>
+                                </div>
+                                <div>
+                                  <dt class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.storageVolumeMounts)}
+                                  </dt>
+                                  <dd class="mt-1 font-medium">{volume.attachmentCount}</dd>
+                                </div>
+                                <div>
+                                  <dt class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.storageBackupTitle)}
+                                  </dt>
+                                  <dd class="mt-1 font-medium">{storageVolumeBackupPolicyLabel(volume)}</dd>
+                                </div>
+                                <div>
+                                  <dt class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.common.domain.status)}
+                                  </dt>
+                                  <dd class="mt-1 font-medium">{volume.lifecycleStatus}</dd>
+                                </div>
+                              </dl>
+
                               {#if volume.sourcePath}
-                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                  {volume.sourcePath}
-                                </p>
+                                <div>
+                                  <p class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.storageVolumeSourcePath)}
+                                  </p>
+                                  <p class="mt-1 break-all rounded-md bg-muted/30 px-3 py-2 font-mono text-xs">
+                                    {volume.sourcePath}
+                                  </p>
+                                </div>
                               {/if}
                             </div>
 
-                            <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto] xl:min-w-[28rem]">
-                              <Input
-                                value={storageVolumeRenameNames[volume.id] ?? volume.name}
-                                aria-label={$t(i18nKeys.console.resources.storageVolumeRenameInput)}
-                                autocomplete="off"
-                                oninput={(event) => updateStorageVolumeRenameName(volume.id, event)}
-                              />
+                            <div class="flex flex-wrap gap-2 xl:max-w-[28rem] xl:justify-end">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={renameStorageVolumeMutation.isPending}
-                                onclick={() => renameStorageVolume(volume)}
+                                onclick={() => openStorageRenameDialog(volume)}
                               >
                                 {$t(i18nKeys.console.resources.storageVolumeRenameAction)}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onclick={() => openStorageBackupDialog(volume)}
+                              >
+                                <ShieldCheck class="mr-2 size-4" aria-hidden="true" />
+                                {$t(i18nKeys.console.resources.storageBackupTitle)}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onclick={() => openStorageRuntimeCleanupDialog(volume)}
+                              >
+                                <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={isResourceArchived}
+                                onclick={() => openStorageAttachDialog(volume)}
+                              >
+                                {$t(i18nKeys.console.resources.storageAttachAction)}
                               </Button>
                               <Button
                                 type="button"
@@ -7879,666 +8091,850 @@
                               </Button>
                             </div>
                           </div>
-                        </article>
-                      {/each}
-                    {:else if !storageVolumesQuery.isPending && !storageVolumesQuery.error}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageVolumesEmpty)}
-                      </div>
-                    {/if}
-                  </div>
-                </section>
 
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <ShieldCheck class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.storageBackupTitle)}
-                        </h3>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageBackupDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{storageVolumeBackups.length}</Badge>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                      <Select.Root bind:value={storageBackupVolumeId} type="single">
-                        <Select.Trigger id="resource-storage-backup-volume-trigger" class="w-full">
-                          {selectedStorageBackupAttachment
-                            ? storageAttachmentApplicationDataLabel(selectedStorageBackupAttachment)
-                            : selectedStorageBackupVolume
-                              ? storageVolumeOptionLabel(selectedStorageBackupVolume)
-                              : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each storageVolumes as volume (volume.id)}
-                            {@const attachment = resourceStorageAttachments.find(
-                              (candidate) => candidate.storageVolumeId === volume.id,
-                            )}
-                            <Select.Item value={volume.id}>
-                              {attachment
-                                ? `${storageAttachmentApplicationDataLabel(attachment)} (${attachment.destinationPath})`
-                                : storageVolumeOptionLabel(volume)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                      {#if selectedStorageBackupAttachment?.dataFormat}
-                        <p class="text-xs text-muted-foreground">
-                          {selectedStorageBackupAttachment.destinationPath}
-                          · {selectedStorageBackupAttachment.dataFormat}
-                        </p>
-                      {/if}
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
-                      <Select.Root bind:value={storageBackupDataFormat} type="single">
-                        <Select.Trigger class="w-full">{storageBackupDataFormat}</Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="unknown">unknown</Select.Item>
-                          <Select.Item value="filesystem">filesystem</Select.Item>
-                          <Select.Item value="sqlite">sqlite</Select.Item>
-                          <Select.Item value="json-files">json-files</Select.Item>
-                          <Select.Item value="application-export">application-export</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-path">
-                      <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
-                      <Input
-                        id="resource-storage-backup-path"
-                        bind:value={storageBackupDestinationPath}
-                        autocomplete="off"
-                        placeholder="/pb_data"
-                      />
-                    </label>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,12rem)]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
-                      <Select.Root bind:value={storageBackupConsistency} type="single">
-                        <Select.Trigger class="w-full">{storageBackupConsistency}</Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="application-consistent">application-consistent</Select.Item>
-                          <Select.Item value="quiesced">quiesced</Select.Item>
-                          <Select.Item value="crash-consistent">crash-consistent</Select.Item>
-                          <Select.Item value="provider-snapshot-consistent">
-                            provider-snapshot-consistent
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
-                      <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
-                      <Input
-                        id="resource-storage-backup-target-ref"
-                        bind:value={storageBackupTargetRef}
-                        autocomplete="off"
-                        placeholder="/var/lib/appaloft/backups"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-count">
-                      <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
-                      <Input
-                        id="resource-storage-backup-retention-count"
-                        bind:value={storageBackupRetentionMaxCount}
-                        autocomplete="off"
-                        inputmode="numeric"
-                      />
-                    </label>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_auto]">
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-min-free">
-                      <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
-                      <Input
-                        id="resource-storage-backup-min-free"
-                        bind:value={storageBackupRetentionMinFreeBytes}
-                        autocomplete="off"
-                        inputmode="numeric"
-                      />
-                    </label>
-
-                    <label class="flex items-center gap-2 pt-7 text-sm font-medium">
-                      <input type="checkbox" bind:checked={storageBackupLiveWrites} />
-                      <span>{$t(i18nKeys.console.resources.storageBackupLiveWrites)}</span>
-                    </label>
-
-                    <div class="flex items-end justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
-                        onclick={planStorageBackup}
-                      >
-                        <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                        {$t(i18nKeys.console.resources.storageBackupPlanAction)}
-                      </Button>
-                      <Button
-                        type="button"
-                        disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
-                        onclick={createStorageBackup}
-                      >
-                        <Plus class="mr-2 size-4" aria-hidden="true" />
-                        {$t(i18nKeys.console.resources.storageBackupCreateAction)}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {#if storageBackupFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        storageBackupFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageBackupFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  {#if storageBackupPlan}
-                    <div class="mt-4 rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Badge variant={storageBackupPlan.blockers.length > 0 ? "secondary" : "outline"}>
-                          {storageBackupPlan.sourceAdapterKey}
-                        </Badge>
-                        <Badge variant="outline">{storageBackupPlan.targetProviderKey}</Badge>
-                        <Badge variant="outline">{storageBackupPlan.consistency}</Badge>
-                        {#if storageBackupPlan.localOnly}
-                          <Badge variant="secondary">
-                            {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
-                          </Badge>
-                        {/if}
-                      </div>
-                      {#if storageBackupPlan.blockers.length > 0}
-                        <div class="mt-3 space-y-2">
-                          {#each storageBackupPlan.blockers as blocker (blocker.code)}
-                            <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2">
-                              <p class="font-medium">{blocker.code}</p>
-                              <p class="mt-1 text-xs">{blocker.message}</p>
-                            </div>
-                          {/each}
-                        </div>
-                      {/if}
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 space-y-3">
-                    {#if !storageBackupVolumeId}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageBackupSelectPrompt)}
-                      </div>
-                    {:else if storageVolumeBackupsQuery.isPending}
-                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageBackupsLoading)}
-                      </div>
-                    {:else if storageVolumeBackupsQuery.error}
-                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                        {readErrorMessage(storageVolumeBackupsQuery.error)}
-                      </div>
-                    {:else if storageVolumeBackups.length === 0}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageBackupsEmpty)}
-                      </div>
-                    {:else}
-                      {#each storageVolumeBackups as backup (backup.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 space-y-2">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">{storageBackupLabel(backup)}</p>
-                                <Badge variant="secondary">{backup.retentionStatus}</Badge>
-                                {#if backup.localOnly}
-                                  <Badge variant="outline">
-                                    {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
-                                  </Badge>
-                                {/if}
-                              </div>
-                              <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                {storageBackupArtifactLabel(backup)}
-                              </p>
-                              {#if backup.failureCode || backup.failureMessage}
-                                <p class="text-xs text-destructive">
-                                  {backup.failureCode ?? ""} {backup.failureMessage ?? ""}
+                          <div class="mt-4 border-t pt-4">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h4 class="text-sm font-medium">
+                                  {$t(i18nKeys.console.resources.storageVolumeMountsTitle)}
+                                </h4>
+                                <p class="mt-1 text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageVolumeMountsDescription)}
                                 </p>
+                              </div>
+                              {#if currentAttachments.length === 0}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isResourceArchived}
+                                  onclick={() => openStorageAttachDialog(volume)}
+                                >
+                                  {$t(i18nKeys.console.resources.storageAttachAction)}
+                                </Button>
                               {/if}
                             </div>
-                            <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto] lg:min-w-[28rem]">
-                              <Input
-                                id={`storage-backup-restore-name-${backup.id}`}
-                                value={storageBackupRestoreNames[backup.id] ?? ""}
-                                aria-label={$t(i18nKeys.console.resources.storageBackupRestoreName)}
-                                autocomplete="off"
-                                placeholder={$t(i18nKeys.console.resources.storageBackupRestoreNamePlaceholder)}
-                                oninput={(event) => {
-                                  storageBackupRestoreNames = {
-                                    ...storageBackupRestoreNames,
-                                    [backup.id]: event.currentTarget.value,
-                                  };
-                                }}
-                              />
+
+                            {#if displayAttachments.length > 0}
+                              <div class="mt-3 divide-y border-y">
+                                {#each displayAttachments as attachment (`${attachment.destinationPath}:${attachment.attachedAt}`)}
+                                  <div class="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="min-w-0 space-y-1">
+                                      <div class="flex flex-wrap items-center gap-2">
+                                        <p class="break-all font-mono text-xs">
+                                          {attachment.destinationPath}
+                                        </p>
+                                        <Badge variant="secondary">
+                                          {storageMountModeLabel(attachment.mountMode)}
+                                        </Badge>
+                                        {#if attachment.dataFormat}
+                                          <Badge variant="outline">{attachment.dataFormat}</Badge>
+                                        {/if}
+                                      </div>
+                                      <p class="text-xs text-muted-foreground">
+                                        {storageVolumeAttachmentDisplayLabel(attachment)}
+                                        · {$t(i18nKeys.console.resources.storageAttachedAt)}
+                                        {formatTime(attachment.attachedAt)}
+                                      </p>
+                                    </div>
+                                    {#if "storageVolumeId" in attachment}
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isResourceArchived || detachResourceStorageMutation.isPending}
+                                        onclick={() => detachResourceStorage(attachment)}
+                                      >
+                                        {$t(i18nKeys.console.resources.storageDetachAction)}
+                                      </Button>
+                                    {/if}
+                                  </div>
+                                {/each}
+                              </div>
+                            {:else}
+                              <p class="mt-3 border-y py-3 text-sm text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageAttachmentsEmpty)}
+                              </p>
+                            {/if}
+                          </div>
+
+                          <div class="mt-4 border-t pt-4">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h4 class="text-sm font-medium">
+                                  {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
+                                </h4>
+                                <p class="mt-1 text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageVolumeBackupSummaryDescription)}
+                                </p>
+                              </div>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={
-                                  backup.status !== "ready" ||
-                                  restoreStorageVolumeBackupMutation.isPending
-                                }
-                                onclick={() => restoreStorageBackup(backup)}
+                                onclick={() => openStorageBackupDialog(volume)}
                               >
-                                {$t(i18nKeys.console.resources.storageBackupRestoreAction)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={
-                                  backup.status === "pruned" ||
-                                  pruneStorageVolumeBackupMutation.isPending
-                                }
-                                onclick={() => pruneStorageBackup(backup)}
-                              >
-                                <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.storageBackupPruneAction)}
+                                <ShieldCheck class="mr-2 size-4" aria-hidden="true" />
+                                {$t(i18nKeys.console.resources.storageBackupCreateAction)}
                               </Button>
                             </div>
+
+                            {#if latestBackup}
+                              <div class="mt-3 flex flex-col gap-2 border-y py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                  <p class="font-medium">{storageBackupLabel(latestBackup)}</p>
+                                  <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                                    {storageBackupArtifactLabel(latestBackup)}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary">{latestBackup.retentionStatus}</Badge>
+                              </div>
+                            {:else}
+                              <p class="mt-3 border-y py-3 text-sm text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageBackupsEmpty)}
+                              </p>
+                            {/if}
                           </div>
                         </article>
                       {/each}
-                    {/if}
-                  </div>
-                </section>
+                    </div>
+                  </section>
+                {/if}
 
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <Trash2 class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
-                        </h3>
+                <Dialog.Root bind:open={storageCreateDialogOpen}>
+                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
+                    <Dialog.Header>
+                      <Dialog.Title>
+                        {$t(i18nKeys.console.resources.storageVolumeCreateTitle)}
+                      </Dialog.Title>
+                      <Dialog.Description>
+                        {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
+                      </Dialog.Description>
+                    </Dialog.Header>
+                    <form
+                      id="resource-storage-volume-form"
+                      class="space-y-4 px-5 pb-5"
+                      onsubmit={createStorageVolume}
+                    >
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)]">
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-name">
+                          <span>{$t(i18nKeys.console.resources.storageVolumeName)}</span>
+                          <Input
+                            id="resource-storage-volume-name"
+                            bind:value={storageVolumeName}
+                            autocomplete="off"
+                            placeholder="uploads"
+                          />
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageVolumeKind)}</span>
+                          <Select.Root bind:value={storageVolumeKind} type="single">
+                            <Select.Trigger class="w-full">
+                              {storageVolumeKindLabel(storageVolumeKind)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              <Select.Item value="named-volume">
+                                {$t(i18nKeys.console.resources.storageKindNamedVolume)}
+                              </Select.Item>
+                              <Select.Item value="bind-mount">
+                                {$t(i18nKeys.console.resources.storageKindBindMount)}
+                              </Select.Item>
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-description">
+                          <span>{$t(i18nKeys.console.resources.storageVolumeDescription)}</span>
+                          <Input
+                            id="resource-storage-volume-description"
+                            bind:value={storageVolumeDescription}
+                            autocomplete="off"
+                            placeholder={$t(i18nKeys.console.resources.storageVolumeDescriptionPlaceholder)}
+                          />
+                        </label>
                       </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageRuntimeCleanupDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">
-                      {$t(i18nKeys.console.resources.storageRuntimeCleanupBadge)}
-                    </Badge>
-                  </div>
 
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14rem,18rem)]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                      <Select.Root bind:value={storageRuntimeCleanupVolumeId} type="single">
-                        <Select.Trigger id="resource-storage-runtime-cleanup-volume-trigger" class="w-full">
-                          {selectedStorageRuntimeCleanupVolume
-                            ? storageVolumeOptionLabel(selectedStorageRuntimeCleanupVolume)
-                            : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each storageVolumes as volume (volume.id)}
-                            <Select.Item value={volume.id}>
-                              {storageVolumeOptionLabel(volume)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
+                      {#if storageVolumeKind === "bind-mount"}
+                        <label class="block space-y-1.5 text-sm font-medium" for="resource-storage-volume-source">
+                          <span>{$t(i18nKeys.console.resources.storageVolumeSourcePath)}</span>
+                          <Input
+                            id="resource-storage-volume-source"
+                            bind:value={storageVolumeSourcePath}
+                            autocomplete="off"
+                            placeholder="/srv/appaloft/storage/uploads"
+                          />
+                        </label>
+                      {/if}
 
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.server)}</span>
-                      <Select.Root bind:value={storageRuntimeCleanupServerId} type="single">
-                        <Select.Trigger id="resource-storage-runtime-cleanup-server-trigger" class="w-full">
-                          {selectedStorageRuntimeCleanupServer?.name ??
-                            $t(i18nKeys.console.domainBindings.noServerOptions)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each servers as server (server.id)}
-                            <Select.Item value={server.id}>{server.name}</Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
+                      {#if storageVolumeFeedback && storageVolumeFeedback.kind === "error"}
+                        <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                          <p class="font-medium">{storageVolumeFeedback.title}</p>
+                          <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
+                        </div>
+                      {/if}
 
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-runtime-cleanup-before">
-                      <span>{$t(i18nKeys.console.resources.storageRuntimeCleanupBefore)}</span>
-                      <Input
-                        id="resource-storage-runtime-cleanup-before"
-                        bind:value={storageRuntimeCleanupBefore}
-                        autocomplete="off"
-                        placeholder="2026-01-01T00:00:00.000Z"
-                      />
-                    </label>
-                  </div>
+                      <Dialog.Footer class="px-0 pb-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onclick={() => (storageCreateDialogOpen = false)}
+                        >
+                          {$t(i18nKeys.common.actions.close)}
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={!canCreateStorageVolume || createStorageVolumeMutation.isPending}
+                        >
+                          <Plus class="mr-2 size-4" aria-hidden="true" />
+                          {createStorageVolumeMutation.isPending
+                            ? $t(i18nKeys.common.actions.saving)
+                            : $t(i18nKeys.console.resources.storageVolumeCreateAction)}
+                        </Button>
+                      </Dialog.Footer>
+                    </form>
+                  </Dialog.Content>
+                </Dialog.Root>
 
-                  <div class="mt-4 flex flex-wrap justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
-                      onclick={previewStorageRuntimeCleanup}
-                    >
-                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                      {cleanupStorageRuntimeMutation.isPending
-                        ? $t(i18nKeys.common.status.loading)
-                        : $t(i18nKeys.console.resources.storageRuntimeCleanupPreviewAction)}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
-                      onclick={applyStorageRuntimeCleanup}
-                    >
-                      <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.storageRuntimeCleanupApplyAction)}
-                    </Button>
-                  </div>
+                <Dialog.Root bind:open={storageRenameDialogOpen}>
+                  {#if selectedStorageRenameVolume}
+                    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+                      <Dialog.Header>
+                        <Dialog.Title>
+                          {$t(i18nKeys.console.resources.storageVolumeRenameTitle)}
+                        </Dialog.Title>
+                        <Dialog.Description>
+                          {$t(i18nKeys.console.resources.storageVolumeRenameDescription)}
+                        </Dialog.Description>
+                      </Dialog.Header>
+                      <form
+                        class="space-y-4 px-5 pb-5"
+                        onsubmit={(event) => {
+                          event.preventDefault();
+                          renameStorageVolume(selectedStorageRenameVolume);
+                        }}
+                      >
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-rename-name">
+                          <span>{$t(i18nKeys.console.resources.storageVolumeRenameInput)}</span>
+                          <Input
+                            id="resource-storage-volume-rename-name"
+                            value={storageVolumeRenameNames[selectedStorageRenameVolume.id] ?? selectedStorageRenameVolume.name}
+                            autocomplete="off"
+                            oninput={(event) =>
+                              updateStorageVolumeRenameName(selectedStorageRenameVolume.id, event)}
+                          />
+                        </label>
 
-                  {#if storageRuntimeCleanupFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        storageRuntimeCleanupFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
-                    </div>
+                        {#if storageVolumeFeedback && storageVolumeFeedback.kind === "error"}
+                          <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                            <p class="font-medium">{storageVolumeFeedback.title}</p>
+                            <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
+                          </div>
+                        {/if}
+
+                        <Dialog.Footer class="px-0 pb-0">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onclick={() => (storageRenameDialogOpen = false)}
+                          >
+                            {$t(i18nKeys.common.actions.close)}
+                          </Button>
+                          <Button type="submit" disabled={renameStorageVolumeMutation.isPending}>
+                            {$t(i18nKeys.console.resources.storageVolumeRenameAction)}
+                          </Button>
+                        </Dialog.Footer>
+                      </form>
+                    </Dialog.Content>
                   {/if}
+                </Dialog.Root>
 
-                  {#if storageRuntimeCleanupResult}
-                    <div class="mt-4 space-y-3">
-                      <div class="grid gap-2 sm:grid-cols-5">
-                        <div class="rounded-md border bg-muted/15 px-3 py-2">
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupInspected)}
-                          </p>
-                          <p class="text-lg font-semibold">
-                            {storageRuntimeCleanupResult.summary.inspectedCount}
-                          </p>
-                        </div>
-                        <div class="rounded-md border bg-muted/15 px-3 py-2">
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupMatched)}
-                          </p>
-                          <p class="text-lg font-semibold">
-                            {storageRuntimeCleanupResult.summary.matchedCount}
-                          </p>
-                        </div>
-                        <div class="rounded-md border bg-muted/15 px-3 py-2">
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupCleaned)}
-                          </p>
-                          <p class="text-lg font-semibold">
-                            {storageRuntimeCleanupResult.summary.cleanedCount}
-                          </p>
-                        </div>
-                        <div class="rounded-md border bg-muted/15 px-3 py-2">
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupSkipped)}
-                          </p>
-                          <p class="text-lg font-semibold">
-                            {storageRuntimeCleanupResult.summary.skippedCount}
-                          </p>
-                        </div>
-                        <div class="rounded-md border bg-muted/15 px-3 py-2">
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupBlocked)}
-                          </p>
-                          <p class="text-lg font-semibold">
-                            {storageRuntimeCleanupResult.summary.blockedCount}
-                          </p>
+                <Dialog.Root bind:open={storageBackupDialogOpen}>
+                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+                    <Dialog.Header>
+                      <Dialog.Title>{$t(i18nKeys.console.resources.storageBackupTitle)}</Dialog.Title>
+                      <Dialog.Description>
+                        {$t(i18nKeys.console.resources.storageBackupDescription)}
+                      </Dialog.Description>
+                    </Dialog.Header>
+
+                    <div class="space-y-4 px-5 pb-5">
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)]">
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
+                          <Select.Root bind:value={storageBackupVolumeId} type="single">
+                            <Select.Trigger id="resource-storage-backup-volume-trigger" class="w-full">
+                              {selectedStorageBackupAttachment
+                                ? storageAttachmentApplicationDataLabel(selectedStorageBackupAttachment)
+                                : selectedStorageBackupVolume
+                                  ? storageVolumeOptionLabel(selectedStorageBackupVolume)
+                                  : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              {#each storageVolumes as volume (volume.id)}
+                                {@const attachment = resourceStorageAttachments.find(
+                                  (candidate) => candidate.storageVolumeId === volume.id,
+                                )}
+                                <Select.Item value={volume.id}>
+                                  {attachment
+                                    ? `${storageAttachmentApplicationDataLabel(attachment)} (${attachment.destinationPath})`
+                                    : storageVolumeOptionLabel(volume)}
+                                </Select.Item>
+                              {/each}
+                            </Select.Content>
+                          </Select.Root>
+                          {#if selectedStorageBackupAttachment?.dataFormat}
+                            <p class="text-xs text-muted-foreground">
+                              {selectedStorageBackupAttachment.destinationPath}
+                              · {selectedStorageBackupAttachment.dataFormat}
+                            </p>
+                          {/if}
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
+                          <Select.Root bind:value={storageBackupDataFormat} type="single">
+                            <Select.Trigger class="w-full">{storageBackupDataFormat}</Select.Trigger>
+                            <Select.Content>
+                              <Select.Item value="unknown">unknown</Select.Item>
+                              <Select.Item value="filesystem">filesystem</Select.Item>
+                              <Select.Item value="sqlite">sqlite</Select.Item>
+                              <Select.Item value="json-files">json-files</Select.Item>
+                              <Select.Item value="application-export">application-export</Select.Item>
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-path">
+                          <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
+                          <Input
+                            id="resource-storage-backup-path"
+                            bind:value={storageBackupDestinationPath}
+                            autocomplete="off"
+                            placeholder="/pb_data"
+                          />
+                        </label>
+                      </div>
+
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,12rem)]">
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
+                          <Select.Root bind:value={storageBackupConsistency} type="single">
+                            <Select.Trigger class="w-full">{storageBackupConsistency}</Select.Trigger>
+                            <Select.Content>
+                              <Select.Item value="application-consistent">application-consistent</Select.Item>
+                              <Select.Item value="quiesced">quiesced</Select.Item>
+                              <Select.Item value="crash-consistent">crash-consistent</Select.Item>
+                              <Select.Item value="provider-snapshot-consistent">
+                                provider-snapshot-consistent
+                              </Select.Item>
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
+                          <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
+                          <Input
+                            id="resource-storage-backup-target-ref"
+                            bind:value={storageBackupTargetRef}
+                            autocomplete="off"
+                            placeholder="/var/lib/appaloft/backups"
+                          />
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-count">
+                          <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
+                          <Input
+                            id="resource-storage-backup-retention-count"
+                            bind:value={storageBackupRetentionMaxCount}
+                            autocomplete="off"
+                            inputmode="numeric"
+                          />
+                        </label>
+                      </div>
+
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_auto]">
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-min-free">
+                          <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
+                          <Input
+                            id="resource-storage-backup-min-free"
+                            bind:value={storageBackupRetentionMinFreeBytes}
+                            autocomplete="off"
+                            inputmode="numeric"
+                          />
+                        </label>
+
+                        <label class="flex items-center gap-2 pt-7 text-sm font-medium">
+                          <input type="checkbox" bind:checked={storageBackupLiveWrites} />
+                          <span>{$t(i18nKeys.console.resources.storageBackupLiveWrites)}</span>
+                        </label>
+
+                        <div class="flex items-end justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
+                            onclick={planStorageBackup}
+                          >
+                            <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                            {$t(i18nKeys.console.resources.storageBackupPlanAction)}
+                          </Button>
+                          <Button
+                            type="button"
+                            disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
+                            onclick={createStorageBackup}
+                          >
+                            <Plus class="mr-2 size-4" aria-hidden="true" />
+                            {$t(i18nKeys.console.resources.storageBackupCreateAction)}
+                          </Button>
                         </div>
                       </div>
 
-                      <div>
-                        <p class="text-sm font-medium">
-                          {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesTitle)}
-                        </p>
-                        <div class="mt-2 space-y-2">
-                          {#if storageRuntimeCleanupResult.candidates.length > 0}
-                            {#each storageRuntimeCleanupResult.candidates as candidate (candidate.id)}
-                              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                  <div class="min-w-0">
-                                    <p class="break-all font-mono text-xs">{candidate.target}</p>
-                                    <p class="mt-1 text-xs text-muted-foreground">
-                                      {candidate.updatedAt ? formatTime(candidate.updatedAt) : "-"}
-                                    </p>
-                                  </div>
-                                  <Badge variant={candidate.action === "blocked" ? "secondary" : "outline"}>
-                                    {storageRuntimeCleanupCandidateDetail(candidate)}
-                                  </Badge>
+                      {#if storageBackupFeedback}
+                        <div
+                          class={[
+                            "rounded-md border px-3 py-2 text-sm",
+                            storageBackupFeedback.kind === "success"
+                              ? "border-primary/25 bg-primary/5"
+                              : "border-destructive/30 bg-destructive/5 text-destructive",
+                          ]}
+                        >
+                          <p class="font-medium">{storageBackupFeedback.title}</p>
+                          <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
+                        </div>
+                      {/if}
+
+                      {#if storageBackupPlan}
+                        <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <Badge variant={storageBackupPlan.blockers.length > 0 ? "secondary" : "outline"}>
+                              {storageBackupPlan.sourceAdapterKey}
+                            </Badge>
+                            <Badge variant="outline">{storageBackupPlan.targetProviderKey}</Badge>
+                            <Badge variant="outline">{storageBackupPlan.consistency}</Badge>
+                            {#if storageBackupPlan.localOnly}
+                              <Badge variant="secondary">
+                                {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
+                              </Badge>
+                            {/if}
+                          </div>
+                          {#if storageBackupPlan.blockers.length > 0}
+                            <div class="mt-3 space-y-2">
+                              {#each storageBackupPlan.blockers as blocker (blocker.code)}
+                                <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2">
+                                  <p class="font-medium">{blocker.code}</p>
+                                  <p class="mt-1 text-xs">{blocker.message}</p>
                                 </div>
-                              </div>
-                            {/each}
-                          {:else}
-                            <div class="rounded-md border border-dashed bg-muted/15 px-4 py-4 text-sm text-muted-foreground">
-                              {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesEmpty)}
+                              {/each}
                             </div>
                           {/if}
                         </div>
+                      {/if}
+
+                      <div class="space-y-3">
+                        {#if !storageBackupVolumeId}
+                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageBackupSelectPrompt)}
+                          </div>
+                        {:else if storageVolumeBackupsQuery.isPending}
+                          <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageBackupsLoading)}
+                          </div>
+                        {:else if storageVolumeBackupsQuery.error}
+                          <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                            {readErrorMessage(storageVolumeBackupsQuery.error)}
+                          </div>
+                        {:else if storageVolumeBackups.length === 0}
+                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageBackupsEmpty)}
+                          </div>
+                        {:else}
+                          {#each storageVolumeBackups as backup (backup.id)}
+                            <article class="rounded-md border bg-muted/15 p-3">
+                              <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="min-w-0 space-y-2">
+                                  <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-medium">{storageBackupLabel(backup)}</p>
+                                    <Badge variant="secondary">{backup.retentionStatus}</Badge>
+                                    {#if backup.localOnly}
+                                      <Badge variant="outline">
+                                        {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
+                                      </Badge>
+                                    {/if}
+                                  </div>
+                                  <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                    {storageBackupArtifactLabel(backup)}
+                                  </p>
+                                  {#if backup.failureCode || backup.failureMessage}
+                                    <p class="text-xs text-destructive">
+                                      {backup.failureCode ?? ""} {backup.failureMessage ?? ""}
+                                    </p>
+                                  {/if}
+                                </div>
+                                <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto] lg:min-w-[28rem]">
+                                  <Input
+                                    id={`storage-backup-restore-name-${backup.id}`}
+                                    value={storageBackupRestoreNames[backup.id] ?? ""}
+                                    aria-label={$t(i18nKeys.console.resources.storageBackupRestoreName)}
+                                    autocomplete="off"
+                                    placeholder={$t(i18nKeys.console.resources.storageBackupRestoreNamePlaceholder)}
+                                    oninput={(event) => {
+                                      storageBackupRestoreNames = {
+                                        ...storageBackupRestoreNames,
+                                        [backup.id]: event.currentTarget.value,
+                                      };
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                      backup.status !== "ready" ||
+                                      restoreStorageVolumeBackupMutation.isPending
+                                    }
+                                    onclick={() => restoreStorageBackup(backup)}
+                                  >
+                                    {$t(i18nKeys.console.resources.storageBackupRestoreAction)}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                      backup.status === "pruned" ||
+                                      pruneStorageVolumeBackupMutation.isPending
+                                    }
+                                    onclick={() => pruneStorageBackup(backup)}
+                                  >
+                                    <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                                    {$t(i18nKeys.console.resources.storageBackupPruneAction)}
+                                  </Button>
+                                </div>
+                              </div>
+                            </article>
+                          {/each}
+                        {/if}
                       </div>
 
-                      {#if storageRuntimeCleanupResult.warnings.length > 0}
-                        <div>
-                          <p class="text-sm font-medium">
-                            {$t(i18nKeys.console.resources.storageRuntimeCleanupWarningsTitle)}
-                          </p>
-                          <div class="mt-2 space-y-2">
-                            {#each storageRuntimeCleanupResult.warnings as warning, index (index)}
-                              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                                <p class="font-medium">{warning.code}</p>
-                                <p class="mt-1 text-xs text-muted-foreground">{warning.message}</p>
-                              </div>
-                            {/each}
-                          </div>
+                      <Dialog.Footer class="px-0 pb-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onclick={() => (storageBackupDialogOpen = false)}
+                        >
+                          {$t(i18nKeys.common.actions.close)}
+                        </Button>
+                      </Dialog.Footer>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Root>
+
+                <Dialog.Root bind:open={storageRuntimeCleanupDialogOpen}>
+                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+                    <Dialog.Header>
+                      <Dialog.Title>
+                        {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
+                      </Dialog.Title>
+                      <Dialog.Description>
+                        {$t(i18nKeys.console.resources.storageRuntimeCleanupDescription)}
+                      </Dialog.Description>
+                    </Dialog.Header>
+
+                    <div class="space-y-4 px-5 pb-5">
+                      <div class="flex justify-end">
+                        <Badge variant="secondary">
+                          {$t(i18nKeys.console.resources.storageRuntimeCleanupBadge)}
+                        </Badge>
+                      </div>
+
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14rem,18rem)]">
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
+                          <Select.Root bind:value={storageRuntimeCleanupVolumeId} type="single">
+                            <Select.Trigger id="resource-storage-runtime-cleanup-volume-trigger" class="w-full">
+                              {selectedStorageRuntimeCleanupVolume
+                                ? storageVolumeOptionLabel(selectedStorageRuntimeCleanupVolume)
+                                : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              {#each storageVolumes as volume (volume.id)}
+                                <Select.Item value={volume.id}>
+                                  {storageVolumeOptionLabel(volume)}
+                                </Select.Item>
+                              {/each}
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.common.domain.server)}</span>
+                          <Select.Root bind:value={storageRuntimeCleanupServerId} type="single">
+                            <Select.Trigger id="resource-storage-runtime-cleanup-server-trigger" class="w-full">
+                              {selectedStorageRuntimeCleanupServer?.name ??
+                                $t(i18nKeys.console.domainBindings.noServerOptions)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              {#each servers as server (server.id)}
+                                <Select.Item value={server.id}>{server.name}</Select.Item>
+                              {/each}
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-runtime-cleanup-before">
+                          <span>{$t(i18nKeys.console.resources.storageRuntimeCleanupBefore)}</span>
+                          <Input
+                            id="resource-storage-runtime-cleanup-before"
+                            bind:value={storageRuntimeCleanupBefore}
+                            autocomplete="off"
+                            placeholder="2026-01-01T00:00:00.000Z"
+                          />
+                        </label>
+                      </div>
+
+                      <div class="flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
+                          onclick={previewStorageRuntimeCleanup}
+                        >
+                          <RefreshCw class="mr-2 size-4" aria-hidden="true" />
+                          {cleanupStorageRuntimeMutation.isPending
+                            ? $t(i18nKeys.common.status.loading)
+                            : $t(i18nKeys.console.resources.storageRuntimeCleanupPreviewAction)}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
+                          onclick={applyStorageRuntimeCleanup}
+                        >
+                          <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                          {$t(i18nKeys.console.resources.storageRuntimeCleanupApplyAction)}
+                        </Button>
+                      </div>
+
+                      {#if storageRuntimeCleanupFeedback}
+                        <div
+                          class={[
+                            "rounded-md border px-3 py-2 text-sm",
+                            storageRuntimeCleanupFeedback.kind === "success"
+                              ? "border-primary/25 bg-primary/5"
+                              : "border-destructive/30 bg-destructive/5 text-destructive",
+                          ]}
+                        >
+                          <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
+                          <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
                         </div>
                       {/if}
-                    </div>
-                  {/if}
-                </section>
 
-                <form
-                  id="resource-storage-attachment-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={attachResourceStorage}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.storageAttachTitle)}
-                        </h3>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageAttachDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">
-                      {$t(i18nKeys.console.resources.storageSnapshotBadge)}
-                    </Badge>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(10rem,12rem)]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                      <Select.Root bind:value={storageAttachmentVolumeId} type="single">
-                        <Select.Trigger id="resource-storage-attachment-volume-trigger" class="w-full">
-                          {selectedStorageVolume
-                            ? storageVolumeOptionLabel(selectedStorageVolume)
-                            : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each storageVolumes as volume (volume.id)}
-                            <Select.Item value={volume.id}>
-                              {storageVolumeOptionLabel(volume)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-storage-destination">
-                      <span>{$t(i18nKeys.console.resources.storageDestinationPath)}</span>
-                      <Input
-                        id="resource-storage-destination"
-                        bind:value={storageAttachmentDestinationPath}
-                        autocomplete="off"
-                        placeholder="/var/lib/app/data"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.storageMountMode)}</span>
-                      <Select.Root bind:value={storageAttachmentMountMode} type="single">
-                        <Select.Trigger class="w-full">
-                          {storageMountModeLabel(storageAttachmentMountMode)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="read-write">
-                            {$t(i18nKeys.console.resources.storageMountModeReadWrite)}
-                          </Select.Item>
-                          <Select.Item value="read-only">
-                            {$t(i18nKeys.console.resources.storageMountModeReadOnly)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-                  </div>
-
-                  {#if storageVolumesQuery.isPending}
-                    <div class="mt-4 rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.storageVolumesLoading)}
-                    </div>
-                  {:else if storageVolumesQuery.error}
-                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                      {readErrorMessage(storageVolumesQuery.error)}
-                    </div>
-                  {:else if storageVolumes.length === 0}
-                    <div class="mt-4 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.storageVolumesEmpty)}
-                    </div>
-                  {/if}
-
-                  {#if storageAttachmentFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        storageAttachmentFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageAttachmentFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canAttachStorage || attachResourceStorageMutation.isPending}
-                    >
-                      {attachResourceStorageMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.console.resources.storageAttachAction)}
-                    </Button>
-                  </div>
-                </form>
-
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 class="text-base font-semibold">
-                        {$t(i18nKeys.console.resources.storageAttachmentsTitle)}
-                      </h3>
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageAttachmentsDescription)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onclick={() => void invalidateStorageAttachmentQueries()}
-                    >
-                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.storageAttachmentsRefresh)}
-                    </Button>
-                  </div>
-
-                  <div class="mt-4 space-y-3">
-                    {#if resourceStorageAttachments.length > 0}
-                      {#each resourceStorageAttachments as attachment (attachment.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 space-y-2">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">
-                                  {storageAttachmentApplicationDataLabel(attachment)}
-                                </p>
-                                {#if attachment.storageVolumeKind}
-                                  <Badge variant="outline">
-                                    {storageVolumeKindLabel(attachment.storageVolumeKind)}
-                                  </Badge>
-                                {/if}
-                                {#if attachment.dataFormat}
-                                  <Badge variant="outline">{attachment.dataFormat}</Badge>
-                                {/if}
-                                <Badge variant="secondary">
-                                  {storageMountModeLabel(attachment.mountMode)}
-                                </Badge>
-                              </div>
-                              <p class="text-sm text-muted-foreground">
-                                {storageAttachmentVolumeLabel(attachment)}
-                              </p>
-                              <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                {attachment.destinationPath}
-                              </p>
+                      {#if storageRuntimeCleanupResult}
+                        <div class="space-y-3">
+                          <div class="grid gap-2 sm:grid-cols-5">
+                            <div class="rounded-md border bg-muted/15 px-3 py-2">
                               <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageAttachedAt)}
-                                {formatTime(attachment.attachedAt)}
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupInspected)}
+                              </p>
+                              <p class="text-lg font-semibold">
+                                {storageRuntimeCleanupResult.summary.inspectedCount}
                               </p>
                             </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={isResourceArchived || detachResourceStorageMutation.isPending}
-                              onclick={() => detachResourceStorage(attachment)}
-                            >
-                              {$t(i18nKeys.console.resources.storageDetachAction)}
-                            </Button>
+                            <div class="rounded-md border bg-muted/15 px-3 py-2">
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupMatched)}
+                              </p>
+                              <p class="text-lg font-semibold">
+                                {storageRuntimeCleanupResult.summary.matchedCount}
+                              </p>
+                            </div>
+                            <div class="rounded-md border bg-muted/15 px-3 py-2">
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupCleaned)}
+                              </p>
+                              <p class="text-lg font-semibold">
+                                {storageRuntimeCleanupResult.summary.cleanedCount}
+                              </p>
+                            </div>
+                            <div class="rounded-md border bg-muted/15 px-3 py-2">
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupSkipped)}
+                              </p>
+                              <p class="text-lg font-semibold">
+                                {storageRuntimeCleanupResult.summary.skippedCount}
+                              </p>
+                            </div>
+                            <div class="rounded-md border bg-muted/15 px-3 py-2">
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupBlocked)}
+                              </p>
+                              <p class="text-lg font-semibold">
+                                {storageRuntimeCleanupResult.summary.blockedCount}
+                              </p>
+                            </div>
                           </div>
-                        </article>
-                      {/each}
-                    {:else}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.storageAttachmentsEmpty)}
+
+                          <div>
+                            <p class="text-sm font-medium">
+                              {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesTitle)}
+                            </p>
+                            <div class="mt-2 space-y-2">
+                              {#if storageRuntimeCleanupResult.candidates.length > 0}
+                                {#each storageRuntimeCleanupResult.candidates as candidate (candidate.id)}
+                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                      <div class="min-w-0">
+                                        <p class="break-all font-mono text-xs">{candidate.target}</p>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                          {candidate.updatedAt ? formatTime(candidate.updatedAt) : "-"}
+                                        </p>
+                                      </div>
+                                      <Badge variant={candidate.action === "blocked" ? "secondary" : "outline"}>
+                                        {storageRuntimeCleanupCandidateDetail(candidate)}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                {/each}
+                              {:else}
+                                <div class="rounded-md border border-dashed bg-muted/15 px-4 py-4 text-sm text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesEmpty)}
+                                </div>
+                              {/if}
+                            </div>
+                          </div>
+
+                          {#if storageRuntimeCleanupResult.warnings.length > 0}
+                            <div>
+                              <p class="text-sm font-medium">
+                                {$t(i18nKeys.console.resources.storageRuntimeCleanupWarningsTitle)}
+                              </p>
+                              <div class="mt-2 space-y-2">
+                                {#each storageRuntimeCleanupResult.warnings as warning, index (index)}
+                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                                    <p class="font-medium">{warning.code}</p>
+                                    <p class="mt-1 text-xs text-muted-foreground">{warning.message}</p>
+                                  </div>
+                                {/each}
+                              </div>
+                            </div>
+                          {/if}
+                        </div>
+                      {/if}
+
+                      <Dialog.Footer class="px-0 pb-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onclick={() => (storageRuntimeCleanupDialogOpen = false)}
+                        >
+                          {$t(i18nKeys.common.actions.close)}
+                        </Button>
+                      </Dialog.Footer>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Root>
+
+                <Dialog.Root bind:open={storageAttachDialogOpen}>
+                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
+                    <Dialog.Header>
+                      <Dialog.Title>{$t(i18nKeys.console.resources.storageAttachTitle)}</Dialog.Title>
+                      <Dialog.Description>
+                        {$t(i18nKeys.console.resources.storageAttachDescription)}
+                      </Dialog.Description>
+                    </Dialog.Header>
+
+                    <form
+                      id="resource-storage-attachment-form"
+                      class="space-y-4 px-5 pb-5"
+                      onsubmit={attachResourceStorage}
+                    >
+                      <div class="flex justify-end">
+                        <Badge variant="secondary">
+                          {$t(i18nKeys.console.resources.storageSnapshotBadge)}
+                        </Badge>
                       </div>
-                    {/if}
-                  </div>
-                </section>
+
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(10rem,12rem)]">
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
+                          <Select.Root bind:value={storageAttachmentVolumeId} type="single">
+                            <Select.Trigger id="resource-storage-attachment-volume-trigger" class="w-full">
+                              {selectedStorageVolume
+                                ? storageVolumeOptionLabel(selectedStorageVolume)
+                                : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              {#each storageVolumes as volume (volume.id)}
+                                <Select.Item value={volume.id}>
+                                  {storageVolumeOptionLabel(volume)}
+                                </Select.Item>
+                              {/each}
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-destination">
+                          <span>{$t(i18nKeys.console.resources.storageDestinationPath)}</span>
+                          <Input
+                            id="resource-storage-destination"
+                            bind:value={storageAttachmentDestinationPath}
+                            autocomplete="off"
+                            placeholder="/var/lib/app/data"
+                          />
+                        </label>
+
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.console.resources.storageMountMode)}</span>
+                          <Select.Root bind:value={storageAttachmentMountMode} type="single">
+                            <Select.Trigger class="w-full">
+                              {storageMountModeLabel(storageAttachmentMountMode)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              <Select.Item value="read-write">
+                                {$t(i18nKeys.console.resources.storageMountModeReadWrite)}
+                              </Select.Item>
+                              <Select.Item value="read-only">
+                                {$t(i18nKeys.console.resources.storageMountModeReadOnly)}
+                              </Select.Item>
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+                      </div>
+
+                      {#if storageVolumes.length === 0}
+                        <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                        </div>
+                      {/if}
+
+                      {#if storageAttachmentFeedback && storageAttachmentFeedback.kind === "error"}
+                        <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                          <p class="font-medium">{storageAttachmentFeedback.title}</p>
+                          <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
+                        </div>
+                      {/if}
+
+                      <Dialog.Footer class="px-0 pb-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onclick={() => (storageAttachDialogOpen = false)}
+                        >
+                          {$t(i18nKeys.common.actions.close)}
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={!canAttachStorage || attachResourceStorageMutation.isPending}
+                        >
+                          {attachResourceStorageMutation.isPending
+                            ? $t(i18nKeys.common.actions.saving)
+                            : $t(i18nKeys.console.resources.storageAttachAction)}
+                        </Button>
+                      </Dialog.Footer>
+                    </form>
+                  </Dialog.Content>
+                </Dialog.Root>
               </section>
 
               {:else if activeSettingsSection === "dependencies"}
