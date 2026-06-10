@@ -99,6 +99,7 @@ export interface DockerComposeUpCommandSpec {
   scales: readonly DockerComposeScaleSpec[];
   projectName?: DisplayNameText;
   workingDirectory?: FilePathText;
+  portableDockerCompose?: boolean;
   detach: boolean;
   build: boolean;
 }

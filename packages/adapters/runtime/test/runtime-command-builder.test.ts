@@ -163,4 +163,25 @@ describe("runtime command builder", () => {
       "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build --scale 'worker=4'",
     );
   });
+
+  test("renders portable Compose up for SSH targets with Docker Compose v1 fallback", () => {
+    const spec = RuntimeCommandBuilder.docker().composeUp({
+      composeFile: "/srv/app/docker-compose.yml",
+      additionalComposeFiles: ["/srv/app/.appaloft.compose.labels.override.yml"],
+      scales: [{ serviceName: "worker", replicas: 4 }],
+      projectName: "preview-123-dep-1",
+      workingDirectory: "/srv/app",
+      portableDockerCompose: true,
+    });
+
+    const command = renderRuntimeCommandString(spec, { quote: shellQuote });
+
+    expect(command).toContain("appaloft_docker_compose() {");
+    expect(command).toContain("docker compose \"$@\"");
+    expect(command).toContain("docker-compose \"$@\"");
+    expect(command).toContain(
+      "appaloft_docker_compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml'",
+    );
+    expect(command).toContain("--scale 'worker=4'");
+  });
 });
