@@ -3470,6 +3470,76 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function clickDialogButtonByAnyText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const dialog = document.querySelector('[role="dialog"]');
+          const elements = Array.from(dialog?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a dialog button or link with one of: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function clickStorageVolumeCardButton(
+  view: Bun.WebView,
+  volumeId: string,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const volumeId = ${JSON.stringify(volumeId)};
+          const texts = ${JSON.stringify(texts)};
+          const card = document.querySelector(\`[data-storage-volume-card="\${volumeId}"]\`);
+          const elements = Array.from(card?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected storage volume ${volumeId} button or link with one of: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function acceptConsoleConfirm(view: Bun.WebView): Promise<void> {
   const accepted = await waitFor(
     () =>
@@ -6107,12 +6177,34 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
 
-      await expectAnyText(view, ["Resource storage attachments", "资源存储挂载"]);
+      await expectAnyText(view, ["Storage volumes", "存储卷"]);
       await expectText(view, "PocketBase data");
       await expectText(view, "/pb_data");
       await expectText(view, "sqlite");
-      await expectAnyText(view, ["Volume backups", "Volume 备份"]);
+      await expectAnyText(view, ["Backup restore points", "备份点"]);
       await expectText(view, "local://backups/svb_uploads.tar.zst");
+      const storagePageDefaultState = JSON.parse(
+        await view.evaluate<string>(`JSON.stringify({
+          attachFormVisible: Boolean(document.querySelector("#resource-storage-attachment-form")),
+          backupFieldVisible: Boolean(document.querySelector("#resource-storage-backup-path")),
+          cards: document.querySelectorAll("[data-storage-volume-card]").length,
+          cleanupFieldVisible: Boolean(document.querySelector("#resource-storage-runtime-cleanup-before")),
+          createFormVisible: Boolean(document.querySelector("#resource-storage-volume-form")),
+        })`),
+      ) as {
+        attachFormVisible: boolean;
+        backupFieldVisible: boolean;
+        cards: number;
+        cleanupFieldVisible: boolean;
+        createFormVisible: boolean;
+      };
+      expect(storagePageDefaultState).toEqual({
+        attachFormVisible: false,
+        backupFieldVisible: false,
+        cards: 1,
+        cleanupFieldVisible: false,
+        createFormVisible: false,
+      });
 
       const listRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/list");
       expect(readOrpcJsonPayload(listRequest.body)).toEqual({
@@ -6120,8 +6212,9 @@ describe.serial("console e2e with Bun.WebView", () => {
         environmentId: "env_demo",
       });
 
-      await setInputValue(view, "#resource-storage-volume-name", "cache");
       await clickButtonByAnyText(view, ["Create volume", "创建 volume"]);
+      await setInputValue(view, "#resource-storage-volume-name", "cache");
+      await clickDialogButtonByAnyText(view, ["Create volume", "创建 volume"]);
       const createRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/create");
       expect(readOrpcJsonPayload(createRequest.body)).toEqual({
         projectId: "prj_demo",
@@ -6131,6 +6224,10 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
 
+      await clickStorageVolumeCardButton(view, "stv_uploads", [
+        "Runtime cleanup",
+        "Runtime cleanup",
+      ]);
       await selectOptionByText(
         view,
         "#resource-storage-runtime-cleanup-volume-trigger",
@@ -6167,6 +6264,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       );
       await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
 
+      await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
+      await clickStorageVolumeCardButton(view, "stv_uploads", ["Volume backups", "Volume 备份"]);
       await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
       await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
       await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
@@ -6197,7 +6296,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         },
       });
       await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
-      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      await clickDialogButtonByAnyText(view, ["Create backup", "创建备份"]);
       const backupCreateRequest = await waitForRecordedRequest(
         "/api/rpc/storageVolumes/backups/create",
       );
@@ -6232,7 +6331,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         storageVolumeId: "stv_uploads",
       });
       await setInputValue(view, "#storage-backup-restore-name-svb_uploads", "uploads-restored");
-      await clickButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
+      await clickDialogButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
       const backupRestoreRequest = await waitForRecordedRequest(
         "/api/rpc/storageVolumes/backups/restore",
       );
@@ -6242,7 +6341,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         restoredVolumeName: "uploads-restored",
       });
       await expectAnyText(view, ["Storage backup restored", "Storage backup 已恢复"]);
-      await clickButtonByAnyText(view, ["Prune", "清理"]);
+      await clickDialogButtonByAnyText(view, ["Prune", "清理"]);
       const backupPruneRequest = await waitForRecordedRequest(
         "/api/rpc/storageVolumes/backups/prune",
       );
@@ -6251,6 +6350,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
 
+      await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
+      await clickStorageVolumeCardButton(view, "stv_uploads", ["Attach storage", "挂载存储"]);
       await selectOptionByText(
         view,
         "#resource-storage-attachment-volume-trigger",
