@@ -20,7 +20,7 @@ import { ok, type Result } from "@appaloft/core";
 import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import { Elysia } from "elysia";
 
-import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src";
+import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src/internal";
 
 class NoopLogger implements AppLogger {
   debug(): void {}
@@ -130,7 +130,7 @@ describe("Appaloft SDK running-server smoke", () => {
         });
 
         if (query instanceof ListProjectsQuery) {
-          return ok({ items: [project] } as T);
+          return ok({ items: [project], total: 1, limit: 100, offset: 0 } as T);
         }
 
         expect(query).toBeInstanceOf(ShowProjectQuery);

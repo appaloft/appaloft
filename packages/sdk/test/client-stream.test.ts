@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src";
+import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src/internal";
 
 const streamOperation: SdkOperationDescriptor = {
   operationKey: "deployments.stream-events",

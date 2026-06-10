@@ -33,9 +33,9 @@ SDK 方法必须来自 OpenAPI SDK contract 以及 `x-appaloft-*` operation meta
 SDK 发布后，Node、Bun 或浏览器自动化可以安装 `@appaloft/sdk`，然后创建一个带 `baseUrl` 的客户端。
 
 ```ts
-import { createAppaloftSdkClient, generatedSdkOperations } from "@appaloft/sdk";
+import { createAppaloftClient } from "@appaloft/sdk";
 
-const appaloft = createAppaloftSdkClient({
+const appaloft = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
 });
 ```
@@ -47,7 +47,7 @@ const appaloft = createAppaloftSdkClient({
 交互式产品操作使用产品会话 cookie。机器自动化使用 deploy token bearer credential。不要把 deploy token 写入仓库配置文件；在 CI 中应通过受信任的 secret 或环境变量注入。
 
 ```ts
-const productClient = createAppaloftSdkClient({
+const productClient = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
   auth: {
     kind: "product-session",
@@ -55,7 +55,7 @@ const productClient = createAppaloftSdkClient({
   },
 });
 
-const actionClient = createAppaloftSdkClient({
+const actionClient = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
   auth: {
     kind: "deploy-token",
@@ -71,17 +71,26 @@ const actionClient = createAppaloftSdkClient({
 每个 SDK 调用应对应一个 operation key。输入字段来自同一个 command/query schema，输出来自 HTTP/oRPC contract。
 
 ```ts
-const result = await appaloft.request({
-  operation: generatedSdkOperations.find(
-    (operation) => operation.operationKey === "organizations.current-context",
-  )!,
+const created = await appaloft.projects.create({ name: "Demo" });
+const listed = await appaloft.projects.list({ limit: 20 });
+const shown = await appaloft.projects.show({ projectId: "prj_123" });
+
+const plan = await appaloft.dependencyResources.provisioning.plan({
+  projectId: "prj_123",
+  environmentId: "env_123",
 });
 
-if (!result.ok) {
-  // result.error is a structured Appaloft error.
-  throw new Error(result.error.code);
+if (!created.ok) {
+  // created.error 是结构化 Appaloft 错误。
+  throw new Error(created.error.code);
 }
 ```
+
+facade 名称从 operation key 生成：kebab-case 转为 camelCase，点号转为嵌套分组。例如 `dependency-resources.provisioning.plan` 会生成 `dependencyResources.provisioning.plan`。
+
+path 参数可以作为顶层字段传入。剩余字段在 `GET`、`DELETE` 和流式 operation 中默认进入 query；在其他 operation 中默认进入 JSON body。集成代码需要精确控制拆分时，可以显式传入 `pathParams`、`query` 或 `body`。
+
+operation descriptor 是生成器内部元数据。公开 SDK 调用方应使用 facade 方法，不需要手工传入 operation metadata。
 
 SDK 是 API 边界测试和外部自动化的合适入口。领域规则、应用 handler、repository 或 adapter 单元测试仍应在它们各自的层级测试。
 
@@ -103,12 +112,8 @@ SDK 返回稳定的结构化错误字段：`code`、`category`、`message`、`re
 ```ts
 const controller = new AbortController();
 
-for await (const envelope of appaloft.stream({
-  operation: generatedSdkOperations.find(
-    (operation) =>
-      operation.operationKey === "deployments.stream-events" && operation.streaming,
-  )!,
-  pathParams: { deploymentId: "dep_123" },
+for await (const envelope of appaloft.deployments.streamEvents({
+  deploymentId: "dep_123",
   signal: controller.signal,
 })) {
   if (envelope && typeof envelope === "object" && "kind" in envelope) {
@@ -118,3 +123,7 @@ for await (const envelope of appaloft.stream({
 ```
 
 当流返回 `closed` 或调用方取消 `AbortSignal` 后，自动化应停止读取并根据需要重新打开流。
+
+流式 facade 方法返回 `AsyncIterable`。它不会把 SDK 改成 throw-only 模式；普通请求 facade 仍返回 `{ ok, status, data }` 或 `{ ok, status, error }`。
+
+当前生成器说明：operation catalog 和 OpenAPI metadata 还没有为每个 generated facade method 暴露足够稳定的 schema 名称来生成逐 operation 的输入/输出别名。TypeScript facade 目前从 operation key 和 route metadata 生成；后续生成器应补充 request、response 和 stream envelope schema id，以便非 TypeScript SDK 也能生成等价的 typed method signature。

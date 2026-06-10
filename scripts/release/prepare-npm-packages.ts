@@ -111,6 +111,8 @@ async function prepareSdkPackage(): Promise<void> {
   for (const file of [
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/internal.js",
+    "dist/internal.d.ts",
     "dist/generated-operations.js",
     "dist/generated-operations.d.ts",
   ]) {
