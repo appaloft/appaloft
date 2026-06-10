@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   CreatedAt,
   DeploymentTarget,
@@ -12,18 +13,17 @@ import {
   DeploymentTargetUsername,
   EnvironmentId,
   HostAddress,
-  ok,
   PortNumber,
   ProjectId,
   ProviderKey,
   type Result,
+  SshPrivateKeyText,
   StorageBindSourcePath,
   StorageVolume,
   StorageVolumeId,
   StorageVolumeKindValue,
   StorageVolumeName,
   StorageVolumeSlug,
-  SshPrivateKeyText,
   TargetKindValue,
 } from "@appaloft/core";
 
@@ -185,7 +185,7 @@ function ssh(
 
 describe("storage runtime cleanup adapter", () => {
   test("[STOR-CLEANUP-001][STOR-CLEANUP-002] renders scoped Docker cleanup without broad prune", () => {
-    const script = renderStorageRuntimeCleanupScript({
+    const script = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_data",
       storageVolumeKind: "named-volume",
       volumeName: "appaloft-stv_data",
@@ -196,8 +196,9 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 0,
       retainedSnapshotCount: 0,
       rollbackCandidateCount: 0,
-    });
+    }));
 
+    expect(script).toMatchSnapshot();
     expect(script).toContain("APPALOFT_STORAGE_CLEANUP_V1");
     expect(script).toContain('docker volume rm "$APPALOFT_DOCKER_VOLUME_NAME"');
     expect(script).toContain('docker ps -q --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME"');
@@ -244,7 +245,7 @@ describe("storage runtime cleanup adapter", () => {
   });
 
   test("[STOR-CLEANUP-004] bind-mount cleanup is diagnostic only", () => {
-    const script = renderStorageRuntimeCleanupScript({
+    const script = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_bind",
       storageVolumeKind: "bind-mount",
       volumeName: "appaloft-stv_bind",
@@ -255,7 +256,7 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 0,
       retainedSnapshotCount: 0,
       rollbackCandidateCount: 0,
-    });
+    }));
 
     expect(script).toContain("bind-mount-unsupported");
     expect(script.indexOf("bind-mount-unsupported")).toBeLessThan(
@@ -295,7 +296,7 @@ describe("storage runtime cleanup adapter", () => {
   });
 
   test("[STOR-CLEANUP-003] retained snapshots and rollback candidates block cleanup in the target script", () => {
-    const retainedSnapshotScript = renderStorageRuntimeCleanupScript({
+    const retainedSnapshotScript = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_data",
       storageVolumeKind: "named-volume",
       volumeName: "appaloft-stv_data",
@@ -306,8 +307,8 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 0,
       retainedSnapshotCount: 1,
       rollbackCandidateCount: 0,
-    });
-    const rollbackCandidateScript = renderStorageRuntimeCleanupScript({
+    }));
+    const rollbackCandidateScript = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_data",
       storageVolumeKind: "named-volume",
       volumeName: "appaloft-stv_data",
@@ -318,16 +319,16 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 0,
       retainedSnapshotCount: 0,
       rollbackCandidateCount: 1,
-    });
+    }));
 
-    expect(retainedSnapshotScript).toContain("APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT=1");
+    expect(retainedSnapshotScript).toContain("APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT='1'");
     expect(retainedSnapshotScript).toContain("blocked retained-snapshot");
-    expect(rollbackCandidateScript).toContain("APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT=1");
+    expect(rollbackCandidateScript).toContain("APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT='1'");
     expect(rollbackCandidateScript).toContain("blocked rollback-candidate");
   });
 
   test("[STOR-CLEANUP-003] in-flight storage backup or restore blocks cleanup in the target script", () => {
-    const script = renderStorageRuntimeCleanupScript({
+    const script = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_data",
       storageVolumeKind: "named-volume",
       volumeName: "appaloft-stv_data",
@@ -338,14 +339,14 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 2,
       retainedSnapshotCount: 0,
       rollbackCandidateCount: 0,
-    });
+    }));
 
-    expect(script).toContain("APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT=2");
+    expect(script).toContain("APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT='2'");
     expect(script).toContain("blocked backup-restore-in-flight");
   });
 
   test("[STOR-CLEANUP-002] ownership labels are required before named volume cleanup", () => {
-    const script = renderStorageRuntimeCleanupScript({
+    const script = ash.render(renderStorageRuntimeCleanupScript({
       storageVolumeId: "stv_data",
       storageVolumeKind: "named-volume",
       volumeName: "appaloft-stv_data",
@@ -356,11 +357,34 @@ describe("storage runtime cleanup adapter", () => {
       backupRestoreInFlightCount: 0,
       retainedSnapshotCount: 0,
       rollbackCandidateCount: 0,
-    });
+    }));
 
     expect(script.indexOf("ownership-unproven")).toBeLessThan(script.indexOf("active_container="));
     expect(script).toContain('[ "$volume_storage_id" != "$APPALOFT_STORAGE_VOLUME_ID" ]');
     expect(script).toContain('[ "$volume_managed" != "true" ]');
+  });
+
+  test("[STOR-CLEANUP-004] executes bind-mount diagnostic path through ash", () => {
+    const script = renderStorageRuntimeCleanupScript({
+      storageVolumeId: "stv_bind",
+      storageVolumeKind: "bind-mount",
+      volumeName: "appaloft-stv_bind",
+      before: "2026-01-01T00:05:00.000Z",
+      dryRun: false,
+      activeAttachmentCount: 0,
+      backupRetentionRequired: false,
+      backupRestoreInFlightCount: 0,
+      retainedSnapshotCount: 0,
+      rollbackCandidateCount: 0,
+    });
+
+    const result = ash.execute(script);
+
+    expect(result.success, result.stderr).toBe(true);
+    expect(result.stdout).toContain("APPALOFT_STORAGE_CLEANUP_V1");
+    expect(result.stdout).toContain(
+      "STORAGE_CLEANUP_CANDIDATE\tstv_bind\tbind-mount\tstv_bind\t\tblocked\tbind-mount-unsupported",
+    );
   });
 
   test("[STOR-CLEANUP-003] unsupported providers return runtime_target_unsupported before mutation", async () => {

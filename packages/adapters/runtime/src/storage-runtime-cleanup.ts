@@ -9,6 +9,7 @@ import {
   type StorageRuntimeCleanupResult,
   type StorageRuntimeCleanupWarning,
 } from "@appaloft/application";
+import { type AshScript, ash } from "@appaloft/ash";
 import { type DeploymentTargetState, domainError, err, ok, type Result } from "@appaloft/core";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { dockerVolumeNameForStorageVolumeId } from "./storage-runtime-mounts";
@@ -47,10 +48,6 @@ function isStorageRuntimeCleanupBlockedReason(
     input !== undefined &&
     storageRuntimeCleanupBlockedReasons.has(input as StorageRuntimeCleanupBlockedReason)
   );
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -109,92 +106,92 @@ export function renderStorageRuntimeCleanupScript(input: {
   backupRestoreInFlightCount: number;
   retainedSnapshotCount: number;
   rollbackCandidateCount: number;
-}): string {
-  return [
-    "set +e",
-    `APPALOFT_STORAGE_VOLUME_ID=${shellQuote(input.storageVolumeId)}`,
-    `APPALOFT_STORAGE_VOLUME_KIND=${shellQuote(input.storageVolumeKind)}`,
-    `APPALOFT_DOCKER_VOLUME_NAME=${shellQuote(input.volumeName)}`,
-    `APPALOFT_STORAGE_CLEANUP_BEFORE=${shellQuote(input.before)}`,
-    `APPALOFT_STORAGE_CLEANUP_DRY_RUN=${input.dryRun ? "1" : "0"}`,
-    `APPALOFT_STORAGE_ACTIVE_ATTACHMENT_COUNT=${input.activeAttachmentCount}`,
-    `APPALOFT_STORAGE_BACKUP_RETENTION_REQUIRED=${input.backupRetentionRequired ? "1" : "0"}`,
-    `APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT=${input.backupRestoreInFlightCount}`,
-    `APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT=${input.retainedSnapshotCount}`,
-    `APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT=${input.rollbackCandidateCount}`,
-    "printf 'APPALOFT_STORAGE_CLEANUP_V1\\n'",
-    "emit_candidate() {",
-    "  id=\"$1\"; kind=\"$2\"; target=\"$3\"; updated_at=\"$4\"; action=\"$5\"; reason=\"$6\"",
-    "  printf 'STORAGE_CLEANUP_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$id\" \"$kind\" \"$target\" \"$updated_at\" \"$action\" \"$reason\"",
-    "}",
-    "older_than_cutoff() {",
-    "  candidate_time=\"$1\"",
-    "  [ -n \"$candidate_time\" ] || return 1",
-    "  [ \"$candidate_time\" \\< \"$APPALOFT_STORAGE_CLEANUP_BEFORE\" ]",
-    "}",
-    "if [ \"$APPALOFT_STORAGE_VOLUME_KIND\" = \"bind-mount\" ]; then",
-    "  emit_candidate \"$APPALOFT_STORAGE_VOLUME_ID\" bind-mount \"$APPALOFT_STORAGE_VOLUME_ID\" \"\" blocked bind-mount-unsupported",
-    "  exit 0",
-    "fi",
-    "if ! command -v docker >/dev/null 2>&1; then",
-    "  printf 'STORAGE_CLEANUP_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  exit 0",
-    "fi",
-    "created_at=$(docker volume inspect -f '{{.CreatedAt}}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null)",
-    "if [ -z \"$created_at\" ] || [ \"$created_at\" = '<no value>' ]; then",
-    "  exit 0",
-    "fi",
-    "volume_storage_id=$(docker volume inspect -f '{{ index .Labels \"appaloft.storage-volume-id\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null)",
-    "volume_managed=$(docker volume inspect -f '{{ index .Labels \"appaloft.managed\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null)",
-    "if [ \"$volume_storage_id\" != \"$APPALOFT_STORAGE_VOLUME_ID\" ] || [ \"$volume_managed\" != \"true\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked ownership-unproven",
-    "  exit 0",
-    "fi",
-    "active_container=$(docker ps -q --filter \"volume=$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null | head -n 1)",
-    "if [ -n \"$active_container\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked active-runtime",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_ACTIVE_ATTACHMENT_COUNT\" != \"0\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked active-attachment",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT\" != \"0\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked retained-snapshot",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT\" != \"0\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked rollback-candidate",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT\" != \"0\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked backup-restore-in-flight",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_BACKUP_RETENTION_REQUIRED\" = \"1\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked backup-retention",
-    "  exit 0",
-    "fi",
-    "if ! older_than_cutoff \"$created_at\"; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" skipped cutoff-not-reached",
-    "  exit 0",
-    "fi",
-    "if [ \"$APPALOFT_STORAGE_CLEANUP_DRY_RUN\" = \"1\" ]; then",
-    "  emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" matched \"\"",
-    "else",
-    "  docker volume rm \"$APPALOFT_DOCKER_VOLUME_NAME\" >/dev/null 2>&1",
-    "  if [ \"$?\" = \"0\" ]; then",
-    "    emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" cleaned \"\"",
-    "  else",
-    "    emit_candidate \"$APPALOFT_DOCKER_VOLUME_NAME\" named-volume \"$APPALOFT_DOCKER_VOLUME_NAME\" \"$created_at\" blocked provider-blocked",
-    "  fi",
-    "fi",
-  ].join("\n");
+}): AshScript {
+  return ash`
+    set +e
+    ${ash.env("APPALOFT_STORAGE_VOLUME_ID", input.storageVolumeId)}
+    ${ash.env("APPALOFT_STORAGE_VOLUME_KIND", input.storageVolumeKind)}
+    ${ash.env("APPALOFT_DOCKER_VOLUME_NAME", input.volumeName)}
+    ${ash.env("APPALOFT_STORAGE_CLEANUP_BEFORE", input.before)}
+    ${ash.env("APPALOFT_STORAGE_CLEANUP_DRY_RUN", input.dryRun ? "1" : "0")}
+    ${ash.env("APPALOFT_STORAGE_ACTIVE_ATTACHMENT_COUNT", input.activeAttachmentCount)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_RETENTION_REQUIRED", input.backupRetentionRequired ? "1" : "0")}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT", input.backupRestoreInFlightCount)}
+    ${ash.env("APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT", input.retainedSnapshotCount)}
+    ${ash.env("APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT", input.rollbackCandidateCount)}
+    ${ash.raw(`printf 'APPALOFT_STORAGE_CLEANUP_V1\\n'
+    emit_candidate() {
+      id="$1"; kind="$2"; target="$3"; updated_at="$4"; action="$5"; reason="$6"
+      printf 'STORAGE_CLEANUP_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$id" "$kind" "$target" "$updated_at" "$action" "$reason"
+    }
+    older_than_cutoff() {
+      candidate_time="$1"
+      [ -n "$candidate_time" ] || return 1
+      [ "$candidate_time" \\< "$APPALOFT_STORAGE_CLEANUP_BEFORE" ]
+    }
+    if [ "$APPALOFT_STORAGE_VOLUME_KIND" = "bind-mount" ]; then
+      emit_candidate "$APPALOFT_STORAGE_VOLUME_ID" bind-mount "$APPALOFT_STORAGE_VOLUME_ID" "" blocked bind-mount-unsupported
+      exit 0
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'STORAGE_CLEANUP_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'
+      exit 0
+    fi
+    created_at=$(docker volume inspect -f '{{.CreatedAt}}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null)
+    if [ -z "$created_at" ] || [ "$created_at" = '<no value>' ]; then
+      exit 0
+    fi
+    volume_storage_id=$(docker volume inspect -f '{{ index .Labels "appaloft.storage-volume-id" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null)
+    volume_managed=$(docker volume inspect -f '{{ index .Labels "appaloft.managed" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null)
+    if [ "$volume_storage_id" != "$APPALOFT_STORAGE_VOLUME_ID" ] || [ "$volume_managed" != "true" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked ownership-unproven
+      exit 0
+    fi
+    active_container=$(docker ps -q --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null | head -n 1)
+    if [ -n "$active_container" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked active-runtime
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_ACTIVE_ATTACHMENT_COUNT" != "0" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked active-attachment
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_RETAINED_SNAPSHOT_COUNT" != "0" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked retained-snapshot
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_ROLLBACK_CANDIDATE_COUNT" != "0" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked rollback-candidate
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_BACKUP_RESTORE_IN_FLIGHT_COUNT" != "0" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked backup-restore-in-flight
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_BACKUP_RETENTION_REQUIRED" = "1" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked backup-retention
+      exit 0
+    fi
+    if ! older_than_cutoff "$created_at"; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" skipped cutoff-not-reached
+      exit 0
+    fi
+    if [ "$APPALOFT_STORAGE_CLEANUP_DRY_RUN" = "1" ]; then
+      emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" matched ""
+    else
+      docker volume rm "$APPALOFT_DOCKER_VOLUME_NAME" >/dev/null 2>&1
+      if [ "$?" = "0" ]; then
+        emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" cleaned ""
+      else
+        emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked provider-blocked
+      fi
+    fi`)}
+  `;
 }
 
-async function runLocalStorageCleanupScript(script: string): Promise<StorageCleanupCommandResult> {
+async function runLocalStorageCleanupScript(script: AshScript): Promise<StorageCleanupCommandResult> {
   const result = await runBufferedProcess({
-    command: shellCommand(script),
+    command: shellCommand(ash.render(script)),
     timeoutMs: 20_000,
     timeoutMessage: "Storage runtime cleanup timed out",
   });
@@ -208,9 +205,9 @@ async function runLocalStorageCleanupScript(script: string): Promise<StorageClea
 
 async function runSshStorageCleanupScript(
   server: DeploymentTargetState,
-  script: string,
+  script: AshScript,
 ): Promise<StorageCleanupCommandResult> {
-  const prepared = prepareSshArgs(server, script);
+  const prepared = prepareSshArgs(server, ash.render(script));
   try {
     const result = await runBufferedProcess({
       command: ["ssh", ...prepared.args],

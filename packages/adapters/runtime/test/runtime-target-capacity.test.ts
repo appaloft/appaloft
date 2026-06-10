@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { ash } from "@appaloft/ash";
 import {
   CreatedAt,
   DeploymentTargetId,
@@ -35,22 +36,24 @@ describe("runtime target capacity diagnostics", () => {
     const script = renderRuntimeTargetCapacityScript({
       runtimeRoot: "/var/lib/appaloft/runtime",
     });
+    const rendered = ash.render(script);
 
-    expect(script).toContain("df -P -k");
-    expect(script).toContain("df -P -i");
-    expect(script).toContain("docker system df");
-    expect(script).toContain("docker inspect --size");
-    expect(script).toContain("appaloft.managed=true");
-    expect(script).toContain("CAPACITY_APPALOFT_WORKSPACE");
-    expect(script).toContain(".appaloft-rollback-candidate");
-    expect(script).toContain("du -sk");
-    expect(script.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(
-      script.indexOf("docker system df"),
+    expect(rendered).toMatchSnapshot();
+    expect(rendered).toContain("df -P -k");
+    expect(rendered).toContain("df -P -i");
+    expect(rendered).toContain("docker system df");
+    expect(rendered).toContain("docker inspect --size");
+    expect(rendered).toContain("appaloft.managed=true");
+    expect(rendered).toContain("CAPACITY_APPALOFT_WORKSPACE");
+    expect(rendered).toContain(".appaloft-rollback-candidate");
+    expect(rendered).toContain("du -sk");
+    expect(rendered.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(
+      rendered.indexOf("docker system df"),
     );
-    expect(script).not.toContain("docker system prune");
-    expect(script).not.toContain("docker volume prune");
-    expect(script).not.toContain(" rm ");
-    expect(script).not.toContain("rm -rf");
+    expect(rendered).not.toContain("docker system prune");
+    expect(rendered).not.toContain("docker volume prune");
+    expect(rendered).not.toContain(" rm ");
+    expect(rendered).not.toContain("rm -rf");
   });
 
   test("[RT-USAGE-002][RT-USAGE-004] renders a bounded attribution profile before expensive capacity checks", () => {
@@ -58,15 +61,21 @@ describe("runtime target capacity diagnostics", () => {
       runtimeRoot: "/var/lib/appaloft/runtime",
       profile: "attribution",
     });
+    const rendered = ash.render(script);
 
-    expect(script).toContain("APPALOFT_CAPACITY_PROFILE='attribution'");
-    expect(script).toContain("CAPACITY_APPALOFT_CONTAINER");
-    expect(script).toContain("CAPACITY_APPALOFT_WORKSPACE");
-    expect(script).toContain("exit 0");
-    expect(script.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(script.indexOf("exit 0"));
-    expect(script.indexOf("CAPACITY_APPALOFT_WORKSPACE")).toBeLessThan(script.indexOf("exit 0"));
-    expect(script.indexOf("exit 0")).toBeLessThan(script.indexOf("docker system df"));
-    expect(script.indexOf("exit 0")).toBeLessThan(script.indexOf("df -P -k"));
+    expect(rendered).toMatchSnapshot();
+    expect(rendered).toContain("APPALOFT_CAPACITY_PROFILE='attribution'");
+    expect(rendered).toContain("CAPACITY_APPALOFT_CONTAINER");
+    expect(rendered).toContain("CAPACITY_APPALOFT_WORKSPACE");
+    expect(rendered).toContain("exit 0");
+    expect(rendered.indexOf("CAPACITY_APPALOFT_CONTAINER")).toBeLessThan(
+      rendered.indexOf("exit 0"),
+    );
+    expect(rendered.indexOf("CAPACITY_APPALOFT_WORKSPACE")).toBeLessThan(
+      rendered.indexOf("exit 0"),
+    );
+    expect(rendered.indexOf("exit 0")).toBeLessThan(rendered.indexOf("docker system df"));
+    expect(rendered.indexOf("exit 0")).toBeLessThan(rendered.indexOf("df -P -k"));
   });
 
   test("[RUNTIME-CAPACITY-INSPECT-002] parses disk, inode, Docker, runtime, and warning output", () => {
