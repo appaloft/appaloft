@@ -83,9 +83,17 @@ jobs:
       - name: Wait For Backend
         run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3101/api/health 60000
 
+      - name: Select Shell E2E Shard
+        id: shell-e2e-shard
+        run: |
+          files="$(bun run scripts/test/select-shell-e2e-shard.ts --shell-root=apps/shell --shard=${{ matrix.shard }} --total=${{ matrix.shard_total }})"
+          echo "files=${files}" >> "${GITHUB_OUTPUT}"
+          echo "Selected shell E2E files for shard ${{ matrix.shard }}/${{ matrix.shard_total }}:"
+          printf '%s\n' "${files}"
+
       - name: Shell CLI + HTTP E2E
         working-directory: apps/shell
-        run: bun test --timeout=900000 ./test/e2e/*.e2e.ts --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+        run: bun test --timeout=900000 ${{ steps.shell-e2e-shard.outputs.files }}
 
       - name: Web WebView Smoke
         if: ${{ matrix.shard == 1 }}
