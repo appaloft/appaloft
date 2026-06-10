@@ -3539,6 +3539,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           projectName: runtimeInstanceNames.composeProjectName,
           workingDirectory: remoteWorkdir,
           scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
+          portableDockerCompose: true,
         }),
         { quote: shellQuote },
       );

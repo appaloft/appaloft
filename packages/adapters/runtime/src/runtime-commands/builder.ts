@@ -66,6 +66,7 @@ export interface DockerComposeUpInput {
   }[];
   projectName?: string;
   workingDirectory?: string;
+  portableDockerCompose?: boolean;
   detach?: boolean;
   build?: boolean;
 }
@@ -139,6 +140,9 @@ export class DockerCommandBuilder {
       ...(input.projectName ? { projectName: DisplayNameText.rehydrate(input.projectName) } : {}),
       ...(input.workingDirectory
         ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }
+        : {}),
+      ...(input.portableDockerCompose
+        ? { portableDockerCompose: input.portableDockerCompose }
         : {}),
       detach: input.detach ?? true,
       build: input.build ?? true,
