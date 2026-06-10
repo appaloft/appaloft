@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash, type AshScript } from "@appaloft/ash";
 import {
   CreatedAt,
   DeploymentTarget,
@@ -186,49 +187,52 @@ class FakeDialectRenderer implements StorageBackupRuntimeCommandRenderer {
   readonly key = "fake-runtime-dialect";
   readonly calls: string[] = [];
 
-  renderDockerVolumeTarBackup(): string {
+  renderDockerVolumeTarBackup(): AshScript {
     this.calls.push("tar-source");
-    return [
-      "printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'",
-      "printf 'STORAGE_BACKUP_SOURCE\\t/tmp/fake.tar.gz\\t42\\tfake-checksum\\n'",
-    ].join("\n");
+    return ash`
+      ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'
+      printf 'STORAGE_BACKUP_SOURCE\\t/tmp/fake.tar.gz\\t42\\tfake-checksum\\n'`)}
+    `;
   }
 
-  renderDockerVolumeSqliteOnlineBackup(): string {
+  renderDockerVolumeSqliteOnlineBackup(): AshScript {
     this.calls.push("sqlite-source");
-    return [
-      "printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'",
-      "printf 'STORAGE_BACKUP_SOURCE\\t/tmp/fake.sqlite.tar.gz\\t43\\tfake-sqlite-checksum\\n'",
-    ].join("\n");
+    return ash`
+      ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'
+      printf 'STORAGE_BACKUP_SOURCE\\t/tmp/fake.sqlite.tar.gz\\t43\\tfake-sqlite-checksum\\n'`)}
+    `;
   }
 
-  renderLocalFilesystemStoreBackup(): string {
+  renderLocalFilesystemStoreBackup(): AshScript {
     this.calls.push("store-target");
-    return [
-      "printf 'APPALOFT_STORAGE_BACKUP_TARGET_V1\\n'",
-      "printf 'STORAGE_BACKUP_ARTIFACT\\t/tmp/fake-artifact.tar.gz\\t44\\tfake-artifact-checksum\\n'",
-    ].join("\n");
+    return ash`
+      ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_TARGET_V1\\n'
+      printf 'STORAGE_BACKUP_ARTIFACT\\t/tmp/fake-artifact.tar.gz\\t44\\tfake-artifact-checksum\\n'`)}
+    `;
   }
 
-  renderLocalFilesystemRestoreBackup(): string {
+  renderLocalFilesystemRestoreBackup(): AshScript {
     this.calls.push("restore-target");
-    return [
-      "printf 'APPALOFT_STORAGE_RESTORE_TARGET_V1\\n'",
-      "printf 'STORAGE_RESTORE_COMPLETED\\tappaloft-stv_fake_restore\\n'",
-    ].join("\n");
+    return ash`
+      ${ash.raw(`printf 'APPALOFT_STORAGE_RESTORE_TARGET_V1\\n'
+      printf 'STORAGE_RESTORE_COMPLETED\\tappaloft-stv_fake_restore\\n'`)}
+    `;
   }
 }
 
 describe("storage volume backup runtime provider", () => {
   test("[STOR-BACKUP-CREATE-001] renders Docker named-volume tar source and local target scripts", () => {
-    const sourceScript = renderDockerVolumeTarBackupScript({
-      storageVolumeId: "stv_data",
-      dockerVolumeName: "appaloft-stv_data",
-      backupId: "svb_data",
-      attemptId: "sba_data",
-      workingRoot: "/var/lib/appaloft/backups/.work",
-    });
+    const sourceScript = ash.render(
+      renderDockerVolumeTarBackupScript({
+        storageVolumeId: "stv_data",
+        dockerVolumeName: "appaloft-stv_data",
+        backupId: "svb_data",
+        attemptId: "sba_data",
+        workingRoot: "/var/lib/appaloft/backups/.work",
+      }),
+    );
 
+    expect(sourceScript).toMatchSnapshot();
     expect(sourceScript).toContain("APPALOFT_STORAGE_BACKUP_SOURCE_V1");
     expect(sourceScript).toContain(
       "APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT='posix-shell-docker'",
@@ -237,14 +241,17 @@ describe("storage volume backup runtime provider", () => {
     expect(sourceScript).toContain("appaloft.storage-volume-id");
     expect(sourceScript).toContain("tar -czf");
 
-    const storeScript = renderLocalFilesystemStoreBackupScript({
-      sourceRef: "/var/lib/appaloft/backups/.work/sources/svb_data.sba_data.tar.gz",
-      storageVolumeId: "stv_data",
-      backupId: "svb_data",
-      targetRef: "/var/lib/appaloft/backups",
-      retentionMaxCount: 3,
-    });
+    const storeScript = ash.render(
+      renderLocalFilesystemStoreBackupScript({
+        sourceRef: "/var/lib/appaloft/backups/.work/sources/svb_data.sba_data.tar.gz",
+        storageVolumeId: "stv_data",
+        backupId: "svb_data",
+        targetRef: "/var/lib/appaloft/backups",
+        retentionMaxCount: 3,
+      }),
+    );
 
+    expect(storeScript).toMatchSnapshot();
     expect(storeScript).toContain("APPALOFT_STORAGE_BACKUP_TARGET_V1");
     expect(storeScript).toContain(
       "APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT='posix-shell-docker'",
@@ -254,12 +261,15 @@ describe("storage volume backup runtime provider", () => {
   });
 
   test("[STOR-BACKUP-RESTORE-001] renders restore-to-new Docker named-volume script", () => {
-    const script = renderLocalFilesystemRestoreBackupScript({
-      artifactHandle: "/var/lib/appaloft/backups/storage-volume/stv_data/svb_data.tar.gz",
-      targetStorageVolumeId: "stv_restored",
-      targetDockerVolumeName: "appaloft-stv_restored",
-    });
+    const script = ash.render(
+      renderLocalFilesystemRestoreBackupScript({
+        artifactHandle: "/var/lib/appaloft/backups/storage-volume/stv_data/svb_data.tar.gz",
+        targetStorageVolumeId: "stv_restored",
+        targetDockerVolumeName: "appaloft-stv_restored",
+      }),
+    );
 
+    expect(script).toMatchSnapshot();
     expect(script).toContain("APPALOFT_STORAGE_RESTORE_TARGET_V1");
     expect(script).toContain("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT='posix-shell-docker'");
     expect(script).toContain("docker volume create");
@@ -311,14 +321,16 @@ describe("storage volume backup runtime provider", () => {
 
   test("[STOR-BACKUP-SQLITE-001] SQLite adapter renders an online backup source command", () => {
     const adapter = new DockerSqliteOnlineStorageBackupSourceAdapter();
-    const script = renderDockerVolumeSqliteOnlineBackupScript({
-      storageVolumeId: "stv_pocketbase",
-      dockerVolumeName: "appaloft-stv_pocketbase",
-      backupId: "svb_pocketbase",
-      attemptId: "sba_pocketbase",
-      sqliteHelperImage: "keinos/sqlite3:latest",
-      workingRoot: "/var/lib/appaloft/backups/.work",
-    });
+    const script = ash.render(
+      renderDockerVolumeSqliteOnlineBackupScript({
+        storageVolumeId: "stv_pocketbase",
+        dockerVolumeName: "appaloft-stv_pocketbase",
+        backupId: "svb_pocketbase",
+        attemptId: "sba_pocketbase",
+        sqliteHelperImage: "keinos/sqlite3:latest",
+        workingRoot: "/var/lib/appaloft/backups/.work",
+      }),
+    );
 
     expect(
       adapter.supports({
@@ -339,6 +351,7 @@ describe("storage volume backup runtime provider", () => {
         },
       }),
     ).toBe(true);
+    expect(script).toMatchSnapshot();
     expect(script).toContain("APPALOFT_STORAGE_BACKUP_SOURCE_V1");
     expect(script).toContain("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT='posix-shell-docker'");
     expect(script).toContain("sqlite3");
@@ -349,6 +362,33 @@ describe("storage volume backup runtime provider", () => {
     expect(script).toContain("tar -czf");
     expect(script).toContain("appaloft.storage-volume-id");
     expect(script).not.toContain("apk add");
+  });
+
+  test("[STOR-BACKUP-CREATE-001] executes local filesystem store script through ash", () => {
+    const root = mkdtempSync(join(tmpdir(), "appaloft-storage-backup-ash-"));
+    const sourceRef = join(root, "source.tar.gz");
+    const targetRef = join(root, "target");
+    writeFileSync(sourceRef, "backup artifact\n");
+
+    try {
+      const script = renderLocalFilesystemStoreBackupScript({
+        sourceRef,
+        storageVolumeId: "stv_data",
+        backupId: "svb_data",
+        targetRef,
+        retentionMaxCount: 3,
+      });
+
+      const result = ash.execute(script);
+      const artifactPath = join(targetRef, "storage-volume", "stv_data", "svb_data.tar.gz");
+
+      expect(result.success, result.stderr).toBe(true);
+      expect(result.stdout).toContain("APPALOFT_STORAGE_BACKUP_TARGET_V1");
+      expect(result.stdout).toContain(`STORAGE_BACKUP_ARTIFACT\t${artifactPath}`);
+      expect(readFileSync(artifactPath, "utf8")).toBe("backup artifact\n");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("[STOR-BACKUP-PLAN-001] runtime registry exposes local filesystem target provider", () => {

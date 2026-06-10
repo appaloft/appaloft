@@ -13,6 +13,7 @@ import {
   type StorageBackupTargetStoreRequest,
   type StorageBackupTargetStoreResult,
 } from "@appaloft/application";
+import { type AshScript, ash } from "@appaloft/ash";
 import { type DeploymentTargetState, domainError, err, ok, type Result } from "@appaloft/core";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 import { dockerVolumeNameForStorageVolumeId } from "./storage-runtime-mounts";
@@ -70,16 +71,16 @@ export interface StorageBackupRuntimeCommandRenderer {
   readonly key: StorageBackupRuntimeCommandDialect;
   renderDockerVolumeTarBackup(
     input: Omit<DockerVolumeTarBackupScriptInput, "commandDialect">,
-  ): string;
+  ): AshScript;
   renderDockerVolumeSqliteOnlineBackup(
     input: Omit<DockerVolumeSqliteOnlineBackupScriptInput, "commandDialect">,
-  ): string;
+  ): AshScript;
   renderLocalFilesystemStoreBackup(
     input: Omit<LocalFilesystemStoreBackupScriptInput, "commandDialect">,
-  ): string;
+  ): AshScript;
   renderLocalFilesystemRestoreBackup(
     input: Omit<LocalFilesystemRestoreBackupScriptInput, "commandDialect">,
-  ): string;
+  ): AshScript;
 }
 
 const backupManifestPrefix = "appaloft-storage-volume-backup://";
@@ -92,10 +93,6 @@ export interface StorageBackupRuntimeProviderOptions {
   commandDialect?: StorageBackupRuntimeCommandDialect;
   commandRenderers?: readonly StorageBackupRuntimeCommandRenderer[];
   workingRoot?: string;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -189,11 +186,11 @@ function resolveRuntimeCommandRenderer(
 
 async function runStorageBackupScript(
   server: DeploymentTargetState | undefined,
-  script: string,
+  script: AshScript,
 ): Promise<StorageBackupCommandResult> {
   if (!server || server.providerKey.value === "local-shell") {
     const result = await runBufferedProcess({
-      command: shellCommand(script),
+      command: shellCommand(ash.render(script)),
       timeoutMs: defaultTimeoutMs,
       timeoutMessage: "Storage volume backup command timed out",
     });
@@ -205,7 +202,7 @@ async function runStorageBackupScript(
     };
   }
 
-  const prepared = prepareSshArgs(server, script);
+  const prepared = prepareSshArgs(server, ash.render(script));
   try {
     const result = await runBufferedProcess({
       command: ["ssh", ...prepared.args],
@@ -236,159 +233,159 @@ function backupCommandError(
   });
 }
 
-export function renderDockerVolumeTarBackupScript(input: DockerVolumeTarBackupScriptInput): string {
+export function renderDockerVolumeTarBackupScript(input: DockerVolumeTarBackupScriptInput): AshScript {
   const commandDialect = input.commandDialect ?? "posix-shell-docker";
-  return [
-    "set -eu",
-    `APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT=${shellQuote(commandDialect)}`,
-    `APPALOFT_STORAGE_VOLUME_ID=${shellQuote(input.storageVolumeId)}`,
-    `APPALOFT_DOCKER_VOLUME_NAME=${shellQuote(input.dockerVolumeName)}`,
-    `APPALOFT_STORAGE_BACKUP_ID=${shellQuote(input.backupId)}`,
-    `APPALOFT_STORAGE_BACKUP_ATTEMPT_ID=${shellQuote(input.attemptId)}`,
-    `APPALOFT_STORAGE_BACKUP_WORKING_ROOT=${shellQuote(input.workingRoot)}`,
-    "printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'",
-    "if ! command -v docker >/dev/null 2>&1; then",
-    "  printf 'STORAGE_BACKUP_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  exit 20",
-    "fi",
-    "volume_storage_id=$(docker volume inspect -f '{{ index .Labels \"appaloft.storage-volume-id\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null || true)",
-    "volume_managed=$(docker volume inspect -f '{{ index .Labels \"appaloft.managed\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null || true)",
-    "if [ \"$volume_storage_id\" != \"$APPALOFT_STORAGE_VOLUME_ID\" ] || [ \"$volume_managed\" != \"true\" ]; then",
-    "  printf 'STORAGE_BACKUP_ERROR\\townership-unproven\\tstorage volume ownership labels do not match\\n'",
-    "  exit 21",
-    "fi",
-    "mkdir -p \"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources\"",
-    "source_ref=\"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.tar.gz\"",
-    "rm -f \"$source_ref\"",
-    "docker run --rm -v \"$APPALOFT_DOCKER_VOLUME_NAME:/source:ro\" -v \"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources:/backup\" alpine:3.20 sh -c \"cd /source && tar -czf /backup/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.tar.gz .\"",
-    "size_bytes=$(wc -c < \"$source_ref\" | tr -d ' ')",
-    "checksum=$(sha256sum \"$source_ref\" 2>/dev/null | awk '{print $1}' || shasum -a 256 \"$source_ref\" | awk '{print $1}')",
-    "printf 'STORAGE_BACKUP_SOURCE\\t%s\\t%s\\t%s\\n' \"$source_ref\" \"$size_bytes\" \"$checksum\"",
-  ].join("\n");
+  return ash`
+    set -eu
+    ${ash.env("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT", commandDialect)}
+    ${ash.env("APPALOFT_STORAGE_VOLUME_ID", input.storageVolumeId)}
+    ${ash.env("APPALOFT_DOCKER_VOLUME_NAME", input.dockerVolumeName)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ID", input.backupId)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ATTEMPT_ID", input.attemptId)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_WORKING_ROOT", input.workingRoot)}
+    ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'STORAGE_BACKUP_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'
+      exit 20
+    fi
+    volume_storage_id=$(docker volume inspect -f '{{ index .Labels "appaloft.storage-volume-id" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null || true)
+    volume_managed=$(docker volume inspect -f '{{ index .Labels "appaloft.managed" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null || true)
+    if [ "$volume_storage_id" != "$APPALOFT_STORAGE_VOLUME_ID" ] || [ "$volume_managed" != "true" ]; then
+      printf 'STORAGE_BACKUP_ERROR\\townership-unproven\\tstorage volume ownership labels do not match\\n'
+      exit 21
+    fi
+    mkdir -p "$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources"
+    source_ref="$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.tar.gz"
+    rm -f "$source_ref"
+    docker run --rm -v "$APPALOFT_DOCKER_VOLUME_NAME:/source:ro" -v "$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources:/backup" alpine:3.20 sh -c "cd /source && tar -czf /backup/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.tar.gz ."
+    size_bytes=$(wc -c < "$source_ref" | tr -d ' ')
+    checksum=$(sha256sum "$source_ref" 2>/dev/null | awk '{print $1}' || shasum -a 256 "$source_ref" | awk '{print $1}')
+    printf 'STORAGE_BACKUP_SOURCE\\t%s\\t%s\\t%s\\n' "$source_ref" "$size_bytes" "$checksum"`)}
+  `;
 }
 
 export function renderDockerVolumeSqliteOnlineBackupScript(
   input: DockerVolumeSqliteOnlineBackupScriptInput,
-): string {
+): AshScript {
   const commandDialect = input.commandDialect ?? "posix-shell-docker";
-  return [
-    "set -eu",
-    `APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT=${shellQuote(commandDialect)}`,
-    `APPALOFT_STORAGE_VOLUME_ID=${shellQuote(input.storageVolumeId)}`,
-    `APPALOFT_DOCKER_VOLUME_NAME=${shellQuote(input.dockerVolumeName)}`,
-    `APPALOFT_STORAGE_BACKUP_ID=${shellQuote(input.backupId)}`,
-    `APPALOFT_STORAGE_BACKUP_ATTEMPT_ID=${shellQuote(input.attemptId)}`,
-    `APPALOFT_SQLITE_HELPER_IMAGE=${shellQuote(input.sqliteHelperImage)}`,
-    `APPALOFT_STORAGE_BACKUP_WORKING_ROOT=${shellQuote(input.workingRoot)}`,
-    "helper_container=\"appaloft-storage-backup-$APPALOFT_STORAGE_BACKUP_ID-$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID\"",
-    "cleanup_helper() { docker rm -f \"$helper_container\" >/dev/null 2>&1 || true; }",
-    "trap cleanup_helper EXIT INT TERM",
-    "printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'",
-    "if ! command -v docker >/dev/null 2>&1; then",
-    "  printf 'STORAGE_BACKUP_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  exit 20",
-    "fi",
-    "volume_storage_id=$(docker volume inspect -f '{{ index .Labels \"appaloft.storage-volume-id\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null || true)",
-    "volume_managed=$(docker volume inspect -f '{{ index .Labels \"appaloft.managed\" }}' \"$APPALOFT_DOCKER_VOLUME_NAME\" 2>/dev/null || true)",
-    "if [ \"$volume_storage_id\" != \"$APPALOFT_STORAGE_VOLUME_ID\" ] || [ \"$volume_managed\" != \"true\" ]; then",
-    "  printf 'STORAGE_BACKUP_ERROR\\townership-unproven\\tstorage volume ownership labels do not match\\n'",
-    "  exit 21",
-    "fi",
-    "work_dir=\"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sqlite/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID\"",
-    "export_dir=\"$work_dir/export\"",
-    "rm -rf \"$work_dir\"",
-    "mkdir -p \"$export_dir\" \"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources\"",
-    "cat > \"$work_dir/sqlite-online-backup.sh\" <<'APPALOFT_SQLITE_BACKUP_SCRIPT'",
-    "set -eu",
-    "if ! command -v sqlite3 >/dev/null 2>&1; then",
-    "  printf 'sqlite3 command is unavailable\\n' >&2",
-    "  exit 22",
-    "fi",
-    "sqlite_relative_path=''",
-    "for candidate in data.db pocketbase.db app.db database.db database.sqlite database.sqlite3; do",
-    "  if [ -f \"/source/$candidate\" ]; then",
-    "    sqlite_relative_path=\"$candidate\"",
-    "    break",
-    "  fi",
-    "done",
-    "if [ -z \"$sqlite_relative_path\" ]; then",
-    "  sqlite_relative_path=$(cd /source && find . -maxdepth 4 -type f \\( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \\) | sed 's#^\\./##' | sort | head -n 1)",
-    "fi",
-    "case \"$sqlite_relative_path\" in",
-    "  ''|/*|../*|*/../*|*/..|*//*)",
-    "    printf 'SQLite database path is missing or unsafe\\n' >&2",
-    "    exit 24",
-    "    ;;",
-    "esac",
-    "tar -czf /backup/raw.tar.gz -C /source .",
-    "tar -xzf /backup/raw.tar.gz -C /backup/export",
-    "sqlite_export_path=\"/backup/export/$sqlite_relative_path\"",
-    "mkdir -p \"$(dirname \"$sqlite_export_path\")\"",
-    "rm -f \"$sqlite_export_path\" \"$sqlite_export_path-wal\" \"$sqlite_export_path-shm\"",
-    "sqlite3 \"/source/$sqlite_relative_path\" \".backup '$sqlite_export_path'\"",
-    "rm -f \"$sqlite_export_path-wal\" \"$sqlite_export_path-shm\"",
-    "printf '%s\\n' \"$sqlite_relative_path\" > /backup/sqlite-path",
-    "APPALOFT_SQLITE_BACKUP_SCRIPT",
-    "docker run --name \"$helper_container\" --rm -v \"$APPALOFT_DOCKER_VOLUME_NAME:/source:ro\" -v \"$work_dir:/backup\" \"$APPALOFT_SQLITE_HELPER_IMAGE\" sh /backup/sqlite-online-backup.sh",
-    "source_ref=\"$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.sqlite.tar.gz\"",
-    "rm -f \"$source_ref\"",
-    "tar -czf \"$source_ref\" -C \"$export_dir\" .",
-    "size_bytes=$(wc -c < \"$source_ref\" | tr -d ' ')",
-    "checksum=$(sha256sum \"$source_ref\" 2>/dev/null | awk '{print $1}' || shasum -a 256 \"$source_ref\" | awk '{print $1}')",
-    "printf 'STORAGE_BACKUP_SOURCE\\t%s\\t%s\\t%s\\n' \"$source_ref\" \"$size_bytes\" \"$checksum\"",
-  ].join("\n");
+  return ash`
+    set -eu
+    ${ash.env("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT", commandDialect)}
+    ${ash.env("APPALOFT_STORAGE_VOLUME_ID", input.storageVolumeId)}
+    ${ash.env("APPALOFT_DOCKER_VOLUME_NAME", input.dockerVolumeName)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ID", input.backupId)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ATTEMPT_ID", input.attemptId)}
+    ${ash.env("APPALOFT_SQLITE_HELPER_IMAGE", input.sqliteHelperImage)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_WORKING_ROOT", input.workingRoot)}
+    ${ash.raw(`helper_container="appaloft-storage-backup-$APPALOFT_STORAGE_BACKUP_ID-$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID"
+    cleanup_helper() { docker rm -f "$helper_container" >/dev/null 2>&1 || true; }
+    trap cleanup_helper EXIT INT TERM
+    printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'STORAGE_BACKUP_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'
+      exit 20
+    fi
+    volume_storage_id=$(docker volume inspect -f '{{ index .Labels "appaloft.storage-volume-id" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null || true)
+    volume_managed=$(docker volume inspect -f '{{ index .Labels "appaloft.managed" }}' "$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null || true)
+    if [ "$volume_storage_id" != "$APPALOFT_STORAGE_VOLUME_ID" ] || [ "$volume_managed" != "true" ]; then
+      printf 'STORAGE_BACKUP_ERROR\\townership-unproven\\tstorage volume ownership labels do not match\\n'
+      exit 21
+    fi
+    work_dir="$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sqlite/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID"
+    export_dir="$work_dir/export"
+    rm -rf "$work_dir"
+    mkdir -p "$export_dir" "$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources"
+    cat > "$work_dir/sqlite-online-backup.sh" <<'APPALOFT_SQLITE_BACKUP_SCRIPT'
+    set -eu
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+      printf 'sqlite3 command is unavailable\\n' >&2
+      exit 22
+    fi
+    sqlite_relative_path=''
+    for candidate in data.db pocketbase.db app.db database.db database.sqlite database.sqlite3; do
+      if [ -f "/source/$candidate" ]; then
+        sqlite_relative_path="$candidate"
+        break
+      fi
+    done
+    if [ -z "$sqlite_relative_path" ]; then
+      sqlite_relative_path=$(cd /source && find . -maxdepth 4 -type f \\( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \\) | sed 's#^\\./##' | sort | head -n 1)
+    fi
+    case "$sqlite_relative_path" in
+      ''|/*|../*|*/../*|*/..|*//*)
+        printf 'SQLite database path is missing or unsafe\\n' >&2
+        exit 24
+        ;;
+    esac
+    tar -czf /backup/raw.tar.gz -C /source .
+    tar -xzf /backup/raw.tar.gz -C /backup/export
+    sqlite_export_path="/backup/export/$sqlite_relative_path"
+    mkdir -p "$(dirname "$sqlite_export_path")"
+    rm -f "$sqlite_export_path" "$sqlite_export_path-wal" "$sqlite_export_path-shm"
+    sqlite3 "/source/$sqlite_relative_path" ".backup '$sqlite_export_path'"
+    rm -f "$sqlite_export_path-wal" "$sqlite_export_path-shm"
+    printf '%s\\n' "$sqlite_relative_path" > /backup/sqlite-path
+    APPALOFT_SQLITE_BACKUP_SCRIPT
+    docker run --name "$helper_container" --rm -v "$APPALOFT_DOCKER_VOLUME_NAME:/source:ro" -v "$work_dir:/backup" "$APPALOFT_SQLITE_HELPER_IMAGE" sh /backup/sqlite-online-backup.sh
+    source_ref="$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.sqlite.tar.gz"
+    rm -f "$source_ref"
+    tar -czf "$source_ref" -C "$export_dir" .
+    size_bytes=$(wc -c < "$source_ref" | tr -d ' ')
+    checksum=$(sha256sum "$source_ref" 2>/dev/null | awk '{print $1}' || shasum -a 256 "$source_ref" | awk '{print $1}')
+    printf 'STORAGE_BACKUP_SOURCE\\t%s\\t%s\\t%s\\n' "$source_ref" "$size_bytes" "$checksum"`)}
+  `;
 }
 
 export function renderLocalFilesystemStoreBackupScript(
   input: LocalFilesystemStoreBackupScriptInput,
-): string {
+): AshScript {
   const commandDialect = input.commandDialect ?? "posix-shell-docker";
-  return [
-    "set -eu",
-    `APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT=${shellQuote(commandDialect)}`,
-    `APPALOFT_STORAGE_BACKUP_SOURCE_REF=${shellQuote(input.sourceRef)}`,
-    `APPALOFT_STORAGE_VOLUME_ID=${shellQuote(input.storageVolumeId)}`,
-    `APPALOFT_STORAGE_BACKUP_ID=${shellQuote(input.backupId)}`,
-    `APPALOFT_STORAGE_BACKUP_TARGET_REF=${shellQuote(input.targetRef)}`,
-    `APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT=${input.retentionMaxCount}`,
-    "printf 'APPALOFT_STORAGE_BACKUP_TARGET_V1\\n'",
-    "artifact_dir=\"$APPALOFT_STORAGE_BACKUP_TARGET_REF/storage-volume/$APPALOFT_STORAGE_VOLUME_ID\"",
-    "mkdir -p \"$artifact_dir\"",
-    "artifact_path=\"$artifact_dir/$APPALOFT_STORAGE_BACKUP_ID.tar.gz\"",
-    "cp \"$APPALOFT_STORAGE_BACKUP_SOURCE_REF\" \"$artifact_path\"",
-    "size_bytes=$(wc -c < \"$artifact_path\" | tr -d ' ')",
-    "checksum=$(sha256sum \"$artifact_path\" 2>/dev/null | awk '{print $1}' || shasum -a 256 \"$artifact_path\" | awk '{print $1}')",
-    "if [ \"$APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT\" -gt 0 ]; then",
-    "  ls -1t \"$artifact_dir\"/*.tar.gz 2>/dev/null | tail -n +$((APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT + 1)) | while IFS= read -r old_artifact; do",
-    "    if [ -n \"$old_artifact\" ]; then",
-    "      rm -f \"$old_artifact\"",
-    "    fi",
-    "  done",
-    "fi",
-    "printf 'STORAGE_BACKUP_ARTIFACT\\t%s\\t%s\\t%s\\n' \"$artifact_path\" \"$size_bytes\" \"$checksum\"",
-  ].join("\n");
+  return ash`
+    set -eu
+    ${ash.env("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT", commandDialect)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_SOURCE_REF", input.sourceRef)}
+    ${ash.env("APPALOFT_STORAGE_VOLUME_ID", input.storageVolumeId)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ID", input.backupId)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_TARGET_REF", input.targetRef)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT", input.retentionMaxCount)}
+    ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_TARGET_V1\\n'
+    artifact_dir="$APPALOFT_STORAGE_BACKUP_TARGET_REF/storage-volume/$APPALOFT_STORAGE_VOLUME_ID"
+    mkdir -p "$artifact_dir"
+    artifact_path="$artifact_dir/$APPALOFT_STORAGE_BACKUP_ID.tar.gz"
+    cp "$APPALOFT_STORAGE_BACKUP_SOURCE_REF" "$artifact_path"
+    size_bytes=$(wc -c < "$artifact_path" | tr -d ' ')
+    checksum=$(sha256sum "$artifact_path" 2>/dev/null | awk '{print $1}' || shasum -a 256 "$artifact_path" | awk '{print $1}')
+    if [ "$APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT" -gt 0 ]; then
+      ls -1t "$artifact_dir"/*.tar.gz 2>/dev/null | tail -n +$((APPALOFT_STORAGE_BACKUP_RETENTION_MAX_COUNT + 1)) | while IFS= read -r old_artifact; do
+        if [ -n "$old_artifact" ]; then
+          rm -f "$old_artifact"
+        fi
+      done
+    fi
+    printf 'STORAGE_BACKUP_ARTIFACT\\t%s\\t%s\\t%s\\n' "$artifact_path" "$size_bytes" "$checksum"`)}
+  `;
 }
 
 export function renderLocalFilesystemRestoreBackupScript(
   input: LocalFilesystemRestoreBackupScriptInput,
-): string {
+): AshScript {
   const commandDialect = input.commandDialect ?? "posix-shell-docker";
-  return [
-    "set -eu",
-    `APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT=${shellQuote(commandDialect)}`,
-    `APPALOFT_STORAGE_BACKUP_ARTIFACT=${shellQuote(input.artifactHandle)}`,
-    `APPALOFT_TARGET_STORAGE_VOLUME_ID=${shellQuote(input.targetStorageVolumeId)}`,
-    `APPALOFT_TARGET_DOCKER_VOLUME_NAME=${shellQuote(input.targetDockerVolumeName)}`,
-    "printf 'APPALOFT_STORAGE_RESTORE_TARGET_V1\\n'",
-    "if ! command -v docker >/dev/null 2>&1; then",
-    "  printf 'STORAGE_RESTORE_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  exit 20",
-    "fi",
-    "test -f \"$APPALOFT_STORAGE_BACKUP_ARTIFACT\"",
-    "docker volume create --label appaloft.managed=true --label appaloft.storage-volume-id=\"$APPALOFT_TARGET_STORAGE_VOLUME_ID\" --label appaloft.storage-volume-kind=named-volume \"$APPALOFT_TARGET_DOCKER_VOLUME_NAME\" >/dev/null",
-    "docker run --rm -v \"$APPALOFT_TARGET_DOCKER_VOLUME_NAME:/target\" -v \"$APPALOFT_STORAGE_BACKUP_ARTIFACT:/backup.tar.gz:ro\" alpine:3.20 sh -c \"cd /target && tar -xzf /backup.tar.gz\"",
-    "printf 'STORAGE_RESTORE_COMPLETED\\t%s\\n' \"$APPALOFT_TARGET_DOCKER_VOLUME_NAME\"",
-  ].join("\n");
+  return ash`
+    set -eu
+    ${ash.env("APPALOFT_STORAGE_BACKUP_COMMAND_DIALECT", commandDialect)}
+    ${ash.env("APPALOFT_STORAGE_BACKUP_ARTIFACT", input.artifactHandle)}
+    ${ash.env("APPALOFT_TARGET_STORAGE_VOLUME_ID", input.targetStorageVolumeId)}
+    ${ash.env("APPALOFT_TARGET_DOCKER_VOLUME_NAME", input.targetDockerVolumeName)}
+    ${ash.raw(`printf 'APPALOFT_STORAGE_RESTORE_TARGET_V1\\n'
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'STORAGE_RESTORE_ERROR\\tdocker-unavailable\\tdocker command is unavailable\\n'
+      exit 20
+    fi
+    test -f "$APPALOFT_STORAGE_BACKUP_ARTIFACT"
+    docker volume create --label appaloft.managed=true --label appaloft.storage-volume-id="$APPALOFT_TARGET_STORAGE_VOLUME_ID" --label appaloft.storage-volume-kind=named-volume "$APPALOFT_TARGET_DOCKER_VOLUME_NAME" >/dev/null
+    docker run --rm -v "$APPALOFT_TARGET_DOCKER_VOLUME_NAME:/target" -v "$APPALOFT_STORAGE_BACKUP_ARTIFACT:/backup.tar.gz:ro" alpine:3.20 sh -c "cd /target && tar -xzf /backup.tar.gz"
+    printf 'STORAGE_RESTORE_COMPLETED\\t%s\\n' "$APPALOFT_TARGET_DOCKER_VOLUME_NAME"`)}
+  `;
 }
 
 function parseSourceOutput(input: {
@@ -509,25 +506,25 @@ export class PosixShellDockerStorageBackupRuntimeCommandRenderer
 
   renderDockerVolumeTarBackup(
     input: Omit<DockerVolumeTarBackupScriptInput, "commandDialect">,
-  ): string {
+  ): AshScript {
     return renderDockerVolumeTarBackupScript({ ...input, commandDialect: this.key });
   }
 
   renderDockerVolumeSqliteOnlineBackup(
     input: Omit<DockerVolumeSqliteOnlineBackupScriptInput, "commandDialect">,
-  ): string {
+  ): AshScript {
     return renderDockerVolumeSqliteOnlineBackupScript({ ...input, commandDialect: this.key });
   }
 
   renderLocalFilesystemStoreBackup(
     input: Omit<LocalFilesystemStoreBackupScriptInput, "commandDialect">,
-  ): string {
+  ): AshScript {
     return renderLocalFilesystemStoreBackupScript({ ...input, commandDialect: this.key });
   }
 
   renderLocalFilesystemRestoreBackup(
     input: Omit<LocalFilesystemRestoreBackupScriptInput, "commandDialect">,
-  ): string {
+  ): AshScript {
     return renderLocalFilesystemRestoreBackupScript({ ...input, commandDialect: this.key });
   }
 }

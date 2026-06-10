@@ -6,6 +6,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
+		"@appaloft/ash": "workspace:*",
 		"@appaloft/application": "workspace:*",
 		"@appaloft/blueprints": "workspace:*",
 		"@appaloft/core": "workspace:*",

@@ -10,6 +10,7 @@ import {
   type RuntimeTargetCapacityPruner,
   type RuntimeTargetCapacityWarning,
 } from "@appaloft/application";
+import { ash, type AshScript } from "@appaloft/ash";
 import { domainError, err, ok, type DeploymentTargetState, type Result } from "@appaloft/core";
 import { runBufferedProcess, shellCommand } from "./buffered-process";
 
@@ -28,10 +29,6 @@ interface CapacityCommandResult {
   stderr: string;
   failed: boolean;
   timedOut: boolean;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -84,113 +81,114 @@ export function renderRuntimeTargetCapacityScript(input: {
   stateRoot?: string;
   sourceWorkspaceRoot?: string;
   profile?: "full" | "attribution";
-}): string {
+}): AshScript {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
   const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? `${runtimeRoot}/ssh-deployments`;
   const profile = input.profile ?? "full";
+  const dockerInspectFormat = [
+    "CAPACITY_APPALOFT_CONTAINER",
+    "{{.Id}}",
+    "{{.Name}}",
+    "{{.State.Running}}",
+    "{{.State.Status}}",
+    "{{.SizeRw}}",
+    '{{ index .Config.Labels "appaloft.deployment-id" }}',
+    '{{ index .Config.Labels "appaloft.project-id" }}',
+    '{{ index .Config.Labels "appaloft.environment-id" }}',
+    '{{ index .Config.Labels "appaloft.resource-id" }}',
+    '{{ index .Config.Labels "appaloft.server-id" }}',
+    '{{ index .Config.Labels "appaloft.destination-id" }}',
+    '{{ index .Config.Labels "appaloft.artifact-kind" }}',
+  ].join("\\t");
+  const sizeBytesOrEmpty = ash.raw("${size_bytes:-}");
+  const coresOrEmpty = ash.raw("${cores:-}");
 
-  return [
-    "set +e",
-    `APPALOFT_RUNTIME_ROOT=${shellQuote(runtimeRoot)}`,
-    `APPALOFT_STATE_ROOT=${shellQuote(stateRoot)}`,
-    `APPALOFT_SOURCE_WORKSPACE_ROOT=${shellQuote(sourceWorkspaceRoot)}`,
-    `APPALOFT_CAPACITY_PROFILE=${shellQuote(profile)}`,
-    "printf 'APPALOFT_CAPACITY_V1\\n'",
-    "if command -v docker >/dev/null 2>&1; then",
-    "  APPALOFT_DOCKER_AVAILABLE=1",
-    "  docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do",
-    "    [ -n \"$container_id\" ] || continue",
-    `    docker inspect --size --format ${shellQuote(
-      [
-        "CAPACITY_APPALOFT_CONTAINER",
-        "{{.Id}}",
-        "{{.Name}}",
-        "{{.State.Running}}",
-        "{{.State.Status}}",
-        "{{.SizeRw}}",
-        '{{ index .Config.Labels "appaloft.deployment-id" }}',
-        '{{ index .Config.Labels "appaloft.project-id" }}',
-        '{{ index .Config.Labels "appaloft.environment-id" }}',
-        '{{ index .Config.Labels "appaloft.resource-id" }}',
-        '{{ index .Config.Labels "appaloft.server-id" }}',
-        '{{ index .Config.Labels "appaloft.destination-id" }}',
-        '{{ index .Config.Labels "appaloft.artifact-kind" }}',
-      ].join("\\t"),
-    )} "$container_id" 2>/dev/null`,
-    "  done",
-    "else",
-    "  APPALOFT_DOCKER_AVAILABLE=0",
-    "  printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "fi",
-    "if [ \"$APPALOFT_CAPACITY_PROFILE\" = \"attribution\" ]; then",
-    "  if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
-    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
-    "      name=$(basename \"$workspace\")",
-    "      active_marker=false",
-    "      rollback_marker=false",
-    "      [ -e \"$workspace/.appaloft-active\" ] && active_marker=true",
-    "      [ -e \"$workspace/.appaloft-rollback-candidate\" ] && rollback_marker=true",
-    "      printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$workspace\" \"\" \"$active_marker\" \"$rollback_marker\"",
-    "    done",
-    "  fi",
-    "  exit 0",
-    "fi",
-    "emit_disk() {",
-    "  target_path=\"$1\"",
-    "  df -P -k \"$target_path\" 2>/dev/null | awk -v p=\"$target_path\" 'NR==2 {gsub(/%/, \"\", $5); printf \"CAPACITY_DISK\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\", p, $6, $2, $3, $4, $5}'",
-    "}",
-    "emit_inodes() {",
-    "  target_path=\"$1\"",
-    "  df -P -i \"$target_path\" 2>/dev/null | awk -v p=\"$target_path\" 'NR==2 {gsub(/%/, \"\", $5); printf \"CAPACITY_INODES\\t%s\\t%s\\t%s\\t%s\\t%s\\n\", p, $6, $3, $4, $5}'",
-    "}",
-    "emit_du() {",
-    "  kind=\"$1\"",
-    "  target_path=\"$2\"",
-    "  if [ -e \"$target_path\" ]; then",
-    "    du -sk \"$target_path\" 2>/dev/null | awk -v kind=\"$kind\" -v p=\"$target_path\" '{printf \"CAPACITY_DU\\t%s\\t%s\\t%s\\n\", kind, p, $1}'",
-    "  else",
-    "    printf 'CAPACITY_DU\\t%s\\t%s\\tmissing\\n' \"$kind\" \"$target_path\"",
-    "  fi",
-    "}",
-    "for target_path in / /var/lib/docker \"$APPALOFT_RUNTIME_ROOT\" \"$APPALOFT_STATE_ROOT\" \"$APPALOFT_SOURCE_WORKSPACE_ROOT\"; do",
-    "  emit_disk \"$target_path\"",
-    "  emit_inodes \"$target_path\"",
-    "done",
-    "emit_du runtimeRoot \"$APPALOFT_RUNTIME_ROOT\"",
-    "emit_du stateRoot \"$APPALOFT_STATE_ROOT\"",
-    "emit_du sourceWorkspace \"$APPALOFT_SOURCE_WORKSPACE_ROOT\"",
-    "if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
-    "  find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do",
-    "    name=$(basename \"$workspace\")",
-    "    size_bytes=$(du -sk \"$workspace\" 2>/dev/null | awk '{print $1 * 1024}')",
-    "    active_marker=false",
-    "    rollback_marker=false",
-    "    [ -e \"$workspace/.appaloft-active\" ] && active_marker=true",
-    "    [ -e \"$workspace/.appaloft-rollback-candidate\" ] && rollback_marker=true",
-    "    printf 'CAPACITY_APPALOFT_WORKSPACE\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$workspace\" \"${size_bytes:-}\" \"$active_marker\" \"$rollback_marker\"",
-    "  done",
-    "fi",
-    "if [ -r /proc/meminfo ]; then",
-    "  awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf \"CAPACITY_MEMORY\\t%s\\t%s\\n\", total, available}' /proc/meminfo",
-    "fi",
-    "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)",
-    "if [ -r /proc/loadavg ]; then",
-    "  read load1 load5 load15 rest < /proc/loadavg",
-    "  printf 'CAPACITY_CPU\\t%s\\t%s\\t%s\\t%s\\n' \"${cores:-}\" \"$load1\" \"$load5\" \"$load15\"",
-    "else",
-    "  printf 'CAPACITY_CPU\\t%s\\t\\t\\t\\n' \"${cores:-}\"",
-    "fi",
-    "if [ \"$APPALOFT_DOCKER_AVAILABLE\" = \"1\" ]; then",
-    "  docker_system_df_output=$(docker system df 2>&1)",
-    "  docker_status=$?",
-    "  if [ \"$docker_status\" = \"0\" ]; then",
-    "    printf '%s\\n' \"$docker_system_df_output\" | sed 's/^/CAPACITY_DOCKER_DF\\t/'",
-    "  else",
-    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker system df failed\\n'",
-    "  fi",
-    "fi",
-  ].join("\n");
+  return ash`
+    set +e
+    ${ash.env("APPALOFT_RUNTIME_ROOT", runtimeRoot)}
+    ${ash.env("APPALOFT_STATE_ROOT", stateRoot)}
+    ${ash.env("APPALOFT_SOURCE_WORKSPACE_ROOT", sourceWorkspaceRoot)}
+    ${ash.env("APPALOFT_CAPACITY_PROFILE", profile)}
+    printf 'APPALOFT_CAPACITY_V1\n'
+    if command -v docker >/dev/null 2>&1; then
+      APPALOFT_DOCKER_AVAILABLE=1
+      docker ps -aq --filter label=appaloft.managed=true 2>/dev/null | while read -r container_id; do
+        [ -n "$container_id" ] || continue
+        docker inspect --size --format ${ash.arg(dockerInspectFormat)} "$container_id" 2>/dev/null
+      done
+    else
+      APPALOFT_DOCKER_AVAILABLE=0
+      printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker command is unavailable\n'
+    fi
+    if [ "$APPALOFT_CAPACITY_PROFILE" = "attribution" ]; then
+      if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+        find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+          name=$(basename "$workspace")
+          active_marker=false
+          rollback_marker=false
+          [ -e "$workspace/.appaloft-active" ] && active_marker=true
+          [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+          printf 'CAPACITY_APPALOFT_WORKSPACE\t%s\t%s\t%s\t%s\t%s\n' "$name" "$workspace" "" "$active_marker" "$rollback_marker"
+        done
+      fi
+      exit 0
+    fi
+    emit_disk() {
+      target_path="$1"
+      df -P -k "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_DISK\t%s\t%s\t%s\t%s\t%s\t%s\n", p, $6, $2, $3, $4, $5}'
+    }
+    emit_inodes() {
+      target_path="$1"
+      df -P -i "$target_path" 2>/dev/null | awk -v p="$target_path" 'NR==2 {gsub(/%/, "", $5); printf "CAPACITY_INODES\t%s\t%s\t%s\t%s\t%s\n", p, $6, $3, $4, $5}'
+    }
+    emit_du() {
+      kind="$1"
+      target_path="$2"
+      if [ -e "$target_path" ]; then
+        du -sk "$target_path" 2>/dev/null | awk -v kind="$kind" -v p="$target_path" '{printf "CAPACITY_DU\t%s\t%s\t%s\n", kind, p, $1}'
+      else
+        printf 'CAPACITY_DU\t%s\t%s\tmissing\n' "$kind" "$target_path"
+      fi
+    }
+    for target_path in / /var/lib/docker "$APPALOFT_RUNTIME_ROOT" "$APPALOFT_STATE_ROOT" "$APPALOFT_SOURCE_WORKSPACE_ROOT"; do
+      emit_disk "$target_path"
+      emit_inodes "$target_path"
+    done
+    emit_du runtimeRoot "$APPALOFT_RUNTIME_ROOT"
+    emit_du stateRoot "$APPALOFT_STATE_ROOT"
+    emit_du sourceWorkspace "$APPALOFT_SOURCE_WORKSPACE_ROOT"
+    if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+      find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r workspace; do
+        name=$(basename "$workspace")
+        size_bytes=$(du -sk "$workspace" 2>/dev/null | awk '{print $1 * 1024}')
+        active_marker=false
+        rollback_marker=false
+        [ -e "$workspace/.appaloft-active" ] && active_marker=true
+        [ -e "$workspace/.appaloft-rollback-candidate" ] && rollback_marker=true
+        printf 'CAPACITY_APPALOFT_WORKSPACE\t%s\t%s\t%s\t%s\t%s\n' "$name" "$workspace" "${sizeBytesOrEmpty}" "$active_marker" "$rollback_marker"
+      done
+    fi
+    if [ -r /proc/meminfo ]; then
+      awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total) printf "CAPACITY_MEMORY\t%s\t%s\n", total, available}' /proc/meminfo
+    fi
+    cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+    if [ -r /proc/loadavg ]; then
+      read load1 load5 load15 rest < /proc/loadavg
+      printf 'CAPACITY_CPU\t%s\t%s\t%s\t%s\n' "${coresOrEmpty}" "$load1" "$load5" "$load15"
+    else
+      printf 'CAPACITY_CPU\t%s\t\t\t\n' "${coresOrEmpty}"
+    fi
+    if [ "$APPALOFT_DOCKER_AVAILABLE" = "1" ]; then
+      docker_system_df_output=$(docker system df 2>&1)
+      docker_status=$?
+      if [ "$docker_status" = "0" ]; then
+        printf '%s\n' "$docker_system_df_output" | sed 's/^/CAPACITY_DOCKER_DF\t/'
+      else
+        printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker system df failed\n'
+      fi
+    fi
+  `;
 }
 
 export function renderRuntimeTargetCapacityPruneScript(input: {
@@ -200,180 +198,186 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
   before: string;
   categories: string[];
   dryRun: boolean;
-}): string {
+}): AshScript {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
   const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? `${runtimeRoot}/ssh-deployments`;
   const categories = input.categories.join(",");
 
-  return [
-    "set +e",
-    `APPALOFT_RUNTIME_ROOT=${shellQuote(runtimeRoot)}`,
-    `APPALOFT_STATE_ROOT=${shellQuote(stateRoot)}`,
-    `APPALOFT_SOURCE_WORKSPACE_ROOT=${shellQuote(sourceWorkspaceRoot)}`,
-    `APPALOFT_PRUNE_BEFORE=${shellQuote(input.before)}`,
-    `APPALOFT_PRUNE_CATEGORIES=${shellQuote(categories)}`,
-    `APPALOFT_PRUNE_DRY_RUN=${input.dryRun ? "1" : "0"}`,
-    "APPALOFT_PRUNE_CANDIDATE_LIMIT=${APPALOFT_PRUNE_CANDIDATE_LIMIT:-200}",
-    'APPALOFT_PRUNE_TMP="${TMPDIR:-/tmp}/appaloft-capacity-prune-$$"',
-    "APPALOFT_PRUNE_INSPECTED=0",
-    "APPALOFT_PRUNE_MATCHED=0",
-    "APPALOFT_PRUNE_PRUNED=0",
-    "APPALOFT_PRUNE_SKIPPED=0",
-    "APPALOFT_PRUNE_EXCLUDED=0",
-    "APPALOFT_PRUNE_RECLAIMABLE_BYTES=0",
-    "APPALOFT_PRUNE_REPORTED=0",
-    'cleanup_prune_tmp() { rm -f "$APPALOFT_PRUNE_TMP".*; }',
-    "trap cleanup_prune_tmp EXIT",
-    "printf 'APPALOFT_CAPACITY_PRUNE_V1\\n'",
-    "has_category() {",
-    "  case \",$APPALOFT_PRUNE_CATEGORIES,\" in",
-    "    *\",$1,\"*) return 0 ;;",
-    "    *) return 1 ;;",
-    "  esac",
-    "}",
-    "older_than_cutoff() {",
-    "  candidate_time=\"$1\"",
-    "  [ -n \"$candidate_time\" ] || return 1",
-    "  [ \"$candidate_time\" \\< \"$APPALOFT_PRUNE_BEFORE\" ]",
-    "}",
-    "emit_candidate() {",
-    "  category=\"$1\"; id=\"$2\"; target=\"$3\"; updated_at=\"$4\"; size_bytes=\"$5\"; action=\"$6\"; reason=\"$7\"",
-    "  case \"${size_bytes:-0}\" in ''|*[!0-9]*) normalized_size=0 ;; *) normalized_size=\"$size_bytes\" ;; esac",
-    "  APPALOFT_PRUNE_INSPECTED=$((APPALOFT_PRUNE_INSPECTED + 1))",
-    "  case \"$action\" in",
-    "    matched) APPALOFT_PRUNE_MATCHED=$((APPALOFT_PRUNE_MATCHED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;",
-    "    pruned) APPALOFT_PRUNE_PRUNED=$((APPALOFT_PRUNE_PRUNED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;",
-    "    skipped) APPALOFT_PRUNE_SKIPPED=$((APPALOFT_PRUNE_SKIPPED + 1)) ;;",
-    "    excluded) APPALOFT_PRUNE_EXCLUDED=$((APPALOFT_PRUNE_EXCLUDED + 1)) ;;",
-    "  esac",
-    "  if [ \"$APPALOFT_PRUNE_REPORTED\" -lt \"$APPALOFT_PRUNE_CANDIDATE_LIMIT\" ]; then",
-    "    printf 'PRUNE_CANDIDATE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$category\" \"$id\" \"$target\" \"$updated_at\" \"$normalized_size\" \"$action\" \"$reason\"",
-    "    APPALOFT_PRUNE_REPORTED=$((APPALOFT_PRUNE_REPORTED + 1))",
-    "  fi",
-    "}",
-    "emit_prune_summary() {",
-    "  omitted=$((APPALOFT_PRUNE_INSPECTED - APPALOFT_PRUNE_REPORTED))",
-    "  printf 'PRUNE_SUMMARY\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$APPALOFT_PRUNE_INSPECTED\" \"$APPALOFT_PRUNE_MATCHED\" \"$APPALOFT_PRUNE_PRUNED\" \"$APPALOFT_PRUNE_SKIPPED\" \"$APPALOFT_PRUNE_EXCLUDED\" \"$APPALOFT_PRUNE_RECLAIMABLE_BYTES\" \"$APPALOFT_PRUNE_REPORTED\" \"$omitted\" \"$APPALOFT_PRUNE_CANDIDATE_LIMIT\"",
-    "}",
-    "if has_category stopped-containers; then",
-    "  if command -v docker >/dev/null 2>&1; then",
-    "    docker ps -a --filter label=appaloft.managed=true --format '{{.ID}}\\t{{.Names}}\\t{{.Status}}' 2>/dev/null > \"$APPALOFT_PRUNE_TMP.containers\"",
-    "    while IFS='	' read -r cid cname cstatus; do",
-    "      [ -n \"$cid\" ] || continue",
-    "      ccreated=$(docker inspect -f '{{.Created}}' \"$cid\" 2>/dev/null)",
-    "      case \"$cstatus\" in",
-    "        Up*) emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped active-runtime ;;",
-    "        *)",
-    "          if older_than_cutoff \"$ccreated\"; then",
-    "            if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
-    "              emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" matched \"\"",
-    "            else",
-    "              docker rm \"$cid\" >/dev/null 2>&1",
-    "              if [ \"$?\" = \"0\" ]; then emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" pruned \"\"; else emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped safety-evidence-missing; fi",
-    "            fi",
-    "          else",
-    "            emit_candidate stopped-containers \"$cid\" \"$cname\" \"$ccreated\" \"0\" skipped cutoff-not-reached",
-    "          fi",
-    "          ;;",
-    "      esac",
-    "    done < \"$APPALOFT_PRUNE_TMP.containers\"",
-    "  else",
-    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  fi",
-    "fi",
-    "if has_category docker-build-cache; then",
-    "  if command -v docker >/dev/null 2>&1; then",
-    "    if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
-    "      emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" matched \"\"",
-    "    else",
-    "      docker builder prune --force --filter \"until=$APPALOFT_PRUNE_BEFORE\" >/dev/null 2>&1",
-    "      if [ \"$?\" = \"0\" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" pruned \"\"; else emit_candidate docker-build-cache docker-build-cache docker-build-cache \"$APPALOFT_PRUNE_BEFORE\" \"0\" skipped safety-evidence-missing; fi",
-    "    fi",
-    "  else",
-    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  fi",
-    "fi",
-    "if has_category unused-images; then",
-    "  if command -v docker >/dev/null 2>&1; then",
-    "    if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
-    "      emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" matched \"\"",
-    "    else",
-    "      docker image prune --force --filter \"until=$APPALOFT_PRUNE_BEFORE\" >/dev/null 2>&1",
-    "      if [ \"$?\" = \"0\" ]; then emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" pruned \"\"; else emit_candidate unused-images docker-unused-images docker-unused-images \"$APPALOFT_PRUNE_BEFORE\" \"0\" skipped safety-evidence-missing; fi",
-    "    fi",
-    "  else",
-    "    printf 'CAPACITY_WARNING\\tdocker-unavailable\\tdocker command is unavailable\\n'",
-    "  fi",
-    "fi",
-    "if has_category preview-workspaces || has_category source-workspaces; then",
-    "  if [ -d \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" ]; then",
-    "    find \"$APPALOFT_SOURCE_WORKSPACE_ROOT\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null > \"$APPALOFT_PRUNE_TMP.workspaces\"",
-    "    while IFS= read -r workspace; do",
-    "      name=$(basename \"$workspace\")",
-    "      case \"$workspace\" in",
-    "        \"$APPALOFT_STATE_ROOT\"|\"$APPALOFT_STATE_ROOT\"/*|\"$APPALOFT_RUNTIME_ROOT/state\"|\"$APPALOFT_RUNTIME_ROOT/state\"/*)",
-    "          emit_candidate source-workspaces \"$name\" \"$workspace\" \"\" \"0\" excluded state-root-excluded",
-    "          continue",
-    "          ;;",
-    "      esac",
-    "      category=source-workspaces",
-    "      case \"$name\" in *preview*|prv_*|preview_*) category=preview-workspaces ;; esac",
-    "      has_category \"$category\" || continue",
-    "      updated_at=$(date -r \"$workspace\" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)",
-    "      size_bytes=$(du -sk \"$workspace\" 2>/dev/null | awk '{print $1 * 1024}')",
-    "      if older_than_cutoff \"$updated_at\"; then",
-    "        if [ -e \"$workspace/.appaloft-active\" ]; then",
-    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped active-runtime",
-    "        elif [ -e \"$workspace/.appaloft-rollback-candidate\" ]; then",
-    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped rollback-candidate",
-    "        elif [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
-    "          emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" matched \"\"",
-    "        else",
-    "          rm -rf \"$workspace\"",
-    "          if [ \"$?\" = \"0\" ]; then emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" pruned \"\"; else emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped safety-evidence-missing; fi",
-    "        fi",
-    "      else",
-    "        emit_candidate \"$category\" \"$name\" \"$workspace\" \"$updated_at\" \"${size_bytes:-0}\" skipped cutoff-not-reached",
-    "      fi",
-    "    done < \"$APPALOFT_PRUNE_TMP.workspaces\"",
-    "  fi",
-    "fi",
-    "if has_category remote-state-markers; then",
-    "  emit_remote_state_marker_candidate() {",
-    "    marker_kind=\"$1\"; marker=\"$2\"; delete_mode=\"$3\"",
-    "    [ -e \"$marker\" ] || return 0",
-    "    marker_name=$(basename \"$marker\")",
-    "    marker_id=\"${marker_kind}_${marker_name}\"",
-    "    case \"$marker\" in",
-    "      \"$APPALOFT_STATE_ROOT\"/journals/*.json|\"$APPALOFT_STATE_ROOT\"/backups/*|\"$APPALOFT_STATE_ROOT\"/recovery/*.json|\"$APPALOFT_STATE_ROOT\"/locks/recovered/*) ;;",
-    "      *) emit_candidate remote-state-markers \"$marker_id\" \"$marker\" \"\" \"0\" skipped safety-evidence-missing; return 0 ;;",
-    "    esac",
-    "    updated_at=$(date -r \"$marker\" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)",
-    "    size_bytes=$(du -sk \"$marker\" 2>/dev/null | awk '{print $1 * 1024}')",
-    "    if older_than_cutoff \"$updated_at\"; then",
-    "      if [ \"$APPALOFT_PRUNE_DRY_RUN\" = \"1\" ]; then",
-    "        emit_candidate remote-state-markers \"$marker_id\" \"$marker\" \"$updated_at\" \"${size_bytes:-0}\" matched \"\"",
-    "      else",
-    "        case \"$delete_mode\" in file) rm -f \"$marker\" ;; tree) rm -rf \"$marker\" ;; esac",
-    "        if [ \"$?\" = \"0\" ]; then emit_candidate remote-state-markers \"$marker_id\" \"$marker\" \"$updated_at\" \"${size_bytes:-0}\" pruned \"\"; else emit_candidate remote-state-markers \"$marker_id\" \"$marker\" \"$updated_at\" \"${size_bytes:-0}\" skipped safety-evidence-missing; fi",
-    "      fi",
-    "    else",
-    "      emit_candidate remote-state-markers \"$marker_id\" \"$marker\" \"$updated_at\" \"${size_bytes:-0}\" skipped cutoff-not-reached",
-    "    fi",
-    "  }",
-    "  if [ -d \"$APPALOFT_STATE_ROOT\" ]; then",
-    "    for marker in \"$APPALOFT_STATE_ROOT\"/journals/*.json; do emit_remote_state_marker_candidate journal \"$marker\" file; done",
-    "    for marker in \"$APPALOFT_STATE_ROOT\"/backups/*; do emit_remote_state_marker_candidate backup \"$marker\" tree; done",
-    "    for marker in \"$APPALOFT_STATE_ROOT\"/recovery/*.json; do emit_remote_state_marker_candidate recovery \"$marker\" file; done",
-    "    for marker in \"$APPALOFT_STATE_ROOT\"/locks/recovered/*; do emit_remote_state_marker_candidate recovered-lock \"$marker\" tree; done",
-    "  fi",
-    "  emit_candidate remote-state-markers state-root \"$APPALOFT_STATE_ROOT\" \"\" \"0\" excluded remote-state-excluded",
-    "fi",
-    "emit_candidate source-workspaces state-root \"$APPALOFT_STATE_ROOT\" \"\" \"0\" excluded state-root-excluded",
-    "emit_candidate source-workspaces volumes docker-volumes \"\" \"0\" excluded volume-excluded",
-    "emit_prune_summary",
-  ].join("\n");
+  return ash`
+    set +e
+    ${ash.env("APPALOFT_RUNTIME_ROOT", runtimeRoot)}
+    ${ash.env("APPALOFT_STATE_ROOT", stateRoot)}
+    ${ash.env("APPALOFT_SOURCE_WORKSPACE_ROOT", sourceWorkspaceRoot)}
+    ${ash.env("APPALOFT_PRUNE_BEFORE", input.before)}
+    ${ash.env("APPALOFT_PRUNE_CATEGORIES", categories)}
+    ${ash.env("APPALOFT_PRUNE_DRY_RUN", input.dryRun ? "1" : "0")}
+    ${ash.raw(String.raw`
+    if [ -z "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then APPALOFT_PRUNE_CANDIDATE_LIMIT=200; fi
+    APPALOFT_PRUNE_TMP_ROOT="$TMPDIR"
+    if [ -z "$APPALOFT_PRUNE_TMP_ROOT" ]; then APPALOFT_PRUNE_TMP_ROOT=/tmp; fi
+    APPALOFT_PRUNE_TMP="$APPALOFT_PRUNE_TMP_ROOT/appaloft-capacity-prune-$$"
+    APPALOFT_PRUNE_INSPECTED=0
+    APPALOFT_PRUNE_MATCHED=0
+    APPALOFT_PRUNE_PRUNED=0
+    APPALOFT_PRUNE_SKIPPED=0
+    APPALOFT_PRUNE_EXCLUDED=0
+    APPALOFT_PRUNE_RECLAIMABLE_BYTES=0
+    APPALOFT_PRUNE_REPORTED=0
+    cleanup_prune_tmp() { rm -f "$APPALOFT_PRUNE_TMP".*; }
+    trap cleanup_prune_tmp EXIT
+    printf 'APPALOFT_CAPACITY_PRUNE_V1\n'
+    has_category() {
+      case ",$APPALOFT_PRUNE_CATEGORIES," in
+        *",$1,"*) return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    older_than_cutoff() {
+      candidate_time="$1"
+      [ -n "$candidate_time" ] || return 1
+      [ "$candidate_time" \< "$APPALOFT_PRUNE_BEFORE" ]
+    }
+    emit_candidate() {
+      category="$1"; id="$2"; target="$3"; updated_at="$4"; size_bytes="$5"; action="$6"; reason="$7"
+      case "$size_bytes" in ''|*[!0-9]*) normalized_size=0 ;; *) normalized_size="$size_bytes" ;; esac
+      APPALOFT_PRUNE_INSPECTED=$((APPALOFT_PRUNE_INSPECTED + 1))
+      case "$action" in
+        matched) APPALOFT_PRUNE_MATCHED=$((APPALOFT_PRUNE_MATCHED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;
+        pruned) APPALOFT_PRUNE_PRUNED=$((APPALOFT_PRUNE_PRUNED + 1)); APPALOFT_PRUNE_RECLAIMABLE_BYTES=$((APPALOFT_PRUNE_RECLAIMABLE_BYTES + normalized_size)) ;;
+        skipped) APPALOFT_PRUNE_SKIPPED=$((APPALOFT_PRUNE_SKIPPED + 1)) ;;
+        excluded) APPALOFT_PRUNE_EXCLUDED=$((APPALOFT_PRUNE_EXCLUDED + 1)) ;;
+      esac
+      if [ "$APPALOFT_PRUNE_REPORTED" -lt "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then
+        printf 'PRUNE_CANDIDATE\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$category" "$id" "$target" "$updated_at" "$normalized_size" "$action" "$reason"
+        APPALOFT_PRUNE_REPORTED=$((APPALOFT_PRUNE_REPORTED + 1))
+      fi
+    }
+    emit_prune_summary() {
+      omitted=$((APPALOFT_PRUNE_INSPECTED - APPALOFT_PRUNE_REPORTED))
+      printf 'PRUNE_SUMMARY\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$APPALOFT_PRUNE_INSPECTED" "$APPALOFT_PRUNE_MATCHED" "$APPALOFT_PRUNE_PRUNED" "$APPALOFT_PRUNE_SKIPPED" "$APPALOFT_PRUNE_EXCLUDED" "$APPALOFT_PRUNE_RECLAIMABLE_BYTES" "$APPALOFT_PRUNE_REPORTED" "$omitted" "$APPALOFT_PRUNE_CANDIDATE_LIMIT"
+    }
+    if has_category stopped-containers; then
+      if command -v docker >/dev/null 2>&1; then
+        docker ps -a --filter label=appaloft.managed=true --format '{{.ID}}\t{{.Names}}\t{{.Status}}' 2>/dev/null > "$APPALOFT_PRUNE_TMP.containers"
+        while IFS='	' read -r cid cname cstatus; do
+          [ -n "$cid" ] || continue
+          ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
+          case "$cstatus" in
+            Up*) emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime ;;
+            *)
+              if older_than_cutoff "$ccreated"; then
+                if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+                  emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
+                else
+                  docker rm "$cid" >/dev/null 2>&1
+                  if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+                fi
+              else
+                emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped cutoff-not-reached
+              fi
+              ;;
+          esac
+        done < "$APPALOFT_PRUNE_TMP.containers"
+      else
+        printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker command is unavailable\n'
+      fi
+    fi
+    if has_category docker-build-cache; then
+      if command -v docker >/dev/null 2>&1; then
+        if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+          emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" matched ""
+        else
+          docker builder prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
+          if [ "$?" = "0" ]; then emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+        fi
+      else
+        printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker command is unavailable\n'
+      fi
+    fi
+    if has_category unused-images; then
+      if command -v docker >/dev/null 2>&1; then
+        if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+          emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" matched ""
+        else
+          docker image prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
+          if [ "$?" = "0" ]; then emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" pruned ""; else emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" skipped safety-evidence-missing; fi
+        fi
+      else
+        printf 'CAPACITY_WARNING\tdocker-unavailable\tdocker command is unavailable\n'
+      fi
+    fi
+    if has_category preview-workspaces || has_category source-workspaces; then
+      if [ -d "$APPALOFT_SOURCE_WORKSPACE_ROOT" ]; then
+        find "$APPALOFT_SOURCE_WORKSPACE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null > "$APPALOFT_PRUNE_TMP.workspaces"
+        while IFS= read -r workspace; do
+          name=$(basename "$workspace")
+          case "$workspace" in
+            "$APPALOFT_STATE_ROOT"|"$APPALOFT_STATE_ROOT"/*|"$APPALOFT_RUNTIME_ROOT/state"|"$APPALOFT_RUNTIME_ROOT/state"/*)
+              emit_candidate source-workspaces "$name" "$workspace" "" "0" excluded state-root-excluded
+              continue
+              ;;
+          esac
+          category=source-workspaces
+          case "$name" in *preview*|prv_*|preview_*) category=preview-workspaces ;; esac
+          has_category "$category" || continue
+          updated_at=$(date -r "$workspace" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)
+          size_bytes=$(du -sk "$workspace" 2>/dev/null | awk '{print $1 * 1024}')
+          case "$size_bytes" in ''|*[!0-9]*) size_bytes=0 ;; esac
+          if older_than_cutoff "$updated_at"; then
+            if [ -e "$workspace/.appaloft-active" ]; then
+              emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" skipped active-runtime
+            elif [ -e "$workspace/.appaloft-rollback-candidate" ]; then
+              emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" skipped rollback-candidate
+            elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+              emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" matched ""
+            else
+              rm -rf "$workspace"
+              if [ "$?" = "0" ]; then emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" pruned ""; else emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" skipped safety-evidence-missing; fi
+            fi
+          else
+            emit_candidate "$category" "$name" "$workspace" "$updated_at" "$size_bytes" skipped cutoff-not-reached
+          fi
+        done < "$APPALOFT_PRUNE_TMP.workspaces"
+      fi
+    fi
+    if has_category remote-state-markers; then
+      emit_remote_state_marker_candidate() {
+        marker_kind="$1"; marker="$2"; delete_mode="$3"
+        [ -e "$marker" ] || return 0
+        marker_name=$(basename "$marker")
+        marker_id="$marker_kind"_"$marker_name"
+        case "$marker" in
+          "$APPALOFT_STATE_ROOT"/journals/*.json|"$APPALOFT_STATE_ROOT"/backups/*|"$APPALOFT_STATE_ROOT"/recovery/*.json|"$APPALOFT_STATE_ROOT"/locks/recovered/*) ;;
+          *) emit_candidate remote-state-markers "$marker_id" "$marker" "" "0" skipped safety-evidence-missing; return 0 ;;
+        esac
+        updated_at=$(date -r "$marker" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)
+        size_bytes=$(du -sk "$marker" 2>/dev/null | awk '{print $1 * 1024}')
+        case "$size_bytes" in ''|*[!0-9]*) size_bytes=0 ;; esac
+        if older_than_cutoff "$updated_at"; then
+          if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+            emit_candidate remote-state-markers "$marker_id" "$marker" "$updated_at" "$size_bytes" matched ""
+          else
+            case "$delete_mode" in file) rm -f "$marker" ;; tree) rm -rf "$marker" ;; esac
+            if [ "$?" = "0" ]; then emit_candidate remote-state-markers "$marker_id" "$marker" "$updated_at" "$size_bytes" pruned ""; else emit_candidate remote-state-markers "$marker_id" "$marker" "$updated_at" "$size_bytes" skipped safety-evidence-missing; fi
+          fi
+        else
+          emit_candidate remote-state-markers "$marker_id" "$marker" "$updated_at" "$size_bytes" skipped cutoff-not-reached
+        fi
+      }
+      if [ -d "$APPALOFT_STATE_ROOT" ]; then
+        for marker in "$APPALOFT_STATE_ROOT"/journals/*.json; do emit_remote_state_marker_candidate journal "$marker" file; done
+        for marker in "$APPALOFT_STATE_ROOT"/backups/*; do emit_remote_state_marker_candidate backup "$marker" tree; done
+        for marker in "$APPALOFT_STATE_ROOT"/recovery/*.json; do emit_remote_state_marker_candidate recovery "$marker" file; done
+        for marker in "$APPALOFT_STATE_ROOT"/locks/recovered/*; do emit_remote_state_marker_candidate recovered-lock "$marker" tree; done
+      fi
+      emit_candidate remote-state-markers state-root "$APPALOFT_STATE_ROOT" "" "0" excluded remote-state-excluded
+    fi
+    emit_candidate source-workspaces state-root "$APPALOFT_STATE_ROOT" "" "0" excluded state-root-excluded
+    emit_candidate source-workspaces volumes docker-volumes "" "0" excluded volume-excluded
+    emit_prune_summary
+    `)}
+  `;
 }
 
 function parseNumber(input: string | undefined): number | null {
@@ -950,9 +954,9 @@ export function parseRuntimeTargetCapacityPruneOutput(input: {
   });
 }
 
-async function runLocalCapacityScript(script: string): Promise<CapacityCommandResult> {
+async function runLocalCapacityScript(script: AshScript): Promise<CapacityCommandResult> {
   const result = await runBufferedProcess({
-    command: shellCommand(script),
+    command: shellCommand(ash.render(script)),
     timeoutMs: 15_000,
     timeoutMessage: "Capacity diagnostic timed out",
   });
@@ -967,9 +971,9 @@ async function runLocalCapacityScript(script: string): Promise<CapacityCommandRe
 
 async function runSshCapacityScript(
   server: DeploymentTargetState,
-  script: string,
+  script: AshScript,
 ): Promise<CapacityCommandResult> {
-  const prepared = prepareSshArgs(server, script);
+  const prepared = prepareSshArgs(server, ash.render(script));
   try {
     const result = await runBufferedProcess({
       command: ["ssh", ...prepared.args],
