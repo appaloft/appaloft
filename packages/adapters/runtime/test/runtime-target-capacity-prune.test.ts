@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   CreatedAt,
   DeploymentTarget,
@@ -235,16 +236,18 @@ describe("runtime target capacity prune adapter", () => {
       categories: ["docker-build-cache", "unused-images"],
       dryRun: true,
     });
+    const rendered = ash.render(script);
 
-    expect(script).toContain("APPALOFT_CAPACITY_PRUNE_V1");
-    expect(script).toContain("docker builder prune --force --filter");
-    expect(script).toContain("docker image prune --force --filter");
-    expect(script).toContain("until=$APPALOFT_PRUNE_BEFORE");
-    expect(script).toContain("state-root-excluded");
-    expect(script).toContain("volume-excluded");
-    expect(script).not.toContain("docker volume prune");
-    expect(script).not.toContain("docker system prune");
-    expect(script).not.toContain("docker rmi");
+    expect(rendered).toMatchSnapshot();
+    expect(rendered).toContain("APPALOFT_CAPACITY_PRUNE_V1");
+    expect(rendered).toContain("docker builder prune --force --filter");
+    expect(rendered).toContain("docker image prune --force --filter");
+    expect(rendered).toContain("until=$APPALOFT_PRUNE_BEFORE");
+    expect(rendered).toContain("state-root-excluded");
+    expect(rendered).toContain("volume-excluded");
+    expect(rendered).not.toContain("docker volume prune");
+    expect(rendered).not.toContain("docker system prune");
+    expect(rendered).not.toContain("docker rmi");
   });
 
   test("[RT-CAP-PRUNE-010] rendered prune script keeps remote-state marker cleanup opt-in and state-root preserving", () => {
@@ -260,17 +263,20 @@ describe("runtime target capacity prune adapter", () => {
       categories: ["remote-state-markers"],
       dryRun: false,
     });
+    const defaultRendered = ash.render(defaultScript);
+    const explicitRendered = ash.render(explicitScript);
 
-    expect(defaultScript).toContain("if has_category remote-state-markers");
-    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/journals/*.json');
-    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/backups/*');
-    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/recovery/*.json');
-    expect(explicitScript).toContain('"$APPALOFT_STATE_ROOT"/locks/recovered/*');
-    expect(explicitScript).toContain("remote-state-excluded");
-    expect(explicitScript).toContain('rm -f "$marker"');
-    expect(explicitScript).toContain('rm -rf "$marker"');
-    expect(explicitScript).not.toContain('rm -rf "$APPALOFT_STATE_ROOT"');
-    expect(explicitScript).not.toContain("pglite");
+    expect(explicitRendered).toMatchSnapshot();
+    expect(defaultRendered).toContain("if has_category remote-state-markers");
+    expect(explicitRendered).toContain('"$APPALOFT_STATE_ROOT"/journals/*.json');
+    expect(explicitRendered).toContain('"$APPALOFT_STATE_ROOT"/backups/*');
+    expect(explicitRendered).toContain('"$APPALOFT_STATE_ROOT"/recovery/*.json');
+    expect(explicitRendered).toContain('"$APPALOFT_STATE_ROOT"/locks/recovered/*');
+    expect(explicitRendered).toContain("remote-state-excluded");
+    expect(explicitRendered).toContain('rm -f "$marker"');
+    expect(explicitRendered).toContain('rm -rf "$marker"');
+    expect(explicitRendered).not.toContain('rm -rf "$APPALOFT_STATE_ROOT"');
+    expect(explicitRendered).not.toContain("pglite");
   });
 
   test("[RT-CAP-PRUNE-011] remote-state marker dry-run output is bounded and reports estimated reclaimable bytes", () => {
@@ -291,15 +297,12 @@ describe("runtime target capacity prune adapter", () => {
         categories: ["remote-state-markers"],
         dryRun: true,
       });
-      const output = Bun.spawnSync(["sh", "-lc", script], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      const output = ash.execute(script);
 
       expect(output.exitCode).toBe(0);
       const parsed = parseRuntimeTargetCapacityPruneOutput({
-        stdout: output.stdout.toString(),
-        stderr: output.stderr.toString(),
+        stdout: output.stdout,
+        stderr: output.stderr,
         server: serverState(),
         before: "2099-01-01T00:00:00.000Z",
         categories: ["remote-state-markers"],
@@ -351,15 +354,12 @@ describe("runtime target capacity prune adapter", () => {
         categories: ["remote-state-markers"],
         dryRun: false,
       });
-      const output = Bun.spawnSync(["sh", "-lc", script], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      const output = ash.execute(script);
 
       expect(output.exitCode).toBe(0);
       const parsed = parseRuntimeTargetCapacityPruneOutput({
-        stdout: output.stdout.toString(),
-        stderr: output.stderr.toString(),
+        stdout: output.stdout,
+        stderr: output.stderr,
         server: serverState(),
         before: "2099-01-01T00:00:00.000Z",
         categories: ["remote-state-markers"],
