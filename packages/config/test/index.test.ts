@@ -103,6 +103,24 @@ describe("resolveConfig", () => {
     expect(configured.autoMigrate).toBe(true);
   });
 
+  test("allows overriding the Postgres connection pool size", () => {
+    const configured = resolveConfig({
+      env: {
+        APPALOFT_DATABASE_POOL_MAX: "3",
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
+      },
+    });
+    const invalid = resolveConfig({
+      env: {
+        APPALOFT_DATABASE_POOL_MAX: "0",
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
+      },
+    });
+
+    expect(configured.databasePoolMax).toBe(3);
+    expect(invalid.databasePoolMax).toBe(10);
+  });
+
   test("[SCHED-MAINT-WORKER-003] keeps scheduled maintenance workers disabled by default", () => {
     const config = resolveConfig({ env: {} });
 
