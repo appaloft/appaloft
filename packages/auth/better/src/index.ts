@@ -9,6 +9,7 @@ import {
   type ActionDeployTokenAuthorizationResult,
   type ActionDeployTokenRequestedScope,
   type ActionDeployTokenResolvedScope,
+  type AppLogger,
   type ChangeAccountProfileInput,
   type ChangeOrganizationMemberRoleInput,
   type ChangeOrganizationProfileInput,
@@ -108,6 +109,7 @@ export interface AuthSessionStatus {
 
 export interface BetterAuthRuntimeConfig extends AppaloftBetterAuthConfig {
   enabled: boolean;
+  logger?: AppLogger;
   organizationAdmission?: BetterAuthOrganizationAdmissionPort;
 }
 
@@ -260,16 +262,10 @@ export class BetterAuthRuntime implements AuthRuntime {
       };
     }
 
-    const session = await this.auth.api.getSession({
-      headers: request.headers,
-    });
-    const accounts = session
-      ? await this.auth.api.listUserAccounts({
-          headers: request.headers,
-        })
-      : [];
+    const session = await this.resolveSessionStatusSession(request);
+    const accounts = session ? await this.resolveSessionStatusAccounts(request) : [];
     const currentUserOrganizationCount = session
-      ? await this.currentUserOrganizationCount(request.headers)
+      ? await this.resolveSessionStatusOrganizationCount(request)
       : undefined;
     const passwordState = session ? resolvePasswordState(accounts) : "unknown";
     const connectedProviders = new Set(
@@ -302,6 +298,51 @@ export class BetterAuthRuntime implements AuthRuntime {
         connectedProviders,
       ),
     };
+  }
+
+  private async resolveSessionStatusSession(request: Request): Promise<unknown | null> {
+    try {
+      return await this.auth.api.getSession({
+        headers: request.headers,
+      });
+    } catch (error) {
+      this.logSessionStatusReadFailure("session", error);
+      return null;
+    }
+  }
+
+  private async resolveSessionStatusAccounts(request: Request): Promise<unknown[]> {
+    try {
+      const accounts = await this.auth.api.listUserAccounts({
+        headers: request.headers,
+      });
+      return Array.isArray(accounts) ? accounts : [];
+    } catch (error) {
+      this.logSessionStatusReadFailure("accounts", error);
+      return [];
+    }
+  }
+
+  private async resolveSessionStatusOrganizationCount(
+    request: Request,
+  ): Promise<number | undefined> {
+    try {
+      return await this.currentUserOrganizationCount(request.headers);
+    } catch (error) {
+      this.logSessionStatusReadFailure("organization-count", error);
+      return undefined;
+    }
+  }
+
+  private logSessionStatusReadFailure(
+    phase: "accounts" | "organization-count" | "session",
+    error: unknown,
+  ): void {
+    this.config.logger?.warn("auth_session_status_read_failed", {
+      phase,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : undefined,
+    });
   }
 
   async getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null> {

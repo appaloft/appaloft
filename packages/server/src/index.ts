@@ -659,6 +659,7 @@ export async function createAppaloftServer(
       ...(config.oidcDiscoveryUrl ? { oidcDiscoveryUrl: config.oidcDiscoveryUrl } : {}),
       ...(config.oidcIssuer ? { oidcIssuer: config.oidcIssuer } : {}),
       ...(config.oidcRedirectUri ? { oidcRedirectUri: config.oidcRedirectUri } : {}),
+      logger,
       trustedOrigins: authTrustedOrigins,
     });
 
