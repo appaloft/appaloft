@@ -20,7 +20,7 @@ import { ok, type Result } from "@appaloft/core";
 import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import { Elysia } from "elysia";
 
-import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src";
+import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src/internal";
 
 class NoopLogger implements AppLogger {
   debug(): void {}

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { generatedSdkOperations } from "../src";
+import { generatedSdkOperations } from "../src/internal";
 
 describe("generated SDK operation metadata", () => {
   test("[RT-MON-002][RT-MON-003][TS-SDK-GEN-001] exposes runtime monitoring read operations", () => {

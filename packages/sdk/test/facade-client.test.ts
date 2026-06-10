@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import { type AppaloftSdkFacadeMethod, createAppaloftClient } from "../src";
 import {
-  type AppaloftClient,
-  type AppaloftSdkFacadeMethod,
-  createAppaloftClient,
   createAppaloftFacadeClient,
   createAppaloftSdkClient,
   type SdkOperationDescriptor,
-} from "../src";
+} from "../src/internal";
 
 const operations = [
   {
@@ -138,7 +136,7 @@ const operations = [
   },
 ] as const satisfies readonly SdkOperationDescriptor[];
 
-interface RepresentativeFacade extends AppaloftClient {
+interface RepresentativeFacade {
   readonly projects: {
     readonly create: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
@@ -172,7 +170,7 @@ describe("Appaloft typed facade client", () => {
         },
       }),
       operations,
-    ) as RepresentativeFacade;
+    ) as unknown as RepresentativeFacade;
 
     const created = await appaloft.projects.create({ name: "Demo" });
     const listed = await appaloft.projects.list({ limit: 20 });
@@ -197,7 +195,7 @@ describe("Appaloft typed facade client", () => {
         },
       }),
       operations,
-    ) as RepresentativeFacade;
+    ) as unknown as RepresentativeFacade;
 
     await appaloft.dependencyResources.provisioning.plan({
       projectId: "prj_demo",
@@ -220,7 +218,7 @@ describe("Appaloft typed facade client", () => {
         },
       }),
       operations,
-    ) as RepresentativeFacade;
+    ) as unknown as RepresentativeFacade;
 
     await appaloft.projects.show({
       pathParams: { projectId: "prj_demo" },
@@ -244,7 +242,7 @@ describe("Appaloft typed facade client", () => {
           }),
       }),
       operations,
-    ) as RepresentativeFacade;
+    ) as unknown as RepresentativeFacade;
 
     const envelopes: unknown[] = [];
 
@@ -268,7 +266,7 @@ describe("Appaloft typed facade client", () => {
         },
       }),
       operations,
-    ) as RepresentativeFacade;
+    ) as unknown as RepresentativeFacade;
 
     await appaloft.deployments.logs({ deploymentId: "dep_demo", tail: 100 });
     await appaloft.deployments.logs.prune({ olderThanDays: 30 });

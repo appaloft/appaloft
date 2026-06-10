@@ -9,6 +9,7 @@ import {
   type CliControlPlaneProfile,
   createRemoteCliProgram,
   defaultPublicCloudControlPlaneUrl,
+  findControlPlaneOperation,
   loginControlPlane,
   MemoryCliControlPlaneProfileStore,
   resolveCliExecutionTarget,
@@ -421,6 +422,17 @@ function createCliAuthExchangeFetch(
 }
 
 describe("CLI remote control-plane client", () => {
+  test("[CONTROL-PLANE-CLI-010] catalog-backed remote operations default to product-session auth", () => {
+    expect(findControlPlaneOperation("environments.create")._unsafeUnwrap()).toMatchObject({
+      operationKey: "environments.create",
+      authPolicy: "product-session",
+    });
+    expect(findControlPlaneOperation("source-events.ingest")._unsafeUnwrap()).toMatchObject({
+      operationKey: "source-events.ingest",
+      authPolicy: "webhook-signature",
+    });
+  });
+
   test("[CONTROL-PLANE-CLI-012] root help and version do not initialize the local runtime", async () => {
     const helpOutput = captureOutput();
     const versionOutput = captureOutput();

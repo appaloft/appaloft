@@ -9,6 +9,7 @@ import {
   collectSdkOperationsFromOpenApi,
   operationFacadePathFromKey,
   operationMethodFromKey,
+  renderSdkFacadeManifest,
   renderTypescriptSdkFacade,
 } from "../src";
 
@@ -112,5 +113,15 @@ describe("TypeScript SDK generator", () => {
     expect(firstRender).toContain('"operationMethod": "capacityInspect"');
     expect(firstRender).toContain('"facadeDefault": true');
     expect(firstRender).toContain('"streaming": true');
+  });
+
+  test("[TS-SDK-FACADE-002] locks the public SDK facade manifest", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+    const manifest = renderSdkFacadeManifest(spec);
+    const expected = await Bun.file(
+      new URL("./fixtures/facade-manifest.snapshot.txt", import.meta.url),
+    ).text();
+
+    expect(manifest).toBe(expected);
   });
 });

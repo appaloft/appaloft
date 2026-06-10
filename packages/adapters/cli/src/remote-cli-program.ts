@@ -5,16 +5,13 @@ import {
   type OperationCatalogEntry,
 } from "@appaloft/application/operation-catalog";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
-import {
-  type AppaloftSdkFetch,
-  type AppaloftSdkOperationRequest,
-  type SdkOperationDescriptor,
-} from "@appaloft/sdk";
+import { type AppaloftSdkFacadeInput, type AppaloftSdkFetch } from "@appaloft/sdk";
 import { Command as EffectCommand } from "@effect/cli";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { mainCommand } from "./commands/index.js";
 import {
+  type CliControlPlaneOperation,
   findControlPlaneOperation,
   performControlPlaneHandshake,
   requestControlPlaneOperation,
@@ -128,8 +125,8 @@ function pathParamNames(path: string): string[] {
 
 function requestForOperation(input: {
   readonly message: RemoteOperationMessage;
-  readonly operation: SdkOperationDescriptor;
-}): Result<Omit<AppaloftSdkOperationRequest, "operation">> {
+  readonly operation: CliControlPlaneOperation;
+}): Result<AppaloftSdkFacadeInput> {
   const payload = readMessagePayload(input.message);
   const pathParams: Record<string, string> = {};
   const pathKeys = new Set(pathParamNames(input.operation.route.path));
@@ -193,7 +190,7 @@ function operationForMessage(input: {
 }
 
 function assertRemoteCapable(
-  operation: SdkOperationDescriptor,
+  operation: CliControlPlaneOperation,
   payload: Record<string, unknown>,
 ): Result<void> {
   if (operation.streaming) {
@@ -306,7 +303,7 @@ async function dispatchRemoteMessage<TResult>(input: {
 
   const result = await requestControlPlaneOperation({
     profile: input.profile,
-    operation: operation.value,
+    operationKey: operation.value.operationKey,
     ...(request.value.pathParams ? { pathParams: request.value.pathParams } : {}),
     ...(request.value.query ? { query: request.value.query } : {}),
     ...(request.value.body === undefined ? {} : { body: request.value.body }),

@@ -90,19 +90,7 @@ Facade names are generated from operation keys: kebab-case becomes camelCase, an
 
 Path parameters can be passed as top-level fields. Remaining fields default to query parameters for `GET`, `DELETE`, and streaming operations, and to JSON body for other operations. Use explicit `pathParams`, `query`, or `body` when an integration needs to control that split.
 
-The lower-level descriptor API remains available for route-level disambiguation or generator experiments:
-
-```ts
-import { createAppaloftSdkClient, generatedSdkOperations } from "@appaloft/sdk";
-
-const sdk = createAppaloftSdkClient({ baseUrl: "https://appaloft.example/api" });
-
-await sdk.request({
-  operation: generatedSdkOperations.find(
-    (operation) => operation.operationKey === "organizations.current-context",
-  )!,
-});
-```
+Operation descriptors are generated internals. Public SDK callers should use the facade methods instead of passing operation metadata by hand.
 
 The SDK is the right boundary for API tests and external automation. Domain rules, application handlers, repositories, and adapter unit tests should stay at the layer they prove.
 
@@ -136,6 +124,6 @@ for await (const envelope of appaloft.deployments.streamEvents({
 
 When the stream returns `closed`, or when the caller aborts the `AbortSignal`, automation should stop reading and reopen the stream only when needed.
 
-Streaming facade methods return the same `AsyncIterable` shape as the lower-level `stream(...)` helper. They do not switch the SDK to throw-only request behavior; ordinary request facades still return `{ ok, status, data }` or `{ ok, status, error }`.
+Streaming facade methods return `AsyncIterable` values. They do not switch the SDK to throw-only request behavior; ordinary request facades still return `{ ok, status, data }` or `{ ok, status, error }`.
 
 Current generator note: the operation catalog and OpenAPI metadata do not yet expose enough stable schema names for per-operation input/output aliases in every generated facade method. The TypeScript facade is generated from operation keys and route metadata today; future generator work should attach request, response, and stream envelope schema ids so non-TypeScript SDKs can emit equivalent typed method signatures.

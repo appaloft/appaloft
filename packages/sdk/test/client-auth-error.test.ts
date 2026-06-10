@@ -4,7 +4,7 @@ import {
   createAppaloftSdkClient,
   isAppaloftSdkErrorCode,
   type SdkOperationDescriptor,
-} from "../src";
+} from "../src/internal";
 
 const productSessionOperation: SdkOperationDescriptor = {
   operationKey: "organizations.current-context",

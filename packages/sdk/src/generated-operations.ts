@@ -1,8 +1,4 @@
-import {
-  type AppaloftSdkClient,
-  type AppaloftSdkFacadeMethod,
-  type SdkOperationDescriptor,
-} from "./index";
+import { type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "./internal";
 
 export const generatedSdkOperations = [
   {
@@ -5013,7 +5009,7 @@ export const generatedSdkOperations = [
   },
 ] as const satisfies readonly SdkOperationDescriptor[];
 
-export interface GeneratedAppaloftClient extends AppaloftSdkClient {
+export interface GeneratedAppaloftClient {
   readonly account: {
     readonly delete: AppaloftSdkFacadeMethod;
     readonly profile: {

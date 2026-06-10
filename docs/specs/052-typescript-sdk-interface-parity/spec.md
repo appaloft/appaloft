@@ -135,8 +135,7 @@ Facade names are generated from operation keys with language-friendly identifier
 kebab-case segments become camelCase, dots become group nesting, and duplicate HTTP route variants
 for the same operation key choose one default facade descriptor. Streaming operation keys such as
 `deployments.stream-events` prefer the streaming descriptor; non-streaming keys prefer the
-non-streaming descriptor. The full `generatedSdkOperations` list remains public for callers that
-need a specific route variant.
+non-streaming descriptor. Operation descriptors are generated internals, not public SDK API.
 
 The TypeScript facade accepts one operation input object. Fields matching route path parameters are
 interpolated into the path. Remaining fields default to query parameters for `GET`, `DELETE`, and
@@ -153,25 +152,22 @@ streaming operations, and to JSON body for other methods. Callers can always pas
   metadata parity (`TS-SDK-OPENAPI-*`), initial SDK generation tooling (`TS-SDK-GEN-001`), and the
   `@appaloft/sdk` import-boundary check (`TS-SDK-BOUNDARY-001`) are implemented.
 - `packages/sdk-generator` collects Appaloft operation descriptors from annotated OpenAPI metadata
-  and renders a reproducible TypeScript operation facade source string. The package is build-time
-  tooling and does not maintain a handwritten method inventory.
+  and renders a reproducible TypeScript operation facade source string plus a committed public
+  facade manifest snapshot. The package is build-time tooling and does not maintain a handwritten
+  method inventory.
 - The generator now also renders language-friendly facade paths and a generated
   `GeneratedAppaloftClient` TypeScript interface from operation metadata. This closes the initial
   high-level facade gap for TypeScript while keeping the same path tree suitable for future
   Python, Go, or Rust generators.
-- `packages/sdk` defines the runtime SDK package boundary and a thin operation request client over
-  generated operation descriptors. It has no runtime dependencies, exports `generatedSdkOperations`
-  built from the OpenAPI SDK contract, supports product-session cookie auth, deploy-token bearer
-  auth, operation input/path/query organization scoping, and typed structured errors without
-  parsing human message text.
-- `packages/sdk` also exports `createAppaloftClient`, a typed facade over the same descriptor list.
-  `createAppaloftSdkClient` and `client.request(...)` remain the compatible lower-level API.
-- The SDK exposes a lower-level stream helper only for operation descriptors marked
-  `streaming: true`. The helper wires `AbortSignal` cancellation into the request, parses JSON,
-  NDJSON, and SSE `data:` JSON envelopes, and turns non-OK responses into structured SDK stream
-  errors.
-- Streaming facade methods return the same `AsyncIterable` as `client.stream(...)`; they are not
-  converted to callback APIs or throw-only request helpers.
+- `packages/sdk` defines the runtime SDK package boundary and exposes `createAppaloftClient` as the
+  public root API. It has no runtime dependencies, uses generated operation descriptors internally,
+  supports product-session cookie auth, deploy-token bearer auth, operation input/path/query
+  organization scoping, and typed structured errors without parsing human message text.
+- The SDK root does not export generated descriptors, descriptor request clients, or low-level
+  `request(...)`/`stream(...)` helpers. Those remain package-internal implementation details for
+  transport tests and repository-internal adapters.
+- Streaming facade methods return `AsyncIterable` values; they are not converted to callback APIs
+  or throw-only request helpers.
 - Public SDK reference docs are active at
   `/docs/reference/typescript-sdk/#typescript-sdk-operation-client` and
   `/docs/en/reference/typescript-sdk/#typescript-sdk-operation-client`. They cover installation,

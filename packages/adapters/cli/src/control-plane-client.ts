@@ -1,4 +1,8 @@
 import {
+  findOperationCatalogEntryByKey,
+  type OperationCatalogEntry,
+} from "@appaloft/application/operation-catalog";
+import {
   type DomainError,
   type DomainErrorDetails,
   type DomainErrorDetailValue,
@@ -7,13 +11,11 @@ import {
   type Result,
 } from "@appaloft/core";
 import {
+  type AppaloftSdkFacadeInput,
+  type AppaloftSdkFacadeMethod,
   type AppaloftSdkFetch,
-  type AppaloftSdkOperationRequest,
   type AppaloftSdkOperationResult,
-  createAppaloftSdkClient,
-  generatedSdkOperations,
-  readAppaloftJsonApiResponse,
-  type SdkOperationDescriptor,
+  createAppaloftClient,
 } from "@appaloft/sdk";
 import {
   type CliControlPlaneAuth,
@@ -23,8 +25,20 @@ import {
 } from "./control-plane-profile.js";
 
 const cliUserAgent = "appaloft-cli";
+const webhookSignatureOnlyOperationKeys = new Set(["source-events.ingest"]);
 
 export type CliRemoteProjectOperationKey = "projects.list" | "projects.show";
+
+export interface CliControlPlaneOperation {
+  readonly operationKey: string;
+  readonly kind: OperationCatalogEntry["kind"];
+  readonly route: {
+    readonly method: "GET" | "POST" | "DELETE";
+    readonly path: string;
+  };
+  readonly authPolicy: "product-session" | "webhook-signature";
+  readonly streaming: boolean;
+}
 
 export interface CliControlPlaneHandshakeResult {
   readonly handshake: CliControlPlaneHandshake;
@@ -50,6 +64,14 @@ export interface CliAuthSessionPollResult {
 export interface CliAuthSessionExchangeResult {
   readonly auth: CliControlPlaneAuth;
 }
+
+type JsonApiReadError = {
+  readonly code: string;
+  readonly category: DomainError["category"];
+  readonly message: string;
+  readonly retryable: boolean;
+  readonly details?: Readonly<Record<string, DomainErrorDetailValue>>;
+};
 
 function cliControlPlaneError(
   code: string,
@@ -111,10 +133,7 @@ function errorFromSdkResult(
   );
 }
 
-function errorFromJsonApiResponse(
-  error: Extract<Awaited<ReturnType<typeof readAppaloftJsonApiResponse>>, { ok: false }>["error"],
-  phase: string,
-): DomainError {
+function errorFromJsonApiResponse(error: JsonApiReadError, phase: string): DomainError {
   const details: DomainErrorDetails = {
     phase,
   };
@@ -160,8 +179,23 @@ function authForProfile(auth: CliControlPlaneAuth) {
   };
 }
 
-export function findControlPlaneOperation(operationKey: string): Result<SdkOperationDescriptor> {
-  const operation = generatedSdkOperations.find((entry) => entry.operationKey === operationKey);
+export function findControlPlaneOperation(operationKey: string): Result<CliControlPlaneOperation> {
+  const entry = findOperationCatalogEntryByKey(operationKey);
+  const route = entry ? defaultRemoteRoute(entry) : undefined;
+
+  const operation =
+    entry && route
+      ? ({
+          operationKey: entry.key,
+          kind: entry.kind,
+          route,
+          authPolicy: webhookSignatureOnlyOperationKeys.has(entry.key)
+            ? "webhook-signature"
+            : "product-session",
+          streaming: route === entry.transports.orpcStream,
+        } satisfies CliControlPlaneOperation)
+      : undefined;
+
   if (!operation) {
     return err(
       cliControlPlaneError(
@@ -177,6 +211,21 @@ export function findControlPlaneOperation(operationKey: string): Result<SdkOpera
     );
   }
   return ok(operation);
+}
+
+function defaultRemoteRoute(
+  entry: OperationCatalogEntry,
+): CliControlPlaneOperation["route"] | undefined {
+  const route = entry.transports.orpc ?? entry.transports.orpcStream;
+
+  if (!route) {
+    return undefined;
+  }
+
+  return {
+    method: route.method,
+    path: route.path.replace(/^\/api(?=\/)/, ""),
+  };
 }
 
 function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
@@ -280,16 +329,93 @@ async function readResponseJson(
   phase: string,
   request: Request,
 ): Promise<Result<unknown>> {
-  const result = await readAppaloftJsonApiResponse(response, {
-    method: request.method,
-    url: request.url,
-  });
+  const result = await readJsonApiResponse(response, request);
 
   if (!result.ok) {
     return err(errorFromJsonApiResponse(result.error, phase));
   }
 
   return ok(result.data);
+}
+
+async function readJsonApiResponse(
+  response: Response,
+  request: Request,
+): Promise<
+  | {
+      readonly ok: true;
+      readonly data: unknown;
+    }
+  | {
+      readonly ok: false;
+      readonly error: JsonApiReadError;
+    }
+> {
+  const text = await response.text();
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (text.length === 0) {
+    return { ok: true, data: null };
+  }
+
+  if (contentType.toLowerCase().includes("text/html")) {
+    return {
+      ok: false,
+      error: unexpectedJsonResponseError({
+        code: "control_plane_unexpected_html_response",
+        message:
+          "Control plane returned HTML instead of JSON. Check the control-plane base URL and API route.",
+        response,
+        request,
+        contentType,
+        bodyKind: "html",
+      }),
+    };
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(text) as unknown };
+  } catch {
+    const hasJsonContentType = contentType.toLowerCase().includes("json");
+    return {
+      ok: false,
+      error: unexpectedJsonResponseError({
+        code: hasJsonContentType
+          ? "control_plane_invalid_json_response"
+          : "control_plane_unexpected_non_json_response",
+        message: hasJsonContentType
+          ? "Control plane returned invalid JSON."
+          : "Control plane returned a non-JSON response.",
+        response,
+        request,
+        contentType,
+        bodyKind: "non-json",
+      }),
+    };
+  }
+}
+
+function unexpectedJsonResponseError(input: {
+  readonly code: string;
+  readonly message: string;
+  readonly response: Response;
+  readonly request: Request;
+  readonly contentType: string;
+  readonly bodyKind: string;
+}): JsonApiReadError {
+  return {
+    code: input.code,
+    category: "infra",
+    message: input.message,
+    retryable: false,
+    details: {
+      method: input.request.method,
+      url: input.request.url,
+      status: input.response.status,
+      contentType: input.contentType,
+      bodyKind: input.bodyKind,
+    },
+  };
 }
 
 function safeAuthErrorDetails(value: unknown, phase: string, status: number): DomainErrorDetails {
@@ -432,11 +558,6 @@ export async function performControlPlaneHandshake(input: {
     return err(handshake.error);
   }
 
-  const currentContextOperation = findControlPlaneOperation("organizations.current-context");
-  if (currentContextOperation.isErr()) {
-    return err(currentContextOperation.error);
-  }
-
   const currentContext = await requestControlPlaneOperation({
     profile: {
       name: "handshake",
@@ -446,7 +567,7 @@ export async function performControlPlaneHandshake(input: {
       createdAt: input.checkedAt,
       updatedAt: input.checkedAt,
     },
-    operation: currentContextOperation.value,
+    operationKey: "organizations.current-context",
     fetch: fetchImplementation,
     phase: "control-plane-auth",
   });
@@ -652,29 +773,50 @@ export async function cancelCliAuthSession(input: {
 
 export async function requestControlPlaneOperation(input: {
   readonly profile: CliControlPlaneProfile;
-  readonly operation: SdkOperationDescriptor;
+  readonly operationKey: string;
   readonly pathParams?: Readonly<Record<string, string>>;
   readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
   readonly body?: unknown;
   readonly fetch?: AppaloftSdkFetch;
   readonly phase: string;
 }): Promise<Result<unknown>> {
-  const client = createAppaloftSdkClient({
+  const boundedRoute = boundedJsonRouteForOperation(input.operationKey);
+  if (boundedRoute) {
+    return requestControlPlaneCatalogRoute({
+      ...input,
+      route: boundedRoute,
+    });
+  }
+
+  const client = createAppaloftClient({
     baseUrl: `${input.profile.baseUrl}/api`,
     auth: authForProfile(input.profile.auth),
     ...(input.fetch ? { fetch: input.fetch } : {}),
     userAgent: cliUserAgent,
   });
 
-  const request: AppaloftSdkOperationRequest = {
-    operation: input.operation,
+  const request: AppaloftSdkFacadeInput = {
     ...(input.pathParams ? { pathParams: input.pathParams } : {}),
     ...(input.query ? { query: input.query } : {}),
     ...(input.body === undefined ? {} : { body: input.body }),
   };
 
   try {
-    const result = await client.request(request);
+    const result = await requestFacadeOperation(client, input.operationKey, request);
+    if (isAsyncIterable(result)) {
+      return err(
+        cliControlPlaneError(
+          "control_plane_unsupported",
+          "user",
+          "Streaming control plane operations are not supported by this request helper",
+          false,
+          {
+            phase: input.phase,
+            operationKey: input.operationKey,
+          },
+        ),
+      );
+    }
     if (!result.ok) {
       return err(errorFromSdkResult(result, input.phase));
     }
@@ -682,6 +824,226 @@ export async function requestControlPlaneOperation(input: {
   } catch (error) {
     return err(errorFromUnknown(error, input.phase));
   }
+}
+
+function boundedJsonRouteForOperation(
+  operationKey: string,
+): CliControlPlaneOperation["route"] | undefined {
+  const entry = findOperationCatalogEntryByKey(operationKey);
+  if (!entry?.transports.orpc || !entry.transports.orpcStream) {
+    return undefined;
+  }
+
+  return {
+    method: entry.transports.orpc.method,
+    path: entry.transports.orpc.path.replace(/^\/api(?=\/)/, ""),
+  };
+}
+
+async function requestControlPlaneCatalogRoute(input: {
+  readonly profile: CliControlPlaneProfile;
+  readonly route: CliControlPlaneOperation["route"];
+  readonly pathParams?: Readonly<Record<string, string>>;
+  readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  readonly body?: unknown;
+  readonly fetch?: AppaloftSdkFetch;
+  readonly phase: string;
+}): Promise<Result<unknown>> {
+  const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
+  const request = buildCatalogRouteRequest(input);
+
+  try {
+    const response = await fetchImplementation(request);
+    const data = await readResponseJson(response, input.phase, request);
+
+    if (data.isErr()) {
+      return err(data.error);
+    }
+
+    if (!response.ok) {
+      return err(
+        errorFromSdkResult(
+          {
+            ok: false,
+            status: response.status,
+            error: domainErrorFromJsonPayload(data.value),
+          },
+          input.phase,
+        ),
+      );
+    }
+
+    return ok(data.value);
+  } catch (error) {
+    return err(errorFromUnknown(error, input.phase));
+  }
+}
+
+function buildCatalogRouteRequest(input: {
+  readonly profile: CliControlPlaneProfile;
+  readonly route: CliControlPlaneOperation["route"];
+  readonly pathParams?: Readonly<Record<string, string>>;
+  readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  readonly body?: unknown;
+}): Request {
+  const url = new URL(
+    interpolateCatalogRoutePath(input.route.path, input.pathParams ?? {}).replace(/^\//, ""),
+    `${input.profile.baseUrl}/api/`,
+  );
+
+  for (const [key, value] of Object.entries(input.query ?? {})) {
+    if (value !== null && value !== undefined) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const headers = new Headers();
+  const auth = authForProfile(input.profile.auth);
+  if (auth.kind === "product-session") {
+    headers.set("cookie", auth.cookie);
+  } else {
+    headers.set("authorization", `Bearer ${auth.token}`);
+  }
+  headers.set("user-agent", cliUserAgent);
+  if (input.body !== undefined) {
+    headers.set("content-type", "application/json");
+  }
+
+  return new Request(url, {
+    method: input.route.method,
+    headers,
+    ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
+  });
+}
+
+function interpolateCatalogRoutePath(
+  path: string,
+  params: Readonly<Record<string, string>>,
+): string {
+  return path.replaceAll(/\{([^}]+)\}/g, (_match, key: string) => {
+    const value = params[key];
+    if (value === undefined) {
+      throw new Error(`Missing control-plane route path parameter: ${key}`);
+    }
+    return encodeURIComponent(value);
+  });
+}
+
+function domainErrorFromJsonPayload(value: unknown): {
+  readonly code: string;
+  readonly category: DomainError["category"];
+  readonly message: string;
+  readonly retryable: boolean;
+  readonly details?: Readonly<Record<string, DomainErrorDetailValue>>;
+} {
+  const candidate = isRecord(value) && isRecord(value.error) ? value.error : value;
+
+  if (isRecord(candidate)) {
+    const code = typeof candidate.code === "string" ? candidate.code : undefined;
+    const category = isDomainErrorCategory(candidate.category) ? candidate.category : undefined;
+    const message = typeof candidate.message === "string" ? candidate.message : undefined;
+    const retryable = typeof candidate.retryable === "boolean" ? candidate.retryable : undefined;
+
+    if (code && category && message && retryable !== undefined) {
+      return {
+        code,
+        category,
+        message,
+        retryable,
+        ...(isDomainErrorDetails(candidate.details) ? { details: candidate.details } : {}),
+      };
+    }
+  }
+
+  return {
+    code: "control_plane_unstructured_error",
+    category: "infra",
+    message: "Control plane returned an error that did not match the Appaloft error contract.",
+    retryable: false,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isDomainErrorCategory(value: unknown): value is DomainError["category"] {
+  return (
+    value === "user" ||
+    value === "infra" ||
+    value === "provider" ||
+    value === "retryable" ||
+    value === "timeout"
+  );
+}
+
+function isDomainErrorDetails(
+  value: unknown,
+): value is Readonly<Record<string, DomainErrorDetailValue>> {
+  return isRecord(value) && Object.values(value).every(isDomainErrorDetailValue);
+}
+
+function isDomainErrorDetailValue(value: unknown): value is DomainErrorDetailValue {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
+  );
+}
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return typeof value === "object" && value !== null && Symbol.asyncIterator in value;
+}
+
+function requestFacadeOperation<T = unknown>(
+  client: unknown,
+  operationKey: string,
+  input?: AppaloftSdkFacadeInput,
+): ReturnType<AppaloftSdkFacadeMethod> {
+  const method = facadeMethodForOperationKey(client, operationKey);
+
+  return method<T>(input);
+}
+
+function facadeMethodForOperationKey(
+  client: unknown,
+  operationKey: string,
+): AppaloftSdkFacadeMethod {
+  let current = client;
+
+  for (const segment of operationKeyToFacadePath(operationKey)) {
+    if ((typeof current !== "object" && typeof current !== "function") || current === null) {
+      throw new Error(`SDK facade operation ${operationKey} is not available`);
+    }
+
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  if (typeof current !== "function") {
+    throw new Error(`SDK facade operation ${operationKey} is not callable`);
+  }
+
+  return current as AppaloftSdkFacadeMethod;
+}
+
+function operationKeyToFacadePath(operationKey: string): string[] {
+  return operationKey.split(".").filter(Boolean).map(operationKeyPartToIdentifier);
+}
+
+function operationKeyPartToIdentifier(part: string): string {
+  const normalized = part
+    .split("-")
+    .filter((value) => value.length > 0)
+    .map((value, index) => (index === 0 ? value : capitalize(value)))
+    .join("");
+
+  return normalized.replaceAll(/[^a-zA-Z0-9_$]/g, "");
+}
+
+function capitalize(value: string): string {
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
 }
 
 export async function requestRemoteProjectOperation(input: {
@@ -697,7 +1059,7 @@ export async function requestRemoteProjectOperation(input: {
 
   return requestControlPlaneOperation({
     profile: input.profile,
-    operation: operation.value,
+    operationKey: operation.value.operationKey,
     ...(input.projectId ? { pathParams: { projectId: input.projectId } } : {}),
     ...(input.fetch ? { fetch: input.fetch } : {}),
     phase: "remote-operation-dispatch",

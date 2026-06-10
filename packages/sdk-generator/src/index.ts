@@ -133,13 +133,33 @@ export function renderTypescriptSdkFacade(
   const operations = collectSdkOperationsFromOpenApi(document);
 
   return [
-    `import { type AppaloftSdkClient, type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "${importPath}";`,
+    `import { type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "${importPath}";`,
     "",
     `export const ${exportName} = ${JSON.stringify(operations, null, 2)} as const satisfies readonly SdkOperationDescriptor[];`,
     "",
     renderGeneratedAppaloftClientInterface(operations),
     "",
   ].join("\n");
+}
+
+export function renderSdkFacadeManifest(document: OpenApiDocument): string {
+  return collectSdkOperationsFromOpenApi(document)
+    .filter((operation) => operation.facadeDefault !== false)
+    .map((operation) =>
+      [
+        `appaloft.${(operation.facadePath ?? operationFacadePathFromKey(operation.operationKey)).join(".")}`,
+        "->",
+        operation.operationKey,
+        operation.route.method,
+        operation.route.path,
+        operation.streaming ? "stream" : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .sort()
+    .join("\n")
+    .concat("\n");
 }
 
 function descriptorFromOpenApiOperation(
@@ -261,11 +281,9 @@ function renderGeneratedAppaloftClientInterface(
     node.hasMethod = true;
   }
 
-  return [
-    "export interface GeneratedAppaloftClient extends AppaloftSdkClient {",
-    renderFacadeProperties(tree, 1),
-    "}",
-  ].join("\n");
+  return ["export interface GeneratedAppaloftClient {", renderFacadeProperties(tree, 1), "}"].join(
+    "\n",
+  );
 }
 
 function renderFacadeProperties(node: FacadeTreeNode, depth: number): string {
