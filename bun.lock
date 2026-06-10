@@ -135,6 +135,7 @@
       "name": "@appaloft/adapter-cli",
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@appaloft/cli-logging": "workspace:*",
         "@appaloft/contracts": "workspace:*",
         "@appaloft/core": "workspace:*",
