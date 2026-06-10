@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildSshRemoteStateProcessArgs,
   type SshRemoteCommandInput,
@@ -12,6 +15,19 @@ function successfulSshResult(): SshRemoteCommandResult {
     stdout: "ok\n",
     stderr: "",
     failed: false,
+  };
+}
+
+function executeCommand(command: string): SshRemoteCommandResult {
+  const result = Bun.spawnSync(["sh", "-lc", command], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+    failed: !result.success,
   };
 }
 
@@ -222,5 +238,48 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(args).toContain("IdentitiesOnly=yes");
     expect(args).toContain("deploy@203.0.113.10");
     expect(args.join(" ")).not.toContain("OPENSSH PRIVATE KEY");
+  });
+
+  test("[CONFIG-FILE-STATE-002] rendered prepare and release scripts execute through the command boundary", async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "appaloft-ssh-remote-state-ash-"));
+    const commands: SshRemoteCommandInput[] = [];
+    const lifecycle = new SshRemoteStateLifecycle({
+      dataRoot,
+      target: {
+        host: "203.0.113.10",
+        port: 2222,
+        username: "deploy",
+      },
+      owner: "appaloft-cli",
+      correlationId: "run_ash",
+      heartbeatIntervalMs: null,
+      runner: {
+        run: async (input) => {
+          commands.push(input);
+          return executeCommand(input.command);
+        },
+      },
+    });
+
+    try {
+      const prepared = await lifecycle.prepare();
+      expect(prepared.isOk()).toBe(true);
+      if (prepared.isErr()) {
+        throw new Error(prepared.error.message);
+      }
+      expect(commands[0]?.command).toContain("sh -lc");
+      expect(await Bun.file(join(dataRoot, "backend.json")).exists()).toBe(true);
+      expect(await Bun.file(join(dataRoot, "schema-version.json")).exists()).toBe(true);
+      expect(await Bun.file(join(dataRoot, "locks", "mutation.lock", "owner.json")).exists()).toBe(
+        true,
+      );
+
+      const released = await prepared.value.release();
+      expect(released.isOk()).toBe(true);
+      expect(commands[1]?.command).toContain("sh -lc");
+      expect(await Bun.file(join(dataRoot, "locks", "mutation.lock")).exists()).toBe(false);
+    } finally {
+      rmSync(dataRoot, { force: true, recursive: true });
+    }
   });
 });

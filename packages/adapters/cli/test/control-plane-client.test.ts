@@ -1269,7 +1269,9 @@ describe("CLI remote control-plane client", () => {
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
       ["GET /api/version", "GET /api/organizations/current-context", "GET /api/servers"],
     );
-    expect(new URL(requests[2]?.url ?? "http://localhost").search).toBe("?runtimeAvailability=all");
+    const listSearch = new URL(requests[2]?.url ?? "http://localhost").searchParams;
+    expect(listSearch.get("offset")).toBe("0");
+    expect(listSearch.get("runtimeAvailability")).toBe("all");
     expect(listed.stdout).toContain("srv_remote");
   });
 
