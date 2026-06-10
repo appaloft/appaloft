@@ -1,3 +1,4 @@
+import { type AshScript, ash } from "@appaloft/ash";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { resolvePublicDocsErrorKnowledge } from "@appaloft/docs-registry";
 import { type RemoteStateSession } from "./deployment-remote-state.js";
@@ -74,10 +75,6 @@ interface RemoteStateLockMetadata {
 function trimmed(value: string | undefined): string | undefined {
   const result = value?.trim();
   return result ? result : undefined;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -182,105 +179,109 @@ function jsonString(value: string): string {
   return JSON.stringify(value);
 }
 
+function renderShLcCommand(script: AshScript): string {
+  return ash.render(ash`sh -lc ${ash.arg(ash.render(script))}`).trim();
+}
+
 function remotePrepareCommand(input: {
   dataRoot: string;
   schemaVersion: number;
   owner: string;
   correlationId: string;
   staleAfterSeconds: number;
-}): string {
-  const script = [
-    "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `schema_version=${shellQuote(String(input.schemaVersion))}`,
-    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
-    'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
-    'now_epoch="$(date -u +%s)"',
-    'stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"',
-    'mkdir -p "$data_root"',
-    'mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"',
-    `backend_marker="$data_root/${serverStateBackendMarkerFile}"`,
-    'actual_backend=""',
-    'if [ -f "$backend_marker" ]; then',
-    '  actual_backend="$(sed -n \'s/.*"stateBackend"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$backend_marker" | head -n 1 || true)"',
-    "fi",
-    'if [ -n "$actual_backend" ] && [ "$actual_backend" != "ssh-pglite" ]; then',
-    `  printf '{"phase":"server-state-backend","reason":${jsonString(serverStateBackendMismatchReason)},"expectedStateBackend":"ssh-pglite","actualStateBackend":"%s"}\\n' "$actual_backend" >&2`,
-    `  exit ${stateBackendMismatchExitCode}`,
-    "fi",
-    `printf '{"schemaVersion":${jsonString(serverStateBackendMarkerSchemaVersion)},"stateBackend":"ssh-pglite","updatedAt":"%s","owner":%s}\\n' "$now" ${shellQuote(jsonString(input.owner))} > "$backend_marker"`,
-    'lock_dir="$data_root/locks/mutation.lock"',
-    'owner_file="$lock_dir/owner.json"',
-    'if ! mkdir "$lock_dir"; then',
-    '  if [ ! -d "$lock_dir" ]; then',
-    '    echo "remote state mutation lock could not be created" >&2',
-    "    exit 1",
-    "  fi",
-    '  last_heartbeat=""',
-    "  owner_file_present=false",
-    '  recorded_stale_after=""',
-    '  lock_age_seconds=""',
-    '  if [ -f "$owner_file" ]; then',
-    "    owner_file_present=true",
-    '    last_heartbeat="$(sed -n \'s/.*"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
-    '    if [ -z "$last_heartbeat" ]; then',
-    '      last_heartbeat="$(sed -n \'s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
-    "    fi",
-    '    recorded_stale_after="$(sed -n \'s/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p\' "$owner_file" | head -n 1 || true)"',
-    "  fi",
-    '  [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"',
-    '  if [ "$recorded_stale_after" -gt "$stale_after_seconds" ]; then recorded_stale_after="$stale_after_seconds"; fi',
-    '  if [ "$owner_file_present" != true ] && [ "$recorded_stale_after" -gt 30 ]; then recorded_stale_after=30; fi',
-    '  if [ -n "$last_heartbeat" ]; then',
-    '    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$last_heartbeat" +%s 2>/dev/null || true)"',
-    "  else",
-    '    heartbeat_epoch=""',
-    "  fi",
-    '  if [ -z "$heartbeat_epoch" ]; then',
-    '    heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || true)"',
-    "  fi",
-    '  if [ -n "$heartbeat_epoch" ]; then',
-    "    lock_age_seconds=$((now_epoch - heartbeat_epoch))",
-    "  fi",
-    '  if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then',
-    '    recovered_path="$data_root/locks/recovered/mutation-$stamp-$$.lock"',
-    '    if mv "$lock_dir" "$recovered_path" 2>/dev/null; then',
-    `      printf '{"phase":"%s","recoveredAt":"%s","recoveredBy":%s,"correlationId":%s,"lockAgeSeconds":%s}\n' "remote-state-lock" "$now" ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$lock_age_seconds" > "$recovered_path/recovered.json"`,
-    '      mkdir "$lock_dir"',
-    "    else",
-    '      if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi',
-    `      exit ${lockConflictExitCode}`,
-    "    fi",
-    "  else",
-    '    if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi',
-    `    exit ${lockConflictExitCode}`,
-    "  fi",
-    "fi",
-    `printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$now" "$now" "$stale_after_seconds" > "$owner_file"`,
-    'marker="$data_root/schema-version.json"',
-    "current_version=0",
-    'if [ -f "$marker" ]; then',
-    '  current_version="$(sed -n \'s/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p\' "$marker" | head -n 1 || true)"',
-    "fi",
-    '[ -n "$current_version" ] || current_version=0',
-    'if [ "$current_version" != "$schema_version" ]; then',
-    '  backup_path="$data_root/backups/schema-$current_version-to-$schema_version-$stamp.json"',
-    '  journal_path="$data_root/journals/schema-$current_version-to-$schema_version-$stamp.json"',
-    '  if [ -f "$marker" ]; then cp "$marker" "$backup_path"; else printf "{}\\n" > "$backup_path"; fi',
-    '  printf \'{"phase":"remote-state-migration","fromVersion":%s,"toVersion":%s,"startedAt":"%s"}\\n\' "$current_version" "$schema_version" "$now" > "$journal_path"',
-    '  printf \'{"version":%s,"migratedAt":"%s"}\\n\' "$schema_version" "$now" > "$marker"',
-    "fi",
-    'actual_version="$(sed -n \'s/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p\' "$marker" | head -n 1 || true)"',
-    'if [ "$actual_version" != "$schema_version" ]; then',
-    '  printf \'{"phase":"remote-state-recovery","message":"schema marker integrity check failed","recordedAt":"%s"}\\n\' "$now" > "$data_root/recovery.json"',
-    '  rm -rf "$lock_dir"',
-    '  echo "remote state schema marker failed integrity check" >&2',
-    `  exit ${migrationFailureExitCode}`,
-    "fi",
-    'printf "prepared %s schema=%s\\n" "$data_root" "$schema_version"',
-  ].join("\n");
-
-  return `sh -lc ${shellQuote(script)}`;
+}): AshScript {
+  return ash`
+    set -eu
+    ${ash.env("data_root", input.dataRoot)}
+    ${ash.env("schema_version", input.schemaVersion)}
+    ${ash.env("stale_after_seconds", input.staleAfterSeconds)}
+    ${ash.env("owner_json", jsonString(input.owner))}
+    ${ash.env("correlation_id_json", jsonString(input.correlationId))}
+    ${ash.raw(`now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    now_epoch="$(date -u +%s)"
+    stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+    mkdir -p "$data_root"
+    mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"`)}
+    ${ash.raw(`backend_marker="$data_root/${serverStateBackendMarkerFile}"
+    actual_backend=""
+    if [ -f "$backend_marker" ]; then
+      actual_backend="$(sed -n 's/.*"stateBackend"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$backend_marker" | head -n 1 || true)"
+    fi
+    if [ -n "$actual_backend" ] && [ "$actual_backend" != "ssh-pglite" ]; then
+      printf '{"phase":"server-state-backend","reason":${jsonString(serverStateBackendMismatchReason)},"expectedStateBackend":"ssh-pglite","actualStateBackend":"%s"}\\n' "$actual_backend" >&2
+      exit ${stateBackendMismatchExitCode}
+    fi
+    printf '{"schemaVersion":${jsonString(serverStateBackendMarkerSchemaVersion)},"stateBackend":"ssh-pglite","updatedAt":"%s","owner":%s}\\n' "$now" "$owner_json" > "$backend_marker"
+    lock_dir="$data_root/locks/mutation.lock"
+    owner_file="$lock_dir/owner.json"
+    if ! mkdir "$lock_dir"; then
+      if [ ! -d "$lock_dir" ]; then
+        echo "remote state mutation lock could not be created" >&2
+        exit 1
+      fi
+      last_heartbeat=""
+      owner_file_present=false
+      recorded_stale_after=""
+      lock_age_seconds=""
+      if [ -f "$owner_file" ]; then
+        owner_file_present=true
+        last_heartbeat="$(sed -n 's/.*"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$owner_file" | head -n 1 || true)"
+        if [ -z "$last_heartbeat" ]; then
+          last_heartbeat="$(sed -n 's/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$owner_file" | head -n 1 || true)"
+        fi
+        recorded_stale_after="$(sed -n 's/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$owner_file" | head -n 1 || true)"
+      fi
+      [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"
+      if [ "$recorded_stale_after" -gt "$stale_after_seconds" ]; then recorded_stale_after="$stale_after_seconds"; fi
+      if [ "$owner_file_present" != true ] && [ "$recorded_stale_after" -gt 30 ]; then recorded_stale_after=30; fi
+      if [ -n "$last_heartbeat" ]; then
+        heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$last_heartbeat" +%s 2>/dev/null || true)"
+      else
+        heartbeat_epoch=""
+      fi
+      if [ -z "$heartbeat_epoch" ]; then
+        heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || true)"
+      fi
+      if [ -n "$heartbeat_epoch" ]; then
+        lock_age_seconds=$((now_epoch - heartbeat_epoch))
+      fi
+      if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then
+        recovered_path="$data_root/locks/recovered/mutation-$stamp-$$.lock"
+        if mv "$lock_dir" "$recovered_path" 2>/dev/null; then
+          printf '{"phase":"%s","recoveredAt":"%s","recoveredBy":%s,"correlationId":%s,"lockAgeSeconds":%s}\\n' "remote-state-lock" "$now" "$owner_json" "$correlation_id_json" "$lock_age_seconds" > "$recovered_path/recovered.json"
+          mkdir "$lock_dir"
+        else
+          if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi
+          exit ${lockConflictExitCode}
+        fi
+      else
+        if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi
+        exit ${lockConflictExitCode}
+      fi
+    fi
+    printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\\n' "$owner_json" "$correlation_id_json" "$now" "$now" "$stale_after_seconds" > "$owner_file"
+    marker="$data_root/schema-version.json"
+    current_version=0
+    if [ -f "$marker" ]; then
+      current_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$marker" | head -n 1 || true)"
+    fi
+    [ -n "$current_version" ] || current_version=0
+    if [ "$current_version" != "$schema_version" ]; then
+      backup_path="$data_root/backups/schema-$current_version-to-$schema_version-$stamp.json"
+      journal_path="$data_root/journals/schema-$current_version-to-$schema_version-$stamp.json"
+      if [ -f "$marker" ]; then cp "$marker" "$backup_path"; else printf "{}\\n" > "$backup_path"; fi
+      printf '{"phase":"remote-state-migration","fromVersion":%s,"toVersion":%s,"startedAt":"%s"}\\n' "$current_version" "$schema_version" "$now" > "$journal_path"
+      printf '{"version":%s,"migratedAt":"%s"}\\n' "$schema_version" "$now" > "$marker"
+    fi
+    actual_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$marker" | head -n 1 || true)"
+    if [ "$actual_version" != "$schema_version" ]; then
+      printf '{"phase":"remote-state-recovery","message":"schema marker integrity check failed","recordedAt":"%s"}\\n' "$now" > "$data_root/recovery.json"
+      rm -rf "$lock_dir"
+      echo "remote state schema marker failed integrity check" >&2
+      exit ${migrationFailureExitCode}
+    fi
+    printf "prepared %s schema=%s\\n" "$data_root" "$schema_version"`)}
+  `;
 }
 
 function remoteHeartbeatCommand(input: {
@@ -288,53 +289,51 @@ function remoteHeartbeatCommand(input: {
   owner: string;
   correlationId: string;
   staleAfterSeconds: number;
-}): string {
+}): AshScript {
   const expectedOwnerFragment = `"owner":${jsonString(input.owner)}`;
   const expectedCorrelationFragment = `"correlationId":${jsonString(input.correlationId)}`;
-  const script = [
-    "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
-    `expected_owner_fragment=${shellQuote(expectedOwnerFragment)}`,
-    `expected_correlation_fragment=${shellQuote(expectedCorrelationFragment)}`,
-    'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
-    'lock_dir="$data_root/locks/mutation.lock"',
-    'owner_file="$lock_dir/owner.json"',
-    '[ -d "$lock_dir" ] || exit 0',
-    '[ -f "$owner_file" ] || exit 0',
-    'grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
-    'grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
-    'started_at="$(sed -n \'s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
-    '[ -n "$started_at" ] || started_at="$now"',
-    `printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$started_at" "$now" "$stale_after_seconds" > "$owner_file"`,
-  ].join("\n");
-
-  return `sh -lc ${shellQuote(script)}`;
+  return ash`
+    set -eu
+    ${ash.env("data_root", input.dataRoot)}
+    ${ash.env("stale_after_seconds", input.staleAfterSeconds)}
+    ${ash.env("expected_owner_fragment", expectedOwnerFragment)}
+    ${ash.env("expected_correlation_fragment", expectedCorrelationFragment)}
+    ${ash.env("owner_json", jsonString(input.owner))}
+    ${ash.env("correlation_id_json", jsonString(input.correlationId))}
+    ${ash.raw(`now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    lock_dir="$data_root/locks/mutation.lock"
+    owner_file="$lock_dir/owner.json"
+    [ -d "$lock_dir" ] || exit 0
+    [ -f "$owner_file" ] || exit 0
+    grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+    grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+    started_at="$(sed -n 's/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' "$owner_file" | head -n 1 || true)"
+    [ -n "$started_at" ] || started_at="$now"
+    printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\\n' "$owner_json" "$correlation_id_json" "$started_at" "$now" "$stale_after_seconds" > "$owner_file"`)}
+  `;
 }
 
 function remoteReleaseCommand(input: {
   dataRoot: string;
   owner: string;
   correlationId: string;
-}): string {
+}): AshScript {
   const expectedOwnerFragment = `"owner":${jsonString(input.owner)}`;
   const expectedCorrelationFragment = `"correlationId":${jsonString(input.correlationId)}`;
-  const script = [
-    "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `expected_owner_fragment=${shellQuote(expectedOwnerFragment)}`,
-    `expected_correlation_fragment=${shellQuote(expectedCorrelationFragment)}`,
-    'lock_dir="$data_root/locks/mutation.lock"',
-    'owner_file="$lock_dir/owner.json"',
-    '[ -d "$lock_dir" ] || exit 0',
-    '[ -f "$owner_file" ] || { rm -rf "$lock_dir"; exit 0; }',
-    'grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
-    'grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
-    'rm -rf "$data_root/locks/mutation.lock"',
-    'printf "released %s\\n" "$data_root"',
-  ].join("\n");
-
-  return `sh -lc ${shellQuote(script)}`;
+  return ash`
+    set -eu
+    ${ash.env("data_root", input.dataRoot)}
+    ${ash.env("expected_owner_fragment", expectedOwnerFragment)}
+    ${ash.env("expected_correlation_fragment", expectedCorrelationFragment)}
+    ${ash.raw(`lock_dir="$data_root/locks/mutation.lock"
+    owner_file="$lock_dir/owner.json"
+    [ -d "$lock_dir" ] || exit 0
+    [ -f "$owner_file" ] || { rm -rf "$lock_dir"; exit 0; }
+    grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+    grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+    rm -rf "$data_root/locks/mutation.lock"
+    printf "released %s\\n" "$data_root"`)}
+  `;
 }
 
 function phaseForPrepareFailure(result: SshRemoteCommandResult): string {
@@ -554,13 +553,15 @@ export class SshRemoteStateLifecycle {
     while (true) {
       const result = await this.runner.run({
         target: this.target,
-        command: remotePrepareCommand({
-          dataRoot: this.dataRoot,
-          schemaVersion: this.schemaVersion,
-          owner: this.owner,
-          correlationId: this.correlationId,
-          staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
-        }),
+        command: renderShLcCommand(
+          remotePrepareCommand({
+            dataRoot: this.dataRoot,
+            schemaVersion: this.schemaVersion,
+            owner: this.owner,
+            correlationId: this.correlationId,
+            staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+          }),
+        ),
         cwd: this.cwd,
         env: this.env,
         redactions: this.target.identityFile ? [this.target.identityFile] : [],
@@ -620,11 +621,13 @@ export class SshRemoteStateLifecycle {
     this.stopHeartbeat();
     const result = await this.runner.run({
       target: this.target,
-      command: remoteReleaseCommand({
-        dataRoot: this.dataRoot,
-        owner: this.owner,
-        correlationId: this.correlationId,
-      }),
+      command: renderShLcCommand(
+        remoteReleaseCommand({
+          dataRoot: this.dataRoot,
+          owner: this.owner,
+          correlationId: this.correlationId,
+        }),
+      ),
       cwd: this.cwd,
       env: this.env,
       redactions: this.target.identityFile ? [this.target.identityFile] : [],
@@ -675,12 +678,14 @@ export class SshRemoteStateLifecycle {
     try {
       const result = await this.runner.run({
         target: this.target,
-        command: remoteHeartbeatCommand({
-          dataRoot: this.dataRoot,
-          owner: this.owner,
-          correlationId: this.correlationId,
-          staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
-        }),
+        command: renderShLcCommand(
+          remoteHeartbeatCommand({
+            dataRoot: this.dataRoot,
+            owner: this.owner,
+            correlationId: this.correlationId,
+            staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+          }),
+        ),
         cwd: this.cwd,
         env: this.env,
         redactions: this.target.identityFile ? [this.target.identityFile] : [],

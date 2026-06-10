@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   buildSshRemoteStateDiagnosticsCommand,
   buildSshRemoteStateLockInspectCommand,
   buildSshRemoteStateLockRecoverStaleCommand,
+  renderSshRemoteStateDiagnosticsScript,
+  renderSshRemoteStateLockInspectScript,
+  renderSshRemoteStateLockRecoverStaleScript,
 } from "../src/commands/remote-state";
 
 describe("CLI SSH remote-state lock commands", () => {
@@ -26,6 +31,17 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
   });
 
+  test("[CONFIG-FILE-STATE-018] rendered inspect script is stable", () => {
+    const script = ash.render(
+      renderSshRemoteStateLockInspectScript({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        staleAfterSeconds: 1_200,
+      }),
+    );
+
+    expect(script).toMatchSnapshot();
+  });
+
   test("[CONFIG-FILE-STATE-019] recover-stale archives only stale mutation locks", () => {
     const command = buildSshRemoteStateLockRecoverStaleCommand({
       dataRoot: "/var/lib/appaloft/runtime/state",
@@ -42,6 +58,18 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).toContain("recorded_stale_after=30");
     expect(command).toContain("appaloft-cli-test");
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
+  });
+
+  test("[CONFIG-FILE-STATE-019] rendered recover-stale script is stable", () => {
+    const script = ash.render(
+      renderSshRemoteStateLockRecoverStaleScript({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        staleAfterSeconds: 1_200,
+        recoveredBy: "appaloft-cli-test",
+      }),
+    );
+
+    expect(script).toMatchSnapshot();
   });
 
   test("[CONFIG-FILE-STATE-020] remote-state maintenance uses stale-only lock maintenance", () => {
@@ -83,5 +111,56 @@ describe("CLI SSH remote-state lock commands", () => {
     expect(command).not.toContain('mkdir "$lock_dir"');
     expect(command).not.toContain('mv "$lock_dir"');
     expect(command).not.toContain("OPENSSH PRIVATE KEY");
+  });
+
+  test("[OP-WORK-QRY-011] rendered diagnostics script is stable", () => {
+    const script = ash.render(
+      renderSshRemoteStateDiagnosticsScript({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        staleAfterSeconds: 1_200,
+        limit: 20,
+      }),
+    );
+
+    expect(script).toMatchSnapshot();
+  });
+
+  test("[CONFIG-FILE-STATE-018] inspect script executes missing and unlocked safe paths", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-state-ash-"));
+    try {
+      const missingRoot = join(tempRoot, "missing");
+      const missing = ash.execute(
+        renderSshRemoteStateLockInspectScript({
+          dataRoot: missingRoot,
+          staleAfterSeconds: 1_200,
+        }),
+      );
+      expect(missing.success).toBe(true);
+      expect(JSON.parse(missing.stdout)).toMatchObject({
+        status: "missing",
+        phase: "remote-state-lock",
+        stateBackend: "ssh-pglite",
+        dataRoot: missingRoot,
+      });
+
+      const unlockedRoot = join(tempRoot, "unlocked");
+      Bun.spawnSync(["mkdir", "-p", unlockedRoot]);
+      const unlocked = ash.execute(
+        renderSshRemoteStateLockInspectScript({
+          dataRoot: unlockedRoot,
+          staleAfterSeconds: 1_200,
+        }),
+      );
+      expect(unlocked.success).toBe(true);
+      expect(JSON.parse(unlocked.stdout)).toMatchObject({
+        status: "unlocked",
+        phase: "remote-state-lock",
+        stateBackend: "ssh-pglite",
+        dataRoot: unlockedRoot,
+        stale: false,
+      });
+    } finally {
+      rmSync(tempRoot, { force: true, recursive: true });
+    }
   });
 });
