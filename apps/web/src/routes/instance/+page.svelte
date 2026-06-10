@@ -9,14 +9,16 @@
     InstanceUpgradeCheckResponse,
     InstanceUpgradeCheckStatus,
     MaintenanceWorkerStatus,
+    OperatorWorkEvent,
+    OperatorWorkItem,
     TerminalSessionSummary,
   } from "@appaloft/contracts";
   import {
+    Activity,
     Clock3,
     ClipboardList,
     Download,
     GitBranch,
-    Globe2,
     Network,
     RefreshCw,
     ShieldCheck,
@@ -25,13 +27,16 @@
   } from "@lucide/svelte";
 
   import { readErrorMessage, request } from "$lib/api/client";
-  import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
-  import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
+  import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Table from "$lib/components/ui/table";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { requestConsoleConfirm } from "$lib/console/modal-interaction";
+  import { instanceSettingsItems } from "$lib/console/settings-nav";
+  import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -46,7 +51,11 @@
     title: string;
     detail: string;
   };
-  type InstanceSection = "overview" | "maintenance" | "sessions" | "guidance";
+  type InstanceSection = "overview" | "workers" | "maintenance" | "sessions" | "guidance";
+  type InstanceRuntimeTopology = NonNullable<MaintenanceWorkerStatus["runtimeTopology"]>;
+  type Props = {
+    section?: InstanceSection | null;
+  };
   type RuntimeStatusResponse = {
     schemaVersion: "cloud-dev-runtime.status/v1";
     generatedAt: string;
@@ -67,7 +76,37 @@
   const currentOrigin = $derived(page.url.origin);
   let upgradeFeedback = $state<UpgradeFeedback | null>(null);
   let terminalSessionFeedback = $state<TerminalSessionFeedback | null>(null);
-  const activeSection = $derived(parseInstanceSection(page.url.searchParams.get("section")));
+  let { section = null }: Props = $props();
+  const activeSection = $derived.by<InstanceSection>(() => {
+    if (section) {
+      return section;
+    }
+
+    if (page.url.pathname.endsWith("/workers")) {
+      return "workers";
+    }
+    if (page.url.pathname.endsWith("/maintenance")) {
+      return "maintenance";
+    }
+    if (page.url.pathname.endsWith("/sessions")) {
+      return "sessions";
+    }
+    if (page.url.pathname.endsWith("/guidance")) {
+      return "guidance";
+    }
+
+    return parseInstanceSection(page.url.searchParams.get("section"));
+  });
+  const selectedWorkId = $derived(page.url.searchParams.get("workId") ?? "");
+  const contextQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["organizations", "current-context"],
+      queryFn: () => orpcClient.organizations.currentContext({}),
+      enabled: browser,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
   const runtimeStatusQuery = createQuery(() =>
     queryOptions({
       queryKey: ["bootstrap", "runtime-status"],
@@ -91,9 +130,29 @@
     queryOptions<DoctorResponse>({
       queryKey: ["system", "doctor"],
       queryFn: () => orpcClient.system.doctor(),
-      enabled: browser && activeSection === "maintenance",
+      enabled: browser && (activeSection === "maintenance" || activeSection === "workers"),
       staleTime: 30_000,
       refetchInterval: 60_000,
+      retry: 0,
+    }),
+  );
+  const operatorWorkQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["operator-work", "instance-workers", { limit: 25 }],
+      queryFn: () => orpcClient.operatorWork.list({ limit: 25 }),
+      enabled: browser && activeSection === "workers",
+      staleTime: 10_000,
+      refetchInterval: 15_000,
+      retry: 0,
+    }),
+  );
+  const selectedOperatorWorkQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["operator-work", selectedWorkId],
+      queryFn: () => orpcClient.operatorWork.show({ workId: selectedWorkId }),
+      enabled: browser && activeSection === "workers" && selectedWorkId.length > 0,
+      staleTime: 5_000,
+      refetchInterval: 10_000,
       retry: 0,
     }),
   );
@@ -177,6 +236,13 @@
       };
     },
   }));
+  const switchCurrentOrganizationMutation = createMutation(() => ({
+    mutationFn: (organizationId: string) =>
+      orpcClient.organizations.switchCurrent({ organizationId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+    },
+  }));
   const domainInstallCommand =
     "curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --domain console.example.com";
   const directInstallCommand = "curl -fsSL https://appaloft.com/install.sh | sudo sh";
@@ -188,8 +254,17 @@
     upgradeStatus === "available" || upgradeStatus === "current" ? upgradeStatus : null,
   );
   const doctor = $derived(doctorQuery.data ?? null);
+  const currentOrganization = $derived(contextQuery.data?.currentOrganization ?? null);
+  const organizations = $derived(contextQuery.data?.organizations ?? []);
   const terminalSessions = $derived(terminalSessionsQuery.data?.items ?? []);
   const maintenanceWorkers = $derived(doctor?.maintenanceWorkers ?? []);
+  const durableWorker = $derived(
+    maintenanceWorkers.find((worker) => worker.key === "durable-worker-runtime") ?? null,
+  );
+  const durableRuntimeTopology = $derived(durableWorker?.runtimeTopology ?? null);
+  const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
+  const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
+  const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
   const enabledMaintenanceWorkerCount = $derived(
     maintenanceWorkers.filter((worker) => worker.enabled).length,
   );
@@ -216,7 +291,12 @@ control-plane-url: ${currentOrigin}
 server-config-deploy: true`);
 
   function parseInstanceSection(value: string | null): InstanceSection {
-    if (value === "maintenance" || value === "sessions" || value === "guidance") {
+    if (
+      value === "workers" ||
+      value === "maintenance" ||
+      value === "sessions" ||
+      value === "guidance"
+    ) {
       return value;
     }
 
@@ -224,21 +304,39 @@ server-config-deploy: true`);
   }
 
   function instanceSectionHref(section: InstanceSection): string {
-    const params = new URLSearchParams(page.url.searchParams);
-
-    if (section === "overview") {
-      params.delete("section");
-    } else {
-      params.set("section", section);
+    switch (section) {
+      case "workers":
+        return "/instance/workers";
+      case "maintenance":
+        return "/instance/maintenance";
+      case "sessions":
+        return "/instance/sessions";
+      case "guidance":
+        return "/instance/guidance";
+      case "overview":
+        return "/instance";
     }
+  }
 
+  function workerDetailHref(workId: string): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    params.set("workId", workId);
     const search = params.toString();
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
-  function selectInstanceSection(section: InstanceSection, event: MouseEvent): void {
-    event.preventDefault();
-    void goto(instanceSectionHref(section), { noScroll: true, keepFocus: true });
+  function switchOrganization(organizationId: string): void {
+    if (!organizationId || organizationId === currentOrganization?.organizationId) {
+      return;
+    }
+
+    switchCurrentOrganizationMutation.mutate(organizationId);
+  }
+
+  function navigateTo(path: string): void {
+    if (browser) {
+      void goto(path);
+    }
   }
 
   function statusLabelKey(status: InstanceUpgradeCheckStatus) {
@@ -307,6 +405,67 @@ server-config-deploy: true`);
     }
   }
 
+  function runtimeModeVariant(mode: InstanceRuntimeTopology["mode"]) {
+    if (mode === "embedded") {
+      return "default";
+    }
+
+    if (mode === "standalone") {
+      return "secondary";
+    }
+
+    return "outline";
+  }
+
+  function workerOnlineStatusLabel(
+    worker: NonNullable<InstanceRuntimeTopology["heartbeat"]>["workers"][number],
+  ): string {
+    return worker.online ? $t(i18nKeys.common.status.active) : $t(i18nKeys.common.status.inactive);
+  }
+
+  function workStatusVariant(status: OperatorWorkItem["status"]) {
+    if (status === "succeeded") {
+      return "default";
+    }
+
+    if (status === "failed" || status === "dead-lettered") {
+      return "destructive";
+    }
+
+    if (status === "running" || status === "retry-scheduled" || status === "pending") {
+      return "secondary";
+    }
+
+    return "outline";
+  }
+
+  function workStatusLabel(status: OperatorWorkItem["status"]): string {
+    if (status === "running") return $t(i18nKeys.common.status.running);
+    if (status === "pending") return $t(i18nKeys.common.status.requested);
+    if (status === "succeeded") return $t(i18nKeys.common.status.passed);
+    if (status === "failed") return $t(i18nKeys.common.status.failed);
+    if (status === "canceled") return $t(i18nKeys.common.actions.cancel);
+    if (status === "retry-scheduled") return $t(i18nKeys.console.instance.workerWorkRetryScheduled);
+    if (status === "dead-lettered") return $t(i18nKeys.console.instance.workerWorkDeadLettered);
+    return $t(i18nKeys.common.status.unknown);
+  }
+
+  function eventStatusLabel(event: OperatorWorkEvent): string {
+    return event.status ? workStatusLabel(event.status) : event.kind;
+  }
+
+  function workScopeLabel(work: OperatorWorkItem): string {
+    return (
+      work.deploymentId ??
+      work.resourceId ??
+      work.projectId ??
+      work.serverId ??
+      work.domainBindingId ??
+      work.certificateId ??
+      "-"
+    );
+  }
+
   function terminalSessionScopeLabel(session: TerminalSessionSummary) {
     return session.scope === "resource"
       ? $t(i18nKeys.console.terminal.lifecycleScopeResource)
@@ -362,70 +521,28 @@ server-config-deploy: true`);
   <title>{$t(i18nKeys.console.instance.pageTitle)} · Appaloft</title>
 </svelte:head>
 
-<ConsoleShell
+<SettingsShell
   title={$t(i18nKeys.console.instance.pageTitle)}
   description={$t(i18nKeys.console.instance.pageDescription)}
+  groupLabel={$t(i18nKeys.console.instance.pageTitle)}
+  activePath={instanceSectionHref(activeSection)}
+  items={instanceSettingsItems()}
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.home), href: "/" },
     { label: $t(i18nKeys.console.instance.pageTitle) },
   ]}
 >
-  <ConsoleResourceCanvas class="max-w-6xl">
-    <div class="console-subnav-layout">
-      <aside class="console-subnav">
-        <p class="console-subnav-kicker">{$t(i18nKeys.console.instance.pageTitle)}</p>
-        <nav class="console-subnav-list" aria-label={$t(i18nKeys.console.instance.pageTitle)}>
-          <a
-            href={instanceSectionHref("overview")}
-            onclick={(event) => selectInstanceSection("overview", event)}
-            aria-current={activeSection === "overview" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <Globe2 class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {$t(i18nKeys.console.instance.overviewTitle)}
-            </span>
-          </a>
+  {#snippet sidebarHeader()}
+    <ConsoleOrganizationSwitcher
+      {currentOrganization}
+      {organizations}
+      pending={switchCurrentOrganizationMutation.isPending}
+      onSwitch={switchOrganization}
+      onNavigate={navigateTo}
+    />
+  {/snippet}
 
-          <a
-            href={instanceSectionHref("maintenance")}
-            onclick={(event) => selectInstanceSection("maintenance", event)}
-            aria-current={activeSection === "maintenance" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <ShieldCheck class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {$t(i18nKeys.console.instance.maintenanceWorkersTitle)}
-            </span>
-          </a>
-
-          <a
-            href={instanceSectionHref("sessions")}
-            onclick={(event) => selectInstanceSection("sessions", event)}
-            aria-current={activeSection === "sessions" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <Terminal class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {$t(i18nKeys.console.terminal.lifecycleTitle)}
-            </span>
-          </a>
-
-          <a
-            href={instanceSectionHref("guidance")}
-            onclick={(event) => selectInstanceSection("guidance", event)}
-            aria-current={activeSection === "guidance" ? "page" : undefined}
-            class="console-subnav-item"
-          >
-            <ClipboardList class="console-subnav-item-icon" />
-            <span class="console-subnav-item-title">
-              {$t(i18nKeys.console.instance.guidanceTitle)}
-            </span>
-          </a>
-        </nav>
-      </aside>
-
-      <div class="console-subnav-content space-y-4">
+  <div class="mx-auto max-w-6xl space-y-4">
         {#if activeSection === "overview"}
           <section class="console-panel p-5">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -637,6 +754,347 @@ server-config-deploy: true`);
                 {$t(i18nKeys.console.instance.applyUnsupported)}
               </p>
             {/if}
+          </section>
+        {:else if activeSection === "workers"}
+          <section class="space-y-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div class="max-w-2xl space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant={durableRuntimeTopology ? runtimeModeVariant(durableRuntimeTopology.mode) : "outline"}>
+                    {durableRuntimeTopology?.mode ?? $t(i18nKeys.common.status.loading)}
+                  </Badge>
+                  <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.instance.workerManagementTitle)}</h1>
+                </div>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.instance.workerManagementBody)}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={doctorQuery.isFetching}
+                  onclick={() => void doctorQuery.refetch()}
+                >
+                  <RefreshCw class={["mr-2 size-4", doctorQuery.isFetching ? "animate-spin" : ""]} />
+                  {$t(i18nKeys.console.instance.refreshDoctor)}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={operatorWorkQuery.isFetching}
+                  onclick={() => void operatorWorkQuery.refetch()}
+                >
+                  <RefreshCw class={["mr-2 size-4", operatorWorkQuery.isFetching ? "animate-spin" : ""]} />
+                  {$t(i18nKeys.console.instance.workerWorkRefresh)}
+                </Button>
+              </div>
+            </div>
+
+            {#if doctorQuery.error}
+              <p class="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {readErrorMessage(doctorQuery.error)}
+              </p>
+            {/if}
+
+            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <div class="space-y-4">
+                <section class="console-panel p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                      <Activity class="size-5 text-primary" />
+                      <div>
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.instance.workerRuntimeTopology)}
+                        </h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeTopologyBody)}
+                        </p>
+                      </div>
+                    </div>
+                    {#if durableWorker}
+                      <Badge variant={durableWorker.enabled ? "default" : "outline"}>
+                        {durableWorker.enabled
+                          ? $t(i18nKeys.console.instance.workerStatusEnabled)
+                          : $t(i18nKeys.console.instance.workerStatusDisabled)}
+                      </Badge>
+                    {/if}
+                  </div>
+
+                  {#if doctorQuery.isPending}
+                    <div class="mt-5 rounded-md border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.common.status.loading)}
+                    </div>
+                  {:else if durableRuntimeTopology}
+                    <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div class="rounded-md border bg-background p-4">
+                        <p class="text-xs uppercase text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeMode)}
+                        </p>
+                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.mode}</p>
+                      </div>
+                      <div class="rounded-md border bg-background p-4">
+                        <p class="text-xs uppercase text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeWorkers)}
+                        </p>
+                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.workerCount}</p>
+                      </div>
+                      <div class="rounded-md border bg-background p-4">
+                        <p class="text-xs uppercase text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeBackend)}
+                        </p>
+                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.queueBackend}</p>
+                      </div>
+                      <div class="rounded-md border bg-background p-4">
+                        <p class="text-xs uppercase text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeRole)}
+                        </p>
+                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.coordinationRole}</p>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 rounded-md border bg-muted/20 p-4">
+                      <div class="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
+                        <div>
+                          <p class="text-xs uppercase text-muted-foreground">
+                            {$t(i18nKeys.console.instance.workerRuntimeGroup)}
+                          </p>
+                          <p class="mt-1 break-all font-mono text-sm">
+                            {durableRuntimeTopology.workerGroup}
+                          </p>
+                        </div>
+                        <div>
+                          <p class="text-xs uppercase text-muted-foreground">
+                            {$t(i18nKeys.console.instance.workerRuntimeWorkerIds)}
+                          </p>
+                          <p class="mt-1 break-all font-mono text-sm">
+                            {durableRuntimeTopology.workerIds.join(", ") || "-"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {#if durableRuntimeTopology.heartbeat}
+                      <div class="mt-4 space-y-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">
+                            {$t(i18nKeys.console.instance.workerRuntimeOnlineWorkers)}:
+                            {durableRuntimeTopology.heartbeat.onlineWorkerCount}
+                          </Badge>
+                          <Badge variant="outline">
+                            {$t(i18nKeys.console.instance.workerRuntimeStaleWorkers)}:
+                            {durableRuntimeTopology.heartbeat.staleWorkerCount}
+                          </Badge>
+                          {#if durableRuntimeTopology.heartbeat.lastSeenAt}
+                            <span class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}
+                              {formatTime(durableRuntimeTopology.heartbeat.lastSeenAt)}
+                            </span>
+                          {/if}
+                        </div>
+
+                        {#if durableRuntimeTopology.heartbeat.workers.length > 0}
+                          <div class="overflow-hidden rounded-md border">
+                            <Table.Root>
+                              <Table.Header>
+                                <Table.Row class="hover:bg-transparent">
+                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
+                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeSlot)}</Table.Head>
+                                  <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
+                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
+                                </Table.Row>
+                              </Table.Header>
+                              <Table.Body>
+                                {#each durableRuntimeTopology.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
+                                  <Table.Row>
+                                    <Table.Cell class="max-w-72 break-all font-mono text-xs">
+                                      {runtimeWorker.workerId}
+                                    </Table.Cell>
+                                    <Table.Cell class="font-mono text-xs">{runtimeWorker.slot}</Table.Cell>
+                                    <Table.Cell>
+                                      <Badge variant={runtimeWorker.online ? "default" : "outline"}>
+                                        {workerOnlineStatusLabel(runtimeWorker)}
+                                      </Badge>
+                                    </Table.Cell>
+                                    <Table.Cell class="text-muted-foreground">
+                                      {formatTime(runtimeWorker.lastSeenAt)}
+                                    </Table.Cell>
+                                  </Table.Row>
+                                {/each}
+                              </Table.Body>
+                            </Table.Root>
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  {:else}
+                    <div class="mt-5 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.instance.workerRuntimeUnavailable)}
+                    </div>
+                  {/if}
+                </section>
+
+                <section class="console-panel p-5">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.instance.workerWorkTitle)}
+                      </h2>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.instance.workerWorkBody)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {$t(i18nKeys.console.instance.workerWorkCount, { count: operatorWorkItems.length })}
+                    </Badge>
+                  </div>
+
+                  {#if operatorWorkQuery.error}
+                    <p class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                      {readErrorMessage(operatorWorkQuery.error)}
+                    </p>
+                  {:else if operatorWorkQuery.isPending}
+                    <div class="mt-5 rounded-md border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.common.status.loading)}
+                    </div>
+                  {:else if operatorWorkItems.length > 0}
+                    <div class="mt-5 overflow-hidden rounded-md border">
+                      <Table.Root>
+                        <Table.Header>
+                          <Table.Row class="hover:bg-transparent">
+                            <Table.Head class="min-w-56">
+                              {$t(i18nKeys.console.instance.workerWorkItem)}
+                            </Table.Head>
+                            <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
+                            <Table.Head>{$t(i18nKeys.console.instance.workerWorkScope)}</Table.Head>
+                            <Table.Head>{$t(i18nKeys.console.instance.workerWorkUpdatedAt)}</Table.Head>
+                            <Table.Head class="w-24">
+                              <span class="sr-only">{$t(i18nKeys.common.actions.viewDetails)}</span>
+                            </Table.Head>
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {#each operatorWorkItems as work (work.id)}
+                            <Table.Row class={selectedWorkId === work.id ? "bg-primary/5" : ""}>
+                              <Table.Cell class="max-w-80">
+                                <div class="min-w-0">
+                                  <p class="truncate font-medium">{work.operationKey}</p>
+                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                                    {work.id}
+                                  </p>
+                                  {#if work.phase || work.step}
+                                    <p class="mt-1 truncate text-xs text-muted-foreground">
+                                      {work.phase ?? "-"}{#if work.step} / {work.step}{/if}
+                                    </p>
+                                  {/if}
+                                </div>
+                              </Table.Cell>
+                              <Table.Cell>
+                                <Badge variant={workStatusVariant(work.status)}>
+                                  {workStatusLabel(work.status)}
+                                </Badge>
+                              </Table.Cell>
+                              <Table.Cell class="max-w-48 truncate font-mono text-xs">
+                                {workScopeLabel(work)}
+                              </Table.Cell>
+                              <Table.Cell class="text-muted-foreground">
+                                {formatTime(work.updatedAt)}
+                              </Table.Cell>
+                              <Table.Cell class="text-right">
+                                <Button href={workerDetailHref(work.id)} size="sm" variant="outline">
+                                  {$t(i18nKeys.common.actions.viewDetails)}
+                                </Button>
+                              </Table.Cell>
+                            </Table.Row>
+                          {/each}
+                        </Table.Body>
+                      </Table.Root>
+                    </div>
+                  {:else}
+                    <div class="mt-5 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.instance.workerWorkEmpty)}
+                    </div>
+                  {/if}
+                </section>
+              </div>
+
+              <aside class="console-panel p-5">
+                <div class="flex items-center gap-3">
+                  <ClipboardList class="size-5 text-primary" />
+                  <div>
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.instance.workerWorkEventsTitle)}
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.instance.workerWorkEventsBody)}
+                    </p>
+                  </div>
+                </div>
+
+                {#if !selectedWorkId}
+                  <div class="mt-5 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.instance.workerWorkEventsSelect)}
+                  </div>
+                {:else if selectedOperatorWorkQuery.error}
+                  <p class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                    {readErrorMessage(selectedOperatorWorkQuery.error)}
+                  </p>
+                {:else if selectedOperatorWorkQuery.isPending}
+                  <div class="mt-5 rounded-md border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                    {$t(i18nKeys.common.status.loading)}
+                  </div>
+                {:else if selectedOperatorWork}
+                  <div class="mt-5 space-y-4">
+                    <div class="rounded-md border bg-background p-3">
+                      <p class="break-all font-mono text-xs">{selectedOperatorWork.id}</p>
+                      <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <Badge variant={workStatusVariant(selectedOperatorWork.status)}>
+                          {workStatusLabel(selectedOperatorWork.status)}
+                        </Badge>
+                        <Badge variant="outline">{selectedOperatorWork.kind}</Badge>
+                      </div>
+                    </div>
+
+                    {#if selectedOperatorWorkEvents.length > 0}
+                      <div class="space-y-3">
+                        {#each selectedOperatorWorkEvents as event (event.id)}
+                          <article class="rounded-md border bg-background p-3 text-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                              <Badge variant={event.status ? workStatusVariant(event.status) : "outline"}>
+                                {eventStatusLabel(event)}
+                              </Badge>
+                              <span class="text-xs text-muted-foreground">
+                                #{event.sequence} · {formatTime(event.occurredAt)}
+                              </span>
+                            </div>
+                            {#if event.message}
+                              <p class="mt-3 leading-6">{event.message}</p>
+                            {/if}
+                            <div class="mt-3 space-y-1 font-mono text-xs text-muted-foreground">
+                              {#if event.phase || event.step}
+                                <p>{event.phase ?? "-"}{#if event.step} / {event.step}{/if}</p>
+                              {/if}
+                              {#if event.workerId || event.workerGroup}
+                                <p>
+                                  {event.workerGroup ?? "-"}
+                                  {#if event.workerId}
+                                    · {event.workerId}
+                                  {/if}
+                                </p>
+                              {/if}
+                            </div>
+                          </article>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.instance.workerWorkEventsEmpty)}
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+              </aside>
+            </div>
           </section>
         {:else if activeSection === "maintenance"}
           <section class="console-panel p-5">
@@ -975,7 +1433,5 @@ server-config-deploy: true`);
             </div>
           </section>
         {/if}
-      </div>
-    </div>
-  </ConsoleResourceCanvas>
-</ConsoleShell>
+  </div>
+</SettingsShell>
