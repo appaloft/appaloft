@@ -586,6 +586,7 @@ export async function createAppaloftServer(
   const database = await createReloadableDatabase({
     driver: config.databaseDriver,
     pgliteDataDir: config.pgliteDataDir,
+    ...(config.databasePoolMax ? { databasePoolMax: config.databasePoolMax } : {}),
     ...(options?.pgliteRuntimeAssets ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets } : {}),
     ...(config.databaseUrl ? { databaseUrl: config.databaseUrl } : {}),
   });

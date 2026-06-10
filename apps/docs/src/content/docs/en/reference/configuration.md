@@ -48,6 +48,7 @@ queue backend, worker group, worker ids, and coordinator role.
 | `APPALOFT_WORKER_COUNT` | `1` | Number of configured worker slots. Enabled modes require at least one; `disabled` can use `0`. |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | Stable worker group used to derive worker ids and coordinate capacity. |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | Required when `APPALOFT_WORKER_QUEUE_BACKEND=external`; supported public values are `kafka`, `temporal`, and `custom`. |
+| `APPALOFT_DATABASE_POOL_MAX` | `10` | Maximum PostgreSQL connections held by each runtime process. Lower this when multiple Web/worker processes share a small session pool. |
 
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>
 
