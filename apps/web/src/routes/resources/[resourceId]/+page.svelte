@@ -1097,6 +1097,7 @@
   let storageRuntimeCleanupServerId = $state("");
   let storageRuntimeCleanupBefore = $state("");
   let storageRuntimeCleanupObservationHandoffKey = $state("");
+  let storageRuntimeCleanupHandoffOpenedKey = $state("");
   let storageRuntimeCleanupDialogOpen = $state(false);
   let storageRuntimeCleanupResult = $state<CleanupStorageVolumeRuntimeResponse | null>(null);
   let storageRuntimeCleanupFeedback = $state<{
@@ -3108,6 +3109,7 @@
       storageRuntimeCleanupServerId = "";
       storageRuntimeCleanupBefore = new Date().toISOString();
       storageRuntimeCleanupObservationHandoffKey = "";
+      storageRuntimeCleanupHandoffOpenedKey = "";
       storageRuntimeCleanupResult = null;
       storageRuntimeCleanupFeedback = null;
       storageBackupVolumeId = "";
@@ -3186,6 +3188,14 @@
       storageRuntimeCleanupBefore = observationHandoff.to;
       storageRuntimeCleanupResult = null;
       storageRuntimeCleanupFeedback = null;
+    }
+    if (
+      observationHandoff &&
+      activeSettingsSection === "storage" &&
+      storageRuntimeCleanupHandoffOpenedKey !== observationHandoffKey
+    ) {
+      storageRuntimeCleanupHandoffOpenedKey = observationHandoffKey;
+      openStorageRuntimeCleanupDialog();
     }
   });
 
@@ -7853,6 +7863,16 @@
                       <Plus class="mr-2 size-4" aria-hidden="true" />
                       {$t(i18nKeys.console.resources.storageVolumeCreateAction)}
                     </Button>
+                    {#if storageVolumes.length === 0}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onclick={() => openStorageRuntimeCleanupDialog()}
+                      >
+                        <Trash2 class="mr-2 size-4" aria-hidden="true" />
+                        {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
+                      </Button>
+                    {/if}
                   </div>
                 </div>
 
