@@ -8,10 +8,12 @@ import {
   ok,
   type Deployment,
   type DeploymentDependencyBindingReferenceState,
+  type DeploymentState,
   type Result,
 } from "@appaloft/core";
 
 import { requireServerBackedDeploymentState } from "./deployment-target";
+import type { DockerEnvironmentVariableInput } from "./runtime-commands";
 
 const appaloftOwnedDependencySecretRefPrefixes = [
   "appaloft://dependency-resources/",
@@ -34,6 +36,34 @@ const appaloftDeploymentRuntimeEnvironmentKeys = new Set([
 
 export function isAppaloftManagedRuntimeEnvironmentKey(key: string): boolean {
   return appaloftDeploymentRuntimeEnvironmentKeys.has(key);
+}
+
+export function runtimeContainerEnvironmentVariables(input: {
+  env: NodeJS.ProcessEnv;
+  state: DeploymentState;
+  dependencyTargetNames: ReadonlySet<string>;
+}): DockerEnvironmentVariableInput[] {
+  return Object.entries(input.env)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    .filter(
+      ([key]) =>
+        key === "PORT" ||
+        isAppaloftManagedRuntimeEnvironmentKey(key) ||
+        input.dependencyTargetNames.has(key) ||
+        input.state.environmentSnapshot.variables.some((variable) => variable.key === key),
+    )
+    .map(([name, value]) => {
+      const snapshotVariable = input.state.environmentSnapshot.variables.find(
+        (variable) => variable.key === name,
+      );
+      return {
+        name,
+        value,
+        ...(snapshotVariable?.isSecret || input.dependencyTargetNames.has(name)
+          ? { redacted: true }
+          : {}),
+      };
+    });
 }
 
 function isInjectableDependencyReference(

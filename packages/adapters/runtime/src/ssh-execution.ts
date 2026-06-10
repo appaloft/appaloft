@@ -75,8 +75,8 @@ import {
 } from "./runtime-commands";
 import { runStreamingProcess } from "./streaming-process";
 import {
-  isAppaloftManagedRuntimeEnvironmentKey,
   resolveDependencyRuntimeEnvironment,
+  runtimeContainerEnvironmentVariables,
 } from "./dependency-runtime-secrets";
 import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
 import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
@@ -2384,26 +2384,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         dependencyTargetNames,
       } = runtimeEnv.value;
       const dockerCommandBuilder = RuntimeCommandBuilder.docker();
-      const dockerEnvVariables = Object.entries(runtimeExecutionEnv)
-        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-        .filter(
-          ([key]) =>
-            key === "PORT" ||
-            isAppaloftManagedRuntimeEnvironmentKey(key) ||
-            dependencyTargetNames.has(key) ||
-            state.environmentSnapshot.variables.some((variable) => variable.key === key),
-        )
-        .map(([name, value]) => {
-          const snapshotVariable = state.environmentSnapshot.variables.find(
-            (variable) => variable.key === name,
-          );
-          return {
-            name,
-            value,
-            ...(snapshotVariable?.isSecret || dependencyTargetNames.has(name)
-              ? { redacted: true }
-              : {}),
-          };
+      const dockerEnvVariables = runtimeContainerEnvironmentVariables({
+        env: runtimeExecutionEnv,
+        state,
+        dependencyTargetNames,
       });
       const labels = dockerLabelsFromAssignments([
         ...appaloftDockerContainerLabelsForDeployment(state),
@@ -3104,6 +3088,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     env: NodeJS.ProcessEnv;
     remoteWorkdir: string;
     image: string;
+    environment?: Record<string, string>;
   }): Promise<
     Result<{ prepared: true; composeFile?: string } | { prepared: false; deployment: Deployment }>
   > {
@@ -3152,6 +3137,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             ...(state.runtimePlan.execution.startCommand
               ? { command: state.runtimePlan.execution.startCommand }
               : {}),
+            ...(input.environment ? { environment: input.environment } : {}),
             includeBuild: Boolean(dockerfilePath),
           }),
         },
@@ -3439,30 +3425,6 @@ export class SshExecutionBackend implements ExecutionBackend {
         deploymentId: state.id.value,
         metadata: state.runtimePlan.execution.metadata,
       });
-      const generatedCompose = await this.prepareRemoteGeneratedServiceGraphCompose({
-        context,
-        deployment,
-        logs,
-        runtimeDir,
-        target,
-        env,
-        remoteWorkdir,
-        image: runtimeInstanceNames.imageName,
-      });
-      if (generatedCompose.isErr()) {
-        return err(generatedCompose.error);
-      }
-      if (!generatedCompose.value.prepared) {
-        return ok({ deployment: generatedCompose.value.deployment });
-      }
-      const composeFile =
-        generatedCompose.value.composeFile ??
-        state.runtimePlan.execution.composeFile ??
-        "docker-compose.yml";
-      const remoteComposeFile = composeFile.startsWith("/")
-        ? composeFile
-        : `${remoteWorkdir}/${composeFile}`;
-      const remoteComposeOwnershipOverrideFile = `${remoteWorkdir}/.appaloft.compose.labels.override.yml`;
       const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
         step: "before-compose-up",
       });
@@ -3478,6 +3440,38 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (runtimeEnv.isErr()) {
         return err(runtimeEnv.error);
       }
+      const runtimeEnvPlaceholders = Object.fromEntries(
+        runtimeContainerEnvironmentVariables({
+          env: runtimeEnv.value.env,
+          state,
+          dependencyTargetNames: runtimeEnv.value.dependencyTargetNames,
+        }).map((variable) => [variable.name, `\${${variable.name}}`]),
+      );
+      const generatedCompose = await this.prepareRemoteGeneratedServiceGraphCompose({
+        context,
+        deployment,
+        logs,
+        runtimeDir,
+        target,
+        env,
+        remoteWorkdir,
+        image: runtimeInstanceNames.imageName,
+        environment: runtimeEnvPlaceholders,
+      });
+      if (generatedCompose.isErr()) {
+        return err(generatedCompose.error);
+      }
+      if (!generatedCompose.value.prepared) {
+        return ok({ deployment: generatedCompose.value.deployment });
+      }
+      const composeFile =
+        generatedCompose.value.composeFile ??
+        state.runtimePlan.execution.composeFile ??
+        "docker-compose.yml";
+      const remoteComposeFile = composeFile.startsWith("/")
+        ? composeFile
+        : `${remoteWorkdir}/${composeFile}`;
+      const remoteComposeOwnershipOverrideFile = `${remoteWorkdir}/.appaloft.compose.labels.override.yml`;
       const composeOwnershipLabels = dockerLabelsFromAssignments(
         appaloftDockerContainerLabelsForDeployment(state),
       );
