@@ -1533,6 +1533,7 @@ export interface ServerSummary {
     reasonCodes: string[];
     message?: string;
   };
+  displayOrder?: number;
   credential?: {
     kind: "local-ssh-agent" | "ssh-private-key";
     credentialId?: string;
@@ -8455,7 +8456,10 @@ export interface ProjectOwnershipReadModel {
 
 export interface ServerReadModel {
   count(context: RepositoryContext): Promise<number>;
-  list(context: RepositoryContext, input?: { limit?: number }): Promise<ServerSummary[]>;
+  list(
+    context: RepositoryContext,
+    input?: { limit?: number; offset?: number },
+  ): Promise<ServerSummary[]>;
   findOne(context: RepositoryContext, spec: ServerSelectionSpec): Promise<ServerSummary | null>;
 }
 

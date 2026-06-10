@@ -283,6 +283,7 @@ export const tokens = {
   configureServerCredentialUseCase: Symbol.for("appaloft.configure_server_credential_use_case"),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),
   countServersQueryService: Symbol.for("appaloft.count_servers_query_service"),
+  reorderServersUseCase: Symbol.for("appaloft.reorder_servers_use_case"),
   listSshCredentialsQueryService: Symbol.for("appaloft.list_ssh_credentials_query_service"),
   showSshCredentialQueryService: Symbol.for("appaloft.show_ssh_credential_query_service"),
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),

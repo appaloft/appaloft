@@ -88,6 +88,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft server capacity policy list` - `scheduled-runtime-prune-policies.list`
 - `appaloft server capacity policy show <policyId>` - `scheduled-runtime-prune-policies.show`
 - `appaloft server rename <serverId> --name <name>` - `servers.rename`
+- `appaloft server reorder --server-ids <ids>` - `servers.reorder`
 - `appaloft server proxy configure <serverId> --kind none|traefik|caddy` - `servers.configure-edge-proxy`
 - `appaloft server deactivate <serverId>` - `servers.deactivate`
 - `appaloft server delete-check <serverId>` - `servers.delete-check`

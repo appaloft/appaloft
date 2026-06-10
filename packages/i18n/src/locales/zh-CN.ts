@@ -2395,6 +2395,7 @@ export const zhCN = {
         "服务器是运行时放置关系，不是项目归属关系；部署时会把项目、环境、资源和服务器串起来。",
       focusTitle: "服务器目标与运行状态",
       listDescription: "按创建时间展示所有部署目标，点击进入详情后可以执行连通性测试。",
+      listRange: "第 {{start}}-{{end}} 个，共 {{total}} 个",
       listTitle: "服务器列表",
       lifecycleInactiveDescription:
         "已停用服务器仍会保留可见，但不会再接收新的部署、调度或代理配置工作。",
@@ -2405,6 +2406,7 @@ export const zhCN = {
       overviewTab: "概览",
       pageTitle: "服务器",
       proxyAccessTab: "代理与访问",
+      reorderHandle: "拖动排序",
       renameFailed: "无法修改服务器名称",
       renameLabel: "显示名称",
       renameSucceeded: "服务器名称已保存",

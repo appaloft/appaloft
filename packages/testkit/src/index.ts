@@ -889,7 +889,7 @@ export class MemoryServerReadModel implements ServerReadModel {
     ).length;
   }
 
-  async list(context: RepositoryContext, input?: { limit?: number }) {
+  async list(context: RepositoryContext, input?: { limit?: number; offset?: number }) {
     void context;
     return [...this.repository.items.values()]
       .flatMap((server) => {
@@ -912,11 +912,16 @@ export class MemoryServerReadModel implements ServerReadModel {
             ...(state.deactivationReason
               ? { deactivationReason: state.deactivationReason.value }
               : {}),
+            displayOrder: state.displayOrder.value,
             createdAt: state.createdAt.value,
           },
         ];
       })
-      .slice(0, input?.limit ?? defaultReadModelListLimit);
+      .sort((a, b) => a.displayOrder - b.displayOrder || b.createdAt.localeCompare(a.createdAt))
+      .slice(
+        input?.offset ?? 0,
+        (input?.offset ?? 0) + (input?.limit ?? defaultReadModelListLimit),
+      );
   }
 
   async findOne(context: RepositoryContext, spec: Parameters<ServerReadModel["findOne"]>[1]) {
@@ -943,6 +948,7 @@ export class MemoryServerReadModel implements ServerReadModel {
         ...memoryServerEdgeProxySummary(state),
         ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
         ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
+        displayOrder: state.displayOrder.value,
         createdAt: state.createdAt.value,
       };
     }
@@ -967,6 +973,7 @@ export class MemoryServerReadModel implements ServerReadModel {
             ...(state.deactivationReason
               ? { deactivationReason: state.deactivationReason.value }
               : {}),
+            displayOrder: state.displayOrder.value,
             createdAt: state.createdAt.value,
           };
         }

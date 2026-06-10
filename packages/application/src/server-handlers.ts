@@ -18,6 +18,8 @@ export * from "./operations/servers/prepare-server-runtime.handler";
 export * from "./operations/servers/prune-server-capacity.handler";
 export * from "./operations/servers/register-server.handler";
 export * from "./operations/servers/rename-server.handler";
+export * from "./operations/servers/reorder-servers.handler";
+export * from "./operations/servers/reorder-servers.use-case";
 export * from "./operations/servers/rotate-ssh-credential.handler";
 export * from "./operations/servers/show-scheduled-runtime-prune-policy.handler";
 export * from "./operations/servers/show-server.handler";
