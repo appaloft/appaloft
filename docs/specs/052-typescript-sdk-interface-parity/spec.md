@@ -80,6 +80,9 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 ## Public Surfaces
 
 - Package: future `@appaloft/sdk` npm package.
+- Typed facade: `createAppaloftClient({ baseUrl, auth })` returns a generated facade tree such as
+  `projects.create`, `projects.list`, `projects.show`, `resources.create`, and
+  `dependencyResources.provisioning.plan`.
 - API contract: generated OpenAPI SDK contract enriched with Appaloft operation metadata.
 - API transport: authenticated HTTP/oRPC routes after Phase 8 auth/org baseline.
 - Generator: future SDK generation tooling that consumes OpenAPI plus `x-appaloft-*` extensions for
@@ -114,6 +117,32 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 - Should the SDK generator live as an internal package in this repository first, or as a reusable
   release tool once the first non-TypeScript SDK is planned?
 
+## Facade Design Notes
+
+PocketBase's collection/resource style is ergonomic because users start from a stable resource noun,
+but Appaloft operations are not generic CRUD rows. The facade therefore uses catalog operation keys
+instead of dynamic collection names. Stripe's generated resource clients show the value of explicit
+method groups and stable errors; Appaloft follows that shape while preserving result objects instead
+of moving to throw-only behavior. Octokit's endpoint metadata and route interpolation match
+Appaloft's operation catalog well, so the facade keeps the descriptor-backed request path available
+for route-level disambiguation. Supabase JS is fluent and domain-oriented, but its query-builder
+style would blur Appaloft command/query boundaries, so this facade does not introduce chained query
+builders. Linear's SDK is close to the desired product API feel, but Appaloft keeps operation keys as
+the cross-language source of truth so Python, Go, and Rust SDKs can generate the same grouped
+surface.
+
+Facade names are generated from operation keys with language-friendly identifier rules:
+kebab-case segments become camelCase, dots become group nesting, and duplicate HTTP route variants
+for the same operation key choose one default facade descriptor. Streaming operation keys such as
+`deployments.stream-events` prefer the streaming descriptor; non-streaming keys prefer the
+non-streaming descriptor. The full `generatedSdkOperations` list remains public for callers that
+need a specific route variant.
+
+The TypeScript facade accepts one operation input object. Fields matching route path parameters are
+interpolated into the path. Remaining fields default to query parameters for `GET`, `DELETE`, and
+streaming operations, and to JSON body for other methods. Callers can always pass explicit
+`pathParams`, `query`, or `body` to override that split.
+
 ## Current Implementation Notes And Migration Gaps
 
 - `packages/orpc` already owns typed business transport routes and has a typed client helper for
@@ -126,15 +155,23 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 - `packages/sdk-generator` collects Appaloft operation descriptors from annotated OpenAPI metadata
   and renders a reproducible TypeScript operation facade source string. The package is build-time
   tooling and does not maintain a handwritten method inventory.
+- The generator now also renders language-friendly facade paths and a generated
+  `GeneratedAppaloftClient` TypeScript interface from operation metadata. This closes the initial
+  high-level facade gap for TypeScript while keeping the same path tree suitable for future
+  Python, Go, or Rust generators.
 - `packages/sdk` defines the runtime SDK package boundary and a thin operation request client over
   generated operation descriptors. It has no runtime dependencies, exports `generatedSdkOperations`
   built from the OpenAPI SDK contract, supports product-session cookie auth, deploy-token bearer
   auth, operation input/path/query organization scoping, and typed structured errors without
   parsing human message text.
+- `packages/sdk` also exports `createAppaloftClient`, a typed facade over the same descriptor list.
+  `createAppaloftSdkClient` and `client.request(...)` remain the compatible lower-level API.
 - The SDK exposes a lower-level stream helper only for operation descriptors marked
   `streaming: true`. The helper wires `AbortSignal` cancellation into the request, parses JSON,
   NDJSON, and SSE `data:` JSON envelopes, and turns non-OK responses into structured SDK stream
   errors.
+- Streaming facade methods return the same `AsyncIterable` as `client.stream(...)`; they are not
+  converted to callback APIs or throw-only request helpers.
 - Public SDK reference docs are active at
   `/docs/reference/typescript-sdk/#typescript-sdk-operation-client` and
   `/docs/en/reference/typescript-sdk/#typescript-sdk-operation-client`. They cover installation,
@@ -153,4 +190,8 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
   catalog can drive additional interface surfaces.
 - No `CORE_OPERATIONS.md` or `operation-catalog.ts` row is added for the SDK itself because the SDK
   is an interface surface over existing operations, not a business operation.
-- Generated high-level streaming facades remain a migration gap for later Phase 9 Code Rounds.
+- The operation catalog and OpenAPI metadata do not yet expose enough stable schema-to-TypeScript
+  mappings for per-operation input/output DTO aliases in the generated facade. The current facade
+  therefore types methods through the shared SDK result and input helpers while preserving result
+  behavior. Generator TODO: attach request body, query, path, response, and stream envelope schema
+  names to operation descriptors, then emit per-operation method signatures from those schema ids.

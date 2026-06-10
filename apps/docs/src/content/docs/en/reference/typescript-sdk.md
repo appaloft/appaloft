@@ -33,9 +33,9 @@ SDK methods must come from the OpenAPI SDK contract and `x-appaloft-*` operation
 After publication, Node, Bun, or browser automation can install `@appaloft/sdk` and create a client with a `baseUrl`.
 
 ```ts
-import { createAppaloftSdkClient, generatedSdkOperations } from "@appaloft/sdk";
+import { createAppaloftClient } from "@appaloft/sdk";
 
-const appaloft = createAppaloftSdkClient({
+const appaloft = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
 });
 ```
@@ -47,7 +47,7 @@ const appaloft = createAppaloftSdkClient({
 Interactive product operations use a product-session cookie. Machine automation uses a deploy-token bearer credential. Do not store deploy tokens in repository config files. In CI, pass them through trusted secrets or environment variables.
 
 ```ts
-const productClient = createAppaloftSdkClient({
+const productClient = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
   auth: {
     kind: "product-session",
@@ -55,7 +55,7 @@ const productClient = createAppaloftSdkClient({
   },
 });
 
-const actionClient = createAppaloftSdkClient({
+const actionClient = createAppaloftClient({
   baseUrl: "https://appaloft.example/api",
   auth: {
     kind: "deploy-token",
@@ -71,16 +71,37 @@ Organization scope is passed through the concrete operation path, query, or body
 Every SDK call should correspond to an operation key. Input fields come from the same command/query schema, and output comes from the HTTP/oRPC contract.
 
 ```ts
-const result = await appaloft.request({
+const created = await appaloft.projects.create({ name: "Demo" });
+const listed = await appaloft.projects.list({ limit: 20 });
+const shown = await appaloft.projects.show({ projectId: "prj_123" });
+
+const plan = await appaloft.dependencyResources.provisioning.plan({
+  projectId: "prj_123",
+  environmentId: "env_123",
+});
+
+if (!created.ok) {
+  // result.error is a structured Appaloft error.
+  throw new Error(created.error.code);
+}
+```
+
+Facade names are generated from operation keys: kebab-case becomes camelCase, and dots become nested groups. For example, `dependency-resources.provisioning.plan` becomes `dependencyResources.provisioning.plan`.
+
+Path parameters can be passed as top-level fields. Remaining fields default to query parameters for `GET`, `DELETE`, and streaming operations, and to JSON body for other operations. Use explicit `pathParams`, `query`, or `body` when an integration needs to control that split.
+
+The lower-level descriptor API remains available for route-level disambiguation or generator experiments:
+
+```ts
+import { createAppaloftSdkClient, generatedSdkOperations } from "@appaloft/sdk";
+
+const sdk = createAppaloftSdkClient({ baseUrl: "https://appaloft.example/api" });
+
+await sdk.request({
   operation: generatedSdkOperations.find(
     (operation) => operation.operationKey === "organizations.current-context",
   )!,
 });
-
-if (!result.ok) {
-  // result.error is a structured Appaloft error.
-  throw new Error(result.error.code);
-}
 ```
 
 The SDK is the right boundary for API tests and external automation. Domain rules, application handlers, repositories, and adapter unit tests should stay at the layer they prove.
@@ -103,12 +124,8 @@ Only operations marked with `x-appaloft-streaming: true` in OpenAPI metadata can
 ```ts
 const controller = new AbortController();
 
-for await (const envelope of appaloft.stream({
-  operation: generatedSdkOperations.find(
-    (operation) =>
-      operation.operationKey === "deployments.stream-events" && operation.streaming,
-  )!,
-  pathParams: { deploymentId: "dep_123" },
+for await (const envelope of appaloft.deployments.streamEvents({
+  deploymentId: "dep_123",
   signal: controller.signal,
 })) {
   if (envelope && typeof envelope === "object" && "kind" in envelope) {
@@ -118,3 +135,7 @@ for await (const envelope of appaloft.stream({
 ```
 
 When the stream returns `closed`, or when the caller aborts the `AbortSignal`, automation should stop reading and reopen the stream only when needed.
+
+Streaming facade methods return the same `AsyncIterable` shape as the lower-level `stream(...)` helper. They do not switch the SDK to throw-only request behavior; ordinary request facades still return `{ ok, status, data }` or `{ ok, status, error }`.
+
+Current generator note: the operation catalog and OpenAPI metadata do not yet expose enough stable schema names for per-operation input/output aliases in every generated facade method. The TypeScript facade is generated from operation keys and route metadata today; future generator work should attach request, response, and stream envelope schema ids so non-TypeScript SDKs can emit equivalent typed method signatures.

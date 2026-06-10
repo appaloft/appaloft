@@ -1,10 +1,15 @@
-import { type SdkOperationDescriptor } from "./index";
+import {
+  type AppaloftSdkClient,
+  type AppaloftSdkFacadeMethod,
+  type SdkOperationDescriptor,
+} from "./index";
 
 export const generatedSdkOperations = [
   {
     operationKey: "account.delete",
     operationGroup: "account",
     operationMethod: "delete",
+    facadePath: ["account", "delete"],
     operationId: "account.delete",
     kind: "command",
     domain: "account",
@@ -16,11 +21,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "account.profile.change",
     operationGroup: "account",
     operationMethod: "profileChange",
+    facadePath: ["account", "profile", "change"],
     operationId: "account.changeProfile",
     kind: "command",
     domain: "account",
@@ -32,11 +39,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "account.profile.show",
     operationGroup: "account",
     operationMethod: "profileShow",
+    facadePath: ["account", "profile", "show"],
     operationId: "account.showProfile",
     kind: "query",
     domain: "account",
@@ -48,11 +57,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "account.sessions.list",
     operationGroup: "account",
     operationMethod: "sessionsList",
+    facadePath: ["account", "sessions", "list"],
     operationId: "account.listSessions",
     kind: "query",
     domain: "account",
@@ -64,11 +75,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "account.sessions.revoke",
     operationGroup: "account",
     operationMethod: "sessionsRevoke",
+    facadePath: ["account", "sessions", "revoke"],
     operationId: "account.revokeSession",
     kind: "command",
     domain: "account",
@@ -80,11 +93,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.archives.create",
     operationGroup: "audit-events",
     operationMethod: "archivesCreate",
+    facadePath: ["auditEvents", "archives", "create"],
     operationId: "auditEvents.archives.create",
     kind: "command",
     domain: "audit-events",
@@ -97,11 +112,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.archives.list",
     operationGroup: "audit-events",
     operationMethod: "archivesList",
+    facadePath: ["auditEvents", "archives", "list"],
     operationId: "auditEvents.archives.list",
     kind: "query",
     domain: "audit-events",
@@ -114,11 +131,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.archives.prune",
     operationGroup: "audit-events",
     operationMethod: "archivesPrune",
+    facadePath: ["auditEvents", "archives", "prune"],
     operationId: "auditEvents.archives.prune",
     kind: "command",
     domain: "audit-events",
@@ -131,11 +150,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.archives.show",
     operationGroup: "audit-events",
     operationMethod: "archivesShow",
+    facadePath: ["auditEvents", "archives", "show"],
     operationId: "auditEvents.archives.show",
     kind: "query",
     domain: "audit-events",
@@ -148,11 +169,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.export",
     operationGroup: "audit-events",
     operationMethod: "export",
+    facadePath: ["auditEvents", "export"],
     operationId: "auditEvents.export",
     kind: "query",
     domain: "audit-events",
@@ -165,11 +188,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.export-global",
     operationGroup: "audit-events",
     operationMethod: "exportGlobal",
+    facadePath: ["auditEvents", "exportGlobal"],
     operationId: "auditEvents.exportGlobal",
     kind: "query",
     domain: "audit-events",
@@ -182,11 +207,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.legal-holds.configure",
     operationGroup: "audit-events",
     operationMethod: "legalHoldsConfigure",
+    facadePath: ["auditEvents", "legalHolds", "configure"],
     operationId: "auditEvents.legalHolds.configure",
     kind: "command",
     domain: "audit-events",
@@ -199,11 +226,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.legal-holds.list",
     operationGroup: "audit-events",
     operationMethod: "legalHoldsList",
+    facadePath: ["auditEvents", "legalHolds", "list"],
     operationId: "auditEvents.legalHolds.list",
     kind: "query",
     domain: "audit-events",
@@ -216,11 +245,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.legal-holds.release",
     operationGroup: "audit-events",
     operationMethod: "legalHoldsRelease",
+    facadePath: ["auditEvents", "legalHolds", "release"],
     operationId: "auditEvents.legalHolds.release",
     kind: "command",
     domain: "audit-events",
@@ -233,11 +264,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.legal-holds.show",
     operationGroup: "audit-events",
     operationMethod: "legalHoldsShow",
+    facadePath: ["auditEvents", "legalHolds", "show"],
     operationId: "auditEvents.legalHolds.show",
     kind: "query",
     domain: "audit-events",
@@ -250,11 +283,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.list",
     operationGroup: "audit-events",
     operationMethod: "list",
+    facadePath: ["auditEvents", "list"],
     operationId: "auditEvents.list",
     kind: "query",
     domain: "audit-events",
@@ -267,11 +302,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.prune",
     operationGroup: "audit-events",
     operationMethod: "prune",
+    facadePath: ["auditEvents", "prune"],
     operationId: "auditEvents.prune",
     kind: "command",
     domain: "audit-events",
@@ -284,11 +321,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "audit-events.show",
     operationGroup: "audit-events",
     operationMethod: "show",
+    facadePath: ["auditEvents", "show"],
     operationId: "auditEvents.show",
     kind: "query",
     domain: "audit-events",
@@ -301,11 +340,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "auth.bootstrap-first-admin",
     operationGroup: "auth",
     operationMethod: "bootstrapFirstAdmin",
+    facadePath: ["auth", "bootstrapFirstAdmin"],
     operationId: "auth.bootstrapFirstAdmin",
     kind: "command",
     domain: "auth",
@@ -318,11 +359,13 @@ export const generatedSdkOperations = [
     authPolicy: "bootstrap-public",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "auth.bootstrap-status",
     operationGroup: "auth",
     operationMethod: "bootstrapStatus",
+    facadePath: ["auth", "bootstrapStatus"],
     operationId: "auth.bootstrapStatus",
     kind: "query",
     domain: "auth",
@@ -335,11 +378,13 @@ export const generatedSdkOperations = [
     authPolicy: "bootstrap-public",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "blueprints.install",
     operationGroup: "blueprints",
     operationMethod: "install",
+    facadePath: ["blueprints", "install"],
     operationId: "blueprints.install",
     kind: "command",
     domain: "blueprints",
@@ -352,11 +397,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "blueprints.installation.show",
     operationGroup: "blueprints",
     operationMethod: "installationShow",
+    facadePath: ["blueprints", "installation", "show"],
     operationId: "blueprints.installation.show",
     kind: "query",
     domain: "blueprints",
@@ -369,11 +416,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "blueprints.list",
     operationGroup: "blueprints",
     operationMethod: "list",
+    facadePath: ["blueprints", "list"],
     operationId: "blueprints.list",
     kind: "query",
     domain: "blueprints",
@@ -386,11 +435,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "blueprints.plan-install",
     operationGroup: "blueprints",
     operationMethod: "planInstall",
+    facadePath: ["blueprints", "planInstall"],
     operationId: "blueprints.planInstall",
     kind: "query",
     domain: "blueprints",
@@ -403,11 +454,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "blueprints.show",
     operationGroup: "blueprints",
     operationMethod: "show",
+    facadePath: ["blueprints", "show"],
     operationId: "blueprints.show",
     kind: "query",
     domain: "blueprints",
@@ -420,11 +473,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "capabilities.query",
     operationGroup: "capabilities",
     operationMethod: "query",
+    facadePath: ["capabilities", "query"],
     operationId: "capabilities.query",
     kind: "query",
     domain: "capabilities",
@@ -438,11 +493,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.delete",
     operationGroup: "certificates",
     operationMethod: "delete",
+    facadePath: ["certificates", "delete"],
     operationId: "certificates.delete",
     kind: "command",
     domain: "certificates",
@@ -455,11 +512,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.import",
     operationGroup: "certificates",
     operationMethod: "import",
+    facadePath: ["certificates", "import"],
     operationId: "certificates.import",
     kind: "command",
     domain: "certificates",
@@ -472,11 +531,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.issue-or-renew",
     operationGroup: "certificates",
     operationMethod: "issueOrRenew",
+    facadePath: ["certificates", "issueOrRenew"],
     operationId: "certificates.issueOrRenew",
     kind: "command",
     domain: "certificates",
@@ -489,11 +550,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.list",
     operationGroup: "certificates",
     operationMethod: "list",
+    facadePath: ["certificates", "list"],
     operationId: "certificates.list",
     kind: "query",
     domain: "certificates",
@@ -506,11 +569,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.retry",
     operationGroup: "certificates",
     operationMethod: "retry",
+    facadePath: ["certificates", "retry"],
     operationId: "certificates.retry",
     kind: "command",
     domain: "certificates",
@@ -523,11 +588,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.revoke",
     operationGroup: "certificates",
     operationMethod: "revoke",
+    facadePath: ["certificates", "revoke"],
     operationId: "certificates.revoke",
     kind: "command",
     domain: "certificates",
@@ -540,11 +607,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "certificates.show",
     operationGroup: "certificates",
     operationMethod: "show",
+    facadePath: ["certificates", "show"],
     operationId: "certificates.show",
     kind: "query",
     domain: "certificates",
@@ -557,11 +626,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "credentials.create-ssh",
     operationGroup: "credentials",
     operationMethod: "createSsh",
+    facadePath: ["credentials", "createSsh"],
     operationId: "credentials.ssh.create",
     kind: "command",
     domain: "credentials",
@@ -574,11 +645,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "credentials.delete-ssh",
     operationGroup: "credentials",
     operationMethod: "deleteSsh",
+    facadePath: ["credentials", "deleteSsh"],
     operationId: "credentials.ssh.delete",
     kind: "command",
     domain: "credentials",
@@ -591,11 +664,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "credentials.list-ssh",
     operationGroup: "credentials",
     operationMethod: "listSsh",
+    facadePath: ["credentials", "listSsh"],
     operationId: "credentials.ssh.list",
     kind: "query",
     domain: "credentials",
@@ -608,11 +683,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "credentials.rotate-ssh",
     operationGroup: "credentials",
     operationMethod: "rotateSsh",
+    facadePath: ["credentials", "rotateSsh"],
     operationId: "credentials.ssh.rotate",
     kind: "command",
     domain: "credentials",
@@ -625,11 +702,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "credentials.show",
     operationGroup: "credentials",
     operationMethod: "show",
+    facadePath: ["credentials", "show"],
     operationId: "credentials.ssh.show",
     kind: "query",
     domain: "credentials",
@@ -642,11 +721,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "default-access-domain-policies.configure",
     operationGroup: "default-access-domain-policies",
     operationMethod: "configure",
+    facadePath: ["defaultAccessDomainPolicies", "configure"],
     operationId: "defaultAccessDomainPolicies.configure",
     kind: "command",
     domain: "default-access-domain-policies",
@@ -659,11 +740,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "default-access-domain-policies.list",
     operationGroup: "default-access-domain-policies",
     operationMethod: "list",
+    facadePath: ["defaultAccessDomainPolicies", "list"],
     operationId: "defaultAccessDomainPolicies.list",
     kind: "query",
     domain: "default-access-domain-policies",
@@ -676,11 +759,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "default-access-domain-policies.show",
     operationGroup: "default-access-domain-policies",
     operationMethod: "show",
+    facadePath: ["defaultAccessDomainPolicies", "show"],
     operationId: "defaultAccessDomainPolicies.show",
     kind: "query",
     domain: "default-access-domain-policies",
@@ -693,11 +778,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.backup-policies.configure",
     operationGroup: "dependency-resources",
     operationMethod: "backupPoliciesConfigure",
+    facadePath: ["dependencyResources", "backupPolicies", "configure"],
     operationId: "dependencyResources.configureBackupPolicy",
     kind: "command",
     domain: "dependency-resources",
@@ -710,11 +797,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.backup-policies.list",
     operationGroup: "dependency-resources",
     operationMethod: "backupPoliciesList",
+    facadePath: ["dependencyResources", "backupPolicies", "list"],
     operationId: "dependencyResources.listBackupPolicies",
     kind: "query",
     domain: "dependency-resources",
@@ -727,11 +816,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.backup-policies.show",
     operationGroup: "dependency-resources",
     operationMethod: "backupPoliciesShow",
+    facadePath: ["dependencyResources", "backupPolicies", "show"],
     operationId: "dependencyResources.showBackupPolicy",
     kind: "query",
     domain: "dependency-resources",
@@ -744,11 +835,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.count",
     operationGroup: "dependency-resources",
     operationMethod: "count",
+    facadePath: ["dependencyResources", "count"],
     operationId: "dependencyResources.count",
     kind: "query",
     domain: "dependency-resources",
@@ -761,11 +854,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.create-backup",
     operationGroup: "dependency-resources",
     operationMethod: "createBackup",
+    facadePath: ["dependencyResources", "createBackup"],
     operationId: "dependencyResources.createBackup",
     kind: "command",
     domain: "dependency-resources",
@@ -778,11 +873,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.delete",
     operationGroup: "dependency-resources",
     operationMethod: "delete",
+    facadePath: ["dependencyResources", "delete"],
     operationId: "dependencyResources.delete",
     kind: "command",
     domain: "dependency-resources",
@@ -795,11 +892,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.import",
     operationGroup: "dependency-resources",
     operationMethod: "import",
+    facadePath: ["dependencyResources", "import"],
     operationId: "dependencyResources.import",
     kind: "command",
     domain: "dependency-resources",
@@ -812,11 +911,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.list",
     operationGroup: "dependency-resources",
     operationMethod: "list",
+    facadePath: ["dependencyResources", "list"],
     operationId: "dependencyResources.list",
     kind: "query",
     domain: "dependency-resources",
@@ -829,11 +930,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.list-backups",
     operationGroup: "dependency-resources",
     operationMethod: "listBackups",
+    facadePath: ["dependencyResources", "listBackups"],
     operationId: "dependencyResources.listBackups",
     kind: "query",
     domain: "dependency-resources",
@@ -846,11 +949,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.provision",
     operationGroup: "dependency-resources",
     operationMethod: "provision",
+    facadePath: ["dependencyResources", "provision"],
     operationId: "dependencyResources.provision",
     kind: "command",
     domain: "dependency-resources",
@@ -863,11 +968,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.provisioning.accept",
     operationGroup: "dependency-resources",
     operationMethod: "provisioningAccept",
+    facadePath: ["dependencyResources", "provisioning", "accept"],
     operationId: "dependencyResources.provisioning.accept",
     kind: "command",
     domain: "dependency-resources",
@@ -880,11 +987,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.provisioning.plan",
     operationGroup: "dependency-resources",
     operationMethod: "provisioningPlan",
+    facadePath: ["dependencyResources", "provisioning", "plan"],
     operationId: "dependencyResources.provisioning.plan",
     kind: "command",
     domain: "dependency-resources",
@@ -897,11 +1006,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.provisioning.status",
     operationGroup: "dependency-resources",
     operationMethod: "provisioningStatus",
+    facadePath: ["dependencyResources", "provisioning", "status"],
     operationId: "dependencyResources.provisioning.status",
     kind: "query",
     domain: "dependency-resources",
@@ -914,11 +1025,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.rename",
     operationGroup: "dependency-resources",
     operationMethod: "rename",
+    facadePath: ["dependencyResources", "rename"],
     operationId: "dependencyResources.rename",
     kind: "command",
     domain: "dependency-resources",
@@ -931,11 +1044,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.restore-backup",
     operationGroup: "dependency-resources",
     operationMethod: "restoreBackup",
+    facadePath: ["dependencyResources", "restoreBackup"],
     operationId: "dependencyResources.restoreBackup",
     kind: "command",
     domain: "dependency-resources",
@@ -948,11 +1063,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.show",
     operationGroup: "dependency-resources",
     operationMethod: "show",
+    facadePath: ["dependencyResources", "show"],
     operationId: "dependencyResources.show",
     kind: "query",
     domain: "dependency-resources",
@@ -965,11 +1082,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "dependency-resources.show-backup",
     operationGroup: "dependency-resources",
     operationMethod: "showBackup",
+    facadePath: ["dependencyResources", "showBackup"],
     operationId: "dependencyResources.showBackup",
     kind: "query",
     domain: "dependency-resources",
@@ -982,11 +1101,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deploy-tokens.create",
     operationGroup: "deploy-tokens",
     operationMethod: "create",
+    facadePath: ["deployTokens", "create"],
     operationId: "deployTokens.create",
     kind: "command",
     domain: "deploy-tokens",
@@ -999,11 +1120,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deploy-tokens.list",
     operationGroup: "deploy-tokens",
     operationMethod: "list",
+    facadePath: ["deployTokens", "list"],
     operationId: "deployTokens.list",
     kind: "query",
     domain: "deploy-tokens",
@@ -1016,11 +1139,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deploy-tokens.revoke",
     operationGroup: "deploy-tokens",
     operationMethod: "revoke",
+    facadePath: ["deployTokens", "revoke"],
     operationId: "deployTokens.revoke",
     kind: "command",
     domain: "deploy-tokens",
@@ -1033,11 +1158,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deploy-tokens.rotate",
     operationGroup: "deploy-tokens",
     operationMethod: "rotate",
+    facadePath: ["deployTokens", "rotate"],
     operationId: "deployTokens.rotate",
     kind: "command",
     domain: "deploy-tokens",
@@ -1050,11 +1177,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deploy-tokens.show",
     operationGroup: "deploy-tokens",
     operationMethod: "show",
+    facadePath: ["deployTokens", "show"],
     operationId: "deployTokens.show",
     kind: "query",
     domain: "deploy-tokens",
@@ -1067,11 +1196,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.archive",
     operationGroup: "deployments",
     operationMethod: "archive",
+    facadePath: ["deployments", "archive"],
     operationId: "deployments.archive",
     kind: "command",
     domain: "deployments",
@@ -1084,11 +1215,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.cancel",
     operationGroup: "deployments",
     operationMethod: "cancel",
+    facadePath: ["deployments", "cancel"],
     operationId: "deployments.cancel",
     kind: "command",
     domain: "deployments",
@@ -1101,11 +1234,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.cleanup-preview",
     operationGroup: "deployments",
     operationMethod: "cleanupPreview",
+    facadePath: ["deployments", "cleanupPreview"],
     operationId: "deployments.cleanupPreview",
     kind: "command",
     domain: "deployments",
@@ -1118,11 +1253,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.count",
     operationGroup: "deployments",
     operationMethod: "count",
+    facadePath: ["deployments", "count"],
     operationId: "deployments.count",
     kind: "query",
     domain: "deployments",
@@ -1135,11 +1272,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.create",
     operationGroup: "deployments",
     operationMethod: "create",
+    facadePath: ["deployments", "create"],
     operationId: "deployments.create",
     kind: "command",
     domain: "deployments",
@@ -1152,11 +1291,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.create",
     operationGroup: "deployments",
     operationMethod: "create",
+    facadePath: ["deployments", "create"],
     operationId: "deployments.createStream",
     kind: "command",
     domain: "deployments",
@@ -1169,11 +1310,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
+    facadeDefault: false,
   },
   {
     operationKey: "deployments.list",
     operationGroup: "deployments",
     operationMethod: "list",
+    facadePath: ["deployments", "list"],
     operationId: "deployments.list",
     kind: "query",
     domain: "deployments",
@@ -1186,11 +1329,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.logs",
     operationGroup: "deployments",
     operationMethod: "logs",
+    facadePath: ["deployments", "logs"],
     operationId: "deployments.logs",
     kind: "query",
     domain: "deployments",
@@ -1203,11 +1348,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.logs.prune",
     operationGroup: "deployments",
     operationMethod: "logsPrune",
+    facadePath: ["deployments", "logs", "prune"],
     operationId: "deployments.pruneLogs",
     kind: "command",
     domain: "deployments",
@@ -1220,11 +1367,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.plan",
     operationGroup: "deployments",
     operationMethod: "plan",
+    facadePath: ["deployments", "plan"],
     operationId: "deployments.plan",
     kind: "query",
     domain: "deployments",
@@ -1237,11 +1386,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.prune",
     operationGroup: "deployments",
     operationMethod: "prune",
+    facadePath: ["deployments", "prune"],
     operationId: "deployments.prune",
     kind: "command",
     domain: "deployments",
@@ -1254,11 +1405,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.recovery-readiness",
     operationGroup: "deployments",
     operationMethod: "recoveryReadiness",
+    facadePath: ["deployments", "recoveryReadiness"],
     operationId: "deployments.recoveryReadiness",
     kind: "query",
     domain: "deployments",
@@ -1271,11 +1424,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.redeploy",
     operationGroup: "deployments",
     operationMethod: "redeploy",
+    facadePath: ["deployments", "redeploy"],
     operationId: "deployments.redeploy",
     kind: "command",
     domain: "deployments",
@@ -1288,11 +1443,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.retry",
     operationGroup: "deployments",
     operationMethod: "retry",
+    facadePath: ["deployments", "retry"],
     operationId: "deployments.retry",
     kind: "command",
     domain: "deployments",
@@ -1305,11 +1462,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.rollback",
     operationGroup: "deployments",
     operationMethod: "rollback",
+    facadePath: ["deployments", "rollback"],
     operationId: "deployments.rollback",
     kind: "command",
     domain: "deployments",
@@ -1322,11 +1481,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.show",
     operationGroup: "deployments",
     operationMethod: "show",
+    facadePath: ["deployments", "show"],
     operationId: "deployments.show",
     kind: "query",
     domain: "deployments",
@@ -1339,11 +1500,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "deployments.stream-events",
     operationGroup: "deployments",
     operationMethod: "streamEvents",
+    facadePath: ["deployments", "streamEvents"],
     operationId: "deployments.events",
     kind: "query",
     domain: "deployments",
@@ -1356,11 +1519,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: false,
   },
   {
     operationKey: "deployments.stream-events",
     operationGroup: "deployments",
     operationMethod: "streamEvents",
+    facadePath: ["deployments", "streamEvents"],
     operationId: "deployments.eventsStream",
     kind: "query",
     domain: "deployments",
@@ -1373,11 +1538,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.configure-route",
     operationGroup: "domain-bindings",
     operationMethod: "configureRoute",
+    facadePath: ["domainBindings", "configureRoute"],
     operationId: "domainBindings.configureRoute",
     kind: "command",
     domain: "domain-bindings",
@@ -1390,11 +1557,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.confirm-ownership",
     operationGroup: "domain-bindings",
     operationMethod: "confirmOwnership",
+    facadePath: ["domainBindings", "confirmOwnership"],
     operationId: "domainBindings.confirmOwnership",
     kind: "command",
     domain: "domain-bindings",
@@ -1407,11 +1576,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.create",
     operationGroup: "domain-bindings",
     operationMethod: "create",
+    facadePath: ["domainBindings", "create"],
     operationId: "domainBindings.create",
     kind: "command",
     domain: "domain-bindings",
@@ -1424,11 +1595,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.delete",
     operationGroup: "domain-bindings",
     operationMethod: "delete",
+    facadePath: ["domainBindings", "delete"],
     operationId: "domainBindings.delete",
     kind: "command",
     domain: "domain-bindings",
@@ -1441,11 +1614,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.delete-check",
     operationGroup: "domain-bindings",
     operationMethod: "deleteCheck",
+    facadePath: ["domainBindings", "deleteCheck"],
     operationId: "domainBindings.deleteCheck",
     kind: "query",
     domain: "domain-bindings",
@@ -1458,11 +1633,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.list",
     operationGroup: "domain-bindings",
     operationMethod: "list",
+    facadePath: ["domainBindings", "list"],
     operationId: "domainBindings.list",
     kind: "query",
     domain: "domain-bindings",
@@ -1475,11 +1652,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.retry-verification",
     operationGroup: "domain-bindings",
     operationMethod: "retryVerification",
+    facadePath: ["domainBindings", "retryVerification"],
     operationId: "domainBindings.retryVerification",
     kind: "command",
     domain: "domain-bindings",
@@ -1492,11 +1671,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-bindings.show",
     operationGroup: "domain-bindings",
     operationMethod: "show",
+    facadePath: ["domainBindings", "show"],
     operationId: "domainBindings.show",
     kind: "query",
     domain: "domain-bindings",
@@ -1509,11 +1690,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "domain-events.prune",
     operationGroup: "domain-events",
     operationMethod: "prune",
+    facadePath: ["domainEvents", "prune"],
     operationId: "domainEvents.prune",
     kind: "command",
     domain: "domain-events",
@@ -1526,11 +1709,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "entitlements.query",
     operationGroup: "entitlements",
     operationMethod: "query",
+    facadePath: ["entitlements", "query"],
     operationId: "entitlements.query",
     kind: "query",
     domain: "entitlements",
@@ -1544,11 +1729,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.archive",
     operationGroup: "environments",
     operationMethod: "archive",
+    facadePath: ["environments", "archive"],
     operationId: "environments.archive",
     kind: "command",
     domain: "environments",
@@ -1561,11 +1748,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.clone",
     operationGroup: "environments",
     operationMethod: "clone",
+    facadePath: ["environments", "clone"],
     operationId: "environments.clone",
     kind: "command",
     domain: "environments",
@@ -1578,11 +1767,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.count",
     operationGroup: "environments",
     operationMethod: "count",
+    facadePath: ["environments", "count"],
     operationId: "environments.count",
     kind: "query",
     domain: "environments",
@@ -1595,11 +1786,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.create",
     operationGroup: "environments",
     operationMethod: "create",
+    facadePath: ["environments", "create"],
     operationId: "environments.create",
     kind: "command",
     domain: "environments",
@@ -1612,11 +1805,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.diff",
     operationGroup: "environments",
     operationMethod: "diff",
+    facadePath: ["environments", "diff"],
     operationId: "environments.diff",
     kind: "query",
     domain: "environments",
@@ -1629,11 +1824,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.effective-precedence",
     operationGroup: "environments",
     operationMethod: "effectivePrecedence",
+    facadePath: ["environments", "effectivePrecedence"],
     operationId: "environments.effectivePrecedence",
     kind: "query",
     domain: "environments",
@@ -1646,11 +1843,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.list",
     operationGroup: "environments",
     operationMethod: "list",
+    facadePath: ["environments", "list"],
     operationId: "environments.list",
     kind: "query",
     domain: "environments",
@@ -1663,11 +1862,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.lock",
     operationGroup: "environments",
     operationMethod: "lock",
+    facadePath: ["environments", "lock"],
     operationId: "environments.lock",
     kind: "command",
     domain: "environments",
@@ -1680,11 +1881,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.promote",
     operationGroup: "environments",
     operationMethod: "promote",
+    facadePath: ["environments", "promote"],
     operationId: "environments.promote",
     kind: "command",
     domain: "environments",
@@ -1697,11 +1900,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.rename",
     operationGroup: "environments",
     operationMethod: "rename",
+    facadePath: ["environments", "rename"],
     operationId: "environments.rename",
     kind: "command",
     domain: "environments",
@@ -1714,11 +1919,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.set-variable",
     operationGroup: "environments",
     operationMethod: "setVariable",
+    facadePath: ["environments", "setVariable"],
     operationId: "environments.setVariable",
     kind: "command",
     domain: "environments",
@@ -1731,11 +1938,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.show",
     operationGroup: "environments",
     operationMethod: "show",
+    facadePath: ["environments", "show"],
     operationId: "environments.show",
     kind: "query",
     domain: "environments",
@@ -1748,11 +1957,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.unlock",
     operationGroup: "environments",
     operationMethod: "unlock",
+    facadePath: ["environments", "unlock"],
     operationId: "environments.unlock",
     kind: "command",
     domain: "environments",
@@ -1765,11 +1976,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "environments.unset-variable",
     operationGroup: "environments",
     operationMethod: "unsetVariable",
+    facadePath: ["environments", "unsetVariable"],
     operationId: "environments.unsetVariable",
     kind: "command",
     domain: "environments",
@@ -1782,11 +1995,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.cancel",
     operationGroup: "operator-work",
     operationMethod: "cancel",
+    facadePath: ["operatorWork", "cancel"],
     operationId: "operatorWork.cancel",
     kind: "command",
     domain: "operator-work",
@@ -1799,11 +2014,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.dead-letter",
     operationGroup: "operator-work",
     operationMethod: "deadLetter",
+    facadePath: ["operatorWork", "deadLetter"],
     operationId: "operatorWork.deadLetter",
     kind: "command",
     domain: "operator-work",
@@ -1816,11 +2033,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.list",
     operationGroup: "operator-work",
     operationMethod: "list",
+    facadePath: ["operatorWork", "list"],
     operationId: "operatorWork.list",
     kind: "query",
     domain: "operator-work",
@@ -1833,11 +2052,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.mark-recovered",
     operationGroup: "operator-work",
     operationMethod: "markRecovered",
+    facadePath: ["operatorWork", "markRecovered"],
     operationId: "operatorWork.markRecovered",
     kind: "command",
     domain: "operator-work",
@@ -1850,11 +2071,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.prune",
     operationGroup: "operator-work",
     operationMethod: "prune",
+    facadePath: ["operatorWork", "prune"],
     operationId: "operatorWork.prune",
     kind: "command",
     domain: "operator-work",
@@ -1867,11 +2090,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.retry",
     operationGroup: "operator-work",
     operationMethod: "retry",
+    facadePath: ["operatorWork", "retry"],
     operationId: "operatorWork.retry",
     kind: "command",
     domain: "operator-work",
@@ -1884,11 +2109,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.show",
     operationGroup: "operator-work",
     operationMethod: "show",
+    facadePath: ["operatorWork", "show"],
     operationId: "operatorWork.show",
     kind: "query",
     domain: "operator-work",
@@ -1901,11 +2128,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "operator-work.stream-events",
     operationGroup: "operator-work",
     operationMethod: "streamEvents",
+    facadePath: ["operatorWork", "streamEvents"],
     operationId: "operatorWork.events",
     kind: "query",
     domain: "operator-work",
@@ -1918,11 +2147,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: false,
   },
   {
     operationKey: "operator-work.stream-events",
     operationGroup: "operator-work",
     operationMethod: "streamEvents",
+    facadePath: ["operatorWork", "streamEvents"],
     operationId: "operatorWork.eventsStream",
     kind: "query",
     domain: "operator-work",
@@ -1935,11 +2166,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.change-member-role",
     operationGroup: "organizations",
     operationMethod: "changeMemberRole",
+    facadePath: ["organizations", "changeMemberRole"],
     operationId: "organizations.updateMemberRole",
     kind: "command",
     domain: "organizations",
@@ -1953,11 +2186,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.current-context",
     operationGroup: "organizations",
     operationMethod: "currentContext",
+    facadePath: ["organizations", "currentContext"],
     operationId: "organizations.currentContext",
     kind: "query",
     domain: "organizations",
@@ -1971,11 +2206,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.delete",
     operationGroup: "organizations",
     operationMethod: "delete",
+    facadePath: ["organizations", "delete"],
     operationId: "organizations.delete",
     kind: "command",
     domain: "organizations",
@@ -1989,11 +2226,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.invite-member",
     operationGroup: "organizations",
     operationMethod: "inviteMember",
+    facadePath: ["organizations", "inviteMember"],
     operationId: "organizations.inviteMember",
     kind: "command",
     domain: "organizations",
@@ -2007,11 +2246,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.list-invitations",
     operationGroup: "organizations",
     operationMethod: "listInvitations",
+    facadePath: ["organizations", "listInvitations"],
     operationId: "organizations.listInvitations",
     kind: "query",
     domain: "organizations",
@@ -2025,11 +2266,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.list-members",
     operationGroup: "organizations",
     operationMethod: "listMembers",
+    facadePath: ["organizations", "listMembers"],
     operationId: "organizations.listMembers",
     kind: "query",
     domain: "organizations",
@@ -2043,11 +2286,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.profile.change",
     operationGroup: "organizations",
     operationMethod: "profileChange",
+    facadePath: ["organizations", "profile", "change"],
     operationId: "organizations.changeProfile",
     kind: "command",
     domain: "organizations",
@@ -2061,11 +2306,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.profile.show",
     operationGroup: "organizations",
     operationMethod: "profileShow",
+    facadePath: ["organizations", "profile", "show"],
     operationId: "organizations.showProfile",
     kind: "query",
     domain: "organizations",
@@ -2079,11 +2326,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.reactivate-member",
     operationGroup: "organizations",
     operationMethod: "reactivateMember",
+    facadePath: ["organizations", "reactivateMember"],
     operationId: "organizations.reactivateMember",
     kind: "command",
     domain: "organizations",
@@ -2097,11 +2346,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.remove-member",
     operationGroup: "organizations",
     operationMethod: "removeMember",
+    facadePath: ["organizations", "removeMember"],
     operationId: "organizations.removeMember",
     kind: "command",
     domain: "organizations",
@@ -2115,11 +2366,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.switch-current",
     operationGroup: "organizations",
     operationMethod: "switchCurrent",
+    facadePath: ["organizations", "switchCurrent"],
     operationId: "organizations.switchCurrent",
     kind: "command",
     domain: "organizations",
@@ -2133,11 +2386,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "organizations.transfer-owner",
     operationGroup: "organizations",
     operationMethod: "transferOwner",
+    facadePath: ["organizations", "transferOwner"],
     operationId: "organizations.transferOwner",
     kind: "command",
     domain: "organizations",
@@ -2151,11 +2406,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "preview-environments.delete",
     operationGroup: "preview-environments",
     operationMethod: "delete",
+    facadePath: ["previewEnvironments", "delete"],
     operationId: "previewEnvironments.delete",
     kind: "command",
     domain: "preview-environments",
@@ -2168,11 +2425,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "preview-environments.list",
     operationGroup: "preview-environments",
     operationMethod: "list",
+    facadePath: ["previewEnvironments", "list"],
     operationId: "previewEnvironments.list",
     kind: "query",
     domain: "preview-environments",
@@ -2185,11 +2444,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "preview-environments.show",
     operationGroup: "preview-environments",
     operationMethod: "show",
+    facadePath: ["previewEnvironments", "show"],
     operationId: "previewEnvironments.show",
     kind: "query",
     domain: "preview-environments",
@@ -2202,11 +2463,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "preview-policies.configure",
     operationGroup: "preview-policies",
     operationMethod: "configure",
+    facadePath: ["previewPolicies", "configure"],
     operationId: "previewPolicies.configure",
     kind: "command",
     domain: "preview-policies",
@@ -2219,11 +2482,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "preview-policies.show",
     operationGroup: "preview-policies",
     operationMethod: "show",
+    facadePath: ["previewPolicies", "show"],
     operationId: "previewPolicies.show",
     kind: "query",
     domain: "preview-policies",
@@ -2236,11 +2501,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.archive",
     operationGroup: "projects",
     operationMethod: "archive",
+    facadePath: ["projects", "archive"],
     operationId: "projects.archive",
     kind: "command",
     domain: "projects",
@@ -2253,11 +2520,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.count",
     operationGroup: "projects",
     operationMethod: "count",
+    facadePath: ["projects", "count"],
     operationId: "projects.count",
     kind: "query",
     domain: "projects",
@@ -2270,11 +2539,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.create",
     operationGroup: "projects",
     operationMethod: "create",
+    facadePath: ["projects", "create"],
     operationId: "projects.create",
     kind: "command",
     domain: "projects",
@@ -2287,11 +2558,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.delete",
     operationGroup: "projects",
     operationMethod: "delete",
+    facadePath: ["projects", "delete"],
     operationId: "projects.delete",
     kind: "command",
     domain: "projects",
@@ -2304,11 +2577,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.delete-check",
     operationGroup: "projects",
     operationMethod: "deleteCheck",
+    facadePath: ["projects", "deleteCheck"],
     operationId: "projects.deleteCheck",
     kind: "query",
     domain: "projects",
@@ -2321,11 +2596,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.list",
     operationGroup: "projects",
     operationMethod: "list",
+    facadePath: ["projects", "list"],
     operationId: "projects.list",
     kind: "query",
     domain: "projects",
@@ -2338,11 +2615,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.rename",
     operationGroup: "projects",
     operationMethod: "rename",
+    facadePath: ["projects", "rename"],
     operationId: "projects.rename",
     kind: "command",
     domain: "projects",
@@ -2355,11 +2634,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.reorder",
     operationGroup: "projects",
     operationMethod: "reorder",
+    facadePath: ["projects", "reorder"],
     operationId: "projects.reorder",
     kind: "command",
     domain: "projects",
@@ -2372,11 +2653,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.restore",
     operationGroup: "projects",
     operationMethod: "restore",
+    facadePath: ["projects", "restore"],
     operationId: "projects.restore",
     kind: "command",
     domain: "projects",
@@ -2389,11 +2672,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.set-description",
     operationGroup: "projects",
     operationMethod: "setDescription",
+    facadePath: ["projects", "setDescription"],
     operationId: "projects.setDescription",
     kind: "command",
     domain: "projects",
@@ -2406,11 +2691,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "projects.show",
     operationGroup: "projects",
     operationMethod: "show",
+    facadePath: ["projects", "show"],
     operationId: "projects.show",
     kind: "query",
     domain: "projects",
@@ -2423,11 +2710,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "provider-job-logs.prune",
     operationGroup: "provider-job-logs",
     operationMethod: "prune",
+    facadePath: ["providerJobLogs", "prune"],
     operationId: "providerJobLogs.prune",
     kind: "command",
     domain: "provider-job-logs",
@@ -2440,11 +2729,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.access-failure-evidence.lookup",
     operationGroup: "resources",
     operationMethod: "accessFailureEvidenceLookup",
+    facadePath: ["resources", "accessFailureEvidence", "lookup"],
     operationId: "resources.accessFailureEvidence",
     kind: "query",
     domain: "resources",
@@ -2457,11 +2748,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.archive",
     operationGroup: "resources",
     operationMethod: "archive",
+    facadePath: ["resources", "archive"],
     operationId: "resources.archive",
     kind: "command",
     domain: "resources",
@@ -2474,11 +2767,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.attach-storage",
     operationGroup: "resources",
     operationMethod: "attachStorage",
+    facadePath: ["resources", "attachStorage"],
     operationId: "resources.attachStorage",
     kind: "command",
     domain: "resources",
@@ -2491,11 +2786,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.bind-dependency",
     operationGroup: "resources",
     operationMethod: "bindDependency",
+    facadePath: ["resources", "bindDependency"],
     operationId: "resources.dependencyBindings.bind",
     kind: "command",
     domain: "resources",
@@ -2508,11 +2805,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-access",
     operationGroup: "resources",
     operationMethod: "configureAccess",
+    facadePath: ["resources", "configureAccess"],
     operationId: "resources.configureAccess",
     kind: "command",
     domain: "resources",
@@ -2525,11 +2824,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-auto-deploy",
     operationGroup: "resources",
     operationMethod: "configureAutoDeploy",
+    facadePath: ["resources", "configureAutoDeploy"],
     operationId: "resources.configureAutoDeploy",
     kind: "command",
     domain: "resources",
@@ -2542,11 +2843,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-health",
     operationGroup: "resources",
     operationMethod: "configureHealth",
+    facadePath: ["resources", "configureHealth"],
     operationId: "resources.configureHealth",
     kind: "command",
     domain: "resources",
@@ -2559,11 +2862,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-network",
     operationGroup: "resources",
     operationMethod: "configureNetwork",
+    facadePath: ["resources", "configureNetwork"],
     operationId: "resources.configureNetwork",
     kind: "command",
     domain: "resources",
@@ -2576,11 +2881,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-runtime",
     operationGroup: "resources",
     operationMethod: "configureRuntime",
+    facadePath: ["resources", "configureRuntime"],
     operationId: "resources.configureRuntime",
     kind: "command",
     domain: "resources",
@@ -2593,11 +2900,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.configure-source",
     operationGroup: "resources",
     operationMethod: "configureSource",
+    facadePath: ["resources", "configureSource"],
     operationId: "resources.configureSource",
     kind: "command",
     domain: "resources",
@@ -2610,11 +2919,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.count",
     operationGroup: "resources",
     operationMethod: "count",
+    facadePath: ["resources", "count"],
     operationId: "resources.count",
     kind: "query",
     domain: "resources",
@@ -2627,11 +2938,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.create",
     operationGroup: "resources",
     operationMethod: "create",
+    facadePath: ["resources", "create"],
     operationId: "resources.create",
     kind: "command",
     domain: "resources",
@@ -2644,11 +2957,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.delete",
     operationGroup: "resources",
     operationMethod: "delete",
+    facadePath: ["resources", "delete"],
     operationId: "resources.delete",
     kind: "command",
     domain: "resources",
@@ -2661,11 +2976,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.detach-storage",
     operationGroup: "resources",
     operationMethod: "detachStorage",
+    facadePath: ["resources", "detachStorage"],
     operationId: "resources.detachStorage",
     kind: "command",
     domain: "resources",
@@ -2678,11 +2995,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.diagnostic-summary",
     operationGroup: "resources",
     operationMethod: "diagnosticSummary",
+    facadePath: ["resources", "diagnosticSummary"],
     operationId: "resources.diagnosticSummary",
     kind: "query",
     domain: "resources",
@@ -2695,11 +3014,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.effective-config",
     operationGroup: "resources",
     operationMethod: "effectiveConfig",
+    facadePath: ["resources", "effectiveConfig"],
     operationId: "resources.effectiveConfig",
     kind: "query",
     domain: "resources",
@@ -2712,11 +3033,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.health",
     operationGroup: "resources",
     operationMethod: "health",
+    facadePath: ["resources", "health"],
     operationId: "resources.health",
     kind: "query",
     domain: "resources",
@@ -2729,11 +3052,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.health-history",
     operationGroup: "resources",
     operationMethod: "healthHistory",
+    facadePath: ["resources", "healthHistory"],
     operationId: "resources.healthHistory",
     kind: "query",
     domain: "resources",
@@ -2746,11 +3071,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.import-variables",
     operationGroup: "resources",
     operationMethod: "importVariables",
+    facadePath: ["resources", "importVariables"],
     operationId: "resources.importVariables",
     kind: "command",
     domain: "resources",
@@ -2763,11 +3090,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.list",
     operationGroup: "resources",
     operationMethod: "list",
+    facadePath: ["resources", "list"],
     operationId: "resources.list",
     kind: "query",
     domain: "resources",
@@ -2780,11 +3109,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.list-dependency-bindings",
     operationGroup: "resources",
     operationMethod: "listDependencyBindings",
+    facadePath: ["resources", "listDependencyBindings"],
     operationId: "resources.dependencyBindings.list",
     kind: "query",
     domain: "resources",
@@ -2797,11 +3128,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.proxy-configuration.preview",
     operationGroup: "resources",
     operationMethod: "proxyConfigurationPreview",
+    facadePath: ["resources", "proxyConfiguration", "preview"],
     operationId: "resources.proxyConfiguration",
     kind: "query",
     domain: "resources",
@@ -2814,11 +3147,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.reset-health",
     operationGroup: "resources",
     operationMethod: "resetHealth",
+    facadePath: ["resources", "resetHealth"],
     operationId: "resources.resetHealth",
     kind: "command",
     domain: "resources",
@@ -2831,11 +3166,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.rotate-dependency-binding-secret",
     operationGroup: "resources",
     operationMethod: "rotateDependencyBindingSecret",
+    facadePath: ["resources", "rotateDependencyBindingSecret"],
     operationId: "resources.dependencyBindings.rotateSecret",
     kind: "command",
     domain: "resources",
@@ -2848,11 +3185,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-control-attempts.prune",
     operationGroup: "resources",
     operationMethod: "runtimeControlAttemptsPrune",
+    facadePath: ["resources", "runtimeControlAttempts", "prune"],
     operationId: "resources.runtimeControlAttempts.prune",
     kind: "command",
     domain: "resources",
@@ -2865,11 +3204,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-log-archives.list",
     operationGroup: "resources",
     operationMethod: "runtimeLogArchivesList",
+    facadePath: ["resources", "runtimeLogArchives", "list"],
     operationId: "resources.logArchives.list",
     kind: "query",
     domain: "resources",
@@ -2882,11 +3223,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-log-archives.prune",
     operationGroup: "resources",
     operationMethod: "runtimeLogArchivesPrune",
+    facadePath: ["resources", "runtimeLogArchives", "prune"],
     operationId: "resources.logArchives.prune",
     kind: "command",
     domain: "resources",
@@ -2899,11 +3242,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-log-archives.show",
     operationGroup: "resources",
     operationMethod: "runtimeLogArchivesShow",
+    facadePath: ["resources", "runtimeLogArchives", "show"],
     operationId: "resources.logArchives.show",
     kind: "query",
     domain: "resources",
@@ -2916,11 +3261,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-logs",
     operationGroup: "resources",
     operationMethod: "runtimeLogs",
+    facadePath: ["resources", "runtimeLogs"],
     operationId: "resources.logs",
     kind: "query",
     domain: "resources",
@@ -2933,11 +3280,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime-logs",
     operationGroup: "resources",
     operationMethod: "runtimeLogs",
+    facadePath: ["resources", "runtimeLogs"],
     operationId: "resources.logsStream",
     kind: "query",
     domain: "resources",
@@ -2950,11 +3299,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
+    facadeDefault: false,
   },
   {
     operationKey: "resources.runtime-logs.archive",
     operationGroup: "resources",
     operationMethod: "runtimeLogsArchive",
+    facadePath: ["resources", "runtimeLogs", "archive"],
     operationId: "resources.archiveLogs",
     kind: "command",
     domain: "resources",
@@ -2967,11 +3318,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime.restart",
     operationGroup: "resources",
     operationMethod: "runtimeRestart",
+    facadePath: ["resources", "runtime", "restart"],
     operationId: "resources.runtime.restart",
     kind: "command",
     domain: "resources",
@@ -2984,11 +3337,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime.start",
     operationGroup: "resources",
     operationMethod: "runtimeStart",
+    facadePath: ["resources", "runtime", "start"],
     operationId: "resources.runtime.start",
     kind: "command",
     domain: "resources",
@@ -3001,11 +3356,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.runtime.stop",
     operationGroup: "resources",
     operationMethod: "runtimeStop",
+    facadePath: ["resources", "runtime", "stop"],
     operationId: "resources.runtime.stop",
     kind: "command",
     domain: "resources",
@@ -3018,11 +3375,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.secrets.create",
     operationGroup: "resources",
     operationMethod: "secretsCreate",
+    facadePath: ["resources", "secrets", "create"],
     operationId: "resources.secrets.create",
     kind: "command",
     domain: "resources",
@@ -3035,11 +3394,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.secrets.delete",
     operationGroup: "resources",
     operationMethod: "secretsDelete",
+    facadePath: ["resources", "secrets", "delete"],
     operationId: "resources.secrets.delete",
     kind: "command",
     domain: "resources",
@@ -3052,11 +3413,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.secrets.list",
     operationGroup: "resources",
     operationMethod: "secretsList",
+    facadePath: ["resources", "secrets", "list"],
     operationId: "resources.secrets.list",
     kind: "query",
     domain: "resources",
@@ -3069,11 +3432,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.secrets.rotate",
     operationGroup: "resources",
     operationMethod: "secretsRotate",
+    facadePath: ["resources", "secrets", "rotate"],
     operationId: "resources.secrets.rotate",
     kind: "command",
     domain: "resources",
@@ -3086,11 +3451,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.secrets.show",
     operationGroup: "resources",
     operationMethod: "secretsShow",
+    facadePath: ["resources", "secrets", "show"],
     operationId: "resources.secrets.show",
     kind: "query",
     domain: "resources",
@@ -3103,11 +3470,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.set-variable",
     operationGroup: "resources",
     operationMethod: "setVariable",
+    facadePath: ["resources", "setVariable"],
     operationId: "resources.setVariable",
     kind: "command",
     domain: "resources",
@@ -3120,11 +3489,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.show",
     operationGroup: "resources",
     operationMethod: "show",
+    facadePath: ["resources", "show"],
     operationId: "resources.show",
     kind: "query",
     domain: "resources",
@@ -3137,11 +3508,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.show-dependency-binding",
     operationGroup: "resources",
     operationMethod: "showDependencyBinding",
+    facadePath: ["resources", "showDependencyBinding"],
     operationId: "resources.dependencyBindings.show",
     kind: "query",
     domain: "resources",
@@ -3154,11 +3527,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.unbind-dependency",
     operationGroup: "resources",
     operationMethod: "unbindDependency",
+    facadePath: ["resources", "unbindDependency"],
     operationId: "resources.dependencyBindings.unbind",
     kind: "command",
     domain: "resources",
@@ -3171,11 +3546,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "resources.unset-variable",
     operationGroup: "resources",
     operationMethod: "unsetVariable",
+    facadePath: ["resources", "unsetVariable"],
     operationId: "resources.unsetVariable",
     kind: "command",
     domain: "resources",
@@ -3188,11 +3565,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "retention-defaults.configure",
     operationGroup: "retention-defaults",
     operationMethod: "configure",
+    facadePath: ["retentionDefaults", "configure"],
     operationId: "retentionDefaults.configure",
     kind: "command",
     domain: "retention-defaults",
@@ -3205,11 +3584,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "retention-defaults.list",
     operationGroup: "retention-defaults",
     operationMethod: "list",
+    facadePath: ["retentionDefaults", "list"],
     operationId: "retentionDefaults.list",
     kind: "query",
     domain: "retention-defaults",
@@ -3222,11 +3603,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "retention-defaults.show",
     operationGroup: "retention-defaults",
     operationMethod: "show",
+    facadePath: ["retentionDefaults", "show"],
     operationId: "retentionDefaults.show",
     kind: "query",
     domain: "retention-defaults",
@@ -3239,11 +3622,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "runtime-monitoring.rollup",
     operationGroup: "runtime-monitoring",
     operationMethod: "rollup",
+    facadePath: ["runtimeMonitoring", "rollup"],
     operationId: "runtimeMonitoring.rollup",
     kind: "query",
     domain: "runtime-monitoring",
@@ -3256,11 +3641,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "runtime-monitoring.samples.list",
     operationGroup: "runtime-monitoring",
     operationMethod: "samplesList",
+    facadePath: ["runtimeMonitoring", "samples", "list"],
     operationId: "runtimeMonitoring.samples",
     kind: "query",
     domain: "runtime-monitoring",
@@ -3273,11 +3660,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "runtime-monitoring.thresholds.configure",
     operationGroup: "runtime-monitoring",
     operationMethod: "thresholdsConfigure",
+    facadePath: ["runtimeMonitoring", "thresholds", "configure"],
     operationId: "runtimeMonitoring.thresholdConfigure",
     kind: "command",
     domain: "runtime-monitoring",
@@ -3290,11 +3679,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "runtime-monitoring.thresholds.show",
     operationGroup: "runtime-monitoring",
     operationMethod: "thresholdsShow",
+    facadePath: ["runtimeMonitoring", "thresholds", "show"],
     operationId: "runtimeMonitoring.thresholdShow",
     kind: "query",
     domain: "runtime-monitoring",
@@ -3307,11 +3698,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "runtime-usage.inspect",
     operationGroup: "runtime-usage",
     operationMethod: "inspect",
+    facadePath: ["runtimeUsage", "inspect"],
     operationId: "runtimeUsage.inspect",
     kind: "query",
     domain: "runtime-usage",
@@ -3324,11 +3717,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-runtime-prune-policies.configure",
     operationGroup: "scheduled-runtime-prune-policies",
     operationMethod: "configure",
+    facadePath: ["scheduledRuntimePrunePolicies", "configure"],
     operationId: "servers.capacity.policy.configure",
     kind: "command",
     domain: "servers",
@@ -3341,11 +3736,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-runtime-prune-policies.list",
     operationGroup: "scheduled-runtime-prune-policies",
     operationMethod: "list",
+    facadePath: ["scheduledRuntimePrunePolicies", "list"],
     operationId: "servers.capacity.policy.list",
     kind: "query",
     domain: "servers",
@@ -3358,11 +3755,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-runtime-prune-policies.show",
     operationGroup: "scheduled-runtime-prune-policies",
     operationMethod: "show",
+    facadePath: ["scheduledRuntimePrunePolicies", "show"],
     operationId: "servers.capacity.policy.show",
     kind: "query",
     domain: "servers",
@@ -3375,11 +3774,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-task-runs.list",
     operationGroup: "scheduled-task-runs",
     operationMethod: "list",
+    facadePath: ["scheduledTaskRuns", "list"],
     operationId: "scheduledTasks.runs.list",
     kind: "query",
     domain: "scheduled-task-runs",
@@ -3392,11 +3793,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-task-runs.logs",
     operationGroup: "scheduled-task-runs",
     operationMethod: "logs",
+    facadePath: ["scheduledTaskRuns", "logs"],
     operationId: "scheduledTasks.runs.logs",
     kind: "query",
     domain: "scheduled-task-runs",
@@ -3409,11 +3812,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-task-runs.show",
     operationGroup: "scheduled-task-runs",
     operationMethod: "show",
+    facadePath: ["scheduledTaskRuns", "show"],
     operationId: "scheduledTasks.runs.show",
     kind: "query",
     domain: "scheduled-task-runs",
@@ -3426,11 +3831,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.configure",
     operationGroup: "scheduled-tasks",
     operationMethod: "configure",
+    facadePath: ["scheduledTasks", "configure"],
     operationId: "scheduledTasks.configure",
     kind: "command",
     domain: "scheduled-tasks",
@@ -3443,11 +3850,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.create",
     operationGroup: "scheduled-tasks",
     operationMethod: "create",
+    facadePath: ["scheduledTasks", "create"],
     operationId: "scheduledTasks.create",
     kind: "command",
     domain: "scheduled-tasks",
@@ -3460,11 +3869,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.delete",
     operationGroup: "scheduled-tasks",
     operationMethod: "delete",
+    facadePath: ["scheduledTasks", "delete"],
     operationId: "scheduledTasks.delete",
     kind: "command",
     domain: "scheduled-tasks",
@@ -3477,11 +3888,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.list",
     operationGroup: "scheduled-tasks",
     operationMethod: "list",
+    facadePath: ["scheduledTasks", "list"],
     operationId: "scheduledTasks.list",
     kind: "query",
     domain: "scheduled-tasks",
@@ -3494,11 +3907,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.run-now",
     operationGroup: "scheduled-tasks",
     operationMethod: "runNow",
+    facadePath: ["scheduledTasks", "runNow"],
     operationId: "scheduledTasks.runNow",
     kind: "command",
     domain: "scheduled-tasks",
@@ -3511,11 +3926,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "scheduled-tasks.show",
     operationGroup: "scheduled-tasks",
     operationMethod: "show",
+    facadePath: ["scheduledTasks", "show"],
     operationId: "scheduledTasks.show",
     kind: "query",
     domain: "scheduled-tasks",
@@ -3528,11 +3945,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.bootstrap-proxy",
     operationGroup: "servers",
     operationMethod: "bootstrapProxy",
+    facadePath: ["servers", "bootstrapProxy"],
     operationId: "servers.bootstrapProxy",
     kind: "command",
     domain: "servers",
@@ -3545,11 +3964,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.capacity.inspect",
     operationGroup: "servers",
     operationMethod: "capacityInspect",
+    facadePath: ["servers", "capacity", "inspect"],
     operationId: "servers.capacity.inspect",
     kind: "query",
     domain: "servers",
@@ -3562,11 +3983,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.capacity.prune",
     operationGroup: "servers",
     operationMethod: "capacityPrune",
+    facadePath: ["servers", "capacity", "prune"],
     operationId: "servers.capacity.prune",
     kind: "command",
     domain: "servers",
@@ -3579,11 +4002,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.configure-credential",
     operationGroup: "servers",
     operationMethod: "configureCredential",
+    facadePath: ["servers", "configureCredential"],
     operationId: "servers.configureCredential",
     kind: "command",
     domain: "servers",
@@ -3596,11 +4021,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.configure-edge-proxy",
     operationGroup: "servers",
     operationMethod: "configureEdgeProxy",
+    facadePath: ["servers", "configureEdgeProxy"],
     operationId: "servers.configureEdgeProxy",
     kind: "command",
     domain: "servers",
@@ -3613,11 +4040,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.count",
     operationGroup: "servers",
     operationMethod: "count",
+    facadePath: ["servers", "count"],
     operationId: "servers.count",
     kind: "query",
     domain: "servers",
@@ -3630,11 +4059,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.deactivate",
     operationGroup: "servers",
     operationMethod: "deactivate",
+    facadePath: ["servers", "deactivate"],
     operationId: "servers.deactivate",
     kind: "command",
     domain: "servers",
@@ -3647,11 +4078,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.delete",
     operationGroup: "servers",
     operationMethod: "delete",
+    facadePath: ["servers", "delete"],
     operationId: "servers.delete",
     kind: "command",
     domain: "servers",
@@ -3664,11 +4097,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.delete-check",
     operationGroup: "servers",
     operationMethod: "deleteCheck",
+    facadePath: ["servers", "deleteCheck"],
     operationId: "servers.deleteCheck",
     kind: "query",
     domain: "servers",
@@ -3681,11 +4116,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.list",
     operationGroup: "servers",
     operationMethod: "list",
+    facadePath: ["servers", "list"],
     operationId: "servers.list",
     kind: "query",
     domain: "servers",
@@ -3698,11 +4135,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.prepare-runtime",
     operationGroup: "servers",
     operationMethod: "prepareRuntime",
+    facadePath: ["servers", "prepareRuntime"],
     operationId: "servers.prepareRuntime",
     kind: "command",
     domain: "servers",
@@ -3715,11 +4154,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.register",
     operationGroup: "servers",
     operationMethod: "register",
+    facadePath: ["servers", "register"],
     operationId: "servers.create",
     kind: "command",
     domain: "servers",
@@ -3732,11 +4173,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.rename",
     operationGroup: "servers",
     operationMethod: "rename",
+    facadePath: ["servers", "rename"],
     operationId: "servers.rename",
     kind: "command",
     domain: "servers",
@@ -3749,11 +4192,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.show",
     operationGroup: "servers",
     operationMethod: "show",
+    facadePath: ["servers", "show"],
     operationId: "servers.show",
     kind: "query",
     domain: "servers",
@@ -3766,11 +4211,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.test-connectivity",
     operationGroup: "servers",
     operationMethod: "testConnectivity",
+    facadePath: ["servers", "testConnectivity"],
     operationId: "servers.testConnectivity",
     kind: "command",
     domain: "servers",
@@ -3783,11 +4230,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.test-draft-connectivity",
     operationGroup: "servers",
     operationMethod: "testDraftConnectivity",
+    facadePath: ["servers", "testDraftConnectivity"],
     operationId: "servers.testDraftConnectivity",
     kind: "command",
     domain: "servers",
@@ -3800,11 +4249,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-events.ingest",
     operationGroup: "source-events",
     operationMethod: "ingest",
+    facadePath: ["sourceEvents", "ingest"],
     operationId: "source-events.ingest",
     kind: "command",
     domain: "source-events",
@@ -3817,11 +4268,13 @@ export const generatedSdkOperations = [
     authPolicy: "webhook-signature",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-events.ingest",
     operationGroup: "source-events",
     operationMethod: "ingest",
+    facadePath: ["sourceEvents", "ingest"],
     operationId: "source-events.ingest",
     kind: "command",
     domain: "source-events",
@@ -3834,11 +4287,13 @@ export const generatedSdkOperations = [
     authPolicy: "webhook-signature",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: false,
   },
   {
     operationKey: "source-events.list",
     operationGroup: "source-events",
     operationMethod: "list",
+    facadePath: ["sourceEvents", "list"],
     operationId: "sourceEvents.list",
     kind: "query",
     domain: "source-events",
@@ -3851,11 +4306,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-events.prune",
     operationGroup: "source-events",
     operationMethod: "prune",
+    facadePath: ["sourceEvents", "prune"],
     operationId: "sourceEvents.prune",
     kind: "command",
     domain: "source-events",
@@ -3868,11 +4325,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-events.replay",
     operationGroup: "source-events",
     operationMethod: "replay",
+    facadePath: ["sourceEvents", "replay"],
     operationId: "sourceEvents.replay",
     kind: "command",
     domain: "source-events",
@@ -3885,11 +4344,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-events.show",
     operationGroup: "source-events",
     operationMethod: "show",
+    facadePath: ["sourceEvents", "show"],
     operationId: "sourceEvents.show",
     kind: "query",
     domain: "source-events",
@@ -3902,11 +4363,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-links.delete",
     operationGroup: "source-links",
     operationMethod: "delete",
+    facadePath: ["sourceLinks", "delete"],
     operationId: "sourceLinks.delete",
     kind: "command",
     domain: "source-links",
@@ -3919,11 +4382,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-links.list",
     operationGroup: "source-links",
     operationMethod: "list",
+    facadePath: ["sourceLinks", "list"],
     operationId: "sourceLinks.list",
     kind: "query",
     domain: "source-links",
@@ -3936,11 +4401,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-links.relink",
     operationGroup: "source-links",
     operationMethod: "relink",
+    facadePath: ["sourceLinks", "relink"],
     operationId: "sourceLinks.relink",
     kind: "command",
     domain: "source-links",
@@ -3953,11 +4420,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "source-links.show",
     operationGroup: "source-links",
     operationMethod: "show",
+    facadePath: ["sourceLinks", "show"],
     operationId: "sourceLinks.show",
     kind: "query",
     domain: "source-links",
@@ -3970,11 +4439,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "static-artifacts.publications.list",
     operationGroup: "static-artifacts",
     operationMethod: "publicationsList",
+    facadePath: ["staticArtifacts", "publications", "list"],
     operationId: "staticArtifacts.listPublications",
     kind: "query",
     domain: "static-artifacts",
@@ -3987,11 +4458,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "static-artifacts.publish",
     operationGroup: "static-artifacts",
     operationMethod: "publish",
+    facadePath: ["staticArtifacts", "publish"],
     operationId: "staticArtifacts.publish",
     kind: "command",
     domain: "static-artifacts",
@@ -4004,11 +4477,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "static-artifacts.publish-archive",
     operationGroup: "static-artifacts",
     operationMethod: "publishArchive",
+    facadePath: ["staticArtifacts", "publishArchive"],
     operationId: "staticArtifacts.publishArchive",
     kind: "command",
     domain: "static-artifacts",
@@ -4021,11 +4496,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "static-artifacts.publish-payload",
     operationGroup: "static-artifacts",
     operationMethod: "publishPayload",
+    facadePath: ["staticArtifacts", "publishPayload"],
     operationId: "staticArtifacts.publishPayload",
     kind: "command",
     domain: "static-artifacts",
@@ -4038,11 +4515,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.backup-plan",
     operationGroup: "storage-volumes",
     operationMethod: "backupPlan",
+    facadePath: ["storageVolumes", "backupPlan"],
     operationId: "storageVolumes.backups.plan",
     kind: "query",
     domain: "storage-volumes",
@@ -4055,11 +4534,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.cleanup-runtime",
     operationGroup: "storage-volumes",
     operationMethod: "cleanupRuntime",
+    facadePath: ["storageVolumes", "cleanupRuntime"],
     operationId: "storageVolumes.cleanupRuntime",
     kind: "command",
     domain: "storage-volumes",
@@ -4072,11 +4553,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.create",
     operationGroup: "storage-volumes",
     operationMethod: "create",
+    facadePath: ["storageVolumes", "create"],
     operationId: "storageVolumes.create",
     kind: "command",
     domain: "storage-volumes",
@@ -4089,11 +4572,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.create-backup",
     operationGroup: "storage-volumes",
     operationMethod: "createBackup",
+    facadePath: ["storageVolumes", "createBackup"],
     operationId: "storageVolumes.backups.create",
     kind: "command",
     domain: "storage-volumes",
@@ -4106,11 +4591,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.delete",
     operationGroup: "storage-volumes",
     operationMethod: "delete",
+    facadePath: ["storageVolumes", "delete"],
     operationId: "storageVolumes.delete",
     kind: "command",
     domain: "storage-volumes",
@@ -4123,11 +4610,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.list",
     operationGroup: "storage-volumes",
     operationMethod: "list",
+    facadePath: ["storageVolumes", "list"],
     operationId: "storageVolumes.list",
     kind: "query",
     domain: "storage-volumes",
@@ -4140,11 +4629,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.list-backups",
     operationGroup: "storage-volumes",
     operationMethod: "listBackups",
+    facadePath: ["storageVolumes", "listBackups"],
     operationId: "storageVolumes.backups.list",
     kind: "query",
     domain: "storage-volumes",
@@ -4157,11 +4648,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.prune-backups",
     operationGroup: "storage-volumes",
     operationMethod: "pruneBackups",
+    facadePath: ["storageVolumes", "pruneBackups"],
     operationId: "storageVolumes.backups.prune",
     kind: "command",
     domain: "storage-volumes",
@@ -4174,11 +4667,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.rename",
     operationGroup: "storage-volumes",
     operationMethod: "rename",
+    facadePath: ["storageVolumes", "rename"],
     operationId: "storageVolumes.rename",
     kind: "command",
     domain: "storage-volumes",
@@ -4191,11 +4686,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.restore-backup",
     operationGroup: "storage-volumes",
     operationMethod: "restoreBackup",
+    facadePath: ["storageVolumes", "restoreBackup"],
     operationId: "storageVolumes.backups.restore",
     kind: "command",
     domain: "storage-volumes",
@@ -4208,11 +4705,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.restore-plan",
     operationGroup: "storage-volumes",
     operationMethod: "restorePlan",
+    facadePath: ["storageVolumes", "restorePlan"],
     operationId: "storageVolumes.backups.restorePlan",
     kind: "query",
     domain: "storage-volumes",
@@ -4225,11 +4724,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.show",
     operationGroup: "storage-volumes",
     operationMethod: "show",
+    facadePath: ["storageVolumes", "show"],
     operationId: "storageVolumes.show",
     kind: "query",
     domain: "storage-volumes",
@@ -4242,11 +4743,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "storage-volumes.show-backup",
     operationGroup: "storage-volumes",
     operationMethod: "showBackup",
+    facadePath: ["storageVolumes", "showBackup"],
     operationId: "storageVolumes.backups.show",
     kind: "query",
     domain: "storage-volumes",
@@ -4259,11 +4762,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.doctor",
     operationGroup: "system",
     operationMethod: "doctor",
+    facadePath: ["system", "doctor"],
     operationId: "system.doctor",
     kind: "query",
     domain: "system",
@@ -4276,11 +4781,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.github-app-connection.show",
     operationGroup: "system",
     operationMethod: "githubAppConnectionShow",
+    facadePath: ["system", "githubAppConnection", "show"],
     operationId: "integrations.github.appConnection.show",
     kind: "query",
     domain: "system",
@@ -4293,11 +4800,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.github-repositories.list",
     operationGroup: "system",
     operationMethod: "githubRepositoriesList",
+    facadePath: ["system", "githubRepositories", "list"],
     operationId: "integrations.github.repositories.list",
     kind: "query",
     domain: "system",
@@ -4310,11 +4819,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.instance-upgrade.apply",
     operationGroup: "system",
     operationMethod: "instanceUpgradeApply",
+    facadePath: ["system", "instanceUpgrade", "apply"],
     operationId: "system.instance-upgrade.apply",
     kind: "command",
     domain: "system",
@@ -4327,11 +4838,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.instance-upgrade.check",
     operationGroup: "system",
     operationMethod: "instanceUpgradeCheck",
+    facadePath: ["system", "instanceUpgrade", "check"],
     operationId: "system.instance-upgrade.check",
     kind: "query",
     domain: "system",
@@ -4344,11 +4857,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.integrations.list",
     operationGroup: "system",
     operationMethod: "integrationsList",
+    facadePath: ["system", "integrations", "list"],
     operationId: "integrations.list",
     kind: "query",
     domain: "system",
@@ -4361,11 +4876,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.plugins.list",
     operationGroup: "system",
     operationMethod: "pluginsList",
+    facadePath: ["system", "plugins", "list"],
     operationId: "plugins.list",
     kind: "query",
     domain: "system",
@@ -4378,11 +4895,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "system.providers.list",
     operationGroup: "system",
     operationMethod: "providersList",
+    facadePath: ["system", "providers", "list"],
     operationId: "providers.list",
     kind: "query",
     domain: "system",
@@ -4395,11 +4914,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "terminal-sessions.close",
     operationGroup: "terminal-sessions",
     operationMethod: "close",
+    facadePath: ["terminalSessions", "close"],
     operationId: "terminalSessions.close",
     kind: "command",
     domain: "terminal-sessions",
@@ -4412,11 +4933,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "terminal-sessions.expire",
     operationGroup: "terminal-sessions",
     operationMethod: "expire",
+    facadePath: ["terminalSessions", "expire"],
     operationId: "terminalSessions.expire",
     kind: "command",
     domain: "terminal-sessions",
@@ -4429,11 +4952,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "terminal-sessions.list",
     operationGroup: "terminal-sessions",
     operationMethod: "list",
+    facadePath: ["terminalSessions", "list"],
     operationId: "terminalSessions.list",
     kind: "query",
     domain: "terminal-sessions",
@@ -4446,11 +4971,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "terminal-sessions.open",
     operationGroup: "terminal-sessions",
     operationMethod: "open",
+    facadePath: ["terminalSessions", "open"],
     operationId: "terminalSessions.open",
     kind: "command",
     domain: "terminal-sessions",
@@ -4463,11 +4990,13 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "terminal-sessions.show",
     operationGroup: "terminal-sessions",
     operationMethod: "show",
+    facadePath: ["terminalSessions", "show"],
     operationId: "terminalSessions.show",
     kind: "query",
     domain: "terminal-sessions",
@@ -4480,5 +5009,387 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
 ] as const satisfies readonly SdkOperationDescriptor[];
+
+export interface GeneratedAppaloftClient extends AppaloftSdkClient {
+  readonly account: {
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly profile: {
+      readonly change: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly sessions: {
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly revoke: AppaloftSdkFacadeMethod;
+    };
+  };
+  readonly auditEvents: {
+    readonly archives: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly prune: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly export: AppaloftSdkFacadeMethod;
+    readonly exportGlobal: AppaloftSdkFacadeMethod;
+    readonly legalHolds: {
+      readonly configure: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly release: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly prune: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly auth: {
+    readonly bootstrapFirstAdmin: AppaloftSdkFacadeMethod;
+    readonly bootstrapStatus: AppaloftSdkFacadeMethod;
+  };
+  readonly blueprints: {
+    readonly install: AppaloftSdkFacadeMethod;
+    readonly installation: {
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly planInstall: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly capabilities: {
+    readonly query: AppaloftSdkFacadeMethod;
+  };
+  readonly certificates: {
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly import: AppaloftSdkFacadeMethod;
+    readonly issueOrRenew: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly retry: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly credentials: {
+    readonly createSsh: AppaloftSdkFacadeMethod;
+    readonly deleteSsh: AppaloftSdkFacadeMethod;
+    readonly listSsh: AppaloftSdkFacadeMethod;
+    readonly rotateSsh: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly defaultAccessDomainPolicies: {
+    readonly configure: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly dependencyResources: {
+    readonly backupPolicies: {
+      readonly configure: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly createBackup: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly import: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly listBackups: AppaloftSdkFacadeMethod;
+    readonly provision: AppaloftSdkFacadeMethod;
+    readonly provisioning: {
+      readonly accept: AppaloftSdkFacadeMethod;
+      readonly plan: AppaloftSdkFacadeMethod;
+      readonly status: AppaloftSdkFacadeMethod;
+    };
+    readonly rename: AppaloftSdkFacadeMethod;
+    readonly restoreBackup: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly showBackup: AppaloftSdkFacadeMethod;
+  };
+  readonly deployments: {
+    readonly archive: AppaloftSdkFacadeMethod;
+    readonly cancel: AppaloftSdkFacadeMethod;
+    readonly cleanupPreview: AppaloftSdkFacadeMethod;
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly logs: AppaloftSdkFacadeMethod & {
+      readonly prune: AppaloftSdkFacadeMethod;
+    };
+    readonly plan: AppaloftSdkFacadeMethod;
+    readonly prune: AppaloftSdkFacadeMethod;
+    readonly recoveryReadiness: AppaloftSdkFacadeMethod;
+    readonly redeploy: AppaloftSdkFacadeMethod;
+    readonly retry: AppaloftSdkFacadeMethod;
+    readonly rollback: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly streamEvents: AppaloftSdkFacadeMethod;
+  };
+  readonly deployTokens: {
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+    readonly rotate: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly domainBindings: {
+    readonly configureRoute: AppaloftSdkFacadeMethod;
+    readonly confirmOwnership: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly deleteCheck: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly retryVerification: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly domainEvents: {
+    readonly prune: AppaloftSdkFacadeMethod;
+  };
+  readonly entitlements: {
+    readonly query: AppaloftSdkFacadeMethod;
+  };
+  readonly environments: {
+    readonly archive: AppaloftSdkFacadeMethod;
+    readonly clone: AppaloftSdkFacadeMethod;
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly diff: AppaloftSdkFacadeMethod;
+    readonly effectivePrecedence: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly lock: AppaloftSdkFacadeMethod;
+    readonly promote: AppaloftSdkFacadeMethod;
+    readonly rename: AppaloftSdkFacadeMethod;
+    readonly setVariable: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly unlock: AppaloftSdkFacadeMethod;
+    readonly unsetVariable: AppaloftSdkFacadeMethod;
+  };
+  readonly operatorWork: {
+    readonly cancel: AppaloftSdkFacadeMethod;
+    readonly deadLetter: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly markRecovered: AppaloftSdkFacadeMethod;
+    readonly prune: AppaloftSdkFacadeMethod;
+    readonly retry: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly streamEvents: AppaloftSdkFacadeMethod;
+  };
+  readonly organizations: {
+    readonly changeMemberRole: AppaloftSdkFacadeMethod;
+    readonly currentContext: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly inviteMember: AppaloftSdkFacadeMethod;
+    readonly listInvitations: AppaloftSdkFacadeMethod;
+    readonly listMembers: AppaloftSdkFacadeMethod;
+    readonly profile: {
+      readonly change: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly reactivateMember: AppaloftSdkFacadeMethod;
+    readonly removeMember: AppaloftSdkFacadeMethod;
+    readonly switchCurrent: AppaloftSdkFacadeMethod;
+    readonly transferOwner: AppaloftSdkFacadeMethod;
+  };
+  readonly previewEnvironments: {
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly previewPolicies: {
+    readonly configure: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly projects: {
+    readonly archive: AppaloftSdkFacadeMethod;
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly deleteCheck: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly rename: AppaloftSdkFacadeMethod;
+    readonly reorder: AppaloftSdkFacadeMethod;
+    readonly restore: AppaloftSdkFacadeMethod;
+    readonly setDescription: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly providerJobLogs: {
+    readonly prune: AppaloftSdkFacadeMethod;
+  };
+  readonly resources: {
+    readonly accessFailureEvidence: {
+      readonly lookup: AppaloftSdkFacadeMethod;
+    };
+    readonly archive: AppaloftSdkFacadeMethod;
+    readonly attachStorage: AppaloftSdkFacadeMethod;
+    readonly bindDependency: AppaloftSdkFacadeMethod;
+    readonly configureAccess: AppaloftSdkFacadeMethod;
+    readonly configureAutoDeploy: AppaloftSdkFacadeMethod;
+    readonly configureHealth: AppaloftSdkFacadeMethod;
+    readonly configureNetwork: AppaloftSdkFacadeMethod;
+    readonly configureRuntime: AppaloftSdkFacadeMethod;
+    readonly configureSource: AppaloftSdkFacadeMethod;
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly detachStorage: AppaloftSdkFacadeMethod;
+    readonly diagnosticSummary: AppaloftSdkFacadeMethod;
+    readonly effectiveConfig: AppaloftSdkFacadeMethod;
+    readonly health: AppaloftSdkFacadeMethod;
+    readonly healthHistory: AppaloftSdkFacadeMethod;
+    readonly importVariables: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly listDependencyBindings: AppaloftSdkFacadeMethod;
+    readonly proxyConfiguration: {
+      readonly preview: AppaloftSdkFacadeMethod;
+    };
+    readonly resetHealth: AppaloftSdkFacadeMethod;
+    readonly rotateDependencyBindingSecret: AppaloftSdkFacadeMethod;
+    readonly runtime: {
+      readonly restart: AppaloftSdkFacadeMethod;
+      readonly start: AppaloftSdkFacadeMethod;
+      readonly stop: AppaloftSdkFacadeMethod;
+    };
+    readonly runtimeControlAttempts: {
+      readonly prune: AppaloftSdkFacadeMethod;
+    };
+    readonly runtimeLogArchives: {
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly prune: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly runtimeLogs: AppaloftSdkFacadeMethod & {
+      readonly archive: AppaloftSdkFacadeMethod;
+    };
+    readonly secrets: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly delete: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly rotate: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly setVariable: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly showDependencyBinding: AppaloftSdkFacadeMethod;
+    readonly unbindDependency: AppaloftSdkFacadeMethod;
+    readonly unsetVariable: AppaloftSdkFacadeMethod;
+  };
+  readonly retentionDefaults: {
+    readonly configure: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly runtimeMonitoring: {
+    readonly rollup: AppaloftSdkFacadeMethod;
+    readonly samples: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly thresholds: {
+      readonly configure: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+  };
+  readonly runtimeUsage: {
+    readonly inspect: AppaloftSdkFacadeMethod;
+  };
+  readonly scheduledRuntimePrunePolicies: {
+    readonly configure: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly scheduledTaskRuns: {
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly logs: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly scheduledTasks: {
+    readonly configure: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly runNow: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly servers: {
+    readonly bootstrapProxy: AppaloftSdkFacadeMethod;
+    readonly capacity: {
+      readonly inspect: AppaloftSdkFacadeMethod;
+      readonly prune: AppaloftSdkFacadeMethod;
+    };
+    readonly configureCredential: AppaloftSdkFacadeMethod;
+    readonly configureEdgeProxy: AppaloftSdkFacadeMethod;
+    readonly count: AppaloftSdkFacadeMethod;
+    readonly deactivate: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly deleteCheck: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly prepareRuntime: AppaloftSdkFacadeMethod;
+    readonly register: AppaloftSdkFacadeMethod;
+    readonly rename: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly testConnectivity: AppaloftSdkFacadeMethod;
+    readonly testDraftConnectivity: AppaloftSdkFacadeMethod;
+  };
+  readonly sourceEvents: {
+    readonly ingest: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly prune: AppaloftSdkFacadeMethod;
+    readonly replay: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly sourceLinks: {
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly relink: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly staticArtifacts: {
+    readonly publications: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly publish: AppaloftSdkFacadeMethod;
+    readonly publishArchive: AppaloftSdkFacadeMethod;
+    readonly publishPayload: AppaloftSdkFacadeMethod;
+  };
+  readonly storageVolumes: {
+    readonly backupPlan: AppaloftSdkFacadeMethod;
+    readonly cleanupRuntime: AppaloftSdkFacadeMethod;
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly createBackup: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly listBackups: AppaloftSdkFacadeMethod;
+    readonly pruneBackups: AppaloftSdkFacadeMethod;
+    readonly rename: AppaloftSdkFacadeMethod;
+    readonly restoreBackup: AppaloftSdkFacadeMethod;
+    readonly restorePlan: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly showBackup: AppaloftSdkFacadeMethod;
+  };
+  readonly system: {
+    readonly doctor: AppaloftSdkFacadeMethod;
+    readonly githubAppConnection: {
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly githubRepositories: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly instanceUpgrade: {
+      readonly apply: AppaloftSdkFacadeMethod;
+      readonly check: AppaloftSdkFacadeMethod;
+    };
+    readonly integrations: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly plugins: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly providers: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+  };
+  readonly terminalSessions: {
+    readonly close: AppaloftSdkFacadeMethod;
+    readonly expire: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly open: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+}

@@ -23,6 +23,7 @@ contracts, and stream semantics as CLI, Web, generated OpenAPI, and generated MC
 | TS-SDK-OPENAPI-002 | OpenAPI contract | Catalog/OpenAPI route parity | Every operation catalog entry with HTTP/oRPC route metadata appears in the OpenAPI SDK contract by normalized method and path. |
 | TS-SDK-OPENAPI-003 | OpenAPI contract | No SDK-only operations | Every OpenAPI operation annotated with `x-appaloft-operation-key` maps back to exactly one operation catalog entry. |
 | TS-SDK-GEN-001 | SDK generator | Generated TypeScript operation facade | Generated SDK operation groups and methods are reproducible from OpenAPI operation ids plus `x-appaloft-operation-key` metadata, without a handwritten method inventory. |
+| TS-SDK-FACADE-001 | SDK runtime | Typed facade dispatch | `createAppaloftClient` exposes generated operation-key groups such as `projects.create`, `projects.list`, `projects.show`, nested kebab-case groups, explicit path/query/body overrides, callable group nodes, and streaming facade methods while preserving SDK result and stream semantics. |
 | TS-SDK-BOUNDARY-001 | package boundary | SDK import boundary | `@appaloft/sdk` imports no `core`, `application`, repository, handler, use-case, DI token, shell, persistence, provider SDK, or CLI local-state module. |
 | TS-SDK-AUTH-001 | SDK runtime | Product-session and deploy-token auth | SDK request configuration follows accepted product-session, deploy-token, organization scope, 401, and 403 semantics. |
 | TS-SDK-ERROR-001 | SDK runtime | Structured error handling | SDK callers receive typed structured errors and do not need to branch on raw human message text. |
@@ -34,9 +35,9 @@ contracts, and stream semantics as CLI, Web, generated OpenAPI, and generated MC
 ## Current Implementation Notes And Migration Gaps
 
 OpenAPI metadata parity, the initial SDK generator, the `@appaloft/sdk` import-boundary check, SDK
-auth/error runtime behavior, and lower-level stream helper behavior are automated through
-`TS-SDK-OPENAPI-*`, `TS-SDK-GEN-001`, `TS-SDK-BOUNDARY-001`, `TS-SDK-AUTH-001`,
-`TS-SDK-ERROR-001`, and `TS-SDK-STREAM-001`.
+auth/error runtime behavior, typed facade dispatch, and lower-level stream helper behavior are
+automated through `TS-SDK-OPENAPI-*`, `TS-SDK-GEN-001`, `TS-SDK-FACADE-001`,
+`TS-SDK-BOUNDARY-001`, `TS-SDK-AUTH-001`, `TS-SDK-ERROR-001`, and `TS-SDK-STREAM-001`.
 Public SDK reference docs are registered under `typescript-sdk.operation-client` and covered by
 `TS-SDK-DOCS-001` plus the public docs registry checks. `TS-SDK-BLACKBOX-001` is automated by
 `packages/sdk/test/running-server-smoke.test.ts`, which exercises representative project

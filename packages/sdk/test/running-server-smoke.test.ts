@@ -130,7 +130,7 @@ describe("Appaloft SDK running-server smoke", () => {
         });
 
         if (query instanceof ListProjectsQuery) {
-          return ok({ items: [project] } as T);
+          return ok({ items: [project], total: 1, limit: 100, offset: 0 } as T);
         }
 
         expect(query).toBeInstanceOf(ShowProjectQuery);

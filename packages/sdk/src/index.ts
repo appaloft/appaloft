@@ -1,3 +1,5 @@
+import { type GeneratedAppaloftClient, generatedSdkOperations } from "./generated-operations";
+
 export const apiVersion = "v1";
 
 export { generatedSdkOperations } from "./generated-operations";
@@ -24,6 +26,8 @@ export interface SdkOperationDescriptor {
   readonly operationKey: string;
   readonly operationGroup: string;
   readonly operationMethod: string;
+  readonly facadePath?: readonly string[];
+  readonly facadeDefault?: boolean;
   readonly operationId: string;
   readonly kind: SdkOperationKind;
   readonly domain: string;
@@ -81,6 +85,15 @@ export interface AppaloftSdkOperationRequest {
   readonly signal?: AbortSignal;
 }
 
+export interface AppaloftSdkFacadeInput {
+  readonly pathParams?: Readonly<Record<string, string>>;
+  readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  readonly body?: unknown;
+  readonly signal?: AbortSignal;
+  readonly parseEnvelope?: (value: unknown) => unknown;
+  readonly [key: string]: unknown;
+}
+
 export interface AppaloftSdkStreamRequest<TEnvelope = unknown> extends AppaloftSdkOperationRequest {
   readonly parseEnvelope?: (value: unknown) => TEnvelope;
 }
@@ -107,6 +120,18 @@ export interface AppaloftSdkClient {
   ) => AsyncIterable<TEnvelope>;
 }
 
+export type AppaloftSdkFacadeResult<T> = Promise<AppaloftSdkOperationResult<T>> & AsyncIterable<T>;
+
+export type AppaloftSdkFacadeMethod = <T = unknown>(
+  input?: AppaloftSdkFacadeInput,
+) => AppaloftSdkFacadeResult<T>;
+
+export type AppaloftSdkFacadeGroup = {
+  readonly [key: string]: unknown;
+};
+
+export type AppaloftClient = AppaloftSdkClient & AppaloftSdkFacadeGroup;
+
 export class AppaloftSdkStreamError extends Error {
   constructor(
     message: string,
@@ -116,6 +141,13 @@ export class AppaloftSdkStreamError extends Error {
     super(message);
     this.name = "AppaloftSdkStreamError";
   }
+}
+
+export function createAppaloftClient(options: AppaloftSdkClientOptions): GeneratedAppaloftClient {
+  return createAppaloftFacadeClient(
+    createAppaloftSdkClient(options),
+    generatedSdkOperations,
+  ) as unknown as GeneratedAppaloftClient;
 }
 
 export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): AppaloftSdkClient {
@@ -170,6 +202,217 @@ export function createAppaloftSdkClient(options: AppaloftSdkClientOptions): Appa
       return streamOperation(fetchImplementation, options, input);
     },
   };
+}
+
+export function createAppaloftFacadeClient(
+  client: AppaloftSdkClient,
+  operations: readonly SdkOperationDescriptor[] = generatedSdkOperations,
+): AppaloftClient {
+  const facade = client as AppaloftClient;
+  const seenFacadeKeys = new Set<string>();
+
+  for (const operation of operations) {
+    if (operation.facadeDefault === false) {
+      continue;
+    }
+
+    const facadePath = operation.facadePath ?? operationKeyToFacadePath(operation.operationKey);
+    const facadeKey = facadePath.join(".");
+
+    if (facadePath.length === 0 || seenFacadeKeys.has(facadeKey)) {
+      continue;
+    }
+
+    seenFacadeKeys.add(facadeKey);
+    attachFacadeOperation(facade, facadePath, operation, client);
+  }
+
+  return facade;
+}
+
+function attachFacadeOperation(
+  root: Record<string, unknown>,
+  facadePath: readonly string[],
+  operation: SdkOperationDescriptor,
+  client: AppaloftSdkClient,
+): void {
+  let target = root;
+
+  for (const segment of facadePath.slice(0, -1)) {
+    const existing = target[segment];
+
+    if (existing === undefined) {
+      const group: AppaloftSdkFacadeGroup = {};
+      target[segment] = group;
+      target = group;
+      continue;
+    }
+
+    if (!isFacadeContainer(existing)) {
+      throw new Error(`SDK facade path conflict at ${facadePath.join(".")}`);
+    }
+
+    target = existing as Record<string, unknown>;
+  }
+
+  const leaf = lastFacadeSegment(facadePath);
+  const method = ((input?: AppaloftSdkFacadeInput) => {
+    const request = buildFacadeRequest(operation, input);
+
+    if (operation.streaming) {
+      const parseEnvelope = input?.parseEnvelope as ((value: unknown) => unknown) | undefined;
+      return client.stream({
+        ...request,
+        ...(parseEnvelope ? { parseEnvelope } : {}),
+      });
+    }
+
+    return client.request(request);
+  }) as AppaloftSdkFacadeMethod;
+
+  const existing = target[leaf];
+
+  if (isPlainFacadeGroup(existing)) {
+    Object.assign(method, existing);
+  }
+
+  target[leaf] = method;
+}
+
+function isFacadeContainer(
+  value: unknown,
+): value is Record<string, unknown> | AppaloftSdkFacadeMethod {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+function isPlainFacadeGroup(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function buildFacadeRequest(
+  operation: SdkOperationDescriptor,
+  input: AppaloftSdkFacadeInput | undefined,
+): AppaloftSdkOperationRequest {
+  const normalizedInput = input ?? {};
+  const reservedKeys = new Set(["pathParams", "query", "body", "signal", "parseEnvelope"]);
+  const pathParamNames = new Set(pathParameterNames(operation.route.path));
+  const pathParams = {
+    ...extractPathParams(operation.route.path, normalizedInput),
+    ...(normalizedInput.pathParams ?? {}),
+  };
+  const looseInput = Object.fromEntries(
+    Object.entries(normalizedInput).filter(
+      ([key]) => !reservedKeys.has(key) && !pathParamNames.has(key),
+    ),
+  );
+  const hasExplicitBody = Object.hasOwn(normalizedInput, "body");
+  const hasExplicitQuery = normalizedInput.query !== undefined;
+  const defaultsToQuery =
+    !hasExplicitBody &&
+    (operation.route.method === "GET" ||
+      operation.route.method === "DELETE" ||
+      operation.streaming);
+
+  const request: AppaloftSdkOperationRequest = {
+    operation,
+    ...(Object.keys(pathParams).length > 0 ? { pathParams } : {}),
+    ...(!defaultsToQuery && Object.keys(looseInput).length > 0 ? { body: looseInput } : {}),
+    ...(hasExplicitBody ? { body: normalizedInput.body } : {}),
+    ...(normalizedInput.signal ? { signal: normalizedInput.signal } : {}),
+  };
+
+  if (defaultsToQuery || hasExplicitQuery) {
+    const query = {
+      ...(defaultsToQuery ? queryFromLooseInput(looseInput) : {}),
+      ...(normalizedInput.query ?? {}),
+    };
+
+    if (Object.keys(query).length > 0) {
+      return { ...request, query };
+    }
+  }
+
+  return request;
+}
+
+function extractPathParams(
+  path: string,
+  input: AppaloftSdkFacadeInput,
+): Readonly<Record<string, string>> {
+  const params: Record<string, string> = {};
+
+  for (const key of pathParameterNames(path)) {
+    const value = input[key];
+
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new Error(`SDK facade path parameter ${key} must be a string, number, or boolean`);
+    }
+
+    params[key] = String(value);
+  }
+
+  return params;
+}
+
+function pathParameterNames(path: string): string[] {
+  return [...path.matchAll(/\{([^}]+)\}/g)]
+    .map((match) => match[1])
+    .filter((value): value is string => Boolean(value));
+}
+
+function lastFacadeSegment(facadePath: readonly string[]): string {
+  const leaf = facadePath.at(-1);
+
+  if (!leaf) {
+    throw new Error("SDK facade path must contain at least one segment");
+  }
+
+  return leaf;
+}
+
+function queryFromLooseInput(
+  input: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, string | number | boolean | null | undefined>> {
+  const query: Record<string, string | number | boolean | null | undefined> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      value === null ||
+      value === undefined
+    ) {
+      query[key] = value;
+      continue;
+    }
+
+    throw new Error(`SDK facade query parameter ${key} must be a scalar value`);
+  }
+
+  return query;
+}
+
+function operationKeyToFacadePath(operationKey: string): string[] {
+  return operationKey.split(".").filter(Boolean).map(operationKeyPartToIdentifier);
+}
+
+function operationKeyPartToIdentifier(part: string): string {
+  const normalized = part
+    .split("-")
+    .filter((value) => value.length > 0)
+    .map((value, index) => (index === 0 ? value : capitalize(value)))
+    .join("");
+
+  return normalized.replaceAll(/[^a-zA-Z0-9_$]/g, "");
+}
+
+function capitalize(value: string): string {
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
 }
 
 async function fetchSdkOperation(

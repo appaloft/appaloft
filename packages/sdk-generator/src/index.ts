@@ -35,6 +35,8 @@ export interface SdkOperationDescriptor {
   readonly operationKey: string;
   readonly operationGroup: string;
   readonly operationMethod: string;
+  readonly facadePath?: readonly string[];
+  readonly facadeDefault?: boolean;
   readonly operationId: string;
   readonly kind: SdkOperationKind;
   readonly domain: string;
@@ -90,6 +92,10 @@ export function operationMethodFromKey(operationKey: string): string {
     .join("");
 }
 
+export function operationFacadePathFromKey(operationKey: string): string[] {
+  return operationKey.split(".").filter(Boolean).map(operationKeyPartToIdentifier);
+}
+
 export function collectSdkOperationsFromOpenApi(
   document: OpenApiDocument,
 ): SdkOperationDescriptor[] {
@@ -115,7 +121,7 @@ export function collectSdkOperationsFromOpenApi(
     }
   }
 
-  return operations.sort(compareSdkOperations);
+  return markDefaultFacadeOperations(operations.sort(compareSdkOperations));
 }
 
 export function renderTypescriptSdkFacade(
@@ -127,9 +133,11 @@ export function renderTypescriptSdkFacade(
   const operations = collectSdkOperationsFromOpenApi(document);
 
   return [
-    `import { type SdkOperationDescriptor } from "${importPath}";`,
+    `import { type AppaloftSdkClient, type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "${importPath}";`,
     "",
     `export const ${exportName} = ${JSON.stringify(operations, null, 2)} as const satisfies readonly SdkOperationDescriptor[];`,
+    "",
+    renderGeneratedAppaloftClientInterface(operations),
     "",
   ].join("\n");
 }
@@ -163,6 +171,7 @@ function descriptorFromOpenApiOperation(
     operationKey,
     operationGroup: operationGroupFromKey(operationKey),
     operationMethod: operationMethodFromKey(operationKey),
+    facadePath: operationFacadePathFromKey(operationKey),
     operationId: operation.operationId ?? operationKey,
     kind,
     domain,
@@ -176,6 +185,117 @@ function descriptorFromOpenApiOperation(
     errorFamily,
     streaming,
   };
+}
+
+function markDefaultFacadeOperations(
+  operations: readonly SdkOperationDescriptor[],
+): SdkOperationDescriptor[] {
+  const byKey = new Map<string, readonly SdkOperationDescriptor[]>();
+
+  for (const operation of operations) {
+    byKey.set(operation.operationKey, [...(byKey.get(operation.operationKey) ?? []), operation]);
+  }
+
+  const defaultByKey = new Map<string, SdkOperationDescriptor>(
+    [...byKey.entries()].map(([operationKey, candidates]) => [
+      operationKey,
+      chooseDefaultFacadeOperation(operationKey, candidates),
+    ]),
+  );
+
+  return operations.map((operation) => ({
+    ...operation,
+    facadeDefault: defaultByKey.get(operation.operationKey) === operation,
+  }));
+}
+
+function chooseDefaultFacadeOperation(
+  operationKey: string,
+  candidates: readonly SdkOperationDescriptor[],
+): SdkOperationDescriptor {
+  const streamingKey = operationKey
+    .split(".")
+    .some((part) => part === "stream" || part.startsWith("stream-"));
+
+  if (streamingKey) {
+    return candidates.find((operation) => operation.streaming) ?? firstOperation(candidates);
+  }
+
+  return candidates.find((operation) => !operation.streaming) ?? firstOperation(candidates);
+}
+
+function firstOperation(candidates: readonly SdkOperationDescriptor[]): SdkOperationDescriptor {
+  const [first] = candidates;
+
+  if (!first) {
+    throw new Error("Cannot choose a default SDK facade operation from an empty candidate list");
+  }
+
+  return first;
+}
+
+interface FacadeTreeNode {
+  hasMethod: boolean;
+  children: Map<string, FacadeTreeNode>;
+}
+
+function renderGeneratedAppaloftClientInterface(
+  operations: readonly SdkOperationDescriptor[],
+): string {
+  const tree: FacadeTreeNode = { hasMethod: false, children: new Map() };
+
+  for (const operation of operations) {
+    if (operation.facadeDefault === false) {
+      continue;
+    }
+
+    const facadePath = operation.facadePath ?? operationFacadePathFromKey(operation.operationKey);
+    let node = tree;
+
+    for (const segment of facadePath) {
+      const child = node.children.get(segment) ?? { hasMethod: false, children: new Map() };
+      node.children.set(segment, child);
+      node = child;
+    }
+
+    node.hasMethod = true;
+  }
+
+  return [
+    "export interface GeneratedAppaloftClient extends AppaloftSdkClient {",
+    renderFacadeProperties(tree, 1),
+    "}",
+  ].join("\n");
+}
+
+function renderFacadeProperties(node: FacadeTreeNode, depth: number): string {
+  return [...node.children.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([name, child]) =>
+        `${indent(depth)}readonly ${JSON.stringify(name)}: ${renderFacadeNode(child, depth)};`,
+    )
+    .join("\n");
+}
+
+function renderFacadeNode(node: FacadeTreeNode, depth: number): string {
+  const properties = renderFacadeProperties(node, depth + 1);
+
+  if (node.children.size === 0) {
+    return "AppaloftSdkFacadeMethod";
+  }
+
+  const group = ["{", properties, `${indent(depth)}}`].join("\n");
+
+  if (node.hasMethod) {
+    return `AppaloftSdkFacadeMethod & ${group}`;
+  }
+
+  return group;
+}
+
+function indent(depth: number): string {
+  return "  ".repeat(depth);
 }
 
 function operationKeyPartToIdentifier(part: string): string {
