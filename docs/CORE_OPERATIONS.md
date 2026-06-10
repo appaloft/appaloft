@@ -92,6 +92,7 @@ Implemented operations:
 | Count projects | Product-session member query | `projects.count` | `CountProjectsQuery` | `CountProjectsQueryInput` | `appaloft project count` | `GET /api/projects/count` |
 | Show project | Product-session member query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
 | Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
+| Reorder projects | Command | `projects.reorder` | `ReorderProjectsCommand` | `ReorderProjectsCommandInput` | `appaloft project reorder --project-ids <ids>` | `POST /api/projects/reorder` |
 | Set project description | Command | `projects.set-description` | `SetProjectDescriptionCommand` | `SetProjectDescriptionCommandInput` | `appaloft project set-description <projectId>` | `POST /api/projects/{projectId}/description` |
 | Archive project | Command | `projects.archive` | `ArchiveProjectCommand` | `ArchiveProjectCommandInput` | `appaloft project archive <projectId>` | `POST /api/projects/{projectId}/archive` |
 | Restore project | Command | `projects.restore` | `RestoreProjectCommand` | `RestoreProjectCommandInput` | `appaloft project restore <projectId>` | `POST /api/projects/{projectId}/restore` |

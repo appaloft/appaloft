@@ -14,6 +14,7 @@ import {
   ok,
   Project,
   ProjectByIdSpec,
+  ProjectDisplayOrder,
   ProjectId,
   ProjectLifecycleStatusValue,
   ProjectName,
@@ -48,6 +49,7 @@ import {
   DeleteProjectUseCase,
   ListProjectsQueryService,
   RenameProjectUseCase,
+  ReorderProjectsUseCase,
   RestoreProjectUseCase,
   SetProjectDescriptionUseCase,
   ShowProjectQueryService,
@@ -61,6 +63,7 @@ function projectFixture(input?: {
   archivedAt?: string;
   archiveReason?: string;
   organizationId?: string;
+  displayOrder?: number;
 }): Project {
   return Project.rehydrate({
     id: ProjectId.rehydrate(input?.id ?? "prj_demo"),
@@ -73,6 +76,7 @@ function projectFixture(input?: {
     ...(input?.archiveReason
       ? { archiveReason: ArchiveReason.rehydrate(input.archiveReason) }
       : {}),
+    displayOrder: ProjectDisplayOrder.rehydrate(input?.displayOrder ?? 0),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
 }
@@ -82,6 +86,7 @@ function projectEvent(
   type:
     | "project-renamed"
     | "project-description-set"
+    | "project-reordered"
     | "project-archived"
     | "project-restored"
     | "project-deleted",
@@ -249,6 +254,122 @@ describe("project lifecycle operations", () => {
       "prj_active",
       "prj_archived",
     ]);
+  });
+
+  test("[PROJ-LIFE-REORDER-001] reorders active projects and list returns pagination metadata", async () => {
+    const { clock, context, eventBus, logger, projectReadModel, projects } = await createHarness([
+      projectFixture({
+        id: "prj_alpha",
+        name: "Alpha",
+        slug: "alpha",
+        displayOrder: 0,
+      }),
+      projectFixture({
+        id: "prj_beta",
+        name: "Beta",
+        slug: "beta",
+        displayOrder: 1,
+      }),
+      projectFixture({
+        id: "prj_gamma",
+        name: "Gamma",
+        slug: "gamma",
+        displayOrder: 2,
+      }),
+    ]);
+    const reorder = new ReorderProjectsUseCase(projects, clock, eventBus, logger);
+    const list = new ListProjectsQueryService(projectReadModel);
+
+    const reorderResult = await reorder.execute(context, {
+      projectIds: ["prj_gamma", "prj_alpha", "prj_beta"],
+    });
+    const listResult = await list.execute(
+      context,
+      ListProjectsQuery.create({ limit: 2, offset: 1 })._unsafeUnwrap(),
+    );
+
+    expect(reorderResult.isOk()).toBe(true);
+    expect(reorderResult._unsafeUnwrap()).toEqual({
+      reorderedProjectIds: ["prj_gamma", "prj_alpha", "prj_beta"],
+    });
+    expect(listResult.isOk()).toBe(true);
+    expect(listResult._unsafeUnwrap()).toMatchObject({
+      total: 3,
+      limit: 2,
+      offset: 1,
+    });
+    expect(listResult._unsafeUnwrap().items.map((project) => project.id)).toEqual([
+      "prj_alpha",
+      "prj_beta",
+    ]);
+    expect(projectEvent(eventBus.events, "project-reordered").payload).toMatchObject({
+      projectId: "prj_gamma",
+      previousDisplayOrder: 2,
+      nextDisplayOrder: 0,
+    });
+  });
+
+  test("[PROJ-LIFE-REORDER-002] rejects duplicate project ids", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness();
+    const reorder = new ReorderProjectsUseCase(projects, clock, eventBus, logger);
+
+    const result = await reorder.execute(context, {
+      projectIds: ["prj_demo", "prj_demo"],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-REORDER-003] rejects archived project reorder", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const reorder = new ReorderProjectsUseCase(projects, clock, eventBus, logger);
+
+    const result = await reorder.execute(context, {
+      projectIds: ["prj_demo"],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "project_archived",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-REORDER-004] rejects cross-organization project reorder", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([
+      projectFixture({
+        id: "prj_alpha",
+        name: "Alpha",
+        slug: "alpha",
+        organizationId: "org_alpha",
+      }),
+      projectFixture({
+        id: "prj_beta",
+        name: "Beta",
+        slug: "beta",
+        organizationId: "org_beta",
+      }),
+    ]);
+    const reorder = new ReorderProjectsUseCase(projects, clock, eventBus, logger);
+
+    const result = await reorder.execute(context, {
+      projectIds: ["prj_alpha", "prj_beta"],
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+    });
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("[PROJ-LIFE-SHOW-001] shows a project by id with lifecycle metadata", async () => {

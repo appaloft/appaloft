@@ -15,6 +15,7 @@ relatedOperations:
   - projects.create
   - projects.show
   - projects.rename
+  - projects.reorder
   - projects.set-description
   - projects.archive
   - projects.restore
@@ -32,13 +33,17 @@ Project 是用户管理一组资源、环境和部署历史的边界。它不是
 
 <h2 id="project-lifecycle">项目生命周期</h2>
 
-项目可以被读取、重命名、设置描述、归档、恢复、执行删除预检，并在 blocker 清空后删除。归档项目会保留项目、资源和部署历史，但会阻止在该项目下创建新的环境、资源或部署。恢复项目会重新允许新的项目级创建和部署入口。
+项目可以被读取、重命名、排序、设置描述、归档、恢复、执行删除预检，并在 blocker 清空后删除。归档项目会保留项目、资源和部署历史，但会阻止在该项目下创建新的环境、资源或部署。恢复项目会重新允许新的项目级创建和部署入口。
 
-项目设置里的重命名、描述、归档、恢复和删除只改变项目级元数据或生命周期。它们不会创建 deployment、不会改写历史 deployment snapshot，也不会立即停止、重启或删除正在运行的 runtime。
+项目列表排序、项目设置里的重命名、描述、归档、恢复和删除只改变项目级元数据或生命周期。它们不会创建 deployment、不会改写历史 deployment snapshot，也不会立即停止、重启或删除正在运行的 runtime。
 
 <h3 id="project-rename">重命名项目</h3>
 
 使用 Web、CLI 或 API 重命名项目时，Appaloft 会根据新名称重新生成项目 slug。如果新 slug 已被其他项目使用，请选择另一个名称。
+
+<h3 id="project-reorder">排序项目</h3>
+
+项目排序只改变当前组织下活跃项目在列表中的显示顺序。排序不会移动资源、环境或部署历史，也不会影响运行中的 runtime。
 
 <h3 id="project-description">设置项目描述</h3>
 

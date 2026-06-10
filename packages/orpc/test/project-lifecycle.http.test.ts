@@ -12,9 +12,11 @@ import {
   DeleteProjectCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   RenameProjectCommand,
+  ReorderProjectsCommand,
   RestoreProjectCommand,
   SetProjectDescriptionCommand,
   ShowProjectQuery,
@@ -44,6 +46,44 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
   }
 }
 
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_project_lifecycle",
+        label: "project-lifecycle@example.test",
+      },
+      email: "project-lifecycle@example.test",
+      organizationId: input.organizationId ?? "org_project_lifecycle_test",
+      role: input.requiredRole,
+      userId: "usr_project_lifecycle",
+    }),
+};
+
+function productRequest(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set(
+    "cookie",
+    headers.get("cookie") ?? "better-auth.session_token=project-lifecycle-test",
+  );
+
+  return new Request(url, {
+    ...init,
+    headers,
+  });
+}
+
+function mountProjectLifecycleRoutes(input: { commandBus: CommandBus; queryBus: QueryBus }) {
+  return mountAppaloftOrpcRoutes(new Elysia(), {
+    commandBus: input.commandBus,
+    executionContextFactory: new TestExecutionContextFactory(),
+    logger: new NoopLogger(),
+    productSessionAuthorizationPort,
+    queryBus: input.queryBus,
+  });
+}
+
 describe("project lifecycle HTTP routes", () => {
   test("[READ-MODEL-COUNT-003] dispatches CountProjectsQuery through HTTP", async () => {
     let capturedQuery: Query<unknown> | undefined;
@@ -57,14 +97,9 @@ describe("project lifecycle HTTP routes", () => {
         return ok({ count: 3 } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
-    const response = await app.handle(new Request("http://localhost/api/projects/count"));
+    const response = await app.handle(productRequest("http://localhost/api/projects/count"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ count: 3 });
@@ -83,15 +118,10 @@ describe("project lifecycle HTTP routes", () => {
         return ok({ count: 3 } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/count", {
+      productRequest("http://localhost/api/projects/count", {
         headers: {
           "x-appaloft-edge-action": "managed_challenge",
           "x-appaloft-edge-provider": "edge-fixture",
@@ -137,14 +167,9 @@ describe("project lifecycle HTTP routes", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
-    const response = await app.handle(new Request("http://localhost/api/projects/prj_demo"));
+    const response = await app.handle(productRequest("http://localhost/api/projects/prj_demo"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -167,15 +192,10 @@ describe("project lifecycle HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/rename", {
+      productRequest("http://localhost/api/projects/prj_demo/rename", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -196,6 +216,40 @@ describe("project lifecycle HTTP routes", () => {
     });
   });
 
+  test("[PROJ-LIFE-ENTRY-HTTP-009] dispatches ReorderProjectsCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ reorderedProjectIds: ["prj_b", "prj_a"] } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      productRequest("http://localhost/api/projects/reorder", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectIds: ["prj_b", "prj_a"],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ reorderedProjectIds: ["prj_b", "prj_a"] });
+    expect(capturedCommand).toBeInstanceOf(ReorderProjectsCommand);
+    expect(capturedCommand).toMatchObject({
+      projectIds: ["prj_b", "prj_a"],
+    });
+  });
+
   test("[PROJ-LIFE-ENTRY-HTTP-003] dispatches ArchiveProjectCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {
@@ -208,15 +262,10 @@ describe("project lifecycle HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/archive", {
+      productRequest("http://localhost/api/projects/prj_demo/archive", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -249,15 +298,10 @@ describe("project lifecycle HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/restore", {
+      productRequest("http://localhost/api/projects/prj_demo/restore", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -295,15 +339,10 @@ describe("project lifecycle HTTP routes", () => {
         } as T);
       },
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/delete-check"),
+      productRequest("http://localhost/api/projects/prj_demo/delete-check"),
     );
 
     expect(response.status).toBe(200);
@@ -345,15 +384,10 @@ describe("project lifecycle HTTP routes", () => {
           checkedAt: "2026-01-01T00:00:00.000Z",
         } as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/delete-check"),
+      productRequest("http://localhost/api/projects/prj_demo/delete-check"),
     );
 
     expect(response.status).toBe(200);
@@ -390,15 +424,10 @@ describe("project lifecycle HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo", {
+      productRequest("http://localhost/api/projects/prj_demo", {
         method: "DELETE",
         headers: {
           "content-type": "application/json",
@@ -431,15 +460,10 @@ describe("project lifecycle HTTP routes", () => {
       execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
         ok({} as T),
     } as QueryBus;
-    const app = mountAppaloftOrpcRoutes(new Elysia(), {
-      commandBus,
-      executionContextFactory: new TestExecutionContextFactory(),
-      logger: new NoopLogger(),
-      queryBus,
-    });
+    const app = mountProjectLifecycleRoutes({ commandBus, queryBus });
 
     const response = await app.handle(
-      new Request("http://localhost/api/projects/prj_demo/description", {
+      productRequest("http://localhost/api/projects/prj_demo/description", {
         method: "POST",
         headers: {
           "content-type": "application/json",

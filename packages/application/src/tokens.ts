@@ -266,6 +266,7 @@ export const tokens = {
   ),
   deleteProjectUseCase: Symbol.for("appaloft.delete_project_use_case"),
   renameProjectUseCase: Symbol.for("appaloft.rename_project_use_case"),
+  reorderProjectsUseCase: Symbol.for("appaloft.reorder_projects_use_case"),
   restoreProjectUseCase: Symbol.for("appaloft.restore_project_use_case"),
   setProjectDescriptionUseCase: Symbol.for("appaloft.set_project_description_use_case"),
   showProjectQueryService: Symbol.for("appaloft.show_project_query_service"),

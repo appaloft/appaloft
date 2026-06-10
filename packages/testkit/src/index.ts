@@ -717,6 +717,7 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      offset?: number;
       lifecycleStatus?: NonNullable<Parameters<ProjectReadModel["list"]>[1]>["lifecycleStatus"];
     },
   ): Promise<ProjectSummary[]> {
@@ -749,7 +750,21 @@ export class MemoryProjectReadModel implements ProjectReadModel, ProjectOwnershi
 
         return [summary];
       })
-      .slice(0, input?.limit ?? defaultReadModelListLimit);
+      .sort((left, right) => {
+        const leftDisplayOrder = left.displayOrder ?? 0;
+        const rightDisplayOrder = right.displayOrder ?? 0;
+        if (leftDisplayOrder !== rightDisplayOrder) {
+          return leftDisplayOrder - rightDisplayOrder;
+        }
+        if (left.createdAt !== right.createdAt) {
+          return right.createdAt.localeCompare(left.createdAt);
+        }
+        return left.id.localeCompare(right.id);
+      })
+      .slice(
+        input?.offset ?? 0,
+        (input?.offset ?? 0) + (input?.limit ?? defaultReadModelListLimit),
+      );
   }
 
   async findOne(
@@ -804,6 +819,7 @@ function projectSummaryFromState(project: Project): ProjectSummary | null {
     lifecycleStatus: state.lifecycleStatus.value as ProjectSummary["lifecycleStatus"],
     ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
     ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
+    displayOrder: state.displayOrder.value,
     createdAt: state.createdAt.value,
   };
 }

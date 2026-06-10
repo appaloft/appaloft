@@ -93,6 +93,7 @@ import { durableWorkLedgerMigration } from "./migrations/084_durable_work_ledger
 import { durableWorkerHeartbeatsMigration } from "./migrations/085_durable_worker_heartbeats";
 import { storageVolumeBackupsMigration } from "./migrations/086_storage_volume_backups";
 import { resourceStorageAttachmentBackupMetadataMigration } from "./migrations/087_resource_storage_attachment_backup_metadata";
+import { projectDisplayOrderMigration } from "./migrations/088_project_display_order";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -278,6 +279,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "086_storage_volume_backups": storageVolumeBackupsMigration,
       "087_resource_storage_attachment_backup_metadata":
         resourceStorageAttachmentBackupMetadataMigration,
+      "088_project_display_order": projectDisplayOrderMigration,
     };
   }
 }

@@ -215,6 +215,10 @@ export {
   listProjectsQueryInputSchema,
 } from "./operations/projects/list-projects.query";
 export * from "./operations/projects/rename-project.schema";
+export {
+  type ReorderProjectsCommandInput,
+  reorderProjectsCommandInputSchema,
+} from "./operations/projects/reorder-projects.command";
 export * from "./operations/projects/restore-project.schema";
 export * from "./operations/projects/set-project-description.schema";
 export * from "./operations/projects/show-project.schema";

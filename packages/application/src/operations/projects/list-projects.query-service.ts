@@ -27,11 +27,17 @@ export class ListProjectsQueryService {
   async execute(
     context: ExecutionContext,
     query?: ListProjectsQuery,
-  ): Promise<Result<{ items: ProjectSummary[] }>> {
+  ): Promise<Result<{ items: ProjectSummary[]; total: number; limit: number; offset: number }>> {
     const organizationId = context.principal?.activeOrganization?.organizationId;
     const limit = boundedListLimit(query?.limit);
+    const offset = query?.offset ?? 0;
     const lifecycleStatus = query?.lifecycleStatus ?? "active";
     const operationScopePort = this.operationScopePort ?? defaultOperationScopePort;
+    const baseInput = {
+      limit,
+      offset,
+      lifecycleStatus,
+    };
     if (listProjectsOperation) {
       const scoped = await scopeOperation({
         context,
@@ -49,26 +55,32 @@ export class ListProjectsQueryService {
         const organizationIds = constraintsByKind(decision.constraints, "organization");
         const projectIds = constraintsByKind(decision.constraints, "project");
         if (!organizationIds?.length && !projectIds?.length) {
-          return ok({ items: [] });
+          return ok({ items: [], total: 0, limit, offset });
         }
 
+        const scopedInput = {
+          ...(organizationIds ? { organizationIds } : {}),
+          ...(projectIds ? { projectIds } : {}),
+          ...baseInput,
+        };
         return ok({
-          items: await this.readModel.list(toRepositoryContext(context), {
-            ...(organizationIds ? { organizationIds } : {}),
-            ...(projectIds ? { projectIds } : {}),
-            limit,
-            lifecycleStatus,
-          }),
+          items: await this.readModel.list(toRepositoryContext(context), scopedInput),
+          total: await this.readModel.count(toRepositoryContext(context), scopedInput),
+          limit,
+          offset,
         });
       }
     }
 
+    const input = {
+      ...(organizationId ? { organizationId } : {}),
+      ...baseInput,
+    };
     return ok({
-      items: await this.readModel.list(toRepositoryContext(context), {
-        ...(organizationId ? { organizationId } : {}),
-        limit,
-        lifecycleStatus,
-      }),
+      items: await this.readModel.list(toRepositoryContext(context), input),
+      total: await this.readModel.count(toRepositoryContext(context), input),
+      limit,
+      offset,
     });
   }
 }
