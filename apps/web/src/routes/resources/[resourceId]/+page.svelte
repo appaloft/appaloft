@@ -7916,6 +7916,19 @@
                       <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
                     </div>
                   {/if}
+                  {#if storageBackupFeedback}
+                    <div
+                      class={[
+                        "rounded-md border px-3 py-2 text-sm",
+                        storageBackupFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{storageBackupFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
+                    </div>
+                  {/if}
                 </div>
 
                 {#if storageVolumesQuery.isPending}

@@ -3504,6 +3504,42 @@ async function clickDialogButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function clickStorageVolumeCardButton(
+  view: Bun.WebView,
+  volumeId: string,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const volumeId = ${JSON.stringify(volumeId)};
+          const texts = ${JSON.stringify(texts)};
+          const card = document.querySelector(\`[data-storage-volume-card="\${volumeId}"]\`);
+          const elements = Array.from(card?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected storage volume ${volumeId} button or link with one of: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function acceptConsoleConfirm(view: Bun.WebView): Promise<void> {
   const accepted = await waitFor(
     () =>
@@ -6188,7 +6224,10 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
 
-      await clickButtonByAnyText(view, ["Runtime cleanup", "Runtime cleanup"]);
+      await clickStorageVolumeCardButton(view, "stv_uploads", [
+        "Runtime cleanup",
+        "Runtime cleanup",
+      ]);
       await selectOptionByText(
         view,
         "#resource-storage-runtime-cleanup-volume-trigger",
@@ -6226,7 +6265,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
 
       await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
-      await clickButtonByAnyText(view, ["Volume backups", "Volume 备份"]);
+      await clickStorageVolumeCardButton(view, "stv_uploads", ["Volume backups", "Volume 备份"]);
       await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
       await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
       await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
@@ -6312,7 +6351,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
 
       await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
-      await clickButtonByAnyText(view, ["Attach storage", "挂载存储"]);
+      await clickStorageVolumeCardButton(view, "stv_uploads", ["Attach storage", "挂载存储"]);
       await selectOptionByText(
         view,
         "#resource-storage-attachment-volume-trigger",
