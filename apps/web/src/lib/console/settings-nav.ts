@@ -1,12 +1,16 @@
 import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import {
+  Activity,
   Archive,
   Building2,
+  ClipboardList,
+  Globe2,
   KeyRound,
   MailPlus,
   Puzzle,
   ShieldAlert,
   ShieldCheck,
+  Terminal,
   UserRound,
   UsersRound,
 } from "@lucide/svelte";
@@ -70,6 +74,36 @@ export function organizationSettingsItems(extensions: readonly SystemPluginWebEx
       href: "/organization/danger-zone",
       labelKey: i18nKeys.console.organization.dangerZoneTitle,
       icon: ShieldAlert,
+    },
+  ];
+}
+
+export function instanceSettingsItems() {
+  return [
+    {
+      href: "/instance",
+      labelKey: i18nKeys.console.instance.overviewTitle,
+      icon: Globe2,
+    },
+    {
+      href: "/instance/workers",
+      labelKey: i18nKeys.console.instance.workerManagementTitle,
+      icon: Activity,
+    },
+    {
+      href: "/instance/maintenance",
+      labelKey: i18nKeys.console.instance.maintenanceWorkersTitle,
+      icon: ShieldCheck,
+    },
+    {
+      href: "/instance/sessions",
+      labelKey: i18nKeys.console.terminal.lifecycleTitle,
+      icon: Terminal,
+    },
+    {
+      href: "/instance/guidance",
+      labelKey: i18nKeys.console.instance.guidanceTitle,
+      icon: ClipboardList,
     },
   ];
 }

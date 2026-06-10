@@ -91,32 +91,45 @@ describe("organization auth management console surface", () => {
     );
   });
 
-  test("[ORG-TEAM-WEB-004] keeps organization settings outside the product sidebar while instance uses focused console pages", async () => {
-    const [organizationPageSource, instancePageSource, managementShellSource, settingsNavSource] =
-      await Promise.all([
-        readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
-        readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
-        readFile(
-          new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
-          "utf8",
-        ),
-        readFile(new URL("../../lib/console/settings-nav.ts", import.meta.url), "utf8"),
-      ]);
+  test("[ORG-TEAM-WEB-004] keeps organization and instance management outside the product sidebar", async () => {
+    const [
+      organizationPageSource,
+      instancePageSource,
+      instanceWorkersRouteSource,
+      managementShellSource,
+      settingsNavSource,
+    ] = await Promise.all([
+      readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/workers/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../../lib/console/settings-nav.ts", import.meta.url), "utf8"),
+    ]);
 
     expect(organizationPageSource).toContain("SettingsShell");
     expect(organizationPageSource).not.toContain("ConsoleShell");
     expect(organizationPageSource).toContain("activeSection");
     expect(organizationPageSource).toContain("organizationSettingsItems");
-    expect(instancePageSource).toContain("ConsoleShell");
-    expect(instancePageSource).toContain("ConsoleResourceCanvas");
+    expect(instancePageSource).toContain("SettingsShell");
+    expect(instancePageSource).not.toContain("ConsoleShell");
+    expect(instancePageSource).not.toContain("ConsoleResourceCanvas");
+    expect(instancePageSource).toContain("instanceSettingsItems");
+    expect(instancePageSource).toContain("ConsoleOrganizationSwitcher");
     expect(instancePageSource).toContain("orpcClient.system.doctor");
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
+    expect(instanceWorkersRouteSource).toContain('<InstancePage section="workers" />');
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(settingsNavSource).toContain('href: "/organization/members"');
     expect(settingsNavSource).toContain('href: "/organization/invitations"');
     expect(settingsNavSource).toContain('href: "/organization/deploy-tokens"');
+    expect(settingsNavSource).toContain("instanceSettingsItems");
+    expect(settingsNavSource).toContain('href: "/instance/workers"');
+    expect(settingsNavSource).toContain("i18nKeys.console.instance.workerManagementTitle");
     expect(managementShellSource).not.toContain('href: "/organization"');
     expect(managementShellSource).not.toContain('href: "/instance"');
     expect(managementShellSource).not.toContain("managementItems");
@@ -125,7 +138,7 @@ describe("organization auth management console surface", () => {
     expect(managementShellSource).not.toContain("filteredProjects");
   });
 
-  test("[ORG-TEAM-WEB-005] presents instance operations as focused ConsoleShell subpages", async () => {
+  test("[ORG-TEAM-WEB-005] presents instance worker operations through settings routes and work ledger", async () => {
     const [instancePageSource, contractsSource, zhLocaleSource] = await Promise.all([
       readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
@@ -135,32 +148,45 @@ describe("organization auth management console surface", () => {
       ),
     ]);
 
-    expect(instancePageSource).toContain("ConsoleShell");
-    expect(instancePageSource).toContain("ConsoleResourceCanvas");
+    expect(instancePageSource).toContain("SettingsShell");
+    expect(instancePageSource).not.toContain("ConsoleShell");
+    expect(instancePageSource).not.toContain("ConsoleResourceCanvas");
     expect(instancePageSource).toContain("parseInstanceSection");
     expect(instancePageSource).toContain("instanceSectionHref");
-    expect(instancePageSource).toContain("selectInstanceSection");
     expect(instancePageSource).toContain('page.url.searchParams.get("section")');
     expect(instancePageSource).toContain('activeSection === "overview"');
+    expect(instancePageSource).toContain('activeSection === "workers"');
     expect(instancePageSource).toContain('activeSection === "maintenance"');
     expect(instancePageSource).toContain('activeSection === "sessions"');
     expect(instancePageSource).toContain('activeSection === "guidance"');
+    expect(instancePageSource).toContain('return "/instance/workers"');
     expect(instancePageSource).toContain("i18nKeys.console.instance.overviewTitle");
     expect(instancePageSource).toContain("i18nKeys.console.instance.commitShaLabel");
     expect(instancePageSource).toContain("currentCommitSha");
     expect(instancePageSource).toContain("orpcClient.system.doctor");
+    expect(instancePageSource).toContain("orpcClient.operatorWork.list");
+    expect(instancePageSource).toContain("orpcClient.operatorWork.show");
     expect(instancePageSource).toContain("maintenanceWorkers");
+    expect(instancePageSource).toContain("durableWorker");
+    expect(instancePageSource).toContain("durableRuntimeTopology");
+    expect(instancePageSource).toContain("selectedOperatorWorkEvents");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.workerDurableRuntime");
     expect(instancePageSource).toContain("worker.runtimeTopology");
     expect(instancePageSource).toContain("worker.runtimeTopology.heartbeat");
     expect(instancePageSource).toContain("workerRuntimeHeartbeat");
     expect(instancePageSource).toContain("workerRuntimeTopology");
+    expect(instancePageSource).toContain("workerManagementTitle");
+    expect(instancePageSource).toContain("workerWorkEventsTitle");
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(contractsSource).toContain("currentCommitSha: z.string().optional()");
     expect(contractsSource).toContain("heartbeat");
+    expect(contractsSource).toContain("workerId: z.string()");
+    expect(contractsSource).toContain("operatorWorkEventSchema");
     expect(zhLocaleSource).toContain('pageTitle: "实例"');
     expect(zhLocaleSource).toContain('instance: "实例"');
+    expect(zhLocaleSource).toContain('workerManagementTitle: "Worker 管理"');
+    expect(zhLocaleSource).toContain('workerWorkEventsTitle: "事件日志"');
   });
 
   test("[SETTINGS-WEB-001] account and organization settings use sidebar shell and neutral contracts", async () => {
