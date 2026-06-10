@@ -95,6 +95,12 @@ import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
 import { remoteDockerPrepareCommand } from "./server-runtime-preparer";
+import {
+  renderRemotePrivateTextFileCommand,
+  renderRuntimeEnvironmentShellFile,
+  withOptionalRemoteRuntimeEnvironmentFile,
+  withRemoteRuntimeEnvironmentFile,
+} from "./ssh-runtime-env-file";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
 import {
   dockerStorageMountsFromRuntimeMetadata,
@@ -3440,12 +3446,13 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (runtimeEnv.isErr()) {
         return err(runtimeEnv.error);
       }
+      const runtimeEnvVariables = runtimeContainerEnvironmentVariables({
+        env: runtimeEnv.value.env,
+        state,
+        dependencyTargetNames: runtimeEnv.value.dependencyTargetNames,
+      });
       const runtimeEnvPlaceholders = Object.fromEntries(
-        runtimeContainerEnvironmentVariables({
-          env: runtimeEnv.value.env,
-          state,
-          dependencyTargetNames: runtimeEnv.value.dependencyTargetNames,
-        }).map((variable) => [variable.name, `\${${variable.name}}`]),
+        runtimeEnvVariables.map((variable) => [variable.name, `\${${variable.name}}`]),
       );
       const generatedCompose = await this.prepareRemoteGeneratedServiceGraphCompose({
         context,
@@ -3472,6 +3479,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         ? composeFile
         : `${remoteWorkdir}/${composeFile}`;
       const remoteComposeOwnershipOverrideFile = `${remoteWorkdir}/.appaloft.compose.labels.override.yml`;
+      const remoteRuntimeEnvFile = `${remoteWorkdir}/.appaloft/runtime.env`;
       const composeOwnershipLabels = dockerLabelsFromAssignments(
         appaloftDockerContainerLabelsForDeployment(state),
       );
@@ -3519,16 +3527,49 @@ export class SshExecutionBackend implements ExecutionBackend {
           }),
         });
       }
+      const runtimeEnvFile = renderRemotePrivateTextFileCommand({
+        path: remoteRuntimeEnvFile,
+        contents: renderRuntimeEnvironmentShellFile({ variables: runtimeEnvVariables }),
+      });
+      const writeRuntimeEnvFile = await this.runRemoteCommand({
+        target,
+        command: runtimeEnvFile.command,
+        cwd: runtimeDir,
+        env: runtimeEnv.value.env,
+        redactions: [...runtimeEnv.value.redactions, ...runtimeEnvFile.redactions],
+      });
+      if (writeRuntimeEnvFile.failed) {
+        const message = "SSH Docker Compose runtime environment write failed";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_compose_runtime_env_write_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              runtimeEnvFile: remoteRuntimeEnvFile,
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
       logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
       const composeOverride = await this.runRemoteCommandStreaming({
         target,
-        command: renderComposeOwnershipLabelOverrideScript({
-          composeFile: remoteComposeFile,
-          overrideFile: remoteComposeOwnershipOverrideFile,
-          labels: composeOwnershipLabels,
-          mounts: storageMounts.value,
-          volumeRealizations: storageVolumeRealizations.value,
-          quote: shellQuote,
+        command: withRemoteRuntimeEnvironmentFile({
+          envFile: remoteRuntimeEnvFile,
+          command: renderComposeOwnershipLabelOverrideScript({
+            composeFile: remoteComposeFile,
+            overrideFile: remoteComposeOwnershipOverrideFile,
+            labels: composeOwnershipLabels,
+            mounts: storageMounts.value,
+            volumeRealizations: storageVolumeRealizations.value,
+            quote: shellQuote,
+          }),
         }),
         cwd: runtimeDir,
         env: runtimeEnv.value.env,
@@ -3549,6 +3590,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               composeFile: remoteComposeFile,
               composeProjectName: runtimeInstanceNames.composeProjectName,
               composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
+              runtimeEnvFile: remoteRuntimeEnvFile,
               host: target.host,
               ...prepared.source.metadata,
             },
@@ -3576,7 +3618,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const up = await this.runRemoteCommandStreaming({
         target,
-        command: upCommand,
+        command: withRemoteRuntimeEnvironmentFile({
+          envFile: remoteRuntimeEnvFile,
+          command: upCommand,
+        }),
         cwd: runtimeDir,
         env: runtimeEnv.value.env,
         redactions: runtimeEnv.value.redactions,
@@ -3601,6 +3646,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               composeFile: remoteComposeFile,
               composeProjectName: runtimeInstanceNames.composeProjectName,
               composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
+              runtimeEnvFile: remoteRuntimeEnvFile,
               ...prepared.source.metadata,
             },
           }),
@@ -3621,6 +3667,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             composeFile: remoteComposeFile,
             composeProjectName: runtimeInstanceNames.composeProjectName,
             composeOwnershipOverrideFile: remoteComposeOwnershipOverrideFile,
+            runtimeEnvFile: remoteRuntimeEnvFile,
             ...prepared.source.metadata,
           },
         }),
@@ -3703,9 +3750,12 @@ export class SshExecutionBackend implements ExecutionBackend {
             : `${remoteWorkdir}/${composeFile}`;
           await this.runRemoteCommand({
             target,
-            command: `docker compose -p ${shellQuote(
-              metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
-            )} -f ${shellQuote(remoteComposeFile)} down`,
+            command: withOptionalRemoteRuntimeEnvironmentFile({
+              envFile: `${remoteWorkdir}/.appaloft/runtime.env`,
+              command: `docker compose -p ${shellQuote(
+                metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
+              )} -f ${shellQuote(remoteComposeFile)} down`,
+            }),
             cwd: runtimeDir,
             env,
             redactions,
@@ -3862,9 +3912,12 @@ export class SshExecutionBackend implements ExecutionBackend {
             : `${remoteWorkdir}/${composeFile}`;
           await this.runRemoteCommand({
             target,
-            command: `docker compose -p ${shellQuote(
-              metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
-            )} -f ${shellQuote(remoteComposeFile)} down`,
+            command: withOptionalRemoteRuntimeEnvironmentFile({
+              envFile: `${remoteWorkdir}/.appaloft/runtime.env`,
+              command: `docker compose -p ${shellQuote(
+                metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
+              )} -f ${shellQuote(remoteComposeFile)} down`,
+            }),
             cwd: runtimeDir,
             env,
             redactions,
