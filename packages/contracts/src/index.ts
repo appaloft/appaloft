@@ -440,6 +440,7 @@ export const projectSummarySchema = z.object({
   lifecycleStatus: z.enum(["active", "archived"]),
   archivedAt: z.string().optional(),
   archiveReason: z.string().optional(),
+  displayOrder: z.number().int().nonnegative().optional(),
   createdAt: z.string(),
 });
 
@@ -456,6 +457,11 @@ export const showProjectInputSchema = z.object({
 export const renameProjectInputSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
+});
+
+export const reorderProjectsInputSchema = z.object({
+  projectIds: z.array(z.string().min(1)).min(1).max(500),
+  startOffset: z.number().int().nonnegative().optional(),
 });
 
 export const setProjectDescriptionInputSchema = z.object({
@@ -530,12 +536,19 @@ export const countResponseSchema = z.object({
 
 export const listProjectsResponseSchema = z.object({
   items: z.array(projectSummarySchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
 });
 
 export const showProjectResponseSchema = projectSummarySchema;
 
 export const renameProjectResponseSchema = z.object({
   id: z.string(),
+});
+
+export const reorderProjectsResponseSchema = z.object({
+  reorderedProjectIds: z.array(z.string()),
 });
 
 export const setProjectDescriptionResponseSchema = z.object({
@@ -6494,6 +6507,7 @@ export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 export type ShowProjectInput = z.infer<typeof showProjectInputSchema>;
 export type RenameProjectInput = z.infer<typeof renameProjectInputSchema>;
+export type ReorderProjectsInput = z.infer<typeof reorderProjectsInputSchema>;
 export type SetProjectDescriptionInput = z.infer<typeof setProjectDescriptionInputSchema>;
 export type ArchiveProjectInput = z.infer<typeof archiveProjectInputSchema>;
 export type RestoreProjectInput = z.infer<typeof restoreProjectInputSchema>;
@@ -6504,6 +6518,7 @@ export type CountResponse = z.infer<typeof countResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
 export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
+export type ReorderProjectsResponse = z.infer<typeof reorderProjectsResponseSchema>;
 export type SetProjectDescriptionResponse = z.infer<typeof setProjectDescriptionResponseSchema>;
 export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema>;
 export type RestoreProjectResponse = z.infer<typeof restoreProjectResponseSchema>;

@@ -6,6 +6,7 @@ This matrix covers:
 
 - `projects.show`
 - `projects.rename`
+- `projects.reorder`
 - `projects.set-description`
 - `projects.archive`
 - `projects.restore`
@@ -21,6 +22,7 @@ It also verifies that no entrypoint exposes generic `projects.update`.
 - [Project Lifecycle Workflow](../workflows/project-lifecycle.md)
 - [projects.show Query Spec](../queries/projects.show.md)
 - [projects.rename Command Spec](../commands/projects.rename.md)
+- [projects.reorder Command Spec](../commands/projects.reorder.md)
 - [projects.set-description Command Spec](../commands/projects.set-description.md)
 - [projects.archive Command Spec](../commands/projects.archive.md)
 - [projects.restore Command Spec](../commands/projects.restore.md)
@@ -41,6 +43,10 @@ It also verifies that no entrypoint exposes generic `projects.update`.
 | PROJ-LIFE-RENAME-002 | `projects.rename` | integration | Rename to the same normalized name. | Returns idempotent `ok({ id })` without duplicate event. |
 | PROJ-LIFE-RENAME-003 | `projects.rename` | integration | Rename would reuse another project's slug. | Returns `project_slug_conflict`, no mutation, no event. |
 | PROJ-LIFE-RENAME-004 | `projects.rename` | integration | Archived project renamed. | Returns `project_archived`, no mutation, no event. |
+| PROJ-LIFE-REORDER-001 | `projects.reorder` | integration | Active projects reordered within one organization. | Persists display order, `projects.list` returns the new order with total/limit/offset, and publishes `project-reordered` only for changed projects. |
+| PROJ-LIFE-REORDER-002 | `projects.reorder` | integration | Duplicate project ids are submitted. | Returns `validation_error`, no mutation, no event. |
+| PROJ-LIFE-REORDER-003 | `projects.reorder` | integration | Archived project is included. | Returns `project_archived`, no mutation, no event. |
+| PROJ-LIFE-REORDER-004 | `projects.reorder` | integration | Projects from different organizations are submitted together. | Returns `validation_error`, no mutation, no event. |
 | PROJ-LIFE-DESC-001 | `projects.set-description` | integration | Active project description is changed. | Persists normalized description, publishes `project-description-set`, returns `ok({ id })`, and preserves name, slug, lifecycle, and child state. |
 | PROJ-LIFE-DESC-002 | `projects.set-description` | integration | Description is omitted or empty. | Clears the optional description and publishes `project-description-set` only when state changes. |
 | PROJ-LIFE-DESC-003 | `projects.set-description` | integration | Description is unchanged. | Returns idempotent `ok({ id })` without duplicate event. |
@@ -60,7 +66,7 @@ It also verifies that no entrypoint exposes generic `projects.update`.
 | PROJ-LIFE-GUARD-002 | `resources.create` | integration | Archived project selected. | Returns `project_archived`, `phase = project-lifecycle-guard`. |
 | PROJ-LIFE-GUARD-003 | `deployments.create` | integration | Archived project selected. | Returns `project_archived`, `phase = project-lifecycle-guard`. |
 | PROJ-LIFE-ENTRY-001 | CLI | e2e-preferred | Project show command. | Dispatches `ShowProjectQuery`; no repository bypass. |
-| PROJ-LIFE-ENTRY-002 | CLI | e2e-preferred | Project rename/set-description/archive/restore/delete-check/delete commands. | Dispatch matching command/query messages; no `project update` command exists. |
+| PROJ-LIFE-ENTRY-002 | CLI | e2e-preferred | Project rename/reorder/set-description/archive/restore/delete-check/delete commands. | Dispatch matching command/query messages; no `project update` command exists. |
 | PROJ-LIFE-ENTRY-003 | HTTP/oRPC | e2e-preferred | Show, rename, set-description, archive, restore, delete-check, and delete routes. | Reuse application schemas and dispatch through QueryBus/CommandBus. |
 | PROJ-LIFE-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include show, rename, set-description, archive, restore, delete-check, and delete. |
 | PROJ-LIFE-ENTRY-005 | Web | e2e-preferred | Project detail/settings lifecycle controls. | Reads `projects.show`, dispatches `projects.rename`, `projects.archive`, and `projects.restore`, and does not expose `projects.update`. |
@@ -68,6 +74,7 @@ It also verifies that no entrypoint exposes generic `projects.update`.
 | PROJ-LIFE-ENTRY-007 | Web | e2e-preferred | Archived project affordance guard. | Disables project-scoped creation affordances when archived while preserving read access to history and rollups. |
 | PROJ-LIFE-ENTRY-008-WEB | Web | e2e-preferred | Archived project delete action. | Reads `projects.delete-check`, enables delete only when eligible, requires exact project id confirmation, and dispatches `projects.delete`. |
 | PROJ-LIFE-EVT-001 | `project-renamed` | integration | Rename succeeds. | Event includes previous/next name and slug, timestamp, and no secrets. |
+| PROJ-LIFE-EVT-006 | `project-reordered` | integration | Reorder succeeds. | Event includes previous/next display order, timestamp, and no secrets. |
 | PROJ-LIFE-EVT-003 | `project-description-set` | integration | Description changes or is cleared. | Event includes project id, slug, changed timestamp, optional previous/next description, and no secrets or child/runtime state. |
 | PROJ-LIFE-EVT-002 | `project-archived` | integration | Archive succeeds with safe reason. | Event includes project id, slug, archived timestamp, optional reason, and no secrets. |
 | PROJ-LIFE-EVT-004 | `project-restored` | integration | Restore succeeds. | Event includes project id, slug, restore timestamp, optional previous archive metadata, and no secrets. |

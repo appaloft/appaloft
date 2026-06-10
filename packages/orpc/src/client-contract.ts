@@ -144,6 +144,7 @@ import {
   type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
+  type ReorderProjectsCommandInput,
   type ReplaySourceEventCommandInput,
   type ResetResourceHealthCommandInput,
   type ResourceAccessFailureEvidenceLookupQueryInput,
@@ -357,6 +358,7 @@ import {
   type RenameServerResponse,
   type RenameStorageVolumeInput,
   type RenameStorageVolumeResponse,
+  type ReorderProjectsResponse,
   type ReplaySourceEventResponse,
   type ResetResourceHealthResponse,
   type ResourceAccessFailureEvidenceLookup,
@@ -710,6 +712,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RenameProjectCommandInput,
       RenameProjectResponse,
+      AppaloftClientError
+    >;
+    reorder: Client<
+      AppaloftClientContext,
+      ReorderProjectsCommandInput,
+      ReorderProjectsResponse,
       AppaloftClientError
     >;
     setDescription: Client<

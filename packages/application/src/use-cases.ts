@@ -155,6 +155,7 @@ export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/delete-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/projects/rename-project.use-case";
+export * from "./operations/projects/reorder-projects.use-case";
 export * from "./operations/projects/restore-project.use-case";
 export * from "./operations/projects/set-project-description.use-case";
 export * from "./operations/projects/show-project.query-service";

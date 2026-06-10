@@ -179,6 +179,59 @@ describe("CLI project commands", () => {
     });
   });
 
+  test("[PROJ-LIFE-ENTRY-CLI-008] project reorder dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { ReorderProjectsCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ reorderedProjectIds: ["prj_b", "prj_a"] } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_project_reorder_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "project",
+        "reorder",
+        "--project-ids",
+        "prj_b,prj_a",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ReorderProjectsCommand);
+    expect(commands[0]).toMatchObject({
+      projectIds: ["prj_b", "prj_a"],
+    });
+  });
+
   test("[PROJ-LIFE-ENTRY-CLI-003] project archive dispatches the application command", async () => {
     ensureReflectMetadata();
     const { ArchiveProjectCommand, createExecutionContext } = await import("@appaloft/application");

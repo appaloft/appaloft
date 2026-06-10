@@ -5,6 +5,7 @@ export * from "./operations/projects/create-project.command";
 export * from "./operations/projects/delete-project.command";
 export * from "./operations/projects/list-projects.query";
 export * from "./operations/projects/rename-project.command";
+export * from "./operations/projects/reorder-projects.command";
 export * from "./operations/projects/restore-project.command";
 export * from "./operations/projects/set-project-description.command";
 export * from "./operations/projects/show-project.query";

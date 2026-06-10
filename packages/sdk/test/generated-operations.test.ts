@@ -67,6 +67,21 @@ describe("generated SDK operation metadata", () => {
     });
   });
 
+  test("[PROJ-LIFE-REORDER-001][TS-SDK-GEN-001] exposes project reorder metadata", () => {
+    expect(
+      generatedSdkOperations.find((operation) => operation.operationKey === "projects.reorder"),
+    ).toMatchObject({
+      operationGroup: "projects",
+      operationMethod: "reorder",
+      kind: "command",
+      route: {
+        method: "POST",
+        path: "/projects/reorder",
+      },
+      docsHref: "/docs/resources/projects/#project-lifecycle",
+    });
+  });
+
   test("[PROJ-LIFE-DELETE-CHECK-001][PROJ-LIFE-DELETE-001][TS-SDK-GEN-001] exposes project delete metadata", () => {
     expect(
       generatedSdkOperations.find(

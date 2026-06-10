@@ -47,6 +47,7 @@ function toProjectSummary(
     slug: row.slug,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     lifecycleStatus: row.lifecycle_status as "active" | "archived",
+    displayOrder: row.display_order ?? 0,
     ...(row.archived_at
       ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
       : {}),
@@ -110,6 +111,7 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
       organizationIds?: readonly string[];
       projectIds?: readonly string[];
       limit?: number;
+      offset?: number;
       lifecycleStatus?: ProjectReadModelListInput["lifecycleStatus"];
     },
   ) {
@@ -143,9 +145,14 @@ export class PgProjectReadModel implements ProjectReadModel, ProjectOwnershipRea
           query = query.where("lifecycle_status", "=", input.lifecycleStatus);
         }
         query = query.limit(input?.limit ?? defaultReadModelListLimit);
+        if (input?.offset) {
+          query = query.offset(input.offset);
+        }
 
         return query
+          .orderBy("display_order", "asc")
           .orderBy("created_at", "desc")
+          .orderBy("id", "asc")
           .execute()
           .then((rows) => rows.map(toProjectSummary));
       },

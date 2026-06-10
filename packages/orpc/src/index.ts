@@ -382,6 +382,7 @@ import {
   RenameProjectCommand,
   RenameServerCommand,
   RenameStorageVolumeCommand,
+  ReorderProjectsCommand,
   ReplaySourceEventCommand,
   ResetResourceHealthCommand,
   ResolveActionServerConfigDeploymentTargetCommand,
@@ -429,6 +430,7 @@ import {
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
   renameStorageVolumeCommandInputSchema,
+  reorderProjectsCommandInputSchema,
   replaySourceEventCommandInputSchema,
   resetResourceHealthCommandInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
@@ -732,6 +734,7 @@ import {
   renameProjectResponseSchema,
   renameServerResponseSchema,
   renameStorageVolumeResponseSchema,
+  reorderProjectsResponseSchema,
   replaySourceEventResponseSchema,
   resetResourceHealthResponseSchema,
   resourceAccessFailureEvidenceLookupSchema,
@@ -3292,6 +3295,19 @@ export const renameProjectProcedure = base
   .output(renameProjectResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, RenameProjectCommand.create(input)),
+  );
+
+export const reorderProjectsProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/reorder",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(reorderProjectsCommandInputSchema)
+  .output(reorderProjectsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReorderProjectsCommand.create(input)),
   );
 
 export const setProjectDescriptionProcedure = base
@@ -6275,6 +6291,7 @@ export const appaloftOrpcRouter = {
     create: createProjectProcedure,
     show: showProjectProcedure,
     rename: renameProjectProcedure,
+    reorder: reorderProjectsProcedure,
     setDescription: setProjectDescriptionProcedure,
     archive: archiveProjectProcedure,
     restore: restoreProjectProcedure,

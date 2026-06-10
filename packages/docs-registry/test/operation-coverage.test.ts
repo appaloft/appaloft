@@ -67,6 +67,11 @@ describe("public docs operation coverage", () => {
       status: "documented",
       topicId: "project.lifecycle",
     });
+    expect(getPublicDocsOperationCoverage("projects.reorder")).toMatchObject({
+      operationKey: "projects.reorder",
+      status: "documented",
+      topicId: "project.lifecycle",
+    });
     expect(getPublicDocsOperationCoverage("projects.archive")).toMatchObject({
       operationKey: "projects.archive",
       status: "documented",
@@ -77,6 +82,7 @@ describe("public docs operation coverage", () => {
         "docs/workflows/project-lifecycle.md",
         "docs/queries/projects.show.md",
         "docs/commands/projects.rename.md",
+        "docs/commands/projects.reorder.md",
         "docs/commands/projects.archive.md",
         "docs/testing/project-lifecycle-test-matrix.md",
         "docs/specs/008-project-lifecycle-settings-closure/spec.md",
@@ -303,6 +309,7 @@ describe("public docs operation coverage", () => {
   test("[OP-WORK-DOCS-001] operator work queries record read-only docs coverage", async () => {
     const listCoverage = getPublicDocsOperationCoverage("operator-work.list");
     const showCoverage = getPublicDocsOperationCoverage("operator-work.show");
+    const streamCoverage = getPublicDocsOperationCoverage("operator-work.stream-events");
     const pruneCoverage = getPublicDocsOperationCoverage("operator-work.prune");
     const topic = publicDocsHelpTopics["operator.work-ledger"];
 
@@ -313,6 +320,11 @@ describe("public docs operation coverage", () => {
     });
     expect(showCoverage).toMatchObject({
       operationKey: "operator-work.show",
+      status: "documented",
+      topicId: "operator.work-ledger",
+    });
+    expect(streamCoverage).toMatchObject({
+      operationKey: "operator-work.stream-events",
       status: "documented",
       topicId: "operator.work-ledger",
     });
@@ -327,6 +339,7 @@ describe("public docs operation coverage", () => {
         "docs/decisions/ADR-054-durable-process-delivery-baseline.md",
         "docs/queries/operator-work.list.md",
         "docs/queries/operator-work.show.md",
+        "docs/queries/operator-work.stream-events.md",
         "docs/testing/durable-process-delivery-test-matrix.md",
         "docs/testing/operator-work-ledger-test-matrix.md",
       ]),
