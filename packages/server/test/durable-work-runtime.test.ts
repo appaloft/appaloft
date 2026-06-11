@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { hostname } from "node:os";
 import {
   type AppLogger,
   createExecutionContext,
@@ -583,10 +584,17 @@ describe("durable work server runtime", () => {
         { timeoutMs: 1_000, intervalMs: 10 },
       );
 
-      expect(new Set(heartbeats?.map((heartbeat) => heartbeat.workerId)).size).toBe(2);
-      expect(
-        heartbeats?.every((heartbeat) => heartbeat.workerId.startsWith("appaloft-worker-")),
-      ).toBe(true);
+      const workerIds = heartbeats?.map((heartbeat) => heartbeat.workerId) ?? [];
+      const sanitizedHostname = hostname()
+        .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+      expect(new Set(workerIds).size).toBe(2);
+      expect(workerIds.every((workerId) => workerId.startsWith("appaloft-worker-replica-"))).toBe(
+        true,
+      );
+      expect(workerIds.some((workerId) => workerId.includes(sanitizedHostname))).toBe(false);
+      expect(workerIds.some((workerId) => /^appaloft-worker-[0-9]+$/.test(workerId))).toBe(false);
       expect(heartbeats?.map((heartbeat) => heartbeat.slot).sort()).toEqual([1, 2]);
       expect(new Set(heartbeats?.map((heartbeat) => heartbeat.leaseOwnerId)).size).toBe(2);
     } finally {
