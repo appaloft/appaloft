@@ -6403,6 +6403,9 @@ export const maintenanceWorkerRuntimeTopologySchema = z.object({
   workerGroup: z.string(),
   workerIds: z.array(z.string()),
   coordinationRole: z.enum(["coordinator", "worker", "disabled"]),
+  slotAssignment: z.enum(["all-local", "explicit", "leased", "none"]).optional(),
+  localWorkerIds: z.array(z.string()).optional(),
+  workerSlot: z.number().int().positive().optional(),
   externalBackendKind: z.enum(["kafka", "temporal", "custom"]).optional(),
   heartbeat: z
     .object({

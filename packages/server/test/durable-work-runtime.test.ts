@@ -17,6 +17,7 @@ import {
   type DurableWorkWorkerHeartbeatFilter,
   type DurableWorkWorkerHeartbeatRecord,
   type DurableWorkWorkerHeartbeatStore,
+  type DurableWorkWorkerSlotClaimInput,
   type ExecutionContextFactory,
   type RepositoryContext,
 } from "@appaloft/application";
@@ -184,20 +185,88 @@ class InMemoryDurableWorkQueueAdapter implements DurableWorkQueueAdapter {
 class InMemoryDurableWorkWorkerHeartbeatStore implements DurableWorkWorkerHeartbeatStore {
   readonly heartbeats = new Map<string, DurableWorkWorkerHeartbeatRecord>();
 
+  async claimWorkerSlot(
+    _context: RepositoryContext,
+    input: DurableWorkWorkerSlotClaimInput,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord | null>> {
+    for (let slot = 1; slot <= input.workerCount; slot += 1) {
+      const existing = [...this.heartbeats.values()].find(
+        (heartbeat) => heartbeat.workerGroup === input.workerGroup && heartbeat.slot === slot,
+      );
+      if (
+        existing &&
+        existing.leaseOwnerId !== input.leaseOwnerId &&
+        existing.workerId !== input.workerId &&
+        existing.status === "online" &&
+        existing.lastSeenAt >= input.staleBefore
+      ) {
+        continue;
+      }
+
+      const heartbeat: DurableWorkWorkerHeartbeatRecord = {
+        workerId: input.workerId,
+        workerGroup: input.workerGroup,
+        slot,
+        mode: input.mode,
+        queueBackend: input.queueBackend,
+        leaseOwnerId: input.leaseOwnerId,
+        processStartedAt: input.processStartedAt,
+        lastSeenAt: input.lastSeenAt,
+        status: "online",
+      };
+      if (existing?.workerId && existing.workerId !== input.workerId) {
+        this.heartbeats.delete(existing.workerId);
+      }
+      this.heartbeats.set(input.workerId, heartbeat);
+      return ok(heartbeat);
+    }
+
+    return ok(null);
+  }
+
   async recordHeartbeat(
     _context: RepositoryContext,
     heartbeat: DurableWorkWorkerHeartbeatRecord,
   ): Promise<Result<DurableWorkWorkerHeartbeatRecord>> {
+    const existing = [...this.heartbeats.values()].find(
+      (record) => record.workerGroup === heartbeat.workerGroup && record.slot === heartbeat.slot,
+    );
+    if (
+      existing &&
+      existing.leaseOwnerId &&
+      heartbeat.leaseOwnerId &&
+      existing.leaseOwnerId !== heartbeat.leaseOwnerId
+    ) {
+      return ok(existing);
+    }
+    if (existing?.workerId && existing.workerId !== heartbeat.workerId) {
+      this.heartbeats.delete(existing.workerId);
+    }
     this.heartbeats.set(heartbeat.workerId, heartbeat);
     return ok(heartbeat);
   }
 
   async markStopped(
     _context: RepositoryContext,
-    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
-  ): Promise<Result<DurableWorkWorkerHeartbeatRecord>> {
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt"> &
+      Pick<Partial<DurableWorkWorkerHeartbeatRecord>, "leaseOwnerId">,
+  ): Promise<Result<void>> {
     const existing = this.heartbeats.get(input.workerId);
+    if (input.leaseOwnerId && existing?.leaseOwnerId !== input.leaseOwnerId) {
+      return ok(undefined);
+    }
+    const stoppedBase: DurableWorkWorkerHeartbeatRecord = existing ?? {
+      workerId: input.workerId,
+      workerGroup: "appaloft-worker",
+      slot: 1,
+      mode: "embedded",
+      queueBackend: "database",
+      processStartedAt: input.lastSeenAt,
+      lastSeenAt: input.lastSeenAt,
+      status: "stopping",
+    };
     const stopped: DurableWorkWorkerHeartbeatRecord = {
+      ...stoppedBase,
       ...(existing ?? {
         workerId: input.workerId,
         workerGroup: "appaloft-worker",
@@ -210,7 +279,7 @@ class InMemoryDurableWorkWorkerHeartbeatStore implements DurableWorkWorkerHeartb
       status: "stopping",
     };
     this.heartbeats.set(input.workerId, stopped);
-    return ok(stopped);
+    return ok(undefined);
   }
 
   async listHeartbeats(
@@ -301,6 +370,7 @@ describe("durable work server runtime", () => {
         queueBackend: "database",
         expectedWorkerCount: 1,
         coordinationRole: "coordinator",
+        slotAssignment: "all-local",
         workers: [
           {
             workerId: "appaloft-worker-1",
@@ -410,6 +480,7 @@ describe("durable work server runtime", () => {
         queueBackend: "database",
         expectedWorkerCount: 1,
         coordinationRole: "coordinator",
+        slotAssignment: "all-local",
         workers: [
           {
             workerId: "appaloft-worker-1",
@@ -461,5 +532,66 @@ describe("durable work server runtime", () => {
       workerId: "appaloft-worker-1",
       status: "stopping",
     });
+  });
+
+  test("[PROC-DELIVERY-WORKER-032] standalone replica runners lease distinct worker slots", async () => {
+    const adapter = new InMemoryDurableWorkQueueAdapter();
+    const heartbeatStore = new InMemoryDurableWorkWorkerHeartbeatStore();
+    const topology = {
+      mode: "standalone" as const,
+      queueBackend: "database" as const,
+      expectedWorkerCount: 2,
+      coordinationRole: "worker" as const,
+      slotAssignment: "leased" as const,
+      workerGroup: "appaloft-worker",
+      workers: [],
+    };
+
+    const createRunner = () =>
+      createDurableWorkRuntimeRunner({
+        topology,
+        adapter,
+        heartbeatStore,
+        deploymentRepository: {} as never,
+        deploymentLifecycleService: {} as never,
+        executionBackend: {} as never,
+        eventBus: {} as never,
+        processAttemptRecorder: {} as never,
+        executionContextFactory,
+        logger,
+        intervalSeconds: 60,
+        batchSize: 5,
+        leaseDurationMs: 300_000,
+      });
+
+    const first = createRunner();
+    const second = createRunner();
+
+    try {
+      await first.start();
+      await second.start();
+
+      const heartbeats = await waitFor(
+        async () => {
+          const records = await heartbeatStore.listHeartbeats(
+            createExecutionContext({ entrypoint: "system", requestId: "req_test" }),
+            { workerGroup: "appaloft-worker", status: "online" },
+          );
+          const values = records._unsafeUnwrap();
+          return values.length === 2 ? values : null;
+        },
+        { timeoutMs: 1_000, intervalMs: 10 },
+      );
+
+      expect(new Set(heartbeats?.map((heartbeat) => heartbeat.workerId)).size).toBe(2);
+      expect(
+        heartbeats?.every((heartbeat) => heartbeat.workerId.startsWith("appaloft-worker-")),
+      ).toBe(true);
+      expect(heartbeats?.map((heartbeat) => heartbeat.slot).sort()).toEqual([1, 2]);
+      expect(new Set(heartbeats?.map((heartbeat) => heartbeat.leaseOwnerId)).size).toBe(2);
+    } finally {
+      await first.stop();
+      await second.stop();
+    }
   });
 });

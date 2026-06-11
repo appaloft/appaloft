@@ -73,6 +73,7 @@ export interface WorkerRuntimeConfig {
   queueBackend: WorkerQueueBackend;
   workerCount: number;
   workerGroup: string;
+  workerSlot?: number;
   externalBackendKind?: ExternalWorkerBackendKind;
 }
 
@@ -771,6 +772,9 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     defaults.workerRuntime.workerCount;
   const workerRuntimeWorkerGroup =
     env.APPALOFT_WORKER_GROUP ?? workerRuntime.workerGroup ?? defaults.workerRuntime.workerGroup;
+  const workerRuntimeWorkerSlot =
+    parsePositiveInteger(env.APPALOFT_WORKER_SLOT) ??
+    parsePositiveInteger(workerRuntime.workerSlot);
   const workerRuntimeExternalBackendKind =
     parseExternalWorkerBackendKind(env.APPALOFT_WORKER_EXTERNAL_BACKEND_KIND) ??
     workerRuntime.externalBackendKind;
@@ -1337,6 +1341,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       queueBackend: workerRuntimeQueueBackend,
       workerCount: workerRuntimeWorkerCount,
       workerGroup: workerRuntimeWorkerGroup,
+      ...(workerRuntimeWorkerSlot ? { workerSlot: workerRuntimeWorkerSlot } : {}),
       ...(workerRuntimeExternalBackendKind
         ? { externalBackendKind: workerRuntimeExternalBackendKind }
         : {}),

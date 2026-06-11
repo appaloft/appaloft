@@ -964,6 +964,54 @@ function chooseStrategies(input: {
       source.inspection?.dockerfilePath ??
       source.metadata?.dockerfilePath ??
       "Dockerfile";
+    const serviceGraph = requestedDeployment.services ?? [];
+    if (serviceGraph.length > 0) {
+      const targetServiceName =
+        requestedDeployment.targetServiceName ??
+        serviceGraph.find((service) => service.network?.exposureMode === "reverse-proxy")?.name ??
+        serviceGraph.find((service) => service.network?.exposureMode === "direct-port")?.name;
+      const metadata = {
+        ...serviceGraphMetadata({
+          requestedDeployment,
+          dockerfilePath,
+          composeFile: generatedServiceGraphComposeFile,
+          ...(targetServiceName ? { targetServiceName } : {}),
+        }),
+      };
+      const execution = RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
+        workingDirectory: FilePathText.rehydrate(source.locator),
+        composeFile: FilePathText.rehydrate(generatedServiceGraphComposeFile),
+        dockerfilePath: FilePathText.rehydrate(dockerfilePath),
+        ...runtimeHealthCheckFields(requestedDeployment),
+        port,
+        metadata,
+      });
+
+      return withRequestedAccessRoutes({
+        requestedDeployment,
+        buildStrategy: BuildStrategyKindValue.rehydrate("dockerfile"),
+        packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
+        execution,
+        runtimeArtifact: composeRuntimeArtifact({
+          composeFile: generatedServiceGraphComposeFile,
+          metadata: {
+            sourceKind: source.kind,
+            dockerfilePath,
+            applicationShape: "container-native",
+            serviceGraphSource: "repository-config",
+            serviceNames: serviceGraph.map((service) => service.name).join(","),
+            ...(targetServiceName ? { targetServiceName } : {}),
+          },
+        }),
+        steps: [
+          PlanStepText.rehydrate("Build docker image"),
+          PlanStepText.rehydrate("Generate compose service graph"),
+          PlanStepText.rehydrate("Run docker compose"),
+          PlanStepText.rehydrate("Verify stack"),
+        ],
+      });
+    }
     const replicas = requestedReplicaCount(requestedDeployment);
     if (replicas > 1) {
       const targetServiceName = requestedDeployment.targetServiceName ?? "app";

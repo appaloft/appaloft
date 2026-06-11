@@ -10,6 +10,10 @@ describe("repository service graph compose rendering", () => {
       image: "appaloft-runtime-dep_123",
       dockerfilePath: ".appaloft/Dockerfile.appaloft",
       defaultPort: 3000,
+      environment: {
+        APPALOFT_DATABASE_URL: "${APPALOFT_DATABASE_URL}",
+        APPALOFT_WORKER_COUNT: "4",
+      },
       services: [
         {
           name: "web",
@@ -35,6 +39,9 @@ describe("repository service graph compose rendering", () => {
             exposureMode: "none",
           },
           replicas: 4,
+          env: {
+            APPALOFT_WORKER_SLOT: "2",
+          },
         },
       ],
     });
@@ -49,6 +56,9 @@ describe("repository service graph compose rendering", () => {
     expect(compose).toContain('- "3000"');
     expect(compose).toContain('"worker":');
     expect(compose).toContain('command: "bun run start:worker"');
+    expect(compose).toContain('"APPALOFT_DATABASE_URL": "${APPALOFT_DATABASE_URL}"');
+    expect(compose).toContain('"APPALOFT_WORKER_COUNT": "4"');
+    expect(compose).toContain('"APPALOFT_WORKER_SLOT": "2"');
     expect(compose).toContain("replicas: 4");
     expect(compose).not.toContain("ports:");
   });

@@ -8,6 +8,7 @@ interface RenderServiceGraphComposeInput {
   dockerfilePath: string;
   services: RequestedDeploymentServiceConfig[];
   defaultPort: number;
+  environment?: Record<string, string>;
 }
 
 interface RenderReplicatedWorkloadComposeInput {
@@ -55,9 +56,13 @@ function renderService(input: {
   dockerfilePath: string;
   defaultPort: number;
   includeBuild: boolean;
+  environment: Record<string, string> | undefined;
 }): string[] {
   const port = servicePort(input.service, input.defaultPort);
-  const env = serviceEnvironment(input.service);
+  const env = {
+    ...(input.environment ?? {}),
+    ...serviceEnvironment(input.service),
+  };
   const command = serviceCommand(input.service);
   const lines = [
     `  ${yamlQuoted(input.service.name)}:`,
@@ -103,6 +108,7 @@ export function renderServiceGraphCompose(input: RenderServiceGraphComposeInput)
         dockerfilePath: input.dockerfilePath,
         defaultPort: input.defaultPort,
         includeBuild: index === 0,
+        environment: input.environment,
       }),
     ),
     "",
