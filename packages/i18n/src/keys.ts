@@ -752,7 +752,6 @@ export const i18nKeys = {
       workerRuntimeMonitoringCollector: "console:instance.workerRuntimeMonitoringCollector",
       workerRuntimeOnlineWorkers: "console:instance.workerRuntimeOnlineWorkers",
       workerRuntimeRole: "console:instance.workerRuntimeRole",
-      workerRuntimeSlot: "console:instance.workerRuntimeSlot",
       workerRuntimeStaleWorkers: "console:instance.workerRuntimeStaleWorkers",
       workerRuntimeTopology: "console:instance.workerRuntimeTopology",
       workerRuntimeTopologyBody: "console:instance.workerRuntimeTopologyBody",
