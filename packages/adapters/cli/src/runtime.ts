@@ -344,6 +344,13 @@ function terminalSessionErrorFromUnknown(error: unknown): DomainError {
   });
 }
 
+async function closeAsyncIterableIfPresent(stream: unknown): Promise<void> {
+  const close = (stream as { close?: unknown })?.close;
+  if (typeof close === "function") {
+    await close.call(stream);
+  }
+}
+
 async function pipeTerminalSession(input: {
   descriptor: TerminalSessionDescriptor;
   gateway: TerminalSessionGateway;
@@ -608,7 +615,7 @@ export const runResourceRuntimeLogsQuery = (
             }
           }
         } finally {
-          await output.stream.close();
+          await closeAsyncIterableIfPresent(output.stream);
         }
       },
       catch: runtimeLogErrorFromUnknown,
@@ -647,7 +654,7 @@ export const runDeploymentEventStreamQuery = (
             }
           }
         } finally {
-          await output.stream.close();
+          await closeAsyncIterableIfPresent(output.stream);
         }
       },
       catch: deploymentEventStreamErrorFromUnknown,
@@ -686,7 +693,7 @@ export const runOperatorWorkEventStreamQuery = (
             }
           }
         } finally {
-          await output.stream.close();
+          await closeAsyncIterableIfPresent(output.stream);
         }
       },
       catch: operatorWorkEventStreamErrorFromUnknown,

@@ -91,6 +91,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
   import {
+    latestOperatorWorkEventCursor,
+    operatorWorkEnvelopeProgressEvents,
+    operatorWorkEventProgressStatus,
+    summarizeBlueprintInstallProgress,
+    type BlueprintInstallProgressSnapshot,
+    type BlueprintInstallStatusSummary,
+  } from "$lib/console/blueprint-install-progress";
+  import {
     createDeploymentWithProgress,
     observeDeploymentProgressAfterAcceptance,
   } from "$lib/console/deployment-progress";
@@ -362,23 +370,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     acknowledgements?: string[];
     secretValues?: { key: string; value: string }[];
   };
-  type BlueprintInstallResult = {
+  type BlueprintInstallResult = BlueprintInstallProgressSnapshot & {
     duplicate?: boolean;
-    executionStatus?: string;
-    installedApplication?: {
-      applicationId?: string;
-      status?: string;
-      components?: readonly {
-        resource?: { resourceId?: string };
-        deployment?: { deploymentId?: string };
-        endpoints?: readonly { url?: string }[];
-      }[];
-      executionFailure?: {
-        code?: string;
-        reason?: string;
-        details?: Record<string, unknown>;
-      };
-    };
   };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
@@ -846,13 +839,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let projectSectionOpen = $state(true);
   let serverSectionOpen = $state(true);
   let deployFeedback = $state<{
-    kind: "success" | "error";
+    kind: "success" | "running" | "error";
     title: string;
     detail: string;
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
+  let lastOperatorWorkId = $state("");
   let workflowDeploymentTraceLink = $state("");
+  let blueprintOperatorWorkFollowEpoch = 0;
+  let blueprintOperatorWorkStream: AsyncIterator<unknown> | null = null;
   let lastAccessUrl = $state("");
   let diagnosticSummaryLoading = $state(false);
   let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
@@ -1946,6 +1942,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     if (diagnosticSummaryCopyResetTimeout) {
       clearTimeout(diagnosticSummaryCopyResetTimeout);
     }
+    stopBlueprintOperatorWorkFollow();
   });
 
   $effect(() => {
@@ -4056,51 +4053,216 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     return `quick-deploy:${slug}:${suffix}`;
   }
 
-  function readBlueprintInstallStatus(result: unknown): string {
-    return result && typeof result === "object" && "executionStatus" in result
-      ? String((result as BlueprintInstallResult).executionStatus ?? "")
-      : "";
-  }
-
-  function readBlueprintInstallAccessUrl(result: unknown): string {
-    const components =
-      result && typeof result === "object"
-        ? (result as BlueprintInstallResult).installedApplication?.components
-        : undefined;
-    return components?.flatMap((component) => component.endpoints ?? []).find((endpoint) => endpoint.url)
-      ?.url ?? "";
-  }
-
-  function readBlueprintInstallDeploymentId(result: unknown): string {
-    const components =
-      result && typeof result === "object"
-        ? (result as BlueprintInstallResult).installedApplication?.components
-        : undefined;
-    return components?.find((component) => component.deployment?.deploymentId)?.deployment
-      ?.deploymentId ?? "";
-  }
-
-  function readBlueprintInstallResourceId(result: unknown): string {
-    const components =
-      result && typeof result === "object"
-        ? (result as BlueprintInstallResult).installedApplication?.components
-        : undefined;
-    return components?.find((component) => component.resource?.resourceId)?.resource?.resourceId ?? "";
-  }
-
   function readBlueprintInstallFailureReason(result: unknown): string {
-    if (!result || typeof result !== "object") {
-      return "";
-    }
-
-    const failure = (result as BlueprintInstallResult).installedApplication?.executionFailure;
-    return failure?.reason ?? failure?.code ?? "";
+    return result && typeof result === "object"
+      ? summarizeBlueprintInstallProgress(result as BlueprintInstallProgressSnapshot).failureReason
+      : "";
   }
 
   function blueprintDeploymentTerminalStatus(): string {
     return [...workflowDeploymentProgressEvents]
       .reverse()
       .find((event) => event.status === "failed" || event.status === "succeeded")?.status ?? "";
+  }
+
+  function appendBlueprintInstallProgressEvents(events: DeploymentProgressEvent[]): void {
+    for (const event of events) {
+      appendWorkflowDeploymentProgressEvent(event);
+    }
+  }
+
+  function updateBlueprintInstallFeedbackFromWorkEvent(event: DeploymentProgressEvent): void {
+    if (!lastOperatorWorkId) {
+      return;
+    }
+
+    if (event.status === "succeeded") {
+      setWorkflowStepStatus("deployments.create", "succeeded");
+      deployFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
+        detail: event.message,
+      };
+      return;
+    }
+
+    if (event.status === "failed") {
+      setWorkflowStepStatus("deployments.create", "failed");
+      deployFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
+        detail: event.message,
+      };
+    }
+  }
+
+  async function replayBlueprintOperatorWorkProgress(
+    workId: string,
+  ): Promise<{ cursor?: string; status: "running" | "succeeded" | "failed" }> {
+    if (!workId) {
+      return { status: "running" };
+    }
+
+    const replay = await orpcClient.operatorWork.events({
+      workId,
+      historyLimit: 100,
+      includeHistory: true,
+      follow: false,
+      untilTerminal: true,
+    });
+    const progressEvents = operatorWorkEnvelopeProgressEvents(replay.envelopes);
+    appendBlueprintInstallProgressEvents(progressEvents);
+    const status = operatorWorkEventProgressStatus(replay.envelopes);
+    updateBlueprintInstallFeedbackFromWorkEvent(progressEvents.at(-1) ?? {
+      timestamp: new Date().toISOString(),
+      source: "appaloft",
+      phase: "deploy",
+      level: "info",
+      message: $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedDetail, { workId }),
+      status,
+      step: {
+        current: 1,
+        total: 2,
+        label: "queued",
+      },
+    });
+
+    return {
+      cursor: latestOperatorWorkEventCursor(replay.envelopes),
+      status,
+    };
+  }
+
+  function stopBlueprintOperatorWorkFollow(): void {
+    blueprintOperatorWorkFollowEpoch += 1;
+    void blueprintOperatorWorkStream?.return?.();
+    blueprintOperatorWorkStream = null;
+  }
+
+  function startBlueprintOperatorWorkFollow(workId: string, cursor?: string): void {
+    if (!workId) {
+      return;
+    }
+
+    stopBlueprintOperatorWorkFollow();
+    const followEpoch = blueprintOperatorWorkFollowEpoch;
+
+    void (async () => {
+      const stream = await orpcClient.operatorWork.eventsStream({
+        workId,
+        historyLimit: 0,
+        includeHistory: false,
+        follow: true,
+        untilTerminal: true,
+        ...(cursor ? { cursor } : {}),
+      });
+
+      try {
+        if (followEpoch !== blueprintOperatorWorkFollowEpoch) {
+          await stream.return?.();
+          return;
+        }
+        blueprintOperatorWorkStream = stream;
+        let result = await stream.next();
+
+        while (!result.done && followEpoch === blueprintOperatorWorkFollowEpoch) {
+          const envelope = result.value;
+
+          switch (envelope.kind) {
+            case "accepted":
+            case "running":
+            case "progress":
+            case "retry-scheduled":
+            case "succeeded":
+            case "failed":
+            case "canceled":
+            case "dead-lettered":
+              {
+                const progressEvents = operatorWorkEnvelopeProgressEvents([envelope]);
+                appendBlueprintInstallProgressEvents(progressEvents);
+                updateBlueprintInstallFeedbackFromWorkEvent(progressEvents.at(-1) ?? {
+                  timestamp: new Date().toISOString(),
+                  source: "appaloft",
+                  phase: "deploy",
+                  level: "info",
+                  message: envelope.event.message ?? envelope.event.kind,
+                  status: operatorWorkEventProgressStatus([envelope]),
+                  step: {
+                    current: envelope.event.sequence,
+                    total: envelope.event.sequence,
+                    label: envelope.event.step ?? envelope.event.kind,
+                  },
+                });
+              }
+              break;
+            case "gap":
+              workflowProgressError = $t(i18nKeys.console.deployments.progressStreamDisconnected);
+              return;
+            case "error":
+              workflowProgressError = envelope.error.message;
+              return;
+            case "closed":
+              return;
+            case "heartbeat":
+              break;
+          }
+
+          result = await stream.next();
+        }
+      } catch (error) {
+        if (followEpoch === blueprintOperatorWorkFollowEpoch) {
+          workflowProgressError = readErrorMessage(error);
+        }
+      } finally {
+        await stream.return?.();
+        if (blueprintOperatorWorkStream === stream) {
+          blueprintOperatorWorkStream = null;
+        }
+      }
+    })();
+  }
+
+  async function observeBlueprintInstallProgressAfterAcceptance(
+    installSummary: BlueprintInstallStatusSummary,
+  ): Promise<BlueprintInstallStatusSummary> {
+    let latestSummary = installSummary;
+
+    if (latestSummary.applicationId) {
+      try {
+        const readback = (await orpcClient.blueprints.installation.show({
+          applicationId: latestSummary.applicationId,
+        })) as BlueprintInstallProgressSnapshot;
+        latestSummary = summarizeBlueprintInstallProgress(readback);
+      } catch (error) {
+        workflowProgressError = readErrorMessage(error);
+      }
+    }
+
+    lastOperatorWorkId = latestSummary.operatorWorkId || lastOperatorWorkId;
+
+    if (!latestSummary.deploymentId && latestSummary.operatorWorkId) {
+      try {
+        const workProgress = await replayBlueprintOperatorWorkProgress(latestSummary.operatorWorkId);
+        if (workProgress.status === "running") {
+          startBlueprintOperatorWorkFollow(latestSummary.operatorWorkId, workProgress.cursor);
+        }
+      } catch (error) {
+        workflowProgressError = readErrorMessage(error);
+      }
+    }
+
+    if (latestSummary.applicationId) {
+      try {
+        const readback = (await orpcClient.blueprints.installation.show({
+          applicationId: latestSummary.applicationId,
+        })) as BlueprintInstallProgressSnapshot;
+        latestSummary = summarizeBlueprintInstallProgress(readback);
+      } catch {
+        // The operator-work stream already carries a safe status if readback is temporarily unavailable.
+      }
+    }
+
+    return latestSummary;
   }
 
   function serverIsRuntimeAvailable(server: ServerSummary | null | undefined): boolean {
@@ -4267,11 +4429,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             },
           )
         : await orpcClient.blueprints.install(installInput);
-      const status = readBlueprintInstallStatus(installResult);
+      let installSummary = summarizeBlueprintInstallProgress(installResult);
+      lastOperatorWorkId = installSummary.operatorWorkId;
+      lastAccessUrl = installSummary.accessUrl;
+      lastCreatedDeploymentId = installSummary.deploymentId;
+      selectedResourceId = installSummary.resourceId || selectedResourceId;
 
-      lastAccessUrl = readBlueprintInstallAccessUrl(installResult);
-      lastCreatedDeploymentId = readBlueprintInstallDeploymentId(installResult);
-      selectedResourceId = readBlueprintInstallResourceId(installResult) || selectedResourceId;
+      installSummary = await observeBlueprintInstallProgressAfterAcceptance(installSummary);
+      lastOperatorWorkId = installSummary.operatorWorkId || lastOperatorWorkId;
+      lastAccessUrl = installSummary.accessUrl || lastAccessUrl;
+      lastCreatedDeploymentId = installSummary.deploymentId || lastCreatedDeploymentId;
+      selectedResourceId = installSummary.resourceId || selectedResourceId;
 
       if (lastCreatedDeploymentId) {
         await observeDeploymentProgressAfterAcceptance(
@@ -4289,15 +4457,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
       const terminalStatus = blueprintDeploymentTerminalStatus();
       const failureReason =
+        installSummary.failureReason ||
         readBlueprintInstallFailureReason(installResult) ||
         (terminalStatus === "failed" ? workflowProgressError : "");
-      const installSucceeded = status !== "rollback-required" && terminalStatus !== "failed" && !failureReason;
-      setWorkflowStepStatus("deployments.create", installSucceeded ? "succeeded" : "failed");
+      const installSucceeded =
+        (installSummary.terminalStatus === "succeeded" || terminalStatus === "succeeded") &&
+        terminalStatus !== "failed" &&
+        !failureReason;
+      const installFailed = Boolean(failureReason) || installSummary.terminalStatus === "failed" || terminalStatus === "failed";
+      setWorkflowStepStatus(
+        "deployments.create",
+        installSucceeded ? "succeeded" : installFailed ? "failed" : "running",
+      );
       deployFeedback = {
-        kind: installSucceeded ? "success" : "error",
+        kind: installSucceeded ? "success" : installFailed ? "error" : "running",
         title: installSucceeded
           ? $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle)
-          : $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
+          : installFailed
+            ? $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle)
+            : $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedTitle),
         detail:
           failureReason ||
           lastAccessUrl ||
@@ -4305,7 +4483,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             ? $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
                 deploymentId: lastCreatedDeploymentId,
               })
-            : status || "Blueprint install accepted."),
+            : installSummary.message ||
+              (lastOperatorWorkId
+                ? $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedDetail, {
+                    workId: lastOperatorWorkId,
+                  })
+                : $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedFallback, {
+                    status: installSummary.executionStatus,
+                  }))),
       };
     } catch (error) {
       setWorkflowStepStatus("deployments.create", "failed");
@@ -6391,11 +6576,18 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       </section>
 
       {#if deployFeedback}
-        <section class={deployFeedback.kind === "success" ? "space-y-3 border-y py-4" : "space-y-3 border-y border-destructive/30 py-4"}>
+        <section
+          class={[
+            "space-y-3 border-y py-4",
+            deployFeedback.kind === "error" ? "border-destructive/30" : "",
+          ]}
+        >
           <div>
             <h2 class="flex items-center gap-2 text-base font-semibold">
               {#if deployFeedback.kind === "success"}
                 <CheckCircle2 class="size-4" />
+              {:else if deployFeedback.kind === "running"}
+                <LoaderCircle class="size-4 animate-spin" />
               {:else}
                 <ShieldCheck class="size-4" />
               {/if}
@@ -6404,7 +6596,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           </div>
           <div>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
-            {#if lastCreatedDeploymentId || (deployFeedback.kind === "success" && lastAccessUrl)}
+            {#if lastCreatedDeploymentId || lastOperatorWorkId || (deployFeedback.kind === "success" && lastAccessUrl)}
               <div class="mt-4 flex flex-wrap gap-2">
                 {#if deployFeedback.kind === "success" && lastAccessUrl}
                   <Button
@@ -6441,6 +6633,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     {/if}
                     {quickDeployDiagnosticSummaryButtonLabel}
                   </Button>
+                {/if}
+                {#if lastOperatorWorkId}
+                  <Button
+                    href={`/instance/workers?workId=${encodeURIComponent(lastOperatorWorkId)}`}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {$t(i18nKeys.console.quickDeploy.blueprintInstallOpenWork)}
+                  </Button>
+                {/if}
+                {#if lastCreatedDeploymentId}
                   {#if diagnosticSummaryError}
                     <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
                   {/if}
@@ -6480,11 +6683,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
   traceLink={workflowDeploymentTraceLink}
+  operatorWorkId={lastOperatorWorkId}
   onClose={() => {
     workflowProgressDialogOpen = false;
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());
+  }}
+  onOpenOperatorWork={() => {
+    if (lastOperatorWorkId) {
+      void goto(`/instance/workers?workId=${encodeURIComponent(lastOperatorWorkId)}`);
+    }
   }}
 />
 

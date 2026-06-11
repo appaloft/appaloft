@@ -1367,6 +1367,54 @@ describe("CLI remote control-plane client", () => {
     expect(output.stdout).toContain("runtime log line");
   });
 
+  test("[OP-WORK-CLI-016] remote bounded work events adapt the SDK response for CLI rendering", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/operator-work/wrk_remote/events": jsonResponse({
+          workId: "wrk_remote",
+          envelopes: [
+            {
+              schemaVersion: "operator-work.stream-events/v1",
+              kind: "closed",
+              reason: "completed",
+              cursor: "wrk_remote:1",
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "work",
+        "events",
+        "wrk_remote",
+        "--include-history",
+        "true",
+        "--until-terminal",
+        "true",
+        "--follow",
+        "false",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/operator-work/wrk_remote/events",
+      ],
+    );
+    expect(output.stdout).toContain("wrk_remote");
+    expect(output.stdout).toContain("completed");
+  });
+
   test("[CONTROL-PLANE-CLI-015] remote GET diagnostics keep boolean query parameters explicit", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
@@ -1653,6 +1701,28 @@ describe("CLI remote control-plane client", () => {
       },
     });
     expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
+  });
+
+  test("[OP-WORK-CLI-014] work commands dispatch to the selected remote control plane", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "work", "show", "dw_blueprint_install_cia_demo"],
+      store: activeStore(),
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      argv: ["node", "appaloft", "work", "show", "dw_blueprint_install_cia_demo"],
+      diagnostics: {
+        source: "profile",
+        command: "work",
+        effectiveMode: "self-hosted",
+      },
+      profile: {
+        name: "local",
+        mode: "self-hosted",
+        baseUrl: "http://127.0.0.1:4310",
+      },
+    });
   });
 
   test("[CONTROL-PLANE-CLI-012] default Cloud URL cannot be dispatched as self-hosted", async () => {

@@ -62,6 +62,18 @@ class CloseTrackingOperatorWorkEventStream implements OperatorWorkEventStream {
   }
 }
 
+class RemoteOperatorWorkEventStreamWithoutClose
+  implements AsyncIterable<OperatorWorkEventStreamEnvelope>
+{
+  constructor(private readonly envelopes: OperatorWorkEventStreamEnvelope[]) {}
+
+  async *[Symbol.asyncIterator](): AsyncIterator<OperatorWorkEventStreamEnvelope> {
+    for (const envelope of this.envelopes) {
+      yield envelope;
+    }
+  }
+}
+
 describe("CLI operator work commands", () => {
   test("[OP-WORK-CLI-001] work list dispatches the read-only application query", async () => {
     ensureReflectMetadata();
@@ -245,6 +257,60 @@ describe("CLI operator work commands", () => {
       pollIntervalMs: 50,
     });
     expect(stream.closed).toBe(true);
+  });
+
+  test("[OP-WORK-CLI-015] work events accepts remote stream iterables without close", async () => {
+    ensureReflectMetadata();
+    const { createCliProgram } = await import("../src");
+    const stream = new RemoteOperatorWorkEventStreamWithoutClose([
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "closed",
+        reason: "completed",
+        cursor: "wrk_blueprint_install:2",
+      },
+    ]);
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queries: AppQuery<unknown>[] = [];
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          mode: "stream",
+          workId: "wrk_blueprint_install",
+          stream,
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory: createExecutionContextFactory(
+        "req_cli_operator_work_events_remote_stream_test",
+      ),
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "work",
+        "events",
+        "wrk_blueprint_install",
+        "--follow",
+        "false",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
   });
 
   test("[PROC-DELIVERY-009][OP-WORK-ENTRY-004] work mark-recovered dispatches the command", async () => {

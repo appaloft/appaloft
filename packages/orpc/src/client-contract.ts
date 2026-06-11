@@ -177,6 +177,8 @@ import {
   type SetProjectDescriptionCommandInput,
   type SetResourceVariableCommandInput,
   type ShowAccountProfileQueryInput,
+  type ShowBlueprintInstallationQueryInput,
+  type ShowBlueprintInstallationResponse,
   type ShowBlueprintQueryInput,
   type ShowBlueprintResponse,
   type ShowCertificateQueryInput,
@@ -778,6 +780,14 @@ export type AppaloftOrpcClientContract = {
       AcceptBlueprintInstallCommandResponse,
       AppaloftClientError
     >;
+    installation: {
+      show: Client<
+        AppaloftClientContext,
+        ShowBlueprintInstallationQueryInput,
+        ShowBlueprintInstallationResponse,
+        AppaloftClientError
+      >;
+    };
   };
   servers: {
     count: Client<

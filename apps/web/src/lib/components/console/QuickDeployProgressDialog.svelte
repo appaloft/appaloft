@@ -14,7 +14,7 @@
     status: QuickDeployWorkflowStepStatus;
   };
   type QuickDeployFeedback = {
-    kind: "success" | "error";
+    kind: "success" | "running" | "error";
     title: string;
     detail: string;
   } | null;
@@ -27,9 +27,11 @@
     progressError?: string;
     feedback?: QuickDeployFeedback;
     deploymentId?: string;
+    operatorWorkId?: string;
     traceLink?: string;
     onClose?: () => void;
     onOpenDeployment?: () => void;
+    onOpenOperatorWork?: () => void;
   };
 
   let {
@@ -40,9 +42,11 @@
     progressError = "",
     feedback = null,
     deploymentId = "",
+    operatorWorkId = "",
     traceLink = "",
     onClose,
     onOpenDeployment,
+    onOpenOperatorWork,
   }: Props = $props();
 
   function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
@@ -115,6 +119,10 @@
       return $t(i18nKeys.console.deployments.progressStatusRunning);
     }
 
+    if (feedback?.kind === "running") {
+      return $t(i18nKeys.console.deployments.progressStatusRunning);
+    }
+
     if (feedback?.kind === "success") {
       return $t(i18nKeys.console.deployments.progressStatusSucceeded);
     }
@@ -131,6 +139,10 @@
       return "default";
     }
 
+    if (feedback?.kind === "running") {
+      return "secondary";
+    }
+
     if (feedback?.kind === "error" || progressError) {
       return "destructive";
     }
@@ -140,6 +152,10 @@
 
   function deploymentPanelStatus(): DeploymentProgressDialogStatus {
     if (pending) {
+      return "running";
+    }
+
+    if (feedback?.kind === "running") {
       return "running";
     }
 
@@ -179,6 +195,9 @@
               {#if deploymentId}
                 <span>{$t(i18nKeys.console.deployments.progressDeploymentLabel)} {deploymentId}</span>
               {/if}
+              {#if operatorWorkId}
+                <span>work {operatorWorkId}</span>
+              {/if}
               {#if traceLink}
                 <span class="max-w-full truncate">
                   {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
@@ -204,6 +223,11 @@
             {#if deploymentId && onOpenDeployment}
               <Button type="button" size="sm" variant="outline" onclick={() => onOpenDeployment?.()}>
                 {$t(i18nKeys.common.actions.viewDeployment)}
+              </Button>
+            {/if}
+            {#if operatorWorkId && onOpenOperatorWork}
+              <Button type="button" size="sm" variant="outline" onclick={() => onOpenOperatorWork?.()}>
+                {$t(i18nKeys.console.quickDeploy.blueprintInstallOpenWork)}
               </Button>
             {/if}
             <Button
@@ -274,7 +298,9 @@
                   "rounded-md border px-3 py-2 text-sm",
                   feedback.kind === "success"
                     ? "border-primary/25 bg-primary/5"
-                    : "border-destructive/25 bg-destructive/5 text-destructive",
+                    : feedback.kind === "running"
+                      ? "border-border bg-muted/20"
+                      : "border-destructive/25 bg-destructive/5 text-destructive",
                 ]}
               >
                 <p class="font-medium">{feedback.title}</p>
