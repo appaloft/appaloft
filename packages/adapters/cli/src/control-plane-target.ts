@@ -78,6 +78,7 @@ const remoteCapableTopLevelCommands = new Set([
   "dependency",
   "deploy-token",
   "deployments",
+  "doctor",
   "domain-binding",
   "domain-event",
   "env",

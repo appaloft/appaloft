@@ -294,6 +294,102 @@ function createControlPlaneFetch(
       });
     }
 
+    if (url.pathname === "/api/system/doctor") {
+      return jsonResponse({
+        readiness: {
+          status: "ready",
+          checks: {
+            database: true,
+            migrations: true,
+          },
+          details: {
+            databaseDriver: "postgres",
+            databaseMode: "external",
+          },
+        },
+        providers: [],
+        plugins: [],
+        maintenanceWorkers: [
+          {
+            key: "durable-worker-runtime",
+            label: "Durable worker runtime",
+            enabled: false,
+            activation: "disabled-by-config",
+            safetyMode: "durable-process-delivery",
+            intervalSeconds: 0,
+            runtimeTopology: {
+              mode: "disabled",
+              queueBackend: "database",
+              workerCount: 0,
+              workerGroup: "cloud-web",
+              workerIds: [],
+              coordinationRole: "disabled",
+            },
+            observedRuntimeHeartbeats: [
+              {
+                workerGroup: "cloud-worker",
+                workerCount: 4,
+                workerIds: [
+                  "cloud-worker-replica-a",
+                  "cloud-worker-replica-b",
+                  "cloud-worker-replica-c",
+                  "cloud-worker-replica-d",
+                ],
+                heartbeat: {
+                  staleAfterSeconds: 15,
+                  onlineWorkerCount: 4,
+                  staleWorkerCount: 0,
+                  lastSeenAt: "2026-05-17T00:00:00.000Z",
+                  workers: [
+                    {
+                      workerId: "cloud-worker-replica-a",
+                      workerGroup: "cloud-worker",
+                      slot: 1,
+                      status: "online",
+                      online: true,
+                      lastSeenAt: "2026-05-17T00:00:00.000Z",
+                    },
+                    {
+                      workerId: "cloud-worker-replica-b",
+                      workerGroup: "cloud-worker",
+                      slot: 2,
+                      status: "online",
+                      online: true,
+                      lastSeenAt: "2026-05-17T00:00:00.000Z",
+                    },
+                    {
+                      workerId: "cloud-worker-replica-c",
+                      workerGroup: "cloud-worker",
+                      slot: 3,
+                      status: "online",
+                      online: true,
+                      lastSeenAt: "2026-05-17T00:00:00.000Z",
+                    },
+                    {
+                      workerId: "cloud-worker-replica-d",
+                      workerGroup: "cloud-worker",
+                      slot: 4,
+                      status: "online",
+                      online: true,
+                      lastSeenAt: "2026-05-17T00:00:00.000Z",
+                    },
+                  ],
+                },
+              },
+            ],
+            configurationKeys: [
+              "APPALOFT_WORKER_RUNTIME_MODE",
+              "APPALOFT_WORKER_QUEUE_BACKEND",
+              "APPALOFT_WORKER_COUNT",
+              "APPALOFT_WORKER_GROUP",
+              "APPALOFT_WORKER_OBSERVED_GROUPS",
+            ],
+            operationKeys: ["deployments.create", "operator-work.*"],
+          },
+        ],
+      });
+    }
+
     if (url.pathname === "/api/static-artifacts/publish-payload") {
       return jsonResponse(
         {
@@ -1128,6 +1224,28 @@ describe("CLI remote control-plane client", () => {
     expect(shown.stdout).toContain("Remote Project");
   });
 
+  test("[CONTROL-PLANE-CLI-006][SYSTEM-DIAG-004] doctor dispatches through the selected control plane", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "doctor"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context", "GET /api/system/doctor"],
+    );
+    expect(output.stdout).toContain('"databaseDriver": "postgres"');
+    expect(output.stdout).toContain('"workerGroup": "cloud-worker"');
+    expect(output.stdout).toContain('"onlineWorkerCount": 4');
+    expect(output.stdout).not.toContain("appaloft-worker-1");
+  });
+
   test("[CONTROL-PLANE-CLI-007][CONTROL-PLANE-MODE-003] no trusted remote source preserves the local CLI path", async () => {
     const result = await resolveCliExecutionTarget({
       argv: ["node", "appaloft", "project", "list"],
@@ -1715,6 +1833,28 @@ describe("CLI remote control-plane client", () => {
       diagnostics: {
         source: "profile",
         command: "work",
+        effectiveMode: "self-hosted",
+      },
+      profile: {
+        name: "local",
+        mode: "self-hosted",
+        baseUrl: "http://127.0.0.1:4310",
+      },
+    });
+  });
+
+  test("[SYSTEM-DIAG-004] doctor command resolves to the selected remote control plane", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "doctor"],
+      store: activeStore(),
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      argv: ["node", "appaloft", "doctor"],
+      diagnostics: {
+        source: "profile",
+        command: "doctor",
         effectiveMode: "self-hosted",
       },
       profile: {
