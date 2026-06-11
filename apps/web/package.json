@@ -35,6 +35,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/svelte-query": "^6.1.29",
     "@types/node": "^22",
+    "@types/sortablejs": "^1.15.9",
     "bits-ui": "^2.18.1",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
@@ -52,6 +53,7 @@
   },
   "dependencies": {
     "@thesvg/icons": "^3.0.10",
-    "@wterm/dom": "^0.3.0"
+    "@wterm/dom": "^0.3.0",
+    "sortablejs": "^1.15.7"
   }
 }
