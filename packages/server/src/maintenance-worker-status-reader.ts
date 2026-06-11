@@ -84,6 +84,7 @@ function status(input: {
   defaultRetryDelaySeconds?: number;
   rawRetentionHours?: number;
   runtimeTopology?: MaintenanceWorkerStatus["runtimeTopology"];
+  observedRuntimeHeartbeats?: MaintenanceWorkerStatus["observedRuntimeHeartbeats"];
   activation?: MaintenanceWorkerActivation;
   configurationKeys: string[];
   operationKeys: string[];
@@ -103,6 +104,9 @@ function status(input: {
       ? { rawRetentionHours: input.rawRetentionHours }
       : {}),
     ...(input.runtimeTopology ? { runtimeTopology: input.runtimeTopology } : {}),
+    ...(input.observedRuntimeHeartbeats
+      ? { observedRuntimeHeartbeats: input.observedRuntimeHeartbeats }
+      : {}),
     configurationKeys: input.configurationKeys,
     operationKeys: input.operationKeys,
   };
@@ -123,6 +127,33 @@ async function durableWorkerRuntimeStatus(
   const enabled = workerRuntime.mode !== "disabled";
   const heartbeat =
     enabled && heartbeatProvider ? await heartbeatProvider(workerRuntime.workerGroup) : undefined;
+  const observedRuntimeHeartbeats = heartbeatProvider
+    ? (
+        await Promise.all(
+          config.workerRuntimeObservedGroups.map(async (observed) => ({
+            workerGroup: observed.workerGroup,
+            workerCount: observed.workerCount,
+            workerIds: Array.from(
+              { length: observed.workerCount },
+              (_, index) => `${observed.workerGroup}-${index + 1}`,
+            ),
+            heartbeat: await heartbeatProvider(observed.workerGroup),
+          })),
+        )
+      ).map((observed) => ({
+        workerGroup: observed.workerGroup,
+        workerCount: observed.workerCount,
+        workerIds: observed.workerIds,
+        ...(observed.heartbeat ? { heartbeat: observed.heartbeat } : {}),
+      }))
+    : config.workerRuntimeObservedGroups.map((observed) => ({
+        workerGroup: observed.workerGroup,
+        workerCount: observed.workerCount,
+        workerIds: Array.from(
+          { length: observed.workerCount },
+          (_, index) => `${observed.workerGroup}-${index + 1}`,
+        ),
+      }));
 
   return status({
     key: "durable-worker-runtime",
@@ -144,12 +175,14 @@ async function durableWorkerRuntimeStatus(
         ? { externalBackendKind: workerRuntime.externalBackendKind }
         : {}),
     },
+    ...(observedRuntimeHeartbeats.length > 0 ? { observedRuntimeHeartbeats } : {}),
     configurationKeys: [
       "APPALOFT_WORKER_RUNTIME_MODE",
       "APPALOFT_WORKER_QUEUE_BACKEND",
       "APPALOFT_WORKER_COUNT",
       "APPALOFT_WORKER_GROUP",
       "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
+      "APPALOFT_WORKER_OBSERVED_GROUPS",
     ],
     operationKeys: [
       "deployments.create",

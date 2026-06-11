@@ -31,6 +31,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           "APPALOFT_WORKER_COUNT",
           "APPALOFT_WORKER_GROUP",
           "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
+          "APPALOFT_WORKER_OBSERVED_GROUPS",
         ],
         operationKeys: [
           "deployments.create",
@@ -204,6 +205,62 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
     );
 
     expect(durableRuntime?.runtimeTopology?.heartbeat).toBeUndefined();
+  });
+
+  test("[LONG-WORK-MON-008] shows observed standalone worker groups when the current process is disabled", async () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(
+      resolveConfig({
+        env: {
+          APPALOFT_WORKER_RUNTIME_MODE: "disabled",
+          APPALOFT_WORKER_COUNT: "0",
+          APPALOFT_WORKER_GROUP: "web-process",
+          APPALOFT_WORKER_OBSERVED_GROUPS: "cloud-deployment-worker:4",
+        },
+      }),
+      async (workerGroup) => ({
+        staleAfterSeconds: 15,
+        onlineWorkerCount: 4,
+        staleWorkerCount: 0,
+        lastSeenAt: "2026-06-09T09:00:00.000Z",
+        workers: Array.from({ length: 4 }, (_, index) => ({
+          workerId: `${workerGroup}-${index + 1}`,
+          workerGroup,
+          slot: index + 1,
+          status: "online" as const,
+          online: true,
+          lastSeenAt: "2026-06-09T09:00:00.000Z",
+        })),
+      }),
+    );
+
+    const durableRuntime = (await reader.list()).find(
+      (entry) => entry.key === "durable-worker-runtime",
+    );
+
+    expect(durableRuntime).toMatchObject({
+      enabled: false,
+      runtimeTopology: {
+        mode: "disabled",
+        workerCount: 0,
+        workerGroup: "web-process",
+      },
+      observedRuntimeHeartbeats: [
+        {
+          workerGroup: "cloud-deployment-worker",
+          workerCount: 4,
+          workerIds: [
+            "cloud-deployment-worker-1",
+            "cloud-deployment-worker-2",
+            "cloud-deployment-worker-3",
+            "cloud-deployment-worker-4",
+          ],
+          heartbeat: {
+            onlineWorkerCount: 4,
+            staleWorkerCount: 0,
+          },
+        },
+      ],
+    });
   });
 
   test("[SCHED-MAINT-WORKER-002] reflects environment-enabled runner status", async () => {

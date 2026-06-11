@@ -39,7 +39,8 @@ through an adapter while still projecting safe durable-work and process-attempt 
 `operator-work.*` queries.
 
 `appaloft doctor`, `GET /api/system/doctor`, and the Web Instance page report the configured mode,
-queue backend, worker group, worker ids, and coordinator role.
+queue backend, worker group, worker ids, and coordinator role. Web/API processes that do not run
+durable work can still observe standalone worker groups by setting `APPALOFT_WORKER_OBSERVED_GROUPS`.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -48,6 +49,7 @@ queue backend, worker group, worker ids, and coordinator role.
 | `APPALOFT_WORKER_COUNT` | `1` | Number of configured worker slots. Enabled modes require at least one; `disabled` can use `0`. |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | Stable worker group used to derive worker ids and coordinate capacity. |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | Required when `APPALOFT_WORKER_QUEUE_BACKEND=external`; supported public values are `kafka`, `temporal`, and `custom`. |
+| `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | Comma-separated `worker-group:count` entries that doctor and the Web Instance page should read from the durable worker heartbeat model, even when the current Web/API process uses `APPALOFT_WORKER_RUNTIME_MODE=disabled`. |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | Maximum PostgreSQL connections held by each runtime process. Lower this when multiple Web/worker processes share a small session pool. |
 
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>

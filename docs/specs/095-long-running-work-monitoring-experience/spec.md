@@ -68,6 +68,7 @@ This slice defines three monitoring layers:
 | LONG-WORK-MON-005 | Instance page shows worker runtime topology | Worker runtime is configured | Admin opens Instance maintenance workers | The durable worker runtime row has a label, safety text, activation text, and mode/backend/group/worker ids/coordination role readback. |
 | LONG-WORK-MON-006 | Worker heartbeat is separate from topology | Worker runtime is writing heartbeat records | Admin opens Instance maintenance workers or doctor output | The durable worker runtime row shows online/stale worker counts and recent heartbeat evidence from the heartbeat read model, while deployment detail/events remain free of worker liveness internals. |
 | LONG-WORK-MON-007 | CLI command names match implemented surface | Monitoring follow-up commands are generated | A user reads a quick deploy or workflow result | Commands use `appaloft work list/show` for operator work and `appaloft deployments events ... --follow` for user deployment progress. |
+| LONG-WORK-MON-008 | Disabled Web/API process observes standalone workers | Web/API is configured not to execute durable work and an external worker group is configured for observation | Admin opens Instance maintenance workers or doctor output | The durable worker runtime row reports the current process as disabled and separately shows the observed standalone worker group, expected worker count, worker ids, and heartbeat readback for that group. |
 
 ## Out Of Scope
 

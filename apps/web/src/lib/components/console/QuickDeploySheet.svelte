@@ -4098,7 +4098,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   async function replayBlueprintOperatorWorkProgress(
     workId: string,
-  ): Promise<{ cursor?: string; status: "running" | "succeeded" | "failed" }> {
+  ): Promise<{ cursor?: string; status: "running" | "succeeded" | "failed"; message?: string }> {
     if (!workId) {
       return { status: "running" };
     }
@@ -4113,7 +4113,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     const progressEvents = operatorWorkEnvelopeProgressEvents(replay.envelopes);
     appendBlueprintInstallProgressEvents(progressEvents);
     const status = operatorWorkEventProgressStatus(replay.envelopes);
-    updateBlueprintInstallFeedbackFromWorkEvent(progressEvents.at(-1) ?? {
+    const lastProgressEvent = progressEvents.at(-1);
+    updateBlueprintInstallFeedbackFromWorkEvent(lastProgressEvent ?? {
       timestamp: new Date().toISOString(),
       source: "appaloft",
       phase: "deploy",
@@ -4130,6 +4131,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     return {
       cursor: latestOperatorWorkEventCursor(replay.envelopes),
       status,
+      ...(lastProgressEvent?.message ? { message: lastProgressEvent.message } : {}),
     };
   }
 
@@ -4245,6 +4247,18 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         const workProgress = await replayBlueprintOperatorWorkProgress(latestSummary.operatorWorkId);
         if (workProgress.status === "running") {
           startBlueprintOperatorWorkFollow(latestSummary.operatorWorkId, workProgress.cursor);
+        } else {
+          latestSummary = {
+            ...latestSummary,
+            terminalStatus: workProgress.status,
+            userStatus: workProgress.status,
+            executionStatus:
+              workProgress.status === "failed" ? "failed" : latestSummary.executionStatus,
+            failureReason:
+              workProgress.status === "failed"
+                ? latestSummary.failureReason || workflowProgressError || workProgress.message || "failed"
+                : latestSummary.failureReason,
+          };
         }
       } catch (error) {
         workflowProgressError = readErrorMessage(error);
