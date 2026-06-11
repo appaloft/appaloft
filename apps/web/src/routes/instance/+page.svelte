@@ -941,7 +941,6 @@ server-config-deploy: true`);
                                     <Table.Header>
                                       <Table.Row class="hover:bg-transparent">
                                         <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
-                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeSlot)}</Table.Head>
                                         <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
                                         <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
                                       </Table.Row>
@@ -952,7 +951,6 @@ server-config-deploy: true`);
                                           <Table.Cell class="max-w-72 break-all font-mono text-xs">
                                             {runtimeWorker.workerId}
                                           </Table.Cell>
-                                          <Table.Cell class="font-mono text-xs">{runtimeWorker.slot}</Table.Cell>
                                           <Table.Cell>
                                             <Badge variant={runtimeWorker.online ? "default" : "outline"}>
                                               {workerOnlineStatusLabel(runtimeWorker)}
@@ -1067,7 +1065,6 @@ server-config-deploy: true`);
                               <Table.Header>
                                 <Table.Row class="hover:bg-transparent">
                                   <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
-                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeSlot)}</Table.Head>
                                   <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
                                   <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
                                 </Table.Row>
@@ -1078,7 +1075,6 @@ server-config-deploy: true`);
                                     <Table.Cell class="max-w-72 break-all font-mono text-xs">
                                       {runtimeWorker.workerId}
                                     </Table.Cell>
-                                    <Table.Cell class="font-mono text-xs">{runtimeWorker.slot}</Table.Cell>
                                     <Table.Cell>
                                       <Badge variant={runtimeWorker.online ? "default" : "outline"}>
                                         {workerOnlineStatusLabel(runtimeWorker)}
@@ -1435,7 +1431,7 @@ server-config-deploy: true`);
                                 <p class="break-words font-mono">
                                   {worker.runtimeTopology.heartbeat.workers
                                     .map((runtimeWorker) =>
-                                      `${runtimeWorker.workerId}:${runtimeWorker.online ? "online" : "stale"}@${runtimeWorker.lastSeenAt}`,
+                                      `${runtimeWorker.workerId} ${runtimeWorker.online ? "online" : "stale"} ${runtimeWorker.lastSeenAt}`,
                                     )
                                     .join(", ")}
                                 </p>

@@ -774,7 +774,6 @@ export const zhCN = {
       workerRuntimeMonitoringCollector: "Runtime monitoring collector",
       workerRuntimeOnlineWorkers: "在线",
       workerRuntimeRole: "role",
-      workerRuntimeSlot: "租约 slot",
       workerRuntimeStaleWorkers: "陈旧",
       workerRuntimeTopology: "Web/API 执行状态",
       workerRuntimeTopologyBody:
