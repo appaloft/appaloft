@@ -535,7 +535,7 @@ describe("durable work server runtime", () => {
     });
   });
 
-  test("[PROC-DELIVERY-WORKER-032] standalone replica runners lease distinct worker slots", async () => {
+  test("[PROC-DELIVERY-WORKER-032] standalone replica runners lease distinct replica identities", async () => {
     const adapter = new InMemoryDurableWorkQueueAdapter();
     const heartbeatStore = new InMemoryDurableWorkWorkerHeartbeatStore();
     const topology = {
