@@ -1124,6 +1124,13 @@ export const enUS = {
         "Resource terminal needs a successful deployment with workspace metadata. Pick a deployment that recorded its workspace, redeploy the resource, or use the server terminal.",
     },
     projects: {
+      activityDescription:
+        "Project activity will show commands, events, and target links when the activity read model is connected.",
+      activityGapDescription:
+        "The project activity projection is not wired into this page yet. Use Resources and Deployments for the current operational record.",
+      activityGapTitle: "Activity read model gap",
+      activityTitle: "Activity",
+      addResourceAction: "Add resource",
       activeProjects: "With deployments",
       active: "Active",
       archiveAction: "Archive",
@@ -1145,6 +1152,16 @@ export const enUS = {
       deleteConfirmPrompt: "Type the project id to delete this archived project.",
       deleteFailed: "Project was not deleted",
       deleteSucceeded: "Project deleted",
+      attentionFailedDeploymentTitle: "Failed deployment",
+      attentionNoAccessDetail:
+        "No resource currently has a public access route. Open networking on a resource to manage access.",
+      attentionNoAccessTitle: "No public access",
+      attentionNoDeploymentDetail:
+        "Resources exist, but no deployment attempt has been recorded for this project.",
+      attentionNoDeploymentTitle: "Deploy a resource",
+      attentionRunningDeploymentTitle: "Deployment running",
+      attentionTitle: "Attention",
+      deployedResourcesLabel: "deployed",
       detailDescription: "Environments, resources, and deployment records for this project",
       description: "Projects, environments, and deployment relationships",
       emptyBody:
@@ -1204,16 +1221,23 @@ export const enUS = {
       environmentUnlockSucceeded: "Environment unlocked",
       environmentsDescription: "Configuration boundaries grouped under this project.",
       environmentsTitle: "Environments",
+      failedDeploymentsLabel: "failed",
       focusDescription:
         "The project list keeps ownership, environment count, resource count, and latest deployment visible. Execution details move to detail pages.",
       focusLabel: "Project index",
       focusTitle: "Project ownership and deployment relationships",
+      healthSummaryGap:
+        "Resource health rollup needs a dedicated summary projection. Until then, deployment attention and access state are shown separately.",
       lastDeployment: "Latest deployment",
+      latestDeploymentTitle: "Latest deployment",
       latestResource: "Latest resource",
+      manageAccessAction: "Manage access",
+      noAccessResourcesLabel: "without access",
       noDeploymentShort: "No deployment yet",
       noDescription: "No description.",
       noEnvironment:
         "This project has no environment yet. You can create a production environment during deployment.",
+      noAttentionTitle: "No failed or running deployment needs attention.",
       noProjectDeploymentBody:
         "Runs, rollbacks, and environment snapshots appear here as deployment records are created.",
       noProjectDeploymentTitle: "This project has no deployments.",
@@ -1239,11 +1263,20 @@ export const enUS = {
         "Resources whose environment kind is preview. These include previews without a source-driven preview record.",
       previewResourcesTitle: "Preview resources",
       previewTitle: "Preview",
+      previewsTitle: "Previews",
       allEnvironments: "All environments",
       dangerZoneDescription:
         "Archive and deletion are separated from normal settings because they change whether future project-scoped operations are allowed.",
       dangerZoneTitle: "Danger zone",
       environmentFilterLabel: "Environment",
+      environmentManageDescription:
+        "Rename, clone, lock, or archive one environment at a time. Resource configuration stays on resource pages.",
+      environmentVariablesLabel: "variables",
+      generalSettingsTitle: "General",
+      lifecycleTitle: "Lifecycle",
+      openFailedDeploymentAction: "Open failed deployment",
+      openRunningDeploymentAction: "Open running deployment",
+      operationalSummaryTitle: "Operational summary",
       projectsWithResources: "With resources",
       publicAccessDescription: "Default access URLs created by resource deployments.",
       publicAccessTitle: "Public access",
@@ -1254,6 +1287,7 @@ export const enUS = {
       renameSucceeded: "Project renamed",
       settingsDescription:
         "Project lifecycle changes use dedicated operations. They do not create deployments, rewrite historical snapshots, or immediately change runtime state.",
+      settingsDescriptionLabel: "Description",
       settingsTitle: "Project settings",
       createResourceDescription:
         "Define the resource source and network, then start the first deployment in the current project, environment, and server.",
@@ -1290,6 +1324,12 @@ export const enUS = {
       recentDeploymentsTitle: "Recent deployments",
       resourcesDescription: "Deployment artifacts and service boundaries.",
       resourcesTitle: "Resources",
+      runningDeploymentsLabel: "running",
+      settingsEditProjectAction: "Edit project",
+      settingsLifecycleDescription:
+        "Archive and restore change whether future project-scoped operations are allowed. They do not delete resources or deployment history.",
+      settingsSlugLabel: "Slug",
+      undeployedResourcesLabel: "undeployed",
     },
     domainBindings: {
       confirmOwnership: "Confirm ownership",

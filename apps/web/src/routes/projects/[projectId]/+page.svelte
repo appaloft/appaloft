@@ -8,14 +8,17 @@
     ArrowLeft,
     ArrowRight,
     Copy,
+    ExternalLink,
     FolderOpen,
     Gauge,
     GitPullRequestArrow,
     Lock,
+    Pencil,
     Play,
     Plus,
     RotateCcw,
     Save,
+    Search,
     Trash2,
     Unlock,
   } from "@lucide/svelte";
@@ -31,6 +34,7 @@
     RestoreProjectInput,
     RuntimeMonitoringRollupResponse,
     UnlockEnvironmentInput,
+    EnvironmentSummary,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -39,6 +43,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
+  import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
   import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
   import ResourceListTable from "$lib/components/console/ResourceListTable.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -66,9 +71,12 @@
     findProject,
     findResource,
     formatTime,
+    latestResourceDeployment,
     previewEnvironmentDetailHref,
     projectDetailHref,
     projectQuickDeployHref,
+    resourceDetailHref,
+    resourceNewDeploymentHref,
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -78,18 +86,28 @@
   type ProjectDetailTab =
     | "overview"
     | "resources"
-    | "preview"
-    | "environments"
     | "deployments"
+    | "environments"
+    | "preview"
+    | "activity"
     | "settings";
   const projectDetailTabs = [
     "overview",
     "resources",
-    "preview",
-    "environments",
     "deployments",
+    "environments",
+    "preview",
+    "activity",
     "settings",
   ] as const;
+  type ProjectAttentionItem = {
+    kind: "failed-deployment" | "running-deployment" | "missing-access" | "no-deployment";
+    title: string;
+    detail: string;
+    href: string;
+    action: string;
+    tone: "destructive" | "warning" | "neutral";
+  };
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
@@ -251,6 +269,15 @@
   const projectDeployments = $derived(
     project ? deployments.filter((deployment) => deployment.projectId === project.id) : [],
   );
+  const latestProjectDeploymentSummary = $derived(projectDeployments[0] ?? null);
+  const failedProjectDeployments = $derived(
+    projectDeployments.filter((deployment) => deployment.status === "failed"),
+  );
+  const runningProjectDeployments = $derived(
+    projectDeployments.filter((deployment) =>
+      ["created", "planning", "planned", "running", "cancel-requested"].includes(deployment.status),
+    ),
+  );
   const projectRuntimeMonitoringScope = $derived({
     kind: "project" as const,
     projectId,
@@ -307,6 +334,133 @@
       ];
     }),
   );
+  const resourcesWithoutAccess = $derived.by(() =>
+    projectResources.filter((resource) => !selectCurrentResourceAccessRoute(resource.accessSummary)),
+  );
+  const deployedProjectResources = $derived.by(() =>
+    projectResources.filter((resource) => resource.deploymentCount > 0 || resource.lastDeploymentId),
+  );
+  const undeployedProjectResources = $derived.by(() =>
+    projectResources.filter((resource) => !resource.deploymentCount && !resource.lastDeploymentId),
+  );
+  const projectResourceGroups = $derived.by(() =>
+    projectEnvironments.map((environment) => ({
+      environment,
+      resources: projectResources.filter((resource) => resource.environmentId === environment.id),
+    })),
+  );
+  const nonEmptyProjectResourceGroups = $derived(
+    projectResourceGroups.filter((group) => group.resources.length > 0),
+  );
+  const projectResourcesWithoutKnownEnvironment = $derived.by(() =>
+    projectResources.filter(
+      (resource) =>
+        !projectEnvironments.some((environment) => environment.id === resource.environmentId),
+    ),
+  );
+  const primaryResource = $derived(projectResources[0] ?? null);
+  const latestDeploymentResource = $derived(
+    latestProjectDeploymentSummary
+      ? findResource(projectResources, latestProjectDeploymentSummary.resourceId)
+      : null,
+  );
+  const latestDeploymentEnvironment = $derived(
+    latestProjectDeploymentSummary
+      ? findEnvironment(projectEnvironments, latestProjectDeploymentSummary.environmentId)
+      : null,
+  );
+  const projectAttentionItems = $derived.by<ProjectAttentionItem[]>(() => {
+    const items: ProjectAttentionItem[] = [];
+    for (const deployment of failedProjectDeployments.slice(0, 2)) {
+      const resource = findResource(projectResources, deployment.resourceId);
+      items.push({
+        kind: "failed-deployment",
+        title: $t(i18nKeys.console.projects.attentionFailedDeploymentTitle),
+        detail: `${resource?.name ?? deployment.resourceId} · ${formatTime(deployment.createdAt)}`,
+        href: deploymentDetailHref(deployment),
+        action: $t(i18nKeys.common.actions.openDeployments),
+        tone: "destructive",
+      });
+    }
+
+    for (const deployment of runningProjectDeployments.slice(0, Math.max(0, 3 - items.length))) {
+      const resource = findResource(projectResources, deployment.resourceId);
+      items.push({
+        kind: "running-deployment",
+        title: $t(i18nKeys.console.projects.attentionRunningDeploymentTitle),
+        detail: `${resource?.name ?? deployment.resourceId} · ${deployment.status}`,
+        href: deploymentDetailHref(deployment),
+        action: $t(i18nKeys.common.actions.openDeployments),
+        tone: "warning",
+      });
+    }
+
+    if (items.length < 3 && projectResources.length > 0 && projectAccessRoutes.length === 0) {
+      const resource = primaryResource;
+      if (resource) {
+        items.push({
+          kind: "missing-access",
+          title: $t(i18nKeys.console.projects.attentionNoAccessTitle),
+          detail: $t(i18nKeys.console.projects.attentionNoAccessDetail),
+          href: `${resourceDetailHref(resource)}?tab=domains`,
+          action: $t(i18nKeys.console.projects.manageAccessAction),
+          tone: "neutral",
+        });
+      }
+    }
+
+    if (items.length < 3 && projectResources.length > 0 && projectDeployments.length === 0) {
+      const resource = primaryResource;
+      if (resource) {
+        items.push({
+          kind: "no-deployment",
+          title: $t(i18nKeys.console.projects.attentionNoDeploymentTitle),
+          detail: $t(i18nKeys.console.projects.attentionNoDeploymentDetail),
+          href: resourceNewDeploymentHref(resource),
+          action: $t(i18nKeys.common.actions.deploy),
+          tone: "neutral",
+        });
+      }
+    }
+
+    return items;
+  });
+  const projectNextAction = $derived.by(() => {
+    if (failedProjectDeployments[0]) {
+      return {
+        label: $t(i18nKeys.console.projects.openFailedDeploymentAction),
+        href: deploymentDetailHref(failedProjectDeployments[0]),
+      };
+    }
+    if (runningProjectDeployments[0]) {
+      return {
+        label: $t(i18nKeys.console.projects.openRunningDeploymentAction),
+        href: deploymentDetailHref(runningProjectDeployments[0]),
+      };
+    }
+    if (!primaryResource) {
+      return {
+        label: $t(i18nKeys.console.projects.addResourceAction),
+        href: projectQuickDeployHref(projectId),
+      };
+    }
+    if (projectDeployments.length === 0) {
+      return {
+        label: $t(i18nKeys.common.actions.deploy),
+        href: resourceNewDeploymentHref(primaryResource),
+      };
+    }
+    if (projectAccessRoutes.length === 0) {
+      return {
+        label: $t(i18nKeys.console.projects.manageAccessAction),
+        href: `${resourceDetailHref(primaryResource)}?tab=domains`,
+      };
+    }
+    return {
+      label: $t(i18nKeys.common.actions.openResource),
+      href: resourceDetailHref(primaryResource),
+    };
+  });
   const selectedMonitoringEnvironment = $derived(
     projectEnvironments.find((environment) => environment.id === selectedMonitoringEnvironmentId) ??
       null,
@@ -319,6 +473,11 @@
   let projectFormProjectId = $state("");
   let projectName = $state("");
   let quickDeployDialogOpen = $state(false);
+  let projectRenameDialogOpen = $state(false);
+  let environmentCreateDialogOpen = $state(false);
+  let environmentRenameDialogOpen = $state(false);
+  let environmentCloneDialogOpen = $state(false);
+  let selectedEnvironmentId = $state("");
   let resourceFilterQuery = $state("");
   let resourceEnvironmentFilter = $state("all");
   let cloneEnvironmentNames = $state<Record<string, string>>({});
@@ -339,12 +498,31 @@
       return matchesQuery && matchesEnvironment;
     }),
   );
+  const selectedEnvironment = $derived(
+    projectEnvironments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
+  );
   const canRenameProject = $derived(
     Boolean(project) &&
       canRenameProjectByCapability &&
       !isProjectArchived &&
       projectName.trim().length > 0 &&
       projectName.trim() !== project?.name,
+  );
+  const canRenameSelectedEnvironment = $derived(
+    Boolean(selectedEnvironment) &&
+      selectedEnvironment?.lifecycleStatus === "active" &&
+      !isProjectArchived &&
+      renameEnvironmentName(selectedEnvironment?.id ?? "", selectedEnvironment?.name ?? "")
+        .trim()
+        .length > 0 &&
+      renameEnvironmentName(selectedEnvironment?.id ?? "", selectedEnvironment?.name ?? "")
+        .trim() !== selectedEnvironment?.name,
+  );
+  const canCloneSelectedEnvironment = $derived(
+    Boolean(selectedEnvironment) &&
+      selectedEnvironment?.lifecycleStatus === "active" &&
+      !isProjectArchived &&
+      cloneEnvironmentName(selectedEnvironment?.id ?? "").trim().length > 0,
   );
   const renameProjectMutation = createMutation(() => ({
     mutationFn: (input: RenameProjectInput) => orpcClient.projects.rename(input),
@@ -357,6 +535,7 @@
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
       void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      projectRenameDialogOpen = false;
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -460,6 +639,8 @@
         detail: result.id,
       };
       cloneEnvironmentNames = {};
+      environmentCloneDialogOpen = false;
+      selectedEnvironmentId = "";
       void queryClient.invalidateQueries({ queryKey: ["environments"] });
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       if (project) {
@@ -483,6 +664,8 @@
         detail: result.id,
       };
       renameEnvironmentNames = {};
+      environmentRenameDialogOpen = false;
+      selectedEnvironmentId = "";
       void queryClient.invalidateQueries({ queryKey: ["environments"] });
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       if (project) {
@@ -840,18 +1023,46 @@
     void setModalOpen(page, "quick-deploy", open);
   }
 
+  function openProjectRenameDialog(): void {
+    if (!project) return;
+    projectName = project.name;
+    projectRenameDialogOpen = true;
+  }
+
+  function openEnvironmentCreateDialog(): void {
+    environmentCreateDialogOpen = true;
+  }
+
+  function closeEnvironmentCreateDialog(): void {
+    environmentCreateDialogOpen = false;
+  }
+
+  function openEnvironmentRenameDialog(environment: EnvironmentSummary): void {
+    selectedEnvironmentId = environment.id;
+    setRenameEnvironmentName(environment.id, environment.name);
+    environmentRenameDialogOpen = true;
+  }
+
+  function openEnvironmentCloneDialog(environment: EnvironmentSummary): void {
+    selectedEnvironmentId = environment.id;
+    setCloneEnvironmentName(environment.id, "");
+    environmentCloneDialogOpen = true;
+  }
+
   function projectTabLabel(tab: ProjectDetailTab): string {
     switch (tab) {
       case "overview":
         return $t(i18nKeys.console.deployments.overviewTab);
       case "resources":
         return $t(i18nKeys.common.domain.resources);
-      case "preview":
-        return $t(i18nKeys.console.projects.previewTitle);
-      case "environments":
-        return $t(i18nKeys.common.domain.environments);
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
+      case "environments":
+        return $t(i18nKeys.common.domain.environments);
+      case "preview":
+        return $t(i18nKeys.console.projects.previewsTitle);
+      case "activity":
+        return $t(i18nKeys.console.projects.activityTitle);
       case "settings":
         return $t(i18nKeys.console.projects.settingsTitle);
     }
@@ -921,7 +1132,7 @@
     </section>
   {:else}
     <div class="space-y-8">
-      <section class="space-y-6">
+      <section class="space-y-5">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -939,14 +1150,12 @@
                 {project.description ?? $t(i18nKeys.console.projects.noDescription)}
               </p>
             </div>
-            <p class="text-xs text-muted-foreground">
-              {$t(i18nKeys.common.domain.createdAt)} · {formatTime(project.createdAt)}
-            </p>
-            {#if project.archivedAt}
-              <p class="text-xs text-muted-foreground">
-                {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
-              </p>
-            {/if}
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>{$t(i18nKeys.common.domain.createdAt)} · {formatTime(project.createdAt)}</span>
+              {#if project.archivedAt}
+                <span>{$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}</span>
+              {/if}
+            </div>
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -957,42 +1166,70 @@
                   disabled={disabled || isProjectArchived}
                 >
                   <Plus class="size-4" />
-                  {$t(i18nKeys.common.actions.quickDeploy)}
+                  {$t(i18nKeys.console.projects.addResourceAction)}
                 </Button>
               {/snippet}
             </CapabilityGate>
-            <Button href={`/deployments?projectId=${project.id}`} variant="outline">
-              {$t(i18nKeys.common.actions.viewDeployments)}
+            <Button href={projectNextAction.href} variant="outline">
+              {projectNextAction.label}
+              <ArrowRight class="size-4" />
             </Button>
           </div>
         </div>
 
-        <dl class="console-metric-strip sm:grid-cols-4">
-          <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <section class="grid gap-3 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.common.domain.resources)}
-            </dt>
-            <dd class="mt-1 text-2xl font-semibold">{projectResources.length}</dd>
-          </div>
-          <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {$t(i18nKeys.common.domain.environments)}
-            </dt>
-            <dd class="mt-1 text-2xl font-semibold">{projectEnvironments.length}</dd>
-          </div>
-          <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {$t(i18nKeys.common.domain.deployments)}
-            </dt>
-            <dd class="mt-1 text-2xl font-semibold">{projectDeployments.length}</dd>
-          </div>
-          <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{projectResources.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {deployedProjectResources.length} {$t(i18nKeys.console.projects.deployedResourcesLabel)}
+            </p>
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.console.projects.publicAccessTitle)}
-            </dt>
-            <dd class="mt-1 text-2xl font-semibold">{projectAccessRoutes.length}</dd>
-          </div>
-        </dl>
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{projectAccessRoutes.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {resourcesWithoutAccess.length} {$t(i18nKeys.console.projects.noAccessResourcesLabel)}
+            </p>
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.console.projects.latestDeploymentTitle)}
+            </p>
+            {#if latestProjectDeploymentSummary}
+              <a
+                href={deploymentDetailHref(latestProjectDeploymentSummary)}
+                class="mt-2 block truncate text-sm font-semibold underline-offset-4 hover:underline"
+              >
+                {latestProjectDeploymentSummary.status}
+              </a>
+              <p class="mt-1 truncate text-xs text-muted-foreground">
+                {latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId} · {formatTime(latestProjectDeploymentSummary.createdAt)}
+              </p>
+            {:else}
+              <p class="mt-2 text-sm font-semibold">{$t(i18nKeys.console.projects.noDeploymentShort)}</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {undeployedProjectResources.length} {$t(i18nKeys.console.projects.undeployedResourcesLabel)}
+              </p>
+            {/if}
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.console.projects.attentionTitle)}
+            </p>
+            <p class="mt-2 text-2xl font-semibold">
+              {failedProjectDeployments.length + runningProjectDeployments.length}
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {failedProjectDeployments.length} {$t(i18nKeys.console.projects.failedDeploymentsLabel)}
+              · {runningProjectDeployments.length} {$t(i18nKeys.console.projects.runningDeploymentsLabel)}
+            </p>
+          </article>
+        </section>
       </section>
 
       <Tabs.Root value={activeProjectTab} class="space-y-6">
@@ -1011,7 +1248,247 @@
         </Tabs.List>
 
         <Tabs.Content value="overview" class="mt-0 flex flex-col gap-6">
-          <section class="console-panel order-2 space-y-5 p-5">
+          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div class="space-y-5">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.projects.resourcesTitle)}
+                  </h2>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.projects.resourcesDescription)}
+                  </p>
+                </div>
+                <Button href={projectTabHref("resources")} variant="outline">
+                  {$t(i18nKeys.common.actions.viewAll)}
+                  <ArrowRight class="size-4" />
+                </Button>
+              </div>
+
+              {#if projectResources.length > 0}
+                <div class="space-y-4">
+                  {#each nonEmptyProjectResourceGroups as group (group.environment.id)}
+                    <section class="space-y-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <h3 class="truncate text-sm font-semibold">{group.environment.name}</h3>
+                          <p class="text-xs text-muted-foreground">
+                            {group.resources.length} {$t(i18nKeys.common.domain.resources)}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{group.environment.kind}</Badge>
+                      </div>
+                      <div class="console-record-list">
+                        {#each group.resources.slice(0, 4) as resource (resource.id)}
+                          {@const currentAccessRoute = selectCurrentResourceAccessRoute(resource.accessSummary)}
+                          {@const latestDeployment = latestResourceDeployment(resource, projectDeployments)}
+                          <div class="console-record-row">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div class="min-w-0">
+                                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                                  <a
+                                    href={resourceDetailHref(resource)}
+                                    class="truncate text-sm font-medium underline-offset-4 hover:underline"
+                                  >
+                                    {resource.name}
+                                  </a>
+                                  <Badge variant="secondary">{resource.kind}</Badge>
+                                  <Badge variant="outline">
+                                    {resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}
+                                  </Badge>
+                                </div>
+                                <p class="mt-1 truncate text-xs text-muted-foreground">
+                                  {currentAccessRoute?.route.url ?? $t(i18nKeys.console.projects.noPublicAccess)}
+                                </p>
+                              </div>
+                              <div class="flex shrink-0 flex-wrap gap-2">
+                                <Button
+                                  href={resourceNewDeploymentHref(resource)}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  <Play class="size-4" />
+                                  {$t(i18nKeys.common.actions.deploy)}
+                                </Button>
+                                <Button
+                                  href={resourceDetailHref(resource)}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  {$t(i18nKeys.common.actions.openResource)}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        {/each}
+                        {#if group.resources.length > 4}
+                          <a
+                            href={projectTabHref("resources")}
+                            class="console-record-row block text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                          >
+                            {$t(i18nKeys.common.actions.viewAll)} · {group.resources.length}
+                          </a>
+                        {/if}
+                      </div>
+                    </section>
+                  {/each}
+
+                  {#if projectResourcesWithoutKnownEnvironment.length > 0}
+                    <section class="space-y-2">
+                      <div>
+                        <h3 class="text-sm font-semibold">{$t(i18nKeys.console.projects.noEnvironment)}</h3>
+                      </div>
+                      <ResourceListTable
+                        resources={projectResourcesWithoutKnownEnvironment}
+                        deployments={projectDeployments}
+                        {environments}
+                        emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
+                        emptyDescription={$t(i18nKeys.console.projects.noResources)}
+                        showEnvironment
+                      />
+                    </section>
+                  {/if}
+                </div>
+              {:else}
+                <div class="console-subtle-panel px-4 py-6">
+                  <div class="flex items-start gap-3">
+                    <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
+                    <div class="space-y-2">
+                      <p class="text-sm font-medium">
+                        {$t(i18nKeys.console.projects.noResourcesShort)}
+                      </p>
+                      <p class="text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.projects.noResources)}
+                      </p>
+                      <CapabilityGate
+                        operationKey="resources.create"
+                        resourceRefs={{ projectId: project.id }}
+                      >
+                        {#snippet children({ disabled })}
+                          <Button
+                            size="sm"
+                            href={projectQuickDeployHref(project.id)}
+                            disabled={disabled || isProjectArchived}
+                          >
+                            <Plus class="size-4" />
+                            {$t(i18nKeys.console.projects.addResourceAction)}
+                          </Button>
+                        {/snippet}
+                      </CapabilityGate>
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            </div>
+
+            <aside class="space-y-4">
+              <section class="console-side-panel space-y-3">
+                <div>
+                  <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.projects.publicAccessTitle)}
+                    </h2>
+                    <span class="text-sm text-muted-foreground">{projectAccessRoutes.length}</span>
+                  </div>
+                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.publicAccessDescription)}
+                  </p>
+                </div>
+
+                <div class="console-record-list">
+                  {#if projectAccessRoutes.length > 0}
+                    {#each projectAccessRoutes.slice(0, 4) as route (`${route.resourceId}-${route.hostname}-${route.pathPrefix}`)}
+                      <a
+                        href={route.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="console-record-row block"
+                      >
+                        <div class="flex min-w-0 items-center justify-between gap-2">
+                          <p class="min-w-0 truncate text-sm font-medium">{route.hostname}</p>
+                          <ExternalLink class="size-3 shrink-0 text-muted-foreground" />
+                        </div>
+                        <p class="mt-1 truncate text-xs text-muted-foreground">
+                          {route.resourceName} · {route.pathPrefix} · {route.scheme.toUpperCase()}
+                        </p>
+                      </a>
+                    {/each}
+                  {:else}
+                    <p class="px-4 py-4 text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.projects.noPublicAccess)}
+                    </p>
+                  {/if}
+                </div>
+              </section>
+
+              <section class="console-side-panel space-y-3">
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.projects.latestDeploymentTitle)}
+                </h2>
+                {#if latestProjectDeploymentSummary}
+                  <a
+                    href={deploymentDetailHref(latestProjectDeploymentSummary)}
+                    class="console-record-row block"
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <span class="text-sm font-medium">{latestProjectDeploymentSummary.status}</span>
+                      <Badge variant="outline">
+                        {latestDeploymentEnvironment?.name ?? latestProjectDeploymentSummary.environmentId}
+                      </Badge>
+                    </div>
+                    <p class="mt-1 truncate text-xs text-muted-foreground">
+                      {latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId}
+                    </p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      {formatTime(latestProjectDeploymentSummary.createdAt)}
+                    </p>
+                  </a>
+                {:else}
+                  <p class="text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
+                  </p>
+                {/if}
+              </section>
+
+              <section class="console-side-panel space-y-3">
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.projects.attentionTitle)}
+                </h2>
+                {#if projectAttentionItems.length > 0}
+                  <div class="space-y-2">
+                    {#each projectAttentionItems as item (`${item.kind}-${item.href}`)}
+                      <a
+                        href={item.href}
+                        class={[
+                          "block rounded-md border px-3 py-2 transition hover:bg-muted/40",
+                          item.tone === "destructive"
+                            ? "border-destructive/30 bg-destructive/5"
+                            : "border-border bg-background",
+                        ]}
+                      >
+                        <p class="text-sm font-medium">{item.title}</p>
+                        <p class="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                        <p class="mt-2 text-xs font-medium text-foreground">{item.action}</p>
+                      </a>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.noAttentionTitle)}
+                  </p>
+                {/if}
+              </section>
+
+              <section class="console-side-panel space-y-2">
+                <h2 class="text-sm font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.projects.healthSummaryGap)}
+                </p>
+              </section>
+            </aside>
+          </section>
+
+          <section class="console-panel space-y-5 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
@@ -1040,9 +1517,9 @@
               {/if}
             </div>
 
-            <div class="grid gap-4 xl:grid-cols-2">
-              <article class="console-subtle-panel p-4">
-                <div class="flex items-center justify-between gap-3">
+            <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+              <article class="console-subtle-panel min-w-0 p-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div class="min-w-0">
                     <h3 class="truncate text-sm font-semibold">
                       {$t(i18nKeys.common.domain.project)} · {project.name}
@@ -1059,7 +1536,7 @@
                       {/if}
                     </p>
                   </div>
-                  <Badge variant="outline">
+                  <Badge class="w-fit shrink-0" variant="outline">
                     {$t(i18nKeys.console.runtimeUsage.rollupTitle)}
                   </Badge>
                 </div>
@@ -1095,8 +1572,8 @@
                 {/if}
               </article>
 
-              <article class="console-subtle-panel p-4">
-                <div class="flex items-center justify-between gap-3">
+              <article class="console-subtle-panel min-w-0 p-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div class="min-w-0">
                     <h3 class="truncate text-sm font-semibold">
                       {$t(i18nKeys.common.domain.environment)} · {selectedMonitoringEnvironment?.name ??
@@ -1116,7 +1593,7 @@
                       {/if}
                     </p>
                   </div>
-                  <Badge variant="outline">
+                  <Badge class="w-fit shrink-0" variant="outline">
                     {$t(i18nKeys.console.runtimeUsage.rollupTitle)}
                   </Badge>
                 </div>
@@ -1152,107 +1629,6 @@
                 {/if}
               </article>
             </div>
-          </section>
-
-          <section class="order-1 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <div class="space-y-4">
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold">
-                    {$t(i18nKeys.console.projects.resourcesTitle)}
-                  </h2>
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.projects.resourcesDescription)}
-                  </p>
-                </div>
-                <Button href={projectTabHref("resources")} variant="outline">
-                  {$t(i18nKeys.common.actions.viewAll)}
-                  <ArrowRight class="size-4" />
-                </Button>
-              </div>
-
-              {#if projectResources.length > 0}
-                <ResourceListTable
-                  resources={projectResources}
-                  deployments={projectDeployments}
-                  {environments}
-                  emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
-                  emptyDescription={$t(i18nKeys.console.projects.noResources)}
-                  createHref={projectQuickDeployHref(project.id)}
-                  createLabel={$t(i18nKeys.common.actions.quickDeploy)}
-                  createDisabled={isProjectArchived}
-                  showEnvironment
-                />
-              {:else}
-                <div class="console-subtle-panel px-4 py-6">
-                  <div class="flex items-start gap-3">
-                    <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
-                    <div class="space-y-2">
-                      <p class="text-sm font-medium">
-                        {$t(i18nKeys.console.projects.noProjectDeploymentTitle)}
-                      </p>
-                      <p class="text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
-                      </p>
-                      <CapabilityGate
-                        operationKey="resources.create"
-                        resourceRefs={{ projectId: project.id }}
-                      >
-                        {#snippet children({ disabled })}
-                          <Button
-                            size="sm"
-                            href={projectQuickDeployHref(project.id)}
-                            disabled={disabled || isProjectArchived}
-                          >
-                            <Play class="size-4" />
-                            {$t(i18nKeys.common.actions.deploy)}
-                          </Button>
-                        {/snippet}
-                      </CapabilityGate>
-                    </div>
-                  </div>
-                </div>
-              {/if}
-            </div>
-
-            <aside class="console-side-panel space-y-3">
-              <div>
-                <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-sm font-semibold">
-                    {$t(i18nKeys.console.projects.publicAccessTitle)}
-                  </h2>
-                  <span class="text-sm text-muted-foreground">{projectAccessRoutes.length}</span>
-                </div>
-                <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                  {$t(i18nKeys.console.projects.publicAccessDescription)}
-                </p>
-              </div>
-
-              <div class="console-record-list">
-                {#if projectAccessRoutes.length > 0}
-                  {#each projectAccessRoutes.slice(0, 5) as route (`${route.resourceId}-${route.hostname}-${route.pathPrefix}`)}
-                    <a
-                      href={route.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      class="console-record-row block"
-                    >
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <p class="min-w-0 truncate text-sm font-medium">{route.hostname}</p>
-                        <Badge variant="secondary">{route.kind}</Badge>
-                      </div>
-                      <p class="mt-1 text-xs text-muted-foreground">
-                        {route.resourceName} · {route.pathPrefix} · {route.scheme.toUpperCase()}
-                      </p>
-                    </a>
-                  {/each}
-                {:else}
-                  <p class="px-4 py-4 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.projects.noPublicAccess)}
-                  </p>
-                {/if}
-              </div>
-            </aside>
           </section>
         </Tabs.Content>
 
@@ -1302,7 +1678,7 @@
                       disabled={disabled || isProjectArchived}
                     >
                       <Plus class="size-4" />
-                      {$t(i18nKeys.common.actions.quickDeploy)}
+                      {$t(i18nKeys.console.projects.addResourceAction)}
                     </Button>
                   {/snippet}
                 </CapabilityGate>
@@ -1318,7 +1694,7 @@
                 ? $t(i18nKeys.console.projects.noResources)
                 : $t(i18nKeys.console.projects.noFilteredResources)}
               createHref={projectQuickDeployHref(project.id)}
-              createLabel={$t(i18nKeys.common.actions.quickDeploy)}
+              createLabel={$t(i18nKeys.console.projects.addResourceAction)}
               createDisabled={isProjectArchived}
               showEnvironment
             />
@@ -1512,7 +1888,18 @@
                   {$t(i18nKeys.console.projects.environmentsDescription)}
                 </p>
               </div>
-              <Badge variant="outline">{projectEnvironments.length}</Badge>
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{projectEnvironments.length}</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isProjectArchived}
+                  onclick={openEnvironmentCreateDialog}
+                >
+                  <Plus class="size-4" />
+                  {$t(i18nKeys.console.projects.environmentCreateAction)}
+                </Button>
+              </div>
             </div>
 
             <div class="grid gap-4 xl:grid-cols-2">
@@ -1553,7 +1940,27 @@
                           </p>
                         {/if}
                       </div>
-                      <div class="flex shrink-0 items-center gap-1">
+                      <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isProjectArchived || environment.lifecycleStatus !== "active"}
+                          onclick={() => openEnvironmentRenameDialog(environment)}
+                        >
+                          <Pencil class="size-4" />
+                          {$t(i18nKeys.console.projects.environmentRenameAction)}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isProjectArchived || environment.lifecycleStatus !== "active"}
+                          onclick={() => openEnvironmentCloneDialog(environment)}
+                        >
+                          <Copy class="size-4" />
+                          {$t(i18nKeys.console.projects.environmentCloneAction)}
+                        </Button>
                         {#if environment.lifecycleStatus === "locked"}
                           <Button
                             type="button"
@@ -1596,89 +2003,28 @@
                         </Button>
                       </div>
                     </div>
-                    {#if environment.lifecycleStatus === "active"}
-                      <div class="mt-5 grid gap-3">
-                        <form
-                          id={`environment-rename-form-${environment.id}`}
-                          class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-                          onsubmit={(event) => {
-                            event.preventDefault();
-                            renameEnvironment(environment.id);
-                          }}
-                        >
-                          <label class="sr-only" for={`environment-rename-name-${environment.id}`}>
-                            {$t(i18nKeys.console.projects.environmentRenameNameLabel)}
-                          </label>
-                          <Input
-                            id={`environment-rename-name-${environment.id}`}
-                            value={renameEnvironmentName(environment.id, environment.name)}
-                            placeholder={$t(
-                              i18nKeys.console.projects.environmentRenameNamePlaceholder,
-                            )}
-                            disabled={isProjectArchived || renameEnvironmentMutation.isPending}
-                            oninput={(event) =>
-                              setRenameEnvironmentName(
-                                environment.id,
-                                event.currentTarget.value,
-                              )}
-                          />
-                          <Button
-                            type="submit"
-                            variant="outline"
-                            aria-label={$t(i18nKeys.console.projects.environmentRenameAction)}
-                            title={$t(i18nKeys.console.projects.environmentRenameAction)}
-                            disabled={isProjectArchived ||
-                              renameEnvironmentMutation.isPending ||
-                              renameEnvironmentName(environment.id, environment.name).trim()
-                                .length === 0 ||
-                              renameEnvironmentName(environment.id, environment.name).trim() ===
-                                environment.name}
-                          >
-                            <Save class="size-4" />
-                            {$t(i18nKeys.console.projects.environmentRenameAction)}
-                          </Button>
-                        </form>
-                        <form
-                          id={`environment-clone-form-${environment.id}`}
-                          class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-                          onsubmit={(event) => {
-                            event.preventDefault();
-                            cloneEnvironment(environment.id);
-                          }}
-                        >
-                          <label class="sr-only" for={`environment-clone-name-${environment.id}`}>
-                            {$t(i18nKeys.console.projects.environmentCloneNameLabel)}
-                          </label>
-                          <Input
-                            id={`environment-clone-name-${environment.id}`}
-                            value={cloneEnvironmentName(environment.id)}
-                            placeholder={$t(
-                              i18nKeys.console.projects.environmentCloneNamePlaceholder,
-                            )}
-                            disabled={isProjectArchived || cloneEnvironmentMutation.isPending}
-                            oninput={(event) =>
-                              setCloneEnvironmentName(environment.id, event.currentTarget.value)}
-                          />
-                          <Button
-                            type="submit"
-                            variant="outline"
-                            aria-label={$t(i18nKeys.console.projects.environmentCloneAction)}
-                            title={$t(i18nKeys.console.projects.environmentCloneAction)}
-                            disabled={isProjectArchived ||
-                              cloneEnvironmentMutation.isPending ||
-                              cloneEnvironmentName(environment.id).trim().length === 0}
-                          >
-                            <Copy class="size-4" />
-                            {$t(i18nKeys.console.projects.environmentCloneAction)}
-                          </Button>
-                        </form>
-                      </div>
-                    {/if}
+                    <p class="mt-4 text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.projects.environmentManageDescription)}
+                    </p>
                   </article>
                 {/each}
               {:else}
-                <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground xl:col-span-2">
-                  {$t(i18nKeys.console.projects.noEnvironment)}
+                <div class="console-subtle-panel px-4 py-6 xl:col-span-2">
+                  <div class="flex items-start gap-3">
+                    <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
+                    <div class="space-y-2">
+                      <p class="text-sm font-medium">{$t(i18nKeys.console.projects.noEnvironment)}</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isProjectArchived}
+                        onclick={openEnvironmentCreateDialog}
+                      >
+                        <Plus class="size-4" />
+                        {$t(i18nKeys.console.projects.environmentCreateAction)}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -1728,11 +2074,15 @@
                       {#snippet children({ disabled })}
                         <Button
                           size="sm"
-                          href={projectQuickDeployHref(project.id)}
+                          href={primaryResource
+                            ? resourceNewDeploymentHref(primaryResource)
+                            : projectQuickDeployHref(project.id)}
                           disabled={disabled || isProjectArchived}
                         >
                           <Play class="size-4" />
-                          {$t(i18nKeys.common.actions.deploy)}
+                          {primaryResource
+                            ? $t(i18nKeys.common.actions.deploy)
+                            : $t(i18nKeys.console.projects.addResourceAction)}
                         </Button>
                       {/snippet}
                     </CapabilityGate>
@@ -1743,72 +2093,141 @@
           </section>
         </Tabs.Content>
 
-        <Tabs.Content value="settings" class="mt-0">
-          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <div class="console-panel space-y-4 p-5">
+        <Tabs.Content value="activity" class="mt-0">
+          <section class="console-panel space-y-5 p-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <h2 class="text-lg font-semibold">
-                    {$t(i18nKeys.console.projects.settingsTitle)}
-                  </h2>
-                  <DocsHelpLink
-                    href={webDocsHrefs.projectLifecycle}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
-                  />
-                </div>
-                <p class="text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.projects.settingsDescription)}
+                <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.activityTitle)}</h2>
+                <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.projects.activityDescription)}
                 </p>
               </div>
+              <Badge variant="outline">later phase</Badge>
+            </div>
 
-              {#if lifecycleFeedback}
-                <div
-                  class={`rounded-md border px-3 py-2 text-sm ${
-                    lifecycleFeedback.kind === "success"
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-destructive/20 bg-destructive/5 text-destructive"
-                  }`}
-                >
-                  <p class="font-medium">{lifecycleFeedback.title}</p>
-                  <p class="mt-1 opacity-80">{lifecycleFeedback.detail}</p>
+            <div class="console-subtle-panel px-4 py-6">
+              <div class="flex items-start gap-3">
+                <Search class="mt-0.5 size-4 text-muted-foreground" />
+                <div class="space-y-2">
+                  <p class="text-sm font-medium">
+                    {$t(i18nKeys.console.projects.activityGapTitle)}
+                  </p>
+                  <p class="max-w-2xl text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.activityGapDescription)}
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <Button href={projectTabHref("resources")} size="sm" variant="outline">
+                      {$t(i18nKeys.common.domain.resources)}
+                    </Button>
+                    <Button href={projectTabHref("deployments")} size="sm" variant="outline">
+                      {$t(i18nKeys.common.domain.deployments)}
+                    </Button>
+                  </div>
                 </div>
-              {/if}
+              </div>
+            </div>
+          </section>
+        </Tabs.Content>
 
-              <form
-                id="project-rename-form"
-                class="grid gap-3 sm:grid-cols-[minmax(0,22rem)_auto] sm:items-end"
-                onsubmit={(event) => {
-                  event.preventDefault();
-                  renameProject();
-                }}
-              >
-                <label class="grid gap-1 text-sm" for="project-name">
-                  <span class="font-medium">{$t(i18nKeys.console.projects.renameLabel)}</span>
-                  <Input
-                    id="project-name"
-                    bind:value={projectName}
-                    autocomplete="off"
-                    disabled={isProjectArchived || renameProjectMutation.isPending}
-                  />
-                </label>
+        <Tabs.Content value="settings" class="mt-0">
+          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div class="space-y-4">
+              <section class="console-panel space-y-4 p-5">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.projects.generalSettingsTitle)}
+                    </h2>
+                    <DocsHelpLink
+                      href={webDocsHrefs.projectLifecycle}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
+                    />
+                  </div>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.projects.settingsDescription)}
+                  </p>
+                </div>
+
+                {#if lifecycleFeedback}
+                  <div
+                    class={`rounded-md border px-3 py-2 text-sm ${
+                      lifecycleFeedback.kind === "success"
+                        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                        : "border-destructive/20 bg-destructive/5 text-destructive"
+                    }`}
+                  >
+                    <p class="font-medium">{lifecycleFeedback.title}</p>
+                    <p class="mt-1 opacity-80">{lifecycleFeedback.detail}</p>
+                  </div>
+                {/if}
+
+                <dl class="grid gap-4 sm:grid-cols-2">
+                  <div class="rounded-md border bg-background p-3">
+                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {$t(i18nKeys.console.projects.renameLabel)}
+                    </dt>
+                    <dd class="mt-1 truncate text-sm font-medium">{project.name}</dd>
+                  </div>
+                  <div class="rounded-md border bg-background p-3">
+                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {$t(i18nKeys.console.projects.settingsSlugLabel)}
+                    </dt>
+                    <dd class="mt-1 truncate font-mono text-sm">{project.slug}</dd>
+                  </div>
+                  <div class="rounded-md border bg-background p-3 sm:col-span-2">
+                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      ID
+                    </dt>
+                    <dd class="mt-1 break-all font-mono text-sm">{project.id}</dd>
+                  </div>
+                  <div class="rounded-md border bg-background p-3 sm:col-span-2">
+                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {$t(i18nKeys.console.projects.settingsDescriptionLabel)}
+                    </dt>
+                    <dd class="mt-1 text-sm">
+                      {project.description ?? $t(i18nKeys.console.projects.noDescription)}
+                    </dd>
+                  </div>
+                </dl>
+
                 <CapabilityGate
                   operationKey="projects.rename"
                   resourceRefs={{ projectId: project.id }}
                 >
                   {#snippet children({ disabled })}
                     <Button
-                      type="submit"
+                      type="button"
                       variant="outline"
-                      disabled={disabled || !canRenameProject || renameProjectMutation.isPending}
+                      disabled={disabled || isProjectArchived}
+                      onclick={openProjectRenameDialog}
                     >
-                      <Save class="size-4" />
-                      {renameProjectMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
+                      <Pencil class="size-4" />
+                      {$t(i18nKeys.console.projects.settingsEditProjectAction)}
                     </Button>
                   {/snippet}
                 </CapabilityGate>
-              </form>
+              </section>
+
+              <section class="console-panel space-y-4 p-5">
+                <div class="space-y-1">
+                  <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.lifecycleTitle)}</h2>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.projects.settingsLifecycleDescription)}
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant={isProjectArchived ? "destructive" : "secondary"}>
+                    {isProjectArchived
+                      ? $t(i18nKeys.console.projects.archived)
+                      : $t(i18nKeys.console.projects.active)}
+                  </Badge>
+                  {#if project.archivedAt}
+                    <span class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
+                    </span>
+                  {/if}
+                </div>
+              </section>
             </div>
 
             <aside class="console-side-panel space-y-4 border-destructive/25 bg-destructive/5">
@@ -1912,6 +2331,189 @@
             stateModal="quick-deploy"
           />
         </div>
+      </Dialog.Content>
+    </Dialog.Root>
+
+    <Dialog.Root bind:open={projectRenameDialogOpen}>
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.projects.settingsEditProjectAction)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.projects.settingsDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <form
+          class="space-y-5 px-5 pb-5"
+          onsubmit={(event) => {
+            event.preventDefault();
+            renameProject();
+          }}
+        >
+          <label class="grid gap-1 text-sm" for="project-rename-dialog-name">
+            <span class="font-medium">{$t(i18nKeys.console.projects.renameLabel)}</span>
+            <Input
+              id="project-rename-dialog-name"
+              bind:value={projectName}
+              autocomplete="off"
+              disabled={isProjectArchived || renameProjectMutation.isPending}
+            />
+          </label>
+          <div class="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onclick={() => {
+                projectRenameDialogOpen = false;
+              }}
+            >
+              {$t(i18nKeys.common.actions.cancel)}
+            </Button>
+            <CapabilityGate
+              operationKey="projects.rename"
+              resourceRefs={{ projectId: project.id }}
+            >
+              {#snippet children({ disabled })}
+                <Button
+                  type="submit"
+                  disabled={disabled || !canRenameProject || renameProjectMutation.isPending}
+                >
+                  <Save class="size-4" />
+                  {renameProjectMutation.isPending
+                    ? $t(i18nKeys.common.actions.saving)
+                    : $t(i18nKeys.common.actions.save)}
+                </Button>
+              {/snippet}
+            </CapabilityGate>
+          </div>
+        </form>
+      </Dialog.Content>
+    </Dialog.Root>
+
+    <Dialog.Root bind:open={environmentCreateDialogOpen}>
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.projects.environmentCreateTitle)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.projects.environmentCreateDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <div class="px-5 pb-5">
+          <EnvironmentCreateForm
+            projectId={project.id}
+            panel={false}
+            showIntro={false}
+            idPrefix="project-environment-create"
+            onCreated={closeEnvironmentCreateDialog}
+          />
+        </div>
+      </Dialog.Content>
+    </Dialog.Root>
+
+    <Dialog.Root bind:open={environmentRenameDialogOpen}>
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.projects.environmentRenameAction)}</Dialog.Title>
+          <Dialog.Description>
+            {selectedEnvironment?.name ?? $t(i18nKeys.common.domain.environment)}
+          </Dialog.Description>
+        </Dialog.Header>
+        {#if selectedEnvironment}
+          <form
+            class="space-y-5 px-5 pb-5"
+            onsubmit={(event) => {
+              event.preventDefault();
+              renameEnvironment(selectedEnvironment.id);
+            }}
+          >
+            <label class="grid gap-1 text-sm" for="environment-rename-dialog-name">
+              <span class="font-medium">
+                {$t(i18nKeys.console.projects.environmentRenameNameLabel)}
+              </span>
+              <Input
+                id="environment-rename-dialog-name"
+                value={renameEnvironmentName(selectedEnvironment.id, selectedEnvironment.name)}
+                placeholder={$t(i18nKeys.console.projects.environmentRenameNamePlaceholder)}
+                disabled={isProjectArchived || renameEnvironmentMutation.isPending}
+                oninput={(event) =>
+                  setRenameEnvironmentName(selectedEnvironment.id, event.currentTarget.value)}
+              />
+            </label>
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => {
+                  environmentRenameDialogOpen = false;
+                }}
+              >
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canRenameSelectedEnvironment || renameEnvironmentMutation.isPending}
+              >
+                <Save class="size-4" />
+                {renameEnvironmentMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.common.actions.save)}
+              </Button>
+            </div>
+          </form>
+        {/if}
+      </Dialog.Content>
+    </Dialog.Root>
+
+    <Dialog.Root bind:open={environmentCloneDialogOpen}>
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.projects.environmentCloneAction)}</Dialog.Title>
+          <Dialog.Description>
+            {selectedEnvironment?.name ?? $t(i18nKeys.common.domain.environment)}
+          </Dialog.Description>
+        </Dialog.Header>
+        {#if selectedEnvironment}
+          <form
+            class="space-y-5 px-5 pb-5"
+            onsubmit={(event) => {
+              event.preventDefault();
+              cloneEnvironment(selectedEnvironment.id);
+            }}
+          >
+            <label class="grid gap-1 text-sm" for="environment-clone-dialog-name">
+              <span class="font-medium">
+                {$t(i18nKeys.console.projects.environmentCloneNameLabel)}
+              </span>
+              <Input
+                id="environment-clone-dialog-name"
+                value={cloneEnvironmentName(selectedEnvironment.id)}
+                placeholder={$t(i18nKeys.console.projects.environmentCloneNamePlaceholder)}
+                disabled={isProjectArchived || cloneEnvironmentMutation.isPending}
+                oninput={(event) =>
+                  setCloneEnvironmentName(selectedEnvironment.id, event.currentTarget.value)}
+              />
+            </label>
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => {
+                  environmentCloneDialogOpen = false;
+                }}
+              >
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canCloneSelectedEnvironment || cloneEnvironmentMutation.isPending}
+              >
+                <Copy class="size-4" />
+                {cloneEnvironmentMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.projects.environmentCloneAction)}
+              </Button>
+            </div>
+          </form>
+        {/if}
       </Dialog.Content>
     </Dialog.Root>
   {/if}
