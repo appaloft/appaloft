@@ -794,8 +794,6 @@ export const enUS = {
         "These are the replicas observed by the heartbeat read model after one worker service is scaled with replicas.",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
-      workerRuntimeClaimedBy: "Recent claimant",
-      workerRuntimeClaimedByEmpty: "No claimed worker recorded",
       workerRuntimeGroup: "group",
       workerRuntimeHeartbeat: "Worker heartbeat",
       workerRuntimeLastSeen: "last seen",
