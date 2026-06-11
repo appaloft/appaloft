@@ -9,4 +9,5 @@
 - [x] Correct generated CLI monitoring command strings to `appaloft work ...`.
 - [x] Add tests covering Instance durable worker runtime copy/readback, heartbeat summary, and
   generated command names.
+- [x] Add external worker-group observation for Web/API processes that do not execute durable work.
 - [ ] Add dedicated Cloud/Enterprise worker process packaging follow-up.

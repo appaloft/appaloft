@@ -6424,6 +6424,13 @@ export const maintenanceWorkerRuntimeTopologySchema = z.object({
     .optional(),
 });
 
+export const maintenanceWorkerObservedRuntimeHeartbeatSchema = z.object({
+  workerGroup: z.string(),
+  workerCount: z.number().int().nonnegative(),
+  workerIds: z.array(z.string()),
+  heartbeat: maintenanceWorkerRuntimeTopologySchema.shape.heartbeat,
+});
+
 export const maintenanceWorkerStatusSchema = z.object({
   key: z.enum([
     "certificate-retry-scheduler",
@@ -6444,6 +6451,7 @@ export const maintenanceWorkerStatusSchema = z.object({
   defaultRetryDelaySeconds: z.number().int().positive().optional(),
   rawRetentionHours: z.number().int().positive().optional(),
   runtimeTopology: maintenanceWorkerRuntimeTopologySchema.optional(),
+  observedRuntimeHeartbeats: z.array(maintenanceWorkerObservedRuntimeHeartbeatSchema).optional(),
   configurationKeys: z.array(z.string()),
   operationKeys: z.array(z.string()),
 });

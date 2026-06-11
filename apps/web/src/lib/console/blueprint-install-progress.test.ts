@@ -110,4 +110,48 @@ describe("Blueprint install progress helpers", () => {
       },
     ]);
   });
+
+  test("[CLOUD-BLUEPRINT-QD-032] treats rollback-required install readback as failed even without deployment ids", () => {
+    const snapshot: BlueprintInstallProgressSnapshot = {
+      schemaVersion: "appaloft.cloud.installed-application.command-result/v1",
+      applicationId: "cia_failed",
+      executionStatus: "rollback-required",
+      monitoring: {
+        workId: "dw_blueprint_install_cia_failed",
+        deploymentIds: [],
+      },
+      installedApplication: {
+        applicationId: "cia_failed",
+        status: "rollback-required",
+        components: [
+          {
+            resource: { resourceId: "res_failed" },
+            deployment: { status: "planned", reason: "blueprint-install" },
+            endpoints: [],
+          },
+        ],
+      },
+      progress: {
+        status: "rollback-required",
+        userStatus: "failed",
+        currentStep: "rollback-required",
+        message: "Blueprint install failed before deployment creation.",
+        deploymentIds: [],
+        operatorWorkId: "dw_blueprint_install_cia_failed",
+      },
+    };
+
+    expect(summarizeBlueprintInstallProgress(snapshot)).toMatchObject({
+      applicationId: "cia_failed",
+      executionStatus: "rollback-required",
+      userStatus: "failed",
+      terminalStatus: "failed",
+      operatorWorkId: "dw_blueprint_install_cia_failed",
+      deploymentIds: [],
+      deploymentId: "",
+      resourceId: "res_failed",
+      currentStep: "rollback-required",
+      failureReason: "rollback-required",
+    });
+  });
 });

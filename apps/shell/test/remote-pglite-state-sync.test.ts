@@ -112,6 +112,7 @@ function testConfig(
       workerCount: 1,
       workerGroup: "appaloft-worker",
     },
+    workerRuntimeObservedGroups: [],
     enabledSystemPlugins: [],
   };
 }

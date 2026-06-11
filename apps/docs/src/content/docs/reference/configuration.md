@@ -38,7 +38,8 @@ authority。Temporal、Kafka 或其他外部 workflow engine 必须通过 adapte
 `operator-work.*` query 投影安全的 durable-work 和 process-attempt 进度。
 
 `appaloft doctor`、`GET /api/system/doctor` 和 Web Instance 页面会报告配置的 mode、queue backend、
-worker group、worker ids 和 coordinator role。
+worker group、worker ids 和 coordinator role。Web/API 进程不执行 durable work 时，也可以通过
+`APPALOFT_WORKER_OBSERVED_GROUPS` 观测独立 worker group。
 
 | 变量 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -47,6 +48,7 @@ worker group、worker ids 和 coordinator role。
 | `APPALOFT_WORKER_COUNT` | `1` | 配置的 worker slots 数。启用模式至少需要 1 个；`disabled` 可设为 `0`。 |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | 稳定 worker group，用来生成 worker ids 并协调容量。 |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | `APPALOFT_WORKER_QUEUE_BACKEND=external` 时必填；public 支持值为 `kafka`、`temporal`、`custom`。 |
+| `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | 逗号分隔的 `worker-group:count` 列表。doctor 和 Web Instance 页面会从 durable worker 心跳 read model 读取这些 group，即使当前 Web/API 进程配置为 `APPALOFT_WORKER_RUNTIME_MODE=disabled`。 |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | PostgreSQL runtime 每个进程最多保留的连接数。多 Web/worker 进程共享较小 session pool 时应按进程数降低这个值。 |
 
 <h2 id="reference-scheduled-workers">Scheduled workers</h2>

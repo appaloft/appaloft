@@ -76,6 +76,11 @@ export interface WorkerRuntimeConfig {
   externalBackendKind?: ExternalWorkerBackendKind;
 }
 
+export interface ObservedWorkerRuntimeGroupConfig {
+  workerGroup: string;
+  workerCount: number;
+}
+
 export interface PreviewCleanupRetrySchedulerConfig {
   enabled: boolean;
   intervalSeconds: number;
@@ -199,6 +204,7 @@ export interface AppConfig {
   scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
   runtimeMonitoringCollectorRunner: RuntimeMonitoringCollectorRunnerConfig;
   workerRuntime: WorkerRuntimeConfig;
+  workerRuntimeObservedGroups: ObservedWorkerRuntimeGroupConfig[];
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -306,6 +312,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> & { databasePoolMax
     workerCount: 1,
     workerGroup: "appaloft-worker",
   },
+  workerRuntimeObservedGroups: [],
   enabledSystemPlugins: [],
 };
 
@@ -439,6 +446,34 @@ function parseStringList(value: readonly string[] | string | undefined): string[
     .filter((item: string) => item.length > 0);
 
   return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+}
+
+function parseObservedWorkerRuntimeGroups(
+  value: readonly ObservedWorkerRuntimeGroupConfig[] | readonly string[] | string | undefined,
+): ObservedWorkerRuntimeGroupConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const items: readonly (ObservedWorkerRuntimeGroupConfig | string)[] =
+    typeof value === "string" ? value.split(",") : value;
+  const groups = new Map<string, ObservedWorkerRuntimeGroupConfig>();
+
+  for (const item of items) {
+    const workerGroup =
+      typeof item === "string" ? item.split(":")[0]?.trim() : item.workerGroup.trim();
+    const rawCount =
+      typeof item === "string" ? item.split(":").slice(1).join(":").trim() : item.workerCount;
+    const workerCount = parseNonNegativeInteger(rawCount);
+
+    if (!workerGroup || workerCount === undefined) {
+      continue;
+    }
+
+    groups.set(workerGroup, { workerGroup, workerCount });
+  }
+
+  return groups.size > 0 ? [...groups.values()] : undefined;
 }
 
 function defaultBetterAuthCallbackUrl(baseUrl: string, path: string): string | undefined {
@@ -739,6 +774,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const workerRuntimeExternalBackendKind =
     parseExternalWorkerBackendKind(env.APPALOFT_WORKER_EXTERNAL_BACKEND_KIND) ??
     workerRuntime.externalBackendKind;
+  const workerRuntimeObservedGroups =
+    parseObservedWorkerRuntimeGroups(source.flags?.workerRuntimeObservedGroups) ??
+    parseObservedWorkerRuntimeGroups(env.APPALOFT_WORKER_OBSERVED_GROUPS) ??
+    parseObservedWorkerRuntimeGroups(fileConfig.workerRuntimeObservedGroups) ??
+    defaults.workerRuntimeObservedGroups;
   const dockerSwarmExecutionEnabled =
     parseBoolean(env.APPALOFT_DOCKER_SWARM_EXECUTION_ENABLED) ?? dockerSwarmExecution.enabled;
   const dockerSwarmExecutionCommandTimeoutMs =
@@ -1301,6 +1341,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
         ? { externalBackendKind: workerRuntimeExternalBackendKind }
         : {}),
     },
+    workerRuntimeObservedGroups,
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),
   };

@@ -119,7 +119,6 @@ import {
   type RepositoryContext,
   type TraceAttributes,
 } from "./execution-context";
-import { type StorageBackupProviderRegistryPort } from "./operations/storage-volumes/storage-volume-backup-contract";
 import {
   type AppliedRouteContextMetadata,
   type ResourceAccessFailureDiagnostic,
@@ -199,6 +198,13 @@ export interface MaintenanceWorkerRuntimeHeartbeat {
   workers: MaintenanceWorkerRuntimeHeartbeatWorker[];
 }
 
+export interface MaintenanceWorkerObservedRuntimeHeartbeat {
+  workerGroup: string;
+  workerCount: number;
+  workerIds: string[];
+  heartbeat?: MaintenanceWorkerRuntimeHeartbeat;
+}
+
 export interface MaintenanceWorkerStatus {
   key: MaintenanceWorkerKey;
   label: string;
@@ -210,6 +216,7 @@ export interface MaintenanceWorkerStatus {
   defaultRetryDelaySeconds?: number;
   rawRetentionHours?: number;
   runtimeTopology?: MaintenanceWorkerRuntimeTopology;
+  observedRuntimeHeartbeats?: MaintenanceWorkerObservedRuntimeHeartbeat[];
   configurationKeys: string[];
   operationKeys: string[];
 }

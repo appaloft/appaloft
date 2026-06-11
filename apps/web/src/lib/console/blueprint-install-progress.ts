@@ -117,6 +117,9 @@ export function summarizeBlueprintInstallProgress(
     snapshot?.progress?.failure?.code ??
     snapshot?.installedApplication?.executionFailure?.reason ??
     snapshot?.installedApplication?.executionFailure?.code ??
+    (blueprintInstallTerminalFailureStatuses.has(normalizedExecutionStatus)
+      ? normalizedExecutionStatus
+      : "") ??
     "";
   const terminalStatus =
     failureReason ||
