@@ -262,7 +262,7 @@
     maintenanceWorkers.find((worker) => worker.key === "durable-worker-runtime") ?? null,
   );
   const durableRuntimeTopology = $derived(durableWorker?.runtimeTopology ?? null);
-  const durableRuntimeNeedsStandaloneClarification = $derived(
+  const durableRuntimeWebExecutionDisabled = $derived(
     durableRuntimeTopology?.mode === "disabled" ||
       durableRuntimeTopology?.coordinationRole === "disabled" ||
       durableRuntimeTopology?.workerCount === 0,
@@ -270,6 +270,27 @@
   const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
   const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
   const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
+  const latestClaimedWorker = $derived.by(() => {
+    const eventWorker = [...selectedOperatorWorkEvents]
+      .reverse()
+      .find((event) => event.workerId || event.workerGroup);
+    if (eventWorker?.workerId) {
+      return eventWorker.workerGroup
+        ? `${eventWorker.workerGroup} · ${eventWorker.workerId}`
+        : eventWorker.workerId;
+    }
+    if (eventWorker?.workerGroup) {
+      return eventWorker.workerGroup;
+    }
+    const selectedClaimedBy = selectedOperatorWork?.safeDetails?.claimedBy;
+    if (typeof selectedClaimedBy === "string" && selectedClaimedBy.trim()) {
+      return selectedClaimedBy;
+    }
+    const listClaimedBy = operatorWorkItems
+      .map((work) => work.safeDetails?.claimedBy)
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    return listClaimedBy ?? "";
+  });
   const enabledMaintenanceWorkerCount = $derived(
     maintenanceWorkers.filter((worker) => worker.enabled).length,
   );
@@ -859,7 +880,16 @@ server-config-deploy: true`);
                     </div>
 
                     <div class="mt-4 rounded-md border bg-muted/20 p-4">
-                      <div class="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
+                      <div class="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]">
+                        <div>
+                          <p class="text-xs uppercase text-muted-foreground">
+                            {$t(i18nKeys.console.instance.workerRuntimeClaimedBy)}
+                          </p>
+                          <p class="mt-1 break-all font-mono text-sm">
+                            {latestClaimedWorker ||
+                              $t(i18nKeys.console.instance.workerRuntimeClaimedByEmpty)}
+                          </p>
+                        </div>
                         <div>
                           <p class="text-xs uppercase text-muted-foreground">
                             {$t(i18nKeys.console.instance.workerRuntimeGroup)}
@@ -877,14 +907,12 @@ server-config-deploy: true`);
                           </p>
                         </div>
                       </div>
+                      {#if durableRuntimeWebExecutionDisabled}
+                        <p class="mt-3 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.instance.workerRuntimeWebDisabledHint)}
+                        </p>
+                      {/if}
                     </div>
-
-                    {#if durableRuntimeNeedsStandaloneClarification}
-                      <div class="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-900 dark:text-amber-100">
-                        <p>{$t(i18nKeys.console.instance.workerRuntimeWebDisabledHint)}</p>
-                        <p class="mt-2">{$t(i18nKeys.console.instance.workerRuntimeStandaloneHint)}</p>
-                      </div>
-                    {/if}
 
                     {#if durableRuntimeTopology.heartbeat}
                       <div class="mt-4 space-y-3">
