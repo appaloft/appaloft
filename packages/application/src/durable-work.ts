@@ -33,6 +33,7 @@ export interface DurableWorkRuntimeConfig {
   readonly queueBackend: DurableWorkQueueBackend;
   readonly workerCount: number;
   readonly workerGroup: string;
+  readonly workerSlot?: number;
   readonly externalBackendKind?: DurableWorkExternalBackendKind;
 }
 
@@ -50,6 +51,7 @@ export interface DurableWorkWorkerHeartbeatRecord {
   readonly slot: number;
   readonly mode: DurableWorkRuntimeMode;
   readonly queueBackend: DurableWorkQueueBackend;
+  readonly leaseOwnerId?: string;
   readonly processStartedAt: string;
   readonly lastSeenAt: string;
   readonly status: DurableWorkWorkerHeartbeatStatus;
@@ -57,17 +59,35 @@ export interface DurableWorkWorkerHeartbeatRecord {
 
 export interface DurableWorkWorkerHeartbeatFilter {
   readonly workerGroup?: string;
+  readonly status?: DurableWorkWorkerHeartbeatStatus;
   readonly limit?: number;
 }
 
+export interface DurableWorkWorkerSlotClaimInput {
+  readonly workerGroup: string;
+  readonly workerCount: number;
+  readonly leaseOwnerId: string;
+  readonly workerId: string;
+  readonly mode: DurableWorkRuntimeMode;
+  readonly queueBackend: DurableWorkQueueBackend;
+  readonly processStartedAt: string;
+  readonly lastSeenAt: string;
+  readonly staleBefore: string;
+}
+
 export interface DurableWorkWorkerHeartbeatStore {
+  claimWorkerSlot(
+    context: RepositoryContext,
+    input: DurableWorkWorkerSlotClaimInput,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord | null>>;
   recordHeartbeat(
     context: RepositoryContext,
     heartbeat: DurableWorkWorkerHeartbeatRecord,
   ): Promise<Result<DurableWorkWorkerHeartbeatRecord>>;
   markStopped(
     context: RepositoryContext,
-    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt"> &
+      Pick<Partial<DurableWorkWorkerHeartbeatRecord>, "leaseOwnerId">,
   ): Promise<Result<void>>;
   listHeartbeats(
     context: RepositoryContext,
@@ -82,6 +102,7 @@ export interface DurableWorkTopology {
   readonly expectedWorkerCount: number;
   readonly workers: readonly DurableWorkWorkerIdentity[];
   readonly coordinationRole: "coordinator" | "worker" | "disabled";
+  readonly slotAssignment: "all-local" | "explicit" | "leased" | "none";
 }
 
 export interface DurableWorkQueueAdapter
@@ -470,6 +491,28 @@ export function createDurableWorkTopology(
     );
   }
 
+  if (config.workerSlot !== undefined) {
+    if (!Number.isInteger(config.workerSlot) || config.workerSlot < 1) {
+      return err(
+        domainError.validation("Durable work worker slot must be a positive integer", {
+          phase: "durable-work-topology",
+          field: "workerSlot",
+        }),
+      );
+    }
+
+    if (config.workerSlot > config.workerCount) {
+      return err(
+        domainError.validation("Durable work worker slot cannot exceed worker count", {
+          phase: "durable-work-topology",
+          field: "workerSlot",
+          workerSlot: config.workerSlot,
+          workerCount: config.workerCount,
+        }),
+      );
+    }
+  }
+
   if (config.queueBackend === "external" && !config.externalBackendKind) {
     return err(
       domainError.validation("External durable work queue backend requires a backend kind", {
@@ -489,23 +532,68 @@ export function createDurableWorkTopology(
     );
   }
 
-  const workers =
+  const slotAssignment =
     config.mode === "disabled"
+      ? "none"
+      : config.workerSlot !== undefined
+        ? "explicit"
+        : config.mode === "standalone"
+          ? "leased"
+          : "all-local";
+  const workers =
+    config.mode === "disabled" || slotAssignment === "leased"
       ? []
-      : Array.from({ length: config.workerCount }, (_, index) => ({
-          workerId: `${workerGroup}-${index + 1}`,
-          workerGroup,
-          slot: index + 1,
-        }));
+      : Array.from(
+          config.workerSlot === undefined ? { length: config.workerCount } : [config.workerSlot],
+          (slotOrUnused, index) => {
+            const slot = config.workerSlot === undefined ? index + 1 : (slotOrUnused as number);
+            return {
+              workerId: `${workerGroup}-${slot}`,
+              workerGroup,
+              slot,
+            };
+          },
+        );
 
   return ok({
     mode: config.mode,
     queueBackend: config.queueBackend,
     workerGroup,
-    expectedWorkerCount: workers.length,
+    expectedWorkerCount: config.mode === "disabled" ? 0 : config.workerCount,
     workers,
-    coordinationRole: config.mode === "disabled" ? "disabled" : "coordinator",
+    coordinationRole:
+      config.mode === "disabled"
+        ? "disabled"
+        : slotAssignment === "all-local"
+          ? "coordinator"
+          : "worker",
+    slotAssignment,
   });
+}
+
+export function createDurableWorkWorkerIds(input: {
+  readonly mode: DurableWorkRuntimeMode;
+  readonly workerGroup: string;
+  readonly workerCount: number;
+}): string[] {
+  return input.mode === "disabled"
+    ? []
+    : Array.from({ length: input.workerCount }, (_, index) => `${input.workerGroup}-${index + 1}`);
+}
+
+export function createDurableWorkLocalWorkerIds(
+  config: Pick<DurableWorkRuntimeConfig, "mode" | "workerGroup" | "workerCount" | "workerSlot">,
+): string[] {
+  if (config.mode === "disabled") {
+    return [];
+  }
+  if (config.workerSlot !== undefined) {
+    return [`${config.workerGroup}-${config.workerSlot}`];
+  }
+  if (config.mode === "standalone") {
+    return [];
+  }
+  return createDurableWorkWorkerIds(config);
 }
 
 export function describeDurableWorkQueueBackend(

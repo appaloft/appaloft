@@ -1,4 +1,5 @@
 import {
+  createDurableWorkLocalWorkerIds,
   createDurableWorkTopology,
   type DurableWorkWorkerHeartbeatStore,
   type ExecutionContextFactory,
@@ -74,6 +75,12 @@ function activation(enabled: boolean): MaintenanceWorkerActivation {
   return enabled ? "starts-with-backend-service" : "disabled-by-config";
 }
 
+function heartbeatWorkerIds(heartbeat?: MaintenanceWorkerRuntimeHeartbeat): string[] {
+  return [...new Set((heartbeat?.workers ?? []).map((worker) => worker.workerId))].sort(
+    (left, right) => left.localeCompare(right),
+  );
+}
+
 function status(input: {
   key: MaintenanceWorkerStatus["key"];
   label: string;
@@ -118,27 +125,24 @@ async function durableWorkerRuntimeStatus(
 ): Promise<MaintenanceWorkerStatus> {
   const { workerRuntime } = config;
   const topology = createDurableWorkTopology(workerRuntime);
-  const workerIds = topology.isOk()
+  const localWorkerIds = topology.isOk()
     ? topology.value.workers.map((worker) => worker.workerId)
-    : Array.from(
-        { length: workerRuntime.mode === "disabled" ? 0 : workerRuntime.workerCount },
-        (_, index) => `${workerRuntime.workerGroup}-${index + 1}`,
-      );
+    : createDurableWorkLocalWorkerIds(workerRuntime);
   const enabled = workerRuntime.mode !== "disabled";
   const heartbeat =
     enabled && heartbeatProvider ? await heartbeatProvider(workerRuntime.workerGroup) : undefined;
   const observedRuntimeHeartbeats = heartbeatProvider
     ? (
         await Promise.all(
-          config.workerRuntimeObservedGroups.map(async (observed) => ({
-            workerGroup: observed.workerGroup,
-            workerCount: observed.workerCount,
-            workerIds: Array.from(
-              { length: observed.workerCount },
-              (_, index) => `${observed.workerGroup}-${index + 1}`,
-            ),
-            heartbeat: await heartbeatProvider(observed.workerGroup),
-          })),
+          config.workerRuntimeObservedGroups.map(async (observed) => {
+            const observedHeartbeat = await heartbeatProvider(observed.workerGroup);
+            return {
+              workerGroup: observed.workerGroup,
+              workerCount: observed.workerCount,
+              workerIds: heartbeatWorkerIds(observedHeartbeat),
+              heartbeat: observedHeartbeat,
+            };
+          }),
         )
       ).map((observed) => ({
         workerGroup: observed.workerGroup,
@@ -149,10 +153,7 @@ async function durableWorkerRuntimeStatus(
     : config.workerRuntimeObservedGroups.map((observed) => ({
         workerGroup: observed.workerGroup,
         workerCount: observed.workerCount,
-        workerIds: Array.from(
-          { length: observed.workerCount },
-          (_, index) => `${observed.workerGroup}-${index + 1}`,
-        ),
+        workerIds: [],
       }));
 
   return status({
@@ -166,10 +167,12 @@ async function durableWorkerRuntimeStatus(
     runtimeTopology: {
       mode: workerRuntime.mode,
       queueBackend: workerRuntime.queueBackend,
-      workerCount: workerIds.length,
+      workerCount: localWorkerIds.length,
       workerGroup: workerRuntime.workerGroup,
-      workerIds,
+      workerIds: localWorkerIds,
       coordinationRole: topology.isOk() ? topology.value.coordinationRole : "disabled",
+      ...(topology.isOk() ? { slotAssignment: topology.value.slotAssignment } : {}),
+      ...(workerRuntime.workerSlot !== undefined ? { workerSlot: workerRuntime.workerSlot } : {}),
       ...(heartbeat ? { heartbeat } : {}),
       ...(workerRuntime.externalBackendKind
         ? { externalBackendKind: workerRuntime.externalBackendKind }
@@ -181,6 +184,7 @@ async function durableWorkerRuntimeStatus(
       "APPALOFT_WORKER_QUEUE_BACKEND",
       "APPALOFT_WORKER_COUNT",
       "APPALOFT_WORKER_GROUP",
+      "APPALOFT_WORKER_SLOT",
       "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
       "APPALOFT_WORKER_OBSERVED_GROUPS",
     ],

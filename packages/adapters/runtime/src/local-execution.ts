@@ -2532,6 +2532,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         dockerfilePath: relativeDockerfilePath,
         services,
         defaultPort: state.runtimePlan.execution.port ?? 3000,
+        ...(input.environment ? { environment: input.environment } : {}),
       }),
     );
 

@@ -1114,6 +1114,7 @@ export interface DurableWorkerHeartbeatsTable {
   slot: number;
   mode: string;
   queue_backend: string;
+  lease_owner_id: string | null;
   process_started_at: string;
   last_seen_at: string;
   status: string;
