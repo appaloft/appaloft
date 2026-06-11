@@ -799,15 +799,6 @@ export async function createAppaloftServer(
       throw new Error(bootstrapDeployTokenOutput.error.message);
     }
   }
-  const bootstrapFirstAdminOutput = await writeBootstrapFirstAdminOutput({
-    config,
-    commandBus,
-    queryBus,
-    executionContextFactory,
-  });
-  if (bootstrapFirstAdminOutput.isErr()) {
-    throw new Error(bootstrapFirstAdminOutput.error.message);
-  }
   const pluginRuntime = resolveToken<LocalPluginHost>(childContainer, tokens.pluginRegistry);
   const requestContextRunner = resolveToken<RequestContextRunner>(
     childContainer,
@@ -1020,8 +1011,26 @@ export async function createAppaloftServer(
   });
 
   let started = false;
+  let firstAdminBootstrapChecked = false;
   let workerRuntimeStarted = false;
   let serverHandle: AppaloftHttpServerHandle | null = null;
+
+  const bootstrapFirstAdminForHttpServer = async (): Promise<void> => {
+    if (firstAdminBootstrapChecked) {
+      return;
+    }
+
+    firstAdminBootstrapChecked = true;
+    const bootstrapFirstAdminOutput = await writeBootstrapFirstAdminOutput({
+      config,
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+    if (bootstrapFirstAdminOutput.isErr()) {
+      throw new Error(bootstrapFirstAdminOutput.error.message);
+    }
+  };
 
   const startWorkerRuntime = async (): Promise<void> => {
     if (workerRuntimeStarted) {
@@ -1056,6 +1065,8 @@ export async function createAppaloftServer(
     if (started) {
       return;
     }
+
+    await bootstrapFirstAdminForHttpServer();
 
     serverHandle = startAppaloftHttpServer({
       hostname: config.httpHost,

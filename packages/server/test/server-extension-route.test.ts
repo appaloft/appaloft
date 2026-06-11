@@ -7,9 +7,11 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type AppQuery,
   type CommandBus,
   operationCatalog,
   PublishStaticArtifactCommand,
+  type QueryBus,
   type TerminalSession,
   type TerminalSessionGateway,
   tokens,
@@ -31,6 +33,49 @@ async function createTempDataDir(): Promise<string> {
 }
 
 describe("createAppaloftServer", () => {
+  test("[FIRST-ADMIN-BOOTSTRAP-008] worker composition skips installer first-admin bootstrap readback", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        firstAdminEmail: "admin@example.com",
+        firstAdminPassword: "startup-admin-password",
+        httpHost: "localhost",
+        httpPort: 3001,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+        workerRuntime: {
+          mode: "disabled",
+          queueBackend: "database",
+          workerCount: 0,
+          workerGroup: "test-worker",
+        },
+      },
+      authRuntime: createTestAuthRuntime(),
+      extensions: [
+        {
+          name: "fail-if-first-admin-bootstrap-runs",
+          configureApplication(context) {
+            context.container.registerInstance(tokens.queryBus, {
+              execute: async (_context: unknown, query: AppQuery<unknown>) => {
+                throw new Error(`first-admin bootstrap query should not run: ${query.type}`);
+              },
+            } as QueryBus);
+          },
+        },
+      ],
+    });
+
+    try {
+      expect(server.config.firstAdminEmail).toBe("admin@example.com");
+    } finally {
+      await server.shutdown();
+    }
+  }, 15_000);
+
   test("[SERVER-DI-001] fails startup registration drift before operations execute", async () => {
     const dataDir = await createTempDataDir();
     const server = await createAppaloftServer({

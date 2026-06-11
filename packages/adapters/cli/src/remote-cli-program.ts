@@ -30,7 +30,11 @@ export interface RemoteCliProgramInput {
 type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
 
 const webhookSignatureOnlyOperations = new Set(["source-events.ingest"]);
-const followStreamOperationKeys = new Set(["deployments.stream-events", "resources.runtime-logs"]);
+const followStreamOperationKeys = new Set([
+  "deployments.stream-events",
+  "operator-work.stream-events",
+  "resources.runtime-logs",
+]);
 
 function remoteOperationError(
   code: string,
@@ -249,6 +253,14 @@ function adaptBoundedStreamResult(operationKey: string, value: unknown): unknown
     return {
       mode: "bounded",
       deploymentId: readOptionalString(value, "deploymentId") ?? "",
+      envelopes: value.envelopes,
+    };
+  }
+
+  if (operationKey === "operator-work.stream-events" && Array.isArray(value.envelopes)) {
+    return {
+      mode: "bounded",
+      workId: readOptionalString(value, "workId") ?? "",
       envelopes: value.envelopes,
     };
   }
