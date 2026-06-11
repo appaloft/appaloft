@@ -50,22 +50,37 @@ describe("dependency resource Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.rotateSecret");
     expect(resourcePageSource).toContain("dependencyRenameNames");
     expect(resourcePageSource).toContain("dependencyImportConnectionUrl");
-    expect(resourcePageSource).toContain("i18nKeys.console.resources.dependencyImportAction");
     expect(resourcePageSource).toContain("dependencyRestoreAcknowledgeDataOverwrite");
     expect(resourcePageSource).toContain("dependencyResources.length === 1");
     expect(resourcePageSource).toContain("bindableDependencyResources.length === 1");
-    expect(resourcePageSource).toContain("i18nKeys.console.resources.dependencyBackupTitle");
-    expect(resourcePageSource).toContain("resource-dependency-backup-resource-trigger");
-    expect(resourcePageSource).toContain("resource-dependency-binding-resource-trigger");
-    expect(resourcePageSource).toContain("webDocsHrefs.dependencyBackupRestore");
-    expect(resourcePageSource).toContain("i18nKeys.console.resources.dependencyRenameAction");
-    expect(resourcePageSource).toContain("i18nKeys.console.resources.dependencyDeleteAction");
-    expect(resourcePageSource).toContain("i18nKeys.console.resources.dependencySecretRotateAction");
+    expect(resourcePageSource).toContain(
+      'const resourceDependenciesSections = ["dependencies", "storage"] as const;',
+    );
+    expect(resourcePageSource).toContain('id="resource-dependency-bindings"');
+    expect(resourcePageSource).toContain(
+      "i18nKeys.console.resources.dependencyResourceManagementTitle",
+    );
+    expect(resourcePageSource).toContain(
+      "i18nKeys.console.resources.dependencyResourceManagementDescription",
+    );
+    expect(resourcePageSource).not.toContain("webDocsHrefs.dependencyBackupRestore");
+    expect(resourcePageSource).not.toContain("i18nKeys.console.resources.dependencyRenameAction");
+    expect(resourcePageSource).not.toContain("i18nKeys.console.resources.dependencyDeleteAction");
+    expect(resourcePageSource).not.toContain(
+      "i18nKeys.console.resources.dependencySecretRotateAction",
+    );
     expect(resourcePageSource).toContain("dependencyBindingSecretRotationAcks");
     expect(resourcePageSource).toContain("resourceDependencyBindings");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.dependenciesTitle");
     expect(resourcePageSource).toContain("webDocsHrefs.dependencyResourceLifecycle");
     expect(resourcePageSource).toContain("webDocsHrefs.dependencyRuntimeInjection");
+    const resourceOverviewSource = resourcePageSource.slice(
+      resourcePageSource.indexOf('id="resource-overview"'),
+      resourcePageSource.indexOf('id="resource-settings-general"'),
+    );
+    expect(resourceOverviewSource).not.toContain("resource-dependency-backup-resource-trigger");
+    expect(resourceOverviewSource).not.toContain("resource-dependency-binding-resource-trigger");
+    expect(resourceOverviewSource).not.toContain("dependencyImportConnectionUrl");
     expect(dependencyResourcePageSource).toContain(
       "i18nKeys.console.dependencyResources.kindMysql",
     );

@@ -153,7 +153,7 @@ describe("runtime usage console readback", () => {
     expect(serverSource).toContain("orpcClient.servers.capacity.inspect");
     expect(serverSource).toContain("orpcClient.servers.capacity.prune");
     expect(serverSource).toContain("capacityPruneBefore = handoff.to");
-    expect(resourceSource).toContain('logsHref={resourceTabHref("logs")}');
+    expect(resourceSource).toContain('logsHref={resourceSettingsSectionHref("logs")}');
     expect(resourceSource).not.toContain('eventsHref={resourceTabHref("deployments")}');
     expect(resourceSource).toContain(
       'diagnosticsHref={resourceSettingsSectionHref("diagnostics")}',

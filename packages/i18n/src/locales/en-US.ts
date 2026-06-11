@@ -1568,6 +1568,7 @@ export const enUS = {
       configurationSecretDescription:
         "Secret values are stored on the write side and masked everywhere they are read back.",
       configurationSetAction: "Set variable",
+      configurationTab: "Configuration",
       configurationTitle: "Configuration",
       configurationUnsetAction: "Unset",
       configurationUnsetFailed: "Resource variable was not removed",
@@ -1846,6 +1847,7 @@ export const enUS = {
         "External resources keep project ownership and access context without a Appaloft runtime.",
       externalProfileTitle: "External resource",
       generatedAccessRoute: "Generated default access",
+      generalSection: "General",
       staticArtifactAccessRoute: "Static artifact access",
       healthChecks: "Health checks",
       healthDescription:
@@ -1863,9 +1865,19 @@ export const enUS = {
       healthRuntime: "Runtime",
       healthSourceIssues: "Source issues",
       healthTitle: "Resource health",
+      jobsTab: "Jobs",
       logsTab: "Logs",
+      networkingTab: "Networking",
       overviewDescription:
-        "Current access, health, latest deployment, and runtime shape for this resource.",
+        "Read the current access, health, latest deployment, configuration summary, dependencies, and next action without editing long forms.",
+      overviewConfigurationSummary: "Configuration summary",
+      overviewCurrentAccess: "Current access",
+      overviewCurrentHealth: "Current health",
+      overviewDependenciesEmpty: "No dependency bindings are attached.",
+      overviewDependencyBindingsSummary: "{{count}} active bindings",
+      overviewDependencyResourcesSummary: "{{count}} available dependency resources",
+      overviewLatestDeployment: "Latest deployment",
+      overviewNextActions: "Next actions",
       overviewNoAccessDescription:
         "Deploy the resource or bind a custom domain to create an operator-facing address.",
       overviewNoAccessTitle: "No access URL is available yet.",
@@ -1980,6 +1992,7 @@ export const enUS = {
       runtimeLogsStopFollow: "Stop",
       runtimeLogsStreamDisconnected: "Runtime log stream disconnected.",
       runtimeLogsTitle: "Runtime logs",
+      runtimeTab: "Runtime",
       runtimeProfileFormDescription:
         "Change the durable runtime planning profile used by future deployments.",
       runtimeProfileSaveFailed: "Runtime profile was not saved",
@@ -1997,7 +2010,7 @@ export const enUS = {
       runtimeStrategyWorkspaceCommands: "Workspace commands",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
-      settingsTab: "Configuration",
+      settingsTab: "Settings",
       scheduledTaskCommandIntent: "Command intent",
       scheduledTaskCommandIntentPlaceholder: "bun run db:migrate",
       scheduledTaskConcurrencyForbid: "Forbid concurrent runs",

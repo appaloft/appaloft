@@ -97,7 +97,6 @@
   import * as Popover from "$lib/components/ui/popover";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import * as Tabs from "$lib/components/ui/tabs";
   import { Textarea } from "$lib/components/ui/textarea";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { requestConsoleConfirm, requestConsolePrompt } from "$lib/console/modal-interaction";
@@ -166,15 +165,12 @@
   type ResourceDetailTab =
     | "overview"
     | "deployments"
-    | "logs"
-    | "domains"
-    | "environment"
+    | "runtime"
+    | "networking"
+    | "configuration"
     | "dependencies"
-    | "scheduled-tasks"
-    | "source-events"
-    | "previews"
-    | "monitor"
-    | "terminal";
+    | "jobs"
+    | "settings";
   let runtimeMonitoringTimeRange = $state<RuntimeMonitoringTimeRangeId>("1h");
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
@@ -235,43 +231,80 @@
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
   type ResourceSettingsSection =
+    | "access"
+    | "general"
     | "profile"
     | "auto-deploy"
     | "storage"
     | "configuration"
     | "domains"
     | "dependencies"
-    | "usage"
+    | "monitor"
+    | "logs"
     | "health"
     | "proxy"
-    | "diagnostics";
-  type ResourceSettingsNavigationSection = Extract<
-    ResourceSettingsSection,
-    "profile" | "auto-deploy" | "storage" | "health" | "proxy" | "diagnostics"
-  >;
+    | "diagnostics"
+    | "terminal"
+    | "scheduled-tasks"
+    | "source-events"
+    | "previews"
+    | "danger";
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = [
     "overview",
     "deployments",
-    "logs",
-    "domains",
-    "environment",
+    "runtime",
+    "networking",
+    "configuration",
     "dependencies",
-    "monitor",
-    "scheduled-tasks",
-    "source-events",
-    "previews",
-    "terminal",
+    "jobs",
+    "settings",
   ] as const;
-  const resourceSettingsSections = [
+  const resourceRuntimeSections = ["monitor", "logs", "terminal"] as const;
+  const resourceNetworkingSections = ["access", "domains", "proxy"] as const;
+  const resourceConfigurationSections = [
     "profile",
+    "configuration",
     "auto-deploy",
-    "storage",
     "health",
-    "proxy",
+  ] as const;
+  const resourceDependenciesSections = ["dependencies", "storage"] as const;
+  const resourceJobsSections = ["scheduled-tasks", "source-events", "previews"] as const;
+  const resourceSettingsSections = [
+    "general",
     "diagnostics",
-  ] as const satisfies readonly ResourceSettingsNavigationSection[];
+    "danger",
+  ] as const;
+  const allResourceSettingsSections = [
+    ...resourceRuntimeSections,
+    ...resourceNetworkingSections,
+    ...resourceConfigurationSections,
+    ...resourceDependenciesSections,
+    ...resourceJobsSections,
+    ...resourceSettingsSections,
+  ] as const satisfies readonly ResourceSettingsSection[];
+  const resourceLegacyTabSections = {
+    monitor: "monitor",
+    logs: "logs",
+    terminal: "terminal",
+    domains: "domains",
+    environment: "profile",
+    "scheduled-tasks": "scheduled-tasks",
+    "source-events": "source-events",
+    previews: "previews",
+  } as const satisfies Record<string, ResourceSettingsSection>;
+  const resourceLegacyQuerySections = {
+    configuration: "configuration",
+    dependencies: "dependencies",
+    domains: "domains",
+    usage: "monitor",
+    storage: "storage",
+    health: "health",
+    proxy: "proxy",
+    diagnostics: "diagnostics",
+    "auto-deploy": "auto-deploy",
+  } as const satisfies Record<string, ResourceSettingsSection>;
 
   const {
     projectsQuery,
@@ -841,27 +874,9 @@
   const activeTab = $derived(
     parseResourceDetailTab(page.url.searchParams.get("tab"), page.url.searchParams.get("section")),
   );
-  const activeResourceContentTab = $derived(
-    activeTab === "domains" || activeTab === "environment" || activeTab === "dependencies"
-      ? "overview"
-      : activeTab,
+  const activeSettingsSection = $derived(
+    parseResourceSettingsSection(activeTab, page.url.searchParams.get("section")),
   );
-  const showResourceOverviewNavigation = $derived(activeTab === "overview");
-  const activeSettingsSection = $derived.by(() => {
-    if (activeTab === "domains") {
-      return "domains";
-    }
-
-    if (activeTab === "environment") {
-      return "configuration";
-    }
-
-    if (activeTab === "dependencies") {
-      return "dependencies";
-    }
-
-    return parseResourceSettingsSection(page.url.searchParams.get("section"));
-  });
   $effect(() => {
     if (!browser) {
       return;
@@ -869,22 +884,22 @@
 
     const deprecatedTab = page.url.searchParams.get("tab");
     const deprecatedSection = page.url.searchParams.get("section");
-    const sectionMovedToTopTab =
-      !deprecatedTab &&
-      (deprecatedSection === "configuration" ||
-        deprecatedSection === "dependencies" ||
-        deprecatedSection === "domains" ||
-        deprecatedSection === "usage");
-    if (deprecatedTab !== "settings" && !sectionMovedToTopTab) {
+    const legacyTabSection =
+      deprecatedTab && deprecatedTab in resourceLegacyTabSections
+        ? resourceLegacyTabSections[deprecatedTab as keyof typeof resourceLegacyTabSections]
+        : null;
+    const legacyQuerySection =
+      deprecatedSection && deprecatedSection in resourceLegacyQuerySections
+        ? resourceLegacyQuerySections[deprecatedSection as keyof typeof resourceLegacyQuerySections]
+        : null;
+    const legacySection =
+      legacyTabSection ?? (deprecatedTab === "settings" || !deprecatedTab ? legacyQuerySection : null);
+
+    if (!legacySection) {
       return;
     }
 
-    const href =
-      deprecatedSection === "usage"
-        ? resourceTabHref("monitor")
-        : resourceSettingsSectionHref(activeSettingsSection);
-
-    void goto(href, {
+    void goto(resourceSettingsSectionHref(legacySection), {
       noScroll: true,
       keepFocus: true,
       replaceState: true,
@@ -3236,7 +3251,7 @@
         return;
       }
 
-      if (currentTab !== "logs") {
+      if (currentTab !== "runtime" || activeSettingsSection !== "logs") {
         runtimeLogsLoading = false;
         return;
       }
@@ -4425,32 +4440,20 @@
   }
 
   function parseResourceDetailTab(value: string | null, section: string | null): ResourceDetailTab {
-    if (value === "settings") {
-      switch (section) {
-        case "configuration":
-          return "environment";
-        case "dependencies":
-          return "dependencies";
-        case "domains":
-          return "domains";
-        case "usage":
-          return "monitor";
-        default:
-          return "overview";
-      }
+    if (value && value in resourceLegacyTabSections) {
+      return resourceSectionTab(
+        resourceLegacyTabSections[value as keyof typeof resourceLegacyTabSections],
+      );
+    }
+
+    if (section && section in resourceLegacyQuerySections && (!value || value === "settings")) {
+      return resourceSectionTab(
+        resourceLegacyQuerySections[section as keyof typeof resourceLegacyQuerySections],
+      );
     }
 
     if (!value) {
-      switch (section) {
-        case "configuration":
-          return "environment";
-        case "dependencies":
-          return "dependencies";
-        case "domains":
-          return "domains";
-        case "usage":
-          return "monitor";
-      }
+      return "overview";
     }
 
     return resourceDetailTabs.includes(value as ResourceDetailTab)
@@ -4458,10 +4461,42 @@
       : "overview";
   }
 
-  function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
-    return resourceSettingsSections.includes(value as ResourceSettingsNavigationSection)
-      ? (value as ResourceSettingsSection)
-      : "profile";
+  function resourceSectionsForTab(tab: ResourceDetailTab): readonly ResourceSettingsSection[] {
+    switch (tab) {
+      case "runtime":
+        return resourceRuntimeSections;
+      case "networking":
+        return resourceNetworkingSections;
+      case "configuration":
+        return resourceConfigurationSections;
+      case "dependencies":
+        return resourceDependenciesSections;
+      case "jobs":
+        return resourceJobsSections;
+      case "settings":
+        return resourceSettingsSections;
+      case "overview":
+      case "deployments":
+        return [];
+    }
+  }
+
+  function resourceDefaultSectionForTab(tab: ResourceDetailTab): ResourceSettingsSection | null {
+    return resourceSectionsForTab(tab)[0] ?? null;
+  }
+
+  function parseResourceSettingsSection(
+    tab: ResourceDetailTab,
+    value: string | null,
+  ): ResourceSettingsSection {
+    const sections = resourceSectionsForTab(tab);
+    const defaultSection = resourceDefaultSectionForTab(tab) ?? "general";
+    if (value && allResourceSettingsSections.includes(value as ResourceSettingsSection)) {
+      const section = value as ResourceSettingsSection;
+      return sections.includes(section) ? section : defaultSection;
+    }
+
+    return defaultSection;
   }
 
   function resourceTabHref(tab: ResourceDetailTab): string {
@@ -4474,9 +4509,7 @@
     } else {
       params.set("tab", tab);
       params.delete("section");
-      if (tab !== "terminal") {
-        params.delete("deploymentId");
-      }
+      params.delete("deploymentId");
     }
 
     const search = params.toString();
@@ -4485,21 +4518,30 @@
 
   function resourceSectionTab(section: ResourceSettingsSection): ResourceDetailTab {
     switch (section) {
-      case "configuration":
-        return "environment";
-      case "dependencies":
-        return "dependencies";
+      case "monitor":
+      case "logs":
+      case "terminal":
+        return "runtime";
+      case "access":
       case "domains":
-        return "domains";
-      case "usage":
-        return "monitor";
-      case "profile":
-      case "auto-deploy":
-      case "storage":
-      case "health":
       case "proxy":
+        return "networking";
+      case "profile":
+      case "configuration":
+      case "auto-deploy":
+      case "health":
+        return "configuration";
+      case "dependencies":
+      case "storage":
+        return "dependencies";
+      case "scheduled-tasks":
+      case "source-events":
+      case "previews":
+        return "jobs";
+      case "general":
       case "diagnostics":
-        return "overview";
+      case "danger":
+        return "settings";
     }
   }
 
@@ -4514,24 +4556,18 @@
         return $t(i18nKeys.console.resources.overviewTitle);
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
-      case "logs":
-        return $t(i18nKeys.console.resources.logsTab);
-      case "domains":
-        return $t(i18nKeys.console.resources.domainBindingsTitle);
-      case "environment":
-        return $t(i18nKeys.common.domain.environment);
+      case "runtime":
+        return $t(i18nKeys.console.resources.runtimeTab);
+      case "networking":
+        return $t(i18nKeys.console.resources.networkingTab);
+      case "configuration":
+        return $t(i18nKeys.console.resources.configurationTab);
       case "dependencies":
         return $t(i18nKeys.console.resources.dependenciesTitle);
-      case "scheduled-tasks":
-        return $t(i18nKeys.console.resources.scheduledTasksTab);
-      case "source-events":
-        return $t(i18nKeys.console.resources.sourceEventsTab);
-      case "previews":
-        return $t(i18nKeys.console.resources.previewEnvironmentsTab);
-      case "monitor":
-        return $t(i18nKeys.console.runtimeUsage.monitorTab);
-      case "terminal":
-        return $t(i18nKeys.console.terminal.title);
+      case "jobs":
+        return $t(i18nKeys.console.resources.jobsTab);
+      case "settings":
+        return $t(i18nKeys.console.resources.settingsTab);
     }
   }
 
@@ -4584,7 +4620,9 @@
 
   function resourceSettingsSectionHref(section: ResourceSettingsSection): string {
     const params = new URLSearchParams(page.url.searchParams);
-    params.delete("deploymentId");
+    if (section !== "terminal") {
+      params.delete("deploymentId");
+    }
 
     const tab = resourceSectionTab(section);
     if (tab === "overview") {
@@ -4593,13 +4631,7 @@
       params.set("tab", tab);
     }
 
-    if (
-      section === "profile" ||
-      section === "configuration" ||
-      section === "dependencies" ||
-      section === "domains" ||
-      section === "usage"
-    ) {
+    if (section === resourceDefaultSectionForTab(tab)) {
       params.delete("section");
     } else {
       params.set("section", section);
@@ -4616,6 +4648,10 @@
 
   function resourceSettingsSectionLabel(section: ResourceSettingsSection): string {
     switch (section) {
+      case "access":
+        return $t(i18nKeys.console.resources.accessTab);
+      case "general":
+        return $t(i18nKeys.console.resources.generalSection);
       case "profile":
         return $t(i18nKeys.console.resources.profileTitle);
       case "auto-deploy":
@@ -4628,14 +4664,26 @@
         return $t(i18nKeys.console.resources.dependenciesTitle);
       case "domains":
         return $t(i18nKeys.console.resources.domainBindingsTitle);
-      case "usage":
-        return $t(i18nKeys.console.runtimeUsage.usageSection);
+      case "monitor":
+        return $t(i18nKeys.console.runtimeUsage.monitorTab);
+      case "logs":
+        return $t(i18nKeys.console.resources.logsTab);
       case "health":
         return $t(i18nKeys.console.resources.healthPolicy);
       case "proxy":
         return $t(i18nKeys.console.resources.proxyConfigurationTitle);
       case "diagnostics":
         return $t(i18nKeys.console.resources.diagnosticsTitle);
+      case "terminal":
+        return $t(i18nKeys.console.terminal.title);
+      case "scheduled-tasks":
+        return $t(i18nKeys.console.resources.scheduledTasksTab);
+      case "source-events":
+        return $t(i18nKeys.console.resources.sourceEventsTab);
+      case "previews":
+        return $t(i18nKeys.console.resources.previewEnvironmentsTab);
+      case "danger":
+        return $t(i18nKeys.console.resources.dangerZoneTitle);
     }
   }
 
@@ -5246,6 +5294,61 @@
     }
   }
 
+  function resourceLatestDeploymentTime(deployment: typeof latestDeployment): string {
+    if (!deployment) {
+      return "-";
+    }
+
+    return formatTime(deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt);
+  }
+
+  function resourceSourceSummary(): string {
+    const source = resourceDetail?.source;
+    if (!source) {
+      return $t(i18nKeys.common.status.notConfigured);
+    }
+
+    return source.displayName || source.locator || source.kind;
+  }
+
+  function resourceRuntimeSummary(): string {
+    const runtimeProfile = resourceDetail?.runtimeProfile;
+    if (!runtimeProfile) {
+      return $t(i18nKeys.common.status.notConfigured);
+    }
+
+    return runtimeStrategyLabel(runtimeProfile.strategy);
+  }
+
+  function resourceNetworkSummary(): string {
+    const profile = resource?.networkProfile;
+    if (!profile) {
+      return $t(i18nKeys.common.status.notConfigured);
+    }
+
+    return [
+      `${$t(i18nKeys.common.domain.port)} ${profile.internalPort}`,
+      networkProtocolLabel(profile.upstreamProtocol),
+      networkExposureModeLabel(profile.exposureMode),
+    ].join(" · ");
+  }
+
+  function resourceDependencySummary(): string {
+    if (resourceDependencyBindings.length > 0) {
+      return $t(i18nKeys.console.resources.overviewDependencyBindingsSummary, {
+        count: String(resourceDependencyBindings.length),
+      });
+    }
+
+    if (dependencyResources.length > 0) {
+      return $t(i18nKeys.console.resources.overviewDependencyResourcesSummary, {
+        count: String(dependencyResources.length),
+      });
+    }
+
+    return $t(i18nKeys.console.resources.overviewDependenciesEmpty);
+  }
+
   function resourceHealthSectionStatusLabel(status: string | undefined): string {
     switch (status) {
       case "healthy":
@@ -5316,6 +5419,31 @@
 <svelte:head>
   <title>{resource?.name ?? $t(i18nKeys.console.resources.pageTitle)} · Appaloft</title>
 </svelte:head>
+
+{#snippet resourceSectionNavigation()}
+  <aside class="min-w-0 border-b bg-background lg:border-b-0 lg:border-r">
+    <nav class="min-w-0" aria-label={resourceTabLabel(activeTab)}>
+      <div role="tablist" class="flex min-w-0 gap-1 overflow-x-auto p-3 lg:flex-col">
+        {#each resourceSectionsForTab(activeTab) as section (section)}
+          <a
+            href={resourceSettingsSectionHref(section)}
+            role="tab"
+            aria-selected={activeSettingsSection === section}
+            class={[
+              "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
+              activeSettingsSection === section
+                ? "border-primary/40 bg-primary/5 text-foreground shadow-xs"
+                : "bg-card text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground",
+            ]}
+            onclick={(event) => selectResourceSettingsSection(section, event)}
+          >
+            {resourceSettingsSectionLabel(section)}
+          </a>
+        {/each}
+      </div>
+    </nav>
+  </aside>
+{/snippet}
 
 <ConsoleShell
   title={resource?.name ?? $t(i18nKeys.console.resources.pageTitle)}
@@ -5494,7 +5622,7 @@
         </div>
       </section>
 
-      <Tabs.Root value={activeResourceContentTab} class="space-y-0">
+      <div class="space-y-0">
         <nav
           aria-label={$t(i18nKeys.console.resources.overviewTitle)}
           class="flex min-w-0 justify-start gap-6 overflow-x-auto border-b"
@@ -5516,7 +5644,8 @@
           {/each}
         </nav>
 
-        <Tabs.Content value="deployments" class="mt-0 pt-5">
+        {#if activeTab === "deployments"}
+          <div class="mt-0 pt-5">
 
           <section id="resource-deployments" class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -5565,10 +5694,14 @@
               {/if}
             </div>
           </section>
-        </Tabs.Content>
+        </div>
+        {:else if activeTab === "jobs"}
+          <div class="mt-0 pt-5">
+            <div class="grid min-w-0 border-b lg:min-h-[42rem] lg:grid-cols-[10.5rem_minmax(0,1fr)]">
+              {@render resourceSectionNavigation()}
 
-        <Tabs.Content value="scheduled-tasks" class="mt-0 pt-5">
-          <section id="resource-scheduled-tasks" class="space-y-5">
+              {#if activeSettingsSection === "scheduled-tasks"}
+                <section id="resource-scheduled-tasks" class="space-y-5 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -5942,11 +6075,9 @@
                 </div>
               </section>
             </div>
-          </section>
-        </Tabs.Content>
-
-        <Tabs.Content value="source-events" class="mt-0 pt-5">
-          <section id="resource-source-events" class="space-y-4">
+                </section>
+              {:else if activeSettingsSection === "source-events"}
+                <section id="resource-source-events" class="space-y-4 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -6081,11 +6212,9 @@
                 {/each}
               </div>
             {/if}
-          </section>
-        </Tabs.Content>
-
-        <Tabs.Content value="previews" class="mt-0 pt-5">
-          <section id="resource-preview-environments" class="space-y-5">
+                </section>
+              {:else if activeSettingsSection === "previews"}
+                <section id="resource-preview-environments" class="space-y-5 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -6254,853 +6383,50 @@
                 {/each}
               </div>
             {/if}
-          </section>
-        </Tabs.Content>
-
-        <Tabs.Content
-          value="overview"
-          class={["mt-0", showResourceOverviewNavigation ? "" : "pt-5"]}
-        >
-          <div
-            class={showResourceOverviewNavigation
-              ? "grid min-w-0 border-b lg:min-h-[42rem] lg:grid-cols-[10.5rem_minmax(0,1fr)]"
-              : "space-y-6"}
-          >
-            {#if showResourceOverviewNavigation}
-              <aside class="min-w-0 border-b bg-background lg:border-b-0 lg:border-r">
-                <nav class="min-w-0" aria-label={$t(i18nKeys.console.resources.overviewTitle)}>
-                  <div role="tablist" class="flex min-w-0 gap-1 overflow-x-auto p-3 lg:flex-col">
-                    {#each resourceSettingsSections as section (section)}
-                      <a
-                        href={resourceSettingsSectionHref(section)}
-                        role="tab"
-                        aria-selected={activeSettingsSection === section}
-                        class={[
-                          "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
-                          activeSettingsSection === section
-                            ? "border-primary/40 bg-primary/5 text-foreground shadow-xs"
-                            : "bg-card text-muted-foreground hover:border-primary/25 hover:bg-primary/5 hover:text-foreground",
-                        ]}
-                        onclick={(event) => selectResourceSettingsSection(section, event)}
-                      >
-                        {resourceSettingsSectionLabel(section)}
-                      </a>
-                    {/each}
-                  </div>
-                </nav>
-              </aside>
-            {/if}
-
-            <div class={showResourceOverviewNavigation ? "space-y-8 p-5" : "space-y-8"}>
-              {#if showResourceOverviewNavigation}
-                <div
-                  class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
-                  role="note"
-                >
-                  <div class="flex gap-3">
-                    <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                    <div class="min-w-0">
-                      <p class="font-medium text-foreground">
-                        {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
-                      </p>
-                      <p class="mt-1 leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                </section>
               {/if}
-
-              {#if activeSettingsSection === "profile"}
-              <div id="resource-overview-profile" class="space-y-4">
-                <ResourceProfileSummary
-                  {resource}
-                  projectName={project?.name ?? resource.projectId}
-                  environmentName={environment?.name ?? resource.environmentId}
-                  destinationId={defaultDestinationId}
-                />
-
-                {#if resourceStorageAttachments.length > 0}
-                  <section id="resource-mounted-storage-overview" class="rounded-md border bg-background p-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
-                          <h3 class="text-base font-semibold">
-                            {$t(i18nKeys.console.resources.storageOverviewTitle)}
-                          </h3>
-                          <Badge variant="outline">{resourceStorageAttachments.length}</Badge>
-                        </div>
-                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                          {$t(i18nKeys.console.resources.storageOverviewDescription)}
-                        </p>
-                      </div>
-                      <Button href={resourceSettingsSectionHref("storage")} variant="outline" size="sm">
-                        {$t(i18nKeys.console.resources.storageOverviewSettingsAction)}
-                      </Button>
-                    </div>
-
-                    <div class="mt-4 grid gap-3">
-                      {#each resourceStorageAttachments as attachment (attachment.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="min-w-0">
-                              <p class="break-all text-sm font-medium">
-                                {storageAttachmentApplicationDataLabel(attachment)}
-                              </p>
-                              <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
-                                {storageAttachmentVolumeLabel(attachment)} · {attachment.storageVolumeId}
-                              </p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                              {#if attachment.storageVolumeKind}
-                                <Badge variant="outline">
-                                  {storageVolumeKindLabel(attachment.storageVolumeKind)}
-                                </Badge>
-                              {/if}
-                              <Badge variant="secondary">
-                                {storageMountModeLabel(attachment.mountMode)}
-                              </Badge>
-                            </div>
-                          </div>
-                          <dl class="mt-3 grid gap-3 text-xs sm:grid-cols-2">
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageDestinationPath)}
-                              </dt>
-                              <dd class="mt-1 break-all font-mono font-medium">
-                                {attachment.destinationPath}
-                              </dd>
-                            </div>
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageOverviewBackupStatus)}
-                              </dt>
-                              <dd class="mt-1 break-words font-medium">
-                                {$t(i18nKeys.console.resources.storageOverviewBackupManageAction)}
-                              </dd>
-                            </div>
-                          </dl>
-                        </article>
-                      {/each}
-                    </div>
-                  </section>
-                {/if}
-
-                <form
-                  id="resource-source-profile-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={configureResourceSource}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.sourceProfileTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceSourceProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        <Badge variant={resourceDetail?.source ? "default" : "outline"}>
-                          {sourceProfileStatusLabel}
-                        </Badge>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.sourceProfileFormDescription)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.sourceKind)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceSourceProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={sourceKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {sourceKindLabel(sourceKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="git-public">
-                            {$t(i18nKeys.console.resources.sourceKindGitPublic)}
-                          </Select.Item>
-                          <Select.Item value="remote-git">
-                            {$t(i18nKeys.console.resources.sourceKindRemoteGit)}
-                          </Select.Item>
-                          <Select.Item value="local-folder">
-                            {$t(i18nKeys.console.resources.sourceKindLocalFolder)}
-                          </Select.Item>
-                          <Select.Item value="docker-image">
-                            {$t(i18nKeys.console.resources.sourceKindDockerImage)}
-                          </Select.Item>
-                          <Select.Item value="compose">
-                            {$t(i18nKeys.console.resources.sourceKindCompose)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-locator">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.sourceLocator)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.deploymentSource}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-source-locator"
-                        bind:value={sourceLocator}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-display-name">
-                      <span>{$t(i18nKeys.console.resources.sourceDisplayName)}</span>
-                      <Input
-                        id="resource-source-display-name"
-                        bind:value={sourceDisplayName}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    {#if sourceVersionIsEditable}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-version">
-                        <span>{$t(i18nKeys.console.resources.sourceVersion)}</span>
-                        <Input
-                          id="resource-source-version"
-                          bind:value={sourceVersion}
-                          autocomplete="off"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium">
-                        <span>{$t(i18nKeys.console.resources.sourceVersionKind)}</span>
-                        <Select.Root bind:value={sourceVersionKind} type="single">
-                          <Select.Trigger class="w-full">
-                            {sourceVersionKind || "infer"}
-                          </Select.Trigger>
-                          <Select.Content>
-                            <Select.Item value="">infer</Select.Item>
-                            {#each sourceVersionKindOptions as versionKind}
-                              <Select.Item value={versionKind}>{versionKind}</Select.Item>
-                            {/each}
-                          </Select.Content>
-                        </Select.Root>
-                      </label>
-                    {/if}
-
-                    {#if sourceKindIsGit}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-git-ref">
-                        <span>{$t(i18nKeys.console.resources.sourceGitRef)}</span>
-                        <Input
-                          id="resource-source-git-ref"
-                          bind:value={sourceGitRef}
-                          autocomplete="off"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-base-directory">
-                        <span>{$t(i18nKeys.console.resources.sourceBaseDirectory)}</span>
-                        <Input
-                          id="resource-source-base-directory"
-                          bind:value={sourceBaseDirectory}
-                          autocomplete="off"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-commit-sha">
-                        <span>{$t(i18nKeys.console.resources.sourceCommitSha)}</span>
-                        <Input
-                          id="resource-source-commit-sha"
-                          bind:value={sourceCommitSha}
-                          autocomplete="off"
-                        />
-                      </label>
-                    {/if}
-
-                    {#if sourceKindIsDockerImage}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-name">
-                        <span>{$t(i18nKeys.console.resources.sourceImageName)}</span>
-                        <Input
-                          id="resource-source-image-name"
-                          bind:value={sourceImageName}
-                          autocomplete="off"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-tag">
-                        <span>{$t(i18nKeys.console.resources.sourceImageTag)}</span>
-                        <Input
-                          id="resource-source-image-tag"
-                          bind:value={sourceImageTag}
-                          autocomplete="off"
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-digest">
-                        <span>{$t(i18nKeys.console.resources.sourceImageDigest)}</span>
-                        <Input
-                          id="resource-source-image-digest"
-                          bind:value={sourceImageDigest}
-                          autocomplete="off"
-                        />
-                      </label>
-                    {/if}
-                  </div>
-
-                  {#if sourceFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        sourceFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{sourceFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{sourceFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canConfigureSource || configureResourceSourceMutation.isPending}
-                    >
-                      {configureResourceSourceMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                      : $t(i18nKeys.common.actions.save)}
-                    </Button>
-                  </div>
-                </form>
-
-                <form
-                  id="resource-source-link-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={relinkSourceLink}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.sourceLinkTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.deploymentSource}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.sourceLinkDescription)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-link-fingerprint">
-                      <span>{$t(i18nKeys.console.resources.sourceLinkFingerprint)}</span>
-                      <Input
-                        id="resource-source-link-fingerprint"
-                        bind:value={sourceLinkFingerprint}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.sourceLinkServer)}</span>
-                      <Select.Root bind:value={sourceLinkServerId} type="single">
-                        <Select.Trigger class="w-full">
-                          {findServer(servers, sourceLinkServerId)?.name ?? sourceLinkServerId}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each servers as server (server.id)}
-                            <Select.Item value={server.id}>
-                              {server.name}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-link-destination">
-                      <span>{$t(i18nKeys.console.resources.sourceLinkDestination)}</span>
-                      <Input
-                        id="resource-source-link-destination"
-                        bind:value={sourceLinkDestinationId}
-                        autocomplete="off"
-                      />
-                    </label>
-                  </div>
-
-                  {#if sourceLinkFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        sourceLinkFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{sourceLinkFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{sourceLinkFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canRelinkSourceLink || relinkSourceLinkMutation.isPending}
-                    >
-                      {relinkSourceLinkMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.console.resources.sourceLinkRelink)}
-                    </Button>
-                  </div>
-                </form>
-
-                <form
-                  id="resource-runtime-profile-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={configureResourceRuntime}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.runtimeProfileTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceRuntimeProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        <Badge variant={resourceDetail?.runtimeProfile ? "default" : "outline"}>
-                          {runtimeProfileStatusLabel}
-                        </Badge>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.runtimeProfileFormDescription)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.runtimeStrategy)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceRuntimeProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={runtimeStrategy} type="single">
-                        <Select.Trigger class="w-full">
-                          {runtimeStrategyLabel(runtimeStrategy)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="auto">
-                            {$t(i18nKeys.console.resources.runtimeStrategyAuto)}
-                          </Select.Item>
-                          <Select.Item value="workspace-commands">
-                            {$t(i18nKeys.console.resources.runtimeStrategyWorkspaceCommands)}
-                          </Select.Item>
-                          <Select.Item value="static">
-                            {$t(i18nKeys.console.resources.runtimeStrategyStatic)}
-                          </Select.Item>
-                          <Select.Item value="dockerfile">
-                            {$t(i18nKeys.console.resources.runtimeStrategyDockerfile)}
-                          </Select.Item>
-                          <Select.Item value="docker-compose">
-                            {$t(i18nKeys.console.resources.runtimeStrategyDockerCompose)}
-                          </Select.Item>
-                          <Select.Item value="prebuilt-image">
-                            {$t(i18nKeys.console.resources.runtimeStrategyPrebuiltImage)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-install-command">
-                      <span>{$t(i18nKeys.console.resources.runtimeInstallCommand)}</span>
-                      <Input
-                        id="resource-runtime-install-command"
-                        bind:value={runtimeInstallCommand}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-build-command">
-                      <span>{$t(i18nKeys.console.resources.runtimeBuildCommand)}</span>
-                      <Input
-                        id="resource-runtime-build-command"
-                        bind:value={runtimeBuildCommand}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-start-command">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.runtimeStartCommand)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceRuntimeProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-runtime-start-command"
-                        bind:value={runtimeStartCommand}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-name">
-                      <span>{$t(i18nKeys.console.resources.runtimeName)}</span>
-                      <Input
-                        id="resource-runtime-name"
-                        bind:value={runtimeName}
-                        autocomplete="off"
-                        placeholder={$t(i18nKeys.console.resources.runtimeNamePlaceholder)}
-                      />
-                    </label>
-
-                    {#if runtimeStrategy === "static"}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-publish-directory">
-                        <span>{$t(i18nKeys.console.resources.runtimePublishDirectory)}</span>
-                        <Input
-                          id="resource-runtime-publish-directory"
-                          bind:value={runtimePublishDirectory}
-                          autocomplete="off"
-                          placeholder={$t(i18nKeys.console.resources.runtimePublishDirectoryPlaceholder)}
-                        />
-                      </label>
-                    {/if}
-
-                    {#if runtimeStrategy === "dockerfile"}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-dockerfile-path">
-                        <span>{$t(i18nKeys.console.resources.runtimeDockerfilePath)}</span>
-                        <Input
-                          id="resource-runtime-dockerfile-path"
-                          bind:value={runtimeDockerfilePath}
-                          autocomplete="off"
-                          placeholder={$t(i18nKeys.console.resources.runtimeDockerfilePathPlaceholder)}
-                        />
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-build-target">
-                        <span>{$t(i18nKeys.console.resources.runtimeBuildTarget)}</span>
-                        <Input
-                          id="resource-runtime-build-target"
-                          bind:value={runtimeBuildTarget}
-                          autocomplete="off"
-                        />
-                      </label>
-                    {/if}
-
-                    {#if runtimeStrategy === "docker-compose"}
-                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-docker-compose-file-path">
-                        <span>{$t(i18nKeys.console.resources.runtimeDockerComposeFilePath)}</span>
-                        <Input
-                          id="resource-runtime-docker-compose-file-path"
-                          bind:value={runtimeDockerComposeFilePath}
-                          autocomplete="off"
-                          placeholder={$t(
-                            i18nKeys.console.resources.runtimeDockerComposeFilePathPlaceholder,
-                          )}
-                        />
-                      </label>
-                    {/if}
-                  </div>
-
-                  {#if runtimeFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        runtimeFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{runtimeFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{runtimeFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <CapabilityGate
-                      operationKey="resources.configure-runtime"
-                      resourceRefs={{ projectId: resource.projectId, resourceId: resource.id }}
-                    >
-                      {#snippet children({ disabled })}
-                        <Button
-                          type="submit"
-                          disabled={disabled ||
-                            !canConfigureRuntime ||
-                            configureResourceRuntimeMutation.isPending}
-                        >
-                          {configureResourceRuntimeMutation.isPending
-                            ? $t(i18nKeys.common.actions.saving)
-                            : $t(i18nKeys.common.actions.save)}
-                        </Button>
-                      {/snippet}
-                    </CapabilityGate>
-                  </div>
-                </form>
-
-                <form
-                  id="resource-network-profile-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={configureResourceNetwork}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.networkProfileTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceNetworkProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        <Badge variant={resource.networkProfile ? "default" : "outline"}>
-                          {networkProfileStatusLabel}
-                        </Badge>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.networkProfileFormDescription)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-network-internal-port">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.port)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceNetworkProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-network-internal-port"
-                        bind:value={networkInternalPort}
-                        autocomplete="off"
-                        inputmode="numeric"
-                        placeholder="3000"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.protocol)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceNetworkProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={networkUpstreamProtocol} type="single">
-                        <Select.Trigger class="w-full">
-                          {networkProtocolLabel(networkUpstreamProtocol)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="http">
-                            {$t(i18nKeys.console.resources.networkProtocolHttp)}
-                          </Select.Item>
-                          <Select.Item value="tcp">
-                            {$t(i18nKeys.console.resources.networkProtocolTcp)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.exposure)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceNetworkProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={networkExposureMode} type="single">
-                        <Select.Trigger class="w-full">
-                          {networkExposureModeLabel(networkExposureMode)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="reverse-proxy">
-                            {$t(i18nKeys.console.resources.networkExposureReverseProxy)}
-                          </Select.Item>
-                          <Select.Item value="none">
-                            {$t(i18nKeys.console.resources.networkExposureNone)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    {#if resource.services.length > 0}
-                      <label class="space-y-1.5 text-sm font-medium">
-                        <span>{$t(i18nKeys.console.resources.targetServiceName)}</span>
-                        <Select.Root bind:value={networkTargetServiceName} type="single">
-                          <Select.Trigger class="w-full">
-                            {selectedNetworkTargetService?.name ??
-                              $t(i18nKeys.console.resources.networkTargetServicePlaceholder)}
-                          </Select.Trigger>
-                          <Select.Content>
-                            {#each resource.services as service (service.name)}
-                              <Select.Item value={service.name}>{service.name}</Select.Item>
-                            {/each}
-                          </Select.Content>
-                        </Select.Root>
-                      </label>
-                    {/if}
-                  </div>
-
-                  <p class="mt-3 text-xs leading-5 text-muted-foreground">
-                    {$t(i18nKeys.console.resources.networkDirectPortDeferred)}
+            </div>
+        </div>
+        {:else if activeTab === "overview"}
+          <div class="mt-0 pt-5">
+            <section id="resource-overview" class="space-y-5">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.overviewTitle)}
+                  </h2>
+                  <p class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.overviewDescription)}
                   </p>
-
-                  {#if networkFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        networkFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{networkFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{networkFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canConfigureNetwork || configureResourceNetworkMutation.isPending}
-                    >
-                      {configureResourceNetworkMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {#if primaryAccessHref}
+                    <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
+                      <Globe2 class="size-4" />
+                      {$t(i18nKeys.console.deployments.openAccessUrl)}
                     </Button>
-                  </div>
-                </form>
-
-                <form
-                  id="resource-access-profile-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={configureResourceAccess}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.accessProfileTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceAccessProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        <Badge variant={resource.accessProfile ? "default" : "outline"}>
-                          {resource.accessProfile
-                            ? $t(i18nKeys.common.status.configured)
-                            : $t(i18nKeys.common.status.notConfigured)}
-                        </Badge>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.accessProfileFormDescription)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.accessGeneratedModeLabel)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceAccessProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={accessGeneratedAccessMode} type="single">
-                        <Select.Trigger class="w-full">
-                          {generatedAccessModeLabel(accessGeneratedAccessMode)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="inherit">
-                            {$t(i18nKeys.console.resources.accessGeneratedModeInherit)}
-                          </Select.Item>
-                          <Select.Item value="disabled">
-                            {$t(i18nKeys.console.resources.accessGeneratedModeDisabled)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-access-path-prefix">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.accessPathPrefix)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceAccessProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-access-path-prefix"
-                        bind:value={accessPathPrefix}
-                        autocomplete="off"
-                        placeholder="/"
-                      />
-                    </label>
-                  </div>
-
-                  {#if accessFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        accessFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{accessFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{accessFeedback.detail}</p>
-                    </div>
                   {/if}
+                  <Button
+                    href={resourceDeploymentHref()}
+                    disabled={isResourceArchived || isPreviewEnvironmentResource}
+                  >
+                    <Plus class="size-4" />
+                    {$t(i18nKeys.common.actions.quickDeploy)}
+                  </Button>
+                </div>
+              </div>
 
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canConfigureAccess || configureResourceAccessMutation.isPending}
-                    >
-                      {configureResourceAccessMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
-                    </Button>
-                  </div>
-                </form>
-
-                <section id="resource-overview-access" class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+                <section class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0 space-y-2">
                       <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                         <Link2 class="size-4" />
-                        {$t(i18nKeys.console.resources.accessUrlTitle)}
+                        {$t(i18nKeys.console.resources.overviewCurrentAccess)}
                       </p>
                       {#if primaryAccessHref}
                         <a
-                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline"
                           href={primaryAccessHref}
                           target="_blank"
                           rel="noreferrer"
@@ -7124,82 +6450,29 @@
                               {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
                             </Badge>
                           {/if}
-                          {#if primaryAccessRoute?.targetPort}
-                            <Badge variant="secondary">
-                              {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
-                            </Badge>
-                          {/if}
                         </div>
                       {:else}
-                        <p class="text-sm leading-6 text-muted-foreground">
-                          {$t(i18nKeys.console.resources.accessUrlEmpty)}
-                        </p>
+                        <div class="rounded-md border border-dashed bg-muted/25 px-4 py-5">
+                          <p class="font-medium">{$t(i18nKeys.console.resources.overviewNoAccessTitle)}</p>
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.overviewNoAccessDescription)}
+                          </p>
+                        </div>
                       {/if}
                       {#if latestAccessFailure}
-                        <div
-                          class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
-                        >
+                        <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
                           <div class="flex flex-wrap items-center gap-2">
                             <p class="font-medium text-destructive">
                               {$t(i18nKeys.console.resources.accessFailureTitle)}
                             </p>
                             <Badge variant="destructive">{latestAccessFailure.code}</Badge>
-                            <DocsHelpLink
-                              href={webDocsHrefs.diagnosticsSafeSupportPayload}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                              className="size-5"
-                            />
                           </div>
-                          <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-5">
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.accessFailureRequestId)}
-                              </dt>
-                              <dd class="break-all font-medium">{latestAccessFailure.requestId}</dd>
-                            </div>
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.accessFailureAffected)}
-                              </dt>
-                              <dd class="break-all font-medium">
-                                {latestAccessFailure.affected?.hostname ?? latestAccessFailure.affected?.url ?? "-"}
-                                {latestAccessFailure.affected?.path
-                                  ? ` ${latestAccessFailure.affected.path}`
-                                  : ""}
-                              </dd>
-                            </div>
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.accessFailureNextAction)}
-                              </dt>
-                              <dd class="break-all font-medium">{latestAccessFailure.nextAction}</dd>
-                            </div>
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.accessFailureRouteSource)}
-                              </dt>
-                              <dd class="break-all font-medium">
-                                {latestAccessFailure.route?.routeSource ?? "-"}
-                              </dd>
-                            </div>
-                            <div class="min-w-0">
-                              <dt class="text-muted-foreground">
-                                {$t(i18nKeys.console.resources.accessFailureRouteId)}
-                              </dt>
-                              <dd class="break-all font-medium">
-                                {latestAccessFailure.route?.routeId ??
-                                  latestAccessFailure.route?.diagnosticId ??
-                                  "-"}
-                              </dd>
-                            </div>
-                          </dl>
+                          <p class="mt-2 break-words text-xs text-muted-foreground">
+                            {latestAccessFailure.nextAction}
+                          </p>
                         </div>
                       {/if}
-                      <p class="text-xs leading-5 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.accessUrlDescription)}
-                      </p>
                     </div>
-
                     {#if primaryAccessHref}
                       <Button
                         type="button"
@@ -7218,3637 +6491,1341 @@
                     {/if}
                   </div>
                 </section>
-              </div>
 
-              {:else if activeSettingsSection === "auto-deploy"}
-              <section id="resource-auto-deploy-settings" class="space-y-4">
-                <form
-                  id="resource-auto-deploy-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={configureResourceAutoDeploy}
-                >
+                <section class="rounded-md border bg-background p-4">
                   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.resources.autoDeployTitle)}
-                        </h2>
-                        <DocsHelpLink
-                          href={webDocsHrefs.sourceAutoDeploySetup}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        <DocsHelpLink
-                          href={webDocsHrefs.sourceAutoDeploySignatures}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                        />
-                        {#if autoDeployPolicy}
-                          <Badge variant={autoDeployStatusVariant(autoDeployPolicy.status)}>
-                            {autoDeployStatusLabel(autoDeployPolicy.status)}
-                          </Badge>
-                        {:else}
-                          <Badge variant="outline">
-                            {$t(i18nKeys.console.resources.autoDeployStatusDisabled)}
-                          </Badge>
-                        {/if}
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.autoDeployDescription)}
+                      <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Gauge class="size-4" />
+                        {$t(i18nKeys.console.resources.overviewCurrentHealth)}
                       </p>
-                    </div>
-
-                    <div class="flex shrink-0 flex-wrap gap-2">
-                      {#if canAcknowledgeAutoDeploySource}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={configureResourceAutoDeployMutation.isPending}
-                          onclick={acknowledgeAutoDeploySourceBinding}
-                        >
-                          <Check class="size-4" />
-                          {$t(i18nKeys.console.resources.autoDeployAcknowledgeSource)}
-                        </Button>
-                      {/if}
-                      {#if autoDeployPolicy}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={isResourceArchived || configureResourceAutoDeployMutation.isPending}
-                          onclick={disableResourceAutoDeploy}
-                        >
-                          <Square class="size-4" />
-                          {$t(i18nKeys.console.resources.autoDeployDisable)}
-                        </Button>
-                      {/if}
-                    </div>
-                  </div>
-
-                  {#if !resourceDetail?.source}
-                    <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.autoDeploySourceMissing)}
-                    </div>
-                  {:else if !sourceSupportsAutoDeploy}
-                    <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.autoDeploySourceUnsupported)}
-                    </div>
-                  {/if}
-
-                  {#if autoDeployPolicy?.status === "blocked"}
-                    <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                      <p class="font-medium">
-                        {$t(i18nKeys.console.resources.autoDeployStatusBlocked)}
+                      <p class="mt-2 flex items-center gap-2 text-lg font-semibold">
+                        <ResourceStatusDot status={resourceHealthOverall} />
+                        {resourceHealthStatusLabel(resourceHealthOverall)}
                       </p>
-                      {#if autoDeployPolicy.blockedReason === "source-binding-changed"}
-                        <p class="mt-1 text-xs leading-5">
-                          {$t(i18nKeys.console.resources.autoDeployBlockedSourceChanged)}
+                      {#if resourceHealth?.observedAt}
+                        <p class="mt-1 text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.resources.healthObservedAt)}
+                          {formatTime(resourceHealth.observedAt)}
                         </p>
                       {/if}
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.resources.autoDeployTriggerKind)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.sourceAutoDeploySetup}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={autoDeployTriggerKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {autoDeployTriggerKindLabel(autoDeployTriggerKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="git-push">
-                            {$t(i18nKeys.console.resources.autoDeployTriggerGitPush)}
-                          </Select.Item>
-                          <Select.Item value="generic-signed-webhook">
-                            {$t(i18nKeys.console.resources.autoDeployTriggerGenericSigned)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-auto-deploy-refs">
-                      <span>{$t(i18nKeys.console.resources.autoDeployRefs)}</span>
-                      <Input
-                        id="resource-auto-deploy-refs"
-                        bind:value={autoDeployRefs}
-                        autocomplete="off"
-                        placeholder={$t(i18nKeys.console.resources.autoDeployRefsPlaceholder)}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.autoDeployEventKind)}</span>
-                      <Select.Root bind:value={autoDeployEventKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {autoDeployEventKindLabel(autoDeployEventKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="push">
-                            {$t(i18nKeys.console.resources.autoDeployEventPush)}
-                          </Select.Item>
-                          <Select.Item value="tag">
-                            {$t(i18nKeys.console.resources.autoDeployEventTag)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label
-                      class="space-y-1.5 text-sm font-medium"
-                      for="resource-auto-deploy-dedupe-window"
-                    >
-                      <span>{$t(i18nKeys.console.resources.autoDeployDedupeWindowSeconds)}</span>
-                      <Input
-                        id="resource-auto-deploy-dedupe-window"
-                        bind:value={autoDeployDedupeWindowSeconds}
-                        autocomplete="off"
-                        inputmode="numeric"
-                      />
-                    </label>
-
-                    {#if autoDeployTriggerKind === "generic-signed-webhook"}
-                      <label
-                        class="space-y-1.5 text-sm font-medium sm:col-span-2"
-                        for="resource-auto-deploy-generic-secret-ref"
-                      >
-                        <span class="inline-flex items-center gap-1.5">
-                          {$t(i18nKeys.console.resources.autoDeployGenericWebhookSecretRef)}
-                          <DocsHelpLink
-                            href={webDocsHrefs.sourceAutoDeploySignatures}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            className="size-5"
-                          />
-                        </span>
-                        <Input
-                          id="resource-auto-deploy-generic-secret-ref"
-                          bind:value={autoDeployGenericWebhookSecretRef}
-                          autocomplete="off"
-                          placeholder={$t(
-                            i18nKeys.console.resources.autoDeployGenericWebhookSecretRefPlaceholder,
-                          )}
-                        />
-                      </label>
-                    {/if}
-                  </div>
-
-                  {#if autoDeployPolicy}
-                    <dl class="mt-4 grid gap-3 rounded-md border bg-muted/20 p-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
-                      <div class="min-w-0">
-                        <dt class="text-muted-foreground">
-                          {$t(i18nKeys.console.resources.autoDeployCurrentFingerprint)}
-                        </dt>
-                        <dd class="truncate font-mono">{autoDeployPolicy.sourceBindingFingerprint}</dd>
-                      </div>
-                      <div class="min-w-0">
-                        <dt class="text-muted-foreground">
-                          {$t(i18nKeys.console.resources.autoDeployUpdatedAt)}
-                        </dt>
-                        <dd class="font-medium">{formatTime(autoDeployPolicy.updatedAt)}</dd>
-                      </div>
-                    </dl>
-                  {/if}
-
-                  {#if autoDeployFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        autoDeployFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{autoDeployFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{autoDeployFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={
-                        !canConfigureAutoDeploy || configureResourceAutoDeployMutation.isPending
-                      }
-                    >
-                      <GitBranch class="size-4" />
-                      {configureResourceAutoDeployMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
-                    </Button>
-                  </div>
-                </form>
-              </section>
-
-              {:else if activeSettingsSection === "configuration"}
-              <section id="resource-overview-configuration" class="space-y-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-lg font-semibold">
-                        {$t(i18nKeys.console.resources.configurationTitle)}
-                      </h2>
-                      <DocsHelpLink
-                        href={webDocsHrefs.environmentVariablePrecedence}
-                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      />
-                    </div>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.configurationDescription)}
-                    </p>
-                  </div>
-                  {#if resourceEffectiveConfig}
-                    <div class="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                      <p class="font-medium text-foreground">
-                        {$t(i18nKeys.console.resources.configurationPrecedence)}
-                      </p>
-                      <p class="mt-1 break-all">{resourceEffectiveConfig.precedence.join(" -> ")}</p>
-                    </div>
-                  {/if}
-                </div>
-
-                <form
-                  id="resource-configuration-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={setResourceVariable}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 class="text-base font-semibold">
-                        {$t(i18nKeys.console.resources.configurationFormTitle)}
-                      </h3>
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.configurationFormDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{$t(i18nKeys.common.domain.resource)}</Badge>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 xl:grid-cols-2">
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-config-key">
-                      <span>{$t(i18nKeys.common.domain.key)}</span>
-                      <Input
-                        id="resource-config-key"
-                        bind:value={configKey}
-                        autocomplete="off"
-                        placeholder="PUBLIC_API_BASE_URL"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
-                      <Select.Root bind:value={configExposure} type="single">
-                        <Select.Trigger class="w-full">
-                          {configExposureLabel(configExposure)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="runtime">
-                            {$t(i18nKeys.console.resources.configurationExposureRuntime)}
-                          </Select.Item>
-                          <Select.Item value="build-time">
-                            {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.kind)}</span>
-                      <Select.Root bind:value={configKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {configKindLabel(configKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="plain-config">
-                            {$t(i18nKeys.console.resources.configurationKindPlain)}
-                          </Select.Item>
-                          <Select.Item value="secret">
-                            {$t(i18nKeys.console.resources.configurationKindSecret)}
-                          </Select.Item>
-                          <Select.Item value="provider-specific">
-                            {$t(i18nKeys.console.resources.configurationKindProviderSpecific)}
-                          </Select.Item>
-                          <Select.Item value="deployment-strategy">
-                            {$t(i18nKeys.console.resources.configurationKindDeploymentStrategy)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label
-                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
-                      for="resource-config-secret"
-                    >
-                      <input
-                        id="resource-config-secret"
-                        bind:checked={configSecret}
-                        type="checkbox"
-                        class="mt-0.5 size-4 rounded border-input"
-                      />
-                      <span class="space-y-1">
-                        <span class="block font-medium">
-                          {$t(i18nKeys.console.quickDeploy.secretStorage)}
-                        </span>
-                        <span class="block text-muted-foreground">
-                          {$t(i18nKeys.console.resources.configurationSecretDescription)}
-                        </span>
-                      </span>
-                    </label>
-
-                    <label
-                      class="space-y-1.5 text-sm font-medium xl:col-span-2"
-                      for="resource-config-value"
-                    >
-                      <span>{$t(i18nKeys.common.domain.value)}</span>
-                      <Textarea
-                        id="resource-config-value"
-                        bind:value={configValue}
-                        rows={4}
-                        spellcheck={false}
-                        autocomplete="off"
-                        placeholder="https://api.example.com"
-                      />
-                    </label>
-                  </div>
-
-                  {#if configFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        configFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{configFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canSetResourceVariable || setResourceVariableMutation.isPending}
-                    >
-                      {setResourceVariableMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.console.resources.configurationSetAction)}
-                    </Button>
-                  </div>
-                </form>
-
-                <form
-                  id="resource-configuration-import-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={importResourceVariables}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 class="text-base font-semibold">
-                        {$t(i18nKeys.console.resources.configurationImportTitle)}
-                      </h3>
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.configurationImportDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">.env</Badge>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 xl:grid-cols-3">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
-                      <Select.Root bind:value={configImportExposure} type="single">
-                        <Select.Trigger class="w-full">
-                          {configExposureLabel(configImportExposure)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="runtime">
-                            {$t(i18nKeys.console.resources.configurationExposureRuntime)}
-                          </Select.Item>
-                          <Select.Item value="build-time">
-                            {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label
-                      class="space-y-1.5 text-sm font-medium"
-                      for="resource-config-import-secret-keys"
-                    >
-                      <span>{$t(i18nKeys.console.resources.configurationImportSecretKeys)}</span>
-                      <Input
-                        id="resource-config-import-secret-keys"
-                        bind:value={configImportSecretKeys}
-                        autocomplete="off"
-                        placeholder="DATABASE_URL, API_TOKEN"
-                      />
-                    </label>
-
-                    <label
-                      class="space-y-1.5 text-sm font-medium"
-                      for="resource-config-import-plain-keys"
-                    >
-                      <span>{$t(i18nKeys.console.resources.configurationImportPlainKeys)}</span>
-                      <Input
-                        id="resource-config-import-plain-keys"
-                        bind:value={configImportPlainKeys}
-                        autocomplete="off"
-                        placeholder="PUBLIC_API_BASE_URL"
-                      />
-                    </label>
-
-                    <label
-                      class="space-y-1.5 text-sm font-medium xl:col-span-3"
-                      for="resource-config-import-content"
-                    >
-                      <span>{$t(i18nKeys.console.resources.configurationImportContent)}</span>
-                      <Textarea
-                        id="resource-config-import-content"
-                        bind:value={configImportContent}
-                        rows={6}
-                        spellcheck={false}
-                        autocomplete="off"
-                        placeholder={"PUBLIC_API_BASE_URL=https://api.example.com\nDATABASE_URL=postgres://user:pass@example/db"}
-                      />
-                    </label>
-                  </div>
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canImportResourceVariables ||
-                        importResourceVariablesMutation.isPending}
-                    >
-                      {importResourceVariablesMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.console.resources.configurationImportAction)}
-                    </Button>
-                  </div>
-                </form>
-
-                {#if resourceEffectiveConfigQuery.isPending}
-                  <div class="space-y-3">
-                    <Skeleton class="h-28 w-full" />
-                    <Skeleton class="h-28 w-full" />
-                  </div>
-                {:else if resourceEffectiveConfigQuery.error}
-                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    {readErrorMessage(resourceEffectiveConfigQuery.error)}
-                  </div>
-                {:else if resourceEffectiveConfig}
-                  <div class="grid gap-4 xl:grid-cols-2">
-                    <section class="rounded-md border bg-background p-4">
-                      <div class="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 class="text-base font-semibold">
-                            {$t(i18nKeys.console.resources.configurationOwnedTitle)}
-                          </h3>
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.configurationOwnedDescription)}
-                          </p>
-                        </div>
-                        <Badge variant="default">{$t(i18nKeys.common.domain.resource)}</Badge>
-                      </div>
-
-                      <div class="mt-4 space-y-3">
-                        {#if resourceEffectiveConfig.ownedEntries.length > 0}
-                          {#each resourceEffectiveConfig.ownedEntries as entry (`${entry.key}:${entry.exposure}:${entry.scope}`)}
-                            <article class="rounded-md border bg-muted/15 p-3">
-                              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="min-w-0 flex-1 space-y-2">
-                                  <div class="flex flex-wrap items-center gap-2">
-                                    <p class="truncate font-medium">{entry.key}</p>
-                                    <Badge variant={configScopeBadgeVariant(entry.scope)}>
-                                      {entry.scope}
-                                    </Badge>
-                                    <Badge variant="outline">
-                                      {configExposureLabel(
-                                        entry.exposure as ResourceVariableExposure,
-                                      )}
-                                    </Badge>
-                                    <Badge variant="outline">
-                                      {configKindLabel(entry.kind as ResourceVariableKind)}
-                                    </Badge>
-                                    {#if entry.isSecret}
-                                      <Badge variant="secondary">
-                                        {$t(i18nKeys.console.resources.configurationSecretBadge)}
-                                      </Badge>
-                                    {/if}
-                                  </div>
-                                  <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                    {entry.value === "" ? '""' : entry.value}
-                                  </p>
-                                  {#if entry.updatedAt}
-                                    <p class="text-xs text-muted-foreground">
-                                      {$t(i18nKeys.console.resources.configurationUpdatedAt)}
-                                      {formatTime(entry.updatedAt)}
-                                    </p>
-                                  {/if}
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isResourceArchived || unsetResourceVariableMutation.isPending}
-                                  onclick={() => unsetResourceVariable(entry)}
-                                >
-                                  {$t(i18nKeys.console.resources.configurationUnsetAction)}
-                                </Button>
-                              </div>
-                            </article>
-                          {/each}
-                        {:else}
-                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.configurationOwnedEmpty)}
-                          </div>
-                        {/if}
-                      </div>
-                    </section>
-
-                    <section class="rounded-md border bg-background p-4">
-                      <div class="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 class="text-base font-semibold">
-                            {$t(i18nKeys.console.resources.configurationEffectiveTitle)}
-                          </h3>
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.configurationEffectiveDescription)}
-                          </p>
-                        </div>
-                        <Badge variant="outline">
-                          {resourceEffectiveConfig.effectiveEntries.length}
-                        </Badge>
-                      </div>
-
-                      <div class="mt-4 space-y-3">
-                        {#if resourceEffectiveConfig.effectiveEntries.length > 0}
-                          {#each resourceEffectiveConfig.effectiveEntries as entry (`${entry.key}:${entry.exposure}:${entry.scope}`)}
-                            <article class="rounded-md border bg-muted/15 p-3">
-                              <div class="space-y-2">
-                                <div class="flex flex-wrap items-center gap-2">
-                                  <p class="truncate font-medium">{entry.key}</p>
-                                  <Badge variant={configScopeBadgeVariant(entry.scope)}>
-                                    {entry.scope}
-                                  </Badge>
-                                  <Badge variant="outline">
-                                    {configExposureLabel(
-                                      entry.exposure as ResourceVariableExposure,
-                                    )}
-                                  </Badge>
-                                  <Badge variant="outline">
-                                    {configKindLabel(entry.kind as ResourceVariableKind)}
-                                  </Badge>
-                                  {#if entry.isSecret}
-                                    <Badge variant="secondary">
-                                      {$t(i18nKeys.console.resources.configurationSecretBadge)}
-                                    </Badge>
-                                  {/if}
-                                </div>
-                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                  {entry.value === "" ? '""' : entry.value}
-                                </p>
-                              </div>
-                            </article>
-                          {/each}
-                        {:else}
-                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.configurationEffectiveEmpty)}
-                          </div>
-                        {/if}
-                      </div>
-                    </section>
-                  </div>
-                {/if}
-              </section>
-
-              {:else if activeSettingsSection === "storage"}
-              <section id="resource-overview-storage" class="space-y-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-lg font-semibold">
-                        {$t(i18nKeys.console.resources.storageTitle)}
-                      </h2>
-                      <DocsHelpLink
-                        href={webDocsHrefs.storageVolumeLifecycle}
-                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      />
-                    </div>
-                    <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.resources.storageDescription)}
-                    </p>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">
-                      {$t(i18nKeys.console.resources.storageVolumeCount, {
-                        count: String(storageVolumes.length),
-                      })}
-                    </Badge>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onclick={() => void invalidateStorageAttachmentQueries()}
-                    >
-                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.storageAttachmentsRefresh)}
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={isResourceArchived}
-                      onclick={openStorageCreateDialog}
-                    >
-                      <Plus class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.storageVolumeCreateAction)}
-                    </Button>
-                    {#if storageVolumes.length === 0}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onclick={() => openStorageRuntimeCleanupDialog()}
-                      >
-                        <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                        {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
-                      </Button>
-                    {/if}
-                  </div>
-                </div>
-
-                <div class="space-y-2">
-                  {#if storageVolumeFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        storageVolumeFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageVolumeFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
-                    </div>
-                  {/if}
-                  {#if storageAttachmentFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        storageAttachmentFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageAttachmentFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
-                    </div>
-                  {/if}
-                  {#if storageRuntimeCleanupFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        storageRuntimeCleanupFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
-                    </div>
-                  {/if}
-                  {#if storageBackupFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        storageBackupFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{storageBackupFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
-                    </div>
-                  {/if}
-                </div>
-
-                {#if storageVolumesQuery.isPending}
-                  <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.resources.storageVolumesLoading)}
-                  </div>
-                {:else if storageVolumesQuery.error}
-                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    {readErrorMessage(storageVolumesQuery.error)}
-                  </div>
-                {:else if storageVolumes.length === 0}
-                  <section class="rounded-md border border-dashed bg-muted/15 px-4 py-8 text-center">
-                    <HardDrive class="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
-                    <h3 class="mt-3 text-base font-semibold">
-                      {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
-                    </h3>
-                    <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.resources.storageVolumesEmpty)}
-                    </p>
-                    <Button
-                      type="button"
-                      class="mt-4"
-                      disabled={isResourceArchived}
-                      onclick={openStorageCreateDialog}
-                    >
-                      <Plus class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.storageVolumeCreateAction)}
-                    </Button>
-                  </section>
-                {:else}
-                  <section class="rounded-md border bg-background">
-                    <div class="border-b p-4">
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <HardDrive class="size-4 text-muted-foreground" aria-hidden="true" />
-                            <h3 class="text-base font-semibold">
-                              {$t(i18nKeys.console.resources.storageVolumeManagementTitle)}
-                            </h3>
-                          </div>
-                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
-                          </p>
-                        </div>
-                        <Badge variant="outline">{storageVolumes.length}</Badge>
-                      </div>
-                    </div>
-
-                    <div class="divide-y">
-                      {#each storageVolumes as volume (volume.id)}
-                        {@const displayAttachments = storageVolumeDisplayAttachments(volume)}
-                        {@const currentAttachments = storageVolumeCurrentResourceAttachments(volume)}
-                        {@const latestBackup = storageVolumeLatestBackup(volume)}
-                        <article class="p-4" data-storage-volume-card={volume.id}>
-                          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div class="min-w-0 flex-1 space-y-3">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="min-w-0 truncate text-base font-semibold">{volume.name}</p>
-                                <Badge variant="outline">{storageVolumeKindLabel(volume.kind)}</Badge>
-                                <Badge variant="secondary">
-                                  {$t(i18nKeys.console.resources.storageVolumeAttachmentCount, {
-                                    count: String(volume.attachmentCount),
-                                  })}
-                                </Badge>
-                                {#if volume.backupRelationship?.retentionRequired}
-                                  <Badge variant="secondary">
-                                    {$t(i18nKeys.console.resources.storageBackupRetentionRequired)}
-                                  </Badge>
-                                {/if}
-                              </div>
-
-                              {#if volume.description}
-                                <p class="text-sm leading-6 text-muted-foreground">{volume.description}</p>
-                              {/if}
-
-                              <dl class="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                                <div>
-                                  <dt class="text-xs text-muted-foreground">
-                                    {$t(i18nKeys.console.resources.storageVolumeKind)}
-                                  </dt>
-                                  <dd class="mt-1 font-medium">{storageVolumeKindLabel(volume.kind)}</dd>
-                                </div>
-                                <div>
-                                  <dt class="text-xs text-muted-foreground">
-                                    {$t(i18nKeys.console.resources.storageVolumeMounts)}
-                                  </dt>
-                                  <dd class="mt-1 font-medium">{volume.attachmentCount}</dd>
-                                </div>
-                                <div>
-                                  <dt class="text-xs text-muted-foreground">
-                                    {$t(i18nKeys.console.resources.storageBackupTitle)}
-                                  </dt>
-                                  <dd class="mt-1 font-medium">{storageVolumeBackupPolicyLabel(volume)}</dd>
-                                </div>
-                                <div>
-                                  <dt class="text-xs text-muted-foreground">
-                                    {$t(i18nKeys.common.domain.status)}
-                                  </dt>
-                                  <dd class="mt-1 font-medium">{volume.lifecycleStatus}</dd>
-                                </div>
-                              </dl>
-
-                              {#if volume.sourcePath}
-                                <div>
-                                  <p class="text-xs text-muted-foreground">
-                                    {$t(i18nKeys.console.resources.storageVolumeSourcePath)}
-                                  </p>
-                                  <p class="mt-1 break-all rounded-md bg-muted/30 px-3 py-2 font-mono text-xs">
-                                    {volume.sourcePath}
-                                  </p>
-                                </div>
-                              {/if}
-                            </div>
-
-                            <div class="flex flex-wrap gap-2 xl:max-w-[28rem] xl:justify-end">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onclick={() => openStorageRenameDialog(volume)}
-                              >
-                                {$t(i18nKeys.console.resources.storageVolumeRenameAction)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onclick={() => openStorageBackupDialog(volume)}
-                              >
-                                <ShieldCheck class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.storageBackupTitle)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onclick={() => openStorageRuntimeCleanupDialog(volume)}
-                              >
-                                <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={isResourceArchived}
-                                onclick={() => openStorageAttachDialog(volume)}
-                              >
-                                {$t(i18nKeys.console.resources.storageAttachAction)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={deleteStorageVolumeMutation.isPending}
-                                onclick={() => deleteStorageVolume(volume)}
-                              >
-                                <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.storageVolumeDeleteAction)}
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div class="mt-4 border-t pt-4">
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <h4 class="text-sm font-medium">
-                                  {$t(i18nKeys.console.resources.storageVolumeMountsTitle)}
-                                </h4>
-                                <p class="mt-1 text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.storageVolumeMountsDescription)}
-                                </p>
-                              </div>
-                              {#if currentAttachments.length === 0}
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isResourceArchived}
-                                  onclick={() => openStorageAttachDialog(volume)}
-                                >
-                                  {$t(i18nKeys.console.resources.storageAttachAction)}
-                                </Button>
-                              {/if}
-                            </div>
-
-                            {#if displayAttachments.length > 0}
-                              <div class="mt-3 divide-y border-y">
-                                {#each displayAttachments as attachment (`${attachment.destinationPath}:${attachment.attachedAt}`)}
-                                  <div class="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                                    <div class="min-w-0 space-y-1">
-                                      <div class="flex flex-wrap items-center gap-2">
-                                        <p class="break-all font-mono text-xs">
-                                          {attachment.destinationPath}
-                                        </p>
-                                        <Badge variant="secondary">
-                                          {storageMountModeLabel(attachment.mountMode)}
-                                        </Badge>
-                                        {#if attachment.dataFormat}
-                                          <Badge variant="outline">{attachment.dataFormat}</Badge>
-                                        {/if}
-                                      </div>
-                                      <p class="text-xs text-muted-foreground">
-                                        {storageVolumeAttachmentDisplayLabel(attachment)}
-                                        · {$t(i18nKeys.console.resources.storageAttachedAt)}
-                                        {formatTime(attachment.attachedAt)}
-                                      </p>
-                                    </div>
-                                    {#if "storageVolumeId" in attachment}
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={isResourceArchived || detachResourceStorageMutation.isPending}
-                                        onclick={() => detachResourceStorage(attachment)}
-                                      >
-                                        {$t(i18nKeys.console.resources.storageDetachAction)}
-                                      </Button>
-                                    {/if}
-                                  </div>
-                                {/each}
-                              </div>
-                            {:else}
-                              <p class="mt-3 border-y py-3 text-sm text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageAttachmentsEmpty)}
-                              </p>
-                            {/if}
-                          </div>
-
-                          <div class="mt-4 border-t pt-4">
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <h4 class="text-sm font-medium">
-                                  {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
-                                </h4>
-                                <p class="mt-1 text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.storageVolumeBackupSummaryDescription)}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onclick={() => openStorageBackupDialog(volume)}
-                              >
-                                <ShieldCheck class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.storageBackupCreateAction)}
-                              </Button>
-                            </div>
-
-                            {#if latestBackup}
-                              <div class="mt-3 flex flex-col gap-2 border-y py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                                <div class="min-w-0">
-                                  <p class="font-medium">{storageBackupLabel(latestBackup)}</p>
-                                  <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
-                                    {storageBackupArtifactLabel(latestBackup)}
-                                  </p>
-                                </div>
-                                <Badge variant="secondary">{latestBackup.retentionStatus}</Badge>
-                              </div>
-                            {:else}
-                              <p class="mt-3 border-y py-3 text-sm text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageBackupsEmpty)}
-                              </p>
-                            {/if}
-                          </div>
-                        </article>
-                      {/each}
-                    </div>
-                  </section>
-                {/if}
-
-                <Dialog.Root bind:open={storageCreateDialogOpen}>
-                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
-                    <Dialog.Header>
-                      <Dialog.Title>
-                        {$t(i18nKeys.console.resources.storageVolumeCreateTitle)}
-                      </Dialog.Title>
-                      <Dialog.Description>
-                        {$t(i18nKeys.console.resources.storageVolumeManagementDescription)}
-                      </Dialog.Description>
-                    </Dialog.Header>
-                    <form
-                      id="resource-storage-volume-form"
-                      class="space-y-4 px-5 pb-5"
-                      onsubmit={createStorageVolume}
-                    >
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)]">
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-name">
-                          <span>{$t(i18nKeys.console.resources.storageVolumeName)}</span>
-                          <Input
-                            id="resource-storage-volume-name"
-                            bind:value={storageVolumeName}
-                            autocomplete="off"
-                            placeholder="uploads"
-                          />
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageVolumeKind)}</span>
-                          <Select.Root bind:value={storageVolumeKind} type="single">
-                            <Select.Trigger class="w-full">
-                              {storageVolumeKindLabel(storageVolumeKind)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              <Select.Item value="named-volume">
-                                {$t(i18nKeys.console.resources.storageKindNamedVolume)}
-                              </Select.Item>
-                              <Select.Item value="bind-mount">
-                                {$t(i18nKeys.console.resources.storageKindBindMount)}
-                              </Select.Item>
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-description">
-                          <span>{$t(i18nKeys.console.resources.storageVolumeDescription)}</span>
-                          <Input
-                            id="resource-storage-volume-description"
-                            bind:value={storageVolumeDescription}
-                            autocomplete="off"
-                            placeholder={$t(i18nKeys.console.resources.storageVolumeDescriptionPlaceholder)}
-                          />
-                        </label>
-                      </div>
-
-                      {#if storageVolumeKind === "bind-mount"}
-                        <label class="block space-y-1.5 text-sm font-medium" for="resource-storage-volume-source">
-                          <span>{$t(i18nKeys.console.resources.storageVolumeSourcePath)}</span>
-                          <Input
-                            id="resource-storage-volume-source"
-                            bind:value={storageVolumeSourcePath}
-                            autocomplete="off"
-                            placeholder="/srv/appaloft/storage/uploads"
-                          />
-                        </label>
-                      {/if}
-
-                      {#if storageVolumeFeedback && storageVolumeFeedback.kind === "error"}
-                        <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                          <p class="font-medium">{storageVolumeFeedback.title}</p>
-                          <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
-                        </div>
-                      {/if}
-
-                      <Dialog.Footer class="px-0 pb-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onclick={() => (storageCreateDialogOpen = false)}
-                        >
-                          {$t(i18nKeys.common.actions.close)}
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={!canCreateStorageVolume || createStorageVolumeMutation.isPending}
-                        >
-                          <Plus class="mr-2 size-4" aria-hidden="true" />
-                          {createStorageVolumeMutation.isPending
-                            ? $t(i18nKeys.common.actions.saving)
-                            : $t(i18nKeys.console.resources.storageVolumeCreateAction)}
-                        </Button>
-                      </Dialog.Footer>
-                    </form>
-                  </Dialog.Content>
-                </Dialog.Root>
-
-                <Dialog.Root bind:open={storageRenameDialogOpen}>
-                  {#if selectedStorageRenameVolume}
-                    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
-                      <Dialog.Header>
-                        <Dialog.Title>
-                          {$t(i18nKeys.console.resources.storageVolumeRenameTitle)}
-                        </Dialog.Title>
-                        <Dialog.Description>
-                          {$t(i18nKeys.console.resources.storageVolumeRenameDescription)}
-                        </Dialog.Description>
-                      </Dialog.Header>
-                      <form
-                        class="space-y-4 px-5 pb-5"
-                        onsubmit={(event) => {
-                          event.preventDefault();
-                          renameStorageVolume(selectedStorageRenameVolume);
-                        }}
-                      >
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-volume-rename-name">
-                          <span>{$t(i18nKeys.console.resources.storageVolumeRenameInput)}</span>
-                          <Input
-                            id="resource-storage-volume-rename-name"
-                            value={storageVolumeRenameNames[selectedStorageRenameVolume.id] ?? selectedStorageRenameVolume.name}
-                            autocomplete="off"
-                            oninput={(event) =>
-                              updateStorageVolumeRenameName(selectedStorageRenameVolume.id, event)}
-                          />
-                        </label>
-
-                        {#if storageVolumeFeedback && storageVolumeFeedback.kind === "error"}
-                          <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                            <p class="font-medium">{storageVolumeFeedback.title}</p>
-                            <p class="mt-1 break-all text-xs">{storageVolumeFeedback.detail}</p>
-                          </div>
-                        {/if}
-
-                        <Dialog.Footer class="px-0 pb-0">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onclick={() => (storageRenameDialogOpen = false)}
-                          >
-                            {$t(i18nKeys.common.actions.close)}
-                          </Button>
-                          <Button type="submit" disabled={renameStorageVolumeMutation.isPending}>
-                            {$t(i18nKeys.console.resources.storageVolumeRenameAction)}
-                          </Button>
-                        </Dialog.Footer>
-                      </form>
-                    </Dialog.Content>
-                  {/if}
-                </Dialog.Root>
-
-                <Dialog.Root bind:open={storageBackupDialogOpen}>
-                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
-                    <Dialog.Header>
-                      <Dialog.Title>{$t(i18nKeys.console.resources.storageBackupTitle)}</Dialog.Title>
-                      <Dialog.Description>
-                        {$t(i18nKeys.console.resources.storageBackupDescription)}
-                      </Dialog.Description>
-                    </Dialog.Header>
-
-                    <div class="space-y-4 px-5 pb-5">
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(0,1fr)]">
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                          <Select.Root bind:value={storageBackupVolumeId} type="single">
-                            <Select.Trigger id="resource-storage-backup-volume-trigger" class="w-full">
-                              {selectedStorageBackupAttachment
-                                ? storageAttachmentApplicationDataLabel(selectedStorageBackupAttachment)
-                                : selectedStorageBackupVolume
-                                  ? storageVolumeOptionLabel(selectedStorageBackupVolume)
-                                  : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              {#each storageVolumes as volume (volume.id)}
-                                {@const attachment = resourceStorageAttachments.find(
-                                  (candidate) => candidate.storageVolumeId === volume.id,
-                                )}
-                                <Select.Item value={volume.id}>
-                                  {attachment
-                                    ? `${storageAttachmentApplicationDataLabel(attachment)} (${attachment.destinationPath})`
-                                    : storageVolumeOptionLabel(volume)}
-                                </Select.Item>
-                              {/each}
-                            </Select.Content>
-                          </Select.Root>
-                          {#if selectedStorageBackupAttachment?.dataFormat}
-                            <p class="text-xs text-muted-foreground">
-                              {selectedStorageBackupAttachment.destinationPath}
-                              · {selectedStorageBackupAttachment.dataFormat}
-                            </p>
-                          {/if}
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
-                          <Select.Root bind:value={storageBackupDataFormat} type="single">
-                            <Select.Trigger class="w-full">{storageBackupDataFormat}</Select.Trigger>
-                            <Select.Content>
-                              <Select.Item value="unknown">unknown</Select.Item>
-                              <Select.Item value="filesystem">filesystem</Select.Item>
-                              <Select.Item value="sqlite">sqlite</Select.Item>
-                              <Select.Item value="json-files">json-files</Select.Item>
-                              <Select.Item value="application-export">application-export</Select.Item>
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-path">
-                          <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
-                          <Input
-                            id="resource-storage-backup-path"
-                            bind:value={storageBackupDestinationPath}
-                            autocomplete="off"
-                            placeholder="/pb_data"
-                          />
-                        </label>
-                      </div>
-
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,12rem)]">
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
-                          <Select.Root bind:value={storageBackupConsistency} type="single">
-                            <Select.Trigger class="w-full">{storageBackupConsistency}</Select.Trigger>
-                            <Select.Content>
-                              <Select.Item value="application-consistent">application-consistent</Select.Item>
-                              <Select.Item value="quiesced">quiesced</Select.Item>
-                              <Select.Item value="crash-consistent">crash-consistent</Select.Item>
-                              <Select.Item value="provider-snapshot-consistent">
-                                provider-snapshot-consistent
-                              </Select.Item>
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
-                          <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
-                          <Input
-                            id="resource-storage-backup-target-ref"
-                            bind:value={storageBackupTargetRef}
-                            autocomplete="off"
-                            placeholder="/var/lib/appaloft/backups"
-                          />
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-count">
-                          <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
-                          <Input
-                            id="resource-storage-backup-retention-count"
-                            bind:value={storageBackupRetentionMaxCount}
-                            autocomplete="off"
-                            inputmode="numeric"
-                          />
-                        </label>
-                      </div>
-
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_auto]">
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-min-free">
-                          <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
-                          <Input
-                            id="resource-storage-backup-min-free"
-                            bind:value={storageBackupRetentionMinFreeBytes}
-                            autocomplete="off"
-                            inputmode="numeric"
-                          />
-                        </label>
-
-                        <label class="flex items-center gap-2 pt-7 text-sm font-medium">
-                          <input type="checkbox" bind:checked={storageBackupLiveWrites} />
-                          <span>{$t(i18nKeys.console.resources.storageBackupLiveWrites)}</span>
-                        </label>
-
-                        <div class="flex items-end justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
-                            onclick={planStorageBackup}
-                          >
-                            <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                            {$t(i18nKeys.console.resources.storageBackupPlanAction)}
-                          </Button>
-                          <Button
-                            type="button"
-                            disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
-                            onclick={createStorageBackup}
-                          >
-                            <Plus class="mr-2 size-4" aria-hidden="true" />
-                            {$t(i18nKeys.console.resources.storageBackupCreateAction)}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {#if storageBackupFeedback}
-                        <div
-                          class={[
-                            "rounded-md border px-3 py-2 text-sm",
-                            storageBackupFeedback.kind === "success"
-                              ? "border-primary/25 bg-primary/5"
-                              : "border-destructive/30 bg-destructive/5 text-destructive",
-                          ]}
-                        >
-                          <p class="font-medium">{storageBackupFeedback.title}</p>
-                          <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
-                        </div>
-                      {/if}
-
-                      {#if storageBackupPlan}
-                        <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                          <div class="flex flex-wrap items-center gap-2">
-                            <Badge variant={storageBackupPlan.blockers.length > 0 ? "secondary" : "outline"}>
-                              {storageBackupPlan.sourceAdapterKey}
-                            </Badge>
-                            <Badge variant="outline">{storageBackupPlan.targetProviderKey}</Badge>
-                            <Badge variant="outline">{storageBackupPlan.consistency}</Badge>
-                            {#if storageBackupPlan.localOnly}
-                              <Badge variant="secondary">
-                                {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
-                              </Badge>
-                            {/if}
-                          </div>
-                          {#if storageBackupPlan.blockers.length > 0}
-                            <div class="mt-3 space-y-2">
-                              {#each storageBackupPlan.blockers as blocker (blocker.code)}
-                                <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2">
-                                  <p class="font-medium">{blocker.code}</p>
-                                  <p class="mt-1 text-xs">{blocker.message}</p>
-                                </div>
-                              {/each}
-                            </div>
-                          {/if}
-                        </div>
-                      {/if}
-
-                      <div class="space-y-3">
-                        {#if !storageBackupVolumeId}
-                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageBackupSelectPrompt)}
-                          </div>
-                        {:else if storageVolumeBackupsQuery.isPending}
-                          <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageBackupsLoading)}
-                          </div>
-                        {:else if storageVolumeBackupsQuery.error}
-                          <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                            {readErrorMessage(storageVolumeBackupsQuery.error)}
-                          </div>
-                        {:else if storageVolumeBackups.length === 0}
-                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageBackupsEmpty)}
-                          </div>
-                        {:else}
-                          {#each storageVolumeBackups as backup (backup.id)}
-                            <article class="rounded-md border bg-muted/15 p-3">
-                              <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div class="min-w-0 space-y-2">
-                                  <div class="flex flex-wrap items-center gap-2">
-                                    <p class="font-medium">{storageBackupLabel(backup)}</p>
-                                    <Badge variant="secondary">{backup.retentionStatus}</Badge>
-                                    {#if backup.localOnly}
-                                      <Badge variant="outline">
-                                        {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
-                                      </Badge>
-                                    {/if}
-                                  </div>
-                                  <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                    {storageBackupArtifactLabel(backup)}
-                                  </p>
-                                  {#if backup.failureCode || backup.failureMessage}
-                                    <p class="text-xs text-destructive">
-                                      {backup.failureCode ?? ""} {backup.failureMessage ?? ""}
-                                    </p>
-                                  {/if}
-                                </div>
-                                <div class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto] lg:min-w-[28rem]">
-                                  <Input
-                                    id={`storage-backup-restore-name-${backup.id}`}
-                                    value={storageBackupRestoreNames[backup.id] ?? ""}
-                                    aria-label={$t(i18nKeys.console.resources.storageBackupRestoreName)}
-                                    autocomplete="off"
-                                    placeholder={$t(i18nKeys.console.resources.storageBackupRestoreNamePlaceholder)}
-                                    oninput={(event) => {
-                                      storageBackupRestoreNames = {
-                                        ...storageBackupRestoreNames,
-                                        [backup.id]: event.currentTarget.value,
-                                      };
-                                    }}
-                                  />
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={
-                                      backup.status !== "ready" ||
-                                      restoreStorageVolumeBackupMutation.isPending
-                                    }
-                                    onclick={() => restoreStorageBackup(backup)}
-                                  >
-                                    {$t(i18nKeys.console.resources.storageBackupRestoreAction)}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={
-                                      backup.status === "pruned" ||
-                                      pruneStorageVolumeBackupMutation.isPending
-                                    }
-                                    onclick={() => pruneStorageBackup(backup)}
-                                  >
-                                    <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                                    {$t(i18nKeys.console.resources.storageBackupPruneAction)}
-                                  </Button>
-                                </div>
-                              </div>
-                            </article>
-                          {/each}
-                        {/if}
-                      </div>
-
-                      <Dialog.Footer class="px-0 pb-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onclick={() => (storageBackupDialogOpen = false)}
-                        >
-                          {$t(i18nKeys.common.actions.close)}
-                        </Button>
-                      </Dialog.Footer>
-                    </div>
-                  </Dialog.Content>
-                </Dialog.Root>
-
-                <Dialog.Root bind:open={storageRuntimeCleanupDialogOpen}>
-                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
-                    <Dialog.Header>
-                      <Dialog.Title>
-                        {$t(i18nKeys.console.resources.storageRuntimeCleanupTitle)}
-                      </Dialog.Title>
-                      <Dialog.Description>
-                        {$t(i18nKeys.console.resources.storageRuntimeCleanupDescription)}
-                      </Dialog.Description>
-                    </Dialog.Header>
-
-                    <div class="space-y-4 px-5 pb-5">
-                      <div class="flex justify-end">
-                        <Badge variant="secondary">
-                          {$t(i18nKeys.console.resources.storageRuntimeCleanupBadge)}
-                        </Badge>
-                      </div>
-
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14rem,18rem)]">
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                          <Select.Root bind:value={storageRuntimeCleanupVolumeId} type="single">
-                            <Select.Trigger id="resource-storage-runtime-cleanup-volume-trigger" class="w-full">
-                              {selectedStorageRuntimeCleanupVolume
-                                ? storageVolumeOptionLabel(selectedStorageRuntimeCleanupVolume)
-                                : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              {#each storageVolumes as volume (volume.id)}
-                                <Select.Item value={volume.id}>
-                                  {storageVolumeOptionLabel(volume)}
-                                </Select.Item>
-                              {/each}
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.common.domain.server)}</span>
-                          <Select.Root bind:value={storageRuntimeCleanupServerId} type="single">
-                            <Select.Trigger id="resource-storage-runtime-cleanup-server-trigger" class="w-full">
-                              {selectedStorageRuntimeCleanupServer?.name ??
-                                $t(i18nKeys.console.domainBindings.noServerOptions)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              {#each servers as server (server.id)}
-                                <Select.Item value={server.id}>{server.name}</Select.Item>
-                              {/each}
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-runtime-cleanup-before">
-                          <span>{$t(i18nKeys.console.resources.storageRuntimeCleanupBefore)}</span>
-                          <Input
-                            id="resource-storage-runtime-cleanup-before"
-                            bind:value={storageRuntimeCleanupBefore}
-                            autocomplete="off"
-                            placeholder="2026-01-01T00:00:00.000Z"
-                          />
-                        </label>
-                      </div>
-
-                      <div class="flex flex-wrap justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
-                          onclick={previewStorageRuntimeCleanup}
-                        >
-                          <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                          {cleanupStorageRuntimeMutation.isPending
-                            ? $t(i18nKeys.common.status.loading)
-                            : $t(i18nKeys.console.resources.storageRuntimeCleanupPreviewAction)}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!canCleanupStorageRuntime || cleanupStorageRuntimeMutation.isPending}
-                          onclick={applyStorageRuntimeCleanup}
-                        >
-                          <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                          {$t(i18nKeys.console.resources.storageRuntimeCleanupApplyAction)}
-                        </Button>
-                      </div>
-
-                      {#if storageRuntimeCleanupFeedback}
-                        <div
-                          class={[
-                            "rounded-md border px-3 py-2 text-sm",
-                            storageRuntimeCleanupFeedback.kind === "success"
-                              ? "border-primary/25 bg-primary/5"
-                              : "border-destructive/30 bg-destructive/5 text-destructive",
-                          ]}
-                        >
-                          <p class="font-medium">{storageRuntimeCleanupFeedback.title}</p>
-                          <p class="mt-1 break-all text-xs">{storageRuntimeCleanupFeedback.detail}</p>
-                        </div>
-                      {/if}
-
-                      {#if storageRuntimeCleanupResult}
-                        <div class="space-y-3">
-                          <div class="grid gap-2 sm:grid-cols-5">
-                            <div class="rounded-md border bg-muted/15 px-3 py-2">
-                              <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupInspected)}
-                              </p>
-                              <p class="text-lg font-semibold">
-                                {storageRuntimeCleanupResult.summary.inspectedCount}
-                              </p>
-                            </div>
-                            <div class="rounded-md border bg-muted/15 px-3 py-2">
-                              <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupMatched)}
-                              </p>
-                              <p class="text-lg font-semibold">
-                                {storageRuntimeCleanupResult.summary.matchedCount}
-                              </p>
-                            </div>
-                            <div class="rounded-md border bg-muted/15 px-3 py-2">
-                              <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupCleaned)}
-                              </p>
-                              <p class="text-lg font-semibold">
-                                {storageRuntimeCleanupResult.summary.cleanedCount}
-                              </p>
-                            </div>
-                            <div class="rounded-md border bg-muted/15 px-3 py-2">
-                              <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupSkipped)}
-                              </p>
-                              <p class="text-lg font-semibold">
-                                {storageRuntimeCleanupResult.summary.skippedCount}
-                              </p>
-                            </div>
-                            <div class="rounded-md border bg-muted/15 px-3 py-2">
-                              <p class="text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupBlocked)}
-                              </p>
-                              <p class="text-lg font-semibold">
-                                {storageRuntimeCleanupResult.summary.blockedCount}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p class="text-sm font-medium">
-                              {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesTitle)}
-                            </p>
-                            <div class="mt-2 space-y-2">
-                              {#if storageRuntimeCleanupResult.candidates.length > 0}
-                                {#each storageRuntimeCleanupResult.candidates as candidate (candidate.id)}
-                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                      <div class="min-w-0">
-                                        <p class="break-all font-mono text-xs">{candidate.target}</p>
-                                        <p class="mt-1 text-xs text-muted-foreground">
-                                          {candidate.updatedAt ? formatTime(candidate.updatedAt) : "-"}
-                                        </p>
-                                      </div>
-                                      <Badge variant={candidate.action === "blocked" ? "secondary" : "outline"}>
-                                        {storageRuntimeCleanupCandidateDetail(candidate)}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                {/each}
-                              {:else}
-                                <div class="rounded-md border border-dashed bg-muted/15 px-4 py-4 text-sm text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.storageRuntimeCleanupCandidatesEmpty)}
-                                </div>
-                              {/if}
-                            </div>
-                          </div>
-
-                          {#if storageRuntimeCleanupResult.warnings.length > 0}
-                            <div>
-                              <p class="text-sm font-medium">
-                                {$t(i18nKeys.console.resources.storageRuntimeCleanupWarningsTitle)}
-                              </p>
-                              <div class="mt-2 space-y-2">
-                                {#each storageRuntimeCleanupResult.warnings as warning, index (index)}
-                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
-                                    <p class="font-medium">{warning.code}</p>
-                                    <p class="mt-1 text-xs text-muted-foreground">{warning.message}</p>
-                                  </div>
-                                {/each}
-                              </div>
-                            </div>
-                          {/if}
-                        </div>
-                      {/if}
-
-                      <Dialog.Footer class="px-0 pb-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onclick={() => (storageRuntimeCleanupDialogOpen = false)}
-                        >
-                          {$t(i18nKeys.common.actions.close)}
-                        </Button>
-                      </Dialog.Footer>
-                    </div>
-                  </Dialog.Content>
-                </Dialog.Root>
-
-                <Dialog.Root bind:open={storageAttachDialogOpen}>
-                  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
-                    <Dialog.Header>
-                      <Dialog.Title>{$t(i18nKeys.console.resources.storageAttachTitle)}</Dialog.Title>
-                      <Dialog.Description>
-                        {$t(i18nKeys.console.resources.storageAttachDescription)}
-                      </Dialog.Description>
-                    </Dialog.Header>
-
-                    <form
-                      id="resource-storage-attachment-form"
-                      class="space-y-4 px-5 pb-5"
-                      onsubmit={attachResourceStorage}
-                    >
-                      <div class="flex justify-end">
-                        <Badge variant="secondary">
-                          {$t(i18nKeys.console.resources.storageSnapshotBadge)}
-                        </Badge>
-                      </div>
-
-                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_minmax(10rem,12rem)]">
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageVolume)}</span>
-                          <Select.Root bind:value={storageAttachmentVolumeId} type="single">
-                            <Select.Trigger id="resource-storage-attachment-volume-trigger" class="w-full">
-                              {selectedStorageVolume
-                                ? storageVolumeOptionLabel(selectedStorageVolume)
-                                : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              {#each storageVolumes as volume (volume.id)}
-                                <Select.Item value={volume.id}>
-                                  {storageVolumeOptionLabel(volume)}
-                                </Select.Item>
-                              {/each}
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium" for="resource-storage-destination">
-                          <span>{$t(i18nKeys.console.resources.storageDestinationPath)}</span>
-                          <Input
-                            id="resource-storage-destination"
-                            bind:value={storageAttachmentDestinationPath}
-                            autocomplete="off"
-                            placeholder="/var/lib/app/data"
-                          />
-                        </label>
-
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.console.resources.storageMountMode)}</span>
-                          <Select.Root bind:value={storageAttachmentMountMode} type="single">
-                            <Select.Trigger class="w-full">
-                              {storageMountModeLabel(storageAttachmentMountMode)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              <Select.Item value="read-write">
-                                {$t(i18nKeys.console.resources.storageMountModeReadWrite)}
-                              </Select.Item>
-                              <Select.Item value="read-only">
-                                {$t(i18nKeys.console.resources.storageMountModeReadOnly)}
-                              </Select.Item>
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-                      </div>
-
-                      {#if storageVolumes.length === 0}
-                        <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                          {$t(i18nKeys.console.resources.storageVolumesEmpty)}
-                        </div>
-                      {/if}
-
-                      {#if storageAttachmentFeedback && storageAttachmentFeedback.kind === "error"}
-                        <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                          <p class="font-medium">{storageAttachmentFeedback.title}</p>
-                          <p class="mt-1 break-all text-xs">{storageAttachmentFeedback.detail}</p>
-                        </div>
-                      {/if}
-
-                      <Dialog.Footer class="px-0 pb-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onclick={() => (storageAttachDialogOpen = false)}
-                        >
-                          {$t(i18nKeys.common.actions.close)}
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={!canAttachStorage || attachResourceStorageMutation.isPending}
-                        >
-                          {attachResourceStorageMutation.isPending
-                            ? $t(i18nKeys.common.actions.saving)
-                            : $t(i18nKeys.console.resources.storageAttachAction)}
-                        </Button>
-                      </Dialog.Footer>
-                    </form>
-                  </Dialog.Content>
-                </Dialog.Root>
-              </section>
-
-              {:else if activeSettingsSection === "dependencies"}
-              <section id="resource-overview-dependencies" class="space-y-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-lg font-semibold">
-                        {$t(i18nKeys.console.resources.dependenciesTitle)}
-                      </h2>
-                      <DocsHelpLink
-                        href={webDocsHrefs.dependencyResourceLifecycle}
-                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      />
-                    </div>
-                    <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.resources.dependenciesDescription)}
-                    </p>
-                  </div>
-                  <Badge variant="outline">{resourceDependencyBindings.length}</Badge>
-                </div>
-
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <Database class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.dependencyResourceManagementTitle)}
-                        </h3>
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyResourceManagementDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{dependencyResources.length}</Badge>
-                  </div>
-
-                  <form class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1fr)_auto]" onsubmit={provisionDependencyResource}>
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-name">
-                      <span>{$t(i18nKeys.console.resources.dependencyName)}</span>
-                      <Input
-                        id="resource-dependency-name"
-                        bind:value={dependencyProvisionName}
-                        autocomplete="off"
-                        placeholder="primary-db"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.dependencyKind)}</span>
-                      <Select.Root bind:value={dependencyProvisionKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {dependencyResourceKindLabel(dependencyProvisionKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each dependencyResourceKindOrder as dependencyKind (dependencyKind)}
-                            <Select.Item value={dependencyKind}>
-                              {dependencyResourceKindLabel(dependencyKind)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-provider">
-                      <span>{$t(i18nKeys.console.resources.dependencyProviderKey)}</span>
-                      <Input
-                        id="resource-dependency-provider"
-                        bind:value={dependencyProviderKey}
-                        autocomplete="off"
-                        placeholder="local"
-                      />
-                    </label>
-
-                    <div class="flex items-end">
-                      <Button
-                        type="submit"
-                        disabled={!canProvisionDependencyResource || provisionDependencyResourceMutation.isPending}
-                      >
-                        <Plus class="mr-2 size-4" aria-hidden="true" />
-                        {provisionDependencyResourceMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.dependencyProvisionAction)}
-                      </Button>
-                    </div>
-                  </form>
-
-                  <form class="mt-4 grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(0,1.4fr)_minmax(0,1fr)_auto]" onsubmit={importDependencyResource}>
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-name">
-                      <span>{$t(i18nKeys.console.resources.dependencyImportName)}</span>
-                      <Input
-                        id="resource-dependency-import-name"
-                        bind:value={dependencyImportName}
-                        autocomplete="off"
-                        placeholder="external-db"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.dependencyKind)}</span>
-                      <Select.Root bind:value={dependencyImportKind} type="single">
-                        <Select.Trigger class="w-full">
-                          {dependencyResourceKindLabel(dependencyImportKind)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each dependencyResourceKindOrder as dependencyKind (dependencyKind)}
-                            <Select.Item value={dependencyKind}>
-                              {dependencyResourceKindLabel(dependencyKind)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-url">
-                      <span>{$t(i18nKeys.console.resources.dependencyImportConnectionUrl)}</span>
-                      <Input
-                        id="resource-dependency-import-url"
-                        bind:value={dependencyImportConnectionUrl}
-                        autocomplete="off"
-                        placeholder={dependencyConnectionPlaceholder(dependencyImportKind)}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-import-secret-ref">
-                      <span>{$t(i18nKeys.console.resources.dependencyImportSecretRef)}</span>
-                      <Input
-                        id="resource-dependency-import-secret-ref"
-                        bind:value={dependencyImportSecretRef}
-                        autocomplete="off"
-                        placeholder="secret://..."
-                      />
-                    </label>
-
-                    <div class="flex items-end">
-                      <Button
-                        type="submit"
-                        disabled={!canImportDependencyResource || importDependencyResourceMutation.isPending}
-                      >
-                        <Link2 class="mr-2 size-4" aria-hidden="true" />
-                        {importDependencyResourceMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.dependencyImportAction)}
-                      </Button>
-                    </div>
-                  </form>
-
-                  <div class="mt-4 space-y-3">
-                    {#if dependencyResourcesQuery.isPending}
-                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependenciesLoading)}
-                      </div>
-                    {:else if dependencyResourcesQuery.error}
-                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                        {readErrorMessage(dependencyResourcesQuery.error)}
-                      </div>
-                    {:else if dependencyResources.length === 0}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependenciesEmpty)}
-                      </div>
-                    {:else}
-                      {#each dependencyResources as dependency (dependency.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 flex-1 space-y-2">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">{dependency.name}</p>
-                                <Badge variant="outline">
-                                  {dependencyResourceKindLabel(dependency.kind)}
-                                </Badge>
-                                <Badge variant="secondary">{dependency.lifecycleStatus}</Badge>
-                                <Badge variant="outline">{dependency.bindingReadiness.status}</Badge>
-                              </div>
-                              {#if dependency.connection?.maskedConnection}
-                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                  {dependency.connection.maskedConnection}
-                                </p>
-                              {/if}
-                              <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <label class="min-w-0 flex-1 space-y-1 text-xs font-medium" for={`dependency-rename-${dependency.id}`}>
-                                  <span>{$t(i18nKeys.console.resources.dependencyRenameInput)}</span>
-                                  <Input
-                                    id={`dependency-rename-${dependency.id}`}
-                                    value={dependencyRenameNames[dependency.id] ?? ""}
-                                    autocomplete="off"
-                                    placeholder={dependency.name}
-                                    oninput={(event) => {
-                                      dependencyRenameNames[dependency.id] = event.currentTarget.value;
-                                    }}
-                                  />
-                                </label>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isResourceArchived ||
-                                    renameDependencyResourceMutation.isPending ||
-                                    !(dependencyRenameNames[dependency.id] ?? "").trim() ||
-                                    (dependencyRenameNames[dependency.id] ?? "").trim() === dependency.name}
-                                  onclick={() => renameDependencyResource(dependency)}
-                                >
-                                  {$t(i18nKeys.console.resources.dependencyRenameAction)}
-                                </Button>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={isResourceArchived ||
-                                deleteDependencyResourceMutation.isPending ||
-                                (dependency.deleteSafety?.blockers.length ?? 0) > 0}
-                              title={(dependency.deleteSafety?.blockers.length ?? 0) > 0
-                                ? $t(i18nKeys.console.resources.dependencyDeleteBlocked)
-                                : undefined}
-                              onclick={() => deleteDependencyResource(dependency)}
-                            >
-                              <Trash2 class="mr-2 size-4" aria-hidden="true" />
-                              {$t(i18nKeys.console.resources.dependencyDeleteAction)}
-                            </Button>
-                          </div>
-                        </article>
-                      {/each}
-                    {/if}
-                  </div>
-                </section>
-
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <Archive class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.dependencyBackupTitle)}
-                        </h3>
-                        <DocsHelpLink
-                          href={webDocsHrefs.dependencyBackupRestore}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBackupDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{dependencyBackups.length}</Badge>
-                  </div>
-
-                  <form class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onsubmit={createDependencyBackup}>
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.dependencyResource)}</span>
-                      <Select.Root bind:value={dependencyBackupResourceId} type="single">
-                        <Select.Trigger id="resource-dependency-backup-resource-trigger" class="w-full">
-                          {selectedDependencyBackupResource
-                            ? dependencyResourceOptionLabel(selectedDependencyBackupResource)
-                            : $t(i18nKeys.console.resources.dependencySelect)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each dependencyResources as dependency (dependency.id)}
-                            <Select.Item value={dependency.id}>
-                              {dependencyResourceOptionLabel(dependency)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-backup-description">
-                      <span>{$t(i18nKeys.console.resources.dependencyBackupDescriptionInput)}</span>
-                      <Input
-                        id="resource-dependency-backup-description"
-                        bind:value={dependencyBackupDescription}
-                        autocomplete="off"
-                        placeholder="pre deploy"
-                      />
-                    </label>
-
-                    <div class="flex items-end">
-                      <Button
-                        type="submit"
-                        disabled={!canCreateDependencyBackup || createDependencyBackupMutation.isPending}
-                      >
-                        <Database class="mr-2 size-4" aria-hidden="true" />
-                        {createDependencyBackupMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.dependencyBackupCreateAction)}
-                      </Button>
-                    </div>
-                  </form>
-
-                  <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <label
-                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
-                      for="resource-dependency-restore-overwrite"
-                    >
-                      <input
-                        id="resource-dependency-restore-overwrite"
-                        bind:checked={dependencyRestoreAcknowledgeDataOverwrite}
-                        type="checkbox"
-                        class="mt-0.5 size-4 rounded border-input"
-                      />
-                      <span>{$t(i18nKeys.console.resources.dependencyBackupAcknowledgeOverwrite)}</span>
-                    </label>
-
-                    <label
-                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
-                      for="resource-dependency-restore-runtime"
-                    >
-                      <input
-                        id="resource-dependency-restore-runtime"
-                        bind:checked={dependencyRestoreAcknowledgeRuntimeNotRestarted}
-                        type="checkbox"
-                        class="mt-0.5 size-4 rounded border-input"
-                      />
-                      <span>{$t(i18nKeys.console.resources.dependencyBackupAcknowledgeRuntime)}</span>
-                    </label>
-                  </div>
-
-                  <div class="mt-4 space-y-3">
-                    {#if !dependencyBackupResourceId}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBackupSelectPrompt)}
-                      </div>
-                    {:else if dependencyBackupsQuery.isPending}
-                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBackupsLoading)}
-                      </div>
-                    {:else if dependencyBackupsQuery.error}
-                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                        {readErrorMessage(dependencyBackupsQuery.error)}
-                      </div>
-                    {:else if dependencyBackups.length === 0}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBackupsEmpty)}
-                      </div>
-                    {:else}
-                      {#each dependencyBackups as backup (backup.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 flex-1 space-y-2">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">{dependencyBackupLabel(backup)}</p>
-                                <Badge variant="secondary">{backup.retentionStatus}</Badge>
-                                {#if backup.latestRestoreAttempt}
-                                  <Badge variant="outline">
-                                    {backup.latestRestoreAttempt.status}
-                                  </Badge>
-                                {/if}
-                              </div>
-                              {#if backup.providerArtifactHandle}
-                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                  {backup.providerArtifactHandle}
-                                </p>
-                              {/if}
-                              {#if backup.failureCode || backup.failureMessage}
-                                <p class="text-xs text-destructive">
-                                  {backup.failureCode ?? ""} {backup.failureMessage ?? ""}
-                                </p>
-                              {/if}
-                              <label class="block space-y-1 text-xs font-medium" for={`dependency-restore-label-${backup.id}`}>
-                                <span>{$t(i18nKeys.console.resources.dependencyBackupRestoreLabel)}</span>
-                                <Input
-                                  id={`dependency-restore-label-${backup.id}`}
-                                  value={dependencyRestoreLabels[backup.id] ?? ""}
-                                  autocomplete="off"
-                                  placeholder="restore before migration"
-                                  oninput={(event) => {
-                                    dependencyRestoreLabels[backup.id] = event.currentTarget.value;
-                                  }}
-                                />
-                              </label>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={isResourceArchived ||
-                                backup.status !== "ready" ||
-                                !dependencyRestoreAcknowledgeDataOverwrite ||
-                                !dependencyRestoreAcknowledgeRuntimeNotRestarted ||
-                                restoreDependencyBackupMutation.isPending}
-                              onclick={() => restoreDependencyBackup(backup)}
-                            >
-                              <RotateCw class="mr-2 size-4" aria-hidden="true" />
-                              {$t(i18nKeys.console.resources.dependencyBackupRestoreAction)}
-                            </Button>
-                          </div>
-                        </article>
-                      {/each}
-                    {/if}
-                  </div>
-                </section>
-
-                <form
-                  id="resource-dependency-binding-form"
-                  class="rounded-md border bg-background p-4"
-                  onsubmit={bindDependencyResource}
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <Link2 class="size-4 text-muted-foreground" aria-hidden="true" />
-                        <h3 class="text-base font-semibold">
-                          {$t(i18nKeys.console.resources.dependencyBindTitle)}
-                        </h3>
-                        <DocsHelpLink
-                          href={webDocsHrefs.dependencyRuntimeInjection}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </div>
-                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBindDescription)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">
-                      {$t(i18nKeys.console.resources.dependencyRuntimeBadge)}
-                    </Badge>
-                  </div>
-
-                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_auto]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.dependencyResource)}</span>
-                      <Select.Root bind:value={dependencyBindingResourceId} type="single">
-                        <Select.Trigger id="resource-dependency-binding-resource-trigger" class="w-full">
-                          {selectedDependencyResource
-                            ? dependencyResourceOptionLabel(selectedDependencyResource)
-                            : $t(i18nKeys.console.resources.dependencySelect)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each bindableDependencyResources as dependency (dependency.id)}
-                            <Select.Item value={dependency.id}>
-                              {dependencyResourceOptionLabel(dependency)}
-                            </Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-target">
-                      <span>{$t(i18nKeys.console.resources.dependencyTargetName)}</span>
-                      <Input
-                        id="resource-dependency-target"
-                        bind:value={dependencyBindingTargetName}
-                        autocomplete="off"
-                        placeholder="DATABASE_URL"
-                      />
-                    </label>
-
-                    <div class="flex items-end">
-                      <Button
-                        type="submit"
-                        disabled={!canBindDependencyResource || bindResourceDependencyMutation.isPending}
-                      >
-                        {bindResourceDependencyMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.dependencyBindAction)}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {#if dependencyFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        dependencyFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{dependencyFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{dependencyFeedback.detail}</p>
-                    </div>
-                  {/if}
-                </form>
-
-                <section class="rounded-md border bg-background p-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 class="text-base font-semibold">
-                        {$t(i18nKeys.console.resources.dependencyBindingsTitle)}
-                      </h3>
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBindingsDescription)}
-                      </p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onclick={() => void invalidateDependencyQueries()}
+                      disabled={resourceHealthQuery.isFetching}
+                      onclick={() => resourceHealthQuery.refetch()}
                     >
-                      <RefreshCw class="mr-2 size-4" aria-hidden="true" />
-                      {$t(i18nKeys.console.resources.dependencyRefresh)}
+                      <RefreshCw
+                        class={["size-4", resourceHealthQuery.isFetching ? "animate-spin" : ""]}
+                      />
+                      {$t(i18nKeys.console.resources.healthRefresh)}
                     </Button>
                   </div>
-
-                  <div class="mt-4 space-y-3">
-                    {#if resourceDependencyBindingsQuery.isPending}
-                      <div class="rounded-md border bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependenciesLoading)}
-                      </div>
-                    {:else if resourceDependencyBindings.length > 0}
-                      {#each resourceDependencyBindings as binding (binding.id)}
-                        <article class="rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0 space-y-2">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium">
-                                  {binding.dependencyResourceName ?? binding.dependencyResourceId}
-                                </p>
-                                <Badge variant="outline">
-                                  {dependencyResourceKindLabel(binding.kind)}
-                                </Badge>
-                                <Badge variant="secondary">{binding.snapshotReadiness.status}</Badge>
-                                <Badge variant="outline">{binding.status}</Badge>
-                              </div>
-                              <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
-                                {binding.target.targetName} · {binding.target.scope} · {binding.target.injectionMode}
-                              </p>
-                              <div class="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                                <label class="space-y-1 text-xs font-medium" for={`dependency-binding-secret-ref-${binding.id}`}>
-                                  <span>{$t(i18nKeys.console.resources.dependencySecretRefInput)}</span>
-                                  <Input
-                                    id={`dependency-binding-secret-ref-${binding.id}`}
-                                    value={dependencyBindingSecretRefs[binding.id] ?? ""}
-                                    autocomplete="off"
-                                    placeholder="secret://..."
-                                    oninput={(event) => {
-                                      dependencyBindingSecretRefs[binding.id] = event.currentTarget.value;
-                                    }}
-                                  />
-                                </label>
-                                <label class="space-y-1 text-xs font-medium" for={`dependency-binding-secret-value-${binding.id}`}>
-                                  <span>{$t(i18nKeys.console.resources.dependencySecretValueInput)}</span>
-                                  <Input
-                                    id={`dependency-binding-secret-value-${binding.id}`}
-                                    value={dependencyBindingSecretValues[binding.id] ?? ""}
-                                    type="password"
-                                    autocomplete="new-password"
-                                    oninput={(event) => {
-                                      dependencyBindingSecretValues[binding.id] = event.currentTarget.value;
-                                    }}
-                                  />
-                                </label>
-                              </div>
-                              <label
-                                class="flex items-start gap-3 rounded-md border bg-background px-3 py-2 text-xs"
-                                for={`dependency-binding-secret-ack-${binding.id}`}
-                              >
-                                <input
-                                  id={`dependency-binding-secret-ack-${binding.id}`}
-                                  checked={dependencyBindingSecretRotationAcks[binding.id] === true}
-                                  type="checkbox"
-                                  class="mt-0.5 size-4 rounded border-input"
-                                  onchange={(event) => {
-                                    dependencyBindingSecretRotationAcks[binding.id] =
-                                      event.currentTarget.checked;
-                                  }}
-                                />
-                                <span>
-                                  {$t(i18nKeys.console.resources.dependencySecretRotateAck)}
-                                </span>
-                              </label>
-                            </div>
-                            <div class="flex flex-wrap gap-2 lg:justify-end">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={!canRotateDependencyBindingSecret(binding.id)}
-                                onclick={() => rotateDependencyBindingSecret(binding)}
-                              >
-                                <RotateCw class="mr-2 size-4" aria-hidden="true" />
-                                {$t(i18nKeys.console.resources.dependencySecretRotateAction)}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={isResourceArchived || unbindResourceDependencyMutation.isPending}
-                                onclick={() => unbindDependencyResource(binding)}
-                              >
-                                {$t(i18nKeys.console.resources.dependencyUnbindAction)}
-                              </Button>
-                            </div>
-                          </div>
-                        </article>
-                      {/each}
-                    {:else}
-                      <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dependencyBindingsEmpty)}
-                      </div>
-                    {/if}
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthRuntime)}
+                      </p>
+                      <p class="mt-1 text-sm font-medium">
+                        {resourceHealthSectionStatusLabel(resourceHealth?.runtime.lifecycle)}
+                      </p>
+                    </div>
+                    <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthPolicy)}
+                      </p>
+                      <p class="mt-1 text-sm font-medium">
+                        {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
+                      </p>
+                    </div>
                   </div>
                 </section>
+              </div>
+
+              <div class="grid gap-4 xl:grid-cols-3">
+                <section class="rounded-md border bg-background p-4 xl:col-span-2">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.overviewLatestDeployment)}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.deploymentsDescription)}
+                      </p>
+                    </div>
+                    <Button href={resourceTabHref("deployments")} variant="outline" size="sm">
+                      {$t(i18nKeys.common.actions.viewDeployments)}
+                    </Button>
+                  </div>
+                  {#if latestDeployment}
+                    <div class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_12rem]">
+                      <div class="min-w-0 rounded-md bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.common.domain.deployment)}
+                        </p>
+                        <a
+                          class="mt-1 block truncate font-mono text-sm font-medium text-primary underline-offset-4 hover:underline"
+                          href={deploymentDetailHref(latestDeployment)}
+                        >
+                          {latestDeployment.id}
+                        </a>
+                      </div>
+                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.common.domain.status)}
+                        </p>
+                        <div class="mt-1">
+                          <DeploymentStatusBadge status={latestDeployment.status} />
+                        </div>
+                      </div>
+                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.common.domain.time)}
+                        </p>
+                        <p class="mt-1 truncate text-sm font-medium">
+                          {resourceLatestDeploymentTime(latestDeployment)}
+                        </p>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-5">
+                      <p class="font-medium">{$t(i18nKeys.console.resources.overviewNoDeploymentTitle)}</p>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.overviewNoDeploymentDescription)}
+                      </p>
+                    </div>
+                  {/if}
+                </section>
+
+                <section class="rounded-md border bg-background p-4">
+                  <h3 class="text-base font-semibold">
+                    {$t(i18nKeys.console.resources.overviewNextActions)}
+                  </h3>
+                  <div class="mt-4 flex flex-col gap-2">
+                    <Button
+                      href={resourceDeploymentHref()}
+                      disabled={isResourceArchived || isPreviewEnvironmentResource}
+                    >
+                      <Plus class="size-4" />
+                      {$t(i18nKeys.common.actions.quickDeploy)}
+                    </Button>
+                    <Button href={resourceSettingsSectionHref("access")} variant="outline">
+                      <Globe2 class="size-4" />
+                      {$t(i18nKeys.console.projects.manageAccessAction)}
+                    </Button>
+                    <Button href={resourceSettingsSectionHref("logs")} variant="outline">
+                      <Terminal class="size-4" />
+                      {$t(i18nKeys.console.resources.runtimeLogsTitle)}
+                    </Button>
+                  </div>
+                </section>
+              </div>
+
+              <section class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 class="text-base font-semibold">
+                      {$t(i18nKeys.console.resources.overviewConfigurationSummary)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
+                    </p>
+                  </div>
+                  <Button href={resourceTabHref("configuration")} variant="outline" size="sm">
+                    {$t(i18nKeys.console.resources.configurationTab)}
+                  </Button>
+                </div>
+                <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-md bg-muted/25 px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.common.domain.source)}
+                    </dt>
+                    <dd class="mt-1 truncate text-sm font-medium">{resourceSourceSummary()}</dd>
+                  </div>
+                  <div class="rounded-md bg-muted/25 px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeProfileTitle)}
+                    </dt>
+                    <dd class="mt-1 truncate text-sm font-medium">{resourceRuntimeSummary()}</dd>
+                  </div>
+                  <div class="rounded-md bg-muted/25 px-3 py-2 sm:col-span-2">
+                    <dt class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.networkProfileTitle)}
+                    </dt>
+                    <dd class="mt-1 truncate text-sm font-medium">{resourceNetworkSummary()}</dd>
+                  </div>
+                </dl>
               </section>
 
-              {:else if activeSettingsSection === "domains"}
-              <section id="resource-overview-domains" class="space-y-4">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.resources.domainBindingsTitle)}
-                    </h2>
-                    <DocsHelpLink
-                      href={webDocsHrefs.domainCustomDomainBinding}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              <section class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 class="text-base font-semibold">
+                      {$t(i18nKeys.console.resources.dependenciesTitle)}
+                    </h3>
+                    <p class="mt-1 text-sm text-muted-foreground">{resourceDependencySummary()}</p>
+                  </div>
+                  <Button href={resourceTabHref("dependencies")} variant="outline" size="sm">
+                    {$t(i18nKeys.console.resources.dependenciesTitle)}
+                  </Button>
+                </div>
+              </section>
+            </section>
+          </div>
+        {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
+          <div class="mt-0 pt-5">
+            <div
+              class="grid min-w-0 border-b lg:min-h-[42rem] lg:grid-cols-[10.5rem_minmax(0,1fr)]"
+            >
+              {@render resourceSectionNavigation()}
+
+              <div class="space-y-8 p-5">
+                {#if activeSettingsSection === "general"}
+                  <div id="resource-settings-general" class="space-y-4">
+                    <ResourceProfileSummary
+                      {resource}
+                      projectName={project?.name ?? resource.projectId}
+                      environmentName={environment?.name ?? resource.environmentId}
+                      destinationId={defaultDestinationId}
                     />
                   </div>
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.resources.domainBindingsDescription)}
-                  </p>
-                </div>
-
-                {#if isServerlessStaticArtifactAccess}
-                  <div class="rounded-md border bg-muted/15 p-4">
-                    <div class="flex gap-3">
-                      <Globe2 class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                {:else if activeSettingsSection === "access"}
+                  <section id="resource-overview-access" class="rounded-md border bg-background p-4">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div class="min-w-0 space-y-2">
-                        <div>
-                          <h3 class="text-sm font-semibold">
-                            {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
-                          </h3>
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
-                          </p>
-                        </div>
-                        {#if currentAccessRoute}
+                        <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Link2 class="size-4" />
+                          {$t(i18nKeys.console.resources.accessUrlTitle)}
+                        </p>
+                        {#if primaryAccessHref}
                           <a
-                            class="inline-flex max-w-full items-center gap-2 truncate text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            href={currentAccessRoute.route.url}
+                            class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                            href={primaryAccessHref}
                             target="_blank"
                             rel="noreferrer"
                           >
-                            <span class="shrink-0">
-                              {$t(i18nKeys.console.resources.staticArtifactDefaultAccess)}
-                            </span>
-                            <span class="truncate">{currentAccessRoute.route.url}</span>
+                            {primaryAccessHref}
                           </a>
+                          <div class="flex flex-wrap items-center gap-2">
+                            {#if primaryAccessKind}
+                              <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
+                            {/if}
+                            {#if primaryDomainBinding}
+                              <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                                {domainBindingStatusLabel(primaryDomainBinding.status)}
+                              </Badge>
+                            {:else}
+                              <Badge
+                                variant={resourceAccessStatusVariant(
+                                  resource?.accessSummary?.proxyRouteStatus,
+                                )}
+                              >
+                                {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
+                              </Badge>
+                            {/if}
+                            {#if primaryAccessRoute?.targetPort}
+                              <Badge variant="secondary">
+                                {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
+                              </Badge>
+                            {/if}
+                          </div>
+                        {:else}
+                          <p class="text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.accessUrlEmpty)}
+                          </p>
                         {/if}
                       </div>
-                    </div>
-                  </div>
-                {:else}
-                  <form
-                    id="resource-domain-binding-create-form"
-                    class="rounded-md border bg-background p-4"
-                    onsubmit={createResourceDomainBinding}
-                  >
-                  <div class="flex flex-wrap gap-x-4 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
-                    <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
-                    <span>
-                      {$t(i18nKeys.common.domain.server)}:
-                      {selectedServer?.name ?? latestDeployment?.serverId ?? "-"}
-                    </span>
-                    <span>{$t(i18nKeys.common.domain.destination)}: {destinationId || "-"}</span>
-                  </div>
 
-                  <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem_10rem_12rem]">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.domainName)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.domainCustomDomainBinding}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-domain-binding-domain-name"
-                        bind:value={domainName}
-                        autocomplete="off"
-                        placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.pathPrefix)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.domainGeneratedAccessRoute}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-domain-binding-path-prefix"
-                        bind:value={pathPrefix}
-                        autocomplete="off"
-                        placeholder="/"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.tls)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.certificateReadiness}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={tlsMode} type="single">
-                        <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="auto">auto</Select.Item>
-                          <Select.Item value="disabled">disabled</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.common.domain.routeBehavior)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.domainGeneratedAccessRoute}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={routeMode} type="single">
-                        <Select.Trigger class="w-full">
-                          {routeMode === "redirect"
-                            ? $t(i18nKeys.console.domainBindings.routeModeRedirect)
-                            : $t(i18nKeys.console.domainBindings.routeModeServe)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="serve">
-                            {$t(i18nKeys.console.domainBindings.routeModeServe)}
-                          </Select.Item>
-                          <Select.Item value="redirect">
-                            {$t(i18nKeys.console.domainBindings.routeModeRedirect)}
-                          </Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-                  </div>
-
-                  {#if routeMode === "redirect"}
-                    <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                      <label class="space-y-1.5 text-sm font-medium">
-                        <span class="inline-flex items-center gap-1.5">
-                          {$t(i18nKeys.common.domain.redirectTo)}
-                          <DocsHelpLink
-                            href={webDocsHrefs.domainCustomDomainBinding}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            className="size-5"
-                          />
-                        </span>
-                        <Select.Root
-                          bind:value={redirectTo}
-                          type="single"
-                          disabled={canonicalRedirectTargets.length === 0}
+                      {#if primaryAccessHref}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          aria-label={accessUrlCopyLabel}
+                          title={accessUrlCopyLabel}
+                          onclick={handleCopyAccessUrl}
                         >
-                          <Select.Trigger class="w-full">
-                            {selectedCanonicalRedirectTarget?.domainName ??
-                              $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
-                          </Select.Trigger>
-                          <Select.Content>
-                            {#each canonicalRedirectTargets as binding (binding.id)}
-                              <Select.Item value={binding.domainName}>{binding.domainName}</Select.Item>
-                            {/each}
-                          </Select.Content>
-                        </Select.Root>
-                      </label>
-
-                      <label class="space-y-1.5 text-sm font-medium">
-                        <span class="inline-flex items-center gap-1.5">
-                          {$t(i18nKeys.common.domain.redirectStatus)}
-                          <DocsHelpLink
-                            href={webDocsHrefs.domainCustomDomainBinding}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            className="size-5"
-                          />
-                        </span>
-                        <Select.Root bind:value={redirectStatus} type="single">
-                          <Select.Trigger class="w-full">{redirectStatus}</Select.Trigger>
-                          <Select.Content>
-                            <Select.Item value="308">308</Select.Item>
-                            <Select.Item value="301">301</Select.Item>
-                            <Select.Item value="307">307</Select.Item>
-                            <Select.Item value="302">302</Select.Item>
-                          </Select.Content>
-                        </Select.Root>
-                      </label>
-                    </div>
-                  {/if}
-
-                  {#if shouldShowServerField || shouldShowDestinationField}
-                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                      {#if shouldShowServerField}
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span class="inline-flex items-center gap-1.5">
-                            {$t(i18nKeys.common.domain.server)}
-                            <DocsHelpLink
-                              href={webDocsHrefs.serverDeploymentTarget}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                              className="size-5"
-                            />
-                          </span>
-                          <Select.Root bind:value={serverId} type="single">
-                            <Select.Trigger class="w-full">
-                              {selectedServer?.name ??
-                                $t(i18nKeys.console.domainBindings.noServerOptions)}
-                            </Select.Trigger>
-                            <Select.Content>
-                              {#each servers as server (server.id)}
-                                <Select.Item value={server.id}>{server.name}</Select.Item>
-                              {/each}
-                            </Select.Content>
-                          </Select.Root>
-                        </label>
-                      {/if}
-
-                      {#if shouldShowDestinationField}
-                        <label class="space-y-1.5 text-sm font-medium">
-                          <span class="inline-flex items-center gap-1.5">
-                            {$t(i18nKeys.common.domain.destination)}
-                            <DocsHelpLink
-                              href={webDocsHrefs.domainGeneratedAccessRoute}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                              className="size-5"
-                            />
-                          </span>
-                          <Input
-                            bind:value={destinationId}
-                            autocomplete="off"
-                            placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
-                          />
-                        </label>
+                          {#if accessUrlCopyState === "copied"}
+                            <Check class="size-4" />
+                          {:else}
+                            <Copy class="size-4" />
+                          {/if}
+                          {accessUrlCopyLabel}
+                        </Button>
                       {/if}
                     </div>
-                  {/if}
-
-                  {#if createFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        createFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{createFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{createFeedback.detail}</p>
+                  </section>
+                {:else if activeSettingsSection === "domains"}
+                  <section id="resource-domain-bindings" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.domainBindingsDescription)}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{resourceDomainBindings.length}</Badge>
                     </div>
-                  {/if}
 
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canCreateBinding || createDomainBindingMutation.isPending}
-                    >
-                      <Globe2 class="size-4" />
-                      {createDomainBindingMutation.isPending
-                        ? $t(i18nKeys.console.domainBindings.formSubmitting)
-                        : $t(i18nKeys.common.actions.bindDomain)}
-                    </Button>
-                  </div>
-                  </form>
-                {/if}
-
-                <div class="space-y-3">
-                  {#if resourceDomainBindings.length > 0}
-                    {#each resourceDomainBindings as binding (binding.id)}
-                      {@const server = binding.serverId ? findServer(servers, binding.serverId) : null}
-                      {@const bindingCertificate = latestCertificateForBinding(binding.id)}
-                      {@const isImportOpen = importBindingId === binding.id}
-                      <article class="rounded-md border bg-background p-4">
-                        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div class="min-w-0 space-y-2">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <Globe2 class="size-4 text-muted-foreground" />
-                              <a
-                                class="truncate font-medium text-primary underline-offset-4 hover:underline"
-                                href={domainBindingHref(binding)}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {binding.domainName}
-                              </a>
-                              <Badge variant={domainBindingStatusVariant(binding.status)}>
-                                {domainBindingStatusLabel(binding.status)}
-                              </Badge>
-                            </div>
-                            <p class="text-sm text-muted-foreground">
-                              {binding.pathPrefix} · {binding.proxyKind} · {$t(
-                                i18nKeys.common.domain.tls,
-                              )}
-                              {" "}
-                              {binding.tlsMode}
-                              {#if binding.redirectTo}
-                                · {$t(i18nKeys.common.domain.redirectTo)} {binding.redirectTo}
-                                ({binding.redirectStatus ?? 308})
-                              {/if}
-                            </p>
-                          </div>
-                          <div class="flex flex-wrap items-center gap-2">
-                            {#if binding.status === "pending_verification"}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={confirmDomainBindingOwnershipMutation.isPending}
-                                onclick={() => confirmDomainBindingOwnership(binding)}
-                              >
-                                <Check class="size-4" />
-                                {confirmDomainBindingOwnershipMutation.isPending
-                                  ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
-                                  : $t(i18nKeys.console.domainBindings.confirmOwnership)}
-                              </Button>
-                            {/if}
-                            <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
-                          </div>
-                        </div>
-                        <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
-                            <p class="text-xs text-muted-foreground">
-                              {$t(i18nKeys.common.domain.server)}
-                            </p>
-                            <p class="mt-1 truncate text-sm font-medium">
-                              {server?.name ?? binding.serverId}
-                            </p>
-                          </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
-                            <p class="text-xs text-muted-foreground">
-                              {$t(i18nKeys.common.domain.destination)}
-                            </p>
-                            <p class="mt-1 truncate text-sm font-medium">{binding.destinationId}</p>
-                          </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
-                            <p class="text-xs text-muted-foreground">
-                              {$t(i18nKeys.console.domainBindings.verificationAttempts, {
-                                count: binding.verificationAttemptCount,
-                              })}
-                            </p>
-                            <p class="mt-1 truncate text-sm font-medium">
-                              {binding.certificatePolicy}
-                            </p>
-                          </div>
-                        </div>
-                        <div class="mt-4 console-subtle-panel p-3">
-                          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p class="text-sm font-medium">
-                                {$t(i18nKeys.console.domainBindings.lifecycleGuideTitle)}
-                              </p>
-                              {#if binding.dnsObservation?.message}
-                                <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                                  {binding.dnsObservation.message}
-                                </p>
-                              {/if}
-                            </div>
-                            <Badge variant={domainBindingStatusVariant(binding.status)}>
-                              {domainBindingStatusLabel(binding.status)}
-                            </Badge>
-                          </div>
-
-                          <div class="mt-3 grid gap-3 lg:grid-cols-3">
-                            <div class="rounded-md bg-background px-3 py-2">
-                              <div class="flex flex-wrap items-center justify-between gap-2">
-                                <p class="text-xs font-medium text-muted-foreground">
-                                  {$t(i18nKeys.console.domainBindings.dnsStepTitle)}
-                                </p>
-                                <Badge
-                                  variant={domainDnsObservationStatusVariant(
-                                    binding.dnsObservation?.status,
-                                  )}
-                                >
-                                  {domainDnsObservationStatusLabel(binding.dnsObservation?.status)}
-                                </Badge>
-                              </div>
-                              <dl class="mt-2 space-y-1 text-xs">
-                                <div>
-                                  <dt class="text-muted-foreground">
-                                    {$t(i18nKeys.console.domainBindings.dnsExpectedTargets)}
-                                  </dt>
-                                  <dd class="mt-0.5 break-all font-mono">
-                                    {binding.dnsObservation?.expectedTargets.length
-                                      ? binding.dnsObservation.expectedTargets.join(", ")
-                                      : "-"}
-                                  </dd>
+                    {#if resourceDomainBindings.length === 0}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.domainBindings.emptyBody)}
+                      </div>
+                    {:else}
+                      <div class="space-y-3">
+                        {#each resourceDomainBindings as binding (binding.id)}
+                          {@const certificate = latestCertificateForBinding(binding.id)}
+                          <article class="rounded-md border bg-background p-4">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div class="min-w-0 space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                  <a
+                                    class="break-all font-medium text-primary underline-offset-4 hover:underline"
+                                    href={domainBindingHref(binding)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {domainBindingHref(binding)}
+                                  </a>
+                                  <Badge variant={domainBindingStatusVariant(binding.status)}>
+                                    {domainBindingStatusLabel(binding.status)}
+                                  </Badge>
+                                  <Badge variant="outline">{binding.proxyKind}</Badge>
+                                  <Badge variant="secondary">{binding.tlsMode}</Badge>
                                 </div>
-                                <div>
-                                  <dt class="text-muted-foreground">
-                                    {$t(i18nKeys.console.domainBindings.dnsObservedTargets)}
-                                  </dt>
-                                  <dd class="mt-0.5 break-all font-mono">
-                                    {binding.dnsObservation?.observedTargets.length
-                                      ? binding.dnsObservation.observedTargets.join(", ")
-                                      : "-"}
-                                  </dd>
+                                <div class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                                  <span>
+                                    {$t(i18nKeys.common.domain.pathPrefix)}:
+                                    <code class="rounded bg-muted px-1 py-0.5">{binding.pathPrefix}</code>
+                                  </span>
+                                  <span>
+                                    {$t(i18nKeys.common.domain.server)}:
+                                    <code class="rounded bg-muted px-1 py-0.5">{binding.serverId ?? "-"}</code>
+                                  </span>
+                                  <span>
+                                    {$t(i18nKeys.common.domain.destination)}:
+                                    <code class="rounded bg-muted px-1 py-0.5">{binding.destinationId ?? "-"}</code>
+                                  </span>
+                                  <span>
+                                    {$t(i18nKeys.common.domain.createdAt)}:
+                                    {formatTime(binding.createdAt)}
+                                  </span>
                                 </div>
-                                {#if binding.dnsObservation?.checkedAt}
-                                  <div>
-                                    <dt class="text-muted-foreground">
-                                      {$t(i18nKeys.console.domainBindings.dnsCheckedAt)}
-                                    </dt>
-                                    <dd class="mt-0.5">{formatTime(binding.dnsObservation.checkedAt)}</dd>
+                                {#if binding.dnsObservation}
+                                  <div class="rounded-md bg-muted/25 px-3 py-2 text-xs">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                      <span class="font-medium">
+                                        {$t(i18nKeys.console.domainBindings.dnsStepTitle)}
+                                      </span>
+                                      <Badge variant={domainDnsObservationStatusVariant(binding.dnsObservation.status)}>
+                                        {domainDnsObservationStatusLabel(binding.dnsObservation.status)}
+                                      </Badge>
+                                      {#if binding.dnsObservation.checkedAt}
+                                        <span class="text-muted-foreground">
+                                          {formatTime(binding.dnsObservation.checkedAt)}
+                                        </span>
+                                      {/if}
+                                    </div>
+                                    {#if binding.dnsObservation.message}
+                                      <p class="mt-1 text-muted-foreground">
+                                        {binding.dnsObservation.message}
+                                      </p>
+                                    {/if}
                                   </div>
                                 {/if}
-                              </dl>
-                            </div>
+                              </div>
 
-                            <div class="rounded-md bg-background px-3 py-2">
-                              <div class="flex flex-wrap items-center justify-between gap-2">
+                              <div class="min-w-0 space-y-2 lg:w-64">
                                 <p class="text-xs font-medium text-muted-foreground">
                                   {$t(i18nKeys.console.domainBindings.tlsStepTitle)}
                                 </p>
-                                {#if bindingCertificate}
-                                  <Badge variant={certificateStatusVariant(bindingCertificate.status)}>
-                                    {certificateStatusLabel(bindingCertificate.status)}
-                                  </Badge>
+                                {#if certificate}
+                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-xs">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                      <Badge variant={certificateStatusVariant(certificate.status)}>
+                                        {certificateStatusLabel(certificate.status)}
+                                      </Badge>
+                                      <Badge variant="outline">{certificateSourceLabel(certificate.source)}</Badge>
+                                    </div>
+                                    {#if certificate.expiresAt}
+                                      <p class="mt-2 text-muted-foreground">
+                                        {$t(i18nKeys.console.resources.certificateExpiresAt)}:
+                                        {formatTime(certificate.expiresAt)}
+                                      </p>
+                                    {/if}
+                                  </div>
                                 {:else}
-                                  <Badge variant="outline">{binding.certificatePolicy}</Badge>
+                                  <div class="rounded-md border border-dashed bg-muted/15 px-3 py-2 text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.certificateSummaryEmpty)}
+                                  </div>
                                 {/if}
                               </div>
-                              <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                                {binding.tlsMode} · {binding.certificatePolicy}
-                              </p>
                             </div>
-
-                            <div class="rounded-md bg-background px-3 py-2">
-                              <div class="flex flex-wrap items-center justify-between gap-2">
-                                <p class="text-xs font-medium text-muted-foreground">
-                                  {$t(i18nKeys.console.domainBindings.routeReadiness)}
-                                </p>
-                                <Badge variant={domainBindingStatusVariant(binding.status)}>
-                                  {domainBindingStatusLabel(binding.status)}
-                                </Badge>
-                              </div>
-                              <p class="mt-2 break-all font-mono text-xs text-muted-foreground">
-                                {domainBindingHref(binding)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="mt-4 rounded-md border bg-muted/15 p-3">
-                          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p class="text-sm font-medium">
-                                {$t(i18nKeys.console.resources.certificateLatestTitle)}
-                              </p>
-                            </div>
-                            {#if bindingCertificate}
-                              <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant={certificateStatusVariant(bindingCertificate.status)}>
-                                  {certificateStatusLabel(bindingCertificate.status)}
-                                </Badge>
-                                <Badge variant="outline">
-                                  {certificateSourceLabel(bindingCertificate.source)}
-                                </Badge>
-                              </div>
-                            {/if}
-                          </div>
-
-                          {#if bindingCertificate}
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.common.domain.source)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {certificateSourceLabel(bindingCertificate.source)}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.common.domain.status)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {certificateStatusLabel(bindingCertificate.status)}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.certificateExpiresAt)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {bindingCertificate.expiresAt
-                                    ? formatTime(bindingCertificate.expiresAt)
-                                    : "-"}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.certificateNotBefore)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {bindingCertificate.notBefore
-                                    ? formatTime(bindingCertificate.notBefore)
-                                    : "-"}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.certificateIssuer)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {bindingCertificate.issuer ?? "-"}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.certificateKeyAlgorithm)}
-                                </p>
-                                <p class="mt-1 truncate text-sm font-medium">
-                                  {bindingCertificate.keyAlgorithm ?? "-"}
-                                </p>
-                              </div>
-                              <div class="rounded-md bg-background px-3 py-2 sm:col-span-2 lg:col-span-3">
-                                <p class="text-xs text-muted-foreground">
-                                  {$t(i18nKeys.console.resources.certificateSans)}
-                                </p>
-                                <p class="mt-1 break-all text-sm font-medium">
-                                  {bindingCertificate.subjectAlternativeNames?.length
-                                    ? bindingCertificate.subjectAlternativeNames.join(", ")
-                                    : "-"}
-                                </p>
-                              </div>
-                            </div>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                              {#if bindingCertificate.source === "managed" && bindingCertificate.latestAttempt?.status === "retry_scheduled"}
-                                <Button
-                                  id={`resource-domain-binding-certificate-retry-${bindingCertificate.id}`}
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onclick={() => retryCertificate(bindingCertificate)}
-                                  disabled={retryCertificateMutation.isPending}
-                                >
-                                  {$t(i18nKeys.console.resources.certificateRetry)}
-                                </Button>
-                              {/if}
-                              {#if bindingCertificate.status === "active"}
-                                <Button
-                                  id={`resource-domain-binding-certificate-revoke-${bindingCertificate.id}`}
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onclick={() => revokeCertificate(bindingCertificate)}
-                                  disabled={revokeCertificateMutation.isPending}
-                                >
-                                  {$t(i18nKeys.console.resources.certificateRevoke)}
-                                </Button>
-                              {/if}
-                              {#if canDeleteCertificate(bindingCertificate)}
-                                <Button
-                                  id={`resource-domain-binding-certificate-delete-${bindingCertificate.id}`}
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  onclick={() => deleteCertificate(bindingCertificate)}
-                                  disabled={deleteCertificateMutation.isPending}
-                                >
-                                  {$t(i18nKeys.console.resources.certificateDelete)}
-                                </Button>
-                              {/if}
-                            </div>
-                            {#if certificateActionFeedback?.bindingId === binding.id}
-                              <div
-                                class={`mt-3 rounded-md border px-3 py-2 text-sm ${
-                                  certificateActionFeedback.kind === "success"
-                                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-                                    : "border-destructive/40 bg-destructive/10 text-destructive"
-                                }`}
-                              >
-                                <p class="font-medium">{certificateActionFeedback.title}</p>
-                                <p class="mt-1 break-all text-xs">{certificateActionFeedback.detail}</p>
-                              </div>
-                            {/if}
-                          {:else}
-                            <div class="mt-3 rounded-md bg-background px-3 py-2 text-sm text-muted-foreground">
-                              {$t(i18nKeys.console.resources.certificateSummaryEmpty)}
-                            </div>
-                          {/if}
-                        </div>
-
-                        <div class="mt-4 rounded-md border border-dashed bg-muted/10 p-3">
-                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p class="text-sm font-medium">
-                                {$t(i18nKeys.console.resources.certificateImportTitle)}
-                              </p>
-                              <p class="mt-1 text-xs text-muted-foreground">
-                                {$t(i18nKeys.console.resources.certificateImportDescription)}
-                              </p>
-                            </div>
-                            {#if binding.certificatePolicy === "manual"}
-                              <Button
-                                id={`resource-domain-binding-import-toggle-${binding.id}`}
-                                type="button"
-                                size="sm"
-                                variant={isImportOpen ? "selected" : "outline"}
-                                aria-expanded={isImportOpen}
-                                onclick={() => toggleCertificateImport(binding)}
-                              >
-                                {isImportOpen
-                                  ? $t(i18nKeys.common.actions.close)
-                                  : $t(i18nKeys.console.resources.certificateImportOpen)}
-                              </Button>
-                            {/if}
-                          </div>
-
-                          {#if importFeedback?.bindingId === binding.id}
-                            <div
-                              class={`mt-3 rounded-md border px-3 py-2 text-sm ${
-                                importFeedback.kind === "success"
-                                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-                                  : "border-destructive/40 bg-destructive/10 text-destructive"
-                              }`}
-                            >
-                              <p class="font-medium">{importFeedback.title}</p>
-                              <p class="mt-1 break-all text-xs">{importFeedback.detail}</p>
-                            </div>
-                          {/if}
-
-                          {#if binding.certificatePolicy === "manual"}
-                            {#if isImportOpen}
-                              <form
-                                id={`resource-domain-binding-import-form-${binding.id}`}
-                                class="mt-4 grid gap-3 border-t pt-4"
-                                onsubmit={(event) => importCertificateForBinding(binding, event)}
-                              >
-                                <label class="space-y-1.5 text-sm font-medium">
-                                  <span class="inline-flex items-center gap-1.5">
-                                    {$t(i18nKeys.console.resources.certificateImportCertificateChain)}
-                                    <DocsHelpLink
-                                      href={webDocsHrefs.certificateReadiness}
-                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                                      className="size-5"
-                                    />
-                                  </span>
-                                  <Textarea
-                                    id={`resource-domain-binding-import-certificate-chain-${binding.id}`}
-                                    bind:value={importCertificateChain}
-                                    rows={6}
-                                    spellcheck={false}
-                                    autocomplete="off"
-                                    placeholder={$t(
-                                      i18nKeys.console.resources
-                                        .certificateImportCertificateChainPlaceholder,
-                                    )}
-                                  />
-                                </label>
-
-                                <label class="space-y-1.5 text-sm font-medium">
-                                  <span class="inline-flex items-center gap-1.5">
-                                    {$t(i18nKeys.console.resources.certificateImportPrivateKey)}
-                                    <DocsHelpLink
-                                      href={webDocsHrefs.certificateReadiness}
-                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                                      className="size-5"
-                                    />
-                                  </span>
-                                  <Textarea
-                                    id={`resource-domain-binding-import-private-key-${binding.id}`}
-                                    bind:value={importPrivateKey}
-                                    rows={6}
-                                    spellcheck={false}
-                                    autocomplete="off"
-                                    placeholder={$t(
-                                      i18nKeys.console.resources
-                                        .certificateImportPrivateKeyPlaceholder,
-                                    )}
-                                  />
-                                </label>
-
-                                <label class="space-y-1.5 text-sm font-medium">
-                                  <span class="inline-flex items-center gap-1.5">
-                                    {$t(i18nKeys.console.resources.certificateImportPassphrase)}
-                                    <DocsHelpLink
-                                      href={webDocsHrefs.certificateReadiness}
-                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                                      className="size-5"
-                                    />
-                                  </span>
-                                  <Input
-                                    id={`resource-domain-binding-import-passphrase-${binding.id}`}
-                                    bind:value={importPassphrase}
-                                    type="password"
-                                    autocomplete="new-password"
-                                    placeholder={$t(
-                                      i18nKeys.console.resources
-                                        .certificateImportPassphrasePlaceholder,
-                                    )}
-                                  />
-                                </label>
-
-                                <div class="flex justify-end">
-                                  <Button
-                                    type="submit"
-                                    disabled={!canImportCertificate || importCertificateMutation.isPending}
-                                  >
-                                    {importCertificateMutation.isPending
-                                      ? $t(i18nKeys.console.resources.certificateImportSubmitting)
-                                      : $t(i18nKeys.console.resources.certificateImportSubmit)}
-                                  </Button>
-                                </div>
-                              </form>
-                            {/if}
-                          {:else}
-                            <div class="mt-3 rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
-                              {binding.certificatePolicy === "disabled"
-                                ? $t(i18nKeys.console.resources.certificateImportDisabledPolicy)
-                                : $t(i18nKeys.console.resources.certificateImportAutoPolicy)}
-                            </div>
-                          {/if}
-                        </div>
-                      </article>
-                    {/each}
-                  {:else}
-                    <div class="rounded-md border bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.noDomainBindings)}
-                    </div>
-                  {/if}
-                </div>
-              </section>
-
-              {:else if activeSettingsSection === "usage"}
-              <RuntimeUsagePanel
-                usage={resourceRuntimeUsage}
-                loading={resourceRuntimeUsageQuery.isPending}
-                error={resourceRuntimeUsageError}
-              />
-
-              {:else if activeSettingsSection === "health"}
-              <section id="resource-overview-health" class="rounded-md border bg-background p-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.resources.healthPolicy)}
-                    </h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.healthDescription)}
-                    </p>
-                  </div>
-                  <Badge variant={resourceHealthSectionStatusVariant(resourceHealth?.healthPolicy.status)}>
-                    {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
-                  </Badge>
-                </div>
-
-                <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div class="rounded-md bg-muted/30 px-3 py-2">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.resources.healthChecks)}
-                    </p>
-                    <p class="mt-1 truncate text-sm font-medium">
-                      {resourceHealth?.healthPolicy.type ?? "-"}
-                    </p>
-                  </div>
-                  <div class="rounded-md bg-muted/30 px-3 py-2">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
-                    </p>
-                    <p class="mt-1 truncate text-sm font-medium">
-                      {resourceHealth?.healthPolicy.path ?? "-"}
-                    </p>
-                  </div>
-                  <div class="rounded-md bg-muted/30 px-3 py-2">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
-                    </p>
-                    <p class="mt-1 truncate text-sm font-medium">
-                      {resourceHealth?.healthPolicy.intervalSeconds ?? "-"}
-                    </p>
-                  </div>
-                  <div class="rounded-md bg-muted/30 px-3 py-2">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
-                    </p>
-                    <p class="mt-1 truncate text-sm font-medium">
-                      {resourceHealth?.healthPolicy.retries ?? "-"}
-                    </p>
-                  </div>
-                </div>
-
-                <form
-                  id="resource-health-policy-form"
-                  class="mt-5 border-t pt-4"
-                  onsubmit={configureResourceHealth}
-                >
-                  <div class="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant={healthEnabled ? "selected" : "outline"}
-                      aria-pressed={healthEnabled}
-                      onclick={() => {
-                        healthEnabled = !healthEnabled;
-                      }}
-                    >
-                      {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                    </Button>
-                    <DocsHelpLink
-                      href={webDocsHrefs.resourceHealthProfile}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    />
-                  </div>
-
-                  <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.quickDeploy.healthCheckMethod)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceHealthProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Select.Root bind:value={healthMethod} type="single">
-                        <Select.Trigger class="w-full">{healthMethod}</Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="GET">GET</Select.Item>
-                          <Select.Item value="HEAD">HEAD</Select.Item>
-                          <Select.Item value="POST">POST</Select.Item>
-                          <Select.Item value="OPTIONS">OPTIONS</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckScheme)}</span>
-                      <Select.Root bind:value={healthScheme} type="single">
-                        <Select.Trigger class="w-full">{healthScheme}</Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="http">http</Select.Item>
-                          <Select.Item value="https">https</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckHost)}</span>
-                      <Input
-                        id="resource-health-host"
-                        bind:value={healthHost}
-                        autocomplete="off"
-                        disabled={!healthEnabled}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceHealthProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-health-path"
-                        bind:value={healthPath}
-                        autocomplete="off"
-                        disabled={!healthEnabled}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckPort)}</span>
-                      <Input
-                        id="resource-health-port"
-                        bind:value={healthPort}
-                        autocomplete="off"
-                        disabled={!healthEnabled}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.resourceHealthProfile}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        bind:value={healthExpectedStatus}
-                        id="resource-health-expected-status"
-                        autocomplete="off"
-                        disabled={!healthEnabled}
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span class="inline-flex items-center gap-1.5">
-                        {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
-                        <DocsHelpLink
-                          href={webDocsHrefs.observabilityHealthSummary}
-                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          className="size-5"
-                        />
-                      </span>
-                      <Input
-                        id="resource-health-interval-seconds"
-                        bind:value={healthIntervalSeconds}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}</span>
-                      <Input
-                        id="resource-health-timeout-seconds"
-                        bind:value={healthTimeoutSeconds}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckRetries)}</span>
-                      <Input
-                        id="resource-health-retries"
-                        bind:value={healthRetries}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}</span>
-                      <Input
-                        id="resource-health-start-period-seconds"
-                        bind:value={healthStartPeriodSeconds}
-                        autocomplete="off"
-                      />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckResponseText)}</span>
-                      <Input
-                        bind:value={healthExpectedText}
-                        id="resource-health-expected-text"
-                        autocomplete="off"
-                        disabled={!healthEnabled}
-                      />
-                    </label>
-                  </div>
-
-                  {#if healthFeedback}
-                    <div
-                      class={[
-                        "mt-4 rounded-md border px-3 py-2 text-sm",
-                        healthFeedback.kind === "success"
-                          ? "border-primary/25 bg-primary/5"
-                          : "border-destructive/30 bg-destructive/5 text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{healthFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{healthFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="mt-4 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!canConfigureHealth || configureResourceHealthMutation.isPending}
-                    >
-                      {configureResourceHealthMutation.isPending
-                        ? $t(i18nKeys.common.actions.saving)
-                        : $t(i18nKeys.common.actions.save)}
-                    </Button>
-                  </div>
-                </form>
-              </section>
-
-              {:else if activeSettingsSection === "proxy"}
-              <section id="resource-overview-proxy" class="space-y-4">
-                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div class="flex items-start gap-3">
-                    <div class="bg-muted p-2">
-                      <Route class="size-4" />
-                    </div>
-                    <div>
-                      <div class="flex flex-wrap items-center gap-2">
+                          </article>
+                        {/each}
+                      </div>
+                    {/if}
+                  </section>
+                {:else if activeSettingsSection === "proxy"}
+                  <section id="resource-proxy-configuration" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
                         <h2 class="text-lg font-semibold">
                           {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
                         </h2>
-                        {#if proxyConfiguration}
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={proxyConfigurationLoading}
+                        onclick={refreshProxyConfiguration}
+                      >
+                        <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
+                        {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
+                      </Button>
+                    </div>
+
+                    {#if proxyConfigurationLoading}
+                      <Skeleton class="h-40 w-full" />
+                    {:else if proxyConfigurationError}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {proxyConfigurationError}
+                      </div>
+                    {:else if !proxyConfiguration}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
+                      </div>
+                    {:else}
+                      <section class="rounded-md border bg-background p-4">
+                        <div class="flex flex-wrap items-center gap-2">
                           <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
                             {proxyConfigurationStatusLabel(proxyConfiguration.status)}
                           </Badge>
+                          <Badge variant="outline">{proxyConfiguration.providerKey}</Badge>
+                          <Badge variant="secondary">{proxyConfiguration.routeScope}</Badge>
+                          {#if proxyConfiguration.stale}
+                            <Badge variant="secondary">
+                              {$t(i18nKeys.console.resources.proxyConfigurationStatusStale)}
+                            </Badge>
+                          {/if}
+                        </div>
+                        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.common.domain.deployment)}
+                            </dt>
+                            <dd class="mt-1 truncate font-medium">
+                              {proxyConfiguration.deploymentId ?? proxyConfiguration.lastAppliedDeploymentId ?? "-"}
+                            </dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
+                            </dt>
+                            <dd class="mt-1 truncate font-medium">
+                              {formatTime(proxyConfiguration.generatedAt)}
+                            </dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.domainBindings.routeReadiness)}
+                            </dt>
+                            <dd class="mt-1 font-medium">{proxyConfiguration.routes.length}</dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
+                            </dt>
+                            <dd class="mt-1 font-medium">{proxyConfiguration.warnings.length}</dd>
+                          </div>
+                        </dl>
+                      </section>
+
+                      {#if proxyConfiguration.routes.length > 0}
+                        <section class="space-y-3">
+                          {#each proxyConfiguration.routes as route (`${route.hostname}-${route.pathPrefix}-${route.source}`)}
+                            <article class="rounded-md border bg-background p-3">
+                              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                  <a
+                                    href={route.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    class="break-all text-sm font-medium text-primary underline-offset-4 hover:underline"
+                                  >
+                                    {route.url}
+                                  </a>
+                                  <p class="mt-1 text-xs text-muted-foreground">
+                                    {route.source} · {route.scheme} · {route.pathPrefix}
+                                  </p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                  <Badge variant="outline">{route.tlsMode}</Badge>
+                                  {#if route.targetPort}
+                                    <Badge variant="secondary">
+                                      {$t(i18nKeys.common.domain.port)} {route.targetPort}
+                                    </Badge>
+                                  {/if}
+                                </div>
+                              </div>
+                            </article>
+                          {/each}
+                        </section>
+                      {/if}
+
+                      {#if proxyConfiguration.sections.length > 0}
+                        <section class="space-y-3">
+                          {#each proxyConfiguration.sections.slice(0, 3) as section (section.id)}
+                            <article class="rounded-md border bg-background p-4">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-sm font-semibold">{section.title}</h3>
+                                <Badge variant="outline">{section.format}</Badge>
+                                {#if section.redacted}
+                                  <Badge variant="secondary">
+                                    {$t(i18nKeys.console.resources.configurationSecretBadge)}
+                                  </Badge>
+                                {/if}
+                              </div>
+                              <pre class="mt-3 max-h-64 overflow-auto rounded-md bg-zinc-950 p-3 text-xs text-zinc-100">{section.content}</pre>
+                            </article>
+                          {/each}
+                        </section>
+                      {/if}
+                    {/if}
+                  </section>
+                {:else if activeSettingsSection === "profile"}
+                  <div id="resource-configuration-profile" class="space-y-4">
+                    <ResourceProfileSummary
+                      {resource}
+                      projectName={project?.name ?? resource.projectId}
+                      environmentName={environment?.name ?? resource.environmentId}
+                      destinationId={defaultDestinationId}
+                    />
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h2 class="text-lg font-semibold">
+                            {$t(i18nKeys.console.resources.overviewConfigurationSummary)}
+                          </h2>
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{resourceDetail?.generatedAt ? formatTime(resourceDetail.generatedAt) : "-"}</Badge>
+                      </div>
+                      <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.source)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">{resourceSourceSummary()}</dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.runtimeProfileTitle)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">{resourceRuntimeSummary()}</dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.networkProfileTitle)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">{resourceNetworkSummary()}</dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.accessProfileTitle)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {resource.accessProfile
+                              ? generatedAccessModeLabel(resource.accessProfile.generatedAccessMode)
+                              : $t(i18nKeys.common.status.notConfigured)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
+                  </div>
+                {:else if activeSettingsSection === "configuration"}
+                  <section id="resource-effective-configuration" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.configurationTitle)}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.configurationDescription)}
+                        </p>
+                      </div>
+                      {#if resourceEffectiveConfig}
+                        <Badge variant="outline">{formatTime(resourceEffectiveConfig.generatedAt)}</Badge>
+                      {/if}
+                    </div>
+
+                    {#if resourceEffectiveConfigQuery.isPending}
+                      <Skeleton class="h-40 w-full" />
+                    {:else if resourceEffectiveConfigQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {readErrorMessage(resourceEffectiveConfigQuery.error)}
+                      </div>
+                    {:else}
+                      <section class="rounded-md border bg-background p-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 class="text-base font-semibold">
+                              {$t(i18nKeys.console.resources.configurationOwnedTitle)}
+                            </h3>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.configurationOwnedDescription)}
+                            </p>
+                          </div>
+                          <Badge variant="outline">{resourceEffectiveConfig?.ownedEntries.length ?? 0}</Badge>
+                        </div>
+
+                        {#if !resourceEffectiveConfig || resourceEffectiveConfig.ownedEntries.length === 0}
+                          <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationOwnedEmpty)}
+                          </div>
+                        {:else}
+                          <div class="mt-4 divide-y rounded-md border">
+                            {#each resourceEffectiveConfig.ownedEntries as entry (`${entry.key}-${entry.exposure}`)}
+                              <div class="grid gap-2 px-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem]">
+                                <div class="min-w-0">
+                                  <p class="truncate font-medium">{entry.key}</p>
+                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                                    {entry.isSecret ? "****" : entry.value}
+                                  </p>
+                                </div>
+                                <Badge class="w-fit" variant={configScopeBadgeVariant(entry.scope)}>
+                                  {entry.scope}
+                                </Badge>
+                                <Badge class="w-fit" variant="outline">
+                                  {configExposureLabel(entry.exposure)}
+                                </Badge>
+                                <Badge class="w-fit" variant={entry.isSecret ? "secondary" : "outline"}>
+                                  {entry.kind}
+                                </Badge>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
+                      </section>
+
+                      <section class="rounded-md border bg-background p-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 class="text-base font-semibold">
+                              {$t(i18nKeys.console.resources.configurationEffectiveTitle)}
+                            </h3>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.configurationEffectiveDescription)}
+                            </p>
+                          </div>
+                          <Badge variant="outline">{resourceEffectiveConfig?.effectiveEntries.length ?? 0}</Badge>
+                        </div>
+
+                        {#if resourceEffectiveConfig?.precedence.length}
+                          <p class="mt-4 rounded-md bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationPrecedence)}:
+                            {resourceEffectiveConfig.precedence.join(" -> ")}
+                          </p>
+                        {/if}
+
+                        {#if !resourceEffectiveConfig || resourceEffectiveConfig.effectiveEntries.length === 0}
+                          <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationEffectiveEmpty)}
+                          </div>
+                        {:else}
+                          <div class="mt-4 divide-y rounded-md border">
+                            {#each resourceEffectiveConfig.effectiveEntries.slice(0, 12) as entry (`${entry.scope}-${entry.key}-${entry.exposure}`)}
+                              <div class="grid gap-2 px-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem]">
+                                <div class="min-w-0">
+                                  <p class="truncate font-medium">{entry.key}</p>
+                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                                    {entry.isSecret ? "****" : entry.value}
+                                  </p>
+                                </div>
+                                <Badge class="w-fit" variant={configScopeBadgeVariant(entry.scope)}>
+                                  {entry.scope}
+                                </Badge>
+                                <Badge class="w-fit" variant="outline">
+                                  {configExposureLabel(entry.exposure)}
+                                </Badge>
+                                <Badge class="w-fit" variant={entry.isSecret ? "secondary" : "outline"}>
+                                  {entry.kind}
+                                </Badge>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
+                      </section>
+                    {/if}
+                  </section>
+                {:else if activeSettingsSection === "auto-deploy"}
+                  <section id="resource-auto-deploy-settings" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <h2 class="text-lg font-semibold">
+                            {$t(i18nKeys.console.resources.autoDeployTitle)}
+                          </h2>
+                          <DocsHelpLink
+                            href={webDocsHrefs.sourceAutoDeploySetup}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          />
+                          <DocsHelpLink
+                            href={webDocsHrefs.sourceAutoDeploySignatures}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          />
+                          {#if autoDeployPolicy}
+                            <Badge variant={autoDeployStatusVariant(autoDeployPolicy.status)}>
+                              {autoDeployStatusLabel(autoDeployPolicy.status)}
+                            </Badge>
+                          {:else}
+                            <Badge variant="outline">
+                              {$t(i18nKeys.console.resources.autoDeployStatusDisabled)}
+                            </Badge>
+                          {/if}
+                        </div>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.autoDeployDescription)}
+                        </p>
+                      </div>
+                      <Button href={resourceSettingsSectionHref("source-events")} variant="outline">
+                        <GitBranch class="size-4" />
+                        {$t(i18nKeys.console.resources.sourceEventsTitle)}
+                      </Button>
+                    </div>
+
+                    {#if !resourceDetail?.source}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.autoDeploySourceMissing)}
+                      </div>
+                    {:else if !sourceSupportsAutoDeploy}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.autoDeploySourceUnsupported)}
+                      </div>
+                    {:else if !autoDeployPolicy}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.autoDeployStatusDisabled)}
+                      </div>
+                    {:else}
+                      <section class="rounded-md border bg-background p-4">
+                        <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.autoDeployTriggerKind)}
+                            </dt>
+                            <dd class="mt-1 text-sm font-medium">
+                              {autoDeployTriggerKindLabel(autoDeployPolicy.triggerKind)}
+                            </dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.autoDeployRefs)}
+                            </dt>
+                            <dd class="mt-1 truncate text-sm font-medium">
+                              {autoDeployPolicy.refs.join(", ")}
+                            </dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.autoDeployEventKind)}
+                            </dt>
+                            <dd class="mt-1 truncate text-sm font-medium">
+                              {autoDeployPolicy.eventKinds.join(", ")}
+                            </dd>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <dt class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.autoDeployUpdatedAt)}
+                            </dt>
+                            <dd class="mt-1 truncate text-sm font-medium">
+                              {formatTime(autoDeployPolicy.updatedAt)}
+                            </dd>
+                          </div>
+                        </dl>
+                        <div class="mt-3 rounded-md bg-muted/25 px-3 py-2">
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.autoDeployCurrentFingerprint)}
+                          </p>
+                          <p class="mt-1 break-all font-mono text-xs">
+                            {autoDeployPolicy.sourceBindingFingerprint}
+                          </p>
+                        </div>
+                        {#if autoDeployPolicy.status === "blocked"}
+                          <div class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                            {$t(i18nKeys.console.resources.autoDeployBlockedSourceChanged)}
+                          </div>
+                        {/if}
+                      </section>
+                    {/if}
+                  </section>
+                {:else if activeSettingsSection === "health"}
+                  <section id="resource-health-policy" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.healthTitle)}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.healthDescription)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={resourceHealthQuery.isFetching}
+                        onclick={() => resourceHealthQuery.refetch()}
+                      >
+                        <RefreshCw class={["size-4", resourceHealthQuery.isFetching ? "animate-spin" : ""]} />
+                        {$t(i18nKeys.console.resources.healthRefresh)}
+                      </Button>
+                    </div>
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <ResourceStatusDot status={resourceHealthOverall} />
+                        <span class="text-lg font-semibold">
+                          {resourceHealthStatusLabel(resourceHealthOverall)}
+                        </span>
+                        {#if resourceHealth?.observedAt}
+                          <span class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthObservedAt)}
+                            {formatTime(resourceHealth.observedAt)}
+                          </span>
                         {/if}
                       </div>
-                      <p class="mt-1 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onclick={refreshProxyConfiguration}
-                    disabled={proxyConfigurationLoading}
-                  >
-                    <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
-                    {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
-                  </Button>
-                </div>
-
-                {#if proxyConfigurationError}
-                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                    {proxyConfigurationError}
-                  </div>
-                {/if}
-
-                <div class="space-y-3">
-                  {#if proxyConfigurationLoading}
-                    <div class="rounded-md bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
-                    </div>
-                  {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
-                    <div class="rounded-md bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
-                    </div>
-                  {:else}
-                    <div class="grid gap-3 md:grid-cols-3">
-                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
-                        <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
-                        <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
-                      </div>
-                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
-                        <span class="text-muted-foreground">
-                          {$t(i18nKeys.common.domain.resources)}
-                        </span>
-                        <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
-                      </div>
-                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
-                        <span class="text-muted-foreground">
-                          {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
-                        </span>
-                        <span class="ml-2 font-medium">
-                          {formatTime(proxyConfiguration.generatedAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {#each proxyConfiguration.sections as section (section.id)}
-                      <article class="rounded-md bg-muted/20">
-                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                          <h3 class="font-medium">{section.title}</h3>
-                          <Badge variant="outline">{section.format}</Badge>
+                      <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthRuntime)}
+                          </dt>
+                          <dd class="mt-1 text-sm font-medium">
+                            {resourceHealthSectionStatusLabel(resourceHealth?.runtime.lifecycle)}
+                          </dd>
                         </div>
-                        <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
-                      </article>
-                    {/each}
-                  {/if}
-                </div>
-              </section>
-
-              {:else if activeSettingsSection === "diagnostics"}
-              <section id="resource-overview-diagnostics" class="rounded-md border bg-background p-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-lg font-semibold">
-                        {$t(i18nKeys.console.resources.diagnosticsTitle)}
-                      </h2>
-                      <DocsHelpLink
-                        href={webDocsHrefs.diagnosticsSafeSupportPayload}
-                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      />
-                    </div>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.diagnosticsDescription)}
-                    </p>
-                    {#if resourceRuntimeMonitoringObservationHandoff}
-                      <p class="mt-2 text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.runtimeUsage.observationWindowHandoff, {
-                          from: formatTime(resourceRuntimeMonitoringObservationHandoff.from),
-                          to: formatTime(resourceRuntimeMonitoringObservationHandoff.to),
-                          scopeKind: resourceRuntimeMonitoringObservationHandoff.scope.kind,
-                          scopeId: resource?.id ?? "",
-                        })}
-                      </p>
-                    {/if}
-                  </div>
-                  <Button
-                    id="resource-diagnostic-summary-copy"
-                    variant="outline"
-                    onclick={copyResourceDiagnosticSummary}
-                    disabled={diagnosticSummaryLoading}
-                  >
-                    <Clipboard class="size-4" />
-                    {diagnosticSummaryButtonLabel}
-                  </Button>
-                </div>
-
-                {#if diagnosticSummaryError}
-                  <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                    {diagnosticSummaryError}
-                  </div>
-                {/if}
-                {#if diagnosticSummaryCopyFallback}
-                  <div class="mt-4 space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                    <div class="space-y-1">
-                      <p class="text-sm font-medium text-destructive">
-                        {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
-                      </p>
-                      <p class="text-xs leading-5 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
-                      </p>
-                    </div>
-                    <Textarea
-                      class="min-h-48 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs leading-5"
-                      readonly
-                      value={diagnosticSummaryCopyFallback}
-                      onclick={selectDiagnosticSummaryFallback}
-                      onfocus={selectDiagnosticSummaryFallback}
-                    />
-                  </div>
-                {/if}
-                <div class="mt-4 space-y-3 rounded-md border bg-muted/20 p-3">
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-semibold">
-                      {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
-                    </h3>
-                    <DocsHelpLink
-                      href={webDocsHrefs.resourceProfileDrift}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      className="size-5"
-                    />
-                  </div>
-                  {#if profileDiagnostics.length === 0}
-                    <p class="text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.resources.profileDiagnosticsEmpty)}
-                    </p>
-                  {:else}
-                    <div class="space-y-2">
-                      {#each profileDiagnostics as diagnostic (`${diagnostic.code}-${diagnostic.fieldPath ?? diagnostic.path ?? diagnostic.message}`)}
-                        <div class="space-y-2 rounded-md border bg-background p-3">
-                          <div class="flex flex-wrap items-center gap-2">
-                            <Badge
-                              variant={diagnostic.severity === "blocking" ? "destructive" : "outline"}
-                            >
-                              {diagnostic.severity}
-                            </Badge>
-                            {#if diagnostic.section}
-                              <Badge variant="secondary">{diagnostic.section}</Badge>
-                            {/if}
-                            {#if diagnostic.fieldPath ?? diagnostic.path}
-                              <span class="font-mono text-xs text-muted-foreground">
-                                {diagnostic.fieldPath ?? diagnostic.path}
-                              </span>
-                            {/if}
-                          </div>
-                          <p class="text-sm text-foreground">{diagnostic.message}</p>
-                          <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            {#if diagnostic.latestDeploymentId}
-                              <span>
-                                {$t(i18nKeys.console.resources.profileDiagnosticsLatestDeployment)}:
-                                {diagnostic.latestDeploymentId}
-                              </span>
-                            {/if}
-                            {#if diagnostic.suggestedCommand}
-                              <span>
-                                {$t(i18nKeys.console.resources.profileDiagnosticsSuggestedCommand)}:
-                                <code class="rounded bg-muted px-1 py-0.5">
-                                  {diagnostic.suggestedCommand}
-                                </code>
-                              </span>
-                            {/if}
-                          </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthPolicy)}
+                          </dt>
+                          <dd class="mt-1 text-sm font-medium">
+                            {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
+                          </dd>
                         </div>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-              </section>
-              {/if}
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthPublicAccess)}
+                          </dt>
+                          <dd class="mt-1 text-sm font-medium">
+                            {resourceHealthSectionStatusLabel(resourceHealth?.publicAccess.status)}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthProxy)}
+                          </dt>
+                          <dd class="mt-1 text-sm font-medium">
+                            {resourceHealthSectionStatusLabel(resourceHealth?.proxy.status)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
 
-              {#if showResourceOverviewNavigation}
-                <section
-                  id="resource-danger-zone"
-                  class="console-panel space-y-4 border-destructive/25 bg-destructive/5 p-5"
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="space-y-1">
-                      <h2 class="text-lg font-semibold text-destructive">
-                        {$t(i18nKeys.console.resources.dangerZoneTitle)}
-                      </h2>
-                      <p class="text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.dangerZoneDescription)}
-                      </p>
-                    </div>
-                    <Badge variant={isResourceArchived ? "destructive" : "outline"}>
-                      {isResourceArchived
-                        ? $t(i18nKeys.console.resources.archived)
-                        : $t(i18nKeys.common.status.active)}
-                    </Badge>
-                  </div>
-
-                  {#if archiveFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        archiveFeedback.kind === "success"
-                          ? "border-primary/25 bg-background"
-                          : "border-destructive/30 bg-background text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{archiveFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
-                    </div>
-                  {/if}
-                  {#if deleteFeedback}
-                    <div
-                      class={[
-                        "rounded-md border px-3 py-2 text-sm",
-                        deleteFeedback.kind === "success"
-                          ? "border-primary/25 bg-background"
-                          : "border-destructive/30 bg-background text-destructive",
-                      ]}
-                    >
-                      <p class="font-medium">{deleteFeedback.title}</p>
-                      <p class="mt-1 break-all text-xs">{deleteFeedback.detail}</p>
-                    </div>
-                  {/if}
-
-                  <div class="flex flex-wrap gap-2">
-                    {#if isPreviewEnvironmentResource}
-                      <Button
-                        id="resource-delete-action"
-                        type="button"
-                        variant="destructive"
-                        disabled={deletePreviewResourceMutation.isPending}
-                        onclick={deletePreviewResource}
-                      >
-                        <Trash2 class="size-4" />
-                        {deletePreviewResourceMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.deleteAction)}
-                      </Button>
+                    {#if resourceHealth?.checks.length}
+                      <section class="rounded-md border bg-background p-4">
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.healthChecks)}
+                        </h3>
+                        <div class="mt-3 space-y-2">
+                          {#each resourceHealth.checks as check (`${check.name}-${check.observedAt}`)}
+                            <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                  <p class="font-medium">{check.name}</p>
+                                  <p class="mt-1 text-xs text-muted-foreground">
+                                    {check.target} · {formatTime(check.observedAt)}
+                                  </p>
+                                  {#if check.message}
+                                    <p class="mt-1 break-words text-xs text-muted-foreground">
+                                      {check.message}
+                                    </p>
+                                  {/if}
+                                </div>
+                                <Badge variant={check.status === "failed" ? "destructive" : check.status === "passed" ? "default" : "outline"}>
+                                  {check.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          {/each}
+                        </div>
+                      </section>
                     {:else}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthNoChecks)}
+                      </div>
+                    {/if}
+
+                    {#if resourceHealth?.sourceErrors.length}
+                      <section class="rounded-md border bg-background p-4">
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.healthSourceIssues)}
+                        </h3>
+                        <div class="mt-3 space-y-2">
+                          {#each resourceHealth.sourceErrors as error (`${error.source}-${error.code}-${error.phase}`)}
+                            <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+                              <p class="font-medium text-destructive">{error.code}</p>
+                              <p class="mt-1 text-xs text-muted-foreground">
+                                {error.source} · {error.phase}
+                              </p>
+                              {#if error.message}
+                                <p class="mt-1 break-words text-xs">{error.message}</p>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      </section>
+                    {/if}
+                  </section>
+                {:else if activeSettingsSection === "dependencies"}
+                  <section id="resource-dependency-bindings" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <h2 class="text-lg font-semibold">
+                            {$t(i18nKeys.console.resources.dependenciesTitle)}
+                          </h2>
+                          <DocsHelpLink
+                            href={webDocsHrefs.dependencyResourceLifecycle}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          />
+                          <DocsHelpLink
+                            href={webDocsHrefs.dependencyRuntimeInjection}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          />
+                        </div>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.dependenciesDescription)}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{resourceDependencyBindings.length}</Badge>
+                    </div>
+
+                    {#if resourceDependencyBindingsQuery.isPending}
+                      <Skeleton class="h-40 w-full" />
+                    {:else if resourceDependencyBindingsQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {readErrorMessage(resourceDependencyBindingsQuery.error)}
+                      </div>
+                    {:else if resourceDependencyBindings.length === 0}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.dependenciesEmpty)}
+                      </div>
+                    {:else}
+                      <div class="space-y-3">
+                        {#each resourceDependencyBindings as binding (binding.id)}
+                          <article class="rounded-md border bg-background p-4">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div class="min-w-0 space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                  <p class="font-medium">
+                                    {binding.dependencyResourceName ?? binding.dependencyResourceSlug ?? binding.dependencyResourceId}
+                                  </p>
+                                  <Badge variant="outline">{dependencyResourceKindLabel(binding.kind)}</Badge>
+                                  <Badge variant="secondary">{binding.sourceMode}</Badge>
+                                  <Badge variant={binding.status === "active" ? "default" : "outline"}>
+                                    {binding.status}
+                                  </Badge>
+                                </div>
+                                {#if binding.connection?.maskedConnection}
+                                  <p class="break-all rounded-md bg-muted/25 px-3 py-2 font-mono text-xs">
+                                    {binding.connection.maskedConnection}
+                                  </p>
+                                {/if}
+                                <dl class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                                  <div>
+                                    <dt>{$t(i18nKeys.common.domain.name)}</dt>
+                                    <dd class="mt-1 font-medium text-foreground">
+                                      {binding.target.targetName}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>{$t(i18nKeys.common.domain.mode)}</dt>
+                                    <dd class="mt-1 font-medium text-foreground">
+                                      {binding.target.injectionMode}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>{$t(i18nKeys.common.domain.readiness)}</dt>
+                                    <dd class="mt-1 font-medium text-foreground">
+                                      {binding.bindingReadiness.status}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>{$t(i18nKeys.common.domain.createdAt)}</dt>
+                                    <dd class="mt-1 font-medium text-foreground">
+                                      {formatTime(binding.createdAt)}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                              <Badge variant={binding.snapshotReadiness.status === "blocked" ? "destructive" : "outline"}>
+                                {binding.snapshotReadiness.status}
+                              </Badge>
+                            </div>
+                          </article>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.dependencyResourceManagementTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.dependencyResourceManagementDescription)}
+                          </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{dependencyResources.length}</Badge>
+                          <Button href="/dependency-resources" variant="outline" size="sm">
+                            {$t(i18nKeys.common.actions.viewDetails)}
+                          </Button>
+                        </div>
+                      </div>
+                    </section>
+                  </section>
+                {:else if activeSettingsSection === "storage"}
+                  <section id="resource-storage" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.storageTitle)}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.storageDescription)}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{resourceStorageAttachments.length}</Badge>
+                    </div>
+
+                    {#if resourceStorageAttachments.length === 0}
+                      <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.storageAttachmentsEmpty)}
+                      </div>
+                    {:else}
+                      <div class="space-y-3">
+                        {#each resourceStorageAttachments as attachment (attachment.id)}
+                          <article class="rounded-md border bg-background p-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div class="min-w-0">
+                                <p class="break-all text-sm font-medium">
+                                  {storageAttachmentApplicationDataLabel(attachment)}
+                                </p>
+                                <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                                  {storageAttachmentVolumeLabel(attachment)} · {attachment.storageVolumeId}
+                                </p>
+                              </div>
+                              <div class="flex flex-wrap gap-2">
+                                {#if attachment.storageVolumeKind}
+                                  <Badge variant="outline">
+                                    {storageVolumeKindLabel(attachment.storageVolumeKind)}
+                                  </Badge>
+                                {/if}
+                                <Badge variant="secondary">
+                                  {storageMountModeLabel(attachment.mountMode)}
+                                </Badge>
+                              </div>
+                            </div>
+                            <dl class="mt-3 grid gap-3 text-xs sm:grid-cols-3">
+                              <div>
+                                <dt class="text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageDestinationPath)}
+                                </dt>
+                                <dd class="mt-1 break-all font-mono font-medium">
+                                  {attachment.destinationPath}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt class="text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageMountMode)}
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                  {storageMountModeLabel(attachment.mountMode)}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt class="text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageAttachedAt)}
+                                </dt>
+                                <dd class="mt-1 font-medium">{formatTime(attachment.attachedAt)}</dd>
+                              </div>
+                            </dl>
+                          </article>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageVolumeBackupSummaryDescription)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{storageVolumes.length}</Badge>
+                      </div>
+                    </section>
+                  </section>
+                {:else if activeSettingsSection === "diagnostics"}
+                  <section id="resource-diagnostics" class="space-y-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.diagnosticsTitle)}
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.diagnosticsDescription)}
+                        </p>
+                      </div>
                       <Button
                         type="button"
-                        variant="destructive"
-                        disabled={isResourceArchived || archiveResourceMutation.isPending}
-                        onclick={archiveResource}
+                        variant="outline"
+                        disabled={diagnosticSummaryLoading}
+                        onclick={copyResourceDiagnosticSummary}
                       >
-                        <Archive class="size-4" />
-                        {archiveResourceMutation.isPending
-                          ? $t(i18nKeys.common.actions.saving)
-                          : $t(i18nKeys.console.resources.archiveAction)}
+                        <Clipboard class="size-4" />
+                        {diagnosticSummaryButtonLabel}
                       </Button>
-                      {#if isResourceArchived}
+                    </div>
+
+                    {#if diagnosticSummaryError}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {diagnosticSummaryError}
+                      </div>
+                    {/if}
+                    {#if diagnosticSummaryCopyFallback}
+                      <section class="rounded-md border bg-background p-4">
+                        <h3 class="text-base font-semibold">
+                          {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
+                        </h3>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
+                        </p>
+                        <Textarea
+                          class="mt-3 font-mono text-xs"
+                          rows={8}
+                          readonly
+                          value={diagnosticSummaryCopyFallback}
+                          onfocus={selectDiagnosticSummaryFallback}
+                        />
+                      </section>
+                    {/if}
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.healthSourceIssues)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{profileDiagnostics.length}</Badge>
+                      </div>
+
+                      {#if profileDiagnostics.length === 0}
+                        <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.resources.profileDiagnosticsEmpty)}
+                        </div>
+                      {:else}
+                        <div class="mt-4 space-y-2">
+                          {#each profileDiagnostics as diagnostic (`${diagnostic.code}-${diagnostic.fieldPath ?? diagnostic.path ?? diagnostic.message}`)}
+                            <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <Badge variant={diagnostic.severity === "blocking" ? "destructive" : "outline"}>
+                                  {diagnostic.severity}
+                                </Badge>
+                                {#if diagnostic.section}
+                                  <Badge variant="secondary">{diagnostic.section}</Badge>
+                                {/if}
+                                <span class="font-mono text-xs text-muted-foreground">
+                                  {diagnostic.code}
+                                </span>
+                              </div>
+                              <p class="mt-2 break-words">{diagnostic.message}</p>
+                              {#if diagnostic.suggestedCommand}
+                                <p class="mt-1 text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.profileDiagnosticsSuggestedCommand)}:
+                                  <code class="rounded bg-muted px-1 py-0.5">
+                                    {diagnostic.suggestedCommand}
+                                  </code>
+                                </p>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
+                    </section>
+                  </section>
+                {:else if activeSettingsSection === "danger"}
+                  <section
+                    id="resource-danger-zone"
+                    class="console-panel space-y-4 border-destructive/25 bg-destructive/5 p-5"
+                  >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="space-y-1">
+                        <h2 class="text-lg font-semibold text-destructive">
+                          {$t(i18nKeys.console.resources.dangerZoneTitle)}
+                        </h2>
+                        <p class="text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.dangerZoneDescription)}
+                        </p>
+                      </div>
+                      <Badge variant={isResourceArchived ? "destructive" : "outline"}>
+                        {isResourceArchived
+                          ? $t(i18nKeys.console.resources.archived)
+                          : $t(i18nKeys.common.status.active)}
+                      </Badge>
+                    </div>
+
+                    {#if archiveFeedback}
+                      <div
+                        class={[
+                          "rounded-md border px-3 py-2 text-sm",
+                          archiveFeedback.kind === "success"
+                            ? "border-primary/25 bg-background"
+                            : "border-destructive/30 bg-background text-destructive",
+                        ]}
+                      >
+                        <p class="font-medium">{archiveFeedback.title}</p>
+                        <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
+                      </div>
+                    {/if}
+                    {#if deleteFeedback}
+                      <div
+                        class={[
+                          "rounded-md border px-3 py-2 text-sm",
+                          deleteFeedback.kind === "success"
+                            ? "border-primary/25 bg-background"
+                            : "border-destructive/30 bg-background text-destructive",
+                        ]}
+                      >
+                        <p class="font-medium">{deleteFeedback.title}</p>
+                        <p class="mt-1 break-all text-xs">{deleteFeedback.detail}</p>
+                      </div>
+                    {/if}
+
+                    <div class="flex flex-wrap gap-2">
+                      {#if isPreviewEnvironmentResource}
                         <Button
                           id="resource-delete-action"
                           type="button"
                           variant="destructive"
-                          disabled={deleteResourceMutation.isPending}
-                          onclick={deleteResource}
+                          disabled={deletePreviewResourceMutation.isPending}
+                          onclick={deletePreviewResource}
                         >
                           <Trash2 class="size-4" />
-                          {deleteResourceMutation.isPending
+                          {deletePreviewResourceMutation.isPending
                             ? $t(i18nKeys.common.actions.saving)
                             : $t(i18nKeys.console.resources.deleteAction)}
                         </Button>
+                      {:else}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={isResourceArchived || archiveResourceMutation.isPending}
+                          onclick={archiveResource}
+                        >
+                          <Archive class="size-4" />
+                          {archiveResourceMutation.isPending
+                            ? $t(i18nKeys.common.actions.saving)
+                            : $t(i18nKeys.console.resources.archiveAction)}
+                        </Button>
+                        {#if isResourceArchived}
+                          <Button
+                            id="resource-delete-action"
+                            type="button"
+                            variant="destructive"
+                            disabled={deleteResourceMutation.isPending}
+                            onclick={deleteResource}
+                          >
+                            <Trash2 class="size-4" />
+                            {deleteResourceMutation.isPending
+                              ? $t(i18nKeys.common.actions.saving)
+                              : $t(i18nKeys.console.resources.deleteAction)}
+                          </Button>
+                        {/if}
                       {/if}
-                    {/if}
-                  </div>
-                </section>
-              {/if}
+                    </div>
+                  </section>
+                {/if}
+              </div>
             </div>
-          </div>
-        </Tabs.Content>
+        </div>
+        {:else if activeTab === "runtime"}
+          <div class="mt-0 pt-5">
+            <div class="grid min-w-0 border-b lg:min-h-[42rem] lg:grid-cols-[10.5rem_minmax(0,1fr)]">
+              {@render resourceSectionNavigation()}
 
-        <Tabs.Content value="monitor" class="mt-0 pt-5">
-          {#if showResourceServerRuntimeFallback}
-            <p class="mb-3 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.runtimeUsage.resourceServerFallbackNotice)}
-            </p>
-          {/if}
-          <RuntimeMonitorPanel
-            scope={resourceRuntimeScope}
-            observationScope={effectiveResourceRuntimeMonitoringObservationScope}
-            usage={effectiveResourceRuntimeUsage}
-            loading={effectiveResourceRuntimeUsageLoading}
-            error={effectiveResourceRuntimeUsageError}
-            retainedSamples={effectiveResourceRuntimeMonitoringSamples}
-            retainedSamplesLoading={showResourceServerRuntimeFallback
-              ? resourceFallbackServerRuntimeMonitoringSamplesQuery.isPending
-              : resourceRuntimeMonitoringSamplesQuery.isPending}
-            retainedSamplesError={effectiveResourceRuntimeMonitoringSamplesError}
-            rollup={effectiveResourceRuntimeMonitoringRollup}
-            rollupLoading={showResourceServerRuntimeFallback
-              ? resourceFallbackServerRuntimeMonitoringRollupQuery.isPending
-              : resourceRuntimeMonitoringRollupQuery.isPending}
-            rollupError={effectiveResourceRuntimeMonitoringRollupError}
-            thresholds={resourceRuntimeMonitoringThresholds}
-            thresholdsLoading={resourceRuntimeMonitoringThresholdsQuery.isPending}
-            thresholdsError={resourceRuntimeMonitoringThresholdsError}
-            timeRange={runtimeMonitoringTimeRange}
-            refreshing={resourceRuntimeUsageQuery.isFetching ||
-              resourceRuntimeMonitoringSamplesQuery.isFetching ||
-              resourceRuntimeMonitoringRollupQuery.isFetching ||
-              resourceRuntimeMonitoringThresholdsQuery.isFetching ||
-              resourceFallbackServerRuntimeUsageQuery.isFetching ||
-              resourceFallbackServerRuntimeMonitoringSamplesQuery.isFetching ||
-              resourceFallbackServerRuntimeMonitoringRollupQuery.isFetching}
-            onTimeRangeChange={(nextTimeRange) => {
-              runtimeMonitoringTimeRange = nextTimeRange;
-            }}
-            onRefresh={refreshRuntimeMonitor}
-            logsHref={resourceTabHref("logs")}
-            diagnosticsHref={resourceSettingsSectionHref("diagnostics")}
-            cleanupHref={resourceSettingsSectionHref("storage")}
-          />
-        </Tabs.Content>
-
-        <Tabs.Content value="logs" class="mt-0 pt-5">
-          <section id="resource-runtime-logs" class="space-y-4">
-            <div class="rounded-md border bg-card p-4">
+              {#if activeSettingsSection === "monitor"}
+                <div class="space-y-8 p-5">
+              {#if showResourceServerRuntimeFallback}
+                <p class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.runtimeUsage.resourceServerFallbackNotice)}
+                </p>
+              {/if}
+              <RuntimeMonitorPanel
+                scope={resourceRuntimeScope}
+                observationScope={effectiveResourceRuntimeMonitoringObservationScope}
+                usage={effectiveResourceRuntimeUsage}
+                loading={effectiveResourceRuntimeUsageLoading}
+                error={effectiveResourceRuntimeUsageError}
+                retainedSamples={effectiveResourceRuntimeMonitoringSamples}
+                retainedSamplesLoading={showResourceServerRuntimeFallback
+                  ? resourceFallbackServerRuntimeMonitoringSamplesQuery.isPending
+                  : resourceRuntimeMonitoringSamplesQuery.isPending}
+                retainedSamplesError={effectiveResourceRuntimeMonitoringSamplesError}
+                rollup={effectiveResourceRuntimeMonitoringRollup}
+                rollupLoading={showResourceServerRuntimeFallback
+                  ? resourceFallbackServerRuntimeMonitoringRollupQuery.isPending
+                  : resourceRuntimeMonitoringRollupQuery.isPending}
+                rollupError={effectiveResourceRuntimeMonitoringRollupError}
+                thresholds={resourceRuntimeMonitoringThresholds}
+                thresholdsLoading={resourceRuntimeMonitoringThresholdsQuery.isPending}
+                thresholdsError={resourceRuntimeMonitoringThresholdsError}
+                timeRange={runtimeMonitoringTimeRange}
+                refreshing={resourceRuntimeUsageQuery.isFetching ||
+                  resourceRuntimeMonitoringSamplesQuery.isFetching ||
+                  resourceRuntimeMonitoringRollupQuery.isFetching ||
+                  resourceRuntimeMonitoringThresholdsQuery.isFetching ||
+                  resourceFallbackServerRuntimeUsageQuery.isFetching ||
+                  resourceFallbackServerRuntimeMonitoringSamplesQuery.isFetching ||
+                  resourceFallbackServerRuntimeMonitoringRollupQuery.isFetching}
+                onTimeRangeChange={(nextTimeRange) => {
+                  runtimeMonitoringTimeRange = nextTimeRange;
+                }}
+                onRefresh={refreshRuntimeMonitor}
+                logsHref={resourceSettingsSectionHref("logs")}
+                diagnosticsHref={resourceSettingsSectionHref("diagnostics")}
+                cleanupHref={resourceSettingsSectionHref("storage")}
+              />
+                </div>
+              {:else if activeSettingsSection === "logs"}
+                <section id="resource-runtime-logs" class="space-y-4 p-5">
+              <div class="rounded-md border bg-card p-4">
               <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div class="flex items-center gap-2">
@@ -11029,32 +8006,33 @@
                 {/if}
               </div>
             </div>
-          </section>
-        </Tabs.Content>
-
-        <Tabs.Content value="terminal" class="mt-0 pt-5">
-          <section class="space-y-3">
-            <div class="flex justify-end">
-              <DocsHelpLink
-                href={webDocsHrefs.serverTerminalSession}
-                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                </section>
+              {:else if activeSettingsSection === "terminal"}
+                <section class="space-y-3 p-5">
+              <div class="flex justify-end">
+                <DocsHelpLink
+                  href={webDocsHrefs.serverTerminalSession}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
+              <TerminalSessionPanel
+                title={$t(i18nKeys.console.terminal.resourceTitle)}
+                description={$t(i18nKeys.console.terminal.resourceDescription)}
+                disabled={resourceDeployments.length === 0}
+                fallbackHref={latestDeployment?.serverId ? serverTerminalHref(latestDeployment.serverId) : ""}
+                fallbackLabel={$t(i18nKeys.console.terminal.serverTitle)}
+                scope={{
+                  kind: "resource",
+                  resourceId: resource.id,
+                  ...(terminalDeploymentId ? { deploymentId: terminalDeploymentId } : {}),
+                }}
               />
+                </section>
+              {/if}
             </div>
-            <TerminalSessionPanel
-              title={$t(i18nKeys.console.terminal.resourceTitle)}
-              description={$t(i18nKeys.console.terminal.resourceDescription)}
-              disabled={resourceDeployments.length === 0}
-              fallbackHref={latestDeployment?.serverId ? serverTerminalHref(latestDeployment.serverId) : ""}
-              fallbackLabel={$t(i18nKeys.console.terminal.serverTitle)}
-              scope={{
-                kind: "resource",
-                resourceId: resource.id,
-                ...(terminalDeploymentId ? { deploymentId: terminalDeploymentId } : {}),
-              }}
-            />
-          </section>
-        </Tabs.Content>
-      </Tabs.Root>
+          </div>
+        {/if}
+      </div>
 
     </div>
   {/if}
