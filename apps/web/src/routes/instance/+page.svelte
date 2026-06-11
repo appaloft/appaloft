@@ -262,6 +262,11 @@
     maintenanceWorkers.find((worker) => worker.key === "durable-worker-runtime") ?? null,
   );
   const durableRuntimeTopology = $derived(durableWorker?.runtimeTopology ?? null);
+  const durableRuntimeNeedsStandaloneClarification = $derived(
+    durableRuntimeTopology?.mode === "disabled" ||
+      durableRuntimeTopology?.coordinationRole === "disabled" ||
+      durableRuntimeTopology?.workerCount === 0,
+  );
   const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
   const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
   const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
@@ -874,6 +879,13 @@ server-config-deploy: true`);
                       </div>
                     </div>
 
+                    {#if durableRuntimeNeedsStandaloneClarification}
+                      <div class="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-900 dark:text-amber-100">
+                        <p>{$t(i18nKeys.console.instance.workerRuntimeWebDisabledHint)}</p>
+                        <p class="mt-2">{$t(i18nKeys.console.instance.workerRuntimeStandaloneHint)}</p>
+                      </div>
+                    {/if}
+
                     {#if durableRuntimeTopology.heartbeat}
                       <div class="mt-4 space-y-3">
                         <div class="flex flex-wrap items-center gap-2">
@@ -1054,6 +1066,52 @@ server-config-deploy: true`);
                         <Badge variant="outline">{selectedOperatorWork.kind}</Badge>
                       </div>
                     </div>
+
+                    {#if selectedOperatorWork.errorCode || selectedOperatorWork.errorCategory || selectedOperatorWork.retriable !== undefined || selectedOperatorWork.safeDetails}
+                      <div class="rounded-md border bg-muted/20 p-3 text-sm">
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.instance.workerWorkFailureSummary)}
+                        </p>
+                        <dl class="mt-3 space-y-2">
+                          {#if selectedOperatorWork.errorCode}
+                            <div>
+                              <dt class="text-xs uppercase text-muted-foreground">
+                                {$t(i18nKeys.console.instance.workerWorkFailureErrorCode)}
+                              </dt>
+                              <dd class="mt-1 break-all font-mono text-xs">{selectedOperatorWork.errorCode}</dd>
+                            </div>
+                          {/if}
+                          {#if selectedOperatorWork.errorCategory}
+                            <div>
+                              <dt class="text-xs uppercase text-muted-foreground">
+                                {$t(i18nKeys.console.instance.workerWorkFailureCategory)}
+                              </dt>
+                              <dd class="mt-1 font-mono text-xs">{selectedOperatorWork.errorCategory}</dd>
+                            </div>
+                          {/if}
+                          {#if selectedOperatorWork.retriable !== undefined}
+                            <div>
+                              <dt class="text-xs uppercase text-muted-foreground">
+                                {$t(i18nKeys.console.instance.workerWorkFailureRetriable)}
+                              </dt>
+                              <dd class="mt-1 font-mono text-xs">{selectedOperatorWork.retriable ? "true" : "false"}</dd>
+                            </div>
+                          {/if}
+                          {#if selectedOperatorWork.safeDetails}
+                            <div>
+                              <dt class="text-xs uppercase text-muted-foreground">
+                                {$t(i18nKeys.console.instance.workerWorkFailureSafeDetails)}
+                              </dt>
+                              <dd class="mt-1 space-y-1 font-mono text-xs">
+                                {#each Object.entries(selectedOperatorWork.safeDetails) as [key, value] (key)}
+                                  <p class="break-all">{key}: {String(value)}</p>
+                                {/each}
+                              </dd>
+                            </div>
+                          {/if}
+                        </dl>
+                      </div>
+                    {/if}
 
                     {#if selectedOperatorWorkEvents.length > 0}
                       <div class="space-y-3">

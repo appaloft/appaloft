@@ -798,7 +798,11 @@ export const enUS = {
       workerRuntimeStaleWorkers: "stale",
       workerRuntimeTopology: "Configured topology",
       workerRuntimeTopologyBody:
-        "Shows the configured durable worker count, mode, and queue backend for this instance.",
+        "Shows the durable worker runtime configuration visible to the current process. Standalone worker topology must be confirmed with background work state and worker heartbeats.",
+      workerRuntimeStandaloneHint:
+        "This Web process is not running embedded worker executors. That is expected in production or standalone worker topologies; use background work status and standalone worker heartbeats to confirm handoff.",
+      workerRuntimeWebDisabledHint:
+        "The current process runtime mode is disabled. workers=0 only means the Web process is not executing durable work; it does not prove that every standalone worker is absent.",
       workerRuntimeUnavailable: "System doctor did not return durable worker runtime topology.",
       workerRuntimeWorkerId: "Worker ID",
       workerRuntimeWorkerIds: "Worker IDs",
@@ -826,6 +830,11 @@ export const enUS = {
       workerWorkEventsEmpty: "This work item has no events to show.",
       workerWorkEventsSelect: "Select a recent work item to inspect its event log.",
       workerWorkEventsTitle: "Event log",
+      workerWorkFailureSummary: "Failure summary",
+      workerWorkFailureErrorCode: "error code",
+      workerWorkFailureCategory: "category",
+      workerWorkFailureRetriable: "retriable",
+      workerWorkFailureSafeDetails: "safe details",
       workerWorkItem: "Work item",
       workerWorkRefresh: "Refresh work",
       workerWorkRetryScheduled: "Retry scheduled",
@@ -2093,6 +2102,10 @@ export const enUS = {
         "The workload listens on this internal port. Reverse proxy routing targets this port.",
       applicationPortInvalid: "Application port must be an integer between 1 and 65535.",
       buildTarget: "Build target",
+      blueprintInstallAcceptedDetail: "Background work {{workId}} is waiting for a Worker handoff.",
+      blueprintInstallAcceptedFallback: "{{status}}, waiting for a background Worker handoff.",
+      blueprintInstallAcceptedTitle: "Blueprint install queued",
+      blueprintInstallOpenWork: "View background work",
       chooseSourceDirectoryBrowserHint:
         "Plain browsers cannot read local paths only; enter the path manually.",
       commandPreview: "Command preview",
