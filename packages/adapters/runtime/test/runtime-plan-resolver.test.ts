@@ -1912,14 +1912,14 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Run docker compose");
   });
 
-  test("[PROC-DELIVERY-WORKER-030] resolves Dockerfile worker slot service graphs into compose workloads", async () => {
+  test("[PROC-DELIVERY-WORKER-030] resolves Dockerfile worker replicas without fixed worker services", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
     const context = createTestExecutionContext();
 
     const result = await resolver.resolve(context, {
-      id: "plan_dockerfile_worker_slots",
+      id: "plan_dockerfile_worker_replicas",
       source: createSource({
         kind: "local-folder",
         locator: "/tmp/worker-app",
@@ -1930,28 +1930,17 @@ describe("DefaultRuntimePlanResolver", () => {
         }),
       }),
       server: {
-        id: "srv_dockerfile_worker_slots",
+        id: "srv_dockerfile_worker_replicas",
         providerKey: "generic-ssh",
       },
-      environmentSnapshot: createEnvironmentSnapshot("snap_dockerfile_worker_slots"),
-      detectedReasoning: ["configured worker slot services"],
+      environmentSnapshot: createEnvironmentSnapshot("snap_dockerfile_worker_replicas"),
+      detectedReasoning: ["configured worker replicas"],
       requestedDeployment: {
         method: "dockerfile",
         dockerfilePath: "Dockerfile.worker",
+        targetServiceName: "worker",
         exposureMode: "none",
-        services: [1, 2, 3, 4].map((slot) => ({
-          name: `worker-${slot}`,
-          kind: "worker" as const,
-          runtime: {
-            strategy: "dockerfile" as const,
-          },
-          network: {
-            exposureMode: "none" as const,
-          },
-          env: {
-            APPALOFT_WORKER_SLOT: String(slot),
-          },
-        })),
+        replicas: 4,
       },
       generatedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -1964,29 +1953,31 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.runtimeArtifact).toEqual(
       expect.objectContaining({
         kind: "compose-project",
-        composeFile: ".appaloft/service-graph.compose.yml",
+        composeFile: ".appaloft/replicated-workload.compose.yml",
         metadata: expect.objectContaining({
           dockerfilePath: "Dockerfile.worker",
-          serviceGraphSource: "repository-config",
-          serviceNames: "worker-1,worker-2,worker-3,worker-4",
+          replicatedWorkload: "true",
+          targetServiceName: "worker",
+          replicas: "4",
         }),
       }),
     );
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-compose-stack",
-        composeFile: ".appaloft/service-graph.compose.yml",
+        composeFile: ".appaloft/replicated-workload.compose.yml",
         dockerfilePath: "Dockerfile.worker",
         metadata: expect.objectContaining({
-          "serviceGraph.enabled": "true",
-          "serviceGraph.serviceNames": "worker-1,worker-2,worker-3,worker-4",
+          "replicatedWorkload.enabled": "true",
+          "replicatedWorkload.serviceName": "worker",
+          "replicatedWorkload.replicas": "4",
         }),
       }),
     );
-    expect(plan.execution.metadata?.["serviceGraph.services"]).toContain("APPALOFT_WORKER_SLOT");
-    expect(plan.execution.metadata?.["serviceGraph.services"]).toContain('"worker-4"');
-    expect(plan.execution.metadata?.["serviceGraph.services"]).not.toContain('"replicas":4');
-    expect(plan.steps).toContain("Generate compose service graph");
+    expect(plan.execution.metadata?.["serviceGraph.services"]).toBeUndefined();
+    expect(JSON.stringify(plan.execution.metadata)).not.toContain("APPALOFT_WORKER_SLOT");
+    expect(JSON.stringify(plan.execution.metadata)).not.toContain("worker-4");
+    expect(plan.steps).toContain("Prepare replicated workload compose");
     expect(plan.steps).toContain("Run docker compose");
   });
 

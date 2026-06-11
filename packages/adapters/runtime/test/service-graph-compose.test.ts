@@ -39,9 +39,6 @@ describe("repository service graph compose rendering", () => {
             exposureMode: "none",
           },
           replicas: 4,
-          env: {
-            APPALOFT_WORKER_SLOT: "2",
-          },
         },
       ],
     });
@@ -58,7 +55,7 @@ describe("repository service graph compose rendering", () => {
     expect(compose).toContain('command: "bun run start:worker"');
     expect(compose).toContain('"APPALOFT_DATABASE_URL": "${APPALOFT_DATABASE_URL}"');
     expect(compose).toContain('"APPALOFT_WORKER_COUNT": "4"');
-    expect(compose).toContain('"APPALOFT_WORKER_SLOT": "2"');
+    expect(compose).not.toContain("APPALOFT_WORKER_SLOT");
     expect(compose).toContain("replicas: 4");
     expect(compose).not.toContain("ports:");
   });

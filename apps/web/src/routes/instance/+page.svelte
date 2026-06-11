@@ -855,10 +855,14 @@ server-config-deploy: true`);
                       <Activity class="size-5 text-primary" />
                       <div>
                         <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.instance.workerRuntimeTopology)}
+                          {observedRuntimeHeartbeats.length > 0
+                            ? $t(i18nKeys.console.instance.workerObservedRuntimeWorkers)
+                            : $t(i18nKeys.console.instance.workerRuntimeTopology)}
                         </h2>
                         <p class="mt-1 text-sm text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeTopologyBody)}
+                          {observedRuntimeHeartbeats.length > 0
+                            ? $t(i18nKeys.console.instance.workerObservedRuntimeWorkersBody)
+                            : $t(i18nKeys.console.instance.workerRuntimeTopologyBody)}
                         </p>
                       </div>
                     </div>
@@ -876,78 +880,8 @@ server-config-deploy: true`);
                       {$t(i18nKeys.common.status.loading)}
                     </div>
                   {:else if durableRuntimeTopology}
-                    <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <div class="rounded-md border bg-background p-4">
-                        <p class="text-xs uppercase text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeMode)}
-                        </p>
-                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.mode}</p>
-                      </div>
-                      <div class="rounded-md border bg-background p-4">
-                        <p class="text-xs uppercase text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeWorkers)}
-                        </p>
-                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.workerCount}</p>
-                      </div>
-                      <div class="rounded-md border bg-background p-4">
-                        <p class="text-xs uppercase text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeBackend)}
-                        </p>
-                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.queueBackend}</p>
-                      </div>
-                      <div class="rounded-md border bg-background p-4">
-                        <p class="text-xs uppercase text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeRole)}
-                        </p>
-                        <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.coordinationRole}</p>
-                      </div>
-                    </div>
-
-                    <div class="mt-4 rounded-md border bg-muted/20 p-4">
-                      <div class="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]">
-                        <div>
-                          <p class="text-xs uppercase text-muted-foreground">
-                            {$t(i18nKeys.console.instance.workerRuntimeClaimedBy)}
-                          </p>
-                          <p class="mt-1 break-all font-mono text-sm">
-                            {latestClaimedWorker ||
-                              $t(i18nKeys.console.instance.workerRuntimeClaimedByEmpty)}
-                          </p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase text-muted-foreground">
-                            {$t(i18nKeys.console.instance.workerRuntimeGroup)}
-                          </p>
-                          <p class="mt-1 break-all font-mono text-sm">
-                            {durableRuntimeTopology.workerGroup}
-                          </p>
-                        </div>
-                        <div>
-                          <p class="text-xs uppercase text-muted-foreground">
-                            {$t(i18nKeys.console.instance.workerRuntimeWorkerIds)}
-                          </p>
-                          <p class="mt-1 break-all font-mono text-sm">
-                            {durableRuntimeTopology.workerIds.join(", ") || "-"}
-                          </p>
-                        </div>
-                      </div>
-                      {#if durableRuntimeWebExecutionDisabled}
-                        <p class="mt-3 text-sm text-muted-foreground">
-                          {$t(i18nKeys.console.instance.workerRuntimeWebDisabledHint)}
-                        </p>
-                      {/if}
-                    </div>
-
                     {#if observedRuntimeHeartbeats.length > 0}
-                      <div class="mt-4 space-y-3 rounded-md border bg-background p-4">
-                        <div>
-                          <p class="text-sm font-medium">
-                            {$t(i18nKeys.console.instance.workerObservedRuntimeWorkers)}
-                          </p>
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.instance.workerObservedRuntimeWorkersBody)}
-                          </p>
-                        </div>
+                      <div class="mt-5 space-y-3">
                         {#each observedRuntimeHeartbeats as observed (observed.workerGroup)}
                           <div class="rounded-md border bg-muted/20 p-3">
                             <div class="grid gap-3 md:grid-cols-3">
@@ -1042,6 +976,71 @@ server-config-deploy: true`);
                         {/each}
                       </div>
                     {/if}
+
+                    <div class={observedRuntimeHeartbeats.length > 0 ? "mt-4" : "mt-5"}>
+                      <div class="rounded-md border bg-muted/20 p-4">
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeMode)}
+                            </p>
+                            <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.mode}</p>
+                          </div>
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeWorkers)}
+                            </p>
+                            <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.workerCount}</p>
+                          </div>
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeBackend)}
+                            </p>
+                            <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.queueBackend}</p>
+                          </div>
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeRole)}
+                            </p>
+                            <p class="mt-1 font-mono text-sm">{durableRuntimeTopology.coordinationRole}</p>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]">
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeClaimedBy)}
+                            </p>
+                            <p class="mt-1 break-all font-mono text-sm">
+                              {latestClaimedWorker ||
+                                $t(i18nKeys.console.instance.workerRuntimeClaimedByEmpty)}
+                            </p>
+                          </div>
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeGroup)}
+                            </p>
+                            <p class="mt-1 break-all font-mono text-sm">
+                              {durableRuntimeTopology.workerGroup}
+                            </p>
+                          </div>
+                          <div>
+                            <p class="text-xs uppercase text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerRuntimeWorkerIds)}
+                            </p>
+                            <p class="mt-1 break-all font-mono text-sm">
+                              {durableRuntimeTopology.workerIds.join(", ") || "-"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {#if durableRuntimeWebExecutionDisabled}
+                          <p class="mt-3 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.instance.workerRuntimeWebDisabledHint)}
+                          </p>
+                        {/if}
+                      </div>
+                    </div>
 
                     {#if durableRuntimeTopology.heartbeat}
                       <div class="mt-4 space-y-3">
