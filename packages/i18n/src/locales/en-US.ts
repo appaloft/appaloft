@@ -803,7 +803,6 @@ export const enUS = {
       workerRuntimeMonitoringCollector: "Runtime monitoring collector",
       workerRuntimeOnlineWorkers: "online",
       workerRuntimeRole: "role",
-      workerRuntimeSlot: "lease slot",
       workerRuntimeStaleWorkers: "stale",
       workerRuntimeTopology: "Web/API execution state",
       workerRuntimeTopologyBody:
