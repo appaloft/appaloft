@@ -785,6 +785,12 @@ export const enUS = {
       workerManagementTitle: "Worker management",
       workerPreviewCleanupRetry: "Preview cleanup retry scheduler",
       workerPreviewExpiryCleanup: "Preview expiry cleanup scheduler",
+      workerObservedExpectedWorkers: "expected workers",
+      workerObservedRuntimeNoHeartbeat: "No heartbeat recorded for this worker group.",
+      workerObservedRuntimeSummary: "Standalone workers {{online}}/{{expected}}",
+      workerObservedRuntimeWorkers: "Observed standalone workers",
+      workerObservedRuntimeWorkersBody:
+        "These worker groups are discovered from the durable worker heartbeat read model.",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
       workerRuntimeClaimedBy: "Recent claimant",

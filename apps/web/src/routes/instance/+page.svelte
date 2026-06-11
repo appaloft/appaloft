@@ -267,6 +267,16 @@
       durableRuntimeTopology?.coordinationRole === "disabled" ||
       durableRuntimeTopology?.workerCount === 0,
   );
+  const observedRuntimeHeartbeats = $derived(durableWorker?.observedRuntimeHeartbeats ?? []);
+  const observedRuntimeExpectedWorkerCount = $derived.by(() =>
+    observedRuntimeHeartbeats.reduce((sum, observed) => sum + observed.workerCount, 0),
+  );
+  const observedRuntimeOnlineWorkerCount = $derived.by(() =>
+    observedRuntimeHeartbeats.reduce(
+      (sum, observed) => sum + (observed.heartbeat?.onlineWorkerCount ?? 0),
+      0,
+    ),
+  );
   const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
   const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
   const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
@@ -786,9 +796,23 @@ server-config-deploy: true`);
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div class="max-w-2xl space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant={durableRuntimeTopology ? runtimeModeVariant(durableRuntimeTopology.mode) : "outline"}>
-                    {durableRuntimeTopology?.mode ?? $t(i18nKeys.common.status.loading)}
-                  </Badge>
+                  {#if observedRuntimeHeartbeats.length > 0}
+                    <Badge
+                      variant={observedRuntimeExpectedWorkerCount > 0 &&
+                      observedRuntimeOnlineWorkerCount === observedRuntimeExpectedWorkerCount
+                        ? "default"
+                        : "outline"}
+                    >
+                      {$t(i18nKeys.console.instance.workerObservedRuntimeSummary, {
+                        online: observedRuntimeOnlineWorkerCount,
+                        expected: observedRuntimeExpectedWorkerCount,
+                      })}
+                    </Badge>
+                  {:else}
+                    <Badge variant={durableRuntimeTopology ? runtimeModeVariant(durableRuntimeTopology.mode) : "outline"}>
+                      {durableRuntimeTopology?.mode ?? $t(i18nKeys.common.status.loading)}
+                    </Badge>
+                  {/if}
                   <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.instance.workerManagementTitle)}</h1>
                 </div>
                 <p class="text-sm leading-6 text-muted-foreground">
@@ -913,6 +937,111 @@ server-config-deploy: true`);
                         </p>
                       {/if}
                     </div>
+
+                    {#if observedRuntimeHeartbeats.length > 0}
+                      <div class="mt-4 space-y-3 rounded-md border bg-background p-4">
+                        <div>
+                          <p class="text-sm font-medium">
+                            {$t(i18nKeys.console.instance.workerObservedRuntimeWorkers)}
+                          </p>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.instance.workerObservedRuntimeWorkersBody)}
+                          </p>
+                        </div>
+                        {#each observedRuntimeHeartbeats as observed (observed.workerGroup)}
+                          <div class="rounded-md border bg-muted/20 p-3">
+                            <div class="grid gap-3 md:grid-cols-3">
+                              <div>
+                                <p class="text-xs uppercase text-muted-foreground">
+                                  {$t(i18nKeys.console.instance.workerRuntimeGroup)}
+                                </p>
+                                <p class="mt-1 break-all font-mono text-sm">{observed.workerGroup}</p>
+                              </div>
+                              <div>
+                                <p class="text-xs uppercase text-muted-foreground">
+                                  {$t(i18nKeys.console.instance.workerObservedExpectedWorkers)}
+                                </p>
+                                <p class="mt-1 font-mono text-sm">{observed.workerCount}</p>
+                              </div>
+                              <div>
+                                <p class="text-xs uppercase text-muted-foreground">
+                                  {$t(i18nKeys.console.instance.workerRuntimeHeartbeat)}
+                                </p>
+                                <p class="mt-1 font-mono text-sm">
+                                  {observed.heartbeat
+                                    ? `${observed.heartbeat.onlineWorkerCount}/${observed.workerCount}`
+                                    : "-"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {#if observed.heartbeat}
+                              <div class="mt-3 flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant={observed.heartbeat.onlineWorkerCount === observed.workerCount
+                                    ? "default"
+                                    : "outline"}
+                                >
+                                  {$t(i18nKeys.console.instance.workerRuntimeOnlineWorkers)}:
+                                  {observed.heartbeat.onlineWorkerCount}
+                                </Badge>
+                                <Badge
+                                  variant={observed.heartbeat.staleWorkerCount > 0
+                                    ? "destructive"
+                                    : "outline"}
+                                >
+                                  {$t(i18nKeys.console.instance.workerRuntimeStaleWorkers)}:
+                                  {observed.heartbeat.staleWorkerCount}
+                                </Badge>
+                                {#if observed.heartbeat.lastSeenAt}
+                                  <span class="text-xs text-muted-foreground">
+                                    {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}
+                                    {formatTime(observed.heartbeat.lastSeenAt)}
+                                  </span>
+                                {/if}
+                              </div>
+
+                              {#if observed.heartbeat.workers.length > 0}
+                                <div class="mt-3 overflow-hidden rounded-md border bg-background">
+                                  <Table.Root>
+                                    <Table.Header>
+                                      <Table.Row class="hover:bg-transparent">
+                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
+                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeSlot)}</Table.Head>
+                                        <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
+                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
+                                      </Table.Row>
+                                    </Table.Header>
+                                    <Table.Body>
+                                      {#each observed.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
+                                        <Table.Row>
+                                          <Table.Cell class="max-w-72 break-all font-mono text-xs">
+                                            {runtimeWorker.workerId}
+                                          </Table.Cell>
+                                          <Table.Cell class="font-mono text-xs">{runtimeWorker.slot}</Table.Cell>
+                                          <Table.Cell>
+                                            <Badge variant={runtimeWorker.online ? "default" : "outline"}>
+                                              {workerOnlineStatusLabel(runtimeWorker)}
+                                            </Badge>
+                                          </Table.Cell>
+                                          <Table.Cell class="text-muted-foreground">
+                                            {formatTime(runtimeWorker.lastSeenAt)}
+                                          </Table.Cell>
+                                        </Table.Row>
+                                      {/each}
+                                    </Table.Body>
+                                  </Table.Root>
+                                </div>
+                              {/if}
+                            {:else}
+                              <p class="mt-3 text-sm text-muted-foreground">
+                                {$t(i18nKeys.console.instance.workerObservedRuntimeNoHeartbeat)}
+                              </p>
+                            {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
 
                     {#if durableRuntimeTopology.heartbeat}
                       <div class="mt-4 space-y-3">

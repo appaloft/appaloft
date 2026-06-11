@@ -633,6 +633,24 @@ describe("resolveConfig", () => {
     });
   });
 
+  test("[LONG-WORK-MON-008] reads observed durable worker groups for standalone process discovery", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WORKER_RUNTIME_MODE: "disabled",
+        APPALOFT_WORKER_COUNT: "0",
+        APPALOFT_WORKER_OBSERVED_GROUPS:
+          "cloud-deployment-worker:4, ignored-worker:not-a-number, cloud-deployment-worker:4",
+      },
+    });
+
+    expect(config.workerRuntimeObservedGroups).toEqual([
+      {
+        workerGroup: "cloud-deployment-worker",
+        workerCount: 4,
+      },
+    ]);
+  });
+
   test("[RT-CAP-SCHED-007] allows configuring the scheduled runtime prune runner through environment", () => {
     const config = resolveConfig({
       env: {

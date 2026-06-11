@@ -174,6 +174,8 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("i18nKeys.console.instance.workerDurableRuntime");
     expect(instancePageSource).toContain("worker.runtimeTopology");
     expect(instancePageSource).toContain("worker.runtimeTopology.heartbeat");
+    expect(instancePageSource).toContain("observedRuntimeHeartbeats");
+    expect(instancePageSource).toContain("workerObservedRuntimeWorkers");
     expect(instancePageSource).toContain("workerRuntimeHeartbeat");
     expect(instancePageSource).toContain("workerRuntimeTopology");
     expect(instancePageSource).toContain("workerManagementTitle");
@@ -181,11 +183,13 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(contractsSource).toContain("currentCommitSha: z.string().optional()");
     expect(contractsSource).toContain("heartbeat");
+    expect(contractsSource).toContain("observedRuntimeHeartbeats");
     expect(contractsSource).toContain("workerId: z.string()");
     expect(contractsSource).toContain("operatorWorkEventSchema");
     expect(zhLocaleSource).toContain('pageTitle: "实例"');
     expect(zhLocaleSource).toContain('instance: "实例"');
     expect(zhLocaleSource).toContain('workerManagementTitle: "Worker 管理"');
+    expect(zhLocaleSource).toContain('workerObservedRuntimeWorkers: "观测到的独立 worker"');
     expect(zhLocaleSource).toContain('workerWorkEventsTitle: "事件日志"');
   });
 
