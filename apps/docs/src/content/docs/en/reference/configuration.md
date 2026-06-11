@@ -46,8 +46,9 @@ durable work can still observe standalone worker groups by setting `APPALOFT_WOR
 | --- | --- | --- |
 | `APPALOFT_WORKER_RUNTIME_MODE` | `embedded` | `embedded` starts worker slots with `appaloft serve`; `standalone` expects dedicated `appaloft worker` processes; `disabled` starts no durable work slots. |
 | `APPALOFT_WORKER_QUEUE_BACKEND` | `database` | Durable queue backend. `database` uses the process-attempt journal; `external` requires an adapter kind. |
-| `APPALOFT_WORKER_COUNT` | `1` | Number of configured worker slots. Enabled modes require at least one; `disabled` can use `0`. |
+| `APPALOFT_WORKER_COUNT` | `1` | Number of expected worker slots in the group. Enabled modes require at least one; `disabled` can use `0`. |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | Stable worker group used to derive worker ids and coordinate capacity. |
+| `APPALOFT_WORKER_SLOT` | unset | Optional explicit slot for this process. When set, the process only starts `<worker-group>-<slot>` while `APPALOFT_WORKER_COUNT` remains the expected group size. |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | Required when `APPALOFT_WORKER_QUEUE_BACKEND=external`; supported public values are `kafka`, `temporal`, and `custom`. |
 | `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | Comma-separated `worker-group:count` entries that doctor and the Web Instance page should read from the durable worker heartbeat model, even when the current Web/API process uses `APPALOFT_WORKER_RUNTIME_MODE=disabled`. |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | Maximum PostgreSQL connections held by each runtime process. Lower this when multiple Web/worker processes share a small session pool. |

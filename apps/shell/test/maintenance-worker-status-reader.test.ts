@@ -30,6 +30,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           "APPALOFT_WORKER_QUEUE_BACKEND",
           "APPALOFT_WORKER_COUNT",
           "APPALOFT_WORKER_GROUP",
+          "APPALOFT_WORKER_SLOT",
           "APPALOFT_WORKER_EXTERNAL_BACKEND_KIND",
           "APPALOFT_WORKER_OBSERVED_GROUPS",
         ],
@@ -260,6 +261,44 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           },
         },
       ],
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-030] reports explicit standalone worker slot separately from expected group capacity", async () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(
+      resolveConfig({
+        env: {
+          APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+          APPALOFT_WORKER_QUEUE_BACKEND: "database",
+          APPALOFT_WORKER_COUNT: "4",
+          APPALOFT_WORKER_GROUP: "cloud-deployment-worker",
+          APPALOFT_WORKER_SLOT: "3",
+        },
+      }),
+    );
+
+    const durableRuntime = (await reader.list()).find(
+      (entry) => entry.key === "durable-worker-runtime",
+    );
+
+    expect(durableRuntime).toMatchObject({
+      enabled: true,
+      activation: "starts-as-standalone-process",
+      runtimeTopology: {
+        mode: "standalone",
+        queueBackend: "database",
+        workerCount: 4,
+        workerGroup: "cloud-deployment-worker",
+        workerIds: [
+          "cloud-deployment-worker-1",
+          "cloud-deployment-worker-2",
+          "cloud-deployment-worker-3",
+          "cloud-deployment-worker-4",
+        ],
+        localWorkerIds: ["cloud-deployment-worker-3"],
+        workerSlot: 3,
+        coordinationRole: "worker",
+      },
     });
   });
 

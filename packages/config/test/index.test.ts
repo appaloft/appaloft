@@ -616,6 +616,26 @@ describe("resolveConfig", () => {
     });
   });
 
+  test("[PROC-DELIVERY-WORKER-030] allows one standalone process to claim an explicit worker slot", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+        APPALOFT_WORKER_QUEUE_BACKEND: "database",
+        APPALOFT_WORKER_COUNT: "4",
+        APPALOFT_WORKER_GROUP: "cloud-deployment-worker",
+        APPALOFT_WORKER_SLOT: "3",
+      },
+    });
+
+    expect(config.workerRuntime).toEqual({
+      mode: "standalone",
+      queueBackend: "database",
+      workerCount: 4,
+      workerGroup: "cloud-deployment-worker",
+      workerSlot: 3,
+    });
+  });
+
   test("[PROC-DELIVERY-WORKER-011] allows disabling the durable worker runtime", () => {
     const config = resolveConfig({
       env: {

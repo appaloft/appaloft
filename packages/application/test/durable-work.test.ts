@@ -194,6 +194,42 @@ describe("durable work topology", () => {
     ]);
   });
 
+  test("[PROC-DELIVERY-WORKER-030] standalone process can claim one explicit worker slot", () => {
+    const topology = createDurableWorkTopology({
+      mode: "standalone",
+      queueBackend: "database",
+      workerCount: 4,
+      workerGroup: "cloud-deployment-worker",
+      workerSlot: 3,
+    });
+
+    expect(topology.isOk()).toBe(true);
+    if (topology.isErr()) throw new Error(topology.error.message);
+    expect(topology.value.expectedWorkerCount).toBe(4);
+    expect(topology.value.coordinationRole).toBe("worker");
+    expect(topology.value.workers).toEqual([
+      {
+        workerId: "cloud-deployment-worker-3",
+        workerGroup: "cloud-deployment-worker",
+        slot: 3,
+      },
+    ]);
+  });
+
+  test("[PROC-DELIVERY-WORKER-031] rejects worker slots outside the configured group size", () => {
+    const topology = createDurableWorkTopology({
+      mode: "standalone",
+      queueBackend: "database",
+      workerCount: 2,
+      workerGroup: "cloud-deployment-worker",
+      workerSlot: 3,
+    });
+
+    expect(topology.isErr()).toBe(true);
+    if (topology.isOk()) throw new Error("Expected topology validation to fail");
+    expect(topology.error.details?.field).toBe("workerSlot");
+  });
+
   test("[PROC-DELIVERY-WORKER-003] disabled topology advertises no workers", () => {
     const topology = createDurableWorkTopology({
       mode: "disabled",

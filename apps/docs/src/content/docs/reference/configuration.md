@@ -45,8 +45,9 @@ worker group、worker ids 和 coordinator role。Web/API 进程不执行 durable
 | --- | --- | --- |
 | `APPALOFT_WORKER_RUNTIME_MODE` | `embedded` | `embedded` 随 `appaloft serve` 启动 worker slots；`standalone` 预期由专用 `appaloft worker` 进程启动；`disabled` 不启动 durable work slots。 |
 | `APPALOFT_WORKER_QUEUE_BACKEND` | `database` | Durable queue backend。`database` 使用 process-attempt journal；`external` 需要 adapter kind。 |
-| `APPALOFT_WORKER_COUNT` | `1` | 配置的 worker slots 数。启用模式至少需要 1 个；`disabled` 可设为 `0`。 |
+| `APPALOFT_WORKER_COUNT` | `1` | worker group 预期的 worker slots 数。启用模式至少需要 1 个；`disabled` 可设为 `0`。 |
 | `APPALOFT_WORKER_GROUP` | `appaloft-worker` | 稳定 worker group，用来生成 worker ids 并协调容量。 |
+| `APPALOFT_WORKER_SLOT` | unset | 当前进程的显式 slot。设置后，本进程只启动 `<worker-group>-<slot>`，`APPALOFT_WORKER_COUNT` 仍表示整个 group 的预期容量。 |
 | `APPALOFT_WORKER_EXTERNAL_BACKEND_KIND` | unset | `APPALOFT_WORKER_QUEUE_BACKEND=external` 时必填；public 支持值为 `kafka`、`temporal`、`custom`。 |
 | `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | 逗号分隔的 `worker-group:count` 列表。doctor 和 Web Instance 页面会从 durable worker 心跳 read model 读取这些 group，即使当前 Web/API 进程配置为 `APPALOFT_WORKER_RUNTIME_MODE=disabled`。 |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | PostgreSQL runtime 每个进程最多保留的连接数。多 Web/worker 进程共享较小 session pool 时应按进程数降低这个值。 |
