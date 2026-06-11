@@ -15,6 +15,8 @@ export const i18nKeys = {
       createAndDeploy: "common:actions.createAndDeploy",
       deploy: "common:actions.deploy",
       deploying: "common:actions.deploying",
+      done: "common:actions.done",
+      edit: "common:actions.edit",
       createDeployment: "common:actions.createDeployment",
       createResource: "common:actions.createResource",
       createServer: "common:actions.createServer",

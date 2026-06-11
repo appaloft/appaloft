@@ -2,9 +2,10 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ArrowRight, FolderOpen, GripVertical, Plus, ShieldCheck } from "@lucide/svelte";
-  import type { CreateProjectResponse } from "@appaloft/contracts";
+  import { ArrowRight, Check, FolderOpen, GripVertical, Pencil, Plus, ShieldCheck } from "@lucide/svelte";
+  import type { CreateProjectResponse, ProjectSummary } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import Sortable from "sortablejs";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
@@ -33,8 +34,89 @@
 
   const projectPageSize = 12;
   let projectOffset = $state(0);
-  let draggedProjectId = $state<string | null>(null);
+  let activeProjectId = $state<string | null>(null);
+  let projectGridElement = $state<HTMLElement | null>(null);
+  let projectSortable: Sortable | null = null;
+  let projectSortableRectSnapshot = new Map<string, SortableCardRect>();
+  let projectSortSnapshot = $state<ProjectSummary[] | null>(null);
+  let projectOptimisticOrderIds = $state<string[] | null>(null);
+  let projectSortMode = $state(false);
   let projectReorderError = $state("");
+  let visibleProjects = $state<ProjectSummary[]>([]);
+
+  type SortableCardRect = {
+    left: number;
+    top: number;
+  };
+
+  function getSortableGridDirection(
+    _event: Event,
+    target: HTMLElement | null,
+    dragElement: HTMLElement,
+  ): "horizontal" | "vertical" {
+    if (!target) {
+      return "vertical";
+    }
+
+    const targetRect = target.getBoundingClientRect();
+    const dragRect = dragElement.getBoundingClientRect();
+    const sameRow =
+      Math.abs(targetRect.top - dragRect.top) < Math.min(targetRect.height, dragRect.height) / 2;
+
+    return sameRow ? "horizontal" : "vertical";
+  }
+
+  function captureSortableCardRects(root: HTMLElement): Map<string, SortableCardRect> {
+    return new Map(
+      Array.from(root.querySelectorAll<HTMLElement>("[data-project-card]"))
+        .map((card) => {
+          const projectId = card.getAttribute("data-project-id");
+          if (!projectId) {
+            return null;
+          }
+
+          const rect = card.getBoundingClientRect();
+          return [projectId, { left: rect.left, top: rect.top }] as const;
+        })
+        .filter((entry): entry is readonly [string, SortableCardRect] => Boolean(entry)),
+    );
+  }
+
+  function animateSortableCardMovement(previousRects: Map<string, SortableCardRect>): void {
+    if (!projectGridElement || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    for (const card of projectGridElement.querySelectorAll<HTMLElement>("[data-project-card]")) {
+      const projectId = card.getAttribute("data-project-id");
+      if (!projectId || projectId === activeProjectId) {
+        continue;
+      }
+
+      const previousRect = previousRects.get(projectId);
+      if (!previousRect) {
+        continue;
+      }
+
+      const currentRect = card.getBoundingClientRect();
+      const offsetX = previousRect.left - currentRect.left;
+      const offsetY = previousRect.top - currentRect.top;
+      if (Math.abs(offsetX) < 1 && Math.abs(offsetY) < 1) {
+        continue;
+      }
+
+      card.animate(
+        [
+          { transform: `translate3d(${offsetX}px, ${offsetY}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        {
+          duration: 220,
+          easing: "cubic-bezier(0.2, 0, 0, 1)",
+        },
+      );
+    }
+  }
 
   const { authSessionQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser, { projects: false });
@@ -46,9 +128,12 @@
     }),
   );
   const projects = $derived(projectsQuery.data?.items ?? []);
+  const projectQueryOrderKey = $derived(projects.map((project) => project.id).join("|"));
+  const projectVisibleOrderKey = $derived(visibleProjects.map((project) => project.id).join("|"));
+  const projectOptimisticOrderKey = $derived(projectOptimisticOrderIds?.join("|") ?? "");
   const projectTotal = $derived(projectsQuery.data?.total ?? projects.length);
   const projectPageStart = $derived(projectTotal > 0 ? projectOffset + 1 : 0);
-  const projectPageEnd = $derived(Math.min(projectOffset + projects.length, projectTotal));
+  const projectPageEnd = $derived(Math.min(projectOffset + visibleProjects.length, projectTotal));
   const canGoPrevious = $derived(projectOffset > 0);
   const canGoNext = $derived(projectOffset + projectPageSize < projectTotal);
   const environments = $derived(environmentsQuery.data?.items ?? []);
@@ -63,7 +148,12 @@
   let projectCreateDialogOpen = $state(false);
 
   const reorderProjectsMutation = createMutation(() => ({
-    mutationFn: (projectIds: string[]) =>
+    mutationFn: ({
+      projectIds,
+    }: {
+      projectIds: string[];
+      rollbackProjects: ProjectSummary[];
+    }) =>
       orpcClient.projects.reorder({
         projectIds,
         startOffset: projectOffset,
@@ -72,10 +162,77 @@
       projectReorderError = "";
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      visibleProjects = [...variables.rollbackProjects];
+      projectOptimisticOrderIds = null;
       projectReorderError = readErrorMessage(error);
     },
   }));
+
+  $effect(() => {
+    if (projectOptimisticOrderKey && projectOptimisticOrderKey !== projectQueryOrderKey) {
+      return;
+    }
+
+    projectOptimisticOrderIds = null;
+    if (!activeProjectId && projectQueryOrderKey !== projectVisibleOrderKey) {
+      visibleProjects = projects;
+    }
+  });
+
+  $effect(() => {
+    if (!browser || !projectSortMode || reorderProjectsMutation.isPending || !projectGridElement) {
+      projectSortable?.destroy();
+      projectSortable = null;
+      return;
+    }
+
+    projectSortable?.destroy();
+    const gridElement = projectGridElement;
+    projectSortable = Sortable.create(gridElement, {
+      animation: 220,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+      handle: "[data-project-reorder-handle]",
+      draggable: "[data-project-card]",
+      dataIdAttr: "data-project-id",
+      ghostClass: "console-sortable-ghost",
+      chosenClass: "console-sortable-chosen",
+      dragClass: "console-sortable-drag",
+      fallbackClass: "console-sortable-fallback",
+      direction: getSortableGridDirection,
+      swapThreshold: 0.5,
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackTolerance: 4,
+      onStart: (event: Sortable.SortableEvent) => {
+        activeProjectId = event.item.getAttribute("data-project-id");
+        projectSortSnapshot = [...visibleProjects];
+        projectSortableRectSnapshot = captureSortableCardRects(gridElement);
+      },
+      onMove: () => {
+        projectSortableRectSnapshot = captureSortableCardRects(gridElement);
+        return true;
+      },
+      onChange: () => {
+        animateSortableCardMovement(projectSortableRectSnapshot);
+        projectSortableRectSnapshot = captureSortableCardRects(gridElement);
+      },
+      onEnd: () => {
+        commitProjectSort(projectSortable?.toArray() ?? []);
+      },
+    });
+
+    return () => {
+      projectSortable?.destroy();
+      projectSortable = null;
+    };
+  });
+
+  $effect(() => {
+    if (projectSortable && projectVisibleOrderKey && !activeProjectId) {
+      projectSortable.sort(visibleProjects.map((project) => project.id), true);
+    }
+  });
 
   $effect(() => {
     projectCreateDialogOpen = modalIsOpen(page, "create-project");
@@ -95,32 +252,46 @@
   }
 
   function setProjectPage(nextOffset: number): void {
+    projectSortMode = false;
+    activeProjectId = null;
+    projectSortSnapshot = null;
     projectOffset = Math.max(0, nextOffset);
   }
 
-  function reorderVisibleProjects(targetProjectId: string): void {
-    if (!draggedProjectId || draggedProjectId === targetProjectId) {
-      draggedProjectId = null;
+  function setProjectSortMode(enabled: boolean): void {
+    if (reorderProjectsMutation.isPending) {
       return;
     }
 
-    const nextProjects = [...projects];
-    const fromIndex = nextProjects.findIndex((project) => project.id === draggedProjectId);
-    const toIndex = nextProjects.findIndex((project) => project.id === targetProjectId);
-    if (fromIndex < 0 || toIndex < 0) {
-      draggedProjectId = null;
+    projectSortMode = enabled;
+    activeProjectId = null;
+    projectSortSnapshot = null;
+  }
+
+  function commitProjectSort(projectIds: string[]): void {
+    const rollbackProjects = projectSortSnapshot ?? visibleProjects;
+    const rollbackIds = rollbackProjects.map((project) => project.id);
+    const projectById = new Map(visibleProjects.map((project) => [project.id, project]));
+    const nextProjects = projectIds
+      .map((projectId) => projectById.get(projectId))
+      .filter((project): project is ProjectSummary => Boolean(project));
+
+    if (nextProjects.length !== visibleProjects.length) {
+      projectSortable?.sort(rollbackIds, true);
+      activeProjectId = null;
+      projectSortSnapshot = null;
       return;
     }
 
-    const [moved] = nextProjects.splice(fromIndex, 1);
-    if (!moved) {
-      draggedProjectId = null;
-      return;
+    const changed = projectIds.join("|") !== rollbackIds.join("|");
+    if (changed) {
+      visibleProjects = nextProjects;
+      projectOptimisticOrderIds = projectIds;
+      reorderProjectsMutation.mutate({ projectIds, rollbackProjects });
     }
 
-    nextProjects.splice(toIndex, 0, moved);
-    draggedProjectId = null;
-    reorderProjectsMutation.mutate(nextProjects.map((project) => project.id));
+    activeProjectId = null;
+    projectSortSnapshot = null;
   }
 </script>
 
@@ -163,16 +334,35 @@
             {$t(i18nKeys.console.projects.focusDescription)}
           </p>
         </div>
-        {#if projects.length > 0}
-          <Button class="shrink-0 self-start" type="button" onclick={openProjectCreateDialog}>
-            <Plus class="size-4" />
-            {$t(i18nKeys.console.projects.createProjectAction)}
-          </Button>
+        {#if visibleProjects.length > 0}
+          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+            <Button type="button" onclick={openProjectCreateDialog}>
+              <Plus class="size-4" />
+              {$t(i18nKeys.console.projects.createProjectAction)}
+            </Button>
+            {#if visibleProjects.length > 1}
+              <Button
+                type="button"
+                variant={projectSortMode ? "selected" : "outline"}
+                disabled={reorderProjectsMutation.isPending}
+                onclick={() => setProjectSortMode(!projectSortMode)}
+                data-project-sort-toggle
+              >
+                {#if projectSortMode}
+                  <Check class="size-4" />
+                  {$t(i18nKeys.common.actions.done)}
+                {:else}
+                  <Pencil class="size-4" />
+                  {$t(i18nKeys.common.actions.edit)}
+                {/if}
+              </Button>
+            {/if}
+          </div>
         {/if}
       </section>
 
       <section class="space-y-3">
-        {#if projects.length > 0}
+        {#if visibleProjects.length > 0}
           <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.projectListTitle)}</h2>
@@ -196,7 +386,7 @@
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!canGoPrevious || reorderProjectsMutation.isPending}
+                  disabled={!canGoPrevious || projectSortMode || reorderProjectsMutation.isPending}
                   onclick={() => setProjectPage(projectOffset - projectPageSize)}
                 >
                   {$t(i18nKeys.common.actions.previous)}
@@ -205,7 +395,7 @@
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!canGoNext || reorderProjectsMutation.isPending}
+                  disabled={!canGoNext || projectSortMode || reorderProjectsMutation.isPending}
                   onclick={() => setProjectPage(projectOffset + projectPageSize)}
                 >
                   {$t(i18nKeys.common.actions.next)}
@@ -220,8 +410,12 @@
             </p>
           {/if}
 
-          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-project-grid>
-            {#each projects as project (project.id)}
+          <div
+            class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            bind:this={projectGridElement}
+            data-project-grid
+          >
+            {#each visibleProjects as project (project.id)}
               {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
               {@const latestDeployment = latestProjectDeployment(project, deployments)}
               {@const latestResource =
@@ -229,58 +423,35 @@
                 projectResources[0]}
               <article
                 class={[
-                  "group flex min-h-56 flex-col rounded-md border bg-card p-4 shadow-sm transition",
-                  draggedProjectId === project.id
+                  "group relative flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm transition-colors",
+                  projectSortMode ? "select-none" : "",
+                  activeProjectId === project.id
                     ? "border-primary/60 bg-primary/5 opacity-80"
                     : "hover:border-primary/30 hover:bg-muted/20",
                 ]}
-                draggable={!reorderProjectsMutation.isPending}
-                ondragstart={(event) => {
-                  draggedProjectId = project.id;
-                  event.dataTransfer?.setData("text/plain", project.id);
-                  if (event.dataTransfer) {
-                    event.dataTransfer.effectAllowed = "move";
-                  }
-                }}
-                ondragover={(event) => {
-                  event.preventDefault();
-                  if (event.dataTransfer) {
-                    event.dataTransfer.dropEffect = "move";
-                  }
-                }}
-                ondrop={(event) => {
-                  event.preventDefault();
-                  reorderVisibleProjects(project.id);
-                }}
-                ondragend={() => {
-                  draggedProjectId = null;
-                }}
                 data-project-card
                 data-project-id={project.id}
               >
-                <div class="flex items-start gap-3">
+                {#if projectSortMode}
                   <button
                     type="button"
-                    class="mt-0.5 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
+                    class="absolute right-3 top-3 z-10 inline-flex size-8 cursor-grab items-center justify-center rounded-md border bg-background/95 text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
                     aria-label={$t(i18nKeys.console.projects.reorderHandle)}
                     title={$t(i18nKeys.console.projects.reorderHandle)}
                     disabled={reorderProjectsMutation.isPending}
                     data-project-reorder-handle
-                    onpointerdown={() => {
-                      draggedProjectId = project.id;
-                    }}
                   >
                     <GripVertical class="size-4" />
                   </button>
-                  <div class="min-w-0 flex-1 space-y-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h3 class="truncate text-base font-semibold">{project.name}</h3>
-                      <Badge variant="outline">{project.slug}</Badge>
-                    </div>
-                    <p class="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                      {project.description ?? $t(i18nKeys.console.projects.noDescription)}
-                    </p>
-                  </div>
+                {/if}
+                <div class="min-w-0 space-y-2 pr-10" data-project-card-header>
+                  <h3 class="truncate text-base font-semibold" title={project.name}>{project.name}</h3>
+                  <Badge variant="outline" class="max-w-full truncate font-mono text-[11px]" title={project.slug}>
+                    {project.slug}
+                  </Badge>
+                  <p class="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    {project.description ?? $t(i18nKeys.console.projects.noDescription)}
+                  </p>
                 </div>
 
                 <div class="mt-5 grid gap-2 text-sm text-muted-foreground">
@@ -354,3 +525,23 @@
     </Dialog.Content>
   </Dialog.Root>
 </ConsoleShell>
+
+<style>
+  :global(.console-sortable-ghost) {
+    opacity: 0.42;
+  }
+
+  :global(.console-sortable-chosen) {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 10px 30px hsl(var(--foreground) / 0.12);
+  }
+
+  :global(.console-sortable-drag) {
+    cursor: grabbing;
+    transition: none !important;
+  }
+
+  :global(.console-sortable-fallback) {
+    transition: none !important;
+  }
+</style>

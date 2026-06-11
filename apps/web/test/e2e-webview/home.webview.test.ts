@@ -3804,6 +3804,111 @@ async function _pressElementBySelector(view: Bun.WebView, selector: string): Pro
   expect(found).toBe(true);
 }
 
+async function dragSortableItem(
+  view: Bun.WebView,
+  input: {
+    itemSelector: string;
+    handleSelector: string;
+    idAttribute: string;
+    sourceIndex: number;
+    targetIndex: number;
+    expectedMovedId: string;
+  },
+): Promise<void> {
+  const dragged = await view.evaluate<boolean>(`(async () => {
+    const itemSelector = ${JSON.stringify(input.itemSelector)};
+    const handleSelector = ${JSON.stringify(input.handleSelector)};
+    const idAttribute = ${JSON.stringify(input.idAttribute)};
+    const sourceIndex = ${input.sourceIndex};
+    const targetIndex = ${input.targetIndex};
+    const expectedMovedId = ${JSON.stringify(input.expectedMovedId)};
+    const pointerId = 73;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const center = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    };
+    const dispatchPointer = (type, target, point, buttons) => {
+      target.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        buttons,
+        clientX: point.x,
+        clientY: point.y,
+        pointerId,
+        pointerType: "mouse",
+        isPrimary: true,
+      }));
+    };
+    const dispatchMouse = (type, target, point, buttons) => {
+      target.dispatchEvent(new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        buttons,
+        clientX: point.x,
+        clientY: point.y,
+      }));
+    };
+
+    const cards = Array.from(document.querySelectorAll(itemSelector));
+    const source = cards[sourceIndex];
+    const target = cards[targetIndex];
+    if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const handle = source.querySelector(handleSelector);
+    if (!(handle instanceof HTMLElement)) {
+      return false;
+    }
+
+    const sourcePoint = center(handle);
+    const targetPoint = center(target);
+    handle.dispatchEvent(new PointerEvent("pointerover", {
+      bubbles: true,
+      cancelable: true,
+      clientX: sourcePoint.x,
+      clientY: sourcePoint.y,
+      pointerId,
+      pointerType: "mouse",
+      isPrimary: true,
+    }));
+    dispatchPointer("pointerdown", handle, sourcePoint, 1);
+    dispatchMouse("mousedown", handle, sourcePoint, 1);
+    await frame();
+
+    const midPoint = {
+      x: (sourcePoint.x + targetPoint.x) / 2,
+      y: (sourcePoint.y + targetPoint.y) / 2,
+    };
+    dispatchPointer("pointermove", document, midPoint, 1);
+    dispatchMouse("mousemove", document, midPoint, 1);
+    await sleep(40);
+    dispatchPointer("pointermove", document, targetPoint, 1);
+    dispatchMouse("mousemove", document, targetPoint, 1);
+    await sleep(220);
+
+    const optimisticCards = Array.from(document.querySelectorAll(itemSelector));
+    const movedDuringDrag = optimisticCards[targetIndex]?.getAttribute(idAttribute) === expectedMovedId;
+
+    dispatchPointer("pointerup", document, targetPoint, 0);
+    dispatchMouse("mouseup", document, targetPoint, 0);
+    await frame();
+    await frame();
+
+    const committedCards = Array.from(document.querySelectorAll(itemSelector));
+    return movedDuringDrag && committedCards[targetIndex]?.getAttribute(idAttribute) === expectedMovedId;
+  })()`);
+
+  expect(dragged).toBe(true);
+}
+
 async function _clickAnyElementBySelector(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -4203,6 +4308,7 @@ describe.serial("console e2e with Bun.WebView", () => {
           hasGrid: Boolean(document.querySelector('[data-project-grid]')),
           handleCount: document.querySelectorAll('[data-project-reorder-handle]').length,
           hasPagination: Boolean(document.querySelector('[data-project-pagination]')),
+          firstHeaderLeft: document.querySelector('[data-project-card-header]')?.getBoundingClientRect().left ?? null,
         });
       })()`),
     ) as {
@@ -4213,42 +4319,35 @@ describe.serial("console e2e with Bun.WebView", () => {
       hasGrid: boolean;
       handleCount: number;
       hasPagination: boolean;
+      firstHeaderLeft: number | null;
     };
     expect(desktopLayout.hasGrid).toBe(true);
     expect(desktopLayout.hasPagination).toBe(true);
     expect(desktopLayout.cardCount).toBe(12);
-    expect(desktopLayout.handleCount).toBe(12);
-    expect(desktopLayout.firstRowCount).toBeGreaterThanOrEqual(3);
-    expect(desktopLayout.firstRowCount).toBeLessThanOrEqual(4);
+    expect(desktopLayout.handleCount).toBe(0);
+    expect(desktopLayout.firstRowCount).toBe(3);
     expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.clientWidth);
 
-    const dragged = await view.evaluate<boolean>(`(() => {
-      const cards = Array.from(document.querySelectorAll('[data-project-card]'));
-      const source = cards[0];
-      const target = cards[2];
-      if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
-        return false;
-      }
+    await clickButtonByAnyText(view, ["Edit", "编辑"]);
+    await waitFor(
+      () =>
+        view.evaluate<number>(`document.querySelectorAll('[data-project-reorder-handle]').length`),
+      (count) => count === 12,
+      "Expected project reorder handles to appear after enabling edit mode",
+    );
+    const editedProjectHeaderLeft = await view.evaluate<number | null>(
+      `document.querySelector('[data-project-card-header]')?.getBoundingClientRect().left ?? null`,
+    );
+    expect(editedProjectHeaderLeft).toBe(desktopLayout.firstHeaderLeft);
 
-      const dragStart = new DragEvent('dragstart', {
-        bubbles: true,
-        dataTransfer: new DataTransfer(),
-      });
-      source.dispatchEvent(dragStart);
-      target.dispatchEvent(new DragEvent('dragover', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: dragStart.dataTransfer,
-      }));
-      target.dispatchEvent(new DragEvent('drop', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: dragStart.dataTransfer,
-      }));
-      source.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
-      return true;
-    })()`);
-    expect(dragged).toBe(true);
+    await dragSortableItem(view, {
+      itemSelector: "[data-project-card]",
+      handleSelector: "[data-project-reorder-handle]",
+      idAttribute: "data-project-id",
+      sourceIndex: 0,
+      targetIndex: 2,
+      expectedMovedId: "prj_grid_01",
+    });
 
     const reorderRequest = await waitForRecordedRequest("/api/rpc/projects/reorder");
     const reorderInput = readOrpcJsonPayload(reorderRequest.body) as {
@@ -4261,6 +4360,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       "prj_grid_03",
       "prj_grid_01",
     ]);
+
+    await clickButtonByAnyText(view, ["Done", "完成"]);
+    await waitFor(
+      () =>
+        view.evaluate<number>(`document.querySelectorAll('[data-project-reorder-handle]').length`),
+      (count) => count === 0,
+      "Expected project reorder handles to hide after leaving edit mode",
+    );
 
     await using mobileView = createWebView({ width: 390, height: 844 });
     await mobileView.navigate(`${previewUrl}/projects`);
@@ -4322,6 +4429,7 @@ describe.serial("console e2e with Bun.WebView", () => {
           hasGrid: Boolean(document.querySelector('[data-server-grid]')),
           handleCount: document.querySelectorAll('[data-server-reorder-handle]').length,
           hasPagination: Boolean(document.querySelector('[data-server-pagination]')),
+          firstHeaderLeft: document.querySelector('[data-server-card-header]')?.getBoundingClientRect().left ?? null,
         });
       })()`),
     ) as {
@@ -4332,42 +4440,35 @@ describe.serial("console e2e with Bun.WebView", () => {
       hasGrid: boolean;
       handleCount: number;
       hasPagination: boolean;
+      firstHeaderLeft: number | null;
     };
     expect(desktopLayout.hasGrid).toBe(true);
     expect(desktopLayout.hasPagination).toBe(true);
     expect(desktopLayout.cardCount).toBe(12);
-    expect(desktopLayout.handleCount).toBe(12);
-    expect(desktopLayout.firstRowCount).toBeGreaterThanOrEqual(3);
-    expect(desktopLayout.firstRowCount).toBeLessThanOrEqual(4);
+    expect(desktopLayout.handleCount).toBe(0);
+    expect(desktopLayout.firstRowCount).toBe(3);
     expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.clientWidth);
 
-    const dragged = await view.evaluate<boolean>(`(() => {
-      const cards = Array.from(document.querySelectorAll('[data-server-card]'));
-      const source = cards[0];
-      const target = cards[2];
-      if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
-        return false;
-      }
+    await clickButtonByAnyText(view, ["Edit", "编辑"]);
+    await waitFor(
+      () =>
+        view.evaluate<number>(`document.querySelectorAll('[data-server-reorder-handle]').length`),
+      (count) => count === 12,
+      "Expected server reorder handles to appear after enabling edit mode",
+    );
+    const editedServerHeaderLeft = await view.evaluate<number | null>(
+      `document.querySelector('[data-server-card-header]')?.getBoundingClientRect().left ?? null`,
+    );
+    expect(editedServerHeaderLeft).toBe(desktopLayout.firstHeaderLeft);
 
-      const dragStart = new DragEvent('dragstart', {
-        bubbles: true,
-        dataTransfer: new DataTransfer(),
-      });
-      source.dispatchEvent(dragStart);
-      target.dispatchEvent(new DragEvent('dragover', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: dragStart.dataTransfer,
-      }));
-      target.dispatchEvent(new DragEvent('drop', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: dragStart.dataTransfer,
-      }));
-      source.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
-      return true;
-    })()`);
-    expect(dragged).toBe(true);
+    await dragSortableItem(view, {
+      itemSelector: "[data-server-card]",
+      handleSelector: "[data-server-reorder-handle]",
+      idAttribute: "data-server-id",
+      sourceIndex: 0,
+      targetIndex: 2,
+      expectedMovedId: "srv_demo",
+    });
 
     const reorderRequest = await waitForRecordedRequest("/api/rpc/servers/reorder");
     const reorderInput = readOrpcJsonPayload(reorderRequest.body) as {
@@ -4376,6 +4477,14 @@ describe.serial("console e2e with Bun.WebView", () => {
     };
     expect(reorderInput.startOffset).toBe(0);
     expect(reorderInput.serverIds?.slice(0, 3)).toEqual(["srv_grid_02", "srv_grid_03", "srv_demo"]);
+
+    await clickButtonByAnyText(view, ["Done", "完成"]);
+    await waitFor(
+      () =>
+        view.evaluate<number>(`document.querySelectorAll('[data-server-reorder-handle]').length`),
+      (count) => count === 0,
+      "Expected server reorder handles to hide after leaving edit mode",
+    );
 
     await using mobileView = createWebView({ width: 390, height: 844 });
     await mobileView.navigate(`${previewUrl}/servers`);

@@ -15,6 +15,8 @@ export const enUS = {
       createAndDeploy: "Create and deploy",
       deploy: "Deploy",
       deploying: "Deploying",
+      done: "Done",
+      edit: "Edit",
       createDeployment: "Create deployment",
       createResource: "Create resource",
       createServer: "Create server",
