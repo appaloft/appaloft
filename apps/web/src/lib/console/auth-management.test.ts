@@ -189,7 +189,7 @@ describe("organization auth management console surface", () => {
     expect(zhLocaleSource).toContain('pageTitle: "实例"');
     expect(zhLocaleSource).toContain('instance: "实例"');
     expect(zhLocaleSource).toContain('workerManagementTitle: "Worker 管理"');
-    expect(zhLocaleSource).toContain('workerObservedRuntimeWorkers: "观测到的独立 worker"');
+    expect(zhLocaleSource).toContain('workerObservedRuntimeWorkers: "后台 Worker 副本"');
     expect(zhLocaleSource).toContain('workerWorkEventsTitle: "事件日志"');
   });
 
