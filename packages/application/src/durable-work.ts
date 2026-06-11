@@ -51,6 +51,7 @@ export interface DurableWorkWorkerHeartbeatRecord {
   readonly slot: number;
   readonly mode: DurableWorkRuntimeMode;
   readonly queueBackend: DurableWorkQueueBackend;
+  readonly leaseOwnerId?: string;
   readonly processStartedAt: string;
   readonly lastSeenAt: string;
   readonly status: DurableWorkWorkerHeartbeatStatus;
@@ -58,17 +59,35 @@ export interface DurableWorkWorkerHeartbeatRecord {
 
 export interface DurableWorkWorkerHeartbeatFilter {
   readonly workerGroup?: string;
+  readonly status?: DurableWorkWorkerHeartbeatStatus;
   readonly limit?: number;
 }
 
+export interface DurableWorkWorkerSlotClaimInput {
+  readonly workerGroup: string;
+  readonly workerCount: number;
+  readonly leaseOwnerId: string;
+  readonly workerId: string;
+  readonly mode: DurableWorkRuntimeMode;
+  readonly queueBackend: DurableWorkQueueBackend;
+  readonly processStartedAt: string;
+  readonly lastSeenAt: string;
+  readonly staleBefore: string;
+}
+
 export interface DurableWorkWorkerHeartbeatStore {
+  claimWorkerSlot(
+    context: RepositoryContext,
+    input: DurableWorkWorkerSlotClaimInput,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord | null>>;
   recordHeartbeat(
     context: RepositoryContext,
     heartbeat: DurableWorkWorkerHeartbeatRecord,
   ): Promise<Result<DurableWorkWorkerHeartbeatRecord>>;
   markStopped(
     context: RepositoryContext,
-    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt"> &
+      Pick<Partial<DurableWorkWorkerHeartbeatRecord>, "leaseOwnerId">,
   ): Promise<Result<void>>;
   listHeartbeats(
     context: RepositoryContext,
@@ -83,6 +102,7 @@ export interface DurableWorkTopology {
   readonly expectedWorkerCount: number;
   readonly workers: readonly DurableWorkWorkerIdentity[];
   readonly coordinationRole: "coordinator" | "worker" | "disabled";
+  readonly slotAssignment: "all-local" | "explicit" | "leased" | "none";
 }
 
 export interface DurableWorkQueueAdapter
@@ -512,8 +532,16 @@ export function createDurableWorkTopology(
     );
   }
 
-  const workers =
+  const slotAssignment =
     config.mode === "disabled"
+      ? "none"
+      : config.workerSlot !== undefined
+        ? "explicit"
+        : config.mode === "standalone"
+          ? "leased"
+          : "all-local";
+  const workers =
+    config.mode === "disabled" || slotAssignment === "leased"
       ? []
       : Array.from(
           config.workerSlot === undefined ? { length: config.workerCount } : [config.workerSlot],
@@ -536,9 +564,10 @@ export function createDurableWorkTopology(
     coordinationRole:
       config.mode === "disabled"
         ? "disabled"
-        : config.workerSlot === undefined
+        : slotAssignment === "all-local"
           ? "coordinator"
           : "worker",
+    slotAssignment,
   });
 }
 
@@ -560,6 +589,9 @@ export function createDurableWorkLocalWorkerIds(
   }
   if (config.workerSlot !== undefined) {
     return [`${config.workerGroup}-${config.workerSlot}`];
+  }
+  if (config.mode === "standalone") {
+    return [];
   }
   return createDurableWorkWorkerIds(config);
 }

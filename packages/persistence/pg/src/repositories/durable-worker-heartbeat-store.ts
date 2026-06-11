@@ -6,6 +6,7 @@ import {
   type DurableWorkWorkerHeartbeatRecord,
   type DurableWorkWorkerHeartbeatStatus,
   type DurableWorkWorkerHeartbeatStore,
+  type DurableWorkWorkerSlotClaimInput,
   type RepositoryContext,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
@@ -42,6 +43,7 @@ function rowToHeartbeat(row: DurableWorkerHeartbeatRow): DurableWorkWorkerHeartb
     slot: row.slot,
     mode: normalizeRuntimeMode(row.mode),
     queueBackend: normalizeQueueBackend(row.queue_backend),
+    ...(row.lease_owner_id ? { leaseOwnerId: row.lease_owner_id } : {}),
     processStartedAt: row.process_started_at,
     lastSeenAt: row.last_seen_at,
     status: normalizeStatus(row.status),
@@ -100,6 +102,111 @@ function validateHeartbeat(record: DurableWorkWorkerHeartbeatRecord): Result<voi
 export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeatStore {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async claimWorkerSlot(
+    context: RepositoryContext,
+    input: DurableWorkWorkerSlotClaimInput,
+  ): Promise<Result<DurableWorkWorkerHeartbeatRecord | null>> {
+    if (!input.workerGroup.trim()) {
+      return err(
+        domainError.validation("Durable worker heartbeat worker group is required", {
+          phase: "durable-worker-heartbeat-validation",
+          field: "workerGroup",
+        }),
+      );
+    }
+
+    if (!Number.isInteger(input.workerCount) || input.workerCount < 1) {
+      return err(
+        domainError.validation("Durable worker heartbeat worker count must be positive", {
+          phase: "durable-worker-heartbeat-validation",
+          field: "workerCount",
+        }),
+      );
+    }
+
+    if (!input.leaseOwnerId.trim()) {
+      return err(
+        domainError.validation("Durable worker heartbeat lease owner is required", {
+          phase: "durable-worker-heartbeat-validation",
+          field: "leaseOwnerId",
+        }),
+      );
+    }
+
+    if (!input.workerId.trim()) {
+      return err(
+        domainError.validation("Durable worker heartbeat worker id is required", {
+          phase: "durable-worker-heartbeat-validation",
+          field: "workerId",
+        }),
+      );
+    }
+
+    const executor = resolveRepositoryExecutor(this.db, context);
+    try {
+      return await context.tracer.startActiveSpan(
+        createReadModelSpanName("durable-worker-heartbeat", "claim-slot"),
+        {
+          attributes: {
+            [appaloftTraceAttributes.repositoryName]: "durable-worker-heartbeat",
+            workerGroup: input.workerGroup,
+            leaseOwnerId: input.leaseOwnerId,
+          },
+        },
+        async () => {
+          for (let slot = 1; slot <= input.workerCount; slot += 1) {
+            const row = await executor
+              .insertInto("durable_worker_heartbeats")
+              .values({
+                worker_id: input.workerId,
+                worker_group: input.workerGroup,
+                slot,
+                mode: input.mode,
+                queue_backend: input.queueBackend,
+                lease_owner_id: input.leaseOwnerId,
+                process_started_at: input.processStartedAt,
+                last_seen_at: input.lastSeenAt,
+                status: "online",
+              })
+              .onConflict((conflict) =>
+                conflict
+                  .columns(["worker_group", "slot"])
+                  .doUpdateSet({
+                    worker_id: input.workerId,
+                    worker_group: input.workerGroup,
+                    slot,
+                    mode: input.mode,
+                    queue_backend: input.queueBackend,
+                    lease_owner_id: input.leaseOwnerId,
+                    process_started_at: input.processStartedAt,
+                    last_seen_at: input.lastSeenAt,
+                    status: "online",
+                  })
+                  .where((eb) =>
+                    eb.or([
+                      eb("durable_worker_heartbeats.lease_owner_id", "=", input.leaseOwnerId),
+                      eb("durable_worker_heartbeats.worker_id", "=", input.workerId),
+                      eb("durable_worker_heartbeats.status", "!=", "online"),
+                      eb("durable_worker_heartbeats.last_seen_at", "<", input.staleBefore),
+                    ]),
+                  ),
+              )
+              .returningAll()
+              .executeTakeFirst();
+
+            if (row) {
+              return ok(rowToHeartbeat(row));
+            }
+          }
+
+          return ok(null);
+        },
+      );
+    } catch (error) {
+      return err(persistenceError("Failed to claim durable worker slot", error));
+    }
+  }
+
   async recordHeartbeat(
     context: RepositoryContext,
     record: DurableWorkWorkerHeartbeatRecord,
@@ -111,7 +218,7 @@ export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeat
 
     const executor = resolveRepositoryExecutor(this.db, context);
     try {
-      await context.tracer.startActiveSpan(
+      const persisted = await context.tracer.startActiveSpan(
         createReadModelSpanName("durable-worker-heartbeat", "record"),
         {
           attributes: {
@@ -121,7 +228,7 @@ export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeat
           },
         },
         async () => {
-          await executor
+          return await executor
             .insertInto("durable_worker_heartbeats")
             .values({
               worker_id: record.workerId,
@@ -129,24 +236,49 @@ export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeat
               slot: record.slot,
               mode: record.mode,
               queue_backend: record.queueBackend,
+              lease_owner_id: record.leaseOwnerId ?? null,
               process_started_at: record.processStartedAt,
               last_seen_at: record.lastSeenAt,
               status: record.status,
             })
             .onConflict((conflict) =>
-              conflict.column("worker_id").doUpdateSet({
-                worker_group: record.workerGroup,
-                slot: record.slot,
-                mode: record.mode,
-                queue_backend: record.queueBackend,
-                process_started_at: record.processStartedAt,
-                last_seen_at: record.lastSeenAt,
-                status: record.status,
-              }),
+              conflict
+                .columns(["worker_group", "slot"])
+                .doUpdateSet({
+                  worker_id: record.workerId,
+                  worker_group: record.workerGroup,
+                  slot: record.slot,
+                  mode: record.mode,
+                  queue_backend: record.queueBackend,
+                  lease_owner_id: record.leaseOwnerId ?? null,
+                  process_started_at: record.processStartedAt,
+                  last_seen_at: record.lastSeenAt,
+                  status: record.status,
+                })
+                .where((eb) =>
+                  record.leaseOwnerId
+                    ? eb.or([
+                        eb("durable_worker_heartbeats.lease_owner_id", "=", record.leaseOwnerId),
+                        eb("durable_worker_heartbeats.worker_id", "=", record.workerId),
+                        eb("durable_worker_heartbeats.status", "!=", "online"),
+                      ])
+                    : eb("durable_worker_heartbeats.worker_id", "=", record.workerId),
+                ),
             )
-            .execute();
+            .returningAll()
+            .executeTakeFirst();
         },
       );
+      if (!persisted) {
+        return err(
+          domainError.conflict("Durable worker heartbeat lease is held by another worker", {
+            phase: "durable-worker-heartbeat-record",
+            workerId: record.workerId,
+            workerGroup: record.workerGroup,
+            slot: record.slot,
+          }),
+        );
+      }
       return ok(record);
     } catch (error) {
       return err(persistenceError("Failed to record durable worker heartbeat", error));
@@ -155,7 +287,8 @@ export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeat
 
   async markStopped(
     context: RepositoryContext,
-    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt">,
+    input: Pick<DurableWorkWorkerHeartbeatRecord, "workerId" | "lastSeenAt"> &
+      Pick<Partial<DurableWorkWorkerHeartbeatRecord>, "leaseOwnerId">,
   ): Promise<Result<void>> {
     if (!input.workerId.trim()) {
       return err(
@@ -182,8 +315,12 @@ export class PgDurableWorkerHeartbeatStore implements DurableWorkWorkerHeartbeat
             .set({
               last_seen_at: input.lastSeenAt,
               status: "stopping",
+              lease_owner_id: null,
             })
             .where("worker_id", "=", input.workerId)
+            .$if(Boolean(input.leaseOwnerId), (query) =>
+              query.where("lease_owner_id", "=", input.leaseOwnerId ?? ""),
+            )
             .execute();
         },
       );

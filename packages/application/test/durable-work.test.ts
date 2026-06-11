@@ -173,10 +173,11 @@ describe("durable work topology", () => {
         },
       ],
       coordinationRole: "coordinator",
+      slotAssignment: "all-local",
     });
   });
 
-  test("[PROC-DELIVERY-WORKER-002] standalone Cloud topology can declare multiple workers", () => {
+  test("[PROC-DELIVERY-WORKER-002] standalone Cloud topology expects leased worker slots", () => {
     const topology = createDurableWorkTopology({
       mode: "standalone",
       queueBackend: "database",
@@ -187,11 +188,9 @@ describe("durable work topology", () => {
     expect(topology.isOk()).toBe(true);
     if (topology.isErr()) throw new Error(topology.error.message);
     expect(topology.value.expectedWorkerCount).toBe(3);
-    expect(topology.value.workers.map((worker) => worker.workerId)).toEqual([
-      "cloud-deployment-worker-1",
-      "cloud-deployment-worker-2",
-      "cloud-deployment-worker-3",
-    ]);
+    expect(topology.value.workers).toEqual([]);
+    expect(topology.value.coordinationRole).toBe("worker");
+    expect(topology.value.slotAssignment).toBe("leased");
   });
 
   test("[PROC-DELIVERY-WORKER-030] standalone process can claim one explicit worker slot", () => {
@@ -214,6 +213,7 @@ describe("durable work topology", () => {
         slot: 3,
       },
     ]);
+    expect(topology.value.slotAssignment).toBe("explicit");
   });
 
   test("[PROC-DELIVERY-WORKER-031] rejects worker slots outside the configured group size", () => {
@@ -243,6 +243,7 @@ describe("durable work topology", () => {
     expect(topology.value.expectedWorkerCount).toBe(0);
     expect(topology.value.workers).toEqual([]);
     expect(topology.value.coordinationRole).toBe("disabled");
+    expect(topology.value.slotAssignment).toBe("none");
   });
 
   test("[PROC-DELIVERY-WORKER-004] enabled runtime rejects zero workers", () => {

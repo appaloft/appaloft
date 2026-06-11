@@ -24,6 +24,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           workerGroup: "appaloft-worker",
           workerIds: ["appaloft-worker-1"],
           coordinationRole: "coordinator",
+          slotAssignment: "all-local",
         },
         configurationKeys: [
           "APPALOFT_WORKER_RUNTIME_MODE",
@@ -224,7 +225,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
         staleWorkerCount: 0,
         lastSeenAt: "2026-06-09T09:00:00.000Z",
         workers: Array.from({ length: 4 }, (_, index) => ({
-          workerId: `${workerGroup}-${index + 1}`,
+          workerId: `${workerGroup}-replica-${index + 1}`,
           workerGroup,
           slot: index + 1,
           status: "online" as const,
@@ -250,10 +251,10 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           workerGroup: "cloud-deployment-worker",
           workerCount: 4,
           workerIds: [
-            "cloud-deployment-worker-1",
-            "cloud-deployment-worker-2",
-            "cloud-deployment-worker-3",
-            "cloud-deployment-worker-4",
+            "cloud-deployment-worker-replica-1",
+            "cloud-deployment-worker-replica-2",
+            "cloud-deployment-worker-replica-3",
+            "cloud-deployment-worker-replica-4",
           ],
           heartbeat: {
             onlineWorkerCount: 4,
@@ -287,17 +288,43 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
       runtimeTopology: {
         mode: "standalone",
         queueBackend: "database",
-        workerCount: 4,
+        workerCount: 1,
         workerGroup: "cloud-deployment-worker",
-        workerIds: [
-          "cloud-deployment-worker-1",
-          "cloud-deployment-worker-2",
-          "cloud-deployment-worker-3",
-          "cloud-deployment-worker-4",
-        ],
-        localWorkerIds: ["cloud-deployment-worker-3"],
+        workerIds: ["cloud-deployment-worker-3"],
         workerSlot: 3,
         coordinationRole: "worker",
+        slotAssignment: "explicit",
+      },
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-032] reports standalone replicas as leased worker slots", async () => {
+    const reader = new ConfigMaintenanceWorkerStatusReader(
+      resolveConfig({
+        env: {
+          APPALOFT_WORKER_RUNTIME_MODE: "standalone",
+          APPALOFT_WORKER_QUEUE_BACKEND: "database",
+          APPALOFT_WORKER_COUNT: "4",
+          APPALOFT_WORKER_GROUP: "cloud-deployment-worker",
+        },
+      }),
+    );
+
+    const durableRuntime = (await reader.list()).find(
+      (entry) => entry.key === "durable-worker-runtime",
+    );
+
+    expect(durableRuntime).toMatchObject({
+      enabled: true,
+      activation: "starts-as-standalone-process",
+      runtimeTopology: {
+        mode: "standalone",
+        queueBackend: "database",
+        workerCount: 0,
+        workerGroup: "cloud-deployment-worker",
+        workerIds: [],
+        coordinationRole: "worker",
+        slotAssignment: "leased",
       },
     });
   });
@@ -337,14 +364,11 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
       runtimeTopology: {
         mode: "standalone",
         queueBackend: "database",
-        workerCount: 3,
+        workerCount: 0,
         workerGroup: "cloud-deployment-worker",
-        workerIds: [
-          "cloud-deployment-worker-1",
-          "cloud-deployment-worker-2",
-          "cloud-deployment-worker-3",
-        ],
-        coordinationRole: "coordinator",
+        workerIds: [],
+        coordinationRole: "worker",
+        slotAssignment: "leased",
       },
     });
     expect(statuses.get("scheduled-task-runner")).toMatchObject({
@@ -407,6 +431,7 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
         workerGroup: "appaloft-worker",
         workerIds: [],
         coordinationRole: "disabled",
+        slotAssignment: "none",
       },
     });
   });

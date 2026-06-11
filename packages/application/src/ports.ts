@@ -177,6 +177,7 @@ export interface MaintenanceWorkerRuntimeTopology {
   workerGroup: string;
   workerIds: string[];
   coordinationRole: "coordinator" | "worker" | "disabled";
+  slotAssignment?: "all-local" | "explicit" | "leased" | "none";
   localWorkerIds?: string[];
   workerSlot?: number;
   externalBackendKind?: "kafka" | "temporal" | "custom";

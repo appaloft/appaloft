@@ -227,10 +227,11 @@ describe("system diagnostics HTTP routes", () => {
               runtimeTopology: {
                 mode: "standalone",
                 queueBackend: "database",
-                workerCount: 2,
+                workerCount: 0,
                 workerGroup: "cloud-deployment-worker",
-                workerIds: ["cloud-deployment-worker-1", "cloud-deployment-worker-2"],
-                coordinationRole: "coordinator",
+                workerIds: [],
+                coordinationRole: "worker",
+                slotAssignment: "leased",
               },
               configurationKeys: [
                 "APPALOFT_WORKER_RUNTIME_MODE",
@@ -304,10 +305,11 @@ describe("system diagnostics HTTP routes", () => {
           runtimeTopology: {
             mode: "standalone",
             queueBackend: "database",
-            workerCount: 2,
+            workerCount: 0,
             workerGroup: "cloud-deployment-worker",
-            workerIds: ["cloud-deployment-worker-1", "cloud-deployment-worker-2"],
-            coordinationRole: "coordinator",
+            workerIds: [],
+            coordinationRole: "worker",
+            slotAssignment: "leased",
           },
         },
         {
