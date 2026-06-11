@@ -4,8 +4,10 @@
   import { page } from "$app/state";
   import {
     ArrowRight,
+    Check,
     GripVertical,
     Network,
+    Pencil,
     Plus,
     Server,
     ShieldCheck,
@@ -13,6 +15,7 @@
   } from "@lucide/svelte";
   import type { ServerSummary } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import Sortable from "sortablejs";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
@@ -35,8 +38,89 @@
 
   const serverPageSize = 12;
   let serverOffset = $state(0);
-  let draggedServerId = $state<string | null>(null);
+  let activeServerId = $state<string | null>(null);
+  let serverGridElement = $state<HTMLElement | null>(null);
+  let serverSortable: Sortable | null = null;
+  let serverSortableRectSnapshot = new Map<string, SortableCardRect>();
+  let serverSortSnapshot = $state<ServerSummary[] | null>(null);
+  let serverOptimisticOrderIds = $state<string[] | null>(null);
+  let serverSortMode = $state(false);
   let serverReorderError = $state("");
+  let visibleServers = $state<ServerSummary[]>([]);
+
+  type SortableCardRect = {
+    left: number;
+    top: number;
+  };
+
+  function getSortableGridDirection(
+    _event: Event,
+    target: HTMLElement | null,
+    dragElement: HTMLElement,
+  ): "horizontal" | "vertical" {
+    if (!target) {
+      return "vertical";
+    }
+
+    const targetRect = target.getBoundingClientRect();
+    const dragRect = dragElement.getBoundingClientRect();
+    const sameRow =
+      Math.abs(targetRect.top - dragRect.top) < Math.min(targetRect.height, dragRect.height) / 2;
+
+    return sameRow ? "horizontal" : "vertical";
+  }
+
+  function captureSortableCardRects(root: HTMLElement): Map<string, SortableCardRect> {
+    return new Map(
+      Array.from(root.querySelectorAll<HTMLElement>("[data-server-card]"))
+        .map((card) => {
+          const serverId = card.getAttribute("data-server-id");
+          if (!serverId) {
+            return null;
+          }
+
+          const rect = card.getBoundingClientRect();
+          return [serverId, { left: rect.left, top: rect.top }] as const;
+        })
+        .filter((entry): entry is readonly [string, SortableCardRect] => Boolean(entry)),
+    );
+  }
+
+  function animateSortableCardMovement(previousRects: Map<string, SortableCardRect>): void {
+    if (!serverGridElement || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    for (const card of serverGridElement.querySelectorAll<HTMLElement>("[data-server-card]")) {
+      const serverId = card.getAttribute("data-server-id");
+      if (!serverId || serverId === activeServerId) {
+        continue;
+      }
+
+      const previousRect = previousRects.get(serverId);
+      if (!previousRect) {
+        continue;
+      }
+
+      const currentRect = card.getBoundingClientRect();
+      const offsetX = previousRect.left - currentRect.left;
+      const offsetY = previousRect.top - currentRect.top;
+      if (Math.abs(offsetX) < 1 && Math.abs(offsetY) < 1) {
+        continue;
+      }
+
+      card.animate(
+        [
+          { transform: `translate3d(${offsetX}px, ${offsetY}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        {
+          duration: 220,
+          easing: "cubic-bezier(0.2, 0, 0, 1)",
+        },
+      );
+    }
+  }
 
   const { authSessionQuery, deploymentsQuery } = createConsoleQueries(browser, { servers: false });
   const serversQuery = createQuery(() =>
@@ -47,9 +131,12 @@
     }),
   );
   const servers = $derived(serversQuery.data?.items ?? []);
+  const serverQueryOrderKey = $derived(servers.map((server) => server.id).join("|"));
+  const serverVisibleOrderKey = $derived(visibleServers.map((server) => server.id).join("|"));
+  const serverOptimisticOrderKey = $derived(serverOptimisticOrderIds?.join("|") ?? "");
   const serverTotal = $derived(serversQuery.data?.total ?? servers.length);
   const serverPageStart = $derived(serverTotal > 0 ? serverOffset + 1 : 0);
-  const serverPageEnd = $derived(Math.min(serverOffset + servers.length, serverTotal));
+  const serverPageEnd = $derived(Math.min(serverOffset + visibleServers.length, serverTotal));
   const canGoPrevious = $derived(serverOffset > 0);
   const canGoNext = $derived(serverOffset + serverPageSize < serverTotal);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
@@ -57,7 +144,12 @@
   let serverCreateDialogOpen = $state(false);
 
   const reorderServersMutation = createMutation(() => ({
-    mutationFn: (serverIds: string[]) =>
+    mutationFn: ({
+      serverIds,
+    }: {
+      serverIds: string[];
+      rollbackServers: ServerSummary[];
+    }) =>
       orpcClient.servers.reorder({
         serverIds,
         startOffset: serverOffset,
@@ -66,10 +158,77 @@
       serverReorderError = "";
       void queryClient.invalidateQueries({ queryKey: ["servers"] });
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      visibleServers = [...variables.rollbackServers];
+      serverOptimisticOrderIds = null;
       serverReorderError = readErrorMessage(error);
     },
   }));
+
+  $effect(() => {
+    if (serverOptimisticOrderKey && serverOptimisticOrderKey !== serverQueryOrderKey) {
+      return;
+    }
+
+    serverOptimisticOrderIds = null;
+    if (!activeServerId && serverQueryOrderKey !== serverVisibleOrderKey) {
+      visibleServers = servers;
+    }
+  });
+
+  $effect(() => {
+    if (!browser || !serverSortMode || reorderServersMutation.isPending || !serverGridElement) {
+      serverSortable?.destroy();
+      serverSortable = null;
+      return;
+    }
+
+    serverSortable?.destroy();
+    const gridElement = serverGridElement;
+    serverSortable = Sortable.create(gridElement, {
+      animation: 220,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+      handle: "[data-server-reorder-handle]",
+      draggable: "[data-server-card]",
+      dataIdAttr: "data-server-id",
+      ghostClass: "console-sortable-ghost",
+      chosenClass: "console-sortable-chosen",
+      dragClass: "console-sortable-drag",
+      fallbackClass: "console-sortable-fallback",
+      direction: getSortableGridDirection,
+      swapThreshold: 0.5,
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackTolerance: 4,
+      onStart: (event: Sortable.SortableEvent) => {
+        activeServerId = event.item.getAttribute("data-server-id");
+        serverSortSnapshot = [...visibleServers];
+        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+      },
+      onMove: () => {
+        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+        return true;
+      },
+      onChange: () => {
+        animateSortableCardMovement(serverSortableRectSnapshot);
+        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+      },
+      onEnd: () => {
+        commitServerSort(serverSortable?.toArray() ?? []);
+      },
+    });
+
+    return () => {
+      serverSortable?.destroy();
+      serverSortable = null;
+    };
+  });
+
+  $effect(() => {
+    if (serverSortable && serverVisibleOrderKey && !activeServerId) {
+      serverSortable.sort(visibleServers.map((server) => server.id), true);
+    }
+  });
 
   $effect(() => {
     serverCreateDialogOpen = modalIsOpen(page, "create-server");
@@ -101,32 +260,46 @@
   }
 
   function setServerPage(nextOffset: number): void {
+    serverSortMode = false;
+    activeServerId = null;
+    serverSortSnapshot = null;
     serverOffset = Math.max(0, nextOffset);
   }
 
-  function reorderVisibleServers(targetServerId: string): void {
-    if (!draggedServerId || draggedServerId === targetServerId) {
-      draggedServerId = null;
+  function setServerSortMode(enabled: boolean): void {
+    if (reorderServersMutation.isPending) {
       return;
     }
 
-    const nextServers = [...servers];
-    const fromIndex = nextServers.findIndex((server) => server.id === draggedServerId);
-    const toIndex = nextServers.findIndex((server) => server.id === targetServerId);
-    if (fromIndex < 0 || toIndex < 0) {
-      draggedServerId = null;
+    serverSortMode = enabled;
+    activeServerId = null;
+    serverSortSnapshot = null;
+  }
+
+  function commitServerSort(serverIds: string[]): void {
+    const rollbackServers = serverSortSnapshot ?? visibleServers;
+    const rollbackIds = rollbackServers.map((server) => server.id);
+    const serverById = new Map(visibleServers.map((server) => [server.id, server]));
+    const nextServers = serverIds
+      .map((serverId) => serverById.get(serverId))
+      .filter((server): server is ServerSummary => Boolean(server));
+
+    if (nextServers.length !== visibleServers.length) {
+      serverSortable?.sort(rollbackIds, true);
+      activeServerId = null;
+      serverSortSnapshot = null;
       return;
     }
 
-    const [moved] = nextServers.splice(fromIndex, 1);
-    if (!moved) {
-      draggedServerId = null;
-      return;
+    const changed = serverIds.join("|") !== rollbackIds.join("|");
+    if (changed) {
+      visibleServers = nextServers;
+      serverOptimisticOrderIds = serverIds;
+      reorderServersMutation.mutate({ serverIds, rollbackServers });
     }
 
-    nextServers.splice(toIndex, 0, moved);
-    draggedServerId = null;
-    reorderServersMutation.mutate(nextServers.map((server) => server.id));
+    activeServerId = null;
+    serverSortSnapshot = null;
   }
 </script>
 
@@ -165,15 +338,34 @@
             {$t(i18nKeys.console.servers.focusDescription)}
           </p>
         </div>
-        {#if servers.length > 0}
-          <Button class="shrink-0 self-start" type="button" onclick={openServerCreateDialog}>
-            <Plus class="size-4" />
-            {$t(i18nKeys.common.actions.createServer)}
-          </Button>
+        {#if visibleServers.length > 0}
+          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+            <Button type="button" onclick={openServerCreateDialog}>
+              <Plus class="size-4" />
+              {$t(i18nKeys.common.actions.createServer)}
+            </Button>
+            {#if visibleServers.length > 1}
+              <Button
+                type="button"
+                variant={serverSortMode ? "selected" : "outline"}
+                disabled={reorderServersMutation.isPending}
+                onclick={() => setServerSortMode(!serverSortMode)}
+                data-server-sort-toggle
+              >
+                {#if serverSortMode}
+                  <Check class="size-4" />
+                  {$t(i18nKeys.common.actions.done)}
+                {:else}
+                  <Pencil class="size-4" />
+                  {$t(i18nKeys.common.actions.edit)}
+                {/if}
+              </Button>
+            {/if}
+          </div>
         {/if}
       </section>
 
-      {#if servers.length === 0}
+      {#if visibleServers.length === 0}
         <ConsoleEmptyState
           tone="server"
           title={$t(i18nKeys.console.servers.emptyTitle)}
@@ -207,7 +399,7 @@
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!canGoPrevious || reorderServersMutation.isPending}
+                  disabled={!canGoPrevious || serverSortMode || reorderServersMutation.isPending}
                   onclick={() => setServerPage(serverOffset - serverPageSize)}
                 >
                   {$t(i18nKeys.common.actions.previous)}
@@ -216,7 +408,7 @@
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!canGoNext || reorderServersMutation.isPending}
+                  disabled={!canGoNext || serverSortMode || reorderServersMutation.isPending}
                   onclick={() => setServerPage(serverOffset + serverPageSize)}
                 >
                   {$t(i18nKeys.common.actions.next)}
@@ -231,62 +423,43 @@
             </p>
           {/if}
 
-          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-server-grid>
-            {#each servers as server (server.id)}
+          <div
+            class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            bind:this={serverGridElement}
+            data-server-grid
+          >
+            {#each visibleServers as server (server.id)}
               <article
                 class={[
-                  "group flex min-h-56 flex-col rounded-md border bg-card p-4 shadow-sm transition",
-                  draggedServerId === server.id
+                  "group relative flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm transition-colors",
+                  serverSortMode ? "select-none" : "",
+                  activeServerId === server.id
                     ? "border-primary/60 bg-primary/5 opacity-80"
                     : "hover:border-primary/30 hover:bg-muted/20",
                 ]}
-                draggable={!reorderServersMutation.isPending}
-                ondragstart={(event) => {
-                  draggedServerId = server.id;
-                  event.dataTransfer?.setData("text/plain", server.id);
-                  if (event.dataTransfer) {
-                    event.dataTransfer.effectAllowed = "move";
-                  }
-                }}
-                ondragover={(event) => {
-                  event.preventDefault();
-                  if (event.dataTransfer) {
-                    event.dataTransfer.dropEffect = "move";
-                  }
-                }}
-                ondrop={(event) => {
-                  event.preventDefault();
-                  reorderVisibleServers(server.id);
-                }}
-                ondragend={() => {
-                  draggedServerId = null;
-                }}
                 data-server-card
                 data-server-id={server.id}
               >
-                <div class="flex items-start gap-3">
+                {#if serverSortMode}
                   <button
                     type="button"
-                    class="mt-0.5 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
+                    class="absolute right-3 top-3 z-10 inline-flex size-8 cursor-grab items-center justify-center rounded-md border bg-background/95 text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
                     aria-label={$t(i18nKeys.console.servers.reorderHandle)}
                     title={$t(i18nKeys.console.servers.reorderHandle)}
                     disabled={reorderServersMutation.isPending}
                     data-server-reorder-handle
-                    onpointerdown={() => {
-                      draggedServerId = server.id;
-                    }}
                   >
                     <GripVertical class="size-4" />
                   </button>
-                  <div class="min-w-0 flex-1 space-y-2">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <Server class="size-4 shrink-0 text-muted-foreground" />
-                      <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
-                    </div>
-                    <p class="break-all font-mono text-sm text-muted-foreground">
-                      {server.host}:{server.port}
-                    </p>
+                {/if}
+                <div class="min-w-0 space-y-2 pr-10" data-server-card-header>
+                  <div class="flex min-w-0 items-center gap-2">
+                    <Server class="size-4 shrink-0 text-muted-foreground" />
+                    <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
                   </div>
+                  <p class="truncate font-mono text-sm text-muted-foreground" title={`${server.host}:${server.port}`}>
+                    {server.host}:{server.port}
+                  </p>
                 </div>
 
                 <div class="mt-5 grid gap-2 text-sm text-muted-foreground">
@@ -344,3 +517,23 @@
     </Dialog.Root>
   {/if}
 </ConsoleShell>
+
+<style>
+  :global(.console-sortable-ghost) {
+    opacity: 0.42;
+  }
+
+  :global(.console-sortable-chosen) {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 10px 30px hsl(var(--foreground) / 0.12);
+  }
+
+  :global(.console-sortable-drag) {
+    cursor: grabbing;
+    transition: none !important;
+  }
+
+  :global(.console-sortable-fallback) {
+    transition: none !important;
+  }
+</style>

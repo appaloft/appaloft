@@ -21,6 +21,8 @@ export const zhCN = {
       createAndDeploy: "创建并部署",
       deploy: "部署",
       deploying: "部署中",
+      done: "完成",
+      edit: "编辑",
       createDeployment: "创建部署",
       createResource: "创建资源",
       createServer: "创建服务器",
