@@ -3523,6 +3523,19 @@ async function expectLocation(view: Bun.WebView, expected: string): Promise<void
   );
 }
 
+async function expectElement(
+  view: Bun.WebView,
+  selector: string,
+  timeoutMs?: number,
+): Promise<void> {
+  await waitFor(
+    () => view.evaluate<boolean>(`Boolean(document.querySelector(${JSON.stringify(selector)}))`),
+    Boolean,
+    `Expected element: ${selector}`,
+    timeoutMs,
+  );
+}
+
 async function waitForRecordedRequest(pathname: string): Promise<RecordedApiRequest> {
   const request = await waitFor<RecordedApiRequest | null>(
     async () => recordedApiRequests.find((request) => request.pathname === pathname) ?? null,
@@ -6794,6 +6807,33 @@ describe.serial("console e2e with Bun.WebView", () => {
       await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
       await clickStorageVolumeCardButton(view, "stv_uploads", ["Volume backups", "Volume 备份"]);
       await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
+      const backupListRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/list",
+      );
+      expect(readOrpcJsonPayload(backupListRequest.body)).toEqual({
+        storageVolumeId: "stv_uploads",
+      });
+      await expectElement(view, "#storage-backup-restore-name-svb_uploads", 15_000);
+      await setInputValue(view, "#storage-backup-restore-name-svb_uploads", "uploads-restored");
+      await clickDialogButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
+      const backupRestoreRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/restore",
+      );
+      expect(readOrpcJsonPayload(backupRestoreRequest.body)).toEqual({
+        backupId: "svb_uploads",
+        targetMode: "new-volume",
+        restoredVolumeName: "uploads-restored",
+      });
+      await expectAnyText(view, ["Storage backup restored", "Storage backup 已恢复"]);
+      await clickDialogButtonByAnyText(view, ["Prune", "清理"]);
+      const backupPruneRequest = await waitForRecordedRequest(
+        "/api/rpc/storageVolumes/backups/prune",
+      );
+      expect(readOrpcJsonPayload(backupPruneRequest.body)).toEqual({
+        backupId: "svb_uploads",
+      });
+      await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
+
       await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
       await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
       await setInputValue(view, "#resource-storage-backup-retention-count", "3");
@@ -6851,31 +6891,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         },
       });
       await expectAnyText(view, ["Storage backup requested", "Storage backup 已请求"]);
-      const backupListRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/list",
-      );
-      expect(readOrpcJsonPayload(backupListRequest.body)).toEqual({
-        storageVolumeId: "stv_uploads",
-      });
-      await setInputValue(view, "#storage-backup-restore-name-svb_uploads", "uploads-restored");
-      await clickDialogButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
-      const backupRestoreRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/restore",
-      );
-      expect(readOrpcJsonPayload(backupRestoreRequest.body)).toEqual({
-        backupId: "svb_uploads",
-        targetMode: "new-volume",
-        restoredVolumeName: "uploads-restored",
-      });
-      await expectAnyText(view, ["Storage backup restored", "Storage backup 已恢复"]);
-      await clickDialogButtonByAnyText(view, ["Prune", "清理"]);
-      const backupPruneRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/prune",
-      );
-      expect(readOrpcJsonPayload(backupPruneRequest.body)).toEqual({
-        backupId: "svb_uploads",
-      });
-      await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
 
       await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
       await clickStorageVolumeCardButton(view, "stv_uploads", ["Attach storage", "挂载存储"]);

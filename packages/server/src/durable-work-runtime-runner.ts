@@ -82,7 +82,15 @@ export function createDurableWorkRuntimeRunner(
     .replace(/^-+|-+$/g, "")
     .slice(0, 120);
   const leaseOwnerId = processId || Math.random().toString(36).slice(2, 10);
-  const processWorkerId = `${input.topology.workerGroup}-${leaseOwnerId}`;
+  const replicaId = `${Date.parse(processStartedAt).toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`
+    .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  const processWorkerId = `${input.topology.workerGroup}-replica-${
+    replicaId || Math.random().toString(36).slice(2, 10)
+  }`;
   const timers: ReturnType<typeof setInterval>[] = [];
   const activeWorkerTicks = new Map<string, Promise<void>>();
   let leasedWorker: DurableWorkWorkerIdentity | undefined;
