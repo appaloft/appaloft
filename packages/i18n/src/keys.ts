@@ -743,8 +743,6 @@ export const i18nKeys = {
       workerObservedRuntimeWorkersBody: "console:instance.workerObservedRuntimeWorkersBody",
       workerRawRetentionHours: "console:instance.workerRawRetentionHours",
       workerRuntimeBackend: "console:instance.workerRuntimeBackend",
-      workerRuntimeClaimedBy: "console:instance.workerRuntimeClaimedBy",
-      workerRuntimeClaimedByEmpty: "console:instance.workerRuntimeClaimedByEmpty",
       workerRuntimeGroup: "console:instance.workerRuntimeGroup",
       workerRuntimeHeartbeat: "console:instance.workerRuntimeHeartbeat",
       workerRuntimeLastSeen: "console:instance.workerRuntimeLastSeen",

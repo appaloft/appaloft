@@ -280,27 +280,6 @@
   const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
   const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
   const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
-  const latestClaimedWorker = $derived.by(() => {
-    const eventWorker = [...selectedOperatorWorkEvents]
-      .reverse()
-      .find((event) => event.workerId || event.workerGroup);
-    if (eventWorker?.workerId) {
-      return eventWorker.workerGroup
-        ? `${eventWorker.workerGroup} · ${eventWorker.workerId}`
-        : eventWorker.workerId;
-    }
-    if (eventWorker?.workerGroup) {
-      return eventWorker.workerGroup;
-    }
-    const selectedClaimedBy = selectedOperatorWork?.safeDetails?.claimedBy;
-    if (typeof selectedClaimedBy === "string" && selectedClaimedBy.trim()) {
-      return selectedClaimedBy;
-    }
-    const listClaimedBy = operatorWorkItems
-      .map((work) => work.safeDetails?.claimedBy)
-      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
-    return listClaimedBy ?? "";
-  });
   const enabledMaintenanceWorkerCount = $derived(
     maintenanceWorkers.filter((worker) => worker.enabled).length,
   );
@@ -1004,16 +983,7 @@ server-config-deploy: true`);
                           </div>
                         </div>
 
-                        <div class="mt-4 grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]">
-                          <div>
-                            <p class="text-xs uppercase text-muted-foreground">
-                              {$t(i18nKeys.console.instance.workerRuntimeClaimedBy)}
-                            </p>
-                            <p class="mt-1 break-all font-mono text-sm">
-                              {latestClaimedWorker ||
-                                $t(i18nKeys.console.instance.workerRuntimeClaimedByEmpty)}
-                            </p>
-                          </div>
+                        <div class="mt-4 grid gap-3 lg:grid-cols-2">
                           <div>
                             <p class="text-xs uppercase text-muted-foreground">
                               {$t(i18nKeys.console.instance.workerRuntimeGroup)}

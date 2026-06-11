@@ -765,8 +765,6 @@ export const zhCN = {
         "这些是同一个 worker 服务通过 replicas 启动后，heartbeat read model 实际观测到的副本。",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
-      workerRuntimeClaimedBy: "最近接手者",
-      workerRuntimeClaimedByEmpty: "未记录接手 worker",
       workerRuntimeGroup: "group",
       workerRuntimeHeartbeat: "Worker 心跳",
       workerRuntimeLastSeen: "最近心跳",
