@@ -101,6 +101,7 @@ const remoteCapableTopLevelCommands = new Set([
   "storage",
   "terminal-session",
   "upgrade",
+  "work",
 ]);
 
 const localOnlyTopLevelCommands = new Set(["db", "deploy", "init", "remote-state", "serve"]);
