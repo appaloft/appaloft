@@ -2,6 +2,37 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 
 describe("console header switcher", () => {
+  test("[CONSOLE-HEADER-LAYOUT-001] keeps global shell headers as one-line navigation bars", async () => {
+    const [shellSource, settingsShellSource] = await Promise.all([
+      readFile(new URL("../components/console/ConsoleShell.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../components/console/SettingsShell.svelte", import.meta.url), "utf8"),
+    ]);
+    const headerStart = shellSource.indexOf("<header\n      data-console-header");
+    const headerSource = shellSource.slice(
+      headerStart,
+      shellSource.indexOf("</header>", headerStart),
+    );
+    const settingsHeaderStart = settingsShellSource.indexOf(
+      "<header\n      data-settings-shell-header",
+    );
+    const settingsHeaderSource = settingsShellSource.slice(
+      settingsHeaderStart,
+      settingsShellSource.indexOf("</header>", settingsHeaderStart),
+    );
+
+    expect(headerSource).toContain("pl-2 pr-3");
+    expect(headerSource).toContain("md:pl-3 md:pr-4");
+    expect(headerSource).not.toContain("{description}");
+    expect(headerSource.indexOf("<SidebarTrigger />")).toBeLessThan(
+      headerSource.indexOf("<Breadcrumb.Root"),
+    );
+    expect(settingsHeaderSource).toContain("pl-2 pr-3");
+    expect(settingsHeaderSource).not.toContain("{description}");
+    expect(settingsHeaderSource.indexOf("<SidebarTrigger />")).toBeLessThan(
+      settingsHeaderSource.indexOf("<Breadcrumb.Root"),
+    );
+  });
+
   test("[CONSOLE-HEADER-SWITCHER-001] renders loading skeletons before object names resolve", async () => {
     const shellSource = await readFile(
       new URL("../components/console/ConsoleShell.svelte", import.meta.url),
@@ -18,15 +49,24 @@ describe("console header switcher", () => {
       await Promise.all([
         readFile(new URL("../components/console/ConsoleShell.svelte", import.meta.url), "utf8"),
         readFile(
-          new URL("../../routes/projects/[projectId]/+page.svelte", import.meta.url),
+          new URL(
+            "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
         readFile(
-          new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+          new URL(
+            "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
         readFile(
-          new URL("../../routes/deployments/[deploymentId]/+page.svelte", import.meta.url),
+          new URL(
+            "../../routes/deployments/[deploymentId=deploymentId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
       ]);

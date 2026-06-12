@@ -239,7 +239,7 @@
         description={$t(i18nKeys.console.home.emptyStateBody)}
         learnMoreHref={webDocsHrefs.projectLifecycle}
       >
-        <Button href="/deploy">
+        <Button href="/?modal=quick-deploy">
           <Play class="size-4" />
           {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
@@ -454,15 +454,18 @@
             </div>
           </section>
 
-          <section class="nothing-side-panel">
+          <section class="nothing-side-panel" data-home-deployment-rollup>
             <div class="nothing-section-header">
               <p class="nothing-label">{$t(i18nKeys.console.home.recentDeploymentsTitle)}</p>
               <p>{$t(i18nKeys.console.home.recentDeploymentsDescription)}</p>
+              <p class="nothing-rollup-gap">
+                {$t(i18nKeys.console.home.recentDeploymentsReadModelGap)}
+              </p>
             </div>
             {#if deploymentsLoading}
-              <div class="nothing-activity-list" aria-hidden="true">
+              <div class="nothing-deployment-rollup-list" aria-hidden="true">
                 {#each Array.from({ length: 3 }) as _, index (index)}
-                  <div class="nothing-activity-row">
+                  <div class="nothing-deployment-rollup-row">
                     <span>
                       <Skeleton class="h-4 w-36" />
                       <Skeleton class="mt-2 h-3 w-28" />
@@ -475,9 +478,9 @@
                 {/each}
               </div>
             {:else if deployments.length > 0}
-              <div class="nothing-activity-list">
+              <div class="nothing-deployment-rollup-list">
                 {#each deployments.slice(0, 5) as deployment (deployment.id)}
-                  <a href="/deployments" class="nothing-activity-row">
+                  <a href="/deployments" class="nothing-deployment-rollup-row">
                     <span>
                       <strong>{latestDeploymentResourceName(deployment)}</strong>
                       <small>{deployment.runtimePlan.source.displayName}</small>
@@ -500,13 +503,26 @@
             {/if}
           </section>
 
+          <section class="nothing-side-panel" data-home-activity-read-model-gap>
+            <div class="nothing-section-header">
+              <p class="nothing-label">{$t(i18nKeys.console.home.recentActivityTitle)}</p>
+              <p>{$t(i18nKeys.console.home.recentActivityDescription)}</p>
+              <p class="nothing-rollup-gap">
+                {$t(i18nKeys.console.home.recentActivityReadModelGap)}
+              </p>
+            </div>
+            <div class="nothing-side-empty">
+              {$t(i18nKeys.console.home.recentActivityReadModelGap)}
+            </div>
+          </section>
+
           <section class="nothing-side-panel">
             <div class="nothing-section-header">
               <p class="nothing-label">{$t(i18nKeys.console.home.nextStepsTitle)}</p>
               <p>{$t(i18nKeys.console.home.nextStepsDescription)}</p>
             </div>
             <div class="nothing-next-actions">
-              <a href="/deploy" class="nothing-next-row">
+              <a href="/?modal=quick-deploy" class="nothing-next-row">
                 <Play class="size-4" />
                 <span>{$t(i18nKeys.common.actions.quickDeploy)}</span>
                 <ArrowRight class="size-3.5" />
@@ -615,10 +631,16 @@
   .nothing-project-access a,
   .nothing-project-open,
   .nothing-context-cell,
-  .nothing-activity-row,
+  .nothing-deployment-rollup-row,
   .nothing-next-row {
     color: var(--text-primary);
     text-decoration: none;
+  }
+
+  .nothing-rollup-gap {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
   }
 
   .nothing-project-card-header {
@@ -666,8 +688,8 @@
   .nothing-project-metric,
   .nothing-project-access,
   .nothing-project-access a,
-  .nothing-activity-row,
-  .nothing-activity-row > span,
+  .nothing-deployment-rollup-row,
+  .nothing-deployment-rollup-row > span,
   .nothing-next-row {
     min-width: 0;
   }
@@ -698,8 +720,8 @@
   .nothing-project-metric small,
   .nothing-project-access small,
   .nothing-resource-chip small,
-  .nothing-activity-row small,
-  .nothing-activity-row em {
+  .nothing-deployment-rollup-row small,
+  .nothing-deployment-rollup-row em {
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: 11px;
@@ -839,7 +861,7 @@
   }
 
   .nothing-resource-chip strong,
-  .nothing-activity-row strong {
+  .nothing-deployment-rollup-row strong {
     display: block;
     overflow: hidden;
     color: var(--text-primary);
@@ -850,7 +872,7 @@
   }
 
   .nothing-resource-chip small,
-  .nothing-activity-row small {
+  .nothing-deployment-rollup-row small {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1004,28 +1026,28 @@
   .nothing-context-cell:focus-visible,
   .nothing-next-row:hover,
   .nothing-next-row:focus-visible,
-  .nothing-activity-row:hover,
-  .nothing-activity-row:focus-visible {
+  .nothing-deployment-rollup-row:hover,
+  .nothing-deployment-rollup-row:focus-visible {
     background: color-mix(in oklch, var(--primary) 3%, transparent);
   }
 
-  .nothing-activity-list,
+  .nothing-deployment-rollup-list,
   .nothing-next-actions {
     display: grid;
     border-top: 1px solid var(--input);
   }
 
-  .nothing-activity-row,
+  .nothing-deployment-rollup-row,
   .nothing-next-row {
     border-bottom: 1px solid var(--border);
   }
 
-  .nothing-activity-row:last-child,
+  .nothing-deployment-rollup-row:last-child,
   .nothing-next-row:last-child {
     border-bottom: 0;
   }
 
-  .nothing-activity-row {
+  .nothing-deployment-rollup-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -1033,7 +1055,7 @@
     padding: 12px 0;
   }
 
-  .nothing-activity-row > span:last-child {
+  .nothing-deployment-rollup-row > span:last-child {
     display: grid;
     justify-items: end;
     gap: 4px;
@@ -1089,7 +1111,7 @@
   .nothing-project-access a:focus-visible,
   .nothing-project-open:focus-visible,
   .nothing-context-cell:focus-visible,
-  .nothing-activity-row:focus-visible,
+  .nothing-deployment-rollup-row:focus-visible,
   .nothing-side-link:focus-visible,
   .nothing-next-row:focus-visible {
     outline: 2px solid var(--ring);

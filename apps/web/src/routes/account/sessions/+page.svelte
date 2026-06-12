@@ -2,10 +2,12 @@
   import { browser } from "$app/environment";
   import { Monitor, ShieldCheck, SquareTerminal, Trash2 } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import type { AccountSessionSummary } from "@appaloft/contracts";
 
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { readErrorMessage } from "$lib/api/client";
   import { accountSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
@@ -15,6 +17,8 @@
 
   let operationNotice = $state("");
   let operationError = $state("");
+  let revokeSessionDialogOpen = $state(false);
+  let selectedSessionForRevoke = $state<AccountSessionSummary | null>(null);
 
   const sessionsQuery = createQuery(() =>
     queryOptions({
@@ -30,6 +34,8 @@
     onSuccess: () => {
       operationError = "";
       operationNotice = $t(i18nKeys.console.accountSettings.sessionRevoked);
+      revokeSessionDialogOpen = false;
+      selectedSessionForRevoke = null;
       void queryClient.invalidateQueries({ queryKey: ["account", "sessions"] });
     },
     onError: (error) => {
@@ -40,10 +46,33 @@
 
   const sessions = $derived(sessionsQuery.data?.items ?? []);
 
-  function revokeSession(sessionId: string): void {
-    if (!revokeSessionMutation.isPending) {
-      revokeSessionMutation.mutate(sessionId);
+  function openRevokeSessionDialog(session: AccountSessionSummary): void {
+    if (revokeSessionMutation.isPending) {
+      return;
     }
+
+    selectedSessionForRevoke = session;
+    operationError = "";
+    revokeSessionDialogOpen = true;
+  }
+
+  function setRevokeSessionDialogOpen(open: boolean): void {
+    if (!open && revokeSessionMutation.isPending) {
+      return;
+    }
+
+    revokeSessionDialogOpen = open;
+    if (!open) {
+      selectedSessionForRevoke = null;
+    }
+  }
+
+  function confirmRevokeSession(): void {
+    if (!selectedSessionForRevoke || revokeSessionMutation.isPending) {
+      return;
+    }
+
+    revokeSessionMutation.mutate(selectedSessionForRevoke.sessionId);
   }
 
   type AccountSessionClientKind = "web" | "cli" | "unknown";
@@ -169,7 +198,7 @@
         <p class="break-words text-sm text-muted-foreground">{readErrorMessage(sessionsQuery.error)}</p>
       </section>
     {:else}
-      <div class="console-record-list">
+      <div class="console-record-list" data-account-sessions-display-surface>
         {#if sessions.length === 0}
           <div class="console-record-row text-sm text-muted-foreground">
             {$t(i18nKeys.console.accountSettings.emptySessions)}
@@ -216,14 +245,12 @@
               </div>
               <Button
                 disabled={revokeSessionMutation.isPending}
-                onclick={() => revokeSession(session.sessionId)}
+                onclick={() => openRevokeSessionDialog(session)}
                 size="sm"
-                variant="destructive"
+                variant="outline"
               >
-                <Trash2 class="size-3.5" />
-                {revokeSessionMutation.isPending
-                  ? $t(i18nKeys.console.accountSettings.revokingSession)
-                  : $t(i18nKeys.console.accountSettings.revokeSession)}
+                <ShieldCheck class="size-3.5" />
+                {$t(i18nKeys.console.accountSettings.lifecycleManageAction)}
               </Button>
             </div>
           {/each}
@@ -231,4 +258,75 @@
       </div>
     {/if}
   </div>
+
+  <Dialog.Root bind:open={revokeSessionDialogOpen} onOpenChange={setRevokeSessionDialogOpen}>
+    {#if selectedSessionForRevoke}
+      {@const selectedClientKind = sessionClientKind(selectedSessionForRevoke)}
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.accountSettings.revokeSession)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.accountSettings.sessionsBody)}
+          </Dialog.Description>
+        </Dialog.Header>
+
+        <div class="space-y-4 px-5 py-4" data-account-session-revoke-dialog>
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="font-medium">{sessionDisplayName(selectedSessionForRevoke)}</p>
+              <Badge variant="secondary">
+                {#if selectedClientKind === "cli"}
+                  <SquareTerminal class="size-3.5" />
+                {:else}
+                  <Monitor class="size-3.5" />
+                {/if}
+                {clientLabel(selectedClientKind)}
+              </Badge>
+              {#if selectedSessionForRevoke.current}
+                <Badge variant="outline">
+                  <ShieldCheck class="size-3.5" />
+                  {$t(i18nKeys.console.accountSettings.currentSession)}
+                </Badge>
+              {/if}
+            </div>
+            <p class="mt-2 break-all font-mono text-xs text-muted-foreground">
+              {selectedSessionForRevoke.sessionId}
+            </p>
+            <p class="mt-2 text-xs text-muted-foreground">
+              {$t(i18nKeys.console.accountSettings.lastActiveAt)} · {selectedSessionForRevoke.lastActiveAt
+                ? formatTime(selectedSessionForRevoke.lastActiveAt)
+                : $t(i18nKeys.common.status.unknown)}
+            </p>
+          </div>
+
+          {#if operationError}
+            <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p class="break-words text-destructive">{operationError}</p>
+            </div>
+          {/if}
+        </div>
+
+        <Dialog.Footer class="border-t p-5">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setRevokeSessionDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.cancel)}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={revokeSessionMutation.isPending}
+            onclick={confirmRevokeSession}
+          >
+            <Trash2 class="size-4" />
+            {revokeSessionMutation.isPending
+              ? $t(i18nKeys.console.accountSettings.revokingSession)
+              : $t(i18nKeys.console.accountSettings.revokeSession)}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    {/if}
+  </Dialog.Root>
 </SettingsShell>

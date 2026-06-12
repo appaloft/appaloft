@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
     ArrowLeft,
@@ -22,7 +23,9 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     endpointFromTemplate,
@@ -30,6 +33,7 @@
     findBlueprintCatalogExtension,
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
@@ -238,18 +242,39 @@
       code?: string;
     };
   };
+  type InstalledApplicationComponent = {
+    componentId: string;
+    name?: string;
+    kind?: string;
+    resource?: { status?: "planned" | "realized"; resourceId?: string; resourceSlug?: string };
+    deployment?: { status?: "planned" | "realized"; deploymentId?: string; reason?: string };
+    endpoints?: readonly { label?: string; url?: string; public?: boolean }[];
+  };
+  type InstalledApplicationDependency = {
+    requirementId: string;
+    kind?: string;
+    bindingStatus?: "planned" | "bound" | "blocked";
+    plannedMode?: string;
+    dependencyResourceId?: string;
+    maskedConnection?: string;
+    componentIds?: readonly string[];
+  };
   type InstalledApplicationInstallResult = {
     applicationId?: string;
     executionStatus?: string;
     installedApplication?: {
       applicationId?: string;
       status?: string;
+      components?: readonly InstalledApplicationComponent[];
+      dependencies?: readonly InstalledApplicationDependency[];
     };
     progress?: InstalledApplicationProgress;
   };
   type InstalledApplicationShowResponse = {
     applicationId?: string;
     status?: string;
+    components?: readonly InstalledApplicationComponent[];
+    dependencies?: readonly InstalledApplicationDependency[];
     progress?: InstalledApplicationProgress;
   };
 
@@ -290,6 +315,8 @@
   let upgradePlanPending = $state(false);
   let upgradePlanError = $state("");
   let upgradePlanOutput = $state<BlueprintUpgradePlanResponse | null>(null);
+  let installDialogOpen = $state(false);
+  let upgradePlanDialogOpen = $state(false);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -417,6 +444,25 @@
     const profileVariables = selectedProfileDefinition?.variables ?? [];
     return [...componentVariables, ...profileVariables];
   });
+  const installedApplicationComponents = $derived(
+    installResult?.installedApplication?.components ?? [],
+  );
+  const installedApplicationDependencies = $derived(
+    installResult?.installedApplication?.dependencies ?? [],
+  );
+  const installedApplicationPublicEndpoints = $derived(
+    installedApplicationComponents.flatMap((component) =>
+      (component.endpoints ?? [])
+        .filter((endpoint) => endpoint.url)
+        .map((endpoint) => ({
+          componentId: component.componentId,
+          componentName: component.name ?? component.componentId,
+          label: endpoint.label ?? component.name ?? component.componentId,
+          url: endpoint.url ?? "",
+          public: endpoint.public ?? false,
+        })),
+    ),
+  );
 
   function blueprintRegistryEntryToListing(
     entry: BlueprintRegistryEntry,
@@ -550,6 +596,11 @@
   }
 
   $effect(() => {
+    installDialogOpen = modalIsOpen(page, "blueprint-install");
+    upgradePlanDialogOpen = modalIsOpen(page, "blueprint-upgrade-plan");
+  });
+
+  $effect(() => {
     if (!detail) {
       return;
     }
@@ -588,26 +639,53 @@
     }
   });
 
-  function deployHref(): string {
-    const url = new URL(returnTo || "/deploy", "https://appaloft.local");
-    url.pathname = "/deploy";
-    url.searchParams.set("source", "blueprint");
+  function quickDeployDialogHref(): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    params.set("modal", "quick-deploy");
+    params.set("source", "blueprint");
     const sourceExtensionKey =
-      deploySourceExtension?.key ?? url.searchParams.get("sourceExtension") ?? "";
+      deploySourceExtension?.key ?? params.get("sourceExtension") ?? "";
     if (sourceExtensionKey) {
-      url.searchParams.set("sourceExtension", sourceExtensionKey);
+      params.set("sourceExtension", sourceExtensionKey);
     }
-    url.searchParams.set("blueprintSlug", listing?.slug ?? slug);
-    url.searchParams.set("blueprintTitle", listing?.title ?? slug);
+    params.set("blueprintSlug", listing?.slug ?? slug);
+    params.set("blueprintTitle", listing?.title ?? slug);
     if (selectedVariant) {
-      url.searchParams.set("blueprintVariant", selectedVariant);
+      params.set("blueprintVariant", selectedVariant);
     } else {
-      url.searchParams.delete("blueprintVariant");
+      params.delete("blueprintVariant");
     }
-    url.searchParams.set("step", "project");
-    url.searchParams.set("projectMode", "new");
-    url.searchParams.set("projectName", listing?.title ?? slug);
-    return `${url.pathname}${url.search}`;
+    params.set("step", "project");
+    params.set("projectMode", "new");
+    params.set("projectName", listing?.title ?? slug);
+
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function openQuickDeployDialog(): void {
+    void goto(quickDeployDialogHref(), {
+      keepFocus: true,
+      noScroll: true,
+    });
+  }
+
+  function setInstallDialogOpen(open: boolean): void {
+    installDialogOpen = open;
+    void setModalOpen(page, "blueprint-install", open);
+  }
+
+  function openInstallDialog(): void {
+    setInstallDialogOpen(true);
+  }
+
+  function setUpgradePlanDialogOpen(open: boolean): void {
+    upgradePlanDialogOpen = open;
+    void setModalOpen(page, "blueprint-upgrade-plan", open);
+  }
+
+  function openUpgradePlanDialog(): void {
+    setUpgradePlanDialogOpen(true);
   }
 
   function updateParameter(key: string, value: string): void {
@@ -666,6 +744,7 @@
       });
       installResult = result;
       secretValues = {};
+      setInstallDialogOpen(false);
     } catch (error) {
       installError = readErrorMessage(error);
     } finally {
@@ -688,6 +767,8 @@
         installedApplication: {
           applicationId: result.applicationId ?? installResult?.installedApplication?.applicationId,
           status: result.status ?? installResult?.installedApplication?.status,
+          components: result.components ?? installResult?.installedApplication?.components,
+          dependencies: result.dependencies ?? installResult?.installedApplication?.dependencies,
         },
         progress: result.progress ?? installResult?.progress,
       };
@@ -710,6 +791,53 @@
 
   function progressSupportCommand(progress: InstalledApplicationProgress): string {
     return progress.operatorWorkId ? `appaloft work show ${progress.operatorWorkId}` : "";
+  }
+
+  function progressDeploymentHref(deploymentId: string): string {
+    return `/deployments/${encodeURIComponent(deploymentId)}`;
+  }
+
+  function progressResourceHref(resourceId: string): string {
+    return `/resources/${encodeURIComponent(resourceId)}`;
+  }
+
+  function dependencyResourceCollectionHref(dependencyResourceId?: string): string {
+    const params = new URLSearchParams();
+    if (dependencyResourceId) {
+      params.set("resourceId", dependencyResourceId);
+    }
+    const query = params.toString();
+    return query ? `/dependency-resources?${query}` : "/dependency-resources";
+  }
+
+  function installedApplicationHref(applicationId: string): string {
+    return `/installed-applications/${encodeURIComponent(applicationId)}`;
+  }
+
+  function installHandoffTitle(progress: InstalledApplicationProgress): string {
+    if (progress.userStatus === "succeeded") {
+      return "安装交接";
+    }
+    if (progress.userStatus === "failed") {
+      return "安装需要处理";
+    }
+    return "安装正在进行";
+  }
+
+  function installHandoffDescription(progress: InstalledApplicationProgress): string {
+    if (progress.userStatus === "succeeded") {
+      return "查看这次安装已经能确认的结果；还未接入的交接信息会明确标出。";
+    }
+    if (progress.userStatus === "failed") {
+      return "先查看失败原因和部署尝试，再决定重试、回滚或打开对应对象页面。";
+    }
+    return "部署尝试和工作项会持续更新；这里保持为状态和下一步，不展示安装表单。";
+  }
+
+  function componentDeploymentStatus(
+    deployment: InstalledApplicationProgress["componentDeployments"][number]["deployment"],
+  ): string {
+    return "deploymentId" in deployment ? "已创建部署尝试" : deployment.status;
   }
 
   async function generatePlan(): Promise<void> {
@@ -738,6 +866,7 @@
           },
         }),
       });
+      setInstallDialogOpen(false);
     } catch (error) {
       planError = readErrorMessage(error);
     } finally {
@@ -769,6 +898,7 @@
           ...(profile ? { targetProfile: profile } : {}),
         }),
       });
+      setUpgradePlanDialogOpen(false);
     } catch (error) {
       upgradePlanError = readErrorMessage(error);
     } finally {
@@ -868,7 +998,10 @@
       </div>
     </section>
   {:else}
-    <div class="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <div
+      class="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
+      data-blueprint-detail-display-surface
+    >
       <div class="min-w-0 space-y-5">
         <section class="console-panel p-5">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -915,38 +1048,50 @@
                 </div>
               </div>
             </div>
-            <Button href={deployHref()} class="shrink-0">
-              进入部署流程
-              <ArrowRight class="size-4" />
-            </Button>
+            {#if installEndpoint}
+              <Button type="button" class="shrink-0 xl:hidden" onclick={openInstallDialog}>
+                配置安装
+                <ArrowRight class="size-4" />
+              </Button>
+            {:else}
+              <Button type="button" class="shrink-0 xl:hidden" onclick={openQuickDeployDialog}>
+                快速部署
+                <ArrowRight class="size-4" />
+              </Button>
+            {/if}
           </div>
         </section>
 
         {#if selectedUpgrade || variantOptions.length > 0}
-          <section class="console-panel p-5">
+          <section class="console-panel p-5" data-blueprint-variant-display-surface>
             <div class="grid gap-4 lg:grid-cols-2">
               <div class="space-y-2">
                 <h2 class="text-lg font-semibold">部署方案</h2>
                 {#if variantOptions.length > 0}
                   <div class="grid gap-2">
                     {#each variantOptions as variant (variant.id)}
-                      <button
-                        type="button"
-                        class={`rounded-md border px-3 py-2 text-left text-sm ${selectedVariant === variant.id ? "border-primary bg-primary/5" : "bg-background"}`}
-                        onclick={() => {
-                          selectedVariant = variant.id;
-                        }}
+                      <article
+                        class={`rounded-md border px-3 py-2 text-sm ${selectedVariant === variant.id ? "border-primary bg-primary/5" : "bg-background"}`}
+                        data-blueprint-variant-option
                       >
-                        <span class="font-medium">{variant.label ?? variant.id}</span>
+                        <div class="flex items-start justify-between gap-3">
+                          <span class="min-w-0 font-medium">{variant.label ?? variant.id}</span>
+                          {#if selectedVariant === variant.id}
+                            <Badge variant="outline">当前方案</Badge>
+                          {/if}
+                        </div>
                         <span class="mt-1 block text-xs leading-5 text-muted-foreground">
                           {variant.summary ?? "同一 Blueprint 的可选拓扑。"}
                         </span>
-                      </button>
+                      </article>
                     {/each}
                   </div>
                 {:else}
                   <p class="text-sm leading-6 text-muted-foreground">这个 Blueprint 只有默认部署方案。</p>
                 {/if}
+                <p class="text-xs leading-5 text-muted-foreground">
+                  方案选择、Profile 和参数输入在配置安装弹窗内完成；默认页只展示 Blueprint 能创建什么。
+                </p>
               </div>
               <div class="space-y-2">
                 <h2 class="text-lg font-semibold">升级策略</h2>
@@ -1179,122 +1324,56 @@
       </div>
 
       <aside class="min-w-0 space-y-5 xl:sticky xl:top-20 xl:self-start">
-        <section class="console-side-panel space-y-4">
+        <section class="console-side-panel space-y-4" data-blueprint-install-summary>
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h2 class="text-lg font-semibold">安装计划</h2>
-              <p class="text-sm text-muted-foreground">先生成 dry-run，再决定是否进入部署流程。</p>
+              <h2 class="text-lg font-semibold">安装入口</h2>
+              <p class="text-sm text-muted-foreground">配置、dry-run 和接受安装在弹窗内完成。</p>
             </div>
             <Boxes class="size-5 text-muted-foreground" />
           </div>
 
-          <div class="space-y-3">
-            <label class="space-y-1.5">
-              <span>Profile</span>
-              <select
-                class="min-h-9 rounded-md border border-input bg-background px-3 text-sm"
-                bind:value={profile}
-              >
-                {#each profileNames as profileName (profileName)}
-                  <option value={profileName}>{profileName}</option>
-                {/each}
-              </select>
-            </label>
-
-            {#if variantOptions.length > 0}
-              <label class="space-y-1.5">
-                <span>部署方案</span>
-                <select
-                  class="min-h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  bind:value={selectedVariant}
-                >
-                  {#each variantOptions as variant (variant.id)}
-                    <option value={variant.id}>{variant.label ?? variant.id}</option>
-                  {/each}
-                </select>
-                <span class="block text-xs leading-5 text-muted-foreground">
-                  {selectedVariantDefinition?.summary ?? "选择同一应用的不同依赖资源或运行配置。"}
-                </span>
-              </label>
-            {/if}
-
-            {#each effectiveManifest.parameters as parameter (parameter.key)}
-              <label class="space-y-1.5">
-                <span>{parameter.label}</span>
-                <Input
-                  value={parameterValues[parameter.key] ?? ""}
-                  oninput={(event) => updateParameter(parameter.key, event.currentTarget.value)}
-                  placeholder={String(parameter.default ?? "")}
-                />
-              </label>
-            {/each}
-
-            {#if effectiveManifest.secrets.length > 0}
-              <div class="space-y-2" data-blueprint-install-secret-inputs>
-                <p class="text-sm font-medium">安装密钥</p>
-                <p class="text-xs leading-5 text-muted-foreground">
-                  只在接受安装时提交给运行时；安装进度和 dry-run 不会回显密钥值。
-                </p>
-                {#each effectiveManifest.secrets as secret (secret.key)}
-                  <label class="space-y-1.5">
-                    <span>
-                      {secret.label}
-                      {#if secret.required}
-                        <span class="text-destructive">*</span>
-                      {/if}
-                    </span>
-                    <Input
-                      value={secretValues[secret.key] ?? ""}
-                      type="password"
-                      autocomplete="new-password"
-                      oninput={(event) => updateSecretValue(secret.key, event.currentTarget.value)}
-                      placeholder={secret.key}
-                    />
-                  </label>
-                {/each}
-              </div>
-            {/if}
+          <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">目标方案</span>
+              <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">默认 Profile</span>
+              <span class="font-mono">{profile}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">参数 / 密钥</span>
+              <span class="font-mono">{effectiveManifest.parameters.length} / {effectiveManifest.secrets.length}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-muted-foreground">组件 / 依赖</span>
+              <span class="font-mono">{effectiveManifest.components.length} / {effectiveManifest.resources.length}</span>
+            </div>
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            <Button onclick={generatePlan} disabled={planPending}>
-              {#if planPending}
+          <div class="grid gap-2">
+            <Button
+              type="button"
+              class="hidden xl:inline-flex"
+              onclick={openInstallDialog}
+              disabled={!installPlanEndpoint}
+            >
+              {#if planPending || installPending}
                 <LoaderCircle class="size-4 animate-spin" />
               {/if}
-              Generate dry-run
+              配置安装
             </Button>
-            <Button href={deployHref()} variant="outline">
-              部署流程
+            <Button type="button" variant="outline" onclick={openQuickDeployDialog}>
+              打开快速部署
               <ArrowRight class="size-4" />
             </Button>
           </div>
-
-          {#if installEndpoint}
-            <Button
-              onclick={acceptInstall}
-              disabled={installPending}
-              variant="outline"
-              class="w-full"
-              data-blueprint-accept-install
-            >
-              {#if installPending}
-                <LoaderCircle class="size-4 animate-spin" />
-              {/if}
-              接受安装并查看进度
-            </Button>
-          {/if}
 
           {#if planError}
             <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
               {planError}
             </div>
-          {/if}
-
-          {#if planOutput}
-            <details class="console-subtle-panel p-3">
-              <summary class="cursor-pointer text-sm font-medium">查看 dry-run plan JSON</summary>
-              <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(planOutput, null, 2)}</pre>
-            </details>
           {/if}
 
           {#if installError}
@@ -1303,13 +1382,24 @@
             </div>
           {/if}
 
+          {#if planOutput}
+            <details class="console-subtle-panel p-3" data-blueprint-install-plan-result>
+              <summary class="cursor-pointer text-sm font-medium">查看 dry-run plan JSON</summary>
+              <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(planOutput, null, 2)}</pre>
+            </details>
+          {/if}
+
           {#if installResult?.progress}
-            <div class="console-subtle-panel space-y-3 p-3" data-blueprint-install-progress>
+            <div
+              class="console-subtle-panel space-y-4 p-3"
+              data-blueprint-install-progress
+              data-blueprint-install-handoff
+            >
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p class="text-sm font-semibold">安装进度</p>
+                  <p class="text-sm font-semibold">{installHandoffTitle(installResult.progress)}</p>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    {installResult.progress.message}
+                    {installHandoffDescription(installResult.progress)}
                   </p>
                 </div>
                 <Badge variant={installResult.progress.userStatus === "failed" ? "destructive" : "outline"}>
@@ -1330,38 +1420,220 @@
                   <span class="text-muted-foreground">应用 ID</span>
                   <span class="break-all font-mono">{installResult.progress.applicationId}</span>
                 </div>
+                <p class="border-t pt-2 leading-5 text-muted-foreground">
+                  {installResult.progress.message}
+                </p>
               </div>
 
-              {#if installResult.progress.componentDeployments.length > 0}
-                <div class="space-y-2">
-                  <p class="text-xs font-medium text-muted-foreground">组件部署</p>
-                  {#each installResult.progress.componentDeployments as component (component.componentId)}
-                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="font-medium">{component.name}</span>
-                        {#if "deploymentId" in component.deployment}
-                          <Button
-                            href={`/deployments/${component.deployment.deploymentId}`}
-                            variant="outline"
-                            size="sm"
-                          >
-                            查看部署
-                            <ArrowRight class="size-3.5" />
-                          </Button>
-                        {:else}
-                          <Badge variant="outline">planned</Badge>
-                        {/if}
-                      </div>
-                    </div>
-                  {/each}
+              <section class="space-y-2" data-blueprint-install-created-resources>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs font-medium text-muted-foreground">创建的资源</p>
+                  <Badge variant="outline">{installedApplicationComponents.length || "pending"}</Badge>
                 </div>
-              {/if}
+                {#each installedApplicationComponents as component (component.componentId)}
+                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="truncate font-medium">{component.name ?? component.componentId}</p>
+                        <p class="mt-1 truncate font-mono text-muted-foreground">
+                          {component.resource?.resourceId ?? component.resource?.resourceSlug ?? "resource pending"}
+                        </p>
+                      </div>
+                      {#if component.resource?.resourceId}
+                        <Button
+                          href={progressResourceHref(component.resource.resourceId)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          打开资源
+                          <ArrowRight class="size-3.5" />
+                        </Button>
+                      {:else}
+                        <Badge variant="outline">planned</Badge>
+                      {/if}
+                    </div>
+                  </div>
+                {:else}
+                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    安装 snapshot 还没有资源 readback。等待 install worker 完成，或刷新安装状态。
+                  </div>
+                {/each}
+              </section>
+
+              <section class="space-y-2" data-blueprint-install-dependencies>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs font-medium text-muted-foreground">依赖资源</p>
+                  <Badge variant="outline">{installedApplicationDependencies.length || "none"}</Badge>
+                </div>
+                {#each installedApplicationDependencies as dependency (dependency.requirementId)}
+                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="truncate font-medium">{dependency.requirementId}</p>
+                        <p class="mt-1 truncate font-mono text-muted-foreground">
+                          {dependency.dependencyResourceId ?? dependency.plannedMode ?? "dependency pending"}
+                        </p>
+                      </div>
+                      {#if dependency.dependencyResourceId}
+                        <Button
+                          href={dependencyResourceCollectionHref(dependency.dependencyResourceId)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          打开治理
+                          <ArrowRight class="size-3.5" />
+                        </Button>
+                      {:else}
+                        <Badge variant={dependency.bindingStatus === "blocked" ? "destructive" : "outline"}>
+                          {dependency.bindingStatus ?? "planned"}
+                        </Badge>
+                      {/if}
+                    </div>
+                    {#if dependency.dependencyResourceId}
+                      <p class="mt-2 border-t pt-2 leading-5 text-muted-foreground">
+                        依赖资源 detail route 还未实现；当前从依赖资源 collection 进入治理。
+                      </p>
+                    {/if}
+                  </div>
+                {:else}
+                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    这个安装结果没有依赖资源 readback；无依赖或仍在等待 install worker。
+                  </div>
+                {/each}
+              </section>
+
+              <section class="space-y-2" data-blueprint-install-public-urls>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs font-medium text-muted-foreground">公开 URL</p>
+                  <Badge variant="outline">{installedApplicationPublicEndpoints.length || "none"}</Badge>
+                </div>
+                {#each installedApplicationPublicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
+                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="truncate font-medium">{endpoint.label}</p>
+                        <p class="mt-1 truncate font-mono text-muted-foreground">{endpoint.url}</p>
+                      </div>
+                      <Button href={endpoint.url} target="_blank" rel="noreferrer" variant="outline" size="sm">
+                        打开
+                        <ExternalLink class="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    当前安装结果没有公开访问摘要。公开 URL、域名和证书仍从资源网络页或域名绑定页治理。
+                  </div>
+                {/each}
+              </section>
+
+              <section class="space-y-2" data-blueprint-install-component-deployments>
+                <p class="text-xs font-medium text-muted-foreground">组件部署</p>
+                {#each installResult.progress.componentDeployments as component (component.componentId)}
+                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <p class="truncate font-medium">{component.name}</p>
+                        <p class="mt-1 font-mono text-muted-foreground">
+                          {componentDeploymentStatus(component.deployment)}
+                        </p>
+                      </div>
+                      {#if "deploymentId" in component.deployment}
+                        <Button
+                          href={progressDeploymentHref(component.deployment.deploymentId)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          查看部署
+                          <ArrowRight class="size-3.5" />
+                        </Button>
+                      {:else}
+                        <Badge variant="outline">planned</Badge>
+                      {/if}
+                    </div>
+                  </div>
+                {:else}
+                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    当前安装进度没有组件部署。等待 install worker 或刷新状态。
+                  </div>
+                {/each}
+              </section>
 
               {#if installResult.progress.failure}
                 <div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   {installResult.progress.failure.reason}
                 </div>
               {/if}
+
+              <div class="grid gap-2" data-blueprint-install-next-actions>
+                {#if installedApplicationEndpoint}
+                  <Button
+                    type="button"
+                    onclick={refreshInstalledApplicationProgress}
+                    disabled={installRefreshPending}
+                    variant="outline"
+                    class="w-full"
+                  >
+                    {#if installRefreshPending}
+                      <LoaderCircle class="size-4 animate-spin" />
+                    {/if}
+                    刷新安装状态
+                  </Button>
+                {/if}
+                {#if installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
+                  {@const firstResourceId = installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
+                  {#if firstResourceId}
+                    <Button
+                      href={progressResourceHref(firstResourceId)}
+                      variant="outline"
+                      class="w-full"
+                    >
+                      打开首个资源
+                      <ArrowRight class="size-4" />
+                    </Button>
+                  {/if}
+                {/if}
+                {#if installedApplicationPublicEndpoints[0]?.url}
+                  <Button
+                    href={installedApplicationPublicEndpoints[0].url}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="outline"
+                    class="w-full"
+                  >
+                    打开公开 URL
+                    <ExternalLink class="size-4" />
+                  </Button>
+                {/if}
+                {#if installResult.progress.deploymentIds[0]}
+                  <Button
+                    href={progressDeploymentHref(installResult.progress.deploymentIds[0])}
+                    variant="outline"
+                    class="w-full"
+                  >
+                    打开最新部署
+                    <ArrowRight class="size-4" />
+                  </Button>
+                {/if}
+                {#if installResult.progress.applicationId}
+                  <Button
+                    href={installedApplicationHref(installResult.progress.applicationId)}
+                    variant="outline"
+                    class="w-full"
+                  >
+                    查看安装聚合
+                    <ArrowRight class="size-4" />
+                  </Button>
+                {:else}
+                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    Installed Application readback 暂不可用；先打开资源或部署记录继续观察。
+                  </div>
+                {/if}
+                <Button href="/projects" variant="outline" class="w-full">
+                  打开项目列表
+                  <ArrowRight class="size-4" />
+                </Button>
+              </div>
 
               {#if installResult.progress.operatorWorkId}
                 <details
@@ -1378,142 +1650,50 @@
                   </div>
                 </details>
               {/if}
-
-              {#if installedApplicationEndpoint}
-                <Button
-                  onclick={refreshInstalledApplicationProgress}
-                  disabled={installRefreshPending}
-                  variant="outline"
-                  class="w-full"
-                >
-                  {#if installRefreshPending}
-                    <LoaderCircle class="size-4 animate-spin" />
-                  {/if}
-                  刷新安装进度
-                </Button>
-              {/if}
             </div>
           {/if}
         </section>
 
         {#if upgradePlanEndpoint}
-          <section class="console-side-panel space-y-4">
-          <div>
-            <h2 class="text-lg font-semibold">升级 dry-run</h2>
-            <p class="text-sm text-muted-foreground">从已安装应用读取当前状态，预览更新到目标方案的风险和差异。</p>
-          </div>
-
-          <label class="space-y-1.5" data-blueprint-upgrade-from-installed-application>
-            <span>已安装应用 ID</span>
-            <Input
-              value={upgradeApplicationId}
-              oninput={(event) => {
-                upgradeApplicationId = event.currentTarget.value;
-              }}
-              placeholder="cia_..."
-            />
-          </label>
-
-          <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">目标版本</span>
-              <span class="font-mono">{listing.blueprint.version}</span>
+          <section class="console-side-panel space-y-4" data-blueprint-upgrade-summary>
+            <div>
+              <h2 class="text-lg font-semibold">升级 dry-run</h2>
+              <p class="text-sm text-muted-foreground">输入已安装应用 ID 的操作在弹窗内完成。</p>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">目标方案</span>
-              <span class="font-medium">{selectedVariantLabel()}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">目标 Profile</span>
-              <span class="font-mono">{profile}</span>
-            </div>
-          </div>
 
-          <Button onclick={generateUpgradePlan} disabled={upgradePlanPending || !upgradePlanEndpoint} variant="outline" class="w-full">
-            {#if upgradePlanPending}
-              <LoaderCircle class="size-4 animate-spin" />
-            {/if}
-            生成升级 dry-run
-          </Button>
-
-          {#if upgradePlanError}
-            <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
-              {upgradePlanError}
-            </div>
-          {/if}
-
-          {#if upgradePlanOutput}
-            <div class="grid gap-2 rounded-md border border-border p-3 text-xs">
-              <div class="flex flex-wrap gap-2">
-                <Badge variant="outline">{upgradePlanOutput.plan?.classification ?? "unknown"}</Badge>
-                <Badge variant="outline">
-                  {upgradePlanOutput.plan?.destructive ? "destructive" : "non-destructive"}
-                </Badge>
-                <Badge variant="outline">
-                  {upgradePlanOutput.plan?.requiresManualReview ? "manual-review" : "auto-review"}
-                </Badge>
-                <Badge variant="outline">
-                  {upgradePlanOutput.nonExecution?.marker ?? "dry-run-only"}
-                </Badge>
+            <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">目标版本</span>
+                <span class="font-mono">{listing.blueprint.version}</span>
               </div>
-
-              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                <div class="rounded-md bg-muted/40 p-2">
-                  <p class="text-muted-foreground">当前</p>
-                  <p class="mt-1 font-mono">
-                    {upgradePlanOutput.current?.source.blueprintVersion ??
-                      upgradePlanOutput.plan?.blueprint.fromVersion}
-                  </p>
-                  <p class="mt-1 truncate">
-                    {upgradePlanOutput.current?.source.blueprintVariant ??
-                      upgradePlanOutput.plan?.blueprint.fromVariant ??
-                      "default"}
-                    {" · "}
-                    {upgradePlanOutput.current?.source.profile ?? "profile"}
-                  </p>
-                </div>
-                <div class="rounded-md bg-muted/40 p-2">
-                  <p class="text-muted-foreground">目标</p>
-                  <p class="mt-1 font-mono">
-                    {upgradePlanOutput.target?.blueprint.version ??
-                      upgradePlanOutput.plan?.blueprint.toVersion}
-                  </p>
-                  <p class="mt-1 truncate">
-                    {upgradePlanOutput.target?.blueprint.variant ??
-                      upgradePlanOutput.plan?.blueprint.toVariant ??
-                      "default"}
-                    {" · "}
-                    {upgradePlanOutput.target?.blueprint.profile ?? profile}
-                  </p>
-                </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">目标方案</span>
+                <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
               </div>
-
-              {#if upgradePlanOutput.changes?.length}
-                <ul class="space-y-1">
-                  {#each upgradePlanOutput.changes.slice(0, 5) as change (`${change.kind}-${change.summary}`)}
-                    <li class="leading-5">
-                      <span class="font-medium">{change.classification}</span>
-                      {" · "}
-                      <span>{change.summary}</span>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-
-              {#if upgradePlanOutput.preservedUserConfigurationWarnings?.length}
-                <ul class="space-y-1 text-muted-foreground">
-                  {#each upgradePlanOutput.preservedUserConfigurationWarnings.slice(0, 4) as warning (warning)}
-                    <li>{warning}</li>
-                  {/each}
-                </ul>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">目标 Profile</span>
+                <span class="font-mono">{profile}</span>
+              </div>
+              {#if upgradeApplicationId}
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">已安装应用</span>
+                  <span class="min-w-0 truncate font-mono">{upgradeApplicationId}</span>
+                </div>
               {/if}
             </div>
 
-            <details class="console-subtle-panel p-3">
-              <summary class="cursor-pointer text-sm font-medium">查看 upgrade plan JSON</summary>
-              <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(upgradePlanOutput, null, 2)}</pre>
-            </details>
-          {/if}
+            <Button
+              type="button"
+              onclick={openUpgradePlanDialog}
+              disabled={upgradePlanPending || !upgradePlanEndpoint}
+              variant="outline"
+              class="w-full"
+            >
+              {#if upgradePlanPending}
+                <LoaderCircle class="size-4 animate-spin" />
+              {/if}
+              配置升级 dry-run
+            </Button>
           </section>
         {/if}
 
@@ -1522,6 +1702,286 @@
           返回应用市场
         </Button>
       </aside>
+
+      <Dialog.Root bind:open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <Dialog.Content closeLabel="关闭" class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>配置 Blueprint 安装</Dialog.Title>
+            <Dialog.Description>
+              选择本次安装的方案、Profile 和输入值。关闭后默认页只保留安装摘要和执行结果。
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <section class="space-y-5 px-5 pb-5" data-blueprint-install-dialog>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="space-y-1.5 text-sm">
+                <span class="font-medium">Profile</span>
+                <Select.Root bind:value={profile} type="single">
+                  <Select.Trigger class="w-full">
+                    {profile || "production"}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each profileNames as profileName (profileName)}
+                      <Select.Item value={profileName}>{profileName}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
+              {#if variantOptions.length > 0}
+                <label class="space-y-1.5 text-sm">
+                  <span class="font-medium">部署方案</span>
+                  <Select.Root bind:value={selectedVariant} type="single">
+                    <Select.Trigger class="w-full">
+                      {selectedVariantLabel()}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each variantOptions as variant (variant.id)}
+                        <Select.Item value={variant.id}>{variant.label ?? variant.id}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                  <span class="block text-xs leading-5 text-muted-foreground">
+                    {selectedVariantDefinition?.summary ?? "选择同一应用的不同依赖资源或运行配置。"}
+                  </span>
+                </label>
+              {/if}
+            </div>
+
+            {#if effectiveManifest.parameters.length > 0}
+              <section class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-semibold">参数</h3>
+                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                    这些值只用于生成本次 install plan，不代表系统中已经存在的配置。
+                  </p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  {#each effectiveManifest.parameters as parameter (parameter.key)}
+                    <label class="space-y-1.5 text-sm">
+                      <span class="font-medium">{parameter.label}</span>
+                      <Input
+                        value={parameterValues[parameter.key] ?? ""}
+                        oninput={(event) => updateParameter(parameter.key, event.currentTarget.value)}
+                        placeholder={String(parameter.default ?? "")}
+                      />
+                      <span class="block truncate font-mono text-xs text-muted-foreground">
+                        {parameter.key} · {parameter.type}
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              </section>
+            {/if}
+
+            {#if effectiveManifest.secrets.length > 0}
+              <section class="space-y-3" data-blueprint-install-secret-inputs>
+                <div>
+                  <h3 class="text-sm font-semibold">安装密钥</h3>
+                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                    只在接受安装时提交给运行时；安装进度和 dry-run 不会回显密钥值。
+                  </p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  {#each effectiveManifest.secrets as secret (secret.key)}
+                    <label class="space-y-1.5 text-sm">
+                      <span class="font-medium">
+                        {secret.label}
+                        {#if secret.required}
+                          <span class="text-destructive">*</span>
+                        {/if}
+                      </span>
+                      <Input
+                        value={secretValues[secret.key] ?? ""}
+                        type="password"
+                        autocomplete="new-password"
+                        oninput={(event) => updateSecretValue(secret.key, event.currentTarget.value)}
+                        placeholder={secret.key}
+                      />
+                      <span class="block truncate font-mono text-xs text-muted-foreground">
+                        {secret.key}
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              </section>
+            {/if}
+
+            <div class="rounded-md border bg-muted/30 p-3 text-xs">
+              <div class="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span class="text-muted-foreground">目标项目</span>
+                  <p class="mt-1 font-medium">{listing.title}</p>
+                </div>
+                <div>
+                  <span class="text-muted-foreground">目标环境</span>
+                  <p class="mt-1 font-mono">{profile || "production"}</p>
+                </div>
+              </div>
+            </div>
+
+            <Dialog.Footer>
+              <Button
+                type="button"
+                variant="outline"
+                onclick={generatePlan}
+                disabled={planPending || !installPlanEndpoint}
+              >
+                {#if planPending}
+                  <LoaderCircle class="size-4 animate-spin" />
+                {/if}
+                Generate dry-run
+              </Button>
+              {#if installEndpoint}
+                <Button
+                  type="button"
+                  onclick={acceptInstall}
+                  disabled={installPending}
+                  data-blueprint-accept-install
+                >
+                  {#if installPending}
+                    <LoaderCircle class="size-4 animate-spin" />
+                  {/if}
+                  接受安装
+                </Button>
+              {/if}
+            </Dialog.Footer>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {#if upgradePlanEndpoint}
+        <Dialog.Root bind:open={upgradePlanDialogOpen} onOpenChange={setUpgradePlanDialogOpen}>
+          <Dialog.Content closeLabel="关闭" class="max-w-xl">
+            <Dialog.Header>
+              <Dialog.Title>配置升级 dry-run</Dialog.Title>
+              <Dialog.Description>
+                从一个已安装应用读取当前状态，预览升级到当前 Blueprint 方案的风险和差异。
+              </Dialog.Description>
+            </Dialog.Header>
+
+            <section class="space-y-5 px-5 pb-5" data-blueprint-upgrade-plan-dialog>
+              <label class="space-y-1.5 text-sm" data-blueprint-upgrade-from-installed-application>
+                <span class="font-medium">已安装应用 ID</span>
+                <Input
+                  value={upgradeApplicationId}
+                  oninput={(event) => {
+                    upgradeApplicationId = event.currentTarget.value;
+                  }}
+                  placeholder="cia_..."
+                />
+              </label>
+
+              <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">目标版本</span>
+                  <span class="font-mono">{listing.blueprint.version}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">目标方案</span>
+                  <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">目标 Profile</span>
+                  <span class="font-mono">{profile}</span>
+                </div>
+              </div>
+
+              <Dialog.Footer>
+                <Button
+                  type="button"
+                  onclick={generateUpgradePlan}
+                  disabled={upgradePlanPending || !upgradePlanEndpoint}
+                >
+                  {#if upgradePlanPending}
+                    <LoaderCircle class="size-4 animate-spin" />
+                  {/if}
+                  生成升级 dry-run
+                </Button>
+              </Dialog.Footer>
+
+              {#if upgradePlanError}
+                <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
+                  {upgradePlanError}
+                </div>
+              {/if}
+
+              {#if upgradePlanOutput}
+                <div class="grid gap-2 rounded-md border border-border p-3 text-xs">
+                  <div class="flex flex-wrap gap-2">
+                    <Badge variant="outline">{upgradePlanOutput.plan?.classification ?? "unknown"}</Badge>
+                    <Badge variant="outline">
+                      {upgradePlanOutput.plan?.destructive ? "destructive" : "non-destructive"}
+                    </Badge>
+                    <Badge variant="outline">
+                      {upgradePlanOutput.plan?.requiresManualReview ? "manual-review" : "auto-review"}
+                    </Badge>
+                    <Badge variant="outline">
+                      {upgradePlanOutput.nonExecution?.marker ?? "dry-run-only"}
+                    </Badge>
+                  </div>
+
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <div class="rounded-md bg-muted/40 p-2">
+                      <p class="text-muted-foreground">当前</p>
+                      <p class="mt-1 font-mono">
+                        {upgradePlanOutput.current?.source.blueprintVersion ??
+                          upgradePlanOutput.plan?.blueprint.fromVersion}
+                      </p>
+                      <p class="mt-1 truncate">
+                        {upgradePlanOutput.current?.source.blueprintVariant ??
+                          upgradePlanOutput.plan?.blueprint.fromVariant ??
+                          "default"}
+                        {" · "}
+                        {upgradePlanOutput.current?.source.profile ?? "profile"}
+                      </p>
+                    </div>
+                    <div class="rounded-md bg-muted/40 p-2">
+                      <p class="text-muted-foreground">目标</p>
+                      <p class="mt-1 font-mono">
+                        {upgradePlanOutput.target?.blueprint.version ??
+                          upgradePlanOutput.plan?.blueprint.toVersion}
+                      </p>
+                      <p class="mt-1 truncate">
+                        {upgradePlanOutput.target?.blueprint.variant ??
+                          upgradePlanOutput.plan?.blueprint.toVariant ??
+                          "default"}
+                        {" · "}
+                        {upgradePlanOutput.target?.blueprint.profile ?? profile}
+                      </p>
+                    </div>
+                  </div>
+
+                  {#if upgradePlanOutput.changes?.length}
+                    <ul class="space-y-1">
+                      {#each upgradePlanOutput.changes.slice(0, 5) as change (`${change.kind}-${change.summary}`)}
+                        <li class="leading-5">
+                          <span class="font-medium">{change.classification}</span>
+                          {" · "}
+                          <span>{change.summary}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if upgradePlanOutput.preservedUserConfigurationWarnings?.length}
+                    <ul class="space-y-1 text-muted-foreground">
+                      {#each upgradePlanOutput.preservedUserConfigurationWarnings.slice(0, 4) as warning (warning)}
+                        <li>{warning}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+
+                <details class="console-subtle-panel p-3">
+                  <summary class="cursor-pointer text-sm font-medium">查看 upgrade plan JSON</summary>
+                  <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(upgradePlanOutput, null, 2)}</pre>
+                </details>
+              {/if}
+            </section>
+          </Dialog.Content>
+        </Dialog.Root>
+      {/if}
     </div>
   {/if}
 </ConsoleShell>

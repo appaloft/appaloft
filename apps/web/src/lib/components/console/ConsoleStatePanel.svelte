@@ -12,6 +12,7 @@
     detail?: string;
     actionLabel?: string;
     actionHref?: string;
+    actionOnclick?: () => void;
     actionDisabled?: boolean;
     secondaryActionLabel?: string;
     secondaryActionHref?: string;
@@ -25,6 +26,7 @@
     detail = "",
     actionLabel = "",
     actionHref = "",
+    actionOnclick,
     actionDisabled = false,
     secondaryActionLabel = "",
     secondaryActionHref = "",
@@ -90,10 +92,12 @@
             {secondaryActionLabel}
           </Button>
         {/if}
-        {#if actionLabel && actionHref}
-          <Button href={actionHref} size="sm" disabled={actionDisabled}>
+        {#if actionLabel && actionOnclick}
+          <Button type="button" size="sm" disabled={actionDisabled} onclick={actionOnclick}>
             {actionLabel}
           </Button>
+        {:else if actionLabel && actionHref}
+          <Button href={actionHref} size="sm" disabled={actionDisabled}>{actionLabel}</Button>
         {/if}
       </div>
     {/if}

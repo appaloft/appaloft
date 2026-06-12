@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { Moon, Play, Sun } from "@lucide/svelte";
+  import { Moon, Sun } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Component, Snippet } from "svelte";
 
@@ -51,7 +51,6 @@
 
   let {
     title,
-    description,
     groupLabel,
     activePath,
     items,
@@ -155,11 +154,11 @@
   <SidebarInset>
     <header
       data-settings-shell-header
-      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md md:px-6"
+      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b pl-2 pr-3 backdrop-blur-md md:pl-3 md:pr-4"
     >
-      <div class="flex min-w-0 flex-1 items-center gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger />
-        <div class="min-w-0">
+        <div class="flex min-w-0 flex-1 items-center">
           {#if breadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
               <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
@@ -180,7 +179,6 @@
               </Breadcrumb.List>
             </Breadcrumb.Root>
           {/if}
-          <p class="truncate text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -196,10 +194,6 @@
           {:else}
             <Moon class="size-4" />
           {/if}
-        </Button>
-        <Button href="/deploy" size="sm" variant="outline">
-          <Play class="size-4" />
-          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
       </div>
     </header>

@@ -27,7 +27,7 @@ describe("Blueprint marketplace web URLs", () => {
         title: "PocketBase",
       }),
     ).toBe(
-      "https://app.example.test/deploy?source=blueprint&sourceExtension=blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&step=project&projectMode=new&projectName=PocketBase",
+      "https://app.example.test/?modal=quick-deploy&source=blueprint&sourceExtension=blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&step=project&projectMode=new&projectName=PocketBase",
     );
   });
 

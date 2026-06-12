@@ -20,7 +20,7 @@ describe("Blueprint deploy handoff URLs", () => {
         variant: "sqlite",
       }),
     ).toBe(
-      "https://app.appaloft.com/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&blueprintVariant=sqlite&blueprintProfile=production&step=project&projectMode=new&projectName=PocketBase",
+      "https://app.appaloft.com/?modal=quick-deploy&source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=pocketbase&blueprintTitle=PocketBase&blueprintVariant=sqlite&blueprintProfile=production&step=project&projectMode=new&projectName=PocketBase",
     );
   });
 
@@ -36,7 +36,7 @@ describe("Blueprint deploy handoff URLs", () => {
         step: "source",
       }),
     ).toBe(
-      "/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fexample.com%2Fappaloft.blueprint.yaml&blueprintTitle=Example+App&step=source&projectMode=new&projectName=Example+App",
+      "/?modal=quick-deploy&source=blueprint&blueprintUrl=https%3A%2F%2Fexample.com%2Fappaloft.blueprint.yaml&blueprintTitle=Example+App&step=source&projectMode=new&projectName=Example+App",
     );
   });
 
@@ -59,7 +59,7 @@ describe("Blueprint deploy handoff URLs", () => {
         },
       }),
     ).toBe(
-      "[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=n8n&blueprintTitle=n8n&step=project&projectMode=new&projectName=n8n)",
+      "[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/?modal=quick-deploy&source=blueprint&sourceExtension=cloud-blueprint-marketplace&blueprintSlug=n8n&blueprintTitle=n8n&step=project&projectMode=new&projectName=n8n)",
     );
   });
 });

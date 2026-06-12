@@ -27,32 +27,43 @@ describe("terminal session Web console surface", () => {
   test("[TERM-SESSION-ENTRY-002] exposes server terminal entrypoints from list and detail", async () => {
     const [serverListSource, serverDetailSource] = await Promise.all([
       readFile(new URL("../../routes/servers/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../../routes/servers/[serverId]/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../routes/servers/[serverId=consoleObjectId]/+page.svelte", import.meta.url),
+        "utf8",
+      ),
     ]);
 
     expect(serverListSource).toContain("serverTerminalHref");
-    expect(serverListSource).toContain("?tab=terminal");
+    expect(serverListSource).toContain("?tab=runtime&section=terminal");
     expect(serverListSource).toContain("i18nKeys.common.actions.openTerminal");
-    expect(serverDetailSource).toContain('value="terminal"');
+    expect(serverDetailSource).toContain('serverSectionHref("runtime", "terminal")');
+    expect(serverDetailSource).not.toContain('value="terminal"');
     expect(serverDetailSource).toContain("TerminalSessionPanel");
     expect(serverDetailSource).toContain('kind: "server"');
-    expect(serverDetailSource).toContain('serverTabHref("terminal")');
+    expect(serverDetailSource).not.toContain('serverTabHref("terminal")');
   });
 
   test("[TERM-SESSION-CMD-003] deep-links deployment detail to selected resource terminal", async () => {
     const [deploymentPageSource, resourcePageSource, utilsSource] = await Promise.all([
       readFile(
-        new URL("../../routes/deployments/[deploymentId]/+page.svelte", import.meta.url),
+        new URL(
+          "../../routes/deployments/[deploymentId=deploymentId]/+page.svelte",
+          import.meta.url,
+        ),
         "utf8",
       ),
       readFile(
-        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+        new URL(
+          "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+          import.meta.url,
+        ),
         "utf8",
       ),
       readFile(new URL("./utils.ts", import.meta.url), "utf8"),
     ]);
 
     expect(utilsSource).toContain("resourceTerminalHref");
+    expect(utilsSource).toContain('{ tab: "terminal" }');
     expect(utilsSource).toContain('params.set("deploymentId", deploymentId)');
     expect(deploymentPageSource).toContain("resourceTerminalHref");
     expect(deploymentPageSource).toContain("i18nKeys.common.actions.openTerminal");

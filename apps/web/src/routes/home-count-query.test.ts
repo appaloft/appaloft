@@ -55,7 +55,8 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("!hasWork");
     expect(homePageSource).toContain("<ConsoleEmptyState");
     expect(homePageSource).toContain('tone="deployment"');
-    expect(homePageSource).toContain('href="/deploy"');
+    expect(homePageSource).toContain('href="/?modal=quick-deploy"');
+    expect(homePageSource).not.toContain('href="/deploy"');
     expect(homePageSource).toContain("i18nKeys.console.home.emptyStateTitle");
     expect(homePageSource).toContain("i18nKeys.common.actions.quickDeploy");
   });
@@ -77,10 +78,16 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("nothing-side-stack");
     expect(homePageSource).toContain("i18nKeys.console.home.operationContextTitle");
     expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsTitle");
+    expect(homePageSource).toContain("data-home-deployment-rollup");
+    expect(homePageSource).toContain("nothing-deployment-rollup-list");
+    expect(homePageSource).toContain("nothing-deployment-rollup-row");
+    expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsReadModelGap");
     expect(homePageSource).toContain("deployments.slice(0, 5)");
     expect(homePageSource).toContain('class="nothing-side-link"');
     expect(homePageSource).toContain("orpcClient.servers.count({})");
     expect(homePageSource).toContain("orpcClient.deployments.count({})");
+    expect(homePageSource).not.toContain("nothing-activity-list");
+    expect(homePageSource).not.toContain("nothing-activity-row");
     expect(homePageSource).not.toContain("nothing-dashboard-grid");
     expect(homePageSource).not.toContain("nothing-ai-section");
   });

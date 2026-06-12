@@ -4533,7 +4533,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=blueprint-catalog.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=blueprint-catalog.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
     );
 
     await expectText(view, "Baserow");
@@ -4613,7 +4613,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
     );
 
     await expectText(view, "One-Click Docker Demo");
@@ -4664,7 +4664,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/deploy?source=blueprint&step=source`);
+    await view.navigate(`${previewUrl}/?modal=quick-deploy&source=blueprint&step=source`);
 
     await expectAnyText(view, ["No Blueprint selected", "尚未选择蓝图"]);
     await clickButtonByAnyText(view, ["Choose Blueprint", "选择蓝图"]);
@@ -4708,7 +4708,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectMode=new&serverId=srv_demo`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectMode=new&serverId=srv_demo`,
     );
 
     await waitFor(
@@ -4786,7 +4786,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&step=source`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&step=source`,
     );
 
     const renderedStateJson = await waitFor(
@@ -4834,7 +4834,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/marketplace/teable?returnTo=${encodeURIComponent("/deploy?sourceExtension=public-blueprints.quick-deploy-source")}`,
+      `${previewUrl}/marketplace/teable?returnTo=${encodeURIComponent("/?modal=quick-deploy&sourceExtension=public-blueprints.quick-deploy-source")}`,
     );
 
     const renderedStateJson = await waitFor(
@@ -4881,7 +4881,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectId=prj_demo&serverId=srv_demo&step=source`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectId=prj_demo&serverId=srv_demo&step=source`,
     );
 
     await setInputValue(
@@ -5059,9 +5059,9 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
 
       await view.navigate(
-        `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/new`,
+        `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo?modal=deployment`,
       );
-      await expectAnyText(view, ["Quick deploy", "快速部署"]);
+      await expectAnyText(view, ["Create deployment", "创建部署"]);
       await clickButtonByAnyText(view, ["Create deployment", "创建部署"]);
 
       const deploymentRequest = await waitForRecordedRequest("/api/deployments");
@@ -8016,6 +8016,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "Image digest", 15_000);
       await expectText(view, "latest -> sha256:8b1a9953c461");
       await expectAnyText(view, ["Overview", "基本信息"]);
+      await expectAnyText(view, ["Attempt snapshot", "Attempt 快照"]);
+      await expectAnyText(view, ["Attempt access snapshot", "Attempt 访问快照"]);
+      await expectAnyText(view, ["Current resource state", "当前资源状态"]);
+      await expectAnyText(view, ["Recovery readiness", "恢复就绪"]);
+
+      const overviewText = await pageText(view);
+      expect(overviewText).not.toContain("This deployment status is not recoverable.");
+      expect(overviewText).not.toContain("这个部署状态不可恢复。");
 
       const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
       const showInput = readOrpcJsonPayload(showRequest.body);
@@ -8051,6 +8059,14 @@ describe.serial("console e2e with Bun.WebView", () => {
         "Expected deployment detail diagnostic copy payload to be written through the desktop bridge",
       );
       await expectAnyText(view, ["Diagnostic JSON copied", "诊断 JSON 已复制"]);
+
+      await clickButtonByAnyText(view, ["Open recovery action", "打开恢复操作"]);
+      await expectAnyText(view, ["Choose recovery action", "选择恢复操作"]);
+      await clickButtonByAnyText(view, ["Retry", "重试"]);
+      await expectAnyText(view, [
+        "This deployment status is not recoverable.",
+        "这个部署状态不可恢复。",
+      ]);
 
       await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
       await expectText(view, "Application is ready for dep_demo");
@@ -9136,7 +9152,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "github-connected";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/deploy?source=github&githubMode=browser`);
+    await view.navigate(`${previewUrl}/?modal=quick-deploy&source=github&githubMode=browser`);
 
     await expectAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await expectText(view, "acme/platform");
@@ -9161,7 +9177,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "static-quick-deploy";
     resetRecordedApiRequests();
 
-    const deployState = new URL(`${previewUrl}/deploy`);
+    const deployState = new URL(`${previewUrl}/`);
+    deployState.searchParams.set("modal", "quick-deploy");
     deployState.searchParams.set("step", "review");
     deployState.searchParams.set("source", "remote-git");
     deployState.searchParams.set("sourceLocator", "https://github.com/acme/docs-site.git");
@@ -9250,7 +9267,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "static-quick-deploy";
     resetRecordedApiRequests();
 
-    const deployState = new URL(`${previewUrl}/deploy`);
+    const deployState = new URL(`${previewUrl}/`);
+    deployState.searchParams.set("modal", "quick-deploy");
     deployState.searchParams.set("step", "review");
     deployState.searchParams.set("source", "local-folder");
     deployState.searchParams.set("sourceLocator", "/workspace");

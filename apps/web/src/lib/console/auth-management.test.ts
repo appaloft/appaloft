@@ -172,6 +172,9 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("selectedOperatorWorkEvents");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.workerDurableRuntime");
+    expect(instancePageSource).toContain("applyUpgradeDialogOpen");
+    expect(instancePageSource).toContain("openApplyUpgradeDialog");
+    expect(instancePageSource).toContain("data-instance-apply-upgrade-dialog");
     expect(instancePageSource).toContain("worker.runtimeTopology");
     expect(instancePageSource).toContain("worker.runtimeTopology.heartbeat");
     expect(instancePageSource).toContain("observedRuntimeHeartbeats");
@@ -180,6 +183,49 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("workerRuntimeTopology");
     expect(instancePageSource).toContain("workerManagementTitle");
     expect(instancePageSource).toContain("workerWorkEventsTitle");
+    expect(instancePageSource).toContain("terminalSessionCloseDialogOpen");
+    expect(instancePageSource).toContain("terminalSessionsExpireDialogOpen");
+    expect(instancePageSource).toContain("openTerminalSessionCloseDialog");
+    expect(instancePageSource).toContain("openTerminalSessionsExpireDialog");
+    expect(instancePageSource).toContain("data-instance-terminal-close-dialog");
+    expect(instancePageSource).toContain("data-instance-terminal-expire-dialog");
+    expect(instancePageSource).not.toContain("requestConsoleConfirm");
+    const instanceSessionsSectionStart = instancePageSource.indexOf(
+      '{:else if activeSection === "sessions"}',
+    );
+    const instanceSessionsSectionSource = instancePageSource.slice(
+      instanceSessionsSectionStart,
+      instancePageSource.indexOf("{:else}", instanceSessionsSectionStart + 1),
+    );
+    const instanceOverviewSectionStart = instancePageSource.indexOf(
+      '{#if activeSection === "overview"}',
+    );
+    const instanceOverviewSectionSource = instancePageSource.slice(
+      instanceOverviewSectionStart,
+      instancePageSource.indexOf(
+        '{:else if activeSection === "workers"}',
+        instanceOverviewSectionStart,
+      ),
+    );
+    const instanceTerminalDialogSource = instancePageSource.slice(
+      instancePageSource.indexOf("data-instance-terminal-expire-dialog"),
+    );
+    const instanceApplyUpgradeDialogSource = instancePageSource.slice(
+      instancePageSource.indexOf("data-instance-apply-upgrade-dialog"),
+      instancePageSource.indexOf("data-instance-terminal-expire-dialog"),
+    );
+    expect(instanceOverviewSectionSource).toContain("onclick={openApplyUpgradeDialog}");
+    expect(instanceOverviewSectionSource).not.toContain("applyUpgradeMutation.mutate()");
+    expect(instanceApplyUpgradeDialogSource).toContain("onclick={confirmApplyUpgrade}");
+    expect(instanceApplyUpgradeDialogSource).toContain("upgradeCommand");
+    expect(instanceSessionsSectionSource).toContain("openTerminalSessionCloseDialog(session)");
+    expect(instanceSessionsSectionSource).toContain("openTerminalSessionsExpireDialog");
+    expect(instanceSessionsSectionSource).not.toContain("closeTerminalSession(session)");
+    expect(instanceSessionsSectionSource).not.toContain("expireOldTerminalSessions");
+    expect(instanceTerminalDialogSource).toContain(
+      "confirmCloseTerminalSession(selectedTerminalSession)",
+    );
+    expect(instanceTerminalDialogSource).toContain("onclick={confirmExpireTerminalSessions}");
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(contractsSource).toContain("currentCommitSha: z.string().optional()");
     expect(contractsSource).toContain("heartbeat");
@@ -297,7 +343,10 @@ describe("organization auth management console surface", () => {
     expect(layoutCssSource).toContain("margin: -1.5rem");
     expect(layoutCssSource).toContain("min-height: calc(100svh - 3.5rem)");
     expect(layoutCssSource).toContain(".console-subnav-layout > .console-subnav");
-    expect(layoutCssSource).toContain("padding: 0.5rem");
+    expect(layoutCssSource).toContain(".console-subnav-list");
+    expect(layoutCssSource).toContain("gap: 0");
+    expect(layoutCssSource).toContain(".console-subnav-item");
+    expect(layoutCssSource).toContain("padding: 0.625rem 0.875rem");
     expect(layoutCssSource).toContain("border-right-color: var(--sidebar-border)");
     expect(accountSessionsSource).toContain("orpcClient.account.listSessions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
@@ -379,6 +428,14 @@ describe("organization auth management console surface", () => {
       organizationTemplateSource.indexOf('{#if activeSection === "deploy-tokens"}'),
       organizationTemplateSource.indexOf('{#if activeSection === "danger-zone"}'),
     );
+    const memberRoleDialogSource = organizationTemplateSource.slice(
+      organizationTemplateSource.indexOf("<Dialog.Root bind:open={memberRoleDialogOpen}"),
+      organizationTemplateSource.indexOf("data-organization-owner-transfer-dialog"),
+    );
+    const ownerTransferDialogSource = organizationTemplateSource.slice(
+      organizationTemplateSource.indexOf("<Dialog.Root bind:open={ownerTransferDialogOpen}"),
+      organizationTemplateSource.indexOf("<Dialog.Root bind:open={deleteOrganizationDialogOpen}"),
+    );
     expect(profileSummarySource).toContain("focusTitle");
     expect(profileSummarySource).toContain("focusDescription");
     expect(profileSummarySource).toContain("console-metric-strip");
@@ -398,6 +455,21 @@ describe("organization auth management console surface", () => {
     expect(membersSectionSource).toContain("removedMembersTitle");
     expect(membersSectionSource).toContain("reactivateMember");
     expect(membersSectionSource).toContain("statusDeactivated");
+    expect(membersSectionSource).toContain("openMemberRoleDialog(member)");
+    expect(membersSectionSource).toContain("openOwnerTransferDialog(member)");
+    expect(membersSectionSource).not.toContain("bind:value={roleDrafts");
+    expect(membersSectionSource).not.toContain("bind:value={ownerTransferDrafts");
+    expect(membersSectionSource).not.toContain("<Select.Root");
+    expect(memberRoleDialogSource).toContain("onsubmit={submitMemberRole}");
+    expect(memberRoleDialogSource).toContain(
+      "bind:value={roleDrafts[selectedMemberRoleMember.memberId]}",
+    );
+    expect(memberRoleDialogSource).toContain("memberRoleOptions");
+    expect(ownerTransferDialogSource).toContain("onsubmit={submitOwnerTransfer}");
+    expect(ownerTransferDialogSource).toContain(
+      "bind:value={ownerTransferDrafts[selectedOwnerTransferMember.memberId]}",
+    );
+    expect(ownerTransferDialogSource).toContain("ownerTransferCandidates");
     expect(invitationsSectionSource).toContain("openInviteDialog");
     expect(invitationsSectionSource).toContain('tone="invitation"');
     expect(invitationsSectionSource).toContain("emptyInvitationsTitle");
@@ -447,7 +519,10 @@ describe("organization auth management console surface", () => {
     expect(consoleExtensionPageSource).toContain("{pageDocument.description}");
     expect(consoleExtensionPageSource).toContain("pageDocument.actions");
     expect(consoleExtensionPageSource).toContain("data-console-page-table-body");
-    expect(consoleExtensionPageSource).toContain('class="border-t px-5"');
+    expect(consoleExtensionPageSource).toContain("data-console-page-record-list");
+    expect(consoleExtensionPageSource).toContain("data-console-page-record-row");
+    expect(consoleExtensionPageSource).not.toContain("<Table.Root");
+    expect(consoleExtensionPageSource).not.toContain('from "$lib/components/ui/table"');
     expect(userMenuSource).toContain('navigateTo("/account/profile")');
     expect(userMenuSource).not.toContain('navigateTo("/account/security")');
     expect(clientContractSource).toContain("account: {");

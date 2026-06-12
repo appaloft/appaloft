@@ -19,7 +19,6 @@
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import * as Table from "$lib/components/ui/table";
   import {
     findConsolePageExtensionByPath,
     readConsolePageExtensionMetadata,
@@ -776,52 +775,52 @@
               {/if}
             </div>
             {#if section.rows.length > 0}
-              <div class="border-t px-5" data-console-page-table-body>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      {#each section.columns as column (column.key)}
-                        <Table.Head class={column.align === "right" ? "text-right" : ""}>
-                          {column.label}
-                        </Table.Head>
-                      {/each}
-                      {#if section.rows.some((row) => row.details)}
-                        <Table.Head class="text-right"></Table.Head>
-                      {/if}
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {#each section.rows as row, rowIndex (rowIndex)}
-                      <Table.Row>
+              <div class="border-t p-5" data-console-page-table-body>
+                <div class="console-record-list" data-console-page-record-list>
+                  {#each section.rows as row, rowIndex (rowIndex)}
+                    <article
+                      class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
+                      data-console-page-record-row
+                    >
+                      <dl class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {#each section.columns as column (column.key)}
                           {@const cell = readTableCell(row, column.key)}
-                          <Table.Cell
+                          <div
                             class={[
-                              column.align === "right" ? "text-right tabular-nums" : "",
-                              toneClass(cell.tone),
+                              "min-w-0",
+                              column.align === "right" ? "sm:text-right" : "",
                             ]}
                           >
-                            {cell.text}
-                          </Table.Cell>
+                            <dt class="text-xs font-medium text-muted-foreground">
+                              {column.label}
+                            </dt>
+                            <dd
+                              class={[
+                                "mt-1 truncate text-sm font-medium",
+                                column.align === "right" ? "tabular-nums" : "",
+                                toneClass(cell.tone),
+                              ]}
+                              title={cell.text}
+                            >
+                              {cell.text}
+                            </dd>
+                          </div>
                         {/each}
-                        {#if section.rows.some((candidate) => candidate.details)}
-                          <Table.Cell class="text-right">
-                            {#if row.details}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onclick={() => openTableDetails(row.details)}
-                              >
-                                {row.details.label}
-                              </Button>
-                            {/if}
-                          </Table.Cell>
-                        {/if}
-                      </Table.Row>
-                    {/each}
-                  </Table.Body>
-                </Table.Root>
+                      </dl>
+                      {#if row.details}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          class="justify-self-start lg:justify-self-end"
+                          onclick={() => openTableDetails(row.details)}
+                        >
+                          {row.details.label}
+                        </Button>
+                      {/if}
+                    </article>
+                  {/each}
+                </div>
               </div>
             {:else}
               <div class="border-t p-5 text-sm text-muted-foreground">

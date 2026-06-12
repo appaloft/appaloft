@@ -10,38 +10,6 @@ const resourceSourceOptionSource = readFileSync(
   fileURLToPath(new URL("./ResourceSourceOption.svelte", import.meta.url)),
   "utf8",
 );
-const serverRegistrationFormSource = readFileSync(
-  fileURLToPath(new URL("./ServerRegistrationForm.svelte", import.meta.url)),
-  "utf8",
-);
-const consoleLayoutCssSource = readFileSync(
-  fileURLToPath(new URL("../../../routes/layout.css", import.meta.url)),
-  "utf8",
-);
-const deployPageSource = readFileSync(
-  fileURLToPath(new URL("../../../routes/deploy/+page.svelte", import.meta.url)),
-  "utf8",
-);
-const projectDetailPageSource = readFileSync(
-  fileURLToPath(new URL("../../../routes/projects/[projectId]/+page.svelte", import.meta.url)),
-  "utf8",
-);
-const legacyResourceCreatePageSource = readFileSync(
-  fileURLToPath(
-    new URL("../../../routes/projects/[projectId]/resources/new/+page.svelte", import.meta.url),
-  ),
-  "utf8",
-);
-const legacyResourceCreateRouteSource = readFileSync(
-  fileURLToPath(
-    new URL("../../../routes/projects/[projectId]/resources/new/+page.ts", import.meta.url),
-  ),
-  "utf8",
-);
-const consoleUtilsSource = readFileSync(
-  fileURLToPath(new URL("../../console/utils.ts", import.meta.url)),
-  "utf8",
-);
 
 describe("QuickDeploySheet structure", () => {
   test("[QUICK-DEPLOY-UX-001] keeps the lower quick deploy section scoped to variables", () => {
@@ -68,34 +36,21 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain('class="w-full"');
   });
 
-  test("[QUICK-DEPLOY-UX-002B] opens project quick deploy as a URL-addressable locked modal", () => {
+  test("[QUICK-DEPLOY-UX-002B] keeps modal state URL-addressable inside QuickDeploySheet", () => {
     expect(quickDeploySheetSource).toContain("lockedProjectId");
     expect(quickDeploySheetSource).toContain('setSearchParam(params, "modal", stateModal)');
-    expect(quickDeploySheetSource).toContain('url.pathname = statePath || "/deploy"');
+    expect(quickDeploySheetSource).toContain('statePath = "/"');
+    expect(quickDeploySheetSource).toContain('stateBaseSearch = ""');
+    expect(quickDeploySheetSource).toContain('stateModal = "quick-deploy"');
+    expect(quickDeploySheetSource).toContain('url.pathname = statePath || "/"');
+    expect(quickDeploySheetSource).toContain("url.search = stateBaseSearch");
     expect(quickDeploySheetSource).toContain(
       'setSearchParam(params, "projectMode", lockedProjectId ? "existing" : projectMode, "existing")',
     );
     expect(quickDeploySheetSource).toContain("selectedProjectId = lockedProjectId");
-    expect(projectDetailPageSource).toContain('modalIsOpen(page, "quick-deploy")');
-    expect(projectDetailPageSource).toContain("projectQuickDeployHref(project.id)");
-    expect(projectDetailPageSource).toContain("<Dialog.Root bind:open={quickDeployDialogOpen}");
-    expect(projectDetailPageSource).toContain("<QuickDeploySheet");
-    expect(projectDetailPageSource).toContain("lockedProjectId={project.id}");
-    expect(projectDetailPageSource).not.toContain("projectCreateResourceHref(project.id)");
-    expect(consoleUtilsSource).toContain("projectQuickDeployHref");
-    expect(consoleUtilsSource).toContain('modal: "quick-deploy"');
-    expect(consoleUtilsSource).not.toContain("/resources/new");
-    expect(legacyResourceCreateRouteSource).toContain('searchParams.set("modal", "quick-deploy")');
-    expect(legacyResourceCreateRouteSource).toContain(
-      'searchParams.set("projectMode", "existing")',
-    );
-    expect(legacyResourceCreateRouteSource).toContain("throw redirect");
-    expect(legacyResourceCreatePageSource).not.toContain("CreateResourceInput");
-    expect(legacyResourceCreatePageSource).not.toContain("ResourceSourceOption");
   });
 
-  test("[QUICK-DEPLOY-UX-003] keeps the deploy entry readable at constrained console widths", () => {
-    expect(deployPageSource).toContain('<ConsoleResourceCanvas class="max-w-6xl">');
+  test("[QUICK-DEPLOY-UX-003] keeps the source picker readable at constrained console widths", () => {
     expect(quickDeploySheetSource).toContain("lg:grid-cols-[minmax(0,1fr)_20rem]");
     expect(quickDeploySheetSource).not.toContain("md:grid-cols-[minmax(0,1fr)_20rem]");
     expect(quickDeploySheetSource).toContain("grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4");
@@ -231,9 +186,7 @@ describe("QuickDeploySheet structure", () => {
     );
   });
 
-  test("[QD-CHOICE-LIST-001] keeps selectable object lists on Tailwind white and blue surfaces", () => {
-    expect(consoleLayoutCssSource).not.toContain(".console-choice-list");
-    expect(consoleLayoutCssSource).not.toContain(".console-choice-item");
+  test("[QD-CHOICE-LIST-001] keeps quick deploy selectable object lists on Tailwind white and blue surfaces", () => {
     expect(quickDeploySheetSource).toContain("rounded-md border border-input bg-card p-2");
     expect(quickDeploySheetSource).toContain("bg-card text-foreground");
     expect(quickDeploySheetSource).toContain("hover:bg-primary/5");
@@ -252,11 +205,6 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain(
       'variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}',
     );
-    expect(serverRegistrationFormSource).toContain("rounded-md border border-input bg-card p-2");
-    expect(serverRegistrationFormSource).toContain("hover:bg-primary/5");
-    expect(serverRegistrationFormSource).toContain("data-[selected=true]:bg-primary/5");
-    expect(serverRegistrationFormSource).not.toContain("console-choice-list");
-    expect(serverRegistrationFormSource).not.toContain("console-choice-item");
   });
 
   test("[QD-STATIC-001] treats static sites as uploaded artifacts with optional server hosting", () => {
@@ -280,6 +228,7 @@ describe("QuickDeploySheet structure", () => {
   });
 
   test("[QD-SOURCE-VERSION-001] exposes optional Git and Docker source version inputs", () => {
+    expect(quickDeploySheetSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(quickDeploySheetSource).toContain("gitSourceVersionKinds");
     expect(quickDeploySheetSource).toContain('"commit-sha"');
     expect(quickDeploySheetSource).toContain("dockerSourceVersionKinds");
@@ -292,5 +241,13 @@ describe("QuickDeploySheet structure", () => {
     );
     expect(quickDeploySheetSource).toContain("requestedSourceVersionInput");
     expect(quickDeploySheetSource).toContain("...requestedVersion");
+    expect(quickDeploySheetSource).toContain(
+      '<Select.Root bind:value={sourceVersionKind} type="single">',
+    );
+    expect(quickDeploySheetSource).toContain(
+      '<Select.Root bind:value={selectedBlueprintVariant} type="single">',
+    );
+    expect(quickDeploySheetSource).not.toContain("<select");
+    expect(quickDeploySheetSource).not.toContain("<option");
   });
 });

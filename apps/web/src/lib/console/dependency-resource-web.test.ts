@@ -13,11 +13,13 @@ describe("dependency resource Web console surface", () => {
       environmentCreateFormSource,
       serverCreateFormSource,
       projectsPageSource,
-      serverCreatePageSource,
-      quickDeploySource,
+      serversPageSource,
     ] = await Promise.all([
       readFile(
-        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+        new URL(
+          "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+          import.meta.url,
+        ),
         "utf8",
       ),
       readFile(new URL("../../routes/dependency-resources/+page.svelte", import.meta.url), "utf8"),
@@ -32,26 +34,25 @@ describe("dependency resource Web console surface", () => {
       ),
       readFile(new URL("../components/console/ServerCreateForm.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/projects/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../../routes/servers/new/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/servers/+page.svelte", import.meta.url), "utf8"),
     ]);
 
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.list");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.provision");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.import");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.rename");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.delete");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.createBackup");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.listBackups");
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.restoreBackup");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.provision");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.import");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.rename");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.delete");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.createBackup");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.listBackups");
+    expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.restoreBackup");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.list");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.bind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.unbind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.rotateSecret");
-    expect(resourcePageSource).toContain("dependencyRenameNames");
-    expect(resourcePageSource).toContain("dependencyImportConnectionUrl");
-    expect(resourcePageSource).toContain("dependencyRestoreAcknowledgeDataOverwrite");
-    expect(resourcePageSource).toContain("dependencyResources.length === 1");
+    expect(resourcePageSource).not.toContain("dependencyRenameNames");
+    expect(resourcePageSource).not.toContain("dependencyImportConnectionUrl");
+    expect(resourcePageSource).not.toContain("dependencyRestoreAcknowledgeDataOverwrite");
+    expect(resourcePageSource).not.toContain("dependencyResources.length === 1");
     expect(resourcePageSource).toContain("bindableDependencyResources.length === 1");
     expect(resourcePageSource).toContain(
       'const resourceDependenciesSections = ["dependencies", "storage"] as const;',
@@ -112,6 +113,13 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain(
       "orpcClient.dependencyResources.provisioning.accept",
     );
+    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.createBackup");
+    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.listBackups");
+    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.restoreBackup");
+    expect(dependencyResourcePageSource).toContain(
+      "orpcClient.dependencyResources.configureBackupPolicy",
+    );
+    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.delete");
     expect(dependencyResourcePageSource).toContain(
       'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
     );
@@ -124,6 +132,19 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain("projectCreateDialogOpen");
     expect(dependencyResourcePageSource).toContain("environmentCreateDialogOpen");
     expect(dependencyResourcePageSource).toContain("serverCreateDialogOpen");
+    expect(dependencyResourcePageSource).toContain("backupCreateDialogOpen");
+    expect(dependencyResourcePageSource).toContain(
+      "openBackupCreateDialog(selectedDependencyResource)",
+    );
+    expect(dependencyResourcePageSource).toContain("data-dependency-resource-backup-create-dialog");
+    expect(dependencyResourcePageSource).toContain("function confirmBackupResource(): void");
+    expect(dependencyResourcePageSource).toContain(
+      "createBackupMutation.mutate(selectedDependencyResource.id)",
+    );
+    expect(dependencyResourcePageSource).not.toContain("backupResource(resource)");
+    expect(dependencyResourcePageSource).not.toContain(
+      "backupResource(selectedDependencyResource)",
+    );
     expect(dependencyResourcePageSource).toContain("openEnvironmentAfterProjectCreate");
     expect(dependencyResourcePageSource).toContain("onclick={openProjectCreateDialog}");
     expect(dependencyResourcePageSource).toContain("onclick={openEnvironmentCreateDialog}");
@@ -138,8 +159,9 @@ describe("dependency resource Web console surface", () => {
       "<Select.Content class={dependencyResourceSelectContentClass}>",
     );
     expect(dependencyResourcePageSource).toContain("class={dependencyResourceNestedDialogClass}");
+    const nestedDialogClassInterpolation = "$" + "{dependencyResourceNestedDialogClass}";
     expect(dependencyResourcePageSource).toContain(
-      "class={`max-w-5xl ${dependencyResourceNestedDialogClass}`}",
+      `class={\`max-w-5xl ${nestedDialogClassInterpolation}\`}`,
     );
     expect(dependencyResourcePageSource).toContain(
       "aria-label={$t(i18nKeys.console.dependencyResources.selectProject)}",
@@ -221,11 +243,13 @@ describe("dependency resource Web console surface", () => {
     expect(projectsPageSource).toContain("onOpenChange={setProjectCreateDialogOpen}");
     expect(projectsPageSource).toContain("ConsoleEmptyState");
     expect(projectsPageSource).toContain("onCreated={openCreatedProject}");
-    expect(serverCreatePageSource).toContain(
+    expect(serversPageSource).toContain(
       'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
     );
-    expect(serverCreatePageSource).toContain("<ServerCreateForm showSuccessLink />");
-    expect(quickDeploySource).toContain('from "$lib/console/environment-form"');
+    expect(serversPageSource).toContain('modalIsOpen(page, "create-server")');
+    expect(serversPageSource).toContain("bind:open={serverCreateDialogOpen}");
+    expect(serversPageSource).toContain("onOpenChange={setServerCreateDialogOpen}");
+    expect(serversPageSource).toContain("onCreated={openCreatedServer}");
   });
 
   test("[DEP-RES-WEB-001] points dependency help at public lifecycle anchors", () => {

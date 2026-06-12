@@ -7,7 +7,10 @@ describe("storage volume Web console surface", () => {
   test("[STOR-WEB-001] [STOR-WEB-002] [STOR-WEB-003] exposes resource storage through shared oRPC contracts", async () => {
     const [resourcePageSource, clientContractSource] = await Promise.all([
       readFile(
-        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+        new URL(
+          "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+          import.meta.url,
+        ),
         "utf8",
       ),
       readFile(
@@ -19,7 +22,7 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.list");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.create");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.rename");
-    expect(resourcePageSource).toContain("orpcClient.storageVolumes.delete");
+    expect(resourcePageSource).not.toContain("orpcClient.storageVolumes.delete");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.cleanupRuntime");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.plan");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.create");
@@ -27,7 +30,7 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.restore");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.prune");
     expect(resourcePageSource).toContain("orpcClient.resources.attachStorage");
-    expect(resourcePageSource).toContain("orpcClient.resources.detachStorage");
+    expect(resourcePageSource).not.toContain("orpcClient.resources.detachStorage");
     expect(resourcePageSource).toContain("resourceStorageAttachments");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.storageTitle");
     expect(resourcePageSource).toContain("storageAttachmentApplicationDataLabel(attachment)");
@@ -65,9 +68,25 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).not.toContain(
       "i18nKeys.console.resources.storageRuntimeCleanupTitle",
     );
+    const resourceStorageSource = resourcePageSource.slice(
+      resourcePageSource.indexOf('id="resource-storage"'),
+      resourcePageSource.indexOf('id="resource-diagnostics"'),
+    );
+    expect(resourceStorageSource).not.toContain("<form");
+    expect(resourceStorageSource).not.toContain("<Input");
+    expect(resourceStorageSource).not.toContain("<Select.Root");
+    expect(resourceStorageSource).not.toContain('type="submit"');
+    expect(resourceStorageSource).not.toContain("openStorageBackupDialog");
+    expect(resourceStorageSource).not.toContain("openStorageRuntimeCleanupDialog");
+    expect(resourceStorageSource).not.toContain("storageBackupPlanAction");
+    expect(resourceStorageSource).not.toContain("storageBackupCreateAction");
+    expect(resourceStorageSource).not.toContain("storageBackupRestoreAction");
+    expect(resourceStorageSource).not.toContain("storageBackupPruneAction");
+    expect(resourceStorageSource).not.toContain("storageRuntimeCleanupApplyAction");
+    expect(resourceStorageSource).not.toContain("storageRuntimeCleanupPreviewAction");
     expect(resourcePageSource).toContain("cleanupStorageRuntimeMutation");
     expect(resourcePageSource).toContain("cleanupStorageRuntime(true)");
-    expect(resourcePageSource).toContain("cleanupStorageRuntime(false)");
+    expect(resourcePageSource).not.toContain("cleanupStorageRuntime(false)");
     expect(clientContractSource).toContain("create: Client");
     expect(clientContractSource).toContain("rename: Client");
     expect(clientContractSource).toContain("delete: Client");

@@ -57,13 +57,22 @@ describe("runtime usage console readback", () => {
           new URL("../components/console/RuntimeMonitorPanel.svelte", import.meta.url),
           "utf8",
         ),
-        readFile(new URL("../../routes/servers/[serverId]/+page.svelte", import.meta.url), "utf8"),
         readFile(
-          new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+          new URL("../../routes/servers/[serverId=consoleObjectId]/+page.svelte", import.meta.url),
           "utf8",
         ),
         readFile(
-          new URL("../../routes/projects/[projectId]/+page.svelte", import.meta.url),
+          new URL(
+            "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
       ]);
@@ -81,9 +90,14 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("rollupContributorsTitle");
     expect(monitorSource).toContain("thresholds");
     expect(monitorSource).toContain("thresholdConfigure");
+    expect(monitorSource).toContain("thresholdDialogOpen");
+    expect(monitorSource).toContain("data-runtime-threshold-dialog");
     expect(monitorSource).toContain("openLogs");
     expect(monitorSource).toContain("refreshNow");
     expect(monitorSource).toContain("onTimeRangeChange");
+    expect(monitorSource).toContain("aria-pressed={timeRange === option}");
+    expect(monitorSource).toContain("onclick={() => selectTimeRange(option)}");
+    expect(monitorSource).not.toContain("<select");
     expect(componentSource).toContain("runtimeUsageInspect");
     expect(serverSource).toContain("RuntimeMonitorPanel");
     expect(serverSource).toContain('"monitor"');
@@ -101,11 +115,42 @@ describe("runtime usage console readback", () => {
     expect(resourceSource).toContain("runtimeMonitoringThresholdsQueryOptions");
     expect(resourceSource).toContain("runtimeMonitoringTimeRange");
     expect(resourceSource).toContain("refreshRuntimeMonitor");
+    expect(resourceSource).toContain('activeTab === "monitor"');
+    expect(resourceSource).toContain(
+      "runtimeUsageQueryOptions(resourceRuntimeScope, resourceRuntimeMonitorEnabled)",
+    );
+    expect(resourceSource).toContain(
+      "runtimeMonitoringThresholdsQueryOptions(resourceRuntimeScope, resourceRuntimeMonitorEnabled)",
+    );
+    expect(resourceSource).not.toContain(
+      "runtimeUsageQueryOptions(resourceRuntimeScope, browser && resourceId.length > 0)",
+    );
     expect(projectSource).toContain('kind: "project"');
     expect(projectSource).toContain('kind: "environment"');
     expect(projectSource).toContain("runtimeMonitoringRollupQueryOptions");
     expect(projectSource).toContain("projectRuntimeMonitoringRollupQuery");
     expect(projectSource).toContain("environmentRuntimeMonitoringRollupQuery");
+
+    const thresholdDisplaySource =
+      monitorSource.match(
+        /<div class="mt-4 rounded-md border bg-muted\/20 p-3">[\s\S]*?<\/section>/,
+      )?.[0] ?? "";
+    const thresholdDialogSource =
+      monitorSource.match(
+        /<Dialog\.Root bind:open={thresholdDialogOpen}[\s\S]*?data-runtime-threshold-dialog[\s\S]*?<\/Dialog\.Root>/,
+      )?.[0] ?? "";
+
+    expect(thresholdDisplaySource).toContain("setThresholdDialogOpen(true)");
+    expect(thresholdDisplaySource).toContain("configuredThresholdRuleSummaries");
+    expect(thresholdDisplaySource).not.toContain("<Select.Root");
+    expect(thresholdDisplaySource).not.toContain("<form");
+    expect(thresholdDisplaySource).not.toContain("<Input");
+    expect(thresholdDisplaySource).not.toContain("onsubmit={configureThresholdPolicy}");
+    expect(thresholdDisplaySource).not.toContain('type="submit"');
+    expect(thresholdDialogSource).toContain("<form");
+    expect(thresholdDialogSource).toContain("<Input");
+    expect(thresholdDialogSource).toContain("onsubmit={configureThresholdPolicy}");
+    expect(thresholdDialogSource).toContain('type="submit"');
   });
 
   test("[RT-MON-005] Monitor links to logs diagnostics and cleanup without storing log lines", async () => {
@@ -115,9 +160,15 @@ describe("runtime usage console readback", () => {
           new URL("../components/console/RuntimeMonitorPanel.svelte", import.meta.url),
           "utf8",
         ),
-        readFile(new URL("../../routes/servers/[serverId]/+page.svelte", import.meta.url), "utf8"),
         readFile(
-          new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+          new URL("../../routes/servers/[serverId=consoleObjectId]/+page.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
         readFile(
@@ -141,6 +192,8 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("href={observationLinks.logs}");
     expect(monitorSource).toContain("href={observationLinks.diagnostics}");
     expect(monitorSource).toContain("href={observationLinks.cleanup}");
+    expect(monitorSource).toContain("<Settings2");
+    expect(monitorSource).not.toContain("<Trash2");
     expect(monitorSource).not.toContain("eventsHref?: string");
     expect(monitorSource).not.toContain("capacityHref?: string");
     expect(monitorSource).not.toContain("runtimeLogs");
@@ -153,12 +206,10 @@ describe("runtime usage console readback", () => {
     expect(serverSource).toContain("orpcClient.servers.capacity.inspect");
     expect(serverSource).toContain("orpcClient.servers.capacity.prune");
     expect(serverSource).toContain("capacityPruneBefore = handoff.to");
-    expect(resourceSource).toContain('logsHref={resourceSettingsSectionHref("logs")}');
+    expect(resourceSource).toContain('logsHref={resourceTabHref("logs")}');
     expect(resourceSource).not.toContain('eventsHref={resourceTabHref("deployments")}');
-    expect(resourceSource).toContain(
-      'diagnosticsHref={resourceSettingsSectionHref("diagnostics")}',
-    );
-    expect(resourceSource).toContain('cleanupHref={resourceSettingsSectionHref("storage")}');
+    expect(resourceSource).toContain('diagnosticsHref={resourceSectionHref("diagnostics")}');
+    expect(resourceSource).toContain('cleanupHref={resourceSectionHref("storage")}');
     expect(serverSource).toContain("serverRuntimeMonitoringObservationHandoff");
     expect(serverSource).toContain("serverDeploymentsInObservationWindow");
     expect(resourceSource).toContain("resourceRuntimeMonitoringObservationHandoff");
@@ -252,6 +303,7 @@ describe("runtime usage console readback", () => {
     expect(url.pathname).toBe("/resources/res_demo");
     expect(url.hash).toBe("#tail");
     expect(url.searchParams.get("tab")).toBe("logs");
+    expect(url.searchParams.get("section")).toBeNull();
     expect(url.searchParams.get("runtimeMonitoringFrom")).toBe("2026-05-13T00:00:00.000Z");
     expect(url.searchParams.get("runtimeMonitoringTo")).toBe("2026-05-13T01:00:00.000Z");
     expect(url.searchParams.get("runtimeMonitoringScopeKind")).toBe("resource");

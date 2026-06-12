@@ -6,7 +6,10 @@ describe("project detail page structure", () => {
     const [projectSource, i18nKeysSource, englishLocaleSource, chineseLocaleSource] =
       await Promise.all([
         readFile(
-          new URL("../../routes/projects/[projectId]/+page.svelte", import.meta.url),
+          new URL(
+            "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
           "utf8",
         ),
         readFile(new URL("../../../../../packages/i18n/src/keys.ts", import.meta.url), "utf8"),
@@ -25,7 +28,21 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("projectNextAction");
     expect(projectSource).toContain("nonEmptyProjectResourceGroups");
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
+    expect(projectSource).toContain('<div class="console-detail-page">');
+    expect(projectSource).toContain(
+      '<Tabs.Root value={activeProjectTab} class="console-detail-body">',
+    );
+    expect(projectSource).toContain("console-detail-tab-panel console-detail-tab-panel-scroll");
+    expect(projectSource).not.toContain('<div class="space-y-0">');
+    expect(projectSource).not.toContain('<Tabs.Root value={activeProjectTab} class="space-y-6">');
     expect(projectSource).toContain("EnvironmentCreateForm");
+    expect(projectSource).toContain('import * as Select from "$lib/components/ui/select"');
+    expect(projectSource).toContain("data-project-monitor-environment-select");
+    expect(projectSource).toContain("data-project-resource-environment-filter");
+    expect(projectSource).toContain("<Select.Root bind:value={selectedMonitoringEnvironmentId}");
+    expect(projectSource).toContain("<Select.Root bind:value={resourceEnvironmentFilter}");
+    expect(projectSource).not.toContain("<select");
+    expect(projectSource).not.toContain("<option");
     expect(projectSource).toContain("projectRenameDialogOpen");
     expect(projectSource).toContain("environmentRenameDialogOpen");
     expect(projectSource).toContain("environmentCloneDialogOpen");
