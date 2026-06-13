@@ -1455,7 +1455,7 @@
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    安装 snapshot 还没有资源 readback。等待 install worker 完成，或刷新安装状态。
+                    创建的资源还没有返回。等待安装完成，或刷新安装状态。
                   </div>
                 {/each}
               </section>
@@ -1497,7 +1497,7 @@
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    这个安装结果没有依赖资源 readback；无依赖或仍在等待 install worker。
+                    这个安装结果没有依赖资源；可能不需要依赖，或仍在安装中。
                   </div>
                 {/each}
               </section>
@@ -1554,7 +1554,7 @@
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    当前安装进度没有组件部署。等待 install worker 或刷新状态。
+                    当前安装进度没有组件部署。等待安装继续，或刷新状态。
                   </div>
                 {/each}
               </section>
@@ -1626,7 +1626,7 @@
                   </Button>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    Installed Application readback 暂不可用；先打开资源或部署记录继续观察。
+                    安装详情暂时还不能打开。可以先查看资源或部署记录。
                   </div>
                 {/if}
                 <Button href="/projects" variant="outline" class="w-full">

@@ -364,6 +364,21 @@ function svelteSources(rootPath: string): Array<{ path: string; source: string }
   return entries;
 }
 
+function literalTextMatches(source: string, pattern: RegExp): string[] {
+  const matches: string[] = [];
+  const literalPattern = /(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
+
+  for (const literal of source.matchAll(literalPattern)) {
+    const text = literal[2] ?? "";
+    const match = text.match(pattern);
+    if (match) {
+      matches.push(match[0]);
+    }
+  }
+
+  return matches;
+}
+
 function functionBody(source: string, signature: string): string {
   const startIndex = source.indexOf(signature);
   if (startIndex < 0) {
@@ -463,6 +478,43 @@ describe("console page structure", () => {
       );
 
     expect(componentFormsOutsideDialogs).toEqual([]);
+  });
+
+  test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
+    const forbiddenVisibleCopyPattern =
+      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|danger flow|blocker\/check)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot/iu;
+    const visibleCopyFiles = [
+      ...routePageSources(routesRootPath),
+      {
+        path: fileURLToPath(
+          new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),
+        ),
+        source: readFileSync(
+          fileURLToPath(
+            new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),
+          ),
+          "utf8",
+        ),
+      },
+      {
+        path: fileURLToPath(
+          new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url),
+        ),
+        source: readFileSync(
+          fileURLToPath(
+            new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url),
+          ),
+          "utf8",
+        ),
+      },
+    ];
+    const internalVisibleCopy = visibleCopyFiles.flatMap(({ path, source }) =>
+      literalTextMatches(source, forbiddenVisibleCopyPattern).map(
+        (match) => `${path.replace(routesRootPath, "routes")}: ${match}`,
+      ),
+    );
+
+    expect(internalVisibleCopy).toEqual([]);
   });
 
   test("[PROJECT-DEPLOYMENT-IA-002] opens project deployment actions in context instead of legacy pages", () => {
@@ -2056,9 +2108,7 @@ describe("console page structure", () => {
     expect(marketplaceBlueprintDetailPageSource).toContain("打开公开 URL");
     expect(marketplaceBlueprintDetailPageSource).toContain("查看安装聚合");
     expect(marketplaceBlueprintDetailPageSource).toContain("/installed-applications/");
-    expect(marketplaceBlueprintDetailPageSource).toContain(
-      "Installed Application readback 暂不可用",
-    );
+    expect(marketplaceBlueprintDetailPageSource).toContain("安装详情暂时还不能打开");
     expect(marketplaceBlueprintDetailPageSource).not.toContain(
       "Installed Application detail route 仍是 route gap",
     );
@@ -2084,7 +2134,7 @@ describe("console page structure", () => {
     expect(installHandoffSource).toContain("打开最新部署");
     expect(installHandoffSource).toContain("查看安装聚合");
     expect(installHandoffSource).toContain("打开项目列表");
-    expect(installHandoffSource).toContain("Installed Application readback 暂不可用");
+    expect(installHandoffSource).toContain("安装详情暂时还不能打开");
     expect(installHandoffSource).not.toContain("<Input");
     expect(installHandoffSource).not.toContain("<select");
     expect(installHandoffSource).not.toContain("data-blueprint-install-secret-inputs");
@@ -2142,7 +2192,7 @@ describe("console page structure", () => {
     expect(installedApplicationDetailPageSource).toContain("resourceDetailHref");
     expect(installedApplicationDetailPageSource).toContain("dependencyResourceHref");
     expect(installedApplicationDetailPageSource).toContain("deploymentHref");
-    expect(installedApplicationDetailPageSource).toContain("Upgrade、rollback 和 uninstall");
+    expect(installedApplicationDetailPageSource).toContain("升级、回滚和卸载");
     expect(installedApplicationDetailPageSource).toContain("不在默认页展示表单");
     expect(installedApplicationDetailPageSource).toContain("概览");
     expect(installedApplicationDetailPageSource).toContain("资源");
@@ -2212,8 +2262,8 @@ describe("console page structure", () => {
     expect(installedApplicationHistoryTab).toContain(
       "data-installed-application-uninstall-governance",
     );
-    expect(installedApplicationHistoryTab).toContain("blueprint diff");
-    expect(installedApplicationHistoryTab).toContain("blocker/check");
+    expect(installedApplicationHistoryTab).toContain("版本差异");
+    expect(installedApplicationHistoryTab).toContain("强确认");
     expect(installedApplicationDisplaySurface).toContain("打开项目");
     expect(installedApplicationDisplaySurface).toContain("打开首个资源");
     expect(installedApplicationDisplaySurface).toContain("打开治理");

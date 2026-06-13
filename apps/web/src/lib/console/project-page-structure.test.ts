@@ -58,7 +58,7 @@ describe("project detail page structure", () => {
     expect(projectSource).not.toContain(`id={\`environment-clone-form-\${environment.id}\`}`);
     expect(i18nKeysSource).toContain('activityTitle: "console:projects.activityTitle"');
     expect(i18nKeysSource).toContain('healthSummaryGap: "console:projects.healthSummaryGap"');
-    expect(englishLocaleSource).toContain("Activity read model gap");
-    expect(chineseLocaleSource).toContain("Activity read model 缺口");
+    expect(englishLocaleSource).toContain("Project activity is not available yet");
+    expect(chineseLocaleSource).toContain("项目活动暂不可用");
   });
 });

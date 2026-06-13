@@ -442,7 +442,7 @@
                   <div class="console-subtle-panel px-3 py-2 text-sm">
                     <p class="font-medium">{installedApplication.progress.currentStep ?? installedApplication.status}</p>
                     <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                      {installedApplication.progress.message ?? "安装进度会跟随 read model 更新。"}
+                      {installedApplication.progress.message ?? "安装进度更新后会显示在这里。"}
                     </p>
                   </div>
                 {/if}
@@ -489,7 +489,7 @@
                 </article>
               {:else}
                 <p class="text-sm text-muted-foreground">
-                  还没有资源 readback。安装完成前这里保持为空态，不伪造运行结果。
+                  安装完成后，创建的资源会显示在这里。
                 </p>
               {/each}
             </div>
@@ -520,7 +520,7 @@
                   </div>
                 </article>
               {:else}
-                <p class="text-sm text-muted-foreground">这个安装聚合没有依赖资源 readback。</p>
+                <p class="text-sm text-muted-foreground">这个安装没有记录到依赖资源。</p>
               {/each}
             </div>
           </section>
@@ -584,36 +584,36 @@
                 <h2 class="text-sm font-semibold">生命周期</h2>
               </div>
               <p class="text-sm leading-6 text-muted-foreground">
-                Upgrade、rollback 和 uninstall 需要 focused governed flow。当前页面只提供状态、影响面和 owner links，不在默认页展示表单。
+                升级、回滚和卸载需要单独的确认流程。当前页面只展示状态、影响范围和相关入口，不在默认页展示表单。
               </p>
               <div class="grid gap-3" data-installed-application-lifecycle-governance>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-upgrade-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">Upgrade</p>
-                    <Badge variant="outline">later phase</Badge>
+                    <p class="text-sm font-medium">升级</p>
+                    <Badge variant="outline">暂未开放</Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    升级需要先展示 blueprint diff、资源影响和 deployment plan，再进入 focused flow。
+                    升级前需要展示版本差异、资源影响和部署计划，再进入确认流程。
                   </p>
                 </section>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-rollback-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">Rollback</p>
+                    <p class="text-sm font-medium">回滚</p>
                     <Badge variant="outline">
-                      {installedApplication.rollback ? "requested" : "not requested"}
+                      {installedApplication.rollback ? "已请求" : "未请求"}
                     </Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    回滚必须基于安装历史和资源 deployment readiness，不能在聚合页直接提交。
+                    回滚需要基于安装历史和资源部署状态，不能在聚合页直接提交。
                   </p>
                 </section>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-uninstall-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">Uninstall</p>
-                    <Badge variant="outline">danger flow</Badge>
+                    <p class="text-sm font-medium">卸载</p>
+                    <Badge variant="outline">需要确认</Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    卸载需要列出将影响的 resources、dependency resources 和 public URLs，并通过 blocker/check 强确认。
+                    卸载前需要列出会受影响的资源、依赖资源和公开 URL，并通过强确认。
                   </p>
                 </section>
               </div>

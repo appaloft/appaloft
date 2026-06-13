@@ -481,7 +481,7 @@ export const enUS = {
       modeCreateDescription: "Create an Appaloft-managed dependency resource.",
       modeReuse: "Reuse",
       modeReuseDescription: "Register an existing external dependency resource.",
-      createUnavailable: "Provider adapter pending for this dependency kind.",
+      createUnavailable: "This dependency kind cannot be created yet.",
       namePlaceholder: "Main database",
       pageDescription:
         "Provision, backup, restore, and delete managed database, cache, object storage, and search services.",
@@ -1206,8 +1206,7 @@ export const enUS = {
       policySaveFailed: "Preview policy was not saved",
       previewTtlHoursLabel: "Preview TTL hours",
       projectScope: "Project",
-      readbackDescription:
-        "Effective policy readback shows whether this scope is using defaults or configured settings.",
+      readbackDescription: "Shows whether this scope is using defaults or configured settings.",
       readbackTitle: "Effective policy",
       resourceScope: "Resource",
       sameRepositoryPreviewsLabel: "Allow same-repository previews",
@@ -1748,7 +1747,7 @@ export const enUS = {
       configurationImportAction: "Import variables",
       configurationImportContent: ".env content",
       configurationImportDescription:
-        "Paste dotenv content into the resource override layer. Secret-like keys are masked on readback.",
+        "Paste dotenv content into the resource override layer. Secret-like keys are masked when displayed.",
       configurationImportFailed: "Variables were not imported",
       configurationImportPlainKeys: "Force plain keys",
       configurationImportSecretKeys: "Force secret keys",

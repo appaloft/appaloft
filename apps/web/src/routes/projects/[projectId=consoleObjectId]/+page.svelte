@@ -2331,7 +2331,7 @@
                   {$t(i18nKeys.console.projects.activityDescription)}
                 </p>
               </div>
-              <Badge variant="outline">later phase</Badge>
+              <Badge variant="outline">暂未开放</Badge>
             </div>
 
             <div class="console-subtle-panel px-4 py-6" data-project-activity-read-model-gap>
