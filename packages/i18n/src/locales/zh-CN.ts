@@ -2054,8 +2054,8 @@ export const zhCN = {
       runtimeLogsStreamDisconnected: "运行时日志流已断开。",
       runtimeLogsTitle: "运行时日志",
       runtimeLogsUnavailableBody:
-        "这个资源还没有可观察的运行态部署。创建部署后，运行时日志会在这里出现。",
-      runtimeLogsUnavailableTitle: "暂无可观察运行态",
+        "部署完成并记录运行时输出后，日志会显示在这里。当前资源还没有可读取的运行日志。",
+      runtimeLogsUnavailableTitle: "还没有运行日志",
       runtimeTab: "运行态",
       runtimeProfileFormDescription: "修改后续部署使用的持久运行时规划配置。",
       runtimeProfileSaveFailed: "运行时配置保存失败",

@@ -2196,8 +2196,8 @@ export const enUS = {
       runtimeLogsStreamDisconnected: "Runtime log stream disconnected.",
       runtimeLogsTitle: "Runtime logs",
       runtimeLogsUnavailableBody:
-        "This resource does not have an observable runtime deployment yet. Create a deployment to stream runtime logs here.",
-      runtimeLogsUnavailableTitle: "No observable runtime yet",
+        "Runtime logs will appear here after a deployment records application output. This resource does not have readable runtime logs yet.",
+      runtimeLogsUnavailableTitle: "No runtime logs yet",
       runtimeTab: "Runtime",
       runtimeProfileFormDescription:
         "Change the durable runtime planning profile used by future deployments.",

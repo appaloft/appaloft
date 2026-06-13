@@ -739,6 +739,11 @@ describe("console page structure", () => {
       '{:else if activeTab === "logs"}',
       "{/if}\n      </div>",
     );
+    const resourceRuntimeLogsPanelSource = sourceBetween(
+      resourceDetailPageSource,
+      "{#snippet resourceRuntimeLogsPanel()}",
+      "{/snippet}",
+    );
     const resourceTerminalTabSource = sourceBetween(
       resourceDetailPageSource,
       '{:else if activeTab === "terminal"}',
@@ -781,6 +786,8 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("runtimeLogsUnavailableBody");
     expect(resourceDetailPageSource).toContain("terminal.resourceUnavailableTitle");
     expect(resourceDetailPageSource).toContain("terminal.resourceUnavailableBody");
+    expect(resourceDetailPageSource).toContain("readRuntimeLogErrorMessage");
+    expect(resourceDetailPageSource).toContain('"Resource has no observable runtime deployment"');
     const resourceDetailQuerySource = sourceBetween(
       resourceDetailPageSource,
       "const resourceDetailQuery = createQuery",
@@ -831,6 +838,14 @@ describe("console page structure", () => {
     expect(resourceLogsTabSource).not.toContain("data-resource-terminal-unavailable-state");
     expect(resourceLogsTabSource).not.toContain("openResourceDeploymentDialog");
     expect(resourceLogsTabSource).not.toContain("terminal.resourceUnavailable");
+    expect(resourceRuntimeLogsPanelSource).toContain(
+      "data-resource-runtime-logs-unavailable-state",
+    );
+    expect(resourceRuntimeLogsPanelSource).toContain("runtimeLogsUnavailableTitle");
+    expect(resourceRuntimeLogsPanelSource).toContain("runtimeLogsUnavailableBody");
+    expect(resourceRuntimeLogsPanelSource).not.toContain(
+      "Resource has no observable runtime deployment",
+    );
     expect(resourceTerminalTabSource).toContain("<TerminalSessionPanel");
     expect(resourceTerminalTabSource).toContain("data-resource-terminal-unavailable-state");
     expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableTitle");

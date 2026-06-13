@@ -2518,8 +2518,26 @@
     return "";
   }
 
+  function readRuntimeLogErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    if (error && typeof error === "object" && "message" in error) {
+      return String((error as { message?: unknown }).message ?? "");
+    }
+
+    return "";
+  }
+
   function isRuntimeLogsUnavailableError(error: unknown): boolean {
-    return readDomainErrorCode(error) === "resource_runtime_logs_unavailable";
+    if (readDomainErrorCode(error) === "resource_runtime_logs_unavailable") {
+      return true;
+    }
+
+    const message = readRuntimeLogErrorMessage(error);
+    return message === "Resource has no observable runtime deployment" ||
+      message.includes("no observable runtime deployment");
   }
 
   function markRuntimeLogsUnavailable(): void {
