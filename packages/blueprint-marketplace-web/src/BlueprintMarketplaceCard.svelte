@@ -196,7 +196,7 @@
     {/if}
 
     {#if showFacts}
-      <dl class={cn("grid gap-2", isCompact ? "grid-cols-1" : "grid-cols-2")}>
+      <dl class={cn("grid gap-2", isCompact ? "grid-cols-1" : "grid-cols-2")} data-blueprint-marketplace-facts>
         <div class={cn(isCompact ? "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3" : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
           <dt class="whitespace-nowrap text-xs font-bold text-muted-foreground">{labels.dependencies}</dt>
           <dd class={cn("min-w-0 truncate font-semibold text-foreground", isCompact && "font-mono text-sm")} title={dependencySummary()}>{dependencySummary()}</dd>

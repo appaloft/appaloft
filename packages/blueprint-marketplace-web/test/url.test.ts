@@ -41,6 +41,9 @@ describe("Blueprint marketplace web URLs", () => {
     expect(pageSource).toContain("readonly surface?: BlueprintMarketplaceSurface");
     expect(pageSource).toContain("data-marketplace-surface={surface}");
     expect(pageSource).toContain(".marketplace-controls");
+    expect(pageSource).toContain("data-blueprint-marketplace-search");
+    expect(pageSource).toContain("data-blueprint-marketplace-category-tabs");
+    expect(pageSource).toContain("data-blueprint-marketplace-groups");
     expect(pageSource).toContain('data-marketplace-surface="dialog"');
     expect(pageSource).toContain('data-marketplace-surface="quick-deploy"');
     expect(pageSource).toContain("isBlueprintRegistryListResponse(value)");
@@ -53,6 +56,7 @@ describe("Blueprint marketplace web URLs", () => {
     expect(cardSource).toContain("iconFailed = true");
     expect(cardSource).toContain("bg-card");
     expect(cardSource).toContain("data-blueprint-marketplace-card");
+    expect(cardSource).toContain("data-blueprint-marketplace-facts");
     expect(cardSource).not.toContain("<style>");
   });
 });

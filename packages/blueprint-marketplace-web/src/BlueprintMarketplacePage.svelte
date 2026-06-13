@@ -316,11 +316,12 @@
     {/if}
   </header>
 
-  <div class="marketplace-controls">
+  <div class="marketplace-controls" data-blueprint-marketplace-controls>
     <div class="marketplace-toolbar">
       <label class="search-field">
         <span class="sr-only">搜索 Blueprint 目录</span>
         <input
+          data-blueprint-marketplace-search
           type="search"
           placeholder="搜索应用、分类、依赖或标签"
           bind:value={searchTerm}
@@ -336,7 +337,7 @@
     </div>
 
     {#if !isLoading && !errorMessage}
-      <nav class="category-tabs" aria-label="Blueprint categories">
+      <nav class="category-tabs" aria-label="Blueprint categories" data-blueprint-marketplace-category-tabs>
         <button
           type="button"
           class:selected={selectedCategoryKey === "all"}
@@ -416,7 +417,7 @@
       </p>
     {/if}
 
-    <div class="marketplace-groups">
+    <div class="marketplace-groups" data-blueprint-marketplace-groups>
       {#each groupedListings as group (group.category.key)}
         <section class="marketplace-group">
           <div class="group-heading">

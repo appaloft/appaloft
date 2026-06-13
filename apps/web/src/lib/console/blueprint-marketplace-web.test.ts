@@ -225,4 +225,58 @@ describe("Blueprint marketplace console surface", () => {
     expect(blueprintCatalogSchemaSource).toContain("BlueprintRegistryDisplayMetadataResponse");
     expect(blueprintCatalogSchemaSource).not.toContain("@appaloft/blueprints");
   });
+
+  test("[MARKETPLACE-CATALOG-IA-001] keeps catalog display-first and out of runtime ownership", async () => {
+    const [listPageSource, selectorSource, sharedPackageSource, sharedCardSource] =
+      await Promise.all([
+        readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
+        readFile(
+          new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../../../../packages/blueprint-marketplace-web/src/BlueprintMarketplacePage.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../../../../packages/blueprint-marketplace-web/src/BlueprintMarketplaceCard.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      ]);
+
+    expect(listPageSource).toContain("data-marketplace-catalog-display-surface");
+    expect(selectorSource).toContain("data-blueprint-marketplace-selector");
+    expect(selectorSource).toContain('primaryAction={onselect ? "select" : "detail"}');
+    expect(selectorSource).toContain(
+      'subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"',
+    );
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-controls");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-search");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-category-tabs");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-groups");
+    expect(sharedPackageSource).toContain("createBlueprintDetailHref");
+    expect(sharedPackageSource).toContain("createBlueprintDeployHandoffUrl");
+    expect(sharedPackageSource).toContain('primaryAction === "select"');
+    expect(sharedPackageSource).not.toContain("<form");
+    expect(sharedPackageSource).not.toContain("<textarea");
+    expect(sharedPackageSource).not.toContain("orpcClient.resources");
+    expect(sharedPackageSource).not.toContain("orpcClient.deployments");
+    expect(sharedPackageSource).not.toContain("orpcClient.servers");
+    expect(sharedPackageSource).not.toMatch(/\b(delete|destroy|danger|archive)\b/i);
+    expect(sharedCardSource).toContain("data-blueprint-marketplace-card");
+    expect(sharedCardSource).toContain("data-blueprint-marketplace-facts");
+    expect(sharedCardSource).toContain("labels.dependencies");
+    expect(sharedCardSource).toContain("labels.ports");
+    expect(sharedCardSource).toContain("variantSummary()");
+    expect(sharedCardSource).toContain("componentSummary()");
+    expect(sharedCardSource).not.toContain("<form");
+    expect(sharedCardSource).not.toContain("<textarea");
+  });
 });
