@@ -28,6 +28,7 @@
     Square,
     Terminal,
     Trash2,
+    X,
   } from "@lucide/svelte";
   import type { TranslationKey } from "@appaloft/i18n";
   import type {
@@ -3646,6 +3647,13 @@
     }
   }
 
+  function clearScheduledTaskRunLogs(): void {
+    selectedScheduledTaskRunId = "";
+    scheduledTaskRunLogs = [];
+    scheduledTaskRunLogsError = null;
+    scheduledTaskRunLogsLoading = false;
+  }
+
   function configureResourceSource(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -5945,33 +5953,54 @@
                   </div>
                 {/if}
 
-                <div class="max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
-                  {#if scheduledTaskRunLogsLoading}
-                    <p class="text-zinc-400">
-                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsLoading)}
-                    </p>
-                  {:else if scheduledTaskRunLogsError}
-                    <p class="text-destructive">{scheduledTaskRunLogsError}</p>
-                  {:else if !selectedScheduledTaskRunId}
-                    <p class="text-zinc-400">
-                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsSelect)}
-                    </p>
-                  {:else if scheduledTaskRunLogs.length === 0}
-                    <p class="text-zinc-400">
-                      {$t(i18nKeys.console.resources.scheduledTaskRunLogsEmpty)}
-                    </p>
-                  {:else}
-                    <div class="space-y-1">
-                      {#each scheduledTaskRunLogs as entry, index (`${entry.timestamp}-${entry.stream}-${index}`)}
-                        <div class="grid gap-2 sm:grid-cols-[10rem_4rem_1fr]">
-                          <span class="truncate text-zinc-500">{formatTime(entry.timestamp)}</span>
-                          <span class="text-zinc-500">{entry.stream}</span>
-                          <span class="break-words">{entry.message}</span>
-                        </div>
-                      {/each}
+                {#if selectedScheduledTaskRunId || scheduledTaskRunLogsLoading || scheduledTaskRunLogsError}
+                  <div class="rounded-md border bg-card" data-resource-scheduled-task-run-log-detail>
+                    <div class="flex items-center justify-between gap-3 border-b px-3 py-2">
+                      <div class="min-w-0">
+                        <h4 class="text-sm font-medium">
+                          {$t(i18nKeys.console.resources.scheduledTaskRunLogs)}
+                        </h4>
+                        {#if selectedScheduledTaskRunId}
+                          <p class="truncate font-mono text-xs text-muted-foreground">
+                            {selectedScheduledTaskRunId}
+                          </p>
+                        {/if}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onclick={clearScheduledTaskRunLogs}
+                      >
+                        <X class="size-4" />
+                        {$t(i18nKeys.common.actions.close)}
+                      </Button>
                     </div>
-                  {/if}
-                </div>
+                    <div class="max-h-96 overflow-auto bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
+                      {#if scheduledTaskRunLogsLoading}
+                        <p class="text-zinc-400">
+                          {$t(i18nKeys.console.resources.scheduledTaskRunLogsLoading)}
+                        </p>
+                      {:else if scheduledTaskRunLogsError}
+                        <p class="text-destructive">{scheduledTaskRunLogsError}</p>
+                      {:else if scheduledTaskRunLogs.length === 0}
+                        <p class="text-zinc-400">
+                          {$t(i18nKeys.console.resources.scheduledTaskRunLogsEmpty)}
+                        </p>
+                      {:else}
+                        <div class="space-y-1">
+                          {#each scheduledTaskRunLogs as entry, index (`${entry.timestamp}-${entry.stream}-${index}`)}
+                            <div class="grid gap-2 sm:grid-cols-[10rem_4rem_1fr]">
+                              <span class="truncate text-zinc-500">{formatTime(entry.timestamp)}</span>
+                              <span class="text-zinc-500">{entry.stream}</span>
+                              <span class="break-words">{entry.message}</span>
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
               </section>
             </div>
                 </section>

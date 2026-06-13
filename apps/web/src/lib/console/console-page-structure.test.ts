@@ -811,10 +811,16 @@ describe("console page structure", () => {
     );
     expect(resourceDetailPageSource).toContain('id="resource-scheduled-task-create-form"');
     expect(resourceJobsTabSource).toContain("onclick={openScheduledTaskCreateDialog}");
+    expect(resourceJobsTabSource).toContain("data-resource-scheduled-task-run-log-detail");
+    expect(resourceJobsTabSource).toContain(
+      "selectedScheduledTaskRunId || scheduledTaskRunLogsLoading",
+    );
+    expect(resourceJobsTabSource).toContain("onclick={clearScheduledTaskRunLogs}");
     expect(resourceJobsTabSource).not.toContain('id="resource-scheduled-task-create-form"');
     expect(resourceJobsTabSource).not.toContain("previewEnvironment");
     expect(resourceJobsTabSource).not.toContain("resourcePreviewEnvironments");
     expect(resourceJobsTabSource).not.toContain("openPreviewEnvironmentCleanupDialog");
+    expect(resourceJobsTabSource).not.toContain("scheduledTaskRunLogsSelect");
     expect(resourceJobsTabSource).not.toContain("<form");
     expect(resourceJobsTabSource).not.toContain("<Input");
     expect(resourceJobsTabSource).not.toContain("<Textarea");

@@ -2014,7 +2014,6 @@ export const i18nKeys = {
       scheduledTaskRunLogs: "console:resources.scheduledTaskRunLogs",
       scheduledTaskRunLogsEmpty: "console:resources.scheduledTaskRunLogsEmpty",
       scheduledTaskRunLogsLoading: "console:resources.scheduledTaskRunLogsLoading",
-      scheduledTaskRunLogsSelect: "console:resources.scheduledTaskRunLogsSelect",
       scheduledTaskRunManageAction: "console:resources.scheduledTaskRunManageAction",
       scheduledTaskRunManageDescription: "console:resources.scheduledTaskRunManageDescription",
       scheduledTaskRunManageTitle: "console:resources.scheduledTaskRunManageTitle",

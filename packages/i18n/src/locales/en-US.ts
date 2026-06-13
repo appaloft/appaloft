@@ -2241,7 +2241,6 @@ export const enUS = {
       scheduledTaskRunLogs: "Logs",
       scheduledTaskRunLogsEmpty: "This run has no log entries.",
       scheduledTaskRunLogsLoading: "Loading task run logs...",
-      scheduledTaskRunLogsSelect: "Select a run to read logs.",
       scheduledTaskRunManageAction: "Run management",
       scheduledTaskRunManageDescription:
         "Review this task before starting a manual run or changing its enabled state.",

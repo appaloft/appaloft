@@ -2099,7 +2099,6 @@ export const zhCN = {
       scheduledTaskRunLogs: "日志",
       scheduledTaskRunLogsEmpty: "这次运行没有日志。",
       scheduledTaskRunLogsLoading: "正在加载任务运行日志...",
-      scheduledTaskRunLogsSelect: "选择一次运行以查看日志。",
       scheduledTaskRunManageAction: "运行管理",
       scheduledTaskRunManageDescription: "先查看任务定义，再启动手动运行或调整启用状态。",
       scheduledTaskRunManageTitle: "管理定时任务",
