@@ -71,7 +71,7 @@
   const homeDeploymentListLimit = 40;
   const homeEnvironmentListLimit = 120;
   const productQueryEnabled = $derived(browser && canRunProductQueries(authSessionQuery.data));
-  const activeDeploymentStatuses = [
+  const activeDeploymentStatuses: DeploymentSummary["status"][] = [
     "created",
     "planning",
     "planned",
@@ -127,6 +127,22 @@
       refetchInterval: 10_000,
     }),
   );
+  const activeDeploymentCountQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "home", "count", { statuses: activeDeploymentStatuses }],
+      queryFn: () => orpcClient.deployments.count({ statuses: activeDeploymentStatuses }),
+      enabled: productQueryEnabled,
+      refetchInterval: 10_000,
+    }),
+  );
+  const failedDeploymentCountQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "home", "count", { status: "failed" }],
+      queryFn: () => orpcClient.deployments.count({ status: "failed" }),
+      enabled: productQueryEnabled,
+      refetchInterval: 10_000,
+    }),
+  );
   const resourceCountQuery = createQuery(() =>
     queryOptions({
       queryKey: ["resources", "home", "count"],
@@ -150,6 +166,8 @@
       deploymentsQuery.isPending ||
       environmentsQuery.isPending ||
       deploymentCountQuery.isPending ||
+      activeDeploymentCountQuery.isPending ||
+      failedDeploymentCountQuery.isPending ||
       serverCountQuery.isPending ||
       resourceCountQuery.isPending,
   );
@@ -162,6 +180,12 @@
   const activeDeployments = $derived(deployments.filter(isActiveDeployment));
   const failedDeployments = $derived(
     deployments.filter((deployment) => deployment.status === "failed"),
+  );
+  const activeDeploymentTotal = $derived(
+    activeDeploymentCountQuery.data?.count ?? activeDeployments.length,
+  );
+  const failedDeploymentTotal = $derived(
+    failedDeploymentCountQuery.data?.count ?? failedDeployments.length,
   );
   const attentionItems = $derived.by(() => {
     const items: HomeAttentionItem[] = [];
@@ -377,6 +401,45 @@
           </div>
         </section>
 
+        <section class="nothing-status-strip" data-home-status-strip>
+          <a href="/deployments" class="nothing-status-cell" data-tone="progress">
+            <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
+            {#if activeDeploymentCountQuery.isPending}
+              <Skeleton class="h-7 w-10" />
+            {:else}
+              <strong>{activeDeploymentTotal}</strong>
+            {/if}
+            <small>{$t(i18nKeys.console.home.activeDeploymentsTitle)}</small>
+          </a>
+          <a href="/deployments" class="nothing-status-cell" data-tone="critical">
+            <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
+            {#if failedDeploymentCountQuery.isPending}
+              <Skeleton class="h-7 w-10" />
+            {:else}
+              <strong>{failedDeploymentTotal}</strong>
+            {/if}
+            <small>{$t(i18nKeys.console.home.failedDeploymentsTitle)}</small>
+          </a>
+          <a href="/resources" class="nothing-status-cell">
+            <span>{$t(i18nKeys.common.domain.resources)}</span>
+            {#if resourceCountQuery.isPending}
+              <Skeleton class="h-7 w-10" />
+            {:else}
+              <strong>{resourceTotal}</strong>
+            {/if}
+            <small>{$t(i18nKeys.console.home.resourcePreviewLabel)}</small>
+          </a>
+          <a href="/servers" class="nothing-status-cell">
+            <span>{$t(i18nKeys.common.domain.servers)}</span>
+            {#if serverCountQuery.isPending}
+              <Skeleton class="h-7 w-10" />
+            {:else}
+              <strong>{serverTotal}</strong>
+            {/if}
+            <small>{$t(i18nKeys.console.home.serverAvailableTarget)}</small>
+          </a>
+        </section>
+
         <section class="nothing-home-layout">
           <div class="nothing-workboard">
             <section class="nothing-panel" data-home-attention-workqueue>
@@ -452,7 +515,11 @@
               <div class="nothing-panel" data-home-active-deployments>
                 <div class="nothing-section-header">
                   <p class="nothing-label">{$t(i18nKeys.console.home.activeDeploymentsTitle)}</p>
-                  <h2>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</h2>
+                  {#if activeDeploymentCountQuery.isPending}
+                    <Skeleton class="h-5 w-12" />
+                  {:else}
+                    <h2>{activeDeploymentTotal}</h2>
+                  {/if}
                   <p>{$t(i18nKeys.console.home.activeDeploymentsDescription)}</p>
                 </div>
                 {#if deploymentsLoading}
@@ -492,7 +559,11 @@
               <div class="nothing-panel" data-home-failed-deployments>
                 <div class="nothing-section-header">
                   <p class="nothing-label">{$t(i18nKeys.console.home.failedDeploymentsTitle)}</p>
-                  <h2>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</h2>
+                  {#if failedDeploymentCountQuery.isPending}
+                    <Skeleton class="h-5 w-12" />
+                  {:else}
+                    <h2>{failedDeploymentTotal}</h2>
+                  {/if}
                   <p>{$t(i18nKeys.console.home.failedDeploymentsDescription)}</p>
                 </div>
                 {#if deploymentsLoading}
@@ -579,47 +650,6 @@
           </div>
 
           <aside class="nothing-side-stack">
-            <section class="nothing-panel">
-              <div class="nothing-section-header">
-                <p class="nothing-label">{$t(i18nKeys.console.home.operationContextTitle)}</p>
-                <p>{$t(i18nKeys.console.home.operationContextDescription)}</p>
-              </div>
-              <div class="nothing-context-grid">
-                <a href="/deployments" class="nothing-context-cell">
-                  <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
-                  {#if deploymentsLoading}
-                    <Skeleton class="h-[22px] w-8" />
-                  {:else}
-                    <strong>{activeDeployments.length}</strong>
-                  {/if}
-                </a>
-                <a href="/deployments" class="nothing-context-cell">
-                  <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
-                  {#if deploymentsLoading}
-                    <Skeleton class="h-[22px] w-8" />
-                  {:else}
-                    <strong>{failedDeployments.length}</strong>
-                  {/if}
-                </a>
-                <a href="/resources" class="nothing-context-cell">
-                  <span>{$t(i18nKeys.common.domain.resources)}</span>
-                  {#if resourceCountQuery.isPending}
-                    <Skeleton class="h-[22px] w-8" />
-                  {:else}
-                    <strong>{resourceTotal}</strong>
-                  {/if}
-                </a>
-                <a href="/servers" class="nothing-context-cell">
-                  <span>{$t(i18nKeys.common.domain.servers)}</span>
-                  {#if serverCountQuery.isPending}
-                    <Skeleton class="h-[22px] w-8" />
-                  {:else}
-                    <strong>{serverTotal}</strong>
-                  {/if}
-                </a>
-              </div>
-            </section>
-
             <section class="nothing-panel">
               <div class="nothing-section-header">
                 <p class="nothing-label">{$t(i18nKeys.console.home.nextStepsTitle)}</p>
@@ -728,6 +758,84 @@
       grid-template-columns: minmax(0, 1fr) 22rem;
       align-items: start;
     }
+  }
+
+  .nothing-status-strip {
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-2xs);
+  }
+
+  @media (min-width: 700px) {
+    .nothing-status-strip {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .nothing-status-cell {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+    border-top: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 14px 16px;
+    text-decoration: none;
+  }
+
+  .nothing-status-cell:first-child {
+    border-top: 0;
+  }
+
+  @media (min-width: 700px) {
+    .nothing-status-cell {
+      border-top: 0;
+      border-left: 1px solid var(--border);
+    }
+
+    .nothing-status-cell:first-child {
+      border-left: 0;
+    }
+  }
+
+  .nothing-status-cell span,
+  .nothing-status-cell small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nothing-status-cell span {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .nothing-status-cell strong {
+    color: var(--text-display);
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .nothing-status-cell small {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .nothing-status-cell[data-tone="critical"] strong {
+    color: var(--destructive);
+  }
+
+  .nothing-status-cell[data-tone="progress"] strong {
+    color: var(--primary);
   }
 
   .nothing-workboard,
@@ -941,54 +1049,6 @@
     min-width: 0;
   }
 
-  .nothing-context-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: hidden;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-md);
-  }
-
-  .nothing-context-cell {
-    display: grid;
-    gap: 7px;
-    min-width: 0;
-    border-right: 1px solid var(--border);
-    color: var(--text-primary);
-    padding: 12px;
-    text-decoration: none;
-  }
-
-  .nothing-context-cell:last-child {
-    border-right: 0;
-  }
-
-  .nothing-context-cell:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .nothing-context-cell:nth-child(n + 3) {
-    border-top: 1px solid var(--border);
-  }
-
-  .nothing-context-cell span {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .nothing-context-cell strong {
-    color: var(--text-display);
-    font-family: var(--font-mono);
-    font-size: 22px;
-    font-weight: 500;
-    line-height: 1;
-  }
-
   .nothing-next-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1041,8 +1101,8 @@
   .nothing-deployment-row:focus-visible,
   .nothing-deployment-rollup-row:hover,
   .nothing-deployment-rollup-row:focus-visible,
-  .nothing-context-cell:hover,
-  .nothing-context-cell:focus-visible,
+  .nothing-status-cell:hover,
+  .nothing-status-cell:focus-visible,
   .nothing-next-row:hover,
   .nothing-next-row:focus-visible {
     background: color-mix(in oklch, var(--primary) 3%, transparent);
@@ -1050,7 +1110,7 @@
 
   .nothing-deployment-row:focus-visible,
   .nothing-deployment-rollup-row:focus-visible,
-  .nothing-context-cell:focus-visible,
+  .nothing-status-cell:focus-visible,
   .nothing-next-row:focus-visible,
   .nothing-side-link:focus-visible {
     outline: 2px solid var(--ring);
@@ -1060,7 +1120,7 @@
   @media (prefers-reduced-motion: reduce) {
     .nothing-deployment-row,
     .nothing-deployment-rollup-row,
-    .nothing-context-cell,
+    .nothing-status-cell,
     .nothing-next-row {
       transition-duration: 1ms;
     }

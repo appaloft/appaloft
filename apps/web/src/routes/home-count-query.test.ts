@@ -20,15 +20,24 @@ describe("operations workbench home", () => {
     );
     expect(homePageSource).toContain("orpcClient.servers.count({})");
     expect(homePageSource).toContain("orpcClient.deployments.count({})");
+    expect(homePageSource).toContain(
+      "orpcClient.deployments.count({ statuses: activeDeploymentStatuses })",
+    );
+    expect(homePageSource).toContain('orpcClient.deployments.count({ status: "failed" })');
     expect(homePageSource).toContain("orpcClient.resources.count({})");
   });
 
   test("[HOME-WORKBENCH-002] does not render projects as the primary list surface", () => {
     expect(homePageSource).toContain("data-home-workbench-heading");
+    expect(homePageSource).toContain("data-home-status-strip");
     expect(homePageSource).toContain("data-home-attention-workqueue");
     expect(homePageSource).toContain("data-home-active-deployments");
     expect(homePageSource).toContain("data-home-failed-deployments");
     expect(homePageSource).toContain("data-home-deployment-rollup");
+    expect(homePageSource).toContain("nothing-status-strip");
+    expect(homePageSource).toContain("nothing-status-cell");
+    expect(homePageSource).not.toContain("nothing-context-grid");
+    expect(homePageSource).not.toContain("nothing-context-cell");
     expect(homePageSource).not.toContain("data-home-project-context");
     expect(homePageSource).not.toContain("data-home-project-list");
     expect(homePageSource).not.toContain("data-home-project-row");
@@ -101,5 +110,27 @@ describe("operations workbench home", () => {
     );
     expect(homePageSource).not.toContain("nothing-skeleton");
     expect(homePageSource).not.toContain("@keyframes nothing-skeleton");
+  });
+
+  test("[HOME-COPY-001] keeps home copy factual instead of exposing IA intent", () => {
+    const zhLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
+      "utf8",
+    );
+    const enLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../packages/i18n/src/locales/en-US.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(zhLocaleSource).toContain('projectsHeading: "控制台概览"');
+    expect(zhLocaleSource).toContain(
+      'projectsDescription: "查看失败部署、进行中部署、访问缺口和最近部署记录。"',
+    );
+    expect(zhLocaleSource).not.toContain("最值得");
+    expect(zhLocaleSource).not.toContain("值得立刻");
+    expect(enLocaleSource).toContain('projectsHeading: "Console overview"');
+    expect(enLocaleSource).not.toContain("worth opening");
+    expect(enLocaleSource).not.toContain("obviously incomplete");
+    expect(enLocaleSource).not.toContain("Triage attention");
   });
 });

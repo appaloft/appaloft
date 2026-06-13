@@ -720,25 +720,25 @@ export const enUS = {
         "After you create the first project, project and deployment relationships appear here.",
       projectRelationsTitle: "Project relationships",
       projectsDescription:
-        "Triage attention across projects, follow running deployments, and continue from the next operational step.",
-      projectsHeading: "Workbench",
-      projectsKicker: "Workspace",
+        "Review failed deployments, running deployments, access gaps, and recent deployment records.",
+      projectsHeading: "Console overview",
+      projectsKicker: "Operations",
       readinessCard: "Readiness",
       serverAvailableTarget: "Available as deployment targets",
       serverCreatedDuringDeployment: "Can be created during deployment",
       environmentSnapshotEntry: "Saved variable snapshot entry",
       environmentCreatedDuringDeployment: "Create the first environment during deployment",
       activeDeploymentsMetric: "In flight",
-      activeDeploymentsDescription: "Deployment attempts that are being created, planned, or run.",
+      activeDeploymentsDescription: "Deployment records that are being created, planned, or run.",
       activeDeploymentsTitle: "Active deployments",
       attentionDescription:
-        "Ordered by failures, running work, missing deployments, and access gaps. Only projects worth opening now are shown.",
+        "Failed deployments, active deployments, resources without deployments, and access route gaps.",
       attentionFailedDescription:
         "{{project}} has {{count}} failed deployments. The latest affected resource is {{resource}}.",
-      attentionFailedTitle: "Failed deployment needs review",
-      attentionHeading: "Projects needing attention",
+      attentionFailedTitle: "Failed deployment",
+      attentionHeading: "Project status",
       attentionNoAccessDescription:
-        "{{project}} has {{count}} resources without a current access route. Review networking from the project.",
+        "{{project}} has {{count}} resources without a current access route. Review networking from the project page.",
       attentionNoAccessTitle: "Access route gap",
       attentionNoDeploymentDescription:
         "{{project}} has {{count}} resources but no deployment records yet.",
@@ -788,8 +788,8 @@ export const enUS = {
       noAccessRoute: "No access route yet",
       noActiveDeployments: "No deployments are currently running.",
       noAttentionDescription:
-        "No failed, running, or obviously incomplete projects right now. Continue from recent deployments or the project page.",
-      noAttentionTitle: "No projects need immediate action",
+        "No failed deployments, active deployments, undeployed resources, or access route gaps.",
+      noAttentionTitle: "Project status is clear",
       noDeploymentsShort: "No deployments yet",
       noFailedDeployments: "No failed deployments right now.",
       noProjectDescription: "No description",
@@ -799,7 +799,7 @@ export const enUS = {
       operationContextTitle: "Operations",
       quickActionsDescription: "Continue from deploys, servers, and managed services",
       quickActionsTitle: "Common actions",
-      recentDeploymentsDescription: "Recent deployment records across visible projects.",
+      recentDeploymentsDescription: "Recently created or updated deployment records.",
       recentDeploymentsReadModelGap:
         "Activity read model is not connected here yet; this panel only shows deployment records.",
       recentDeploymentsTitle: "Recent deployments",
