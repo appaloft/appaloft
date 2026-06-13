@@ -531,6 +531,19 @@ describe("console page structure", () => {
     expect(internalVisibleCopy).toEqual([]);
   });
 
+  test("[CONSOLE-COPY-IA-001] keeps zh console operation copy out of raw implementation language", () => {
+    const zhLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
+      "utf8",
+    );
+    const rawOperationCopy = literalTextMatches(
+      zhLocaleSource,
+      /\b(?:provider|workload|readiness|runtime usage inspect|workflow|metadata|Destination|storage volume|dependency resource|runtime injection|secret reference|restore point|live writes|dry-run|runtime cleanup|route snapshot|deployment snapshot|proxy route)\b|owner 摘要|Provider|Storage backup|Dependency resource|Secret/u,
+    );
+
+    expect(rawOperationCopy).toEqual([]);
+  });
+
   test("[PROJECT-DEPLOYMENT-IA-002] opens project deployment actions in context instead of legacy pages", () => {
     expect(projectDetailPageSource).toContain("function openProjectDeploymentAction()");
     expect(projectDetailPageSource).toContain("function openProjectNextAction()");
