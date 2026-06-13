@@ -624,6 +624,11 @@
   const latestDeployment = $derived(
     resource ? deployments.find((deployment) => deployment.resourceId === resource.id) : null,
   );
+  const sourceLinkServerLabel = $derived(
+    latestDeployment?.serverId
+      ? (findServer(servers, latestDeployment.serverId)?.name ?? latestDeployment.serverId)
+      : "-",
+  );
   const resourceFallbackServerScope = $derived<RuntimeUsageScope | null>(
     latestDeployment?.serverId
       ? {
@@ -951,6 +956,7 @@
   let sourceImageDigest = $state("");
   let sourceVersion = $state("");
   let sourceVersionKind = $state<SourceVersionKind | "">("");
+  let sourceLinkDialogOpen = $state(false);
   let sourceLinkFormResourceId = $state("");
   let sourceLinkFingerprint = $state("");
   let sourceLinkServerId = $state("");
@@ -1608,6 +1614,7 @@
         title: $t(i18nKeys.console.resources.sourceLinkRelinked),
         detail: result.sourceFingerprint,
       };
+      sourceLinkDialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
     },
@@ -3708,6 +3715,22 @@
       resourceId: resource.id,
       source,
     });
+  }
+
+  function openSourceLinkDialog(): void {
+    if (!resource || isResourceArchived) {
+      return;
+    }
+
+    sourceLinkFingerprint = resourceDetail?.source?.sourceBindingFingerprint ?? "";
+    sourceLinkServerId = latestDeployment?.serverId ?? servers[0]?.id ?? "";
+    sourceLinkDestinationId = defaultDestinationId;
+    sourceLinkFeedback = null;
+    sourceLinkDialogOpen = true;
+  }
+
+  function closeSourceLinkDialog(): void {
+    sourceLinkDialogOpen = false;
   }
 
   function relinkSourceLink(event: SubmitEvent): void {
@@ -7212,6 +7235,83 @@
                         </div>
                       </dl>
                     </section>
+
+                    <section
+                      class="rounded-md border bg-background p-4"
+                      data-resource-source-link-surface
+                    >
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-lg font-semibold">
+                              {$t(i18nKeys.console.resources.sourceLinkTitle)}
+                            </h2>
+                            <DocsHelpLink
+                              href={webDocsHrefs.sourceAutoDeploySetup}
+                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            />
+                            <Badge variant={resourceDetail?.source?.sourceBindingFingerprint ? "default" : "outline"}>
+                              {resourceDetail?.source?.sourceBindingFingerprint
+                                ? $t(i18nKeys.common.status.configured)
+                                : $t(i18nKeys.common.status.notConfigured)}
+                            </Badge>
+                          </div>
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.sourceLinkDescription)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isResourceArchived}
+                          onclick={openSourceLinkDialog}
+                        >
+                          <Link2 class="size-4" />
+                          {$t(i18nKeys.console.resources.sourceLinkRelink)}
+                        </Button>
+                      </div>
+
+                      <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.sourceLinkFingerprint)}
+                          </dt>
+                          <dd class="mt-1 break-all font-mono text-xs">
+                            {resourceDetail?.source?.sourceBindingFingerprint ?? "-"}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.sourceLinkServer)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {sourceLinkServerLabel}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.resources.sourceLinkDestination)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {defaultDestinationId || "-"}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      {#if sourceLinkFeedback}
+                        <div
+                          class={[
+                            "mt-4 rounded-md border px-3 py-2 text-sm",
+                            sourceLinkFeedback.kind === "success"
+                              ? "border-primary/25 bg-primary/5"
+                              : "border-destructive/30 bg-destructive/5 text-destructive",
+                          ]}
+                        >
+                          <p class="font-medium">{sourceLinkFeedback.title}</p>
+                          <p class="mt-1 break-all text-xs">{sourceLinkFeedback.detail}</p>
+                        </div>
+                      {/if}
+                    </section>
                   </div>
                 {:else if activeResourceSection === "configuration"}
                   <section id="resource-effective-configuration" class="space-y-4">
@@ -8741,6 +8841,85 @@
               </Button>
             </Dialog.Footer>
           </div>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root bind:open={sourceLinkDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.sourceLinkTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.sourceLinkDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <form
+            class="space-y-5 px-5 pb-5"
+            onsubmit={relinkSourceLink}
+            data-resource-source-link-dialog
+          >
+            <section class="grid gap-4 rounded-md border bg-background p-4 sm:grid-cols-2">
+              <label class="space-y-1.5 text-sm font-medium sm:col-span-2" for="resource-source-link-fingerprint">
+                <span>{$t(i18nKeys.console.resources.sourceLinkFingerprint)}</span>
+                <Input
+                  id="resource-source-link-fingerprint"
+                  bind:value={sourceLinkFingerprint}
+                  autocomplete="off"
+                  spellcheck={false}
+                  placeholder="sha256:..."
+                />
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.sourceLinkServer)}</span>
+                <Select.Root bind:value={sourceLinkServerId} type="single">
+                  <Select.Trigger class="w-full">
+                    {servers.find((server) => server.id === sourceLinkServerId)?.name ??
+                      sourceLinkServerId ??
+                      "-"}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each servers as server (server.id)}
+                      <Select.Item value={server.id}>{server.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium" for="resource-source-link-destination">
+                <span>{$t(i18nKeys.console.resources.sourceLinkDestination)}</span>
+                <Input
+                  id="resource-source-link-destination"
+                  bind:value={sourceLinkDestinationId}
+                  autocomplete="off"
+                  spellcheck={false}
+                  placeholder={defaultDestinationId || "web"}
+                />
+              </label>
+            </section>
+
+            {#if sourceLinkFeedback?.kind === "error"}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">{sourceLinkFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{sourceLinkFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={closeSourceLinkDialog}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canRelinkSourceLink || relinkSourceLinkMutation.isPending}
+              >
+                <Link2 class="size-4" />
+                {relinkSourceLinkMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.sourceLinkRelink)}
+              </Button>
+            </Dialog.Footer>
+          </form>
         </Dialog.Content>
       </Dialog.Root>
 
