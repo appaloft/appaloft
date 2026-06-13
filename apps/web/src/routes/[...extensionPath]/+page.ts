@@ -19,6 +19,6 @@ const retiredConsoleIntentRoutePatterns = [
 
 export const load: PageLoad = ({ url }) => {
   if (retiredConsoleIntentRoutePatterns.some((pattern) => pattern.test(url.pathname))) {
-    error(404, "This console intent is now handled in context.");
+    error(404, "This console action now opens from its related page.");
   }
 };

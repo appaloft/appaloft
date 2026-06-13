@@ -1377,7 +1377,7 @@ export const enUS = {
         "No resource currently has a public access route. Open networking on a resource to manage access.",
       attentionNoAccessTitle: "No public access",
       attentionNoDeploymentDetail:
-        "Resources exist, but no deployment attempt has been recorded for this project.",
+        "Resources exist, but no deployment record has been created for this project.",
       attentionNoDeploymentTitle: "Deploy a resource",
       attentionRunningDeploymentTitle: "Deployment running",
       attentionTitle: "Attention",
@@ -2063,7 +2063,7 @@ export const enUS = {
       profileDiagnosticsSuggestedCommand: "Suggested command",
       profileDiagnosticsTitle: "Profile diagnostics",
       deploymentsDescription:
-        "Deployment attempts for this resource, newest first, with source and status context.",
+        "Deployment records for this resource, newest first, with source and status context.",
       deploymentsTitle: "Deployments",
       domainBindingsDescription:
         "These are custom domain bindings for the current resource. Default generated access appears in the access area.",
@@ -2195,8 +2195,7 @@ export const enUS = {
         "Source, runtime strategy, and network port come from the resource profile and are not entered again here.",
       newDeploymentSourceTitle: "Resource source",
       newDeploymentSuccessTitle: "Deployment created",
-      newDeploymentTargetDescription:
-        "Choose only the server and destination for this deployment attempt.",
+      newDeploymentTargetDescription: "Choose only the server and destination for this deployment.",
       newDeploymentTargetTitle: "Deployment target",
       newDeploymentPlanAction: "Preview plan",
       newDeploymentPlanPending: "Planning",
@@ -2250,7 +2249,7 @@ export const enUS = {
       runtimeName: "Runtime name",
       runtimeNamePlaceholder: "www",
       runtimeControlsDescription:
-        "Stop, start, or restart the current runtime without creating a new deployment attempt.",
+        "Stop, start, or restart the current runtime without creating a new deployment.",
       runtimeControlsLatest: "Latest control",
       runtimeControlsTitle: "Runtime controls",
       runtimeControlFailed: "Runtime control failed",
@@ -2859,7 +2858,7 @@ export const enUS = {
         "Safety checks are clear. Typed confirmation is still required before deletion.",
       deleteServerSucceeded: "Server deleted",
       deploymentsSurfaceDescription:
-        "Read-only deployment attempts hosted on this server. Create or retry deployments from project resource views or resource pages.",
+        "Read-only deployment records hosted on this server. Create or retry deployments from project resource views or resource pages.",
       deploymentsSurfaceTitle: "Hosted deployments",
       deleteCredentialAction: "Delete",
       deleteCredentialActionAria: "Delete SSH credential {{name}}",
@@ -2943,7 +2942,7 @@ export const enUS = {
       renameSucceeded: "Server name saved",
       runtimeTab: "Runtime",
       runtimeSurfaceDescription:
-        "Inspect server-level monitor signals or open a server terminal without creating a deployment attempt.",
+        "Inspect server-level monitor signals or open a server terminal without creating a deployment.",
       runtimeSurfaceTitle: "Runtime observation",
       serverIdLabel: "Server ID",
       settingsDescription:
