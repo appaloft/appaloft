@@ -2234,13 +2234,18 @@ describe("console page structure", () => {
     expect(installedApplicationDetailPageSource).toContain("resourceDetailHref");
     expect(installedApplicationDetailPageSource).toContain("dependencyResourceHref");
     expect(installedApplicationDetailPageSource).toContain("deploymentHref");
-    expect(installedApplicationDetailPageSource).toContain("升级、回滚和卸载");
-    expect(installedApplicationDetailPageSource).toContain("不在默认页展示表单");
-    expect(installedApplicationDetailPageSource).toContain("概览");
-    expect(installedApplicationDetailPageSource).toContain("资源");
-    expect(installedApplicationDetailPageSource).toContain("依赖资源");
-    expect(installedApplicationDetailPageSource).toContain("访问入口");
-    expect(installedApplicationDetailPageSource).toContain("历史与生命周期");
+    expect(installedApplicationDetailPageSource).toContain(
+      "i18nKeys.console.installedApplications",
+    );
+    expect(installedApplicationDetailPageSource).toContain("tabOverview");
+    expect(installedApplicationDetailPageSource).toContain("tabResources");
+    expect(installedApplicationDetailPageSource).toContain("tabDependencies");
+    expect(installedApplicationDetailPageSource).toContain("tabAccess");
+    expect(installedApplicationDetailPageSource).toContain("tabHistory");
+    expect(installedApplicationDetailPageSource).not.toContain("owner surface");
+    expect(installedApplicationDetailPageSource).not.toContain("Resource owner");
+    expect(installedApplicationDetailPageSource).not.toContain("暂不可用");
+    expect(installedApplicationDetailPageSource).not.toContain("暂时还不能");
 
     const installedApplicationDisplaySurface = sourceBetween(
       installedApplicationDetailPageSource,
@@ -2283,13 +2288,13 @@ describe("console page structure", () => {
     );
     expect(installedApplicationOverviewTab).not.toContain("data-installed-application-public-urls");
     expect(installedApplicationResourcesTab).toContain("data-installed-application-resources");
-    expect(installedApplicationResourcesTab).toContain("创建的资源");
+    expect(installedApplicationResourcesTab).toContain("resourcesTitle");
     expect(installedApplicationDependenciesTab).toContain(
       "data-installed-application-dependencies",
     );
-    expect(installedApplicationDependenciesTab).toContain("打开治理");
+    expect(installedApplicationDependenciesTab).toContain("openGovernance");
     expect(installedApplicationAccessTab).toContain("data-installed-application-public-urls");
-    expect(installedApplicationAccessTab).toContain("公开 URL");
+    expect(installedApplicationAccessTab).toContain("accessTitle");
     expect(installedApplicationHistoryTab).toContain("data-installed-application-history");
     expect(installedApplicationHistoryTab).toContain("data-installed-application-lifecycle-gap");
     expect(installedApplicationHistoryTab).toContain(
@@ -2304,13 +2309,13 @@ describe("console page structure", () => {
     expect(installedApplicationHistoryTab).toContain(
       "data-installed-application-uninstall-governance",
     );
-    expect(installedApplicationHistoryTab).toContain("版本差异");
-    expect(installedApplicationHistoryTab).toContain("强确认");
-    expect(installedApplicationDisplaySurface).toContain("打开项目");
-    expect(installedApplicationDisplaySurface).toContain("打开首个资源");
-    expect(installedApplicationDisplaySurface).toContain("打开治理");
-    expect(installedApplicationDisplaySurface).toContain("打开公开 URL");
-    expect(installedApplicationDisplaySurface).toContain("打开最新部署");
+    expect(installedApplicationHistoryTab).toContain("upgradeDescription");
+    expect(installedApplicationHistoryTab).toContain("uninstallDescription");
+    expect(installedApplicationDisplaySurface).toContain("openProject");
+    expect(installedApplicationDisplaySurface).toContain("openPrimaryResource");
+    expect(installedApplicationDisplaySurface).toContain("openGovernance");
+    expect(installedApplicationDisplaySurface).toContain("openPublicUrl");
+    expect(installedApplicationDisplaySurface).toContain("openLatestDeployment");
     expect(installedApplicationDisplaySurface).not.toContain("<form");
     expect(installedApplicationDisplaySurface).not.toContain('type="submit"');
     expect(installedApplicationDisplaySurface).not.toContain("<Input");

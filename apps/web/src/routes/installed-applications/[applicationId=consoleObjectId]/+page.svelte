@@ -12,6 +12,7 @@
     Package,
     PlugZap,
   } from "@lucide/svelte";
+  import type { TranslationKey } from "@appaloft/i18n";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { request } from "$lib/api/client";
@@ -20,6 +21,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { deploymentDetailHref, formatTime, projectDetailHref, resourceDetailHref } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   type InstalledApplicationResourceRef =
     | { status: "planned"; resourceSlug?: string }
@@ -96,13 +98,14 @@
     lastChangedAt?: string;
   };
   type InstalledApplicationTab = "overview" | "resources" | "dependencies" | "access" | "history";
+  type InstalledApplicationTabItem = { value: InstalledApplicationTab; labelKey: TranslationKey };
 
-  const installedApplicationTabs: { value: InstalledApplicationTab; label: string }[] = [
-    { value: "overview", label: "概览" },
-    { value: "resources", label: "资源" },
-    { value: "dependencies", label: "依赖资源" },
-    { value: "access", label: "访问入口" },
-    { value: "history", label: "历史与生命周期" },
+  const installedApplicationTabs: InstalledApplicationTabItem[] = [
+    { value: "overview", labelKey: i18nKeys.console.installedApplications.tabOverview },
+    { value: "resources", labelKey: i18nKeys.console.installedApplications.tabResources },
+    { value: "dependencies", labelKey: i18nKeys.console.installedApplications.tabDependencies },
+    { value: "access", labelKey: i18nKeys.console.installedApplications.tabAccess },
+    { value: "history", labelKey: i18nKeys.console.installedApplications.tabHistory },
   ];
 
   const applicationId = $derived(page.params.applicationId ?? "");
@@ -170,13 +173,15 @@
       : "",
   );
   const breadcrumbs = $derived([
-    { label: "应用市场", href: "/marketplace" },
-    { label: "安装聚合", href: "/marketplace" },
+    { label: $t(i18nKeys.console.installedApplications.breadcrumbMarketplace), href: "/marketplace" },
+    { label: $t(i18nKeys.console.installedApplications.breadcrumbCurrent), href: "/marketplace" },
     { label: installedApplication?.application?.name ?? applicationId },
   ]);
   const activeTab = $derived(parseInstalledApplicationTab(page.url.searchParams.get("tab")));
   const latestDeploymentHref = $derived(deploymentIds[0] ? deploymentHref(deploymentIds[0]) : "");
-  const latestDeploymentLabel = $derived(deploymentIds[0] ?? "暂无部署记录");
+  const latestDeploymentLabel = $derived(
+    deploymentIds[0] ?? $t(i18nKeys.console.installedApplications.latestDeploymentEmpty),
+  );
 
   function parseInstalledApplicationTab(value: string | null): InstalledApplicationTab {
     if (
@@ -235,8 +240,8 @@
 </svelte:head>
 
 <ConsoleShell
-  title={installedApplication?.application?.name ?? "安装聚合"}
-  description="Blueprint 安装产生的聚合视图；资源运行态、配置和网络治理仍回到 Resource owner surface。"
+  title={installedApplication?.application?.name ?? $t(i18nKeys.console.installedApplications.pageFallbackTitle)}
+  description={$t(i18nKeys.console.installedApplications.pageDescription)}
   {breadcrumbs}
 >
   {#if installedApplicationQuery.isPending}
@@ -250,14 +255,14 @@
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-destructive" />
         <div class="space-y-2">
-          <Badge variant="outline">not-found</Badge>
-          <h1 class="text-xl font-semibold">安装聚合暂不可用</h1>
+          <Badge variant="outline">{$t(i18nKeys.console.installedApplications.notFoundBadge)}</Badge>
+          <h1 class="text-xl font-semibold">{$t(i18nKeys.console.installedApplications.notFoundTitle)}</h1>
           <p class="max-w-2xl text-sm leading-6 text-muted-foreground">
-            没有读取到这个安装聚合。可以回到应用市场，或从安装完成后的 handoff 重新进入。
+            {$t(i18nKeys.console.installedApplications.notFoundDescription)}
           </p>
           <Button href="/marketplace" variant="outline">
             <ArrowLeft class="size-4" />
-            返回应用市场
+            {$t(i18nKeys.console.installedApplications.backToMarketplace)}
           </Button>
         </div>
       </div>
@@ -284,21 +289,25 @@
               {installedApplication.application?.name ?? installedApplication.applicationId ?? applicationId}
             </h1>
             <p class="text-sm leading-6 text-muted-foreground">
-              {installedApplication.application?.projectName ?? installedApplication.application?.projectId ?? "项目"}
+              {installedApplication.application?.projectName ??
+                installedApplication.application?.projectId ??
+                $t(i18nKeys.console.installedApplications.fallbackProject)}
               {" · "}
-              {installedApplication.application?.environmentName ?? installedApplication.application?.environmentId ?? "环境"}
+              {installedApplication.application?.environmentName ??
+                installedApplication.application?.environmentId ??
+                $t(i18nKeys.console.installedApplications.fallbackEnvironment)}
             </p>
           </div>
           <div class="flex shrink-0 flex-wrap gap-2">
             {#if projectHref}
               <Button href={projectHref} variant="outline">
-                打开项目
+                {$t(i18nKeys.console.installedApplications.openProject)}
                 <ArrowRight class="size-4" />
               </Button>
             {/if}
             {#if primaryResourceHref}
               <Button href={primaryResourceHref}>
-                打开首个资源
+                {$t(i18nKeys.console.installedApplications.openPrimaryResource)}
                 <ArrowRight class="size-4" />
               </Button>
             {/if}
@@ -306,7 +315,7 @@
         </div>
       </section>
 
-      <nav class="console-detail-tabs" aria-label="安装聚合页面">
+      <nav class="console-detail-tabs" aria-label={$t(i18nKeys.console.installedApplications.tabAriaLabel)}>
         {#each installedApplicationTabs as tab (tab.value)}
           <a
             href={installedApplicationTabHref(tab.value)}
@@ -314,7 +323,7 @@
             class="console-detail-tab"
             aria-current={activeTab === tab.value ? "page" : undefined}
           >
-            {tab.label}
+            {$t(tab.labelKey)}
           </a>
         {/each}
       </nav>
@@ -327,72 +336,79 @@
                 <article class="console-panel p-4">
                   <div class="flex items-center gap-2 text-sm font-medium">
                     <Boxes class="size-4 text-muted-foreground" />
-                    资源
+                    {$t(i18nKeys.console.installedApplications.outcomeResources)}
                   </div>
                   <p class="mt-3 text-2xl font-semibold">{components.length}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">Resource owner 仍在资源页</p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.installedApplications.outcomeResourcesDescription)}
+                  </p>
                 </article>
                 <article class="console-panel p-4">
                   <div class="flex items-center gap-2 text-sm font-medium">
                     <PlugZap class="size-4 text-muted-foreground" />
-                    依赖
+                    {$t(i18nKeys.console.installedApplications.outcomeDependencies)}
                   </div>
                   <p class="mt-3 text-2xl font-semibold">{dependencies.length}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">绑定和治理回到依赖资源页</p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.installedApplications.outcomeDependenciesDescription)}
+                  </p>
                 </article>
                 <article class="console-panel p-4">
                   <div class="flex items-center gap-2 text-sm font-medium">
                     <Link2 class="size-4 text-muted-foreground" />
-                    公开 URL
+                    {$t(i18nKeys.console.installedApplications.outcomePublicUrls)}
                   </div>
                   <p class="mt-3 text-2xl font-semibold">{publicEndpoints.length}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">访问治理回到 Resource Networking</p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.installedApplications.outcomePublicUrlsDescription)}
+                  </p>
                 </article>
               </section>
 
               <section class="console-panel p-5" data-installed-application-owner-handoff>
                 <div class="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <h2 class="text-lg font-semibold">下一步</h2>
+                    <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.nextActionsTitle)}</h2>
                     <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                      这里展示安装结果，不接管资源运行态。继续操作时回到对应 owner surface。
+                      {$t(i18nKeys.console.installedApplications.nextActionsDescription)}
                     </p>
                   </div>
                   <ListChecks class="size-5 text-muted-foreground" />
                 </div>
                 <div class="grid gap-3 md:grid-cols-3">
                   <article class="rounded-md border bg-muted/20 p-4">
-                    <p class="text-sm font-medium">项目聚合</p>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.projectSummaryTitle)}</p>
                     <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                      查看项目资源板、环境和部署 rollup。
+                      {$t(i18nKeys.console.installedApplications.projectSummaryDescription)}
                     </p>
                     {#if projectHref}
                       <Button href={projectHref} variant="outline" size="sm" class="mt-3">
-                        打开项目
+                        {$t(i18nKeys.console.installedApplications.openProject)}
                         <ArrowRight class="size-4" />
                       </Button>
                     {/if}
                   </article>
                   <article class="rounded-md border bg-muted/20 p-4">
-                    <p class="text-sm font-medium">资源 owner</p>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.resourceControlsTitle)}</p>
                     <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                      配置、网络、运行态和部署动作归 Resource。
+                      {$t(i18nKeys.console.installedApplications.resourceControlsDescription)}
                     </p>
                     {#if primaryResourceHref}
                       <Button href={primaryResourceHref} size="sm" class="mt-3">
-                        打开首个资源
+                        {$t(i18nKeys.console.installedApplications.openPrimaryResource)}
                         <ArrowRight class="size-4" />
                       </Button>
                     {/if}
                   </article>
                   <article class="rounded-md border bg-muted/20 p-4">
-                    <p class="text-sm font-medium">部署观察</p>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.deploymentObservationTitle)}</p>
                     <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                      最新部署：<span class="font-mono">{latestDeploymentLabel}</span>
+                      {$t(i18nKeys.console.installedApplications.latestDeploymentLabel)}
+                      <span class="font-mono">{latestDeploymentLabel}</span>
                     </p>
                     {#if latestDeploymentHref}
                       <Button href={latestDeploymentHref} variant="outline" size="sm" class="mt-3">
-                        打开最新部署
+                        {$t(i18nKeys.console.installedApplications.openLatestDeployment)}
                         <ArrowRight class="size-4" />
                       </Button>
                     {/if}
@@ -405,8 +421,10 @@
               <section class="console-side-panel space-y-4" data-installed-application-handoff>
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <h2 class="text-lg font-semibold">安装交接</h2>
-                    <p class="text-sm text-muted-foreground">聚合视图，不承担资源配置所有权。</p>
+                    <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.installResultTitle)}</h2>
+                    <p class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.installedApplications.installResultDescription)}
+                    </p>
                   </div>
                   <ListChecks class="size-5 text-muted-foreground" />
                 </div>
@@ -425,15 +443,18 @@
                     </span>
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <span class="text-muted-foreground">版本</span>
+                    <span class="text-muted-foreground">{$t(i18nKeys.console.installedApplications.versionLabel)}</span>
                     <span class="font-mono">
-                      {installedApplication.application?.source?.blueprintVersion ?? "unknown"}
+                      {installedApplication.application?.source?.blueprintVersion ??
+                        $t(i18nKeys.common.status.unknown)}
                     </span>
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <span class="text-muted-foreground">更新时间</span>
+                    <span class="text-muted-foreground">{$t(i18nKeys.console.installedApplications.updatedAtLabel)}</span>
                     <span class="font-mono">
-                      {installedApplication.lastChangedAt ? formatTime(installedApplication.lastChangedAt) : "unknown"}
+                      {installedApplication.lastChangedAt
+                        ? formatTime(installedApplication.lastChangedAt)
+                        : $t(i18nKeys.common.status.unknown)}
                     </span>
                   </div>
                 </div>
@@ -442,7 +463,8 @@
                   <div class="console-subtle-panel px-3 py-2 text-sm">
                     <p class="font-medium">{installedApplication.progress.currentStep ?? installedApplication.status}</p>
                     <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                      {installedApplication.progress.message ?? "安装进度更新后会显示在这里。"}
+                      {installedApplication.progress.message ??
+                        $t(i18nKeys.console.installedApplications.progressFallback)}
                     </p>
                   </div>
                 {/if}
@@ -459,7 +481,7 @@
           <section class="console-panel p-5" data-installed-application-resources>
             <div class="mb-4 flex items-center gap-2">
               <Boxes class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">创建的资源</h2>
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.resourcesTitle)}</h2>
             </div>
             <div class="space-y-3">
               {#each components as component (component.componentId)}
@@ -468,7 +490,7 @@
                     <div class="min-w-0">
                       <h3 class="font-semibold">{component.name ?? component.componentId}</h3>
                       <p class="mt-1 text-sm text-muted-foreground">
-                        {component.kind ?? "component"} · {component.resource?.status ?? "planned"}
+                        {component.kind ?? $t(i18nKeys.console.installedApplications.componentFallback)} · {component.resource?.status ?? $t(i18nKeys.console.installedApplications.plannedStatus)}
                       </p>
                     </div>
                     {#if component.resource?.status === "realized" && component.resource.resourceId && installedApplication.application?.projectId && installedApplication.application.environmentId}
@@ -481,7 +503,7 @@
                         size="sm"
                         variant="outline"
                       >
-                        打开资源
+                        {$t(i18nKeys.console.installedApplications.openResource)}
                         <ArrowRight class="size-4" />
                       </Button>
                     {/if}
@@ -489,7 +511,7 @@
                 </article>
               {:else}
                 <p class="text-sm text-muted-foreground">
-                  安装完成后，创建的资源会显示在这里。
+                  {$t(i18nKeys.console.installedApplications.resourcesEmpty)}
                 </p>
               {/each}
             </div>
@@ -498,7 +520,7 @@
           <section class="console-panel p-5" data-installed-application-dependencies>
             <div class="mb-4 flex items-center gap-2">
               <PlugZap class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">依赖资源</h2>
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.dependenciesTitle)}</h2>
             </div>
             <div class="space-y-3">
               {#each dependencies as dependency (dependency.requirementId)}
@@ -510,17 +532,19 @@
                         <Badge variant="outline">{dependency.bindingStatus ?? "planned"}</Badge>
                       </div>
                       <p class="mt-1 text-sm text-muted-foreground">
-                        {dependency.kind ?? "dependency"} · {dependency.plannedMode ?? "bind"}
+                        {dependency.kind ?? $t(i18nKeys.console.installedApplications.dependencyFallback)} · {dependency.plannedMode ?? $t(i18nKeys.console.installedApplications.dependencyModeFallback)}
                       </p>
                     </div>
                     <Button href={dependencyResourceHref(dependency.dependencyResourceId)} size="sm" variant="outline">
-                      打开治理
+                      {$t(i18nKeys.console.installedApplications.openGovernance)}
                       <ArrowRight class="size-4" />
                     </Button>
                   </div>
                 </article>
               {:else}
-                <p class="text-sm text-muted-foreground">这个安装没有记录到依赖资源。</p>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.installedApplications.dependenciesEmpty)}
+                </p>
               {/each}
             </div>
           </section>
@@ -528,7 +552,7 @@
           <section class="console-panel p-5" data-installed-application-public-urls>
             <div class="mb-4 flex items-center gap-2">
               <Link2 class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">公开 URL</h2>
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.accessTitle)}</h2>
             </div>
             <div class="space-y-3">
               {#each publicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
@@ -539,14 +563,14 @@
                       <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{endpoint.url}</p>
                     </div>
                     <Button href={endpoint.url} target="_blank" rel="noreferrer" size="sm" variant="outline">
-                      打开公开 URL
+                      {$t(i18nKeys.console.installedApplications.openPublicUrl)}
                       <ExternalLink class="size-4" />
                     </Button>
                   </div>
                 </article>
               {:else}
                 <p class="text-sm text-muted-foreground">
-                  当前安装聚合没有公开访问摘要。域名、TLS 和访问策略仍在 Resource Networking 管理。
+                  {$t(i18nKeys.console.installedApplications.accessEmpty)}
                 </p>
               {/each}
             </div>
@@ -556,20 +580,28 @@
             <section class="console-panel p-5" data-installed-application-history>
               <div class="mb-4 flex items-center gap-2">
                 <ListChecks class="size-4 text-muted-foreground" />
-                <h2 class="text-lg font-semibold">安装历史</h2>
+                <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.historyTitle)}</h2>
               </div>
               <div class="space-y-3 text-sm">
                 <div class="rounded-md border bg-muted/20 p-4">
-                  <p class="text-xs text-muted-foreground">创建时间</p>
-                  <p class="mt-1 font-mono">{installedApplication.createdAt ? formatTime(installedApplication.createdAt) : "unknown"}</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.installedApplications.createdAtLabel)}</p>
+                  <p class="mt-1 font-mono">
+                    {installedApplication.createdAt
+                      ? formatTime(installedApplication.createdAt)
+                      : $t(i18nKeys.common.status.unknown)}
+                  </p>
                 </div>
                 <div class="rounded-md border bg-muted/20 p-4">
-                  <p class="text-xs text-muted-foreground">最后变更</p>
-                  <p class="mt-1 font-mono">{installedApplication.lastChangedAt ? formatTime(installedApplication.lastChangedAt) : "unknown"}</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.installedApplications.lastChangedAtLabel)}</p>
+                  <p class="mt-1 font-mono">
+                    {installedApplication.lastChangedAt
+                      ? formatTime(installedApplication.lastChangedAt)
+                      : $t(i18nKeys.common.status.unknown)}
+                  </p>
                 </div>
                 {#if installedApplication.rollback}
                   <div class="rounded-md border bg-muted/20 p-4">
-                    <p class="text-xs text-muted-foreground">回滚</p>
+                    <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.installedApplications.rollbackTitle)}</p>
                     <p class="mt-1 text-sm">
                       {installedApplication.rollback.reason ?? "rollback requested"}
                     </p>
@@ -581,39 +613,41 @@
             <aside class="console-side-panel space-y-4" data-installed-application-lifecycle-gap>
               <div class="flex items-center gap-2">
                 <Package class="size-4 text-muted-foreground" />
-                <h2 class="text-sm font-semibold">生命周期</h2>
+                <h2 class="text-sm font-semibold">{$t(i18nKeys.console.installedApplications.lifecycleTitle)}</h2>
               </div>
               <p class="text-sm leading-6 text-muted-foreground">
-                升级、回滚和卸载需要单独的确认流程。当前页面只展示状态、影响范围和相关入口，不在默认页展示表单。
+                {$t(i18nKeys.console.installedApplications.lifecycleDescription)}
               </p>
               <div class="grid gap-3" data-installed-application-lifecycle-governance>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-upgrade-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">升级</p>
-                    <Badge variant="outline">需确认</Badge>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.upgradeTitle)}</p>
+                    <Badge variant="outline">{$t(i18nKeys.console.installedApplications.upgradeBadge)}</Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    升级前需要展示版本差异、资源影响和部署计划，再进入确认流程。
+                    {$t(i18nKeys.console.installedApplications.upgradeDescription)}
                   </p>
                 </section>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-rollback-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">回滚</p>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.rollbackTitle)}</p>
                     <Badge variant="outline">
-                      {installedApplication.rollback ? "已请求" : "未请求"}
+                      {installedApplication.rollback
+                        ? $t(i18nKeys.console.installedApplications.rollbackRequested)
+                        : $t(i18nKeys.console.installedApplications.rollbackNotRequested)}
                     </Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    回滚需要基于安装历史和资源部署状态，不能在聚合页直接提交。
+                    {$t(i18nKeys.console.installedApplications.rollbackDescription)}
                   </p>
                 </section>
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-uninstall-governance>
                   <div class="flex items-center justify-between gap-3">
-                    <p class="text-sm font-medium">卸载</p>
-                    <Badge variant="outline">需要确认</Badge>
+                    <p class="text-sm font-medium">{$t(i18nKeys.console.installedApplications.uninstallTitle)}</p>
+                    <Badge variant="outline">{$t(i18nKeys.console.installedApplications.uninstallBadge)}</Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                    卸载前需要列出会受影响的资源、依赖资源和公开 URL，并通过强确认。
+                    {$t(i18nKeys.console.installedApplications.uninstallDescription)}
                   </p>
                 </section>
               </div>
