@@ -303,6 +303,27 @@ function componentOpenTagsOutsideDialog(source: string, componentName: string): 
   }
 }
 
+function formTagsOutsideDialog(source: string): string[] {
+  const outsideTags: string[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const formIndex = source.indexOf("<form", cursor);
+    if (formIndex < 0) {
+      return outsideTags;
+    }
+
+    const beforeForm = source.slice(0, formIndex);
+    const lastDialogOpen = beforeForm.lastIndexOf("<Dialog.Root");
+    const lastDialogClose = beforeForm.lastIndexOf("</Dialog.Root>");
+    if (lastDialogOpen <= lastDialogClose) {
+      outsideTags.push(source.slice(formIndex, source.indexOf(">", formIndex) + 1));
+    }
+
+    cursor = formIndex + "<form".length;
+  }
+}
+
 function routePageSources(rootPath: string): Array<{ path: string; source: string }> {
   const entries: Array<{ path: string; source: string }> = [];
 
@@ -316,6 +337,26 @@ function routePageSources(rootPath: string): Array<{ path: string; source: strin
     }
 
     if (name === "+page.svelte") {
+      entries.push({ path, source: readFileSync(path, "utf8") });
+    }
+  }
+
+  return entries;
+}
+
+function svelteSources(rootPath: string): Array<{ path: string; source: string }> {
+  const entries: Array<{ path: string; source: string }> = [];
+
+  for (const name of readdirSync(rootPath)) {
+    const path = join(rootPath, name);
+    const stat = statSync(path);
+
+    if (stat.isDirectory()) {
+      entries.push(...svelteSources(path));
+      continue;
+    }
+
+    if (name.endsWith(".svelte")) {
       entries.push({ path, source: readFileSync(path, "utf8") });
     }
   }
@@ -401,6 +442,27 @@ describe("console page structure", () => {
     expect(pagesWithFormComponentsOutsideDialogs).toEqual([]);
     expect(componentOpenTagsOutsideDialog(consoleShellSource, "QuickDeploySheet")).toEqual([]);
     expect(componentOpenTagsOutsideDialog(projectDetailPageSource, "QuickDeploySheet")).toEqual([]);
+  });
+
+  test("[CONSOLE-DISPLAY-STATE-IA-000D] keeps console component forms inside dialogs or explicit form components", () => {
+    const formComponentNames = new Set([
+      "ProjectCreateForm.svelte",
+      "EnvironmentCreateForm.svelte",
+      "ServerCreateForm.svelte",
+      "ServerRegistrationForm.svelte",
+    ]);
+    const componentFormsOutsideDialogs = svelteSources(
+      fileURLToPath(new URL("../components/console", import.meta.url)),
+    )
+      .filter(({ path }) => !formComponentNames.has(path.split("/").at(-1) ?? ""))
+      .flatMap(({ path, source }) =>
+        formTagsOutsideDialog(source).map(
+          (formTag) =>
+            `${path.replace(fileURLToPath(new URL("../components/console", import.meta.url)), "")}: ${formTag}`,
+        ),
+      );
+
+    expect(componentFormsOutsideDialogs).toEqual([]);
   });
 
   test("[PROJECT-DEPLOYMENT-IA-002] opens project deployment actions in context instead of legacy pages", () => {
