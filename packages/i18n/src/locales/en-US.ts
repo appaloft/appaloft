@@ -712,17 +712,16 @@ export const enUS = {
         "No deployment records yet. Quick deploy creates the project relationship, environment snapshot, and deployment record.",
       latestDeploymentTitle: "Latest deployment",
       modeCard: "Mode",
-      pageDescription: "Cross-project attention, deployment activity, and next actions",
+      pageDescription: "Cross-project status, deployment activity, and recent events",
       pageTitle: "Home",
       projectRelationsDescription:
         "Only the first three projects are shown here; the full relationship view is on the projects page.",
       projectRelationsEmpty:
         "After you create the first project, project and deployment relationships appear here.",
       projectRelationsTitle: "Project relationships",
-      projectsDescription:
-        "Review failed deployments, running deployments, access gaps, and recent deployment records.",
+      projectsDescription: "Review deployment status, resource access, and recent records.",
       projectsHeading: "Console overview",
-      projectsKicker: "Operations",
+      projectsKicker: "Overview",
       readinessCard: "Readiness",
       serverAvailableTarget: "Available as deployment targets",
       serverCreatedDuringDeployment: "Can be created during deployment",
@@ -732,7 +731,7 @@ export const enUS = {
       activeDeploymentsDescription: "Deployment records that are being created, planned, or run.",
       activeDeploymentsTitle: "Active deployments",
       attentionDescription:
-        "Failed deployments, active deployments, resources without deployments, and access route gaps.",
+        "Projects with failed deployments, active deployments, undeployed resources, or access route gaps.",
       attentionFailedDescription:
         "{{project}} has {{count}} failed deployments. The latest affected resource is {{resource}}.",
       attentionFailedTitle: "Failed deployment",
@@ -746,7 +745,7 @@ export const enUS = {
       attentionRunningDescription:
         "{{project}} has {{count}} deployments in progress. Current resource: {{resource}}.",
       attentionRunningTitle: "Deployment in progress",
-      attentionTitle: "Attention",
+      attentionTitle: "Status to review",
       attentionToneCritical: "Needs action",
       attentionToneProgress: "In progress",
       attentionToneSetup: "Setup",
@@ -783,13 +782,13 @@ export const enUS = {
       managedServicesMetric: "Managed services",
       accessRouteTitle: "Access",
       moreResources: "+{{count}} more",
-      nextStepsDescription: "Keep creation and full management in their dedicated views.",
-      nextStepsTitle: "Next actions",
+      nextStepsDescription: "Creation, review, and management entry points grouped by object.",
+      nextStepsTitle: "Common entries",
       noAccessRoute: "No access route yet",
       noActiveDeployments: "No deployments are currently running.",
       noAttentionDescription:
-        "No failed deployments, active deployments, undeployed resources, or access route gaps.",
-      noAttentionTitle: "Project status is clear",
+        "There are no failed deployments, active deployments, undeployed resources, or access route gaps.",
+      noAttentionTitle: "No status to review",
       noDeploymentsShort: "No deployments yet",
       noFailedDeployments: "No failed deployments right now.",
       noProjectDescription: "No description",

@@ -123,15 +123,21 @@ describe("operations workbench home", () => {
     );
 
     expect(zhLocaleSource).toContain('projectsHeading: "控制台概览"');
-    expect(zhLocaleSource).toContain(
-      'projectsDescription: "查看失败部署、进行中部署、访问缺口和最近部署记录。"',
-    );
+    expect(zhLocaleSource).toContain('projectsDescription: "查看部署状态、资源访问和最近记录。"');
+    expect(zhLocaleSource).toContain('attentionTitle: "待处理状态"');
+    expect(zhLocaleSource).toContain('nextStepsTitle: "常用入口"');
+    expect(zhLocaleSource).not.toContain("先处理当前");
     expect(zhLocaleSource).not.toContain("最值得");
     expect(zhLocaleSource).not.toContain("值得立刻");
+    expect(zhLocaleSource).not.toContain("值得打开");
+    expect(zhLocaleSource).not.toContain("只显示值得");
     expect(zhLocaleSource).not.toContain("read model");
     expect(zhLocaleSource).not.toContain("尚未接入");
     expect(enLocaleSource).toContain('projectsHeading: "Console overview"');
+    expect(enLocaleSource).toContain('attentionTitle: "Status to review"');
+    expect(enLocaleSource).toContain('nextStepsTitle: "Common entries"');
     expect(enLocaleSource).not.toContain("worth opening");
+    expect(enLocaleSource).not.toContain("next actions");
     expect(enLocaleSource).not.toContain("obviously incomplete");
     expect(enLocaleSource).not.toContain("Triage attention");
     expect(enLocaleSource).not.toContain("read model is not connected");
