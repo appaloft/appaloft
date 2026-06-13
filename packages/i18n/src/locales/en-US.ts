@@ -890,7 +890,7 @@ export const enUS = {
       workerObservedRuntimeSummary: "Worker replicas {{online}}/{{expected}}",
       workerObservedRuntimeWorkers: "Backend worker replicas",
       workerObservedRuntimeWorkersBody:
-        "These are the replicas observed by the heartbeat read model after one worker service is scaled with replicas.",
+        "These are the worker replicas currently observed in heartbeat after the service is scaled.",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
       workerRuntimeGroup: "group",
@@ -909,6 +909,7 @@ export const enUS = {
       workerRuntimeUnavailable: "System doctor did not return durable worker runtime topology.",
       workerRuntimeWorkerId: "Replica ID",
       workerRuntimeWorkerIds: "process worker IDs",
+      workerRuntimeSlot: "Slot",
       workerRuntimeWorkers: "process worker executors",
       workerSafetyCertificateRetry: "Certificate retry only",
       workerSafetyDurableProcessDelivery: "Durable work delivery",

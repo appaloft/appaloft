@@ -945,33 +945,37 @@ server-config-deploy: true`);
                               </div>
 
                               {#if observed.heartbeat.workers.length > 0}
-                                <div class="mt-3 overflow-hidden rounded-md border bg-background">
-                                  <Table.Root>
-                                    <Table.Header>
-                                      <Table.Row class="hover:bg-transparent">
-                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
-                                        <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
-                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
-                                      </Table.Row>
-                                    </Table.Header>
-                                    <Table.Body>
-                                      {#each observed.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
-                                        <Table.Row>
-                                          <Table.Cell class="max-w-72 break-all font-mono text-xs">
-                                            {runtimeWorker.workerId}
-                                          </Table.Cell>
-                                          <Table.Cell>
-                                            <Badge variant={runtimeWorker.online ? "default" : "outline"}>
-                                              {workerOnlineStatusLabel(runtimeWorker)}
-                                            </Badge>
-                                          </Table.Cell>
-                                          <Table.Cell class="text-muted-foreground">
-                                            {formatTime(runtimeWorker.lastSeenAt)}
-                                          </Table.Cell>
-                                        </Table.Row>
-                                      {/each}
-                                    </Table.Body>
-                                  </Table.Root>
+                                <div class="console-record-list mt-3">
+                                  {#each observed.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
+                                    <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_7rem_9rem_12rem] lg:items-center">
+                                      <div class="min-w-0">
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.console.instance.workerRuntimeWorkerId)}
+                                        </p>
+                                        <p class="mt-1 break-all font-mono text-xs">{runtimeWorker.workerId}</p>
+                                      </div>
+                                      <div class="text-sm">
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.console.instance.workerRuntimeSlot)}
+                                        </p>
+                                        <p class="mt-1 font-mono">{runtimeWorker.slot}</p>
+                                      </div>
+                                      <div>
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.common.domain.status)}
+                                        </p>
+                                        <Badge class="mt-1" variant={runtimeWorker.online ? "default" : "outline"}>
+                                          {workerOnlineStatusLabel(runtimeWorker)}
+                                        </Badge>
+                                      </div>
+                                      <div class="text-sm text-muted-foreground">
+                                        <p class="text-xs font-medium">
+                                          {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}
+                                        </p>
+                                        <p class="mt-1">{formatTime(runtimeWorker.lastSeenAt)}</p>
+                                      </div>
+                                    </div>
+                                  {/each}
                                 </div>
                               {/if}
                             {:else}

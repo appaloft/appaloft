@@ -846,7 +846,7 @@ export const zhCN = {
       workerObservedRuntimeSummary: "Worker 副本 {{online}}/{{expected}}",
       workerObservedRuntimeWorkers: "后台 Worker 副本",
       workerObservedRuntimeWorkersBody:
-        "这些是同一个 worker 服务通过 replicas 启动后，heartbeat read model 实际观测到的副本。",
+        "这些是同一个 worker 服务扩容后，当前心跳里实际观测到的副本。",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
       workerRuntimeGroup: "group",
@@ -865,6 +865,7 @@ export const zhCN = {
       workerRuntimeUnavailable: "doctor 没有返回 durable worker runtime 拓扑。",
       workerRuntimeWorkerId: "副本 ID",
       workerRuntimeWorkerIds: "本进程 worker IDs",
+      workerRuntimeSlot: "槽位",
       workerRuntimeWorkers: "本进程执行 worker",
       workerSafetyCertificateRetry: "仅证书重试",
       workerSafetyDurableProcessDelivery: "Durable work 投递",

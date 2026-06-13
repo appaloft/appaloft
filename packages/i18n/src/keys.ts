@@ -831,6 +831,7 @@ export const i18nKeys = {
       workerRuntimeUnavailable: "console:instance.workerRuntimeUnavailable",
       workerRuntimeWorkerId: "console:instance.workerRuntimeWorkerId",
       workerRuntimeWorkerIds: "console:instance.workerRuntimeWorkerIds",
+      workerRuntimeSlot: "console:instance.workerRuntimeSlot",
       workerRuntimeWorkers: "console:instance.workerRuntimeWorkers",
       workerSafetyCertificateRetry: "console:instance.workerSafetyCertificateRetry",
       workerSafetyDurableProcessDelivery: "console:instance.workerSafetyDurableProcessDelivery",
