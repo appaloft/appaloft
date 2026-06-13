@@ -712,7 +712,7 @@ export const enUS = {
         "No deployment records yet. Quick deploy creates the project relationship, environment snapshot, and deployment record.",
       latestDeploymentTitle: "Latest deployment",
       modeCard: "Mode",
-      pageDescription: "Control plane status, recent actions, and entry points",
+      pageDescription: "Cross-project attention, deployment activity, and next actions",
       pageTitle: "Home",
       projectRelationsDescription:
         "Only the first three projects are shown here; the full relationship view is on the projects page.",
@@ -720,8 +720,8 @@ export const enUS = {
         "After you create the first project, project and deployment relationships appear here.",
       projectRelationsTitle: "Project relationships",
       projectsDescription:
-        "Open a project to manage its apps, resources, deployments, environments, and access routes.",
-      projectsHeading: "Projects",
+        "Triage attention across projects, follow running deployments, and continue from the next operational step.",
+      projectsHeading: "Workbench",
       projectsKicker: "Workspace",
       readinessCard: "Readiness",
       serverAvailableTarget: "Available as deployment targets",
@@ -729,6 +729,27 @@ export const enUS = {
       environmentSnapshotEntry: "Saved variable snapshot entry",
       environmentCreatedDuringDeployment: "Create the first environment during deployment",
       activeDeploymentsMetric: "In flight",
+      activeDeploymentsDescription: "Deployment attempts that are being created, planned, or run.",
+      activeDeploymentsTitle: "Active deployments",
+      attentionDescription:
+        "Ordered by failures, running work, missing deployments, and access gaps. Only projects worth opening now are shown.",
+      attentionFailedDescription:
+        "{{project}} has {{count}} failed deployments. The latest affected resource is {{resource}}.",
+      attentionFailedTitle: "Failed deployment needs review",
+      attentionHeading: "Projects needing attention",
+      attentionNoAccessDescription:
+        "{{project}} has {{count}} resources without a current access route. Review networking from the project.",
+      attentionNoAccessTitle: "Access route gap",
+      attentionNoDeploymentDescription:
+        "{{project}} has {{count}} resources but no deployment records yet.",
+      attentionNoDeploymentTitle: "Resources not deployed",
+      attentionRunningDescription:
+        "{{project}} has {{count}} deployments in progress. Current resource: {{resource}}.",
+      attentionRunningTitle: "Deployment in progress",
+      attentionTitle: "Attention",
+      attentionToneCritical: "Needs action",
+      attentionToneProgress: "In progress",
+      attentionToneSetup: "Setup",
       aiIntegrationDescription:
         "The skill owns agent workflow judgment; MCP calls the same operation catalog precisely.",
       aiIntegrationMcpBody:
@@ -750,6 +771,9 @@ export const enUS = {
         "Choose a local folder, GitHub repository, remote Git URL, Docker image, Compose file, or Blueprint to create the first project.",
       emptyStateTitle: "No deployed applications yet",
       failedDeploymentsMetric: "Failed",
+      failedDeploymentsDescription:
+        "Failed deployments link to observation and recovery. Configuration stays out of home.",
+      failedDeploymentsTitle: "Failed deployments",
       healthyDeploymentsMetric: "Healthy",
       recentActivityDescription:
         "Commands, events, configuration changes, and automation events will appear after the unified activity read model is connected.",
@@ -762,11 +786,16 @@ export const enUS = {
       nextStepsDescription: "Keep creation and full management in their dedicated views.",
       nextStepsTitle: "Next actions",
       noAccessRoute: "No access route yet",
+      noActiveDeployments: "No deployments are currently running.",
+      noAttentionDescription:
+        "No failed, running, or obviously incomplete projects right now. Continue from recent deployments or the project page.",
+      noAttentionTitle: "No projects need immediate action",
       noDeploymentsShort: "No deployments yet",
+      noFailedDeployments: "No failed deployments right now.",
       noProjectDescription: "No description",
       noResourcesInProject: "No resources yet",
       operationContextDescription:
-        "Small operational context without turning home into a metrics board.",
+        "Compact cross-project signals for active deployments, failures, resources, and servers.",
       operationContextTitle: "Operations",
       quickActionsDescription: "Continue from deploys, servers, and managed services",
       quickActionsTitle: "Common actions",

@@ -7,9 +7,9 @@ const homePageSource = readFileSync(
   "utf8",
 );
 
-describe("project-first home", () => {
-  test("[HOME-PROJECT-FIRST-001] uses list queries for the project entry view", () => {
-    expect(homePageSource).toContain("const homeProjectListLimit = 8");
+describe("operations workbench home", () => {
+  test("[HOME-WORKBENCH-001] uses list queries for cross-project operational context", () => {
+    expect(homePageSource).toContain("const homeProjectListLimit = 12");
     expect(homePageSource).toContain("orpcClient.projects.list({ limit: homeProjectListLimit })");
     expect(homePageSource).toContain("orpcClient.resources.list({ limit: homeResourceListLimit })");
     expect(homePageSource).toContain(
@@ -18,78 +18,73 @@ describe("project-first home", () => {
     expect(homePageSource).toContain(
       "orpcClient.deployments.list({ limit: homeDeploymentListLimit })",
     );
+    expect(homePageSource).toContain("orpcClient.servers.count({})");
+    expect(homePageSource).toContain("orpcClient.deployments.count({})");
+    expect(homePageSource).toContain("orpcClient.resources.count({})");
   });
 
-  test("[HOME-PROJECT-FIRST-002] demotes raw metrics and avoids dashboard count grids", () => {
-    expect(homePageSource).not.toContain("nothing-metric-grid");
-    expect(homePageSource).not.toContain("nothing-metric-cell");
-    expect(homePageSource).not.toContain("orpcClient.projects.count({})");
-    expect(homePageSource).not.toContain("orpcClient.resources.count({})");
-    expect(homePageSource).not.toContain("orpcClient.environments.count({})");
-    expect(homePageSource).not.toContain("orpcClient.dependencyResources.count({})");
-    expect(homePageSource).not.toContain(
-      "orpcClient.deployments.count({ statuses: [...activeDeploymentStatuses] })",
+  test("[HOME-WORKBENCH-002] does not render projects as the primary list surface", () => {
+    expect(homePageSource).toContain("data-home-workbench-heading");
+    expect(homePageSource).toContain("data-home-attention-workqueue");
+    expect(homePageSource).toContain("data-home-active-deployments");
+    expect(homePageSource).toContain("data-home-failed-deployments");
+    expect(homePageSource).toContain("data-home-deployment-rollup");
+    expect(homePageSource).not.toContain("data-home-project-context");
+    expect(homePageSource).not.toContain("data-home-project-list");
+    expect(homePageSource).not.toContain("data-home-project-row");
+    expect(homePageSource).not.toContain("visibleProjectResources(project)");
+    expect(homePageSource).not.toContain("nothing-project-card");
+    expect(homePageSource).not.toContain("nothing-project-metrics");
+    expect(homePageSource).not.toContain("nothing-project-context-row");
+    expect(homePageSource).not.toContain("nothing-project-context-list");
+    expect(homePageSource).not.toContain("projectContextLine(project)");
+  });
+
+  test("[HOME-WORKBENCH-003] derives attention from deployment and access state", () => {
+    expect(homePageSource).toContain(
+      'type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment"',
     );
-    expect(homePageSource).not.toContain('orpcClient.deployments.count({ status: "failed" })');
-  });
-
-  test("[HOME-PROJECT-FIRST-003] renders projects as the primary interactive surface", () => {
-    expect(homePageSource).toContain("data-home-project-list");
-    expect(homePageSource).toContain("data-home-project-row");
-    expect(homePageSource).toContain("projectDetailHref(project.id)");
-    expect(homePageSource).toContain("visibleProjectResources(project)");
-    expect(homePageSource).toContain("resourceDetailHref(resource)");
+    expect(homePageSource).toContain("const attentionItems = $derived.by");
+    expect(homePageSource).toContain("failedDeployment");
+    expect(homePageSource).toContain("runningDeployment");
+    expect(homePageSource).toContain("resourceWithoutAccess");
     expect(homePageSource).toContain("selectCurrentResourceAccessRoute(resource.accessSummary)");
+    expect(homePageSource).toContain("deploymentDetailHref(failedDeployment)");
+    expect(homePageSource).toContain("deploymentDetailHref(runningDeployment)");
   });
 
-  test("[HOME-PROJECT-FIRST-004] keeps app/resource detail in project and resource routes", () => {
-    expect(homePageSource).toContain("i18nKeys.console.home.resourcePreviewLabel");
-    expect(homePageSource).toContain("i18nKeys.console.home.accessRouteTitle");
-    expect(homePageSource).toContain("i18nKeys.console.home.noResourcesInProject");
-    expect(homePageSource).toContain("i18nKeys.common.actions.viewDetails");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.projectRelationsTitle");
-    expect(homePageSource).not.toContain("i18nKeys.console.home.dashboardOverviewTitle");
-  });
-
-  test("[HOME-EMPTY-STATE-001] guides the first deployment only when there is no work", () => {
-    expect(homePageSource).toContain("!hasWork");
+  test("[HOME-WORKBENCH-004] keeps creation in modal/focused entry points", () => {
     expect(homePageSource).toContain("<ConsoleEmptyState");
-    expect(homePageSource).toContain('tone="deployment"');
     expect(homePageSource).toContain('href="/?modal=quick-deploy"');
-    expect(homePageSource).not.toContain('href="/deploy"');
-    expect(homePageSource).toContain("i18nKeys.console.home.emptyStateTitle");
     expect(homePageSource).toContain("i18nKeys.common.actions.quickDeploy");
+    expect(homePageSource).not.toContain('href="/deploy"');
+    expect(homePageSource).not.toContain("deployments/new");
+    expect(homePageSource).not.toContain("<form");
+    expect(homePageSource).not.toContain("ProjectCreateForm");
+    expect(homePageSource).not.toContain("ServerRegistrationForm");
   });
 
-  test("[HOME-LAYOUT-001] lets project rows use the available console width", () => {
+  test("[HOME-WORKBENCH-005] marks activity as a read-model gap", () => {
+    expect(homePageSource).toContain("data-home-activity-read-model-gap");
+    expect(homePageSource).toContain("recentActivityTitle");
+    expect(homePageSource).toContain("recentActivityDescription");
+    expect(homePageSource).toContain("recentActivityReadModelGap");
+    expect(homePageSource).toContain("recentDeploymentsReadModelGap");
+    expect(homePageSource).not.toContain("orpcClient.activity");
+    expect(homePageSource).not.toContain("orpcClient.events");
+    expect(homePageSource).not.toContain("activityQuery");
+  });
+
+  test("[HOME-LAYOUT-001] keeps home wide, responsive, and panel based", () => {
     expect(homePageSource).toContain(
       'import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";',
     );
     expect(homePageSource).toContain('<ConsoleResourceCanvas class="max-w-none">');
-    expect(homePageSource).toContain("container-type: inline-size");
-    expect(homePageSource).toContain("@container (min-width: 42rem)");
-    expect(homePageSource).not.toContain("@media (min-width: 1320px)");
-    expect(homePageSource).not.toContain("@media (min-width: 980px)");
-    expect(homePageSource).toContain('<section class="nothing-home-heading">');
-    expect(homePageSource).toContain('<div>\n          <p class="nothing-label">');
-  });
-
-  test("[HOME-OPERATION-CONTEXT-001] keeps only compact operational context on home", () => {
+    expect(homePageSource).toContain("nothing-home-layout");
+    expect(homePageSource).toContain("nothing-workboard");
     expect(homePageSource).toContain("nothing-side-stack");
-    expect(homePageSource).toContain("i18nKeys.console.home.operationContextTitle");
-    expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsTitle");
-    expect(homePageSource).toContain("data-home-deployment-rollup");
-    expect(homePageSource).toContain("nothing-deployment-rollup-list");
-    expect(homePageSource).toContain("nothing-deployment-rollup-row");
-    expect(homePageSource).toContain("i18nKeys.console.home.recentDeploymentsReadModelGap");
-    expect(homePageSource).toContain("deployments.slice(0, 5)");
-    expect(homePageSource).toContain('class="nothing-side-link"');
-    expect(homePageSource).toContain("orpcClient.servers.count({})");
-    expect(homePageSource).toContain("orpcClient.deployments.count({})");
-    expect(homePageSource).not.toContain("nothing-activity-list");
-    expect(homePageSource).not.toContain("nothing-activity-row");
-    expect(homePageSource).not.toContain("nothing-dashboard-grid");
-    expect(homePageSource).not.toContain("nothing-ai-section");
+    expect(homePageSource).not.toContain("@media (min-width: 1320px)");
+    expect(homePageSource).not.toContain("letter-spacing: 0.08em");
   });
 
   test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {
@@ -97,10 +92,9 @@ describe("project-first home", () => {
     expect(homePageSource).toContain("<Skeleton class=");
     expect(homePageSource).toContain("const workStateLoading = $derived(");
     expect(homePageSource).toContain("{#if !workStateLoading && !hasWork}");
-    expect(homePageSource).toContain("resourcesLoading");
-    expect(homePageSource).toContain("environmentsLoading");
     expect(homePageSource).toContain("deploymentsLoading");
     expect(homePageSource).toContain("serverCountQuery.isPending");
+    expect(homePageSource).toContain("resourceCountQuery.isPending");
     expect(homePageSource).not.toContain("pageLoading");
     expect(homePageSource).not.toContain(
       '<section class="nothing-home-heading" aria-hidden="true">',

@@ -481,7 +481,7 @@ describe("console page structure", () => {
     const homeActivityGapSource = sourceBetween(
       homePageSource,
       "data-home-activity-read-model-gap",
-      '<section class="nothing-side-panel">',
+      "</aside>",
     );
     assertDisplaySurfaceIsFormFree(homeActivityGapSource);
     expect(homeActivityGapSource).toContain("recentActivityReadModelGap");

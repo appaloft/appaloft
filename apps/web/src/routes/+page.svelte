@@ -1,16 +1,13 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import {
+    AlertCircle,
     ArrowRight,
     Blocks,
-    Box,
-    Braces,
-    Database,
-    FolderOpen,
-    Globe2,
-    Layers3,
+    Clock3,
     Play,
     Server,
+    Zap,
   } from "@lucide/svelte";
   import type {
     DeploymentSummary,
@@ -29,16 +26,30 @@
   import { createConsoleQueries } from "$lib/console/queries";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
-    countProjectEnvironments,
+    deploymentDetailHref,
     formatTime,
     latestProjectDeployment,
     projectDetailHref,
-    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { TranslationKey } from "@appaloft/i18n";
+
+  type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment";
+  type HomeAttentionTone = "critical" | "progress" | "setup";
+
+  interface HomeAttentionItem {
+    project: ProjectSummary;
+    reason: HomeAttentionReason;
+    tone: HomeAttentionTone;
+    count: number;
+    deployment?: DeploymentSummary;
+    resource?: ResourceSummary;
+    href: string;
+    actionLabelKey: TranslationKey;
+    timestamp: string;
+  }
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     certificates: false,
@@ -55,11 +66,18 @@
     version: false,
   });
 
-  const homeProjectListLimit = 8;
-  const homeResourceListLimit = 80;
-  const homeDeploymentListLimit = 20;
-  const homeEnvironmentListLimit = 80;
+  const homeProjectListLimit = 12;
+  const homeResourceListLimit = 120;
+  const homeDeploymentListLimit = 40;
+  const homeEnvironmentListLimit = 120;
   const productQueryEnabled = $derived(browser && canRunProductQueries(authSessionQuery.data));
+  const activeDeploymentStatuses = [
+    "created",
+    "planning",
+    "planned",
+    "running",
+    "cancel-requested",
+  ];
 
   const projectsQuery = createQuery(() =>
     queryOptions({
@@ -109,6 +127,14 @@
       refetchInterval: 10_000,
     }),
   );
+  const resourceCountQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "home", "count"],
+      queryFn: () => orpcClient.resources.count({}),
+      enabled: productQueryEnabled,
+      staleTime: 5_000,
+    }),
+  );
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -116,28 +142,123 @@
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const serverTotal = $derived(serverCountQuery.data?.count ?? 0);
   const deploymentTotal = $derived(deploymentCountQuery.data?.count ?? deployments.length);
-  const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
-  const resourcesLoading = $derived(resourcesQuery.isPending);
-  const environmentsLoading = $derived(environmentsQuery.isPending);
+  const resourceTotal = $derived(resourceCountQuery.data?.count ?? resources.length);
   const deploymentsLoading = $derived(deploymentsQuery.isPending);
   const workStateLoading = $derived(
     projectsQuery.isPending ||
       resourcesQuery.isPending ||
       deploymentsQuery.isPending ||
       environmentsQuery.isPending ||
-      deploymentCountQuery.isPending,
+      deploymentCountQuery.isPending ||
+      serverCountQuery.isPending ||
+      resourceCountQuery.isPending,
   );
-  const hasWork = $derived(projects.length > 0 || resources.length > 0 || deploymentTotal > 0);
-  const activeDeployments = $derived(
-    deployments.filter((deployment) =>
-      ["created", "planning", "planned", "running", "cancel-requested"].includes(
-        deployment.status,
-      ),
-    ),
+  const hasWork = $derived(
+    projects.length > 0 ||
+      resourceTotal > 0 ||
+      deploymentTotal > 0 ||
+      serverTotal > 0,
   );
+  const activeDeployments = $derived(deployments.filter(isActiveDeployment));
   const failedDeployments = $derived(
     deployments.filter((deployment) => deployment.status === "failed"),
   );
+  const attentionItems = $derived.by(() => {
+    const items: HomeAttentionItem[] = [];
+
+    for (const project of projects) {
+      const projectScopedResources = projectResources(project);
+      const projectScopedDeployments = projectDeployments(project);
+      const latestDeployment = latestProjectDeployment(project, deployments);
+      const failedDeployment = projectScopedDeployments.find(
+        (deployment) => deployment.status === "failed",
+      );
+      const runningDeployment = projectScopedDeployments.find(isActiveDeployment);
+      const resourceWithoutAccess = projectScopedResources.find(
+        (resource) => !selectCurrentResourceAccessRoute(resource.accessSummary),
+      );
+
+      if (failedDeployment) {
+        items.push({
+          project,
+          reason: "failed",
+          tone: "critical",
+          count: projectScopedDeployments.filter((deployment) => deployment.status === "failed")
+            .length,
+          deployment: failedDeployment,
+          resource: resourceById(failedDeployment.resourceId),
+          href: deploymentDetailHref(failedDeployment),
+          actionLabelKey: i18nKeys.common.actions.viewDeployment,
+          timestamp: failedDeployment.createdAt,
+        });
+        continue;
+      }
+
+      if (runningDeployment) {
+        items.push({
+          project,
+          reason: "running",
+          tone: "progress",
+          count: projectScopedDeployments.filter(isActiveDeployment).length,
+          deployment: runningDeployment,
+          resource: resourceById(runningDeployment.resourceId),
+          href: deploymentDetailHref(runningDeployment),
+          actionLabelKey: i18nKeys.common.actions.viewDeployment,
+          timestamp: runningDeployment.createdAt,
+        });
+        continue;
+      }
+
+      if (projectScopedResources.length > 0 && !latestDeployment) {
+        items.push({
+          project,
+          reason: "no-deployment",
+          tone: "setup",
+          count: projectScopedResources.length,
+          resource: projectScopedResources[0],
+          href: projectDetailHref(project.id),
+          actionLabelKey: i18nKeys.common.actions.openProject,
+          timestamp: project.createdAt,
+        });
+        continue;
+      }
+
+      if (resourceWithoutAccess) {
+        items.push({
+          project,
+          reason: "no-access",
+          tone: "setup",
+          count: projectScopedResources.filter(
+            (resource) => !selectCurrentResourceAccessRoute(resource.accessSummary),
+          ).length,
+          resource: resourceWithoutAccess,
+          deployment: latestDeployment ?? undefined,
+          href: projectDetailHref(project.id),
+          actionLabelKey: i18nKeys.common.actions.openProject,
+          timestamp: latestDeployment?.createdAt ?? project.createdAt,
+        });
+      }
+    }
+
+    return items.sort(compareAttentionItems).slice(0, 6);
+  });
+
+  function isActiveDeployment(deployment: DeploymentSummary): boolean {
+    return activeDeploymentStatuses.includes(deployment.status);
+  }
+
+  function compareAttentionItems(a: HomeAttentionItem, b: HomeAttentionItem): number {
+    const severityRank: Record<HomeAttentionTone, number> = {
+      critical: 0,
+      progress: 1,
+      setup: 2,
+    };
+
+    return (
+      severityRank[a.tone] - severityRank[b.tone] ||
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }
 
   function projectResources(project: ProjectSummary): ResourceSummary[] {
     return resources.filter((resource) => resource.projectId === project.id);
@@ -147,70 +268,63 @@
     return deployments.filter((deployment) => deployment.projectId === project.id);
   }
 
-  function visibleProjectResources(project: ProjectSummary): ResourceSummary[] {
-    return projectResources(project).slice(0, 3);
+  function projectById(projectId: string): ProjectSummary | undefined {
+    return projects.find((project) => project.id === projectId);
   }
 
-  function projectPrimaryAccessResource(project: ProjectSummary): ResourceSummary | null {
-    return (
-      projectResources(project).find((resource) =>
-        Boolean(selectCurrentResourceAccessRoute(resource.accessSummary)),
-      ) ?? null
-    );
-  }
-
-  function accessUrl(resource: ResourceSummary | null): string {
-    return resource ? (selectCurrentResourceAccessRoute(resource.accessSummary)?.route.url ?? "") : "";
+  function resourceById(resourceId: string): ResourceSummary | undefined {
+    return resources.find((resource) => resource.id === resourceId);
   }
 
   function environmentName(environmentId: string): string {
     return environments.find((environment) => environment.id === environmentId)?.name ?? environmentId;
   }
 
-  function projectEnvironmentNames(project: ProjectSummary): string {
-    const names = environments
-      .filter((environment) => environment.projectId === project.id)
-      .map((environment) => environment.name);
+  function deploymentContextLine(deployment: DeploymentSummary): string {
+    const project = projectById(deployment.projectId);
+    const resource = resourceById(deployment.resourceId);
 
-    return names.length > 0 ? names.slice(0, 2).join(" / ") : "-";
+    return [
+      project?.name ?? deployment.projectId,
+      resource?.name ?? deployment.resourceId,
+      environmentName(deployment.environmentId),
+    ].join(" / ");
   }
 
-  function resourceIcon(resource: ResourceSummary) {
-    switch (resource.kind) {
-      case "compose-stack":
-        return Layers3;
-      case "database":
-      case "cache":
-        return Database;
-      case "worker":
-        return Server;
-      case "static-site":
-        return Braces;
-      case "external":
-        return Globe2;
-      case "application":
-      case "service":
-        return Box;
-    }
-  }
-
-  function resourceKindLabelKey(kind: ResourceSummary["kind"]): TranslationKey {
+  function attentionTitleKey(reason: HomeAttentionReason): TranslationKey {
     const labels = {
-      application: i18nKeys.console.home.resourceKindApplication,
-      service: i18nKeys.console.home.resourceKindService,
-      database: i18nKeys.console.home.resourceKindDatabase,
-      cache: i18nKeys.console.home.resourceKindCache,
-      "compose-stack": i18nKeys.console.home.resourceKindComposeStack,
-      worker: i18nKeys.console.home.resourceKindWorker,
-      "static-site": i18nKeys.console.home.resourceKindStaticSite,
-      external: i18nKeys.console.home.resourceKindExternal,
-    } satisfies Record<ResourceSummary["kind"], TranslationKey>;
+      failed: i18nKeys.console.home.attentionFailedTitle,
+      running: i18nKeys.console.home.attentionRunningTitle,
+      "no-access": i18nKeys.console.home.attentionNoAccessTitle,
+      "no-deployment": i18nKeys.console.home.attentionNoDeploymentTitle,
+    } satisfies Record<HomeAttentionReason, TranslationKey>;
 
-    return labels[kind];
+    return labels[reason];
   }
 
-  function latestDeploymentResourceName(deployment: DeploymentSummary): string {
-    return resources.find((resource) => resource.id === deployment.resourceId)?.name ?? deployment.resourceId;
+  function attentionDescriptionKey(reason: HomeAttentionReason): TranslationKey {
+    const labels = {
+      failed: i18nKeys.console.home.attentionFailedDescription,
+      running: i18nKeys.console.home.attentionRunningDescription,
+      "no-access": i18nKeys.console.home.attentionNoAccessDescription,
+      "no-deployment": i18nKeys.console.home.attentionNoDeploymentDescription,
+    } satisfies Record<HomeAttentionReason, TranslationKey>;
+
+    return labels[reason];
+  }
+
+  function attentionToneLabelKey(tone: HomeAttentionTone): TranslationKey {
+    const labels = {
+      critical: i18nKeys.console.home.attentionToneCritical,
+      progress: i18nKeys.console.home.attentionToneProgress,
+      setup: i18nKeys.console.home.attentionToneSetup,
+    } satisfies Record<HomeAttentionTone, TranslationKey>;
+
+    return labels[tone];
+  }
+
+  function deploymentResourceName(deployment: DeploymentSummary): string {
+    return resourceById(deployment.resourceId)?.name ?? deployment.resourceId;
   }
 </script>
 
@@ -223,338 +337,348 @@
   description={$t(i18nKeys.console.home.pageDescription)}
 >
   <ConsoleResourceCanvas class="max-w-none">
-  <div class="nothing-console-home">
-    {#if !workStateLoading && !hasWork}
-      <section class="nothing-home-heading">
-        <div>
-          <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
-          <h1>{$t(i18nKeys.console.home.emptyHeading)}</h1>
-          <p>{$t(i18nKeys.console.home.emptyDescription)}</p>
-        </div>
-      </section>
+    <div class="nothing-console-home">
+      {#if !workStateLoading && !hasWork}
+        <section class="nothing-home-heading" data-home-workbench-heading>
+          <div>
+            <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
+            <h1>{$t(i18nKeys.console.home.emptyHeading)}</h1>
+            <p>{$t(i18nKeys.console.home.emptyDescription)}</p>
+          </div>
+        </section>
 
-      <ConsoleEmptyState
-        tone="deployment"
-        title={$t(i18nKeys.console.home.emptyStateTitle)}
-        description={$t(i18nKeys.console.home.emptyStateBody)}
-        learnMoreHref={webDocsHrefs.projectLifecycle}
-      >
-        <Button href="/?modal=quick-deploy">
-          <Play class="size-4" />
-          {$t(i18nKeys.common.actions.quickDeploy)}
-        </Button>
-      </ConsoleEmptyState>
-    {:else}
-      <section class="nothing-home-heading">
-        <div>
-          <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
-          <h1>{$t(i18nKeys.console.home.projectsHeading)}</h1>
-          <p>{$t(i18nKeys.console.home.projectsDescription)}</p>
-        </div>
-        <Button href="/projects" variant="outline">
-          {$t(i18nKeys.common.actions.viewAll)}
-          <ArrowRight class="size-4" />
-        </Button>
-      </section>
+        <ConsoleEmptyState
+          tone="deployment"
+          title={$t(i18nKeys.console.home.emptyStateTitle)}
+          description={$t(i18nKeys.console.home.emptyStateBody)}
+          learnMoreHref={webDocsHrefs.projectLifecycle}
+        >
+          <Button href="/?modal=quick-deploy">
+            <Play class="size-4" />
+            {$t(i18nKeys.common.actions.quickDeploy)}
+          </Button>
+        </ConsoleEmptyState>
+      {:else}
+        <section class="nothing-home-heading" data-home-workbench-heading>
+          <div>
+            <p class="nothing-label">{$t(i18nKeys.console.home.projectsKicker)}</p>
+            <h1>{$t(i18nKeys.console.home.projectsHeading)}</h1>
+            <p>{$t(i18nKeys.console.home.projectsDescription)}</p>
+          </div>
+          <div class="nothing-home-actions">
+            <Button href="/?modal=quick-deploy">
+              <Play class="size-4" />
+              {$t(i18nKeys.common.actions.quickDeploy)}
+            </Button>
+            <Button href="/projects" variant="outline">
+              {$t(i18nKeys.common.actions.viewProjects)}
+              <ArrowRight class="size-4" />
+            </Button>
+          </div>
+        </section>
 
-      <section class="nothing-home-layout">
-        <div class="nothing-project-list" data-home-project-list>
-          {#if projectsLoading || (projects.length === 0 && workStateLoading)}
-            {#each Array.from({ length: 4 }) as _, index (index)}
-              <article class="nothing-project-card" aria-hidden="true">
-                <div class="nothing-project-card-header">
-                  <Skeleton class="size-11 shrink-0 rounded-md" />
-                  <span class="nothing-project-copy flex-1">
-                    <Skeleton class="h-5 w-full max-w-72" />
-                    <Skeleton class="h-4 w-full max-w-xl" />
-                  </span>
-                  <Skeleton class="h-6 w-28" />
-                </div>
-                <div class="nothing-project-metrics">
-                  <Skeleton class="h-14 w-full" />
-                  <Skeleton class="h-14 w-full" />
-                  <Skeleton class="h-14 w-full" />
-                </div>
-                <div class="nothing-resource-strip">
-                  <Skeleton class="h-8 w-32" />
-                  <Skeleton class="h-8 w-40" />
-                </div>
-                <div class="nothing-project-access-row">
-                  <Skeleton class="h-5 w-full max-w-md" />
-                  <Skeleton class="h-5 w-20" />
-                </div>
-              </article>
-            {/each}
-          {/if}
-          {#each projects as project (project.id)}
-            {@const resourcesForProject = projectResources(project)}
-            {@const visibleResources = visibleProjectResources(project)}
-            {@const latestDeployment = latestProjectDeployment(project, deployments)}
-            {@const primaryAccessResource = projectPrimaryAccessResource(project)}
-            {@const primaryAccessUrl = accessUrl(primaryAccessResource)}
-            <article class="nothing-project-card" data-home-project-row>
-              <div class="nothing-project-card-header">
-                <a href={projectDetailHref(project.id)} class="nothing-project-identity">
-                  <span class="nothing-project-icon" aria-hidden="true">
-                    <FolderOpen class="size-5" />
-                  </span>
-                  <span class="nothing-project-copy">
-                    <span class="nothing-project-title">
-                      <strong>{project.name}</strong>
-                      <small>{project.slug}</small>
-                    </span>
-                    <span class="nothing-project-description">
-                      {project.description ?? $t(i18nKeys.console.home.noProjectDescription)}
-                    </span>
-                  </span>
-                </a>
-
-                <div class="nothing-project-deploy-state">
-                  <small>{$t(i18nKeys.console.home.latestDeploymentTitle)}</small>
-                  {#if deploymentsLoading}
-                    <Skeleton class="h-6 w-28" />
-                  {:else}
-                    <DeploymentStatusBadge status={latestDeployment?.status} />
-                  {/if}
-                </div>
+        <section class="nothing-home-layout">
+          <div class="nothing-workboard">
+            <section class="nothing-panel" data-home-attention-workqueue>
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.attentionTitle)}</p>
+                <h2>{$t(i18nKeys.console.home.attentionHeading)}</h2>
+                <p>{$t(i18nKeys.console.home.attentionDescription)}</p>
               </div>
 
-              <div class="nothing-project-metrics">
-                <a href={projectDetailHref(project.id)} class="nothing-project-metric">
-                  <small>{$t(i18nKeys.common.domain.resources)}</small>
-                  {#if resourcesLoading}
-                    <Skeleton class="h-6 w-10" />
-                    <Skeleton class="h-3 w-28" />
-                  {:else}
-                    <strong>{resourcesForProject.length}</strong>
-                    <span>
-                      {visibleResources.length > 0
-                        ? visibleResources.map((resource) => resource.name).join(" / ")
-                        : $t(i18nKeys.console.home.noResourcesInProject)}
-                    </span>
-                  {/if}
-                </a>
-
-                <a href={projectDetailHref(project.id)} class="nothing-project-metric">
-                  <small>{$t(i18nKeys.common.domain.environments)}</small>
-                  {#if environmentsLoading}
-                    <Skeleton class="h-6 w-10" />
-                    <Skeleton class="h-3 w-28" />
-                  {:else}
-                    <strong>{countProjectEnvironments(project, environments)}</strong>
-                    <span>{projectEnvironmentNames(project)}</span>
-                  {/if}
-                </a>
-
-                <a href="/deployments" class="nothing-project-metric">
-                  <small>{$t(i18nKeys.common.domain.deployment)}</small>
-                  {#if deploymentsLoading}
-                    <Skeleton class="h-6 w-32" />
-                    <Skeleton class="h-3 w-24" />
-                  {:else if latestDeployment}
-                    <strong>{latestDeployment.runtimePlan.source.displayName}</strong>
-                    <span>{formatTime(latestDeployment.createdAt)}</span>
-                  {:else}
-                    <strong>{$t(i18nKeys.console.home.noDeploymentsShort)}</strong>
-                    <span>{$t(i18nKeys.console.home.latestDeploymentEmpty)}</span>
-                  {/if}
-                </a>
-              </div>
-
-              <div class="nothing-resource-strip" aria-label={$t(i18nKeys.console.home.resourcePreviewLabel)}>
-                {#if resourcesLoading}
-                  <Skeleton class="h-8 w-32" />
-                  <Skeleton class="h-8 w-40" />
-                {:else if visibleResources.length > 0}
-                  {#each visibleResources as resource (resource.id)}
-                    {@const Icon = resourceIcon(resource)}
-                    <a href={resourceDetailHref(resource)} class="nothing-resource-chip">
-                      <span class="nothing-resource-icon" aria-hidden="true">
-                        <Icon class="size-3.5" />
+              {#if workStateLoading}
+                <div class="nothing-attention-list" aria-hidden="true">
+                  {#each Array.from({ length: 3 }) as _, index (index)}
+                    <div class="nothing-attention-card">
+                      <Skeleton class="size-10 rounded-md" />
+                      <span class="nothing-attention-copy">
+                        <Skeleton class="h-4 w-48" />
+                        <Skeleton class="h-3 w-full max-w-xl" />
                       </span>
-                      <span class="min-w-0">
-                        <strong>{resource.name}</strong>
+                      <Skeleton class="h-8 w-28" />
+                    </div>
+                  {/each}
+                </div>
+              {:else if attentionItems.length > 0}
+                <div class="nothing-attention-list">
+                  {#each attentionItems as item (item.project.id + item.reason)}
+                    <article class="nothing-attention-card" data-tone={item.tone}>
+                      <span class="nothing-attention-icon" aria-hidden="true">
+                        {#if item.tone === "critical"}
+                          <AlertCircle class="size-4" />
+                        {:else if item.tone === "progress"}
+                          <Zap class="size-4" />
+                        {:else}
+                          <Clock3 class="size-4" />
+                        {/if}
+                      </span>
+                      <div class="nothing-attention-copy">
+                        <div class="nothing-attention-title">
+                          <strong>{$t(attentionTitleKey(item.reason))}</strong>
+                          <span>{$t(attentionToneLabelKey(item.tone))}</span>
+                        </div>
+                        <p>
+                          {$t(attentionDescriptionKey(item.reason), {
+                            count: item.count,
+                            project: item.project.name,
+                            resource: item.resource?.name ?? "-",
+                          })}
+                        </p>
                         <small>
-                          {$t(resourceKindLabelKey(resource.kind))} · {environmentName(resource.environmentId)}
+                          {item.project.name}
+                          {#if item.deployment}
+                            · {deploymentResourceName(item.deployment)} · {formatTime(item.deployment.createdAt)}
+                          {:else}
+                            · {formatTime(item.timestamp)}
+                          {/if}
                         </small>
+                      </div>
+                      <Button href={item.href} variant="outline" class="justify-self-start md:justify-self-end">
+                        {$t(item.actionLabelKey)}
+                        <ArrowRight class="size-4" />
+                      </Button>
+                    </article>
+                  {/each}
+                </div>
+              {:else}
+                <div class="nothing-panel-empty">
+                  <strong>{$t(i18nKeys.console.home.noAttentionTitle)}</strong>
+                  <span>{$t(i18nKeys.console.home.noAttentionDescription)}</span>
+                </div>
+              {/if}
+            </section>
+
+            <section class="nothing-deployment-board">
+              <div class="nothing-panel" data-home-active-deployments>
+                <div class="nothing-section-header">
+                  <p class="nothing-label">{$t(i18nKeys.console.home.activeDeploymentsTitle)}</p>
+                  <h2>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</h2>
+                  <p>{$t(i18nKeys.console.home.activeDeploymentsDescription)}</p>
+                </div>
+                {#if deploymentsLoading}
+                  <div class="nothing-deployment-list" aria-hidden="true">
+                    {#each Array.from({ length: 2 }) as _, index (index)}
+                      <div class="nothing-deployment-row">
+                        <span>
+                          <Skeleton class="h-4 w-40" />
+                          <Skeleton class="mt-2 h-3 w-56" />
+                        </span>
+                        <Skeleton class="h-6 w-24" />
+                      </div>
+                    {/each}
+                  </div>
+                {:else if activeDeployments.length > 0}
+                  <div class="nothing-deployment-list">
+                    {#each activeDeployments.slice(0, 4) as deployment (deployment.id)}
+                      <a href={deploymentDetailHref(deployment)} class="nothing-deployment-row">
+                        <span>
+                          <strong>{deploymentResourceName(deployment)}</strong>
+                          <small>{deploymentContextLine(deployment)}</small>
+                        </span>
+                        <span class="nothing-deployment-state">
+                          <DeploymentStatusBadge status={deployment.status} />
+                          <em>{formatTime(deployment.createdAt)}</em>
+                        </span>
+                      </a>
+                    {/each}
+                  </div>
+                {:else}
+                  <div class="nothing-panel-empty">
+                    {$t(i18nKeys.console.home.noActiveDeployments)}
+                  </div>
+                {/if}
+              </div>
+
+              <div class="nothing-panel" data-home-failed-deployments>
+                <div class="nothing-section-header">
+                  <p class="nothing-label">{$t(i18nKeys.console.home.failedDeploymentsTitle)}</p>
+                  <h2>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</h2>
+                  <p>{$t(i18nKeys.console.home.failedDeploymentsDescription)}</p>
+                </div>
+                {#if deploymentsLoading}
+                  <div class="nothing-deployment-list" aria-hidden="true">
+                    {#each Array.from({ length: 2 }) as _, index (index)}
+                      <div class="nothing-deployment-row">
+                        <span>
+                          <Skeleton class="h-4 w-40" />
+                          <Skeleton class="mt-2 h-3 w-56" />
+                        </span>
+                        <Skeleton class="h-6 w-24" />
+                      </div>
+                    {/each}
+                  </div>
+                {:else if failedDeployments.length > 0}
+                  <div class="nothing-deployment-list">
+                    {#each failedDeployments.slice(0, 4) as deployment (deployment.id)}
+                      <a href={deploymentDetailHref(deployment)} class="nothing-deployment-row">
+                        <span>
+                          <strong>{deploymentResourceName(deployment)}</strong>
+                          <small>{deploymentContextLine(deployment)}</small>
+                        </span>
+                        <span class="nothing-deployment-state">
+                          <DeploymentStatusBadge status={deployment.status} />
+                          <em>{formatTime(deployment.createdAt)}</em>
+                        </span>
+                      </a>
+                    {/each}
+                  </div>
+                {:else}
+                  <div class="nothing-panel-empty">
+                    {$t(i18nKeys.console.home.noFailedDeployments)}
+                  </div>
+                {/if}
+              </div>
+            </section>
+
+            <section class="nothing-panel" data-home-deployment-rollup>
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.recentDeploymentsTitle)}</p>
+                <h2>{$t(i18nKeys.console.home.deploymentActivityTitle)}</h2>
+                <p>{$t(i18nKeys.console.home.recentDeploymentsDescription)}</p>
+                <p class="nothing-rollup-gap">
+                  {$t(i18nKeys.console.home.recentDeploymentsReadModelGap)}
+                </p>
+              </div>
+              {#if deploymentsLoading}
+                <div class="nothing-deployment-rollup-list" aria-hidden="true">
+                  {#each Array.from({ length: 4 }) as _, index (index)}
+                    <div class="nothing-deployment-rollup-row">
+                      <span>
+                        <Skeleton class="h-4 w-40" />
+                        <Skeleton class="mt-2 h-3 w-60" />
+                      </span>
+                      <Skeleton class="h-6 w-24" />
+                    </div>
+                  {/each}
+                </div>
+              {:else if deployments.length > 0}
+                <div class="nothing-deployment-rollup-list">
+                  {#each deployments.slice(0, 6) as deployment (deployment.id)}
+                    <a href={deploymentDetailHref(deployment)} class="nothing-deployment-rollup-row">
+                      <span>
+                        <strong>{deploymentResourceName(deployment)}</strong>
+                        <small>{deploymentContextLine(deployment)}</small>
+                      </span>
+                      <span class="nothing-deployment-state">
+                        <DeploymentStatusBadge status={deployment.status} />
+                        <em>{formatTime(deployment.createdAt)}</em>
                       </span>
                     </a>
                   {/each}
-                  {#if resourcesForProject.length > visibleResources.length}
-                    <a href={projectDetailHref(project.id)} class="nothing-resource-more">
-                      {$t(i18nKeys.console.home.moreResources, {
-                        count: resourcesForProject.length - visibleResources.length,
-                      })}
-                    </a>
-                  {/if}
-                {:else}
-                  <a href={projectDetailHref(project.id)} class="nothing-resource-empty">
-                    {$t(i18nKeys.console.home.noResourcesInProject)}
-                  </a>
-                {/if}
-              </div>
-
-              <div class="nothing-project-access-row">
-                <div class="nothing-project-access">
-                  <small>{$t(i18nKeys.console.home.accessRouteTitle)}</small>
-                  {#if resourcesLoading}
-                    <Skeleton class="h-5 w-48" />
-                  {:else if primaryAccessUrl && primaryAccessResource}
-                    <a href={primaryAccessUrl} target="_blank" rel="noreferrer">
-                      <Globe2 class="size-3.5" />
-                      <span>{primaryAccessUrl}</span>
-                    </a>
-                  {:else}
-                    <span class="nothing-muted-line">
-                      {$t(i18nKeys.console.home.noAccessRoute)}
-                    </span>
-                  {/if}
                 </div>
+                <a href="/deployments" class="nothing-side-link">
+                  <span>{$t(i18nKeys.common.actions.viewAll)}</span>
+                  <ArrowRight class="size-3.5" />
+                </a>
+              {:else}
+                <div class="nothing-panel-empty">
+                  {$t(i18nKeys.console.home.latestDeploymentEmpty)}
+                </div>
+              {/if}
+            </section>
+          </div>
 
-                <a href={projectDetailHref(project.id)} class="nothing-project-open">
-                  {$t(i18nKeys.common.actions.viewDetails)}
-                  <ArrowRight class="size-4" />
+          <aside class="nothing-side-stack">
+            <section class="nothing-panel">
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.operationContextTitle)}</p>
+                <p>{$t(i18nKeys.console.home.operationContextDescription)}</p>
+              </div>
+              <div class="nothing-context-grid">
+                <a href="/deployments" class="nothing-context-cell">
+                  <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
+                  {#if deploymentsLoading}
+                    <Skeleton class="h-[22px] w-8" />
+                  {:else}
+                    <strong>{activeDeployments.length}</strong>
+                  {/if}
+                </a>
+                <a href="/deployments" class="nothing-context-cell">
+                  <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
+                  {#if deploymentsLoading}
+                    <Skeleton class="h-[22px] w-8" />
+                  {:else}
+                    <strong>{failedDeployments.length}</strong>
+                  {/if}
+                </a>
+                <a href="/resources" class="nothing-context-cell">
+                  <span>{$t(i18nKeys.common.domain.resources)}</span>
+                  {#if resourceCountQuery.isPending}
+                    <Skeleton class="h-[22px] w-8" />
+                  {:else}
+                    <strong>{resourceTotal}</strong>
+                  {/if}
+                </a>
+                <a href="/servers" class="nothing-context-cell">
+                  <span>{$t(i18nKeys.common.domain.servers)}</span>
+                  {#if serverCountQuery.isPending}
+                    <Skeleton class="h-[22px] w-8" />
+                  {:else}
+                    <strong>{serverTotal}</strong>
+                  {/if}
                 </a>
               </div>
-            </article>
-          {/each}
-        </div>
+            </section>
 
-        <aside class="nothing-side-stack">
-          <section class="nothing-side-panel">
-            <div class="nothing-section-header">
-              <p class="nothing-label">{$t(i18nKeys.console.home.operationContextTitle)}</p>
-              <p>{$t(i18nKeys.console.home.operationContextDescription)}</p>
-            </div>
-            <div class="nothing-context-grid">
-              <a href="/deployments" class="nothing-context-cell">
-                <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
-                {#if deploymentsLoading}
-                  <Skeleton class="h-[22px] w-8" />
-                {:else}
-                  <strong>{activeDeployments.length}</strong>
-                {/if}
-              </a>
-              <a href="/deployments" class="nothing-context-cell">
-                <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
-                {#if deploymentsLoading}
-                  <Skeleton class="h-[22px] w-8" />
-                {:else}
-                  <strong>{failedDeployments.length}</strong>
-                {/if}
-              </a>
-              <a href="/servers" class="nothing-context-cell">
-                <span>{$t(i18nKeys.common.domain.servers)}</span>
-                {#if serverCountQuery.isPending}
-                  <Skeleton class="h-[22px] w-8" />
-                {:else}
-                  <strong>{serverTotal}</strong>
-                {/if}
-              </a>
-            </div>
-          </section>
+            <section class="nothing-panel">
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.nextStepsTitle)}</p>
+                <p>{$t(i18nKeys.console.home.nextStepsDescription)}</p>
+              </div>
+              <div class="nothing-next-actions">
+                <a href="/?modal=quick-deploy" class="nothing-next-row">
+                  <Play class="size-4" />
+                  <span>{$t(i18nKeys.common.actions.quickDeploy)}</span>
+                  <ArrowRight class="size-3.5" />
+                </a>
+                <a href="/projects" class="nothing-next-row">
+                  <Blocks class="size-4" />
+                  <span>{$t(i18nKeys.common.actions.viewProjects)}</span>
+                  <ArrowRight class="size-3.5" />
+                </a>
+                <a href="/servers" class="nothing-next-row">
+                  <Server class="size-4" />
+                  <span>{$t(i18nKeys.common.actions.viewServers)}</span>
+                  <ArrowRight class="size-3.5" />
+                </a>
+                <a href="/deployments" class="nothing-next-row">
+                  <Zap class="size-4" />
+                  <span>{$t(i18nKeys.common.actions.viewDeployments)}</span>
+                  <ArrowRight class="size-3.5" />
+                </a>
+              </div>
+            </section>
 
-          <section class="nothing-side-panel" data-home-deployment-rollup>
-            <div class="nothing-section-header">
-              <p class="nothing-label">{$t(i18nKeys.console.home.recentDeploymentsTitle)}</p>
-              <p>{$t(i18nKeys.console.home.recentDeploymentsDescription)}</p>
-              <p class="nothing-rollup-gap">
-                {$t(i18nKeys.console.home.recentDeploymentsReadModelGap)}
-              </p>
-            </div>
-            {#if deploymentsLoading}
-              <div class="nothing-deployment-rollup-list" aria-hidden="true">
-                {#each Array.from({ length: 3 }) as _, index (index)}
-                  <div class="nothing-deployment-rollup-row">
-                    <span>
-                      <Skeleton class="h-4 w-36" />
-                      <Skeleton class="mt-2 h-3 w-28" />
-                    </span>
-                    <span>
-                      <Skeleton class="h-5 w-20" />
-                      <Skeleton class="h-3 w-16" />
-                    </span>
-                  </div>
-                {/each}
+            <section class="nothing-panel" data-home-activity-read-model-gap>
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.recentActivityTitle)}</p>
+                <p>{$t(i18nKeys.console.home.recentActivityDescription)}</p>
               </div>
-            {:else if deployments.length > 0}
-              <div class="nothing-deployment-rollup-list">
-                {#each deployments.slice(0, 5) as deployment (deployment.id)}
-                  <a href="/deployments" class="nothing-deployment-rollup-row">
-                    <span>
-                      <strong>{latestDeploymentResourceName(deployment)}</strong>
-                      <small>{deployment.runtimePlan.source.displayName}</small>
-                    </span>
-                    <span>
-                      <DeploymentStatusBadge status={deployment.status} />
-                      <em>{formatTime(deployment.createdAt)}</em>
-                    </span>
-                  </a>
-                {/each}
-              </div>
-              <a href="/deployments" class="nothing-side-link">
-                <span>{$t(i18nKeys.common.actions.viewAll)}</span>
-                <ArrowRight class="size-3.5" />
-              </a>
-            {:else}
-              <div class="nothing-side-empty">
-                {$t(i18nKeys.console.home.latestDeploymentEmpty)}
-              </div>
-            {/if}
-          </section>
-
-          <section class="nothing-side-panel" data-home-activity-read-model-gap>
-            <div class="nothing-section-header">
-              <p class="nothing-label">{$t(i18nKeys.console.home.recentActivityTitle)}</p>
-              <p>{$t(i18nKeys.console.home.recentActivityDescription)}</p>
-              <p class="nothing-rollup-gap">
+              <div class="nothing-panel-empty">
                 {$t(i18nKeys.console.home.recentActivityReadModelGap)}
-              </p>
-            </div>
-            <div class="nothing-side-empty">
-              {$t(i18nKeys.console.home.recentActivityReadModelGap)}
-            </div>
-          </section>
-
-          <section class="nothing-side-panel">
-            <div class="nothing-section-header">
-              <p class="nothing-label">{$t(i18nKeys.console.home.nextStepsTitle)}</p>
-              <p>{$t(i18nKeys.console.home.nextStepsDescription)}</p>
-            </div>
-            <div class="nothing-next-actions">
-              <a href="/?modal=quick-deploy" class="nothing-next-row">
-                <Play class="size-4" />
-                <span>{$t(i18nKeys.common.actions.quickDeploy)}</span>
-                <ArrowRight class="size-3.5" />
-              </a>
-              <a href="/projects" class="nothing-next-row">
-                <Blocks class="size-4" />
-                <span>{$t(i18nKeys.common.actions.viewProjects)}</span>
-                <ArrowRight class="size-3.5" />
-              </a>
-            </div>
-          </section>
-        </aside>
-      </section>
-    {/if}
-  </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      {/if}
+    </div>
   </ConsoleResourceCanvas>
 </ConsoleShell>
 
 <style>
   .nothing-console-home {
-    --nothing-motion-duration: 180ms;
+    --nothing-motion-duration: 160ms;
     --nothing-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
     display: grid;
-    gap: 24px;
+    gap: 20px;
   }
 
   .nothing-label {
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: 11px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     line-height: 1.2;
     text-transform: uppercase;
   }
@@ -564,11 +688,10 @@
     flex-wrap: wrap;
     align-items: end;
     justify-content: space-between;
-    gap: 16px;
+    gap: 14px;
   }
 
-  .nothing-home-heading > div,
-  .nothing-home-heading:not(:has(> div)) {
+  .nothing-home-heading > div {
     min-width: 0;
   }
 
@@ -583,15 +706,21 @@
 
   .nothing-home-heading p:not(.nothing-label) {
     margin-top: 8px;
-    max-width: 48rem;
+    max-width: 50rem;
     color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.6;
   }
 
+  .nothing-home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .nothing-home-layout {
     display: grid;
-    gap: 24px;
+    gap: 20px;
   }
 
   @media (min-width: 1180px) {
@@ -601,371 +730,15 @@
     }
   }
 
-  .nothing-project-list {
-    container-type: inline-size;
-    display: grid;
-    gap: 14px;
-  }
-
-  .nothing-project-card {
-    display: grid;
-    min-width: 0;
-    overflow: hidden;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-2xs);
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-card {
-      border-radius: var(--radius-lg);
-    }
-  }
-
-  .nothing-project-identity,
-  .nothing-project-metric,
-  .nothing-resource-chip,
-  .nothing-resource-more,
-  .nothing-resource-empty,
-  .nothing-project-access a,
-  .nothing-project-open,
-  .nothing-context-cell,
-  .nothing-deployment-rollup-row,
-  .nothing-next-row {
-    color: var(--text-primary);
-    text-decoration: none;
-  }
-
-  .nothing-rollup-gap {
-    color: var(--text-secondary);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-
-  .nothing-project-card-header {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: start;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 18px;
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-card-header {
-      padding: 20px;
-    }
-  }
-
-  .nothing-project-identity {
-    display: grid;
-    flex: 1 1 24rem;
-    min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .nothing-project-icon,
-  .nothing-resource-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--muted) 40%, var(--surface));
-    color: var(--primary);
-  }
-
-  .nothing-project-icon {
-    width: 44px;
-    height: 44px;
-  }
-
-  .nothing-project-copy,
-  .nothing-project-title,
-  .nothing-project-metric,
-  .nothing-project-access,
-  .nothing-project-access a,
-  .nothing-deployment-rollup-row,
-  .nothing-deployment-rollup-row > span,
-  .nothing-next-row {
-    min-width: 0;
-  }
-
-  .nothing-project-copy {
-    display: grid;
-    gap: 6px;
-  }
-
-  .nothing-project-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .nothing-project-title strong {
-    overflow: hidden;
-    color: var(--text-display);
-    font-size: 16px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-title small,
-  .nothing-project-deploy-state small,
-  .nothing-project-metric small,
-  .nothing-project-access small,
-  .nothing-resource-chip small,
-  .nothing-deployment-rollup-row small,
-  .nothing-deployment-rollup-row em {
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    line-height: 1.4;
-  }
-
-  .nothing-project-title small {
-    overflow: hidden;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-sm);
-    padding: 2px 6px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-description {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-deploy-state {
-    display: grid;
-    justify-items: start;
-    gap: 6px;
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-deploy-state {
-      justify-items: end;
-      text-align: right;
-    }
-  }
-
-  .nothing-project-metrics {
-    display: grid;
-    border-top: 1px solid var(--input);
-    border-bottom: 1px solid var(--input);
-    background: color-mix(in oklch, var(--muted) 18%, var(--surface));
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-metrics {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  .nothing-project-metric {
-    display: grid;
-    min-width: 0;
-    gap: 4px;
-    border-bottom: 1px solid var(--border);
-    padding: 12px 18px;
-  }
-
-  .nothing-project-metric:last-child {
-    border-bottom: 0;
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-metric {
-      border-right: 1px solid var(--border);
-      border-bottom: 0;
-      padding: 12px 20px;
-    }
-
-    .nothing-project-metric:last-child {
-      border-right: 0;
-    }
-  }
-
-  .nothing-project-metric strong {
-    overflow: hidden;
-    color: var(--text-display);
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-metric span {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-size: 12px;
-    line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-metric:hover strong,
-  .nothing-project-metric:focus-visible strong,
-  .nothing-project-identity:hover strong,
-  .nothing-project-identity:focus-visible strong {
-    color: var(--primary);
-  }
-
-  .nothing-resource-strip {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 14px 18px;
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-resource-strip {
-      padding: 14px 20px;
-    }
-  }
-
-  .nothing-resource-chip {
-    display: inline-flex;
-    min-width: 0;
-    align-items: center;
-    gap: 9px;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-md);
-    padding: 7px 9px 7px 7px;
-    transition:
-      border-color var(--nothing-motion-duration) var(--nothing-motion-ease),
-      background-color var(--nothing-motion-duration) var(--nothing-motion-ease);
-  }
-
-  .nothing-resource-chip:hover,
-  .nothing-resource-chip:focus-visible {
-    border-color: color-mix(in oklch, var(--primary) 32%, var(--input));
-    background: color-mix(in oklch, var(--primary) 3%, transparent);
-  }
-
-  .nothing-resource-icon {
-    width: 26px;
-    height: 26px;
-  }
-
-  .nothing-resource-chip strong,
-  .nothing-deployment-rollup-row strong {
-    display: block;
-    overflow: hidden;
-    color: var(--text-primary);
-    font-size: 13px;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-resource-chip small,
-  .nothing-deployment-rollup-row small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-resource-more,
-  .nothing-resource-empty {
-    align-self: center;
-    color: var(--text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
-    width: fit-content;
-  }
-
-  .nothing-resource-more:hover,
-  .nothing-resource-empty:hover,
-  .nothing-project-open:hover {
-    color: var(--primary);
-  }
-
-  .nothing-project-access-row {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: end;
-    justify-content: space-between;
-    gap: 12px;
-    border-top: 1px solid var(--input);
-    padding: 14px 18px 16px;
-  }
-
-  @container (min-width: 42rem) {
-    .nothing-project-access-row {
-      padding: 14px 20px 16px;
-    }
-  }
-
-  .nothing-project-access {
-    display: grid;
-    flex: 1 1 18rem;
-    gap: 5px;
-  }
-
-  .nothing-project-access a {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 12px;
-  }
-
-  .nothing-project-access a span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .nothing-project-access a:hover,
-  .nothing-project-access a:focus-visible {
-    color: var(--primary);
-  }
-
-  .nothing-muted-line {
-    color: var(--text-secondary);
-    font-size: 13px;
-  }
-
-  .nothing-project-open {
-    display: inline-flex;
-    align-items: center;
-    justify-self: start;
-    gap: 6px;
-    color: var(--text-secondary);
-    font-size: 13px;
-    font-weight: 500;
-    transition:
-      color var(--nothing-motion-duration) var(--nothing-motion-ease),
-      transform var(--nothing-motion-duration) var(--nothing-motion-ease);
-  }
-
-  .nothing-project-open:hover,
-  .nothing-project-open:focus-visible {
-    transform: translate3d(3px, 0, 0);
-  }
-
+  .nothing-workboard,
   .nothing-side-stack {
     display: grid;
     gap: 16px;
+    min-width: 0;
   }
 
-  .nothing-side-panel {
+  .nothing-panel {
+    min-width: 0;
     border: 1px solid var(--input);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -975,8 +748,15 @@
 
   .nothing-section-header {
     display: grid;
-    gap: 7px;
+    gap: 6px;
     margin-bottom: 14px;
+  }
+
+  .nothing-section-header h2 {
+    color: var(--text-display);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
   }
 
   .nothing-section-header > p:not(.nothing-label) {
@@ -985,9 +765,185 @@
     line-height: 1.5;
   }
 
+  .nothing-rollup-gap {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .nothing-attention-list,
+  .nothing-deployment-list,
+  .nothing-deployment-rollup-list,
+  .nothing-next-actions {
+    display: grid;
+    min-width: 0;
+  }
+
+  .nothing-attention-card {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    border-top: 1px solid var(--input);
+    padding: 14px 0;
+  }
+
+  .nothing-attention-card:first-child,
+  .nothing-deployment-row:first-child,
+  .nothing-deployment-rollup-row:first-child,
+  .nothing-next-row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .nothing-attention-card:last-child,
+  .nothing-deployment-row:last-child,
+  .nothing-deployment-rollup-row:last-child,
+  .nothing-next-row:last-child {
+    padding-bottom: 0;
+  }
+
+  @media (min-width: 760px) {
+    .nothing-attention-card {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+    }
+  }
+
+  .nothing-attention-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--muted) 45%, var(--surface));
+    color: var(--primary);
+  }
+
+  .nothing-attention-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nothing-attention-card[data-tone="critical"] .nothing-attention-icon {
+    color: var(--destructive);
+  }
+
+  .nothing-attention-card[data-tone="progress"] .nothing-attention-icon {
+    color: var(--primary);
+  }
+
+  .nothing-attention-copy,
+  .nothing-attention-title,
+  .nothing-deployment-row,
+  .nothing-deployment-row > span,
+  .nothing-deployment-rollup-row,
+  .nothing-deployment-rollup-row > span,
+  .nothing-next-row {
+    min-width: 0;
+  }
+
+  .nothing-attention-copy {
+    display: grid;
+    gap: 5px;
+  }
+
+  .nothing-attention-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nothing-attention-title strong,
+  .nothing-deployment-row strong,
+  .nothing-deployment-rollup-row strong {
+    overflow: hidden;
+    color: var(--text-display);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nothing-attention-title span {
+    border: 1px solid var(--input);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 2px 6px;
+    text-transform: uppercase;
+  }
+
+  .nothing-attention-copy p,
+  .nothing-panel-empty {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .nothing-attention-copy small,
+  .nothing-deployment-row small,
+  .nothing-deployment-row em,
+  .nothing-deployment-rollup-row small,
+  .nothing-deployment-rollup-row em {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nothing-deployment-board {
+    display: grid;
+    gap: 16px;
+  }
+
+  @media (min-width: 860px) {
+    .nothing-deployment-board {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .nothing-deployment-row,
+  .nothing-deployment-rollup-row,
+  .nothing-next-row,
+  .nothing-side-link {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .nothing-deployment-row,
+  .nothing-deployment-rollup-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid var(--input);
+    padding: 12px 0;
+  }
+
+  .nothing-deployment-row > span:first-child,
+  .nothing-deployment-rollup-row > span:first-child {
+    display: grid;
+    gap: 4px;
+  }
+
+  .nothing-deployment-state {
+    display: grid;
+    justify-items: end;
+    gap: 4px;
+    min-width: 0;
+  }
+
   .nothing-context-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow: hidden;
     border: 1px solid var(--input);
     border-radius: var(--radius-md);
@@ -996,12 +952,23 @@
   .nothing-context-cell {
     display: grid;
     gap: 7px;
+    min-width: 0;
     border-right: 1px solid var(--border);
+    color: var(--text-primary);
     padding: 12px;
+    text-decoration: none;
   }
 
   .nothing-context-cell:last-child {
     border-right: 0;
+  }
+
+  .nothing-context-cell:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .nothing-context-cell:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
   }
 
   .nothing-context-cell span {
@@ -1022,50 +989,12 @@
     line-height: 1;
   }
 
-  .nothing-context-cell:hover,
-  .nothing-context-cell:focus-visible,
-  .nothing-next-row:hover,
-  .nothing-next-row:focus-visible,
-  .nothing-deployment-rollup-row:hover,
-  .nothing-deployment-rollup-row:focus-visible {
-    background: color-mix(in oklch, var(--primary) 3%, transparent);
-  }
-
-  .nothing-deployment-rollup-list,
-  .nothing-next-actions {
-    display: grid;
-    border-top: 1px solid var(--input);
-  }
-
-  .nothing-deployment-rollup-row,
-  .nothing-next-row {
-    border-bottom: 1px solid var(--border);
-  }
-
-  .nothing-deployment-rollup-row:last-child,
-  .nothing-next-row:last-child {
-    border-bottom: 0;
-  }
-
-  .nothing-deployment-rollup-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 0;
-  }
-
-  .nothing-deployment-rollup-row > span:last-child {
-    display: grid;
-    justify-items: end;
-    gap: 4px;
-  }
-
   .nothing-next-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
+    border-top: 1px solid var(--input);
     padding: 12px 0;
   }
 
@@ -1075,6 +1004,20 @@
 
   .nothing-next-row :global(svg:last-child) {
     color: var(--text-secondary);
+  }
+
+  .nothing-panel-empty {
+    display: grid;
+    gap: 4px;
+    border: 1px dashed var(--input);
+    border-radius: var(--radius-md);
+    padding: 14px;
+  }
+
+  .nothing-panel-empty strong {
+    color: var(--text-display);
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .nothing-side-link {
@@ -1094,39 +1037,32 @@
     text-underline-offset: 3px;
   }
 
-  .nothing-side-empty {
-    border: 1px dashed var(--input);
-    border-radius: var(--radius-md);
-    color: var(--text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
-    padding: 16px;
+  .nothing-deployment-row:hover,
+  .nothing-deployment-row:focus-visible,
+  .nothing-deployment-rollup-row:hover,
+  .nothing-deployment-rollup-row:focus-visible,
+  .nothing-context-cell:hover,
+  .nothing-context-cell:focus-visible,
+  .nothing-next-row:hover,
+  .nothing-next-row:focus-visible {
+    background: color-mix(in oklch, var(--primary) 3%, transparent);
   }
 
-  .nothing-project-identity:focus-visible,
-  .nothing-project-metric:focus-visible,
-  .nothing-resource-chip:focus-visible,
-  .nothing-resource-more:focus-visible,
-  .nothing-resource-empty:focus-visible,
-  .nothing-project-access a:focus-visible,
-  .nothing-project-open:focus-visible,
-  .nothing-context-cell:focus-visible,
+  .nothing-deployment-row:focus-visible,
   .nothing-deployment-rollup-row:focus-visible,
-  .nothing-side-link:focus-visible,
-  .nothing-next-row:focus-visible {
+  .nothing-context-cell:focus-visible,
+  .nothing-next-row:focus-visible,
+  .nothing-side-link:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nothing-resource-chip,
-    .nothing-project-open {
+    .nothing-deployment-row,
+    .nothing-deployment-rollup-row,
+    .nothing-context-cell,
+    .nothing-next-row {
       transition-duration: 1ms;
-    }
-
-    .nothing-project-open:hover,
-    .nothing-project-open:focus-visible {
-      transform: translate3d(0, 0, 0);
     }
   }
 </style>
