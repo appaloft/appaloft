@@ -1118,6 +1118,7 @@
   } | null>(null);
   let dependencyBindingResourceId = $state("");
   let dependencyBindingTargetName = $state("DATABASE_URL");
+  let dependencyBindDialogOpen = $state(false);
   let dependencyBindingSecretRefs = $state<Record<string, string>>({});
   let dependencyBindingSecretValues = $state<Record<string, string>>({});
   let dependencyBindingSecretRotationAcks = $state<Record<string, boolean>>({});
@@ -2337,6 +2338,7 @@
       };
       dependencyBindingResourceId = "";
       dependencyBindingTargetName = "DATABASE_URL";
+      dependencyBindDialogOpen = false;
       void invalidateDependencyQueries();
     },
     onError: (error) => {
@@ -4227,6 +4229,19 @@
       scope: "runtime-only",
       injectionMode: "env",
     });
+  }
+
+  function openDependencyBindDialog(): void {
+    dependencyFeedback = null;
+    dependencyBindingResourceId =
+      dependencyBindingResourceId || bindableDependencyResources[0]?.id || "";
+    dependencyBindingTargetName = dependencyBindingTargetName || "DATABASE_URL";
+    dependencyBindDialogOpen = true;
+  }
+
+  function closeDependencyBindDialog(): void {
+    dependencyBindDialogOpen = false;
+    dependencyFeedback = null;
   }
 
   function canRotateDependencyBindingSecret(bindingId: string): boolean {
@@ -7394,7 +7409,18 @@
                           {$t(i18nKeys.console.resources.dependenciesDescription)}
                         </p>
                       </div>
-                      <Badge variant="outline">{resourceDependencyBindings.length}</Badge>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{resourceDependencyBindings.length}</Badge>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isResourceArchived || bindableDependencyResources.length === 0}
+                          onclick={openDependencyBindDialog}
+                        >
+                          <Link2 class="size-4" />
+                          {$t(i18nKeys.console.resources.dependencyBindAction)}
+                        </Button>
+                      </div>
                     </div>
 
                     {#if resourceDependencyBindingsQuery.isPending}
@@ -7476,6 +7502,15 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{dependencyResources.length}</Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isResourceArchived || bindableDependencyResources.length === 0}
+                            onclick={openDependencyBindDialog}
+                          >
+                            {$t(i18nKeys.console.resources.dependencyBindAction)}
+                          </Button>
                           <Button href="/dependency-resources" variant="outline" size="sm">
                             {$t(i18nKeys.common.actions.viewDetails)}
                           </Button>
@@ -8734,6 +8769,113 @@
                   : $t(i18nKeys.console.resources.scheduledTaskCreateAction)}
               </Button>
             </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root bind:open={dependencyBindDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.dependencyBindTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.dependencyBindDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <form
+            class="space-y-5 px-5 pb-5"
+            onsubmit={bindDependencyResource}
+            data-resource-dependency-bind-dialog
+          >
+            <section class="grid gap-4 rounded-md border bg-background p-4 sm:grid-cols-2">
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.dependencySelect)}</span>
+                <Select.Root bind:value={dependencyBindingResourceId} type="single">
+                  <Select.Trigger class="w-full">
+                    {selectedDependencyResource
+                      ? dependencyResourceOptionLabel(selectedDependencyResource)
+                      : $t(i18nKeys.console.resources.dependenciesEmpty)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each bindableDependencyResources as dependency (dependency.id)}
+                      <Select.Item value={dependency.id}>
+                        {dependencyResourceOptionLabel(dependency)}
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium" for="resource-dependency-target-name">
+                <span>{$t(i18nKeys.console.resources.dependencyTargetName)}</span>
+                <Input
+                  id="resource-dependency-target-name"
+                  bind:value={dependencyBindingTargetName}
+                  autocomplete="off"
+                  placeholder="DATABASE_URL"
+                />
+              </label>
+            </section>
+
+            {#if selectedDependencyResource}
+              <aside class="rounded-md border bg-muted/15 p-4 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {dependencyResourceKindLabel(selectedDependencyResource.kind)}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {selectedDependencyResource.sourceMode}
+                  </Badge>
+                  <Badge
+                    variant={selectedDependencyResource.bindingReadiness.status === "ready"
+                      ? "default"
+                      : "outline"}
+                  >
+                    {selectedDependencyResource.bindingReadiness.status}
+                  </Badge>
+                  <Badge variant="outline">
+                    {$t(i18nKeys.console.resources.dependencyRuntimeBadge)}
+                  </Badge>
+                </div>
+                <p class="mt-3 font-medium">{selectedDependencyResource.name}</p>
+                <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                  {selectedDependencyResource.id}
+                </p>
+              </aside>
+            {:else}
+              <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.dependenciesEmpty)}
+              </div>
+            {/if}
+
+            {#if dependencyFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  dependencyFeedback.kind === "success"
+                    ? "border-primary/25 bg-primary/5"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{dependencyFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{dependencyFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={closeDependencyBindDialog}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canBindDependencyResource || bindResourceDependencyMutation.isPending}
+              >
+                <Link2 class="size-4" />
+                {bindResourceDependencyMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.dependencyBindAction)}
+              </Button>
+            </Dialog.Footer>
           </form>
         </Dialog.Content>
       </Dialog.Root>

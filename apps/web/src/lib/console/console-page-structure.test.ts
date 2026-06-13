@@ -891,6 +891,35 @@ describe("console page structure", () => {
     );
   });
 
+  test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {
+    const resourceDependencyBindingsSectionSource = sourceBetween(
+      resourceDetailPageSource,
+      '<section id="resource-dependency-bindings"',
+      '<section id="resource-storage"',
+    );
+    const dependencyBindDialogSource =
+      resourceDetailPageSource.match(
+        /<Dialog\.Root bind:open={dependencyBindDialogOpen}[\s\S]*?data-resource-dependency-bind-dialog[\s\S]*?<\/Dialog\.Root>/,
+      )?.[0] ?? "";
+
+    expect(resourceDetailPageSource).toContain("dependencyBindDialogOpen");
+    expect(resourceDetailPageSource).toContain("openDependencyBindDialog");
+    expect(resourceDetailPageSource).toContain("closeDependencyBindDialog");
+    expect(resourceDetailPageSource).toContain("data-resource-dependency-bind-dialog");
+    expect(resourceDependencyBindingsSectionSource).toContain("onclick={openDependencyBindDialog}");
+    expect(resourceDependencyBindingsSectionSource).not.toContain("<form");
+    expect(resourceDependencyBindingsSectionSource).not.toContain("<Input");
+    expect(resourceDependencyBindingsSectionSource).not.toContain("<Select.Root");
+    expect(dependencyBindDialogSource).toContain("onsubmit={bindDependencyResource}");
+    expect(dependencyBindDialogSource).toContain(
+      "<Select.Root bind:value={dependencyBindingResourceId}",
+    );
+    expect(dependencyBindDialogSource).toContain('id="resource-dependency-target-name"');
+    expect(dependencyBindDialogSource).toContain("dependencyResourceOptionLabel");
+    expect(dependencyBindDialogSource).toContain("dependencyRuntimeBadge");
+    expect(dependencyBindDialogSource).toContain('type="submit"');
+  });
+
   test("[RESOURCE-DETAIL-IA-002] keeps resource destructive actions behind intent dialogs", () => {
     expect(resourceDetailPageSource).toContain("scheduledTaskDeleteDialogOpen");
     expect(resourceDetailPageSource).toContain("scheduledTaskManageDialogOpen");
