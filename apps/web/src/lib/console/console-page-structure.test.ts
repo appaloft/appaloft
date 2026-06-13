@@ -531,6 +531,23 @@ describe("console page structure", () => {
     expect(pagesWithDestructiveButtonsOutsideDialogs).toEqual([]);
   });
 
+  test("[CONSOLE-MODAL-IA-000] keeps console interactions off browser-native dialogs", () => {
+    const browserNativeDialogPattern =
+      /window\.(?:alert|confirm|prompt)\b|\b(?:alert|confirm|prompt)\(/;
+    const consoleInteractionSources = [
+      ...routePageSources(routesRootPath),
+      ...svelteSources(fileURLToPath(new URL("../components/console", import.meta.url))),
+    ];
+    const browserNativeDialogUsage = consoleInteractionSources
+      .filter(({ path }) => focusedFlowRouteSegments.every((segment) => !path.includes(segment)))
+      .flatMap(({ path, source }) => {
+        const match = source.match(browserNativeDialogPattern);
+        return match ? [`${path.replace(routesRootPath, "routes")}: ${match[0]}`] : [];
+      });
+
+    expect(browserNativeDialogUsage).toEqual([]);
+  });
+
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
     const forbiddenVisibleCopyPattern =
       /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface|deployment attempt|console intent)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
