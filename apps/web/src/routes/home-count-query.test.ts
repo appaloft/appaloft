@@ -131,22 +131,31 @@ describe("operations workbench home", () => {
       "utf8",
     );
 
-    expect(zhLocaleSource).toContain('projectsHeading: "控制台概览"');
-    expect(zhLocaleSource).toContain('projectsDescription: "查看部署状态、资源访问和最近记录。"');
-    expect(zhLocaleSource).toContain('attentionTitle: "待处理状态"');
-    expect(zhLocaleSource).toContain('nextStepsTitle: "常用入口"');
+    expect(zhLocaleSource).toContain('projectsHeading: "运行状态"');
+    expect(zhLocaleSource).toContain(
+      'projectsDescription: "查看跨项目的部署、访问地址和运行目标状态。"',
+    );
+    expect(zhLocaleSource).toContain('attentionTitle: "项目"');
+    expect(zhLocaleSource).toContain('attentionHeading: "项目健康"');
+    expect(zhLocaleSource).toContain('nextStepsTitle: "快捷入口"');
     expect(zhLocaleSource).not.toContain("先处理当前");
     expect(zhLocaleSource).not.toContain("最值得");
     expect(zhLocaleSource).not.toContain("值得立刻");
     expect(zhLocaleSource).not.toContain("值得打开");
     expect(zhLocaleSource).not.toContain("只显示值得");
+    expect(zhLocaleSource).not.toContain("待处理状态");
+    expect(zhLocaleSource).not.toContain("访问地址缺口");
     expect(zhLocaleSource).not.toContain("read model");
     expect(zhLocaleSource).not.toContain("尚未接入");
-    expect(enLocaleSource).toContain('projectsHeading: "Console overview"');
-    expect(enLocaleSource).toContain('attentionTitle: "Status to review"');
-    expect(enLocaleSource).toContain('nextStepsTitle: "Common entries"');
+    expect(enLocaleSource).toContain('projectsHeading: "Operations status"');
+    expect(enLocaleSource).toContain('attentionTitle: "Projects"');
+    expect(enLocaleSource).toContain('attentionHeading: "Project health"');
+    expect(enLocaleSource).toContain('nextStepsTitle: "Shortcuts"');
     expect(enLocaleSource).not.toContain("worth opening");
     expect(enLocaleSource).not.toContain("next actions");
+    expect(enLocaleSource).not.toContain("Status to review");
+    expect(enLocaleSource).not.toContain("Common entries");
+    expect(enLocaleSource).not.toContain("Access route gap");
     expect(enLocaleSource).not.toContain("obviously incomplete");
     expect(enLocaleSource).not.toContain("Triage attention");
     expect(enLocaleSource).not.toContain("read model is not connected");
