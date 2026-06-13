@@ -590,7 +590,7 @@
                 <section class="rounded-md border bg-muted/20 p-3" data-installed-application-upgrade-governance>
                   <div class="flex items-center justify-between gap-3">
                     <p class="text-sm font-medium">升级</p>
-                    <Badge variant="outline">暂未开放</Badge>
+                    <Badge variant="outline">需确认</Badge>
                   </div>
                   <p class="mt-2 text-xs leading-5 text-muted-foreground">
                     升级前需要展示版本差异、资源影响和部署计划，再进入确认流程。

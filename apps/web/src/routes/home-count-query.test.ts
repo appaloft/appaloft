@@ -147,6 +147,7 @@ describe("operations workbench home", () => {
     expect(zhLocaleSource).not.toContain("访问地址缺口");
     expect(zhLocaleSource).not.toContain("read model");
     expect(zhLocaleSource).not.toContain("尚未接入");
+    expect(zhLocaleSource).not.toContain("暂未开放");
     expect(enLocaleSource).toContain('projectsHeading: "Operations status"');
     expect(enLocaleSource).toContain('attentionTitle: "Projects"');
     expect(enLocaleSource).toContain('attentionHeading: "Project health"');

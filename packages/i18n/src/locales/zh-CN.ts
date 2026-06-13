@@ -741,7 +741,8 @@ export const zhCN = {
       failedDeploymentsTitle: "失败部署",
       healthyDeploymentsMetric: "健康",
       recentActivityDescription: "部署、配置和自动化事件会在这里汇总。",
-      recentActivityReadModelGap: "近期活动暂不可用。现在可从最近部署记录查看变化。",
+      recentActivityReadModelGap:
+        "近期活动会汇总部署、配置和自动化事件。当前可先从最近部署记录查看变化。",
       recentActivityTitle: "近期活动",
       managedServicesMetric: "托管服务",
       accessRouteTitle: "访问地址",
@@ -1193,8 +1194,9 @@ export const zhCN = {
     },
     projects: {
       activityDescription: "项目里的部署、配置和自动化事件会在这里汇总。",
-      activityGapDescription: "项目活动暂不可用。当前请通过资源页和部署页查看变化。",
-      activityGapTitle: "项目活动暂不可用",
+      activityGapDescription:
+        "活动会汇总这个项目的部署、配置和自动化事件。当前可从资源页和部署页查看变化。",
+      activityGapTitle: "活动汇总",
       activityTitle: "活动",
       addResourceAction: "添加资源",
       activeProjects: "有部署",
@@ -1303,7 +1305,7 @@ export const zhCN = {
         "项目页只保留归属关系、环境数量、资源数量和最近部署，具体执行信息进入详情。",
       focusLabel: "项目索引",
       focusTitle: "项目归属与部署关系",
-      healthSummaryGap: "健康汇总暂不可用。这里先展示部署状态和访问状态。",
+      healthSummaryGap: "这里按部署状态和访问状态展示项目健康。",
       lastDeployment: "最近部署",
       latestDeploymentTitle: "最近部署",
       latestResource: "最新资源",

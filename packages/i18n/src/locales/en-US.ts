@@ -774,7 +774,7 @@ export const enUS = {
       recentActivityDescription:
         "Deployments, configuration changes, and automation events appear here.",
       recentActivityReadModelGap:
-        "Recent activity is not available yet. Use recent deployment records for the latest changes.",
+        "Recent activity will summarize deployments, configuration changes, and automation events. Use recent deployment records for the latest changes right now.",
       recentActivityTitle: "Recent activity",
       managedServicesMetric: "Managed services",
       accessRouteTitle: "Access",
@@ -1263,8 +1263,8 @@ export const enUS = {
       activityDescription:
         "Deployments, configuration changes, and automation events for this project appear here.",
       activityGapDescription:
-        "Project activity is not available yet. Use Resources and Deployments for the latest changes.",
-      activityGapTitle: "Project activity is not available yet",
+        "Activity will summarize deployments, configuration changes, and automation events for this project. Use Resources and Deployments for the latest changes right now.",
+      activityGapTitle: "Activity summary",
       activityTitle: "Activity",
       addResourceAction: "Add resource",
       activeProjects: "With deployments",
@@ -1381,8 +1381,7 @@ export const enUS = {
         "The project list keeps ownership, environment count, resource count, and latest deployment visible. Execution details move to detail pages.",
       focusLabel: "Project index",
       focusTitle: "Project ownership and deployment relationships",
-      healthSummaryGap:
-        "Health summary is not available yet. Deployment status and access state are shown here first.",
+      healthSummaryGap: "Project health is shown from deployment status and access state.",
       lastDeployment: "Latest deployment",
       latestDeploymentTitle: "Latest deployment",
       latestResource: "Latest resource",

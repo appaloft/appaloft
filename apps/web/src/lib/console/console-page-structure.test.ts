@@ -607,6 +607,7 @@ describe("console page structure", () => {
     expect(projectDetailPageSource).toContain("data-project-activity-read-model-gap");
     expect(projectDetailPageSource).toContain("activityGapTitle");
     expect(projectDetailPageSource).toContain("activityGapDescription");
+    expect(projectDetailPageSource).not.toContain("暂未开放");
     expect(projectDetailPageSource).not.toContain("orpcClient.activity");
     expect(projectDetailPageSource).not.toContain("orpcClient.events");
 
@@ -619,6 +620,7 @@ describe("console page structure", () => {
     expect(projectActivitySurface).toContain("data-project-activity-read-model-gap");
     expect(projectActivitySurface).toContain('projectTabHref("resources")');
     expect(projectActivitySurface).toContain('projectTabHref("deployments")');
+    expect(projectActivitySurface).not.toContain("<Badge");
     expect(projectActivitySurface).not.toContain("<DeploymentTable");
     expect(projectActivitySurface).not.toContain("deploymentsQuery");
     expect(projectActivitySurface).not.toContain("deploymentMutation");
