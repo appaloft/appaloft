@@ -538,7 +538,7 @@ describe("console page structure", () => {
     );
     const rawOperationCopy = literalTextMatches(
       zhLocaleSource,
-      /\b(?:provider|workload|readiness|runtime usage inspect|workflow|metadata|Destination|storage volume|dependency resource|runtime injection|secret reference|restore point|live writes|dry-run|runtime cleanup|route snapshot|deployment snapshot|proxy route)\b|owner 摘要|Provider|Storage backup|Dependency resource|Secret|观察入口|命令意图|归属证据|提供方标识|实现状态/u,
+      /\b(?:provider|workload|readiness|runtime usage inspect|workflow|metadata|Destination|storage volume|dependency resource|runtime injection|secret reference|restore point|live writes|dry-run|runtime cleanup|route snapshot|deployment snapshot|proxy route|runtime plan|Build cache|Route source|Source binding|Base ref)\b|owner 摘要|Provider|Storage backup|Dependency resource|Secret|观察入口|命令意图|归属证据|提供方标识|实现状态|命令意图|Profile 缺失|选择 source|source 是否|按时间展示 source|打开 trace|Trace|Monitor 窗口|Request ID|Route ID|Git ref|镜像 digest|镜像 tag|Ref 不匹配/u,
     );
 
     expect(rawOperationCopy).toEqual([]);
