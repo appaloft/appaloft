@@ -776,9 +776,9 @@ export const enUS = {
       failedDeploymentsTitle: "Failed deployments",
       healthyDeploymentsMetric: "Healthy",
       recentActivityDescription:
-        "Commands, events, configuration changes, and automation events will appear after the unified activity read model is connected.",
+        "Deployments, configuration changes, and automation events appear here.",
       recentActivityReadModelGap:
-        "Home activity read model is not connected yet. Use deployment records, projects, and resources for the current operational record.",
+        "Recent activity is not available yet. Use recent deployment records for the latest changes.",
       recentActivityTitle: "Recent activity",
       managedServicesMetric: "Managed services",
       accessRouteTitle: "Access",
@@ -801,7 +801,7 @@ export const enUS = {
       quickActionsTitle: "Common actions",
       recentDeploymentsDescription: "Recently created or updated deployment records.",
       recentDeploymentsReadModelGap:
-        "Activity read model is not connected here yet; this panel only shows deployment records.",
+        "Deployment records are shown here first. Configuration and automation events appear in recent activity.",
       recentDeploymentsTitle: "Recent deployments",
       resourceKindApplication: "Application",
       resourceKindCache: "Cache",
@@ -1268,10 +1268,10 @@ export const enUS = {
     },
     projects: {
       activityDescription:
-        "Project activity will show commands, events, and target links when the activity read model is connected.",
+        "Deployments, configuration changes, and automation events for this project appear here.",
       activityGapDescription:
-        "The project activity projection is not wired into this page yet. Use Resources and Deployments for the current operational record.",
-      activityGapTitle: "Activity read model gap",
+        "Project activity is not available yet. Use Resources and Deployments for the latest changes.",
+      activityGapTitle: "Project activity is not available yet",
       activityTitle: "Activity",
       addResourceAction: "Add resource",
       activeProjects: "With deployments",
@@ -1389,7 +1389,7 @@ export const enUS = {
       focusLabel: "Project index",
       focusTitle: "Project ownership and deployment relationships",
       healthSummaryGap:
-        "Resource health rollup needs a dedicated summary projection. Until then, deployment attention and access state are shown separately.",
+        "Health summary is not available yet. Deployment status and access state are shown here first.",
       lastDeployment: "Latest deployment",
       latestDeploymentTitle: "Latest deployment",
       latestResource: "Latest resource",

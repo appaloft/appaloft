@@ -743,10 +743,8 @@ export const zhCN = {
       failedDeploymentsDescription: "失败部署只提供观察和恢复入口，不在首页直接改配置。",
       failedDeploymentsTitle: "失败部署",
       healthyDeploymentsMetric: "健康",
-      recentActivityDescription:
-        "命令、事件、配置变更和自动化事件会在统一 activity read model 接入后显示。",
-      recentActivityReadModelGap:
-        "Activity read model 尚未接入首页。当前可用部署记录、项目和资源列表判断近期运维状态。",
+      recentActivityDescription: "部署、配置和自动化事件会在这里汇总。",
+      recentActivityReadModelGap: "近期活动暂不可用。现在可从最近部署记录查看变化。",
       recentActivityTitle: "近期活动",
       managedServicesMetric: "托管服务",
       accessRouteTitle: "访问地址",
@@ -766,7 +764,7 @@ export const zhCN = {
       quickActionsDescription: "从部署、服务器和托管服务继续",
       quickActionsTitle: "常用入口",
       recentDeploymentsDescription: "最近创建或更新的部署记录。",
-      recentDeploymentsReadModelGap: "Activity read model 尚未接入首页；这里仅展示部署记录。",
+      recentDeploymentsReadModelGap: "这里先展示部署记录；配置和自动化事件会在近期活动中汇总。",
       recentDeploymentsTitle: "最近部署",
       resourceKindApplication: "应用",
       resourceKindCache: "缓存",
@@ -1199,10 +1197,9 @@ export const zhCN = {
         "资源终端需要一个记录了工作目录元数据的成功部署。请选择带工作目录的部署、重新部署这个资源，或者改用服务器终端。",
     },
     projects: {
-      activityDescription: "接入项目活动 read model 后，这里会展示命令、事件、目标对象和跳转入口。",
-      activityGapDescription:
-        "项目活动 projection 尚未接入这个页面。当前请通过资源页和部署页查看可操作记录。",
-      activityGapTitle: "Activity read model 缺口",
+      activityDescription: "项目里的部署、配置和自动化事件会在这里汇总。",
+      activityGapDescription: "项目活动暂不可用。当前请通过资源页和部署页查看变化。",
+      activityGapTitle: "项目活动暂不可用",
       activityTitle: "活动",
       addResourceAction: "添加资源",
       activeProjects: "有部署",
@@ -1311,8 +1308,7 @@ export const zhCN = {
         "项目页只保留归属关系、环境数量、资源数量和最近部署，具体执行信息进入详情。",
       focusLabel: "项目索引",
       focusTitle: "项目归属与部署关系",
-      healthSummaryGap:
-        "资源健康汇总需要专门的 summary projection。接入前，这里先分开展示部署 attention 和访问状态。",
+      healthSummaryGap: "健康汇总暂不可用。这里先展示部署状态和访问状态。",
       lastDeployment: "最近部署",
       latestDeploymentTitle: "最近部署",
       latestResource: "最新资源",

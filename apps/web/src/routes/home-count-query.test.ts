@@ -128,9 +128,12 @@ describe("operations workbench home", () => {
     );
     expect(zhLocaleSource).not.toContain("最值得");
     expect(zhLocaleSource).not.toContain("值得立刻");
+    expect(zhLocaleSource).not.toContain("read model");
+    expect(zhLocaleSource).not.toContain("尚未接入");
     expect(enLocaleSource).toContain('projectsHeading: "Console overview"');
     expect(enLocaleSource).not.toContain("worth opening");
     expect(enLocaleSource).not.toContain("obviously incomplete");
     expect(enLocaleSource).not.toContain("Triage attention");
+    expect(enLocaleSource).not.toContain("read model is not connected");
   });
 });
