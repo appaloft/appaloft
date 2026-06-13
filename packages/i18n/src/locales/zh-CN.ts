@@ -1185,6 +1185,9 @@ export const zhCN = {
       lifecycleScopeResource: "资源",
       lifecycleScopeServer: "服务器",
       lifecycleTitle: "活跃终端会话",
+      resourceUnavailableBody:
+        "这个资源还没有可打开终端的部署工作目录。需要排查时先查看部署记录，或者使用服务器终端进入主机级别上下文。",
+      resourceUnavailableTitle: "暂无资源终端目标",
       resourceDescription: "进入由运行时元数据解析出来的最新部署工作目录。",
       resourceTitle: "资源终端",
       serverDescription: "进入选中的服务器目标。",

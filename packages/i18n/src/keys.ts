@@ -1137,6 +1137,8 @@ export const i18nKeys = {
       lifecycleScopeResource: "console:terminal.lifecycleScopeResource",
       lifecycleScopeServer: "console:terminal.lifecycleScopeServer",
       lifecycleTitle: "console:terminal.lifecycleTitle",
+      resourceUnavailableBody: "console:terminal.resourceUnavailableBody",
+      resourceUnavailableTitle: "console:terminal.resourceUnavailableTitle",
       resourceDescription: "console:terminal.resourceDescription",
       resourceTitle: "console:terminal.resourceTitle",
       serverDescription: "console:terminal.serverDescription",

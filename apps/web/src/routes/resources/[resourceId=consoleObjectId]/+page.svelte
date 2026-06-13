@@ -6,6 +6,7 @@
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
+    ArrowRight,
     Archive,
     Check,
     Clipboard,
@@ -7797,20 +7798,23 @@
                   data-resource-terminal-unavailable-state
                 >
                   <p class="text-sm font-medium">
-                    {$t(i18nKeys.console.resources.runtimeLogsUnavailableTitle)}
+                    {$t(i18nKeys.console.terminal.resourceUnavailableTitle)}
                   </p>
                   <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                    {$t(i18nKeys.console.resources.runtimeLogsUnavailableBody)}
+                    {$t(i18nKeys.console.terminal.resourceUnavailableBody)}
                   </p>
-                  <Button
-                    type="button"
-                    class="mt-4"
-                    disabled={!canCreateDeployment}
-                    onclick={openResourceDeploymentDialog}
-                  >
-                    <Play class="size-4" />
-                    {$t(i18nKeys.common.actions.createDeployment)}
-                  </Button>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <Button href={resourceTabHref("deployments")} variant="outline">
+                      {resourceTabLabel("deployments")}
+                      <ArrowRight class="size-4" />
+                    </Button>
+                    {#if latestDeployment?.serverId}
+                      <Button href={serverTerminalHref(latestDeployment.serverId)} variant="outline">
+                        <Terminal class="size-4" />
+                        {$t(i18nKeys.console.terminal.serverTitle)}
+                      </Button>
+                    {/if}
+                  </div>
                 </div>
               {/if}
             </section>

@@ -1251,6 +1251,9 @@ export const enUS = {
       lifecycleScopeResource: "Resource",
       lifecycleScopeServer: "Server",
       lifecycleTitle: "Active terminal sessions",
+      resourceUnavailableBody:
+        "This resource does not have a deployment workspace that can open a terminal yet. Check deployments or use a server terminal when you need host-level access.",
+      resourceUnavailableTitle: "No resource terminal target yet",
       resourceDescription:
         "Starts in the latest deployment workspace resolved from runtime metadata.",
       resourceTitle: "Resource terminal",

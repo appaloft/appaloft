@@ -33,9 +33,12 @@ describe("terminal session Web console surface", () => {
       ),
     ]);
 
-    expect(serverListSource).toContain("serverTerminalHref");
-    expect(serverListSource).toContain("?tab=runtime&section=terminal");
-    expect(serverListSource).toContain("i18nKeys.common.actions.openTerminal");
+    expect(serverListSource).toContain("serverRuntimeHref");
+    expect(serverListSource).toContain("?tab=runtime");
+    expect(serverListSource).toContain("i18nKeys.console.servers.runtimeTab");
+    expect(serverListSource).not.toContain("serverTerminalHref");
+    expect(serverListSource).not.toContain("?tab=runtime&section=terminal");
+    expect(serverListSource).not.toContain("i18nKeys.common.actions.openTerminal");
     expect(serverDetailSource).toContain('serverSectionHref("runtime", "terminal")');
     expect(serverDetailSource).not.toContain('value="terminal"');
     expect(serverDetailSource).toContain("TerminalSessionPanel");

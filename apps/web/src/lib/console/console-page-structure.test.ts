@@ -779,6 +779,8 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("data-resource-terminal-panel");
     expect(resourceDetailPageSource).toContain("data-resource-terminal-unavailable-state");
     expect(resourceDetailPageSource).toContain("runtimeLogsUnavailableBody");
+    expect(resourceDetailPageSource).toContain("terminal.resourceUnavailableTitle");
+    expect(resourceDetailPageSource).toContain("terminal.resourceUnavailableBody");
     const resourceDetailQuerySource = sourceBetween(
       resourceDetailPageSource,
       "const resourceDetailQuery = createQuery",
@@ -819,9 +821,23 @@ describe("console page structure", () => {
     expect(resourceLogsTabSource).toContain("{@render resourceRuntimeLogsPanel()}");
     expect(resourceLogsTabSource).not.toContain("{@render resourceRuntimeControlPanel()}");
     expect(resourceLogsTabSource).not.toContain("openRuntimeControlDialog");
+    expect(resourceLogsTabSource).not.toContain("<TerminalSessionPanel");
+    expect(resourceLogsTabSource).not.toContain("data-resource-terminal-unavailable-state");
+    expect(resourceLogsTabSource).not.toContain("openResourceDeploymentDialog");
+    expect(resourceLogsTabSource).not.toContain("terminal.resourceUnavailable");
     expect(resourceTerminalTabSource).toContain("<TerminalSessionPanel");
     expect(resourceTerminalTabSource).toContain("data-resource-terminal-unavailable-state");
+    expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableTitle");
+    expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableBody");
+    expect(resourceTerminalTabSource).toContain('href={resourceTabHref("deployments")}');
+    expect(resourceTerminalTabSource).toContain("serverTerminalHref(latestDeployment.serverId)");
     expect(resourceTerminalTabSource).not.toContain("runtimeControl");
+    expect(resourceTerminalTabSource).not.toContain("runtimeLogsUnavailableTitle");
+    expect(resourceTerminalTabSource).not.toContain("runtimeLogsUnavailableBody");
+    expect(resourceTerminalTabSource).not.toContain("openResourceDeploymentDialog");
+    expect(resourceTerminalTabSource).not.toContain("onclick={openResourceDeploymentDialog}");
+    expect(resourceTerminalTabSource).not.toContain("<form");
+    expect(resourceTerminalTabSource).not.toContain("<Input");
     expect(runtimeMonitorPanelDisplaySource).toContain("data-runtime-threshold-display-surface");
     expect(runtimeMonitorPanelDisplaySource).toContain("setThresholdDialogOpen(true)");
     expect(runtimeMonitorPanelDisplaySource).not.toContain("<Input");
