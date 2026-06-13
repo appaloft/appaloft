@@ -1491,7 +1491,7 @@
                     </div>
                     {#if dependency.dependencyResourceId}
                       <p class="mt-2 border-t pt-2 leading-5 text-muted-foreground">
-                        依赖资源 detail route 还未实现；当前从依赖资源 collection 进入治理。
+                        依赖资源已记录，可以从依赖资源页面继续查看绑定、备份和恢复状态。
                       </p>
                     {/if}
                   </div>
@@ -1626,7 +1626,7 @@
                   </Button>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    安装详情暂时还不能打开。可以先查看资源或部署记录。
+                    安装结果页会在应用 ID 返回后出现。现在可以先查看资源或部署记录。
                   </div>
                 {/if}
                 <Button href="/projects" variant="outline" class="w-full">

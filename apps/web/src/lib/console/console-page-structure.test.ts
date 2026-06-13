@@ -2150,7 +2150,12 @@ describe("console page structure", () => {
     expect(marketplaceBlueprintDetailPageSource).toContain("打开公开 URL");
     expect(marketplaceBlueprintDetailPageSource).toContain("查看安装聚合");
     expect(marketplaceBlueprintDetailPageSource).toContain("/installed-applications/");
-    expect(marketplaceBlueprintDetailPageSource).toContain("安装详情暂时还不能打开");
+    expect(marketplaceBlueprintDetailPageSource).toContain("安装结果页会在应用 ID 返回后出现");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("安装详情暂时还不能打开");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("暂时还不能");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("detail route");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("resource owner surface");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("owner surface");
     expect(marketplaceBlueprintDetailPageSource).not.toContain(
       "Installed Application detail route 仍是 route gap",
     );
@@ -2176,7 +2181,10 @@ describe("console page structure", () => {
     expect(installHandoffSource).toContain("打开最新部署");
     expect(installHandoffSource).toContain("查看安装聚合");
     expect(installHandoffSource).toContain("打开项目列表");
-    expect(installHandoffSource).toContain("安装详情暂时还不能打开");
+    expect(installHandoffSource).toContain("安装结果页会在应用 ID 返回后出现");
+    expect(installHandoffSource).not.toContain("暂时还不能");
+    expect(installHandoffSource).not.toContain("detail route");
+    expect(installHandoffSource).not.toContain("collection 进入治理");
     expect(installHandoffSource).not.toContain("<Input");
     expect(installHandoffSource).not.toContain("<select");
     expect(installHandoffSource).not.toContain("data-blueprint-install-secret-inputs");

@@ -570,7 +570,7 @@ export const enUS = {
       filterAllResources: "All resources",
       filterAllStatuses: "All statuses",
       filtersDescription:
-        "Narrow the observation surface by owner and status; deployment creation stays on the resource owner surface.",
+        "Filter deployment records by project, environment, resource, and status. Create or retry deployments from project resource views or resource pages.",
       filtersTitle: "Filter deployment records",
       focusDescription:
         "Treat each release as a traceable event; server, snapshot, and command details live on the detail page.",
@@ -2859,7 +2859,7 @@ export const enUS = {
         "Safety checks are clear. Typed confirmation is still required before deletion.",
       deleteServerSucceeded: "Server deleted",
       deploymentsSurfaceDescription:
-        "Read-only deployment attempts hosted on this runtime surface. Deployment creation stays on the resource owner surface.",
+        "Read-only deployment attempts hosted on this server. Create or retry deployments from project resource views or resource pages.",
       deploymentsSurfaceTitle: "Hosted deployments",
       deleteCredentialAction: "Delete",
       deleteCredentialActionAria: "Delete SSH credential {{name}}",
