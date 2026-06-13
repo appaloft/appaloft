@@ -344,6 +344,31 @@ function routePageSources(rootPath: string): Array<{ path: string; source: strin
   return entries;
 }
 
+function destructiveButtonTagsOutsideDialog(source: string): string[] {
+  const outsideTags: string[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const buttonIndex = source.indexOf("<Button", cursor);
+    if (buttonIndex < 0) {
+      return outsideTags;
+    }
+
+    const buttonEndIndex = source.indexOf(">", buttonIndex);
+    const buttonTag =
+      buttonEndIndex >= 0 ? source.slice(buttonIndex, buttonEndIndex + 1) : "<Button";
+    const beforeButton = source.slice(0, buttonIndex);
+    const lastDialogOpen = beforeButton.lastIndexOf("<Dialog.Root");
+    const lastDialogClose = beforeButton.lastIndexOf("</Dialog.Root>");
+
+    if (buttonTag.includes('variant="destructive"') && lastDialogOpen <= lastDialogClose) {
+      outsideTags.push(buttonTag);
+    }
+
+    cursor = buttonIndex + "<Button".length;
+  }
+}
+
 function svelteSources(rootPath: string): Array<{ path: string; source: string }> {
   const entries: Array<{ path: string; source: string }> = [];
 
@@ -492,6 +517,18 @@ describe("console page structure", () => {
       );
 
     expect(componentFormsOutsideDialogs).toEqual([]);
+  });
+
+  test("[CONSOLE-DANGER-IA-000] keeps destructive button treatment inside confirmation dialogs", () => {
+    const pagesWithDestructiveButtonsOutsideDialogs = routePageSources(routesRootPath)
+      .filter(({ path }) => focusedFlowRouteSegments.every((segment) => !path.includes(segment)))
+      .flatMap(({ path, source }) =>
+        destructiveButtonTagsOutsideDialog(source).map(
+          (buttonTag) => `${path.replace(`${routesRootPath}/`, "")}: ${buttonTag}`,
+        ),
+      );
+
+    expect(pagesWithDestructiveButtonsOutsideDialogs).toEqual([]);
   });
 
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
