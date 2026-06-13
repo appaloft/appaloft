@@ -30,6 +30,7 @@ describe("operations workbench home", () => {
   test("[HOME-WORKBENCH-002] does not render projects as the primary list surface", () => {
     expect(homePageSource).toContain("data-home-workbench-heading");
     expect(homePageSource).toContain("data-home-status-strip");
+    expect(homePageSource).toContain("data-home-deployment-watchlist");
     expect(homePageSource).toContain("data-home-attention-workqueue");
     expect(homePageSource).toContain("data-home-active-deployments");
     expect(homePageSource).toContain("data-home-failed-deployments");
@@ -47,6 +48,14 @@ describe("operations workbench home", () => {
     expect(homePageSource).not.toContain("nothing-project-context-row");
     expect(homePageSource).not.toContain("nothing-project-context-list");
     expect(homePageSource).not.toContain("projectContextLine(project)");
+  });
+
+  test("[HOME-WORKBENCH-002A] leads with deployment status instead of a project list", () => {
+    expect(homePageSource.indexOf("data-home-deployment-watchlist")).toBeGreaterThan(-1);
+    expect(homePageSource.indexOf("data-home-attention-workqueue")).toBeGreaterThan(-1);
+    expect(homePageSource.indexOf("data-home-deployment-watchlist")).toBeLessThan(
+      homePageSource.indexOf("data-home-attention-workqueue"),
+    );
   });
 
   test("[HOME-WORKBENCH-003] derives attention from deployment and access state", () => {
@@ -90,7 +99,7 @@ describe("operations workbench home", () => {
     );
     expect(homePageSource).toContain('<ConsoleResourceCanvas class="max-w-none">');
     expect(homePageSource).toContain("nothing-home-layout");
-    expect(homePageSource).toContain("nothing-workboard");
+    expect(homePageSource).toContain("nothing-operations-board");
     expect(homePageSource).toContain("nothing-side-stack");
     expect(homePageSource).not.toContain("@media (min-width: 1320px)");
     expect(homePageSource).not.toContain("letter-spacing: 0.08em");

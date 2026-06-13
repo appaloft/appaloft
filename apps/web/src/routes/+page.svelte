@@ -441,77 +441,8 @@
         </section>
 
         <section class="nothing-home-layout">
-          <div class="nothing-workboard">
-            <section class="nothing-panel" data-home-attention-workqueue>
-              <div class="nothing-section-header">
-                <p class="nothing-label">{$t(i18nKeys.console.home.attentionTitle)}</p>
-                <h2>{$t(i18nKeys.console.home.attentionHeading)}</h2>
-                <p>{$t(i18nKeys.console.home.attentionDescription)}</p>
-              </div>
-
-              {#if workStateLoading}
-                <div class="nothing-attention-list" aria-hidden="true">
-                  {#each Array.from({ length: 3 }) as _, index (index)}
-                    <div class="nothing-attention-card">
-                      <Skeleton class="size-10 rounded-md" />
-                      <span class="nothing-attention-copy">
-                        <Skeleton class="h-4 w-48" />
-                        <Skeleton class="h-3 w-full max-w-xl" />
-                      </span>
-                      <Skeleton class="h-8 w-28" />
-                    </div>
-                  {/each}
-                </div>
-              {:else if attentionItems.length > 0}
-                <div class="nothing-attention-list">
-                  {#each attentionItems as item (item.project.id + item.reason)}
-                    <article class="nothing-attention-card" data-tone={item.tone}>
-                      <span class="nothing-attention-icon" aria-hidden="true">
-                        {#if item.tone === "critical"}
-                          <AlertCircle class="size-4" />
-                        {:else if item.tone === "progress"}
-                          <Zap class="size-4" />
-                        {:else}
-                          <Clock3 class="size-4" />
-                        {/if}
-                      </span>
-                      <div class="nothing-attention-copy">
-                        <div class="nothing-attention-title">
-                          <strong>{$t(attentionTitleKey(item.reason))}</strong>
-                          <span>{$t(attentionToneLabelKey(item.tone))}</span>
-                        </div>
-                        <p>
-                          {$t(attentionDescriptionKey(item.reason), {
-                            count: item.count,
-                            project: item.project.name,
-                            resource: item.resource?.name ?? "-",
-                          })}
-                        </p>
-                        <small>
-                          {item.project.name}
-                          {#if item.deployment}
-                            · {deploymentResourceName(item.deployment)} · {formatTime(item.deployment.createdAt)}
-                          {:else}
-                            · {formatTime(item.timestamp)}
-                          {/if}
-                        </small>
-                      </div>
-                      <Button href={item.href} variant="outline" class="justify-self-start md:justify-self-end">
-                        {$t(item.actionLabelKey)}
-                        <ArrowRight class="size-4" />
-                      </Button>
-                    </article>
-                  {/each}
-                </div>
-              {:else}
-                <div class="nothing-panel-empty">
-                  <strong>{$t(i18nKeys.console.home.noAttentionTitle)}</strong>
-                  <span>{$t(i18nKeys.console.home.noAttentionDescription)}</span>
-                </div>
-              {/if}
-            </section>
-
-            <section class="nothing-deployment-board">
+          <div class="nothing-operations-board">
+            <section class="nothing-deployment-board" data-home-deployment-watchlist>
               <div class="nothing-panel" data-home-active-deployments>
                 <div class="nothing-section-header">
                   <p class="nothing-label">{$t(i18nKeys.console.home.activeDeploymentsTitle)}</p>
@@ -599,6 +530,75 @@
                   </div>
                 {/if}
               </div>
+            </section>
+
+            <section class="nothing-panel" data-home-attention-workqueue>
+              <div class="nothing-section-header">
+                <p class="nothing-label">{$t(i18nKeys.console.home.attentionTitle)}</p>
+                <h2>{$t(i18nKeys.console.home.attentionHeading)}</h2>
+                <p>{$t(i18nKeys.console.home.attentionDescription)}</p>
+              </div>
+
+              {#if workStateLoading}
+                <div class="nothing-attention-list" aria-hidden="true">
+                  {#each Array.from({ length: 3 }) as _, index (index)}
+                    <div class="nothing-attention-card">
+                      <Skeleton class="size-10 rounded-md" />
+                      <span class="nothing-attention-copy">
+                        <Skeleton class="h-4 w-48" />
+                        <Skeleton class="h-3 w-full max-w-xl" />
+                      </span>
+                      <Skeleton class="h-8 w-28" />
+                    </div>
+                  {/each}
+                </div>
+              {:else if attentionItems.length > 0}
+                <div class="nothing-attention-list">
+                  {#each attentionItems as item (item.project.id + item.reason)}
+                    <article class="nothing-attention-card" data-tone={item.tone}>
+                      <span class="nothing-attention-icon" aria-hidden="true">
+                        {#if item.tone === "critical"}
+                          <AlertCircle class="size-4" />
+                        {:else if item.tone === "progress"}
+                          <Zap class="size-4" />
+                        {:else}
+                          <Clock3 class="size-4" />
+                        {/if}
+                      </span>
+                      <div class="nothing-attention-copy">
+                        <div class="nothing-attention-title">
+                          <strong>{$t(attentionTitleKey(item.reason))}</strong>
+                          <span>{$t(attentionToneLabelKey(item.tone))}</span>
+                        </div>
+                        <p>
+                          {$t(attentionDescriptionKey(item.reason), {
+                            count: item.count,
+                            project: item.project.name,
+                            resource: item.resource?.name ?? "-",
+                          })}
+                        </p>
+                        <small>
+                          {item.project.name}
+                          {#if item.deployment}
+                            · {deploymentResourceName(item.deployment)} · {formatTime(item.deployment.createdAt)}
+                          {:else}
+                            · {formatTime(item.timestamp)}
+                          {/if}
+                        </small>
+                      </div>
+                      <Button href={item.href} variant="outline" class="justify-self-start md:justify-self-end">
+                        {$t(item.actionLabelKey)}
+                        <ArrowRight class="size-4" />
+                      </Button>
+                    </article>
+                  {/each}
+                </div>
+              {:else}
+                <div class="nothing-panel-empty">
+                  <strong>{$t(i18nKeys.console.home.noAttentionTitle)}</strong>
+                  <span>{$t(i18nKeys.console.home.noAttentionDescription)}</span>
+                </div>
+              {/if}
             </section>
 
             <section class="nothing-panel" data-home-deployment-rollup>
@@ -838,7 +838,7 @@
     color: var(--primary);
   }
 
-  .nothing-workboard,
+  .nothing-operations-board,
   .nothing-side-stack {
     display: grid;
     gap: 16px;

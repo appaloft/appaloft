@@ -714,11 +714,6 @@ export const enUS = {
       modeCard: "Mode",
       pageDescription: "Cross-project status, deployment activity, and recent events",
       pageTitle: "Home",
-      projectRelationsDescription:
-        "Only the first three projects are shown here; the full relationship view is on the projects page.",
-      projectRelationsEmpty:
-        "After you create the first project, project and deployment relationships appear here.",
-      projectRelationsTitle: "Project relationships",
       projectsDescription: "Review deployment status, resource access, and recent records.",
       projectsHeading: "Console overview",
       projectsKicker: "Overview",
@@ -796,8 +791,6 @@ export const enUS = {
       operationContextDescription:
         "Compact cross-project signals for active deployments, failures, resources, and servers.",
       operationContextTitle: "Operations",
-      quickActionsDescription: "Continue from deploys, servers, and managed services",
-      quickActionsTitle: "Common actions",
       recentDeploymentsDescription: "Recently created or updated deployment records.",
       recentDeploymentsReadModelGap:
         "Deployment records are shown here first. Configuration and automation events appear in recent activity.",
