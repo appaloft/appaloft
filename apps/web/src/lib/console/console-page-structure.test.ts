@@ -793,6 +793,26 @@ describe("console page structure", () => {
     }
   });
 
+  test("[PROJECT-NAV-IA-001] uses the plural Previews tab contract for project previews", () => {
+    const projectDetailTabModelSource = sourceBetween(
+      projectDetailPageSource,
+      "type ProjectDetailTab =",
+      "type ProjectAttentionItem =",
+    );
+    const projectDetailTabsSource = sourceBetween(
+      projectDetailPageSource,
+      "const projectDetailTabs = [",
+      "] as const;",
+    );
+
+    expect(projectDetailTabModelSource).toContain('| "previews"');
+    expect(projectDetailTabModelSource).not.toContain('| "preview"');
+    expect(projectDetailTabsSource).toContain('"previews"');
+    expect(projectDetailTabsSource).not.toContain('"preview"');
+    expect(projectDetailPageSource).toContain('value="previews"');
+    expect(projectDetailPageSource).not.toContain('value="preview"');
+  });
+
   test("[RESOURCE-DEPLOYMENT-IA-001] opens resource deployment creation as an in-context modal", () => {
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "deployment")');
     expect(resourceDetailPageSource).toContain('setModalOpen(page, "deployment", true)');

@@ -87,7 +87,7 @@
     | "resources"
     | "deployments"
     | "environments"
-    | "preview"
+    | "previews"
     | "activity"
     | "settings";
   const projectDetailTabs = [
@@ -95,7 +95,7 @@
     "resources",
     "deployments",
     "environments",
-    "preview",
+    "previews",
     "activity",
     "settings",
   ] as const;
@@ -1233,7 +1233,7 @@
         return $t(i18nKeys.common.domain.deployments);
       case "environments":
         return $t(i18nKeys.common.domain.environments);
-      case "preview":
+      case "previews":
         return $t(i18nKeys.console.projects.previewsTitle);
       case "activity":
         return $t(i18nKeys.console.projects.activityTitle);
@@ -1930,7 +1930,7 @@
         </Tabs.Content>
 
         <Tabs.Content
-          value="preview"
+          value="previews"
           class="console-detail-tab-panel console-detail-tab-panel-scroll"
         >
           <section class="space-y-6">

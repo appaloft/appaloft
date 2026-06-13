@@ -86,7 +86,9 @@ describe("preview environments console page", () => {
     expect(resourceSource).toContain("deletePreviewResource");
     expect(resourceSource).toContain('environment?.kind === "preview"');
     expect(projectSource).toContain("type ProjectDetailTab =");
-    expect(projectSource).toContain('"preview"');
+    expect(projectSource).toContain('"previews"');
+    expect(projectSource).not.toContain('| "preview"');
+    expect(projectSource).not.toContain('value="preview"');
     expect(projectSource).toContain("projectPreviewEnvironmentsQuery");
     expect(projectSource).toContain("orpcClient.previewEnvironments.list");
     expect(projectSource).toContain("projectId,");
