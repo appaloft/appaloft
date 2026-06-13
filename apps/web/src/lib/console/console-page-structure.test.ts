@@ -1692,6 +1692,33 @@ describe("console page structure", () => {
     expect(capacityPruneDialogSource).toContain("<Trash2");
   });
 
+  test("[SERVER-DETAIL-IA-003B] keeps server capacity copy user-facing", () => {
+    const zhLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
+      "utf8",
+    );
+    const enLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url)),
+      "utf8",
+    );
+    const serverCapacityCopy = [
+      "capacityDescription",
+      "capacityGovernanceDescription",
+      "capacityPruneDescription",
+      "capacitySurfaceDescription",
+      "deploymentsSurfaceDescription",
+    ];
+
+    for (const key of serverCapacityCopy) {
+      const zhLine = zhLocaleSource.match(new RegExp(`${key}: [^\\n]+`))?.[0] ?? "";
+      const enLine = enLocaleSource.match(new RegExp(`${key}: [^\\n]+`))?.[0] ?? "";
+      expect(zhLine).not.toMatch(
+        /runtime target|cleanup candidates|deployment attempt|owner 面|按 intent/iu,
+      );
+      expect(enLine).not.toMatch(/runtime target|cleanup candidates|owner surface|owner view/iu);
+    }
+  });
+
   test("[GOVERNANCE-COLLECTION-IA-001] keeps domain binding governance display-first", () => {
     expect(domainBindingsPageSource).toContain("domainBindingsLoading");
     expect(domainBindingsPageSource).toContain("domainBindingEnrichmentLoading");

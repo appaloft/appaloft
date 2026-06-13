@@ -2730,19 +2730,19 @@ export const enUS = {
       capacityCategoryUnusedImages: "Unused images",
       capacityConfirmApply: "Run destructive runtime capacity prune on {{serverId}}?",
       capacityDescription:
-        "Read safe runtime target capacity signals and preview cleanup candidates before any destructive action.",
+        "Review safe runtime capacity signals and preview reclaimable items before any destructive action.",
       capacityDryRunBadge: "Dry-run first",
       capacityErrorTitle: "Unable to read server capacity",
       capacityGovernanceAction: "Open governance flow",
       capacityGovernanceDescription:
-        "Show capacity signals and dry-run results by default. Runtime storage changes stay inside the single confirmation flow.",
+        "Show capacity signals and preview results by default. Runtime storage changes stay inside a single confirmation flow.",
       capacityGovernanceTitle: "Capacity governance",
       capacityInspectedAt: "Inspected {{time}}",
       capacityPreviewAction: "Preview prune",
       capacityPruneBefore: "Before",
       capacityPruneCategories: "Categories",
       capacityPruneDescription:
-        "Dry-run is the default. Build cache and unused images are explicit opt-in categories.",
+        "Preview is the default. Build cache and unused images are cleaned only after explicit selection.",
       capacityPruneFailed: "Runtime capacity prune failed",
       capacityPruneSucceeded: "Runtime capacity prune completed",
       capacityPruneSummary:
@@ -2752,7 +2752,7 @@ export const enUS = {
       capacitySafeReclaimable: "Safe reclaimable",
       capacityStoppedContainers: "Stopped containers",
       capacitySurfaceDescription:
-        "Review capacity signals, dry-run results, and the governance entry. Runtime storage changes open the focused confirmation flow.",
+        "Review capacity signals, preview results, and the governance entry. Runtime storage changes open the confirmation flow.",
       capacitySurfaceTitle: "Capacity governance",
       capacityTab: "Capacity",
       capacityTitle: "Runtime capacity",
