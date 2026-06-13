@@ -482,7 +482,7 @@ describe("console page structure", () => {
 
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
     const forbiddenVisibleCopyPattern =
-      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|danger flow|blocker\/check)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot/iu;
+      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot/iu;
     const visibleCopyFiles = [
       ...routePageSources(routesRootPath),
       {

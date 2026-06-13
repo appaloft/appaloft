@@ -837,7 +837,98 @@
   function componentDeploymentStatus(
     deployment: InstalledApplicationProgress["componentDeployments"][number]["deployment"],
   ): string {
-    return "deploymentId" in deployment ? "已创建部署尝试" : deployment.status;
+    return "deploymentId" in deployment ? "已创建部署尝试" : installPlanStatusLabel(deployment.status);
+  }
+
+  function blueprintComponentKindLabel(kind: string): string {
+    switch (kind) {
+      case "service":
+        return "应用服务";
+      case "worker":
+        return "后台任务";
+      case "static":
+        return "静态站点";
+      default:
+        return kind;
+    }
+  }
+
+  function blueprintRuntimeStrategyLabel(strategy: string): string {
+    switch (strategy) {
+      case "auto":
+        return "自动识别";
+      case "dockerfile":
+        return "Dockerfile";
+      case "docker-compose":
+        return "Docker Compose";
+      case "prebuilt-image":
+        return "预构建镜像";
+      case "static":
+        return "静态构建";
+      case "workspace-commands":
+        return "工作区命令";
+      default:
+        return strategy;
+    }
+  }
+
+  function blueprintRuntimeSummary(component: BlueprintComponent): string {
+    return component.runtime.image ?? component.runtime.startCommand ?? component.runtime.outputDirectory ?? "运行配置";
+  }
+
+  function dependencyKindSummary(): string {
+    const kinds = effectiveManifest?.resources.map((resource) => resource.kind) ?? [];
+    return kinds.length ? kinds.join(" / ") : "无";
+  }
+
+  function installPlanStatusLabel(status: string | undefined): string {
+    switch (status) {
+      case "planned":
+        return "计划中";
+      case "bound":
+        return "已绑定";
+      case "blocked":
+        return "阻塞";
+      case "realized":
+        return "已创建";
+      case "pending":
+        return "等待中";
+      default:
+        return status ?? "等待中";
+    }
+  }
+
+  function countOrNoneLabel(count: number): string | number {
+    return count > 0 ? count : "无";
+  }
+
+  function pendingResourceLabel(value: string | undefined): string {
+    return value ?? "等待创建";
+  }
+
+  function pendingDependencyLabel(value: string | undefined): string {
+    return value ? installPlanStatusLabel(value) : "等待处理";
+  }
+
+  function upgradeClassificationLabel(classification: string | undefined): string {
+    switch (classification) {
+      case "non-breaking":
+        return "兼容变更";
+      case "potentially-breaking":
+        return "需要复核";
+      case "breaking":
+        return "破坏性变更";
+      default:
+        return "未评估";
+    }
+  }
+
+  function upgradeDestructiveLabel(destructive: boolean | undefined): string {
+    return destructive ? "可能破坏性" : "非破坏性";
+  }
+
+  function upgradeReviewLabel(requiresManualReview: boolean | undefined): string {
+    return requiresManualReview ? "需要人工复核" : "自动复核";
   }
 
   async function generatePlan(): Promise<void> {
@@ -1115,7 +1206,7 @@
               组件
             </div>
             <p class="mt-3 text-2xl font-semibold">{effectiveManifest.components.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">service / worker / static surface</p>
+            <p class="mt-1 text-xs text-muted-foreground">应用服务、后台任务或静态站点</p>
           </article>
           <article class="console-panel p-4">
             <div class="flex items-center gap-2 text-sm font-medium">
@@ -1124,7 +1215,7 @@
             </div>
             <p class="mt-3 text-2xl font-semibold">{effectiveManifest.resources.length}</p>
             <p class="mt-1 truncate text-xs text-muted-foreground">
-              {effectiveManifest.resources.map((resource) => resource.kind).join(" / ") || "none"}
+              {dependencyKindSummary()}
             </p>
           </article>
           <article class="console-panel p-4">
@@ -1135,7 +1226,7 @@
             <p class="mt-3 text-2xl font-semibold">
               {effectiveManifest.components.reduce((count, component) => count + component.routes.length, 0)}
             </p>
-            <p class="mt-1 text-xs text-muted-foreground">route intent from Blueprint</p>
+            <p class="mt-1 text-xs text-muted-foreground">安装后生成访问入口</p>
           </article>
         </section>
 
@@ -1199,7 +1290,7 @@
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-semibold">应用拓扑</h2>
-              <p class="text-sm text-muted-foreground">Blueprint 会生成的可部署 workload。</p>
+              <p class="text-sm text-muted-foreground">安装后会创建的应用运行单元。</p>
             </div>
             <Badge variant="outline">{listing.blueprint.version}</Badge>
           </div>
@@ -1210,30 +1301,30 @@
                   <div class="min-w-0">
                     <h3 class="font-semibold">{component.name}</h3>
                     <p class="mt-1 text-sm text-muted-foreground">
-                      {component.kind} · {component.runtime.strategy}
+                      {blueprintComponentKindLabel(component.kind)} · {blueprintRuntimeStrategyLabel(component.runtime.strategy)}
                     </p>
                   </div>
                   <Badge variant="outline">
-                    {component.runtime.image ?? component.runtime.startCommand ?? component.runtime.outputDirectory ?? "runtime"}
+                    {blueprintRuntimeSummary(component)}
                   </Badge>
                 </div>
                 <div class="mt-3 grid gap-2 text-xs md:grid-cols-3">
                   <div>
-                    <p class="text-muted-foreground">Ports</p>
+                    <p class="text-muted-foreground">端口</p>
                     <p class="font-medium">
-                      {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || "none"}
+                      {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || "无"}
                     </p>
                   </div>
                   <div>
-                    <p class="text-muted-foreground">Routes</p>
+                    <p class="text-muted-foreground">访问路径</p>
                     <p class="font-medium">
-                      {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || "none"}
+                      {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || "无"}
                     </p>
                   </div>
                   <div>
-                    <p class="text-muted-foreground">Bindings</p>
+                    <p class="text-muted-foreground">依赖绑定</p>
                     <p class="font-medium">
-                      {[...component.usesResources, ...component.usesSecrets].join(", ") || "none"}
+                      {[...component.usesResources, ...component.usesSecrets].join(", ") || "无"}
                     </p>
                   </div>
                 </div>
@@ -1292,7 +1383,7 @@
                     <div class="console-subtle-panel px-3 py-2 text-sm">
                       <div class="flex items-center justify-between gap-3">
                         <span class="font-medium">{secret.label}</span>
-                        <Badge variant="outline">{secret.required ? "required" : "optional"}</Badge>
+                        <Badge variant="outline">{secret.required ? "必填" : "可选"}</Badge>
                       </div>
                       <p class="mt-1 font-mono text-xs text-muted-foreground">{secret.key}</p>
                     </div>
@@ -1428,7 +1519,7 @@
               <section class="space-y-2" data-blueprint-install-created-resources>
                 <div class="flex items-center justify-between gap-3">
                   <p class="text-xs font-medium text-muted-foreground">创建的资源</p>
-                  <Badge variant="outline">{installedApplicationComponents.length || "pending"}</Badge>
+                  <Badge variant="outline">{countOrNoneLabel(installedApplicationComponents.length)}</Badge>
                 </div>
                 {#each installedApplicationComponents as component (component.componentId)}
                   <div class="rounded-md border bg-background px-3 py-2 text-xs">
@@ -1436,7 +1527,7 @@
                       <div class="min-w-0">
                         <p class="truncate font-medium">{component.name ?? component.componentId}</p>
                         <p class="mt-1 truncate font-mono text-muted-foreground">
-                          {component.resource?.resourceId ?? component.resource?.resourceSlug ?? "resource pending"}
+                          {pendingResourceLabel(component.resource?.resourceId ?? component.resource?.resourceSlug)}
                         </p>
                       </div>
                       {#if component.resource?.resourceId}
@@ -1449,7 +1540,7 @@
                           <ArrowRight class="size-3.5" />
                         </Button>
                       {:else}
-                        <Badge variant="outline">planned</Badge>
+                        <Badge variant="outline">计划中</Badge>
                       {/if}
                     </div>
                   </div>
@@ -1463,7 +1554,7 @@
               <section class="space-y-2" data-blueprint-install-dependencies>
                 <div class="flex items-center justify-between gap-3">
                   <p class="text-xs font-medium text-muted-foreground">依赖资源</p>
-                  <Badge variant="outline">{installedApplicationDependencies.length || "none"}</Badge>
+                  <Badge variant="outline">{countOrNoneLabel(installedApplicationDependencies.length)}</Badge>
                 </div>
                 {#each installedApplicationDependencies as dependency (dependency.requirementId)}
                   <div class="rounded-md border bg-background px-3 py-2 text-xs">
@@ -1471,7 +1562,7 @@
                       <div class="min-w-0">
                         <p class="truncate font-medium">{dependency.requirementId}</p>
                         <p class="mt-1 truncate font-mono text-muted-foreground">
-                          {dependency.dependencyResourceId ?? dependency.plannedMode ?? "dependency pending"}
+                          {dependency.dependencyResourceId ?? pendingDependencyLabel(dependency.plannedMode)}
                         </p>
                       </div>
                       {#if dependency.dependencyResourceId}
@@ -1485,7 +1576,7 @@
                         </Button>
                       {:else}
                         <Badge variant={dependency.bindingStatus === "blocked" ? "destructive" : "outline"}>
-                          {dependency.bindingStatus ?? "planned"}
+                          {installPlanStatusLabel(dependency.bindingStatus)}
                         </Badge>
                       {/if}
                     </div>
@@ -1505,7 +1596,7 @@
               <section class="space-y-2" data-blueprint-install-public-urls>
                 <div class="flex items-center justify-between gap-3">
                   <p class="text-xs font-medium text-muted-foreground">公开 URL</p>
-                  <Badge variant="outline">{installedApplicationPublicEndpoints.length || "none"}</Badge>
+                  <Badge variant="outline">{countOrNoneLabel(installedApplicationPublicEndpoints.length)}</Badge>
                 </div>
                 {#each installedApplicationPublicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
                   <div class="rounded-md border bg-background px-3 py-2 text-xs">
@@ -1548,7 +1639,7 @@
                           <ArrowRight class="size-3.5" />
                         </Button>
                       {:else}
-                        <Badge variant="outline">planned</Badge>
+                        <Badge variant="outline">计划中</Badge>
                       {/if}
                     </div>
                   </div>
@@ -1830,7 +1921,7 @@
                 {#if planPending}
                   <LoaderCircle class="size-4 animate-spin" />
                 {/if}
-                Generate dry-run
+                生成 dry-run
               </Button>
               {#if installEndpoint}
                 <Button
@@ -1909,15 +2000,15 @@
               {#if upgradePlanOutput}
                 <div class="grid gap-2 rounded-md border border-border p-3 text-xs">
                   <div class="flex flex-wrap gap-2">
-                    <Badge variant="outline">{upgradePlanOutput.plan?.classification ?? "unknown"}</Badge>
+                    <Badge variant="outline">{upgradeClassificationLabel(upgradePlanOutput.plan?.classification)}</Badge>
                     <Badge variant="outline">
-                      {upgradePlanOutput.plan?.destructive ? "destructive" : "non-destructive"}
+                      {upgradeDestructiveLabel(upgradePlanOutput.plan?.destructive)}
                     </Badge>
                     <Badge variant="outline">
-                      {upgradePlanOutput.plan?.requiresManualReview ? "manual-review" : "auto-review"}
+                      {upgradeReviewLabel(upgradePlanOutput.plan?.requiresManualReview)}
                     </Badge>
                     <Badge variant="outline">
-                      {upgradePlanOutput.nonExecution?.marker ?? "dry-run-only"}
+                      {upgradePlanOutput.nonExecution ? "仅生成计划" : "可执行计划"}
                     </Badge>
                   </div>
 
