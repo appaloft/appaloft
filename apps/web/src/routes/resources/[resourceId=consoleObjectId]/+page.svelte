@@ -6860,19 +6860,33 @@
                       </div>
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={isResourceArchived || isServerlessStaticArtifactAccess}
-                          onclick={openResourceDomainBindingCreateDialog}
-                        >
-                          <Plus class="size-4" />
-                          {$t(i18nKeys.console.domainBindings.createTitle)}
-                        </Button>
+                        {#if !isServerlessStaticArtifactAccess}
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={isResourceArchived}
+                            onclick={openResourceDomainBindingCreateDialog}
+                          >
+                            <Plus class="size-4" />
+                            {$t(i18nKeys.console.domainBindings.createTitle)}
+                          </Button>
+                        {/if}
                       </div>
                     </div>
 
-                    {#if resourceDomainBindings.length === 0}
+                    {#if isServerlessStaticArtifactAccess}
+                      <div
+                        class="rounded-md border border-dashed bg-muted/25 px-4 py-6"
+                        data-resource-static-artifact-domain-unavailable
+                      >
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
+                        </p>
+                      </div>
+                    {:else if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
                         <p class="text-sm text-muted-foreground">
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
@@ -6881,7 +6895,7 @@
                           type="button"
                           size="sm"
                           class="mt-4"
-                          disabled={isResourceArchived || isServerlessStaticArtifactAccess}
+                          disabled={isResourceArchived}
                           onclick={openResourceDomainBindingCreateDialog}
                         >
                           <Plus class="size-4" />
