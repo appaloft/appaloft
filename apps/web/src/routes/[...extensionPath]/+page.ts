@@ -1,7 +1,5 @@
 import { error } from "@sveltejs/kit";
 
-import { type PageLoad } from "./$types";
-
 const retiredConsoleIntentRoutePatterns = [
   /^\/deploy\/?$/,
   /^\/deployments\/new\/?$/,
@@ -17,7 +15,7 @@ const retiredConsoleIntentRoutePatterns = [
   /^\/resources\/[^/]+\/deployments\/new\/?$/,
 ] as const;
 
-export const load: PageLoad = ({ url }) => {
+export const load = ({ url }: { url: URL }) => {
   if (retiredConsoleIntentRoutePatterns.some((pattern) => pattern.test(url.pathname))) {
     error(404, "This console action now opens from its related page.");
   }
