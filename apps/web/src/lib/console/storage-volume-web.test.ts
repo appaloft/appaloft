@@ -42,7 +42,9 @@ describe("storage volume Web console surface", () => {
       'const resourceDependenciesSections = ["dependencies", "storage"] as const;',
     );
     expect(resourcePageSource).toContain('activeTab === "dependencies"');
-    expect(resourcePageSource).toContain('activeSettingsSection === "storage"');
+    expect(resourcePageSource).toContain('case "storage":\n        return "dependencies";');
+    expect(resourcePageSource).toContain("resourceSectionsForTab(activeTab)");
+    expect(resourcePageSource).toContain("href={resourceSectionHref(section)}");
     expect(resourcePageSource).not.toContain("Tabs.Content");
     expect(resourcePageSource).toContain('id="resource-storage"');
     expect(resourcePageSource).toContain(
@@ -51,7 +53,6 @@ describe("storage volume Web console surface", () => {
     expect(resourcePageSource).toContain(
       "i18nKeys.console.resources.storageVolumeBackupSummaryDescription",
     );
-    expect(resourcePageSource).toContain('resourceSettingsSectionHref("storage")');
     const resourceOverviewSource = resourcePageSource.slice(
       resourcePageSource.indexOf('id="resource-overview"'),
       resourcePageSource.indexOf('id="resource-settings-general"'),
