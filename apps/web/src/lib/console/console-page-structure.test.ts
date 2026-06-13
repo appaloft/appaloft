@@ -379,6 +379,20 @@ function literalTextMatches(source: string, pattern: RegExp): string[] {
   return matches;
 }
 
+function localeEntrySource(source: string, key: string): string {
+  const keyIndex = source.indexOf(`${key}:`);
+  if (keyIndex < 0) {
+    throw new Error(`Missing locale key: ${key}`);
+  }
+
+  const nextEntryIndex = source.indexOf("\n      ", keyIndex + key.length + 1);
+  if (nextEntryIndex < 0) {
+    return source.slice(keyIndex);
+  }
+
+  return source.slice(keyIndex, nextEntryIndex);
+}
+
 function functionBody(source: string, signature: string): string {
   const startIndex = source.indexOf(signature);
   if (startIndex < 0) {
@@ -482,7 +496,7 @@ describe("console page structure", () => {
 
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
     const forbiddenVisibleCopyPattern =
-      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot/iu;
+      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
     const visibleCopyFiles = [
       ...routePageSources(routesRootPath),
       {
@@ -1286,6 +1300,58 @@ describe("console page structure", () => {
     expect(deploymentsPageSource).not.toContain('href="/deploy"');
     expect(deploymentsPageSource).not.toContain("deployments/new");
     expect(deploymentsPageSource).not.toContain("resources.create");
+  });
+
+  test("[DEPLOYMENTS-COPY-IA-001] keeps deployment console copy user-facing", () => {
+    const zhLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
+      "utf8",
+    );
+    const enLocaleSource = readFileSync(
+      fileURLToPath(new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url)),
+      "utf8",
+    );
+    const deploymentCopyKeys = [
+      "accessSnapshotDescription",
+      "accessSnapshotEmpty",
+      "accessSnapshotTitle",
+      "attemptObservationDescription",
+      "attemptObservationTitle",
+      "attemptSnapshotDescription",
+      "attemptSnapshotTitle",
+      "currentResourceStateCurrent",
+      "currentResourceStateDescription",
+      "currentResourceObservationDescription",
+      "currentResourceObservationEmpty",
+      "failedAttemptHint",
+      "filtersDescription",
+      "noFailureSummary",
+      "runningAttemptHint",
+      "recoveryDescription",
+      "recoveryDialogDescription",
+      "recoveryNoReasons",
+      "recoveryReasonRuntimeArtifactMissing",
+      "recoveryRollbackCandidateDescription",
+      "recoverySelectActionDescription",
+      "succeededAttemptHint",
+    ];
+
+    for (const key of deploymentCopyKeys) {
+      const zhEntry = localeEntrySource(zhLocaleSource, key);
+      const enEntry = localeEntrySource(enLocaleSource, key);
+      expect(
+        literalTextMatches(
+          zhEntry,
+          /\battempt\b|deployment attempt|owner 面|资源 owner|artifact|readiness|readiness query|按 intent/iu,
+        ),
+      ).toEqual([]);
+      expect(
+        literalTextMatches(
+          enEntry,
+          /deployment attempt|owner context|owner surface|artifact|readiness query|recovery intent/iu,
+        ),
+      ).toEqual([]);
+    }
   });
 
   test("[DEPLOYMENT-DETAIL-IA-001] keeps recovery actions behind an intent dialog", () => {

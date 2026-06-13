@@ -397,7 +397,7 @@ export const enUS = {
       backup: "Create backup",
       backupCreated: "Backup created",
       backupDescription:
-        "Create a provider backup for the selected dependency resource. Read models show only safe artifact handles.",
+        "Create a provider backup for the selected dependency resource. Lists show only safe backup references.",
       backupFailed: "Backup failed",
       backupListTitle: "Backups and restore",
       backupManageAction: "Open backup flow",
@@ -521,16 +521,16 @@ export const enUS = {
         "This deployment does not have a public access URL yet. Check logs to confirm deployment or port mapping completion.",
       accessUrlTitle: "Access URL",
       accessSnapshotDescription:
-        "Shows the access entry captured by this attempt. It does not claim the resource still uses this address.",
+        "Shows the access entry recorded by this deployment. It does not claim the resource still uses this address.",
       accessSnapshotEmpty:
-        "This attempt did not capture an access URL. Open the resource page for current access.",
-      accessSnapshotTitle: "Attempt access snapshot",
+        "This deployment did not record an access URL. Open the resource page for current access.",
+      accessSnapshotTitle: "Deployment access snapshot",
       attemptObservationDescription:
-        "Open logs, timeline, and environment snapshot captured by this attempt. These records do not change when the resource moves on.",
-      attemptObservationTitle: "Attempt observation",
+        "Open logs, timeline, and environment snapshot recorded by this deployment. These records do not change when the resource moves on.",
+      attemptObservationTitle: "Deployment record observation",
       attemptSnapshotDescription:
-        "An immutable deployment attempt record with the owner context, source, timestamps, and failure summary captured at execution time.",
-      attemptSnapshotTitle: "Attempt snapshot",
+        "An immutable deployment record with the project, environment, resource, source, timestamps, and failure summary captured at execution time.",
+      attemptSnapshotTitle: "Deployment snapshot",
       buildCommand: "Build command",
       buildStrategy: "Build strategy",
       composeFile: "Compose file",
@@ -539,15 +539,15 @@ export const enUS = {
       copyLogsCopied: "Copied",
       copyLogsFailed: "Copy failed",
       currentResourceStateChanged: "Resource has moved on",
-      currentResourceStateCurrent: "Resource currently points to this attempt",
+      currentResourceStateCurrent: "Resource currently points to this deployment",
       currentResourceStateDescription:
-        "The resource page owns current access, health, runtime logs, and terminal. This section only links there so historical attempt status is not treated as current resource state.",
+        "The resource page shows current access, health, runtime logs, and terminal. This section only links there so historical deployment status is not treated as current resource state.",
       currentResourceStateTitle: "Current resource state",
       currentResourceStateUnknown: "Current resource state unknown",
       currentResourceObservationDescription:
-        "Open the resource's current runtime, logs, and terminal. It may no longer match this historical attempt.",
+        "Open the resource's current runtime, logs, and terminal. It may no longer match this historical deployment.",
       currentResourceObservationEmpty:
-        "This detail could not resolve the resource owner, so current resource observation is unavailable.",
+        "This detail could not resolve the related resource, so current resource observation is unavailable.",
       currentResourceObservationTitle: "Current resource observation",
       detailDescription: "Deployment execution, snapshot, and logs",
       description: "Deployment records and project relationships",
@@ -564,7 +564,7 @@ export const enUS = {
       executionKind: "Execution kind",
       executionShape: "Execution shape",
       executionTitle: "Execution config",
-      failedAttemptHint: "Failed attempts",
+      failedAttemptHint: "Failed deployments",
       filteredRecords: "Current filter result",
       filterAllEnvironments: "All environments",
       filterAllResources: "All resources",
@@ -593,7 +593,7 @@ export const enUS = {
       latestFailureTitle: "Latest failure summary",
       latestTitle: "Latest",
       noFailureSummary:
-        "This attempt did not return a failure summary. Use the timeline or deployment logs for more context.",
+        "This deployment did not return a failure summary. Use the timeline or deployment logs for more context.",
       noLogs: "This deployment has no logs yet.",
       noFilteredDeployments: "No deployments match the current filter.",
       noSnapshotVariables: "This environment snapshot has no variables.",
@@ -638,15 +638,15 @@ export const enUS = {
       progressTraceLabel: "trace",
       progressWaiting: "Waiting for deployment progress...",
       records: "Deployment records",
-      runningAttemptHint: "In-flight attempts",
+      runningAttemptHint: "In-flight deployments",
       recoveryAvailable: "Available",
       recoveryCandidateCount: "{{count}} rollback candidates",
       recoveryCommandNotActive: "Specified, not active",
       recoveryDescription:
-        "Readiness uses durable deployment, snapshot, artifact, and resource state before admitting retry, redeploy, or rollback.",
+        "Recovery checks the deployment record, snapshot, retained output, and current resource state before retry, redeploy, or rollback.",
       recoveryDialogDescription:
-        "Recovery creates a new deployment attempt; this page remains the read-only record for the current attempt.",
-      recoveryNoReasons: "No blockers from the readiness query.",
+        "Recovery creates a new deployment record; this page remains the read-only record for the current deployment.",
+      recoveryNoReasons: "No blockers found.",
       recoveryOpenDialogAction: "Open recovery action",
       recoveryReasonAttemptNotTerminal: "Deployment is still running or waiting to finish.",
       recoveryReasonAttemptStatusNotRecoverable: "This deployment status is not recoverable.",
@@ -654,7 +654,7 @@ export const enUS = {
       recoveryReasonNoRollbackCandidate: "No successful retained rollback candidate is available.",
       recoveryReasonResourceProfileInvalid: "Current resource profile is missing or invalid.",
       recoveryReasonResourceRuntimeBusy: "Another deployment owns the resource runtime scope.",
-      recoveryReasonRuntimeArtifactMissing: "Required retained runtime artifact is missing.",
+      recoveryReasonRuntimeArtifactMissing: "Required retained runtime output is missing.",
       recoveryReasonSnapshotMissing: "Required deployment or environment snapshot is missing.",
       recoveryRedeployAction: "Redeploy now",
       recoveryRedeployingAction: "Redeploying",
@@ -665,12 +665,12 @@ export const enUS = {
       recoveryRollbackAction: "Roll back now",
       recoveryRollbackCandidate: "Candidate {{deploymentId}}",
       recoveryRollbackCandidateDescription:
-        "Choose a succeeded deployment attempt with a retained artifact as the rollback target.",
+        "Choose a successful deployment record with retained output as the rollback target.",
       recoveryRollbackCandidateTitle: "Rollback candidate",
       recoveryRollingBackAction: "Rolling back",
       recoveryRollbackTitle: "Rollback",
       recoverySelectActionDescription:
-        "Choose a recovery intent before viewing readiness, candidates, and the confirm action. The default page stays display-only.",
+        "Choose a recovery action before viewing checks, candidates, and the confirm action. The default page stays display-only.",
       recoverySelectActionTitle: "Choose recovery action",
       recoveryTitle: "Recovery readiness",
       runtimePlanDescription: "The executable plan generated from detect and plan.",
@@ -678,7 +678,7 @@ export const enUS = {
       snapshotDescription:
         "The immutable environment snapshot captured for this deployment. Secret values stay masked.",
       snapshotTitle: "Environment snapshot",
-      succeededAttemptHint: "Succeeded attempts",
+      succeededAttemptHint: "Succeeded deployments",
       relatedContextUnavailable:
         "Related project, environment, resource, or server context could not be fully resolved.",
       sectionFallbackUnavailable: "A deployment detail section could not be loaded.",
