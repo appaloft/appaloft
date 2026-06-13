@@ -6634,13 +6634,147 @@
 
               <div class="space-y-8 p-5">
                 {#if activeResourceSection === "general"}
-                  <div id="resource-settings-general" class="space-y-4">
-                    <ResourceProfileSummary
-                      {resource}
-                      projectName={project?.name ?? resource.projectId}
-                      environmentName={environment?.name ?? resource.environmentId}
-                      destinationId={defaultDestinationId}
-                    />
+                  <div id="resource-settings-general" class="space-y-4" data-resource-settings-general>
+                    <section class="rounded-md border bg-background p-4" data-resource-settings-identity>
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                          <h2 class="text-lg font-semibold">
+                            {$t(i18nKeys.console.resources.settingsTitle)}
+                          </h2>
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.settingsDescription)}
+                          </p>
+                        </div>
+                        <Badge variant={isResourceArchived ? "destructive" : "outline"}>
+                          {isResourceArchived
+                            ? $t(i18nKeys.console.resources.archived)
+                            : $t(i18nKeys.common.status.active)}
+                        </Badge>
+                      </div>
+
+                      <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.resource)}
+                          </dt>
+                          <dd class="mt-1 min-w-0">
+                            <p class="truncate text-sm font-medium">{resource.name}</p>
+                            <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                              {resource.id}
+                            </p>
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.project)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {project?.name ?? resource.projectId}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.environment)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {environment?.name ?? resource.environmentId}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.kind)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">{resource.kind}</dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.slug)}
+                          </dt>
+                          <dd class="mt-1 truncate font-mono text-sm font-medium">{resource.slug}</dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.destination)}
+                          </dt>
+                          <dd class="mt-1 truncate font-mono text-sm font-medium">
+                            {defaultDestinationId || "-"}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.createdAt)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {formatTime(resource.createdAt)}
+                          </dd>
+                        </div>
+                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <dt class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.common.domain.status)}
+                          </dt>
+                          <dd class="mt-1 truncate text-sm font-medium">
+                            {isResourceArchived
+                              ? $t(i18nKeys.console.resources.archived)
+                              : $t(i18nKeys.common.status.active)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
+
+                    <section class="rounded-md border bg-background p-4" data-resource-settings-lifecycle>
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="space-y-1">
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.lifecycleStatus)}
+                          </h3>
+                          {#if resourceDetail?.lifecycle.archivedAt}
+                            <p class="text-sm leading-6 text-muted-foreground">
+                              {$t(i18nKeys.console.resources.archivedAt)} · {formatTime(resourceDetail.lifecycle.archivedAt)}
+                            </p>
+                          {:else}
+                            <p class="text-sm leading-6 text-muted-foreground">
+                              {$t(i18nKeys.console.resources.lifecycleDescription)}
+                            </p>
+                          {/if}
+                          {#if isPreviewEnvironmentResource}
+                            <p class="text-sm leading-6 text-muted-foreground">
+                              {$t(i18nKeys.console.resources.lifecyclePreviewResourceNotice)}
+                            </p>
+                          {/if}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onclick={openResourceLifecycleDialog}
+                        >
+                          <Archive class="size-4" />
+                          {$t(i18nKeys.console.resources.lifecycleManageAction)}
+                        </Button>
+                      </div>
+                    </section>
+
+                    <section class="rounded-md border bg-background p-4" data-resource-settings-handoffs>
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.settingsHandoffsTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.settingsHandoffsDescription)}
+                      </p>
+                      <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        <Button href={resourceSectionHref("profile")} variant="outline" class="justify-start">
+                          {$t(i18nKeys.console.resources.profileTitle)}
+                        </Button>
+                        <Button href={resourceSectionHref("access")} variant="outline" class="justify-start">
+                          {$t(i18nKeys.console.resources.accessUrlTitle)}
+                        </Button>
+                        <Button href={resourceSectionHref("diagnostics")} variant="outline" class="justify-start">
+                          {$t(i18nKeys.console.resources.diagnosticsTitle)}
+                        </Button>
+                        <Button href={resourceSectionHref("danger")} variant="outline" class="justify-start">
+                          {$t(i18nKeys.console.resources.dangerZoneTitle)}
+                        </Button>
+                      </div>
+                    </section>
                   </div>
                 {:else if activeResourceSection === "access"}
                   <section id="resource-overview-access" class="rounded-md border bg-background p-4">

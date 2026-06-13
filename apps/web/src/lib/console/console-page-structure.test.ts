@@ -982,6 +982,37 @@ describe("console page structure", () => {
     expect(runtimeThresholdDialogSource).toContain('type="submit"');
   });
 
+  test("[RESOURCE-SETTINGS-IA-001] keeps settings general as identity and lifecycle display surface", () => {
+    const settingsGeneralSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-settings-general"',
+      '{:else if activeResourceSection === "access"}',
+    );
+    const configurationProfileSource = sourceBetween(
+      resourceDetailPageSource,
+      '{:else if activeResourceSection === "profile"}',
+      '{:else if activeResourceSection === "configuration"}',
+    );
+
+    expect(settingsGeneralSource).toContain("data-resource-settings-general");
+    expect(settingsGeneralSource).toContain("data-resource-settings-identity");
+    expect(settingsGeneralSource).toContain("data-resource-settings-lifecycle");
+    expect(settingsGeneralSource).toContain("data-resource-settings-handoffs");
+    expect(settingsGeneralSource).toContain("settingsTitle");
+    expect(settingsGeneralSource).toContain("settingsDescription");
+    expect(settingsGeneralSource).toContain("settingsHandoffsTitle");
+    expect(settingsGeneralSource).toContain('resourceSectionHref("profile")');
+    expect(settingsGeneralSource).toContain('resourceSectionHref("access")');
+    expect(settingsGeneralSource).toContain('resourceSectionHref("diagnostics")');
+    expect(settingsGeneralSource).toContain('resourceSectionHref("danger")');
+    expect(settingsGeneralSource).not.toContain("<ResourceProfileSummary");
+    expect(settingsGeneralSource).not.toContain("applicationProfileTitle");
+    expect(settingsGeneralSource).not.toContain("networkProfileTitle");
+    expect(settingsGeneralSource).not.toContain("serviceTopologyTitle");
+    assertDisplaySurfaceIsFormFree(settingsGeneralSource);
+    expect(configurationProfileSource).toContain("<ResourceProfileSummary");
+  });
+
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
     const resourceDomainBindingsSectionSource =
       resourceDetailPageSource.match(

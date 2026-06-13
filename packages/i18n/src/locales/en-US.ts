@@ -2215,7 +2215,13 @@ export const enUS = {
       runtimeStrategyWorkspaceCommands: "Workspace commands",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
+      settingsDescription:
+        "Identity, placement, lifecycle, and links to the resource areas that own detailed changes.",
+      settingsHandoffsDescription:
+        "Open the area that owns the change instead of editing long forms from the settings overview.",
+      settingsHandoffsTitle: "Related areas",
       settingsTab: "Settings",
+      settingsTitle: "Resource settings",
       scheduledTaskCommandIntent: "Command intent",
       scheduledTaskCommandIntentPlaceholder: "bun run db:migrate",
       scheduledTaskConcurrencyForbid: "Forbid concurrent runs",

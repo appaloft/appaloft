@@ -1987,7 +1987,11 @@ export const i18nKeys = {
       runtimeStrategyWorkspaceCommands: "console:resources.runtimeStrategyWorkspaceCommands",
       serviceTopologyDescription: "console:resources.serviceTopologyDescription",
       serviceTopologyTitle: "console:resources.serviceTopologyTitle",
+      settingsDescription: "console:resources.settingsDescription",
+      settingsHandoffsDescription: "console:resources.settingsHandoffsDescription",
+      settingsHandoffsTitle: "console:resources.settingsHandoffsTitle",
       settingsTab: "console:resources.settingsTab",
+      settingsTitle: "console:resources.settingsTitle",
       scheduledTaskCommandIntent: "console:resources.scheduledTaskCommandIntent",
       scheduledTaskCommandIntentPlaceholder:
         "console:resources.scheduledTaskCommandIntentPlaceholder",
