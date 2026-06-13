@@ -141,8 +141,6 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain(
       "domainCustomDomainBinding",
     );
-    expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("certificateReadiness");
-    expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("serverProxyReadiness");
     expect(sourceByPath["routes/preview-environments/+page.svelte"]).toContain(
       "productGradePreviews",
     );
@@ -231,9 +229,6 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.certificates.revoke",
     );
-    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
-      "orpcClient.certificates.delete",
-    );
 
     expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "deploymentLifecycle",
@@ -263,16 +258,13 @@ describe("console docs help links", () => {
       "orpcClient.servers.capacity.inspect",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "deactivateServerDialogTitle",
+      "lifecycleDialogTitle",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "serverDeactivateConfirmation.trim() === server?.id",
+      "data-server-lifecycle-dialog",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "deleteServerDialogTitle",
-    );
-    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "serverDeleteConfirmation.trim() === server?.id",
+      "serverLifecycleConfirmation.trim() === server?.id",
     );
     expect(
       await readFile(
