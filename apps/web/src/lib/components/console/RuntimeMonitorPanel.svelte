@@ -446,7 +446,7 @@
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div
-          class="inline-flex items-center gap-1 rounded-md border bg-background p-1 text-sm text-muted-foreground"
+          class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"
           aria-label={$t(i18nKeys.console.runtimeUsage.timeRange)}
         >
           <Clock3 class="size-4" />
@@ -454,11 +454,10 @@
           {#each runtimeMonitoringTimeRangeOptions as option (option)}
             <Button
               type="button"
-              size="sm"
               variant="ghost"
               class={timeRange === option
-                ? "border-primary/30 bg-primary/10 text-primary shadow-none hover:bg-primary/15 hover:text-primary"
-                : "bg-transparent text-muted-foreground hover:bg-primary/5 hover:text-foreground"}
+                ? "h-6 border-primary/30 bg-primary/10 px-2 text-primary shadow-none hover:bg-primary/15 hover:text-primary"
+                : "h-6 bg-transparent px-2 text-muted-foreground hover:bg-primary/5 hover:text-foreground"}
               aria-pressed={timeRange === option}
               data-runtime-time-range-option={option}
               onclick={() => selectTimeRange(option)}

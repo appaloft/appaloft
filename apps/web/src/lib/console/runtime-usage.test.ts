@@ -33,6 +33,17 @@ import {
   runtimeUsageQueryKey,
 } from "./runtime-usage";
 
+function sourceBetween(source: string, start: string, end: string): string {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, Math.max(startIndex, 0));
+
+  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+    return "";
+  }
+
+  return source.slice(startIndex, endIndex);
+}
+
 describe("runtime usage console readback", () => {
   test("[RT-USAGE-008] formats compact usage values without changing DTO semantics", () => {
     expect(formatRuntimeUsageBytes(undefined)).toBeNull();
@@ -100,11 +111,20 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("openLogs");
     expect(monitorSource).toContain("refreshNow");
     expect(monitorSource).toContain("onTimeRangeChange");
-    expect(monitorSource).toContain("aria-pressed={timeRange === option}");
-    expect(monitorSource).toContain("data-runtime-time-range-option={option}");
-    expect(monitorSource).toContain("bg-primary/10");
-    expect(monitorSource).toContain("bg-transparent text-muted-foreground");
-    expect(monitorSource).toContain("hover:bg-primary/5");
+    const timeRangeControlSource = sourceBetween(
+      monitorSource,
+      'class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"',
+      '<Button type="button" variant="outline" onclick={() => onRefresh?.()}',
+    );
+    expect(timeRangeControlSource).toContain(
+      'class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"',
+    );
+    expect(timeRangeControlSource).toContain("aria-pressed={timeRange === option}");
+    expect(timeRangeControlSource).toContain("data-runtime-time-range-option={option}");
+    expect(timeRangeControlSource).toContain("h-6 border-primary/30 bg-primary/10 px-2");
+    expect(timeRangeControlSource).toContain("h-6 bg-transparent px-2 text-muted-foreground");
+    expect(timeRangeControlSource).toContain("hover:bg-primary/5");
+    expect(timeRangeControlSource).not.toContain('size="sm"');
     expect(monitorSource).not.toContain('variant={timeRange === option ? "default" : "ghost"}');
     expect(monitorSource).toContain("onclick={() => selectTimeRange(option)}");
     expect(monitorSource).not.toContain("<select");
