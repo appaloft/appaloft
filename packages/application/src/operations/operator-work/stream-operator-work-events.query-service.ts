@@ -245,6 +245,11 @@ function observedEvent(input: {
   const { item } = input;
   const safeDetails = sanitizeSafeDetails(input.safeDetails ?? item.safeDetails);
   const message = sanitizeMessage(input.message);
+  const terminalOrRetryStatus =
+    input.status === "failed" ||
+    input.status === "dead-lettered" ||
+    input.status === "retry-scheduled" ||
+    input.status === "canceled";
 
   return {
     workId: item.id,
@@ -262,9 +267,9 @@ function observedEvent(input: {
     ...(item.resourceId ? { resourceId: item.resourceId } : {}),
     ...(item.deploymentId ? { deploymentId: item.deploymentId } : {}),
     ...(item.serverId ? { serverId: item.serverId } : {}),
-    ...(item.errorCode ? { errorCode: item.errorCode } : {}),
-    ...(item.errorCategory ? { errorCategory: item.errorCategory } : {}),
-    ...(item.retriable === undefined ? {} : { retriable: item.retriable }),
+    ...(terminalOrRetryStatus && item.errorCode ? { errorCode: item.errorCode } : {}),
+    ...(terminalOrRetryStatus && item.errorCategory ? { errorCategory: item.errorCategory } : {}),
+    ...(terminalOrRetryStatus && item.retriable !== undefined ? { retriable: item.retriable } : {}),
     ...(safeDetails ? { safeDetails } : {}),
   };
 }

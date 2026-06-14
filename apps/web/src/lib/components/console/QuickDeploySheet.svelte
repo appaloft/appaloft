@@ -61,6 +61,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     EnvironmentSummary,
     GitHubRepositorySummary,
     IntegrationDescriptor,
+    OperatorWorkItem,
     ProjectSummary,
     RegisterServerInput,
     ResourceSummary,
@@ -95,6 +96,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     latestOperatorWorkEventCursor,
     operatorWorkEnvelopeProgressEvents,
     operatorWorkEventProgressStatus,
+    operatorWorkItemToProgressEvent,
     summarizeBlueprintInstallProgress,
     type BlueprintInstallProgressSnapshot,
     type BlueprintInstallStatusSummary,
@@ -857,6 +859,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let workflowDeploymentTraceLink = $state("");
   let blueprintOperatorWorkFollowEpoch = 0;
   let blueprintOperatorWorkStream: AsyncIterator<unknown> | null = null;
+  let blueprintOperatorWorkPollEpoch = 0;
+  let blueprintOperatorWorkPollTimeout: ReturnType<typeof setTimeout> | undefined;
   let lastAccessUrl = $state("");
   let diagnosticSummaryLoading = $state(false);
   let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
@@ -1962,6 +1966,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       clearTimeout(diagnosticSummaryCopyResetTimeout);
     }
     stopBlueprintOperatorWorkFollow();
+    stopBlueprintOperatorWorkStatusPoll();
   });
 
   $effect(() => {
@@ -3597,6 +3602,18 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
   }
 
+  function appendWorkflowDeploymentProgressEventOnce(event: DeploymentProgressEvent): void {
+    const eventKey = `${event.timestamp}:${event.phase}:${event.status}:${event.message}`;
+    const exists = workflowDeploymentProgressEvents.some(
+      (existing) =>
+        `${existing.timestamp}:${existing.phase}:${existing.status}:${existing.message}` === eventKey,
+    );
+
+    if (!exists) {
+      appendWorkflowDeploymentProgressEvent(event);
+    }
+  }
+
   function lastCreatedDeploymentHref(): string {
     const owner = lastCreatedDeploymentOwner ?? (
       selectedProjectId && selectedEnvironmentId && selectedResourceId
@@ -4125,7 +4142,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   function appendBlueprintInstallProgressEvents(events: DeploymentProgressEvent[]): void {
     for (const event of events) {
-      appendWorkflowDeploymentProgressEvent(event);
+      appendWorkflowDeploymentProgressEventOnce(event);
     }
   }
 
@@ -4199,6 +4216,67 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     blueprintOperatorWorkStream = null;
   }
 
+  function stopBlueprintOperatorWorkStatusPoll(): void {
+    blueprintOperatorWorkPollEpoch += 1;
+    if (blueprintOperatorWorkPollTimeout) {
+      clearTimeout(blueprintOperatorWorkPollTimeout);
+      blueprintOperatorWorkPollTimeout = undefined;
+    }
+  }
+
+  function applyBlueprintOperatorWorkItemStatus(work: OperatorWorkItem): "running" | "succeeded" | "failed" {
+    const event = operatorWorkItemToProgressEvent(work);
+    const terminal = event.status === "failed" || event.status === "succeeded";
+
+    if (terminal) {
+      appendWorkflowDeploymentProgressEventOnce(event);
+      updateBlueprintInstallFeedbackFromWorkEvent(event);
+    }
+
+    return event.status ?? "running";
+  }
+
+  function startBlueprintOperatorWorkStatusPoll(workId: string): void {
+    if (!workId) {
+      return;
+    }
+
+    stopBlueprintOperatorWorkStatusPoll();
+    const pollEpoch = blueprintOperatorWorkPollEpoch;
+
+    const poll = async (): Promise<void> => {
+      if (pollEpoch !== blueprintOperatorWorkPollEpoch) {
+        return;
+      }
+
+      try {
+        const result = await orpcClient.operatorWork.show({ workId });
+        const status = applyBlueprintOperatorWorkItemStatus(result.item);
+
+        if (status === "failed" || status === "succeeded") {
+          stopBlueprintOperatorWorkFollow();
+          stopBlueprintOperatorWorkStatusPoll();
+          await refreshWorkspaceData();
+          return;
+        }
+      } catch (error) {
+        if (pollEpoch === blueprintOperatorWorkPollEpoch) {
+          workflowProgressError = readErrorMessage(error);
+        }
+      }
+
+      if (pollEpoch === blueprintOperatorWorkPollEpoch) {
+        blueprintOperatorWorkPollTimeout = setTimeout(() => {
+          void poll();
+        }, 2_000);
+      }
+    };
+
+    blueprintOperatorWorkPollTimeout = setTimeout(() => {
+      void poll();
+    }, 1_500);
+  }
+
   function startBlueprintOperatorWorkFollow(workId: string, cursor?: string): void {
     if (!workId) {
       return;
@@ -4253,6 +4331,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     label: envelope.event.step ?? envelope.event.kind,
                   },
                 });
+                const status = operatorWorkEventProgressStatus([envelope]);
+                if (status === "failed" || status === "succeeded") {
+                  stopBlueprintOperatorWorkStatusPoll();
+                }
               }
               break;
             case "gap":
@@ -4293,6 +4375,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         const workProgress = await replayBlueprintOperatorWorkProgress(lastOperatorWorkId);
         if (workProgress.status === "running") {
           startBlueprintOperatorWorkFollow(lastOperatorWorkId, workProgress.cursor);
+          startBlueprintOperatorWorkStatusPoll(lastOperatorWorkId);
         } else {
           latestSummary = {
             ...latestSummary,
@@ -4326,6 +4409,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       };
       if (latestSummary.operatorWorkId) {
         lastOperatorWorkId = latestSummary.operatorWorkId;
+        if (latestSummary.terminalStatus === "running") {
+          startBlueprintOperatorWorkStatusPoll(lastOperatorWorkId);
+        }
       }
     }
 
@@ -5111,7 +5197,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
 </script>
 
-<div class="grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+<div
+  class={[
+    "grid min-w-0 gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]",
+    workflowProgressDialogOpen ? "hidden" : "",
+  ]}
+>
   <div class="min-w-0 space-y-5">
       <div class="min-w-0 space-y-6">
         <div class="space-y-2">
@@ -6754,6 +6845,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
   traceLink={workflowDeploymentTraceLink}
+  embedded
   onClose={() => {
     workflowProgressDialogOpen = false;
   }}
