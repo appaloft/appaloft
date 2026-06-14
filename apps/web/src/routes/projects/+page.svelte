@@ -139,12 +139,7 @@
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
-  const pageLoading = $derived(
-    projectsQuery.isPending ||
-      environmentsQuery.isPending ||
-      resourcesQuery.isPending ||
-      deploymentsQuery.isPending,
-  );
+  const projectListLoading = $derived(projectsQuery.isPending && visibleProjects.length === 0);
   let projectCreateDialogOpen = $state(false);
 
   const reorderProjectsMutation = createMutation(() => ({
@@ -307,73 +302,67 @@
     { label: $t(i18nKeys.console.projects.pageTitle) },
   ]}
 >
-  {#if pageLoading}
-    <div class="space-y-5">
-      <section class="space-y-3">
-        <Skeleton class="h-5 w-36" />
-        <Skeleton class="h-4 w-72" />
-      </section>
-      <div class="space-y-3">
-        {#each Array.from({ length: 5 }) as _, index (index)}
-          <Skeleton class="h-12 w-full" />
-        {/each}
-      </div>
-    </div>
-  {:else}
-    <ConsoleResourceCanvas>
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.projects.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.projectLifecycle}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.projects.focusDescription)}
-          </p>
+  <ConsoleResourceCanvas>
+    <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+      <div class="max-w-2xl space-y-2">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.projects.focusTitle)}</h1>
+          <DocsHelpLink
+            href={webDocsHrefs.projectLifecycle}
+            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          />
         </div>
-        {#if visibleProjects.length > 0}
-          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
-            <Button type="button" onclick={openProjectCreateDialog}>
-              <Plus class="size-4" />
-              {$t(i18nKeys.console.projects.createProjectAction)}
-            </Button>
-            {#if visibleProjects.length > 1}
-              <Button
-                type="button"
-                variant={projectSortMode ? "selected" : "outline"}
-                disabled={reorderProjectsMutation.isPending}
-                onclick={() => setProjectSortMode(!projectSortMode)}
-                data-project-sort-toggle
-              >
-                {#if projectSortMode}
-                  <Check class="size-4" />
-                  {$t(i18nKeys.common.actions.done)}
-                {:else}
-                  <Pencil class="size-4" />
-                  {$t(i18nKeys.common.actions.edit)}
-                {/if}
-              </Button>
-            {/if}
-          </div>
-        {/if}
-      </section>
-
-      <section class="space-y-3">
-        {#if visibleProjects.length > 0}
-          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.projectListTitle)}</h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.projects.projectListDescription)}
-              </p>
-            </div>
-            <div
-              class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-              data-project-pagination
+        <p class="text-sm leading-6 text-muted-foreground">
+          {$t(i18nKeys.console.projects.focusDescription)}
+        </p>
+      </div>
+      {#if visibleProjects.length > 0}
+        <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+          <Button type="button" onclick={openProjectCreateDialog}>
+            <Plus class="size-4" />
+            {$t(i18nKeys.console.projects.createProjectAction)}
+          </Button>
+          {#if visibleProjects.length > 1}
+            <Button
+              type="button"
+              variant={projectSortMode ? "selected" : "outline"}
+              disabled={reorderProjectsMutation.isPending}
+              onclick={() => setProjectSortMode(!projectSortMode)}
+              data-project-sort-toggle
             >
+              {#if projectSortMode}
+                <Check class="size-4" />
+                {$t(i18nKeys.common.actions.done)}
+              {:else}
+                <Pencil class="size-4" />
+                {$t(i18nKeys.common.actions.edit)}
+              {/if}
+            </Button>
+          {/if}
+        </div>
+      {/if}
+    </section>
+
+    <section class="space-y-3">
+      {#if visibleProjects.length > 0 || projectListLoading}
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.projectListTitle)}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.projects.projectListDescription)}
+            </p>
+          </div>
+          <div
+            class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+            data-project-pagination
+          >
+            {#if projectListLoading}
+              <Skeleton class="h-5 w-28" />
+              <div class="flex items-center gap-1">
+                <Skeleton class="h-8 w-16 rounded-md" />
+                <Skeleton class="h-8 w-16 rounded-md" />
+              </div>
+            {:else}
               <span>
                 {$t(i18nKeys.console.projects.projectListRange, {
                   start: projectPageStart,
@@ -401,20 +390,45 @@
                   {$t(i18nKeys.common.actions.next)}
                 </Button>
               </div>
-            </div>
+            {/if}
           </div>
+        </div>
 
-          {#if projectReorderError}
-            <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {projectReorderError}
-            </p>
-          {/if}
+        {#if projectReorderError}
+          <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {projectReorderError}
+          </p>
+        {/if}
 
-          <div
-            class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-            bind:this={projectGridElement}
-            data-project-grid
-          >
+        <div
+          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          bind:this={projectGridElement}
+          data-project-grid
+        >
+          {#if projectListLoading}
+            {#each Array.from({ length: 6 }) as _, index (index)}
+              <article
+                class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm"
+                aria-hidden="true"
+                data-project-loading-card
+              >
+                <div class="space-y-2 pr-10">
+                  <Skeleton class="h-5 w-3/5" />
+                  <Skeleton class="h-5 w-32 rounded-md" />
+                  <div class="space-y-1.5 pt-1">
+                    <Skeleton class="h-4 w-full" />
+                    <Skeleton class="h-4 w-4/5" />
+                  </div>
+                </div>
+                <div class="mt-5 grid gap-2">
+                  <Skeleton class="h-4 w-24" />
+                  <Skeleton class="h-4 w-20" />
+                  <Skeleton class="h-4 w-44 max-w-full" />
+                </div>
+                <Skeleton class="mt-auto h-4 w-24" />
+              </article>
+            {/each}
+          {:else}
             {#each visibleProjects as project (project.id)}
               {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
               {@const latestDeployment = latestProjectDeployment(project, deployments)}
@@ -488,20 +502,20 @@
                 </a>
               </article>
             {/each}
-          </div>
-        {:else}
-          <ConsoleEmptyState
-            tone="project"
-            title={$t(i18nKeys.console.projects.emptyTitle)}
-            description={$t(i18nKeys.console.projects.emptyBody)}
-            actionLabel={$t(i18nKeys.console.projects.createProjectAction)}
-            learnMoreHref={webDocsHrefs.projectLifecycle}
-            onAction={openProjectCreateDialog}
-          />
-        {/if}
-      </section>
-    </ConsoleResourceCanvas>
-  {/if}
+          {/if}
+        </div>
+      {:else}
+        <ConsoleEmptyState
+          tone="project"
+          title={$t(i18nKeys.console.projects.emptyTitle)}
+          description={$t(i18nKeys.console.projects.emptyBody)}
+          actionLabel={$t(i18nKeys.console.projects.createProjectAction)}
+          learnMoreHref={webDocsHrefs.projectLifecycle}
+          onAction={openProjectCreateDialog}
+        />
+      {/if}
+    </section>
+  </ConsoleResourceCanvas>
 
   <Dialog.Root
     bind:open={projectCreateDialogOpen}
