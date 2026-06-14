@@ -24,6 +24,7 @@ import { cliCommandDescriptions } from "./docs-help.js";
 const workIdArg = Args.text({ name: "workId" });
 const kindOption = Options.choice("kind", operatorWorkKinds).pipe(Options.optional);
 const statusOption = Options.choice("status", operatorWorkStatuses).pipe(Options.optional);
+const projectIdOption = Options.text("project-id").pipe(Options.optional);
 const resourceIdOption = Options.text("resource-id").pipe(Options.optional);
 const serverIdOption = Options.text("server-id").pipe(Options.optional);
 const deploymentIdOption = Options.text("deployment-id").pipe(Options.optional);
@@ -64,18 +65,20 @@ const listCommand = EffectCommand.make(
   {
     kind: kindOption,
     status: statusOption,
+    projectId: projectIdOption,
     resourceId: resourceIdOption,
     serverId: serverIdOption,
     deploymentId: deploymentIdOption,
     limit: limitOption,
   },
-  ({ deploymentId, kind, limit, resourceId, serverId, status }) => {
+  ({ deploymentId, kind, limit, projectId, resourceId, serverId, status }) => {
     const parsedLimit = optionalLimit(optionalValue(limit));
 
     return runQuery(
       ListOperatorWorkQuery.create({
         ...(optionalValue(kind) ? { kind: optionalValue(kind) } : {}),
         ...(optionalValue(status) ? { status: optionalValue(status) } : {}),
+        ...(optionalValue(projectId) ? { projectId: optionalValue(projectId) } : {}),
         ...(optionalValue(resourceId) ? { resourceId: optionalValue(resourceId) } : {}),
         ...(optionalValue(serverId) ? { serverId: optionalValue(serverId) } : {}),
         ...(optionalValue(deploymentId) ? { deploymentId: optionalValue(deploymentId) } : {}),
