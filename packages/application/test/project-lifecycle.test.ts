@@ -10,6 +10,9 @@ import {
   type DomainEvent,
   EnvironmentByIdSpec,
   EnvironmentId,
+  EnvironmentKindValue,
+  EnvironmentName,
+  EnvironmentProfile,
   OrganizationId,
   ok,
   Project,
@@ -19,6 +22,7 @@ import {
   ProjectLifecycleStatusValue,
   ProjectName,
   ProjectSlug,
+  UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
 import {
@@ -84,6 +88,7 @@ function projectFixture(input?: {
 function projectEvent(
   events: unknown[],
   type:
+    | "environment-archived"
     | "project-renamed"
     | "project-description-set"
     | "project-reordered"
@@ -105,6 +110,21 @@ function projectEvent(
   return event;
 }
 
+function environmentFixture(input?: {
+  id?: string;
+  projectId?: string;
+  name?: string;
+  kind?: "production" | "preview" | "development" | "test";
+}) {
+  return EnvironmentProfile.create({
+    id: EnvironmentId.rehydrate(input?.id ?? "env_empty"),
+    projectId: ProjectId.rehydrate(input?.projectId ?? "prj_demo"),
+    name: EnvironmentName.rehydrate(input?.name ?? "Production"),
+    kind: EnvironmentKindValue.rehydrate(input?.kind ?? "production"),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  })._unsafeUnwrap();
+}
+
 class FakeProjectDeletionBlockerReader {
   constructor(
     private readonly blockers: Array<{
@@ -113,10 +133,18 @@ class FakeProjectDeletionBlockerReader {
       relatedEntityType?: string;
       count?: number;
     }> = [],
+    private readonly emptyEnvironmentArchiveCandidates: Array<{
+      environmentId: string;
+      lifecycleStatus: "active" | "locked";
+    }> = [],
   ) {}
 
   async findBlockers() {
     return ok(this.blockers);
+  }
+
+  async findEmptyEnvironmentArchiveCandidates() {
+    return ok(this.emptyEnvironmentArchiveCandidates);
   }
 }
 
@@ -861,6 +889,7 @@ describe("project lifecycle operations", () => {
     const useCase = new DeleteProjectUseCase(
       projects,
       new FakeProjectDeletionBlockerReader(),
+      new MemoryEnvironmentRepository(),
       clock,
       eventBus,
       logger,
@@ -913,6 +942,7 @@ describe("project lifecycle operations", () => {
           count: 1,
         },
       ]),
+      new MemoryEnvironmentRepository(),
       clock,
       eventBus,
       logger,
@@ -941,6 +971,7 @@ describe("project lifecycle operations", () => {
     const useCase = new DeleteProjectUseCase(
       projects,
       new FakeProjectDeletionBlockerReader(),
+      new MemoryEnvironmentRepository(),
       clock,
       eventBus,
       logger,
@@ -962,6 +993,69 @@ describe("project lifecycle operations", () => {
       },
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[PROJ-LIFE-DELETE-004] auto-archives empty environments before deleting an archived project", async () => {
+    const { clock, context, eventBus, logger, projects, repositoryContext } = await createHarness([
+      projectFixture({
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+      }),
+    ]);
+    const environments = new MemoryEnvironmentRepository();
+    const environment = environmentFixture();
+    await environments.upsert(
+      repositoryContext,
+      environment,
+      UpsertEnvironmentSpec.fromEnvironment(environment),
+    );
+    const useCase = new DeleteProjectUseCase(
+      projects,
+      new FakeProjectDeletionBlockerReader(
+        [],
+        [
+          {
+            environmentId: "env_empty",
+            lifecycleStatus: "active",
+          },
+        ],
+      ),
+      environments,
+      clock,
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      confirmation: { projectId: "prj_demo" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persistedEnvironment = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_empty")),
+    );
+    expect(persistedEnvironment?.toState().lifecycleStatus.value).toBe("archived");
+    expect(persistedEnvironment?.toState().archivedAt?.value).toBe("2026-01-01T00:00:10.000Z");
+    expect(persistedEnvironment?.toState().archiveReason?.value).toBe(
+      "Auto-archived empty environment during project deletion",
+    );
+
+    const persistedProject = await projects.findOne(
+      repositoryContext,
+      ProjectByIdSpec.create(ProjectId.rehydrate("prj_demo")),
+    );
+    expect(persistedProject?.toState().lifecycleStatus.value).toBe("deleted");
+
+    expect(projectEvent(eventBus.events, "environment-archived").payload).toMatchObject({
+      environmentId: "env_empty",
+      projectId: "prj_demo",
+      reason: "Auto-archived empty environment during project deletion",
+    });
+    expect(projectEvent(eventBus.events, "project-deleted").payload).toMatchObject({
+      projectId: "prj_demo",
+    });
   });
 
   test("[PROJ-LIFE-MUTATION-GUARD-001] rejects project mutations after archive", async () => {

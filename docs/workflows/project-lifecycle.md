@@ -69,8 +69,11 @@ retry deployments, mutate historical deployment snapshots, restore deleted child
 runtime state.
 
 `projects.delete-check` previews whether an archived project can be deleted without hiding retained
-child or support history. `projects.delete` soft-deletes only archived projects with no delete-check
-blockers and matching typed confirmation. It does not cascade cleanup.
+child or support history. Empty active or locked environments are not retained blockers when they
+have no environment-owned variables and no non-deleted resources. `projects.delete` soft-deletes
+only archived projects with no delete-check blockers and matching typed confirmation, and it may
+auto-archive those empty environments through the normal environment lifecycle before the final
+blocker check. It does not cascade other cleanup.
 
 Project detail/settings surfaces may compose resource, environment, deployment, and access-route
 rollups from their own read models. Those rollups are read-only context. Project lifecycle commands

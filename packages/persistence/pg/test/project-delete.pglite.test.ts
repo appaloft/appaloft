@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { createExecutionContext, toRepositoryContext } from "@appaloft/application";
 import {
   ArchivedAt,
+  ConfigKey,
+  ConfigValueText,
   CreatedAt,
   DeletedAt,
   EnvironmentId,
@@ -17,12 +19,15 @@ import {
   ProjectByIdSpec,
   ProjectId,
   ProjectName,
+  UpdatedAt,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
+  VariableExposureValue,
+  VariableKindValue,
 } from "@appaloft/core";
 
 describe("project delete persistence", () => {
-  test("[PROJ-LIFE-DELETE-001][PROJ-LIFE-DELETE-CHECK-002] tombstones projects and reads project blockers", async () => {
+  test("[PROJ-LIFE-DELETE-001][PROJ-LIFE-DELETE-CHECK-002][PROJ-LIFE-DELETE-CHECK-003] tombstones projects and reads project blockers", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-project-delete-"));
     const {
       createDatabase,
@@ -67,8 +72,8 @@ describe("project delete persistence", () => {
       })._unsafeUnwrap();
       await projects.upsert(context, activeProject, UpsertProjectSpec.fromProject(activeProject));
 
-      const environment = EnvironmentProfile.create({
-        id: EnvironmentId.rehydrate("env_blocker"),
+      const emptyEnvironment = EnvironmentProfile.create({
+        id: EnvironmentId.rehydrate("env_empty"),
         projectId: ProjectId.rehydrate("prj_blocked"),
         name: EnvironmentName.rehydrate("Production"),
         kind: EnvironmentKindValue.rehydrate("production"),
@@ -76,15 +81,49 @@ describe("project delete persistence", () => {
       })._unsafeUnwrap();
       await environments.upsert(
         context,
-        environment,
-        UpsertEnvironmentSpec.fromEnvironment(environment),
+        emptyEnvironment,
+        UpsertEnvironmentSpec.fromEnvironment(emptyEnvironment),
       );
+
+      const configuredEnvironment = EnvironmentProfile.create({
+        id: EnvironmentId.rehydrate("env_configured"),
+        projectId: ProjectId.rehydrate("prj_blocked"),
+        name: EnvironmentName.rehydrate("Configured"),
+        kind: EnvironmentKindValue.rehydrate("production"),
+        createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      })._unsafeUnwrap();
+      configuredEnvironment
+        .setVariable({
+          key: ConfigKey.rehydrate("APP_PORT"),
+          value: ConfigValueText.rehydrate("3000"),
+          kind: VariableKindValue.rehydrate("plain-config"),
+          exposure: VariableExposureValue.rehydrate("runtime"),
+          updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
+        })
+        ._unsafeUnwrap();
+      await environments.upsert(
+        context,
+        configuredEnvironment,
+        UpsertEnvironmentSpec.fromEnvironment(configuredEnvironment),
+      );
+
+      const autoArchiveCandidates = await blockerReader.findEmptyEnvironmentArchiveCandidates(
+        context,
+        { projectId: "prj_blocked" },
+      );
+      expect(autoArchiveCandidates.isOk()).toBe(true);
+      expect(autoArchiveCandidates._unsafeUnwrap()).toEqual([
+        {
+          environmentId: "env_empty",
+          lifecycleStatus: "active",
+        },
+      ]);
 
       const blockers = await blockerReader.findBlockers(context, { projectId: "prj_blocked" });
       expect(blockers.isOk()).toBe(true);
       expect(blockers._unsafeUnwrap()).toContainEqual({
         kind: "environment",
-        relatedEntityId: "env_blocker",
+        relatedEntityId: "env_configured",
         relatedEntityType: "environment",
         count: 1,
       });

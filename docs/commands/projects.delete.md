@@ -17,9 +17,16 @@
 retained project-scoped state remains.
 
 Success removes the project from normal project list/show read paths through a tombstone lifecycle
-state and records `project-deleted` once. It does not cascade child cleanup, delete runtime state,
-delete deployment history, prune logs, remove source events, revoke domains/certificates, or erase
-audit/event retention.
+state and records `project-deleted` once.
+
+Before the final blocker check, `projects.delete` may automatically archive empty active or locked
+environments in the same project. Empty means the environment has no environment-owned variables and
+no non-deleted resources. This auto-archive uses the normal environment aggregate transition and
+records `environment-archived` for each environment whose state changes.
+
+Except for this empty-environment auto-archive, project delete does not cascade child cleanup, delete
+runtime state, delete deployment history, prune logs, remove source events, revoke
+domains/certificates, or erase audit/event retention.
 
 ## Input Model
 

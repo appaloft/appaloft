@@ -104,7 +104,8 @@ Current boundary:
 - project lifecycle state is explicit; archived projects remain readable, reject new
   project-scoped mutations and deployment admission, and can be restored through `projects.restore`
 - `projects.delete-check` and guarded `projects.delete` soft-delete only archived projects with no
-  retained blockers; delete does not cascade child cleanup or erase support/audit history
+  retained blockers; empty environments are auto-archived through the environment lifecycle and
+  delete does not cascade other child cleanup or erase support/audit history
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources
@@ -113,8 +114,9 @@ Current boundary:
   child mutation or runtime state
 - project rename/set-description/archive must not create deployments, mutate historical deployment
   snapshots, or immediately affect runtime state
-- project delete is guarded by `projects.delete-check`, requires an archived project, and soft
-  deletes only the project tombstone when no retained child/support blockers remain
+- project delete is guarded by `projects.delete-check`, requires an archived project, auto-archives
+  empty environments, and soft deletes the project tombstone when no retained child/support blockers
+  remain
 - project-level "new deployment" must be labeled and implemented as Quick Deploy or another entry
   workflow that selects or creates a resource before dispatching `deployments.create`
 - project source binding is not yet a first-class aggregate concept

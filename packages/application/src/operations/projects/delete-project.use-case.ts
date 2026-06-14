@@ -1,12 +1,17 @@
 import {
+  ArchivedAt,
+  ArchiveReason,
   DeletedAt,
   domainError,
+  EnvironmentByIdSpec,
+  EnvironmentId,
   err,
   ok,
   ProjectByIdSpec,
   ProjectId,
   type Result,
   safeTry,
+  UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
@@ -15,6 +20,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type AppLogger,
   type Clock,
+  type EnvironmentRepository,
   type EventBus,
   type ProjectDeleteBlocker,
   type ProjectDeletionBlockerReader,
@@ -78,6 +84,8 @@ export class DeleteProjectUseCase {
     private readonly projectRepository: ProjectRepository,
     @inject(tokens.projectDeletionBlockerReader)
     private readonly deletionBlockerReader: ProjectDeletionBlockerReader,
+    @inject(tokens.environmentRepository)
+    private readonly environmentRepository: EnvironmentRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.eventBus)
@@ -90,7 +98,14 @@ export class DeleteProjectUseCase {
     context: ExecutionContext,
     input: DeleteProjectCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, deletionBlockerReader, eventBus, logger, projectRepository } = this;
+    const {
+      clock,
+      deletionBlockerReader,
+      environmentRepository,
+      eventBus,
+      logger,
+      projectRepository,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -127,6 +142,53 @@ export class DeleteProjectUseCase {
             confirmationProjectId: confirmationProjectId.value,
           }),
         );
+      }
+
+      const emptyEnvironmentArchiveCandidates =
+        yield* await deletionBlockerReader.findEmptyEnvironmentArchiveCandidates(
+          repositoryContext,
+          {
+            projectId: projectId.value,
+          },
+        );
+      const autoArchiveReason = yield* ArchiveReason.create(
+        "Auto-archived empty environment during project deletion",
+      );
+      for (const candidate of emptyEnvironmentArchiveCandidates) {
+        const environmentId = yield* EnvironmentId.create(candidate.environmentId);
+        const environment = await environmentRepository.findOne(
+          repositoryContext,
+          EnvironmentByIdSpec.create(environmentId),
+        );
+
+        if (!environment) {
+          continue;
+        }
+
+        const environmentState = environment.toState();
+        if (
+          !environmentState.projectId.equals(projectId) ||
+          environmentState.lifecycleStatus.isArchived() ||
+          environmentState.variables.length > 0
+        ) {
+          continue;
+        }
+
+        const archivedAt = yield* ArchivedAt.create(clock.now());
+        const archiveResult = yield* environment.archive({
+          archivedAt,
+          reason: autoArchiveReason,
+        });
+        if (!archiveResult.changed) {
+          continue;
+        }
+
+        await environmentRepository.upsert(
+          repositoryContext,
+          environment,
+          UpsertEnvironmentSpec.fromEnvironment(environment),
+        );
+        await publishDomainEventsAndReturn(context, eventBus, logger, environment, undefined);
       }
 
       const blockers = yield* await deletionBlockerReader.findBlockers(repositoryContext, {
