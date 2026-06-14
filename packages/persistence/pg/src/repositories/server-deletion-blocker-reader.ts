@@ -108,11 +108,6 @@ export class PgServerDeletionBlockerReader implements ServerDeletionBlockerReade
             .select("id")
             .where("server_id", "=", input.serverId)
             .execute();
-          const auditRows = await executor
-            .selectFrom("audit_logs")
-            .select("id")
-            .where("aggregate_id", "=", input.serverId)
-            .execute();
           const credentialBlockerRows = credentialRows.flatMap((row) =>
             row.id ? [{ id: row.id }] : [],
           );
@@ -132,7 +127,6 @@ export class PgServerDeletionBlockerReader implements ServerDeletionBlockerReade
               defaultAccessPolicyRows,
             ),
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
-            blockerFromRows("audit-retention", "audit-log", auditRows),
           ].filter((blocker): blocker is ServerDeletionBlocker => blocker !== null);
 
           return ok(blockers);

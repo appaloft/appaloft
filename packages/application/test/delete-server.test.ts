@@ -239,7 +239,6 @@ describe("DeleteServerUseCase", () => {
         { kind: "source-link" },
         { kind: "default-access-policy" },
         { kind: "runtime-log-retention" },
-        { kind: "audit-retention" },
       ],
     });
 
@@ -261,7 +260,6 @@ describe("DeleteServerUseCase", () => {
       "source-link",
       "default-access-policy",
       "runtime-log-retention",
-      "audit-retention",
     ]);
     expect(blockerReader.calls).toBe(1);
     expect(eventBus.events).toHaveLength(0);

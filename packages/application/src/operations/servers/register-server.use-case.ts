@@ -4,6 +4,7 @@ import {
   DeploymentTargetId,
   DeploymentTargetName,
   EdgeProxyKindValue,
+  err,
   HostAddress,
   ok,
   PortNumber,
@@ -15,16 +16,23 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { findOperationCatalogEntryByKey } from "../../operation-catalog";
+import { checkOperationGuards } from "../../operation-guard";
 import {
+  AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
   type EventBus,
   type IdGenerator,
+  type OperationGuardPort,
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type RegisterServerCommandInput } from "./register-server.command";
+
+const registerServerOperation = findOperationCatalogEntryByKey("servers.register");
+const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 @injectable()
 export class RegisterServerUseCase {
@@ -39,16 +47,35 @@ export class RegisterServerUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.operationGuardPort)
+    private readonly operationGuardPort?: OperationGuardPort,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: RegisterServerCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, eventBus, idGenerator, logger, serverRepository } = this;
+    const { clock, eventBus, idGenerator, logger, operationGuardPort, serverRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      if (registerServerOperation) {
+        const checked = await checkOperationGuards({
+          context,
+          entry: registerServerOperation,
+          message: input,
+          operationGuardPort: operationGuardPort ?? defaultOperationGuardPort,
+          contextAttributes: {
+            host: input.host,
+            providerKey: input.providerKey,
+            targetKind: input.targetKind ?? "single-server",
+          },
+        });
+        if (checked.isErr()) {
+          return err(checked.error);
+        }
+      }
+
       const serverId = yield* DeploymentTargetId.create(idGenerator.next("srv"));
       const name = yield* DeploymentTargetName.create(input.name);
       const host = yield* HostAddress.create(input.host);

@@ -12,10 +12,44 @@ import {
 import {
   createExecutionContext,
   type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   RegisterServerCommand,
   RegisterServerCommandHandler,
   RegisterServerUseCase,
 } from "../src";
+
+class DenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.server-target",
+          kind: "validation",
+          reason: "test-server-target-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.server-target",
+        kind: "validation",
+      },
+      reason: "test-server-target-denied",
+      details: {
+        host: "127.0.0.1",
+        providerKey: "local-shell",
+      },
+    };
+  }
+}
 
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
@@ -24,13 +58,20 @@ function createTestContext(): ExecutionContext {
   });
 }
 
-function createHarness() {
+function createHarness(input: { operationGuardPort?: OperationGuardPort } = {}) {
   const serverRepository = new MemoryServerRepository();
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
   const eventBus = new CapturedEventBus();
   const logger = new NoopLogger();
   const handler = new RegisterServerCommandHandler(
-    new RegisterServerUseCase(serverRepository, clock, new SequenceIdGenerator(), eventBus, logger),
+    new RegisterServerUseCase(
+      serverRepository,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+      input.operationGuardPort,
+    ),
   );
 
   return {
@@ -146,5 +187,39 @@ describe("servers.register command", () => {
 
     expect(command.isErr()).toBe(true);
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
+  test("[SERVER-BOOT-CMD-004] servers.register applies operation guard before persistence", async () => {
+    const operationGuardPort = new DenyingOperationGuardPort();
+    const { eventBus, handler, serverRepository } = createHarness({ operationGuardPort });
+    const command = RegisterServerCommand.create({
+      name: "Blocked local target",
+      host: "127.0.0.1",
+      providerKey: "local-shell",
+    });
+    expect(command.isOk()).toBe(true);
+
+    const result = await handler.handle(createTestContext(), command._unsafeUnwrap());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "operation_check_denied",
+      details: {
+        operationKey: "servers.register",
+        reason: "test-server-target-denied",
+        host: "127.0.0.1",
+        providerKey: "local-shell",
+      },
+    });
+    expect(operationGuardPort.requests).toHaveLength(1);
+    expect(operationGuardPort.requests[0]).toMatchObject({
+      operationKey: "servers.register",
+      contextAttributes: {
+        host: "127.0.0.1",
+        providerKey: "local-shell",
+        targetKind: "single-server",
+      },
+    });
+    expect(serverRepository.items.size).toBe(0);
+    expect(eventBus.events).toEqual([]);
   });
 });
