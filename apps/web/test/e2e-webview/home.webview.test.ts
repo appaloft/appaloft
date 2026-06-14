@@ -83,6 +83,12 @@ let selfHostedAuthE2eSignedIn = true;
 const demoProjectPath = "/projects/prj_demo";
 const demoResourcePath = "/projects/prj_demo/environments/env_demo/resources/res_demo";
 const demoDeploymentPath = `${demoResourcePath}/deployments/dep_demo`;
+const lifecycleActionLabels: [string, ...string[]] = [
+  "Open lifecycle governance",
+  "打开生命周期治理",
+  "Manage lifecycle",
+  "生命周期治理",
+];
 
 function resetSelfHostedAuthE2eState(input: { bootstrapRequired?: boolean } = {}): void {
   const bootstrapRequired = input.bootstrapRequired ?? false;
@@ -5260,7 +5266,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "/var/lib/appaloft/runtime/ssh-deployments/dep_demo/source");
       expect(await pageText(view)).not.toContain("SECRET_TOKEN=do-not-render");
 
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Expire old sessions", "过期旧会话"]);
       const expireRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/expire");
       const expireInput = readOrpcJsonPayload(expireRequest.body);
@@ -5283,6 +5289,8 @@ describe.serial("console e2e with Bun.WebView", () => {
                 candidate.textContent?.includes("term_active")
               );
               const button = Array.from(row?.querySelectorAll("button") ?? []).find((candidate) =>
+                candidate.textContent?.includes("Open lifecycle governance") ||
+                candidate.textContent?.includes("打开生命周期治理") ||
                 candidate.textContent?.includes("Manage lifecycle") ||
                 candidate.textContent?.includes("生命周期治理")
               );
@@ -5347,7 +5355,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       name: "Customer API",
     });
 
-    await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理", "打开生命周期治理"]);
+    await clickButtonByAnyText(view, lifecycleActionLabels);
     await expectAnyText(view, ["Project lifecycle", "项目生命周期", "生命周期"]);
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/projects/archive"),
@@ -6696,7 +6704,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         limit: 50,
       });
 
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogFooterButtonByExactText(view, ["Request cleanup", "请求清理"]);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
@@ -6990,7 +6998,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "prenv_global_27");
       await expectText(view, "def5678");
 
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogFooterButtonByExactText(view, ["Request cleanup", "请求清理"]);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
@@ -7105,6 +7113,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       await expectText(view, "resource-web.example.test");
       await expectAnyText(view, [
+        "Pending verification",
         "pending_verification",
         "PENDING_VERIFICATION",
         "待验证",
@@ -7167,6 +7176,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Domain bindings", "域名绑定"]);
       await expectText(view, "resource-web.example.test");
       await expectAnyText(view, [
+        "Pending verification",
         "pending_verification",
         "PENDING_VERIFICATION",
         "待验证",
@@ -7505,7 +7515,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
 
-    await expectAnyText(view, ["Configuration variables", "配置变量"]);
+    await expectAnyText(view, ["Configuration", "配置变量"]);
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
     await expectText(view, "DATABASE_URL");
 
@@ -7540,7 +7550,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
 
-    await expectAnyText(view, ["Configuration variables", "配置变量"]);
+    await expectAnyText(view, ["Configuration", "配置变量"]);
     await expectAnyText(view, ["Effective future deployment config", "未来部署生效配置"]);
     const defaultState = JSON.parse(
       await view.evaluate<string>(`JSON.stringify({
@@ -7708,7 +7718,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "latest -> sha256:8b1a9953c461");
       await expectAnyText(view, ["Overview", "基本信息"]);
       await expectAnyText(view, ["Deployment snapshot", "当时的部署信息"]);
-      await expectAnyText(view, ["Deployment-time access", "部署时访问地址"]);
+      await expectAnyText(view, [
+        "Deployment access snapshot",
+        "Deployment-time access",
+        "部署时访问地址",
+      ]);
       await expectAnyText(view, ["Current resource state", "当前资源状态"]);
       await expectAnyText(view, ["Recovery readiness", "恢复就绪"]);
 
@@ -8175,7 +8189,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       await expectAnyText(view, ["Delete safety", "DELETE SAFETY", "删除安全检查"]);
       await expectAnyText(view, ["Eligible", "ELIGIBLE", "可删除"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理", "打开生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Delete server", "删除服务器"]);
       await setInputValue(view, "#server-lifecycle-confirmation-input", "srv_demo");
       await clickFormSubmit(view, "#server-lifecycle-form");
@@ -8231,7 +8245,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=danger`);
 
       await expectAnyText(view, ["Lifecycle governance", "生命周期治理"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理", "打开生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Deactivate server", "停用服务器"]);
       await setInputValue(view, "#server-lifecycle-confirmation-input", "srv_demo");
       await clickFormSubmit(view, "#server-lifecycle-form");
@@ -8445,7 +8459,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
       await expectAnyText(view, ["Danger zone", "危险区"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
       await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
 
@@ -8477,7 +8491,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
       await expectAnyText(view, ["Environments", "环境"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
       await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
 
@@ -8539,7 +8553,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+    await clickButtonByAnyText(view, lifecycleActionLabels);
     await clickDialogButtonByAnyText(view, ["Lock", "锁定"]);
     await clickDialogFooterButtonByExactText(view, ["Lock", "锁定"]);
 
@@ -8575,7 +8589,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
       await expectAnyText(view, ["Locked", "已锁定"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Unlock", "解锁"]);
       await clickDialogFooterButtonByExactText(view, ["Unlock", "解锁"]);
 
@@ -8611,9 +8625,10 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
       await expectAnyText(view, ["Archived", "已归档"]);
-      await clickButtonByAnyText(view, ["Manage lifecycle", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
       await clickDialogButtonByAnyText(view, ["Delete", "删除"]);
       await setInputValue(view, "#resource-delete-confirmation", "workspace");
+      await expectInputValue(view, "#resource-delete-confirmation", "workspace");
       await clickDialogFooterButtonByExactText(view, ["Delete", "删除"]);
 
       const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
@@ -8712,11 +8727,10 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
 
-      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
-      await expectAnyText(view, ["Manual certificate", "手动证书"]);
       await clickButtonByAnyText(view, ["Import certificate", "导入证书"]);
+      await expectAnyText(view, ["Manual certificate", "手动证书"]);
       await setInputValue(
         view,
         "#resource-domain-binding-import-certificate-chain-dbn_manual",
@@ -8747,7 +8761,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "crt_manual");
       await expectAnyText(view, ["Imported", "已导入"]);
       await expectAnyText(view, ["Ready", "READY", "已就绪", "就绪"]);
-      await expectText(view, "api.manual.example.test");
+      await expectAnyText(view, ["2026/06/01", "06/01/2026", "6/1/2026", "2026-06-01"]);
     } finally {
       if (previousImportRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/certificates/import"];
@@ -8795,9 +8809,8 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
 
-      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
       await expectText(view, "managed.example.test");
       await expectAnyText(view, [
         "Managed issuance remains responsible for this binding.",
@@ -8914,7 +8927,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       resourceId: "res_static",
     });
 
-    await clickButtonByAnyText(view, ["View deployment", "查看部署"]);
+    await clickDialogButtonByAnyText(view, ["View deployment", "查看部署"]);
     await expectLocation(
       view,
       "/projects/prj_static/environments/env_static/resources/res_static/deployments/dep_static",

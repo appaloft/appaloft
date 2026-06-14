@@ -848,6 +848,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
+  let lastCreatedDeploymentOwner = $state<{
+    projectId: string;
+    environmentId: string;
+    resourceId: string;
+  } | null>(null);
   let lastOperatorWorkId = $state("");
   let workflowDeploymentTraceLink = $state("");
   let blueprintOperatorWorkFollowEpoch = 0;
@@ -3593,15 +3598,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   function lastCreatedDeploymentHref(): string {
-    if (!selectedProjectId || !selectedEnvironmentId || !selectedResourceId) {
+    const owner = lastCreatedDeploymentOwner ?? (
+      selectedProjectId && selectedEnvironmentId && selectedResourceId
+        ? {
+            projectId: selectedProjectId,
+            environmentId: selectedEnvironmentId,
+            resourceId: selectedResourceId,
+          }
+        : null
+    );
+
+    if (!owner) {
       return `/deployments/${encodeURIComponent(lastCreatedDeploymentId)}`;
     }
 
     return deploymentDetailHref({
       id: lastCreatedDeploymentId,
-      projectId: selectedProjectId,
-      environmentId: selectedEnvironmentId,
-      resourceId: selectedResourceId,
+      projectId: owner.projectId,
+      environmentId: owner.environmentId,
+      resourceId: owner.resourceId,
     });
   }
 
@@ -4767,6 +4782,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         return executeQuickDeployDependencyProvisioning(step.input);
       case "deployments.create": {
         deploymentCreateInFlight = true;
+        selectedProjectId = step.input.projectId;
+        selectedServerId = step.input.serverId;
+        selectedEnvironmentId = step.input.environmentId;
+        selectedResourceId = step.input.resourceId;
         try {
           return await createDeploymentWithProgress(
             step.input,
@@ -4803,6 +4822,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
     lastCreatedDeploymentId = "";
+    lastCreatedDeploymentOwner = null;
     lastAccessUrl = "";
     workflowProgressDialogOpen = false;
     resetWorkflowProgress();
@@ -5020,6 +5040,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       selectedServerId = workflowResult.serverId;
       selectedEnvironmentId = workflowResult.environmentId;
       selectedResourceId = workflowResult.resourceId;
+      lastCreatedDeploymentOwner = {
+        projectId: workflowResult.projectId,
+        environmentId: workflowResult.environmentId,
+        resourceId: workflowResult.resourceId,
+      };
 
       await refreshWorkspaceData();
       const refreshedResources = await orpcClient.resources.list({

@@ -909,6 +909,7 @@
     detail: string;
   } | null>(null);
   let importBindingId = $state("");
+  let certificateImportDialogOpen = $state(false);
   let importCertificateChain = $state("");
   let importPrivateKey = $state("");
   let importPassphrase = $state("");
@@ -1506,7 +1507,7 @@
         title: $t(i18nKeys.console.resources.certificateImportSuccessTitle),
         detail: result.certificateId,
       };
-      resetImportCertificateForm();
+      closeCertificateImportDialog();
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
       void queryClient.invalidateQueries({ queryKey: ["certificates"] });
@@ -2914,12 +2915,13 @@
       return;
     }
 
+    const confirmationResourceSlug = resourceDeleteConfirmation;
     deleteFeedback = null;
     closeResourceLifecycleDialog();
     deleteResourceMutation.mutate({
       resourceId: resource.id,
       confirmation: {
-        resourceSlug: resourceDeleteConfirmation,
+        resourceSlug: confirmationResourceSlug,
       },
     });
   }
@@ -2933,6 +2935,7 @@
       return;
     }
 
+    const confirmationResourceSlug = resourceDeleteConfirmation;
     archiveFeedback = null;
     deleteFeedback = null;
     closeResourceLifecycleDialog();
@@ -2940,7 +2943,7 @@
       resourceId: resource.id,
       archiveBeforeDelete: !isResourceArchived,
       confirmation: {
-        resourceSlug: resourceDeleteConfirmation,
+        resourceSlug: confirmationResourceSlug,
       },
     });
   }
@@ -4326,6 +4329,10 @@
     });
   }
 
+  const selectedImportBinding = $derived(
+    resourceDomainBindings.find((binding) => binding.id === importBindingId) ?? null,
+  );
+
   function resetImportCertificateForm(): void {
     importBindingId = "";
     importCertificateChain = "";
@@ -4333,13 +4340,13 @@
     importPassphrase = "";
   }
 
-  function toggleCertificateImport(binding: DomainBindingSummary): void {
-    if (binding.certificatePolicy !== "manual") {
-      return;
-    }
+  function closeCertificateImportDialog(): void {
+    certificateImportDialogOpen = false;
+    resetImportCertificateForm();
+  }
 
-    if (importBindingId === binding.id) {
-      resetImportCertificateForm();
+  function openCertificateImportDialog(binding: DomainBindingSummary): void {
+    if (binding.certificatePolicy !== "manual") {
       return;
     }
 
@@ -4348,6 +4355,7 @@
     importPrivateKey = "";
     importPassphrase = "";
     importFeedback = null;
+    certificateImportDialogOpen = true;
   }
 
   function importCertificateForBinding(binding: DomainBindingSummary, event: SubmitEvent): void {
@@ -7017,6 +7025,39 @@
                                     {$t(i18nKeys.console.resources.certificateSummaryEmpty)}
                                   </div>
                                 {/if}
+                                {#if binding.certificatePolicy === "manual"}
+                                  <Button
+                                    id={`resource-domain-binding-import-toggle-${binding.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onclick={() => openCertificateImportDialog(binding)}
+                                  >
+                                    <ShieldCheck class="size-4" />
+                                    {$t(i18nKeys.console.resources.certificateImportOpen)}
+                                  </Button>
+                                {:else if binding.certificatePolicy === "auto"}
+                                  <p class="text-xs leading-5 text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.certificateImportAutoPolicy)}
+                                  </p>
+                                {:else if binding.certificatePolicy === "disabled"}
+                                  <p class="text-xs leading-5 text-muted-foreground">
+                                    {$t(i18nKeys.console.resources.certificateImportDisabledPolicy)}
+                                  </p>
+                                {/if}
+                                {#if importFeedback?.bindingId === binding.id}
+                                  <div
+                                    class={[
+                                      "rounded-md border px-3 py-2 text-xs",
+                                      importFeedback.kind === "success"
+                                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                                        : "border-destructive/30 bg-destructive/5 text-destructive",
+                                    ]}
+                                  >
+                                    <p class="font-medium">{importFeedback.title}</p>
+                                    <p class="mt-1 break-all">{importFeedback.detail}</p>
+                                  </div>
+                                {/if}
                               </div>
                             </div>
                           </article>
@@ -8702,6 +8743,85 @@
               </Button>
             </Dialog.Footer>
           </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root bind:open={certificateImportDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          closeCertificateImportDialog();
+        } else {
+          certificateImportDialogOpen = true;
+        }
+      }}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.certificateImportTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.certificateImportDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if selectedImportBinding}
+            <form
+              id={`resource-domain-binding-import-form-${selectedImportBinding.id}`}
+              class="space-y-5 px-5 pb-5"
+              onsubmit={(event) => importCertificateForBinding(selectedImportBinding, event)}
+              data-resource-certificate-import-dialog
+            >
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <p class="break-all font-medium">{selectedImportBinding.domainName}</p>
+                <p class="mt-1 font-mono text-xs text-muted-foreground">
+                  {selectedImportBinding.id}
+                </p>
+              </div>
+
+              <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-certificate-chain-${selectedImportBinding.id}`}>
+                <span>{$t(i18nKeys.console.resources.certificateImportCertificateChain)}</span>
+                <Textarea
+                  id={`resource-domain-binding-import-certificate-chain-${selectedImportBinding.id}`}
+                  bind:value={importCertificateChain}
+                  class="min-h-28 font-mono text-xs"
+                  placeholder={$t(i18nKeys.console.resources.certificateImportCertificateChainPlaceholder)}
+                />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}>
+                <span>{$t(i18nKeys.console.resources.certificateImportPrivateKey)}</span>
+                <Textarea
+                  id={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}
+                  bind:value={importPrivateKey}
+                  class="min-h-28 font-mono text-xs"
+                  placeholder={$t(i18nKeys.console.resources.certificateImportPrivateKeyPlaceholder)}
+                />
+              </label>
+              <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}>
+                <span>{$t(i18nKeys.console.resources.certificateImportPassphrase)}</span>
+                <Input
+                  id={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}
+                  bind:value={importPassphrase}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.resources.certificateImportPassphrasePlaceholder)}
+                />
+              </label>
+              <Dialog.Footer class="px-0 pb-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onclick={closeCertificateImportDialog}
+                >
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!canImportCertificate || importCertificateMutation.isPending}
+                >
+                  <ShieldCheck class="size-4" />
+                  {importCertificateMutation.isPending
+                    ? $t(i18nKeys.console.resources.certificateImportSubmitting)
+                    : $t(i18nKeys.console.resources.certificateImportSubmit)}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          {/if}
         </Dialog.Content>
       </Dialog.Root>
 
