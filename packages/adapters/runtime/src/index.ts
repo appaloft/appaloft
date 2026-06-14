@@ -64,11 +64,12 @@ import {
 } from "@appaloft/core";
 import {
   createAdapterSpanName,
+  createDeploymentProgressEvent,
   deploymentProgressSteps,
-  reportDeploymentProgress,
   appaloftTraceAttributes,
   type ExecutionContext,
   type AppLogger,
+  type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
   type ExecutionBackend,
   type RequestedDeploymentConfig,
@@ -1373,9 +1374,12 @@ function shouldFail(deployment: Deployment): boolean {
 export class InMemoryExecutionBackend implements ExecutionBackend {
   private readonly sessions = new Map<string, ExecutionSession>();
 
-  constructor(private readonly progressReporter: DeploymentProgressReporter) {}
+  constructor(
+    private readonly progressRecorder: DeploymentProgressRecorder,
+    private readonly progressReporter: DeploymentProgressReporter,
+  ) {}
 
-  private report(
+  private async report(
     context: ExecutionContext,
     input: {
       deploymentId: string;
@@ -1384,8 +1388,8 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       status?: "running" | "succeeded" | "failed";
       level?: "debug" | "info" | "warn" | "error";
     },
-  ): void {
-    reportDeploymentProgress(this.progressReporter, context, {
+  ): Promise<void> {
+    const event = createDeploymentProgressEvent({
       deploymentId: input.deploymentId,
       phase: input.phase,
       message: input.message,
@@ -1393,6 +1397,8 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       ...(input.level ? { level: input.level } : {}),
       step: deploymentProgressSteps[input.phase],
     });
+    await this.progressRecorder.record(context, event).catch(() => undefined);
+    this.progressReporter.report(context, event);
   }
 
   private applyResult(
@@ -1435,7 +1441,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           phaseLog("verify", `Checking deployment health for resource ${state.resourceId.value}`),
         ];
         for (const log of logs) {
-          this.report(context, {
+          await this.report(context, {
             deploymentId: state.id.value,
             phase: log.phase as "detect" | "plan" | "package" | "deploy" | "verify",
             status: "succeeded",
@@ -1446,7 +1452,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
         if (shouldFail(deployment)) {
           const message = context.t(i18nKeys.backend.progress.simulatedVerificationFailure);
           logs.push(phaseLog("verify", message, "error"));
-          this.report(context, {
+          await this.report(context, {
             deploymentId: state.id.value,
             phase: "verify",
             status: "failed",
@@ -1469,7 +1475,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
 
         const completedMessage = context.t(i18nKeys.backend.progress.deploymentCompleted);
         logs.push(phaseLog("verify", completedMessage));
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "verify",
           status: "succeeded",
@@ -1502,7 +1508,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       status: "failed",
       logs,
     });
-    this.report(context, {
+    await this.report(context, {
       deploymentId,
       phase: "deploy",
       status: "succeeded",
@@ -1532,7 +1538,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           phaseLog("rollback", context.t(i18nKeys.backend.progress.rollbackCompleted)),
         ];
         for (const log of logs) {
-          this.report(context, {
+          await this.report(context, {
             deploymentId: deployment.toState().id.value,
             phase: "rollback",
             status: "succeeded",

@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   type BlueprintInstallProgressSnapshot,
   operatorWorkEnvelopeProgressEvents,
+  operatorWorkItemToProgressEvent,
+  operatorWorkReadableFailure,
   summarizeBlueprintInstallProgress,
 } from "./blueprint-install-progress";
 
@@ -114,11 +116,48 @@ describe("Blueprint install progress helpers", () => {
         status: "failed",
         level: "error",
         message:
-          "step: rollback-required · error: blueprint_install_failed · failure: resource_slug_conflict · phase: resource-admission · operation: CreateResourceCommand",
+          "资源名称冲突 · 资源名称已经被占用，创建资源时失败。 · 请换一个资源名称，或选择复用已有资源后重新安装。 · 阶段: resource-admission · 操作: CreateResourceCommand · 错误: resource_slug_conflict",
       },
     ]);
     expect(progressEvents[1]?.message).not.toContain("worker:");
     expect(progressEvents[1]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
+  });
+
+  test("[CLOUD-BLUEPRINT-QD-034] maps operator work show terminal failure into user-facing progress", () => {
+    const work = {
+      id: "dw_blueprint_install_cia_failed",
+      kind: "blueprint-install" as const,
+      status: "failed" as const,
+      operationKey: "blueprints.install",
+      phase: "install-execution",
+      step: "rollback-required",
+      updatedAt: "2026-06-14T07:05:54.923Z",
+      errorCode: "execution_failed",
+      errorCategory: "infra",
+      retriable: false,
+      nextActions: ["no-action" as const],
+      safeDetails: {
+        failure_code: "resource_slug_conflict",
+        failure_phase: "resource-admission",
+        failure_operation: "CreateResourceCommand",
+      },
+    };
+
+    expect(operatorWorkReadableFailure(work)).toMatchObject({
+      title: "资源名称冲突",
+      detail: "资源名称已经被占用，创建资源时失败。",
+      recovery: "请换一个资源名称，或选择复用已有资源后重新安装。",
+      code: "resource_slug_conflict",
+      phase: "resource-admission",
+      operation: "CreateResourceCommand",
+    });
+    expect(operatorWorkItemToProgressEvent(work)).toMatchObject({
+      phase: "plan",
+      status: "failed",
+      level: "error",
+      message:
+        "资源名称冲突 · 资源名称已经被占用，创建资源时失败。 · 请换一个资源名称，或选择复用已有资源后重新安装。 · 阶段: resource-admission · 操作: CreateResourceCommand · 错误: resource_slug_conflict",
+    });
   });
 
   test("[CLOUD-BLUEPRINT-QD-032] treats rollback-required install readback as failed even without deployment ids", () => {

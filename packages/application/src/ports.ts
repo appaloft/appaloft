@@ -303,6 +303,10 @@ export interface DeploymentProgressReporter {
   report(context: ExecutionContext, event: DeploymentProgressEvent): void;
 }
 
+export interface DeploymentProgressRecorder {
+  record(context: ExecutionContext, event: DeploymentProgressEvent): Promise<Result<void>>;
+}
+
 export interface DeploymentProgressObserver {
   subscribe(listener: DeploymentProgressListener): () => void;
 }

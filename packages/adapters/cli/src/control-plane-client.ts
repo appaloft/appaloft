@@ -826,6 +826,51 @@ export async function requestControlPlaneOperation(input: {
   }
 }
 
+export async function requestControlPlaneStreamOperation(input: {
+  readonly profile: CliControlPlaneProfile;
+  readonly operationKey: string;
+  readonly pathParams?: Readonly<Record<string, string>>;
+  readonly query?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  readonly body?: unknown;
+  readonly fetch?: AppaloftSdkFetch;
+  readonly phase: string;
+}): Promise<Result<AsyncIterable<unknown>>> {
+  const client = createAppaloftClient({
+    baseUrl: `${input.profile.baseUrl}/api`,
+    auth: authForProfile(input.profile.auth),
+    ...(input.fetch ? { fetch: input.fetch } : {}),
+    userAgent: cliUserAgent,
+  });
+
+  const request: AppaloftSdkFacadeInput = {
+    ...(input.pathParams ? { pathParams: input.pathParams } : {}),
+    ...(input.query ? { query: input.query } : {}),
+    ...(input.body === undefined ? {} : { body: input.body }),
+  };
+
+  try {
+    const result = requestFacadeOperation(client, input.operationKey, request);
+    if (!isAsyncIterable(result)) {
+      return err(
+        cliControlPlaneError(
+          "control_plane_unsupported",
+          "user",
+          "Streaming control plane operation did not return a stream",
+          false,
+          {
+            phase: input.phase,
+            operationKey: input.operationKey,
+          },
+        ),
+      );
+    }
+
+    return ok(result);
+  } catch (error) {
+    return err(errorFromUnknown(error, input.phase));
+  }
+}
+
 function boundedJsonRouteForOperation(
   operationKey: string,
 ): CliControlPlaneOperation["route"] | undefined {

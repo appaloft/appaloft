@@ -1,9 +1,11 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
+  createDeploymentProgressEvent,
   deploymentProgressSteps,
   type AppLogger,
   type DeploymentExecutionGuard,
+  type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
   type DependencyResourceSecretStore,
   type EdgeProxyProviderRegistry,
@@ -12,7 +14,6 @@ import {
   type IntegrationAuthPort,
   type ResourceAccessFailureRendererTarget,
   type ServerRepository,
-  reportDeploymentProgress,
   toRepositoryContext,
 } from "@appaloft/application";
 import {
@@ -831,6 +832,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   constructor(
     private readonly runtimeRoot: string,
     private readonly logger: AppLogger,
+    private readonly progressRecorder: DeploymentProgressRecorder,
     private readonly progressReporter: DeploymentProgressReporter,
     private readonly integrationAuthPort?: IntegrationAuthPort,
     private readonly serverRepository?: ServerRepository,
@@ -841,7 +843,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
   ) {}
 
-  private report(
+  private async report(
     context: ExecutionContext,
     input: {
       deploymentId: string;
@@ -852,8 +854,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       status?: "running" | "succeeded" | "failed";
       stream?: "stdout" | "stderr";
     },
-  ): void {
-    reportDeploymentProgress(this.progressReporter, context, {
+  ): Promise<void> {
+    const event = createDeploymentProgressEvent({
       deploymentId: input.deploymentId,
       phase: input.phase,
       message: input.message,
@@ -863,6 +865,23 @@ export class SshExecutionBackend implements ExecutionBackend {
       ...(input.stream ? { stream: input.stream } : {}),
       step: deploymentProgressSteps[input.phase],
     });
+    try {
+      const result = await this.progressRecorder.record(context, event);
+      if (result.isErr()) {
+        this.logger.warn("Failed to persist deployment progress event", {
+          deploymentId: input.deploymentId,
+          phase: input.phase,
+          errorCode: result.error.code,
+        });
+      }
+    } catch (error) {
+      this.logger.warn("Failed to persist deployment progress event", {
+        deploymentId: input.deploymentId,
+        phase: input.phase,
+        error,
+      });
+    }
+    this.progressReporter.report(context, event);
   }
 
   private runtimeDirectory(deploymentId: string): string {
@@ -891,7 +910,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       .filter((outputLine) => outputLine.length > 0)
       .slice(0, 50)) {
       const level = classifyOutputLogLevel(line, input.level);
-      this.report(input.context, {
+      void this.report(input.context, {
         deploymentId: input.deploymentId,
         phase: input.phase,
         source: "application",
@@ -919,7 +938,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return input.persistedCount;
     }
 
-    this.report(input.context, {
+    void this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: input.phase,
       source: "application",
@@ -1046,7 +1065,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
     const inspectMessage = `Inspect SSH Docker container ${input.containerName}`;
     logs.push(phaseLog("verify", inspectMessage));
-    this.report(input.context, {
+    await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
       status: "running",
@@ -1078,7 +1097,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const logsMessage = `Capture SSH Docker logs for ${input.containerName}`;
     logs.push(phaseLog("verify", logsMessage));
-    this.report(input.context, {
+    await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
       status: "running",
@@ -1266,7 +1285,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const message = `Pull and resolve SSH Docker image digest for ${input.image}`;
     input.logs.push(phaseLog("deploy", message));
-    this.report(input.context, {
+    await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "deploy",
       status: "running",
@@ -1514,7 +1533,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       logs.push(
         phaseLog("package", `Clone git source on ${input.target.host}:${remoteSourceRoot}`),
       );
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
@@ -1588,7 +1607,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         tokenizedGithubHttpsPrefix,
       });
       logs.push(phaseLog("package", `Initialize git submodules on ${input.target.host}`));
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
@@ -1679,14 +1698,14 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const commitMessage = `Resolved git commit ${shortGitCommitSha(commitSha)}`;
       logs.push(phaseLog("package", commitMessage));
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
         message: commitMessage,
       });
 
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "succeeded",
@@ -1736,7 +1755,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           : (source.metadata?.composeFilePath ?? "docker-compose.yml");
       const remoteTargetFile = `${remoteSourceRoot}/${targetFile}`;
       logs.push(phaseLog("package", `Write ${source.kind} source to ${remoteTargetFile}`));
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
@@ -1778,7 +1797,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         };
       }
 
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "succeeded",
@@ -1840,7 +1859,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     logs.push(
       phaseLog("package", `Upload source workspace to ${input.target.host}:${remoteWorkdir}`),
     );
-    this.report(context, {
+    await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
       status: "running",
@@ -1893,7 +1912,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    this.report(context, {
+    await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
       status: "succeeded",
@@ -2168,7 +2187,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             { quote: shellQuote },
           );
           logs.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
-          this.report(context, {
+          await this.report(context, {
             deploymentId: state.id.value,
             phase: "package",
             status: "running",
@@ -2277,7 +2296,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (proxyBootstrap) {
         const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
         logs.push(phaseLog("deploy", proxyMessage));
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
           status: "running",
@@ -2336,7 +2355,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
         const readyMessage = `${proxyBootstrap.displayName} edge proxy is ready`;
         logs.push(phaseLog("deploy", readyMessage));
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
           status: "succeeded",
@@ -2616,7 +2635,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const proxyReloadPlan = proxyReloadPlanResult.value;
       if (proxyReloadPlan?.required) {
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
           status: "running",
@@ -2654,7 +2673,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         if (reload.status === "failed") {
-          this.report(context, {
+          await this.report(context, {
             deploymentId: state.id.value,
             phase: "deploy",
             status: "failed",
@@ -2682,7 +2701,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
         }
 
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
           status: "succeeded",
@@ -2794,7 +2813,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       let routeConflictCleanupAttempted = false;
       const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
       if (!healthOptions) {
-        this.report(context, {
+        await this.report(context, {
           deploymentId: state.id.value,
           phase: "verify",
           status: "succeeded",
@@ -2824,7 +2843,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       for (const step of verificationSteps) {
         if (step === "internal-http") {
-          this.report(context, {
+          await this.report(context, {
             deploymentId: state.id.value,
             phase: "verify",
             status: "running",
@@ -2943,7 +2962,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
           for (const publicRouteHealthCheck of publicRouteHealthChecks) {
             const { route, url: publicUrl } = publicRouteHealthCheck;
-            this.report(context, {
+            await this.report(context, {
               deploymentId: state.id.value,
               phase: "verify",
               status: "running",
@@ -3199,7 +3218,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       input.logs.push(
         phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`),
       );
-      this.report(input.context, {
+      await this.report(input.context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "succeeded",
@@ -3315,7 +3334,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     input.logs.push(
       phaseLog("package", `Generated repository service graph compose file ${composeFile}`),
     );
-    this.report(input.context, {
+    await this.report(input.context, {
       deploymentId: state.id.value,
       phase: "package",
       status: "succeeded",
@@ -3610,7 +3629,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         { quote: shellQuote },
       );
       logs.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
-      this.report(context, {
+      await this.report(context, {
         deploymentId: state.id.value,
         phase: "deploy",
         status: "running",
@@ -3851,7 +3870,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             : "No SSH cancellation cleanup required",
       ),
     );
-    this.report(context, {
+    await this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
       status: "succeeded",
@@ -3951,7 +3970,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         logs,
       }),
     );
-    this.report(context, {
+    await this.report(context, {
       deploymentId: state.id.value,
       phase: "rollback",
       status: "succeeded",

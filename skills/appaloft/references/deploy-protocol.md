@@ -159,9 +159,9 @@ Progress monitoring is part of deployment, not an optional afterthought.
 
 - Use `appaloft deployments events <deploymentId> --follow --json` for a single deployment
   attempt. It is the user-level deployment event stream and remains paired with
-  `appaloft logs <deploymentId>` for deployment logs. For remote CLI profiles, the CLI may satisfy
-  this by polling the bounded JSON event route until a terminal envelope when direct SSE streaming
-  is not available.
+  `appaloft logs <deploymentId>` for deployment logs. For remote CLI profiles, the CLI should open
+  the control-plane stream route when it is available; bounded JSON polling is only a compatibility
+  fallback for older control planes that do not expose streaming.
 - Use `appaloft work events <workId> --follow --json` or
   `appaloft work watch <workId> --json` for a parent durable work item that coordinates multiple
   resources, child deployments, retries, or long-running platform work such as Blueprint install.
@@ -172,6 +172,48 @@ Progress monitoring is part of deployment, not an optional afterthought.
   polling and report that the watch surface is unavailable.
 - Use `appaloft work show <workId>` only for a snapshot/detail read. Do not use repeated `work show`
   polling as the live progress mechanism when the event stream is available.
+
+## Real Smoke Cleanup
+
+Treat cleanup as part of a real deployment smoke when the test created project, resource, storage,
+deployment, or runtime state:
+
+1. Identify the exact ids and slugs from the run output, manifest, or Appaloft list/show commands.
+   Do not use broad filters, direct SQL, direct Docker deletion, or provider APIs to decide what to
+   remove.
+2. Stop running workload through `appaloft resource runtime stop <resourceId>` when the resource is
+   still active.
+3. Archive and delete seed-owned resources through
+   `appaloft resource archive <resourceId>` and
+   `appaloft resource delete <resourceId> --confirm-slug <slug>`.
+4. Archive visible seed-owned deployments through
+   `appaloft deployments archive <deploymentId> --confirm <deploymentId>` when they are not removed
+   by resource/project cleanup.
+5. If resource or project deletion is still blocked by `deployment-history`, prune only the exact
+   seed-owned scope. Run dry-runs first, then prune retained records and archived deployments:
+   `appaloft deployments logs prune --resource <resourceId> --before <iso> --dry-run`,
+   `appaloft resource runtime-control-attempts prune --resource <resourceId> --before <iso> --dry-run`,
+   `appaloft provider-job-log prune --resource <resourceId> --before <iso> --dry-run`,
+   `appaloft resource log-archives prune --resource <resourceId> --before <iso> --dry-run`, and
+   `appaloft deployments prune --resource <resourceId> --before <iso> --dry-run`. Execute the same
+   commands without `--dry-run` only after the matched ids belong to the smoke. Do not delete rows
+   directly from the database to bypass retained references.
+6. Run `appaloft project delete-check <projectId>` before deleting a seed-owned project. If blockers
+   remain, clear them through Appaloft lifecycle commands, then archive and delete the project with
+   exact confirmation.
+7. Keep shared or environment-injected SSH server records for reuse unless the user explicitly asks
+   to delete the server. If deleting a seed-owned server record, deactivate it, run delete-check, and
+   delete by exact id.
+8. For Appaloft-managed storage, detach resource attachments first, run
+   `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso>`
+   for runtime realizations, and delete the storage volume only when it is seed-owned.
+9. After Appaloft cleanup completes, use `appaloft server test <serverId>` and
+   `appaloft server capacity inspect <serverId>` as the first read-only orphan check when the server
+   credential is managed by Appaloft. Direct read-only SSH/Docker inspection is acceptable only for
+   verification, not mutation, and only when the needed credential is available. If orphan
+   containers, networks, or volumes with the test resource/deployment identifiers remain, fix or add
+   an Appaloft cleanup operation and rerun it; do not manually remove the remote artifacts as the
+   primary cleanup path.
 
 ## Follow-Up Commands
 
