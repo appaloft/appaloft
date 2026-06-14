@@ -280,6 +280,18 @@ describe("resource runtime log archive persistence", () => {
         capturedAt: "2026-01-01T00:00:00.000Z",
         lines: [],
       });
+      await database.db
+        .insertInto("audit_logs")
+        .values({
+          id: "audit_srv_secondary",
+          aggregate_id: "srv_secondary",
+          event_type: "terminal-session-opened",
+          payload: {
+            serverId: "srv_secondary",
+          },
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
 
       const list = await store.list(context, {
         resourceId: "res_web",
@@ -336,6 +348,12 @@ describe("resource runtime log archive persistence", () => {
         kind: "runtime-log-retention",
         relatedEntityId: "rla_other_resource",
         relatedEntityType: "runtime-log-archive",
+        count: 1,
+      });
+      expect(serverBlockers._unsafeUnwrap()).not.toContainEqual({
+        kind: "audit-retention",
+        relatedEntityId: "audit_srv_secondary",
+        relatedEntityType: "audit-log",
         count: 1,
       });
       expect(remaining.map((row) => row.id)).toEqual(["rla_cutoff_equal", "rla_other_resource"]);
