@@ -27,6 +27,7 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("projectAttentionItems");
     expect(projectSource).toContain("projectNextAction");
     expect(projectSource).toContain("nonEmptyProjectResourceGroups");
+    expect(projectSource).toContain("DeploymentStatusBadge");
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
     expect(projectSource).toContain('<div class="console-detail-page">');
     expect(projectSource).toContain(
@@ -61,6 +62,9 @@ describe("project detail page structure", () => {
     );
     expect(projectSource).not.toContain(`id={\`environment-rename-form-\${environment.id}\`}`);
     expect(projectSource).not.toContain(`id={\`environment-clone-form-\${environment.id}\`}`);
+    expect(projectSource).not.toContain(
+      "{resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}",
+    );
     expect(i18nKeysSource).toContain('activityTitle: "console:projects.activityTitle"');
     expect(i18nKeysSource).toContain('healthSummaryGap: "console:projects.healthSummaryGap"');
     expect(englishLocaleSource).toContain(
