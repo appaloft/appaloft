@@ -3245,6 +3245,7 @@ let apiServer: ReturnType<typeof Bun.serve> | null = null;
 let previewProcess: ReturnType<typeof Bun.spawn> | null = null;
 let previewUrl = "";
 let previewLogs = "";
+let previewExited = false;
 
 function respondJson(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, {
@@ -3313,21 +3314,39 @@ function toReadableStream(stream: unknown): ReadableStream<Uint8Array> | null {
   return null;
 }
 
+function choosePreviewPort(): number {
+  return 30_000 + Math.floor(Math.random() * 20_000);
+}
+
+function isPreviewHtml(body: string): boolean {
+  const normalized = body.toLocaleLowerCase();
+  return normalized.includes("<!doctype html") || normalized.includes("_app/immutable");
+}
+
 async function waitForPreview(url: string): Promise<void> {
-  const deadline = Date.now() + 10_000;
+  const deadline = Date.now() + 15_000;
+  let lastProbe = "not requested";
 
   while (Date.now() < deadline) {
+    if (previewExited) {
+      throw new Error(`Vite preview exited before it became ready at ${url}\n${previewLogs}`);
+    }
+
     try {
       const response = await fetch(url);
-      if (response.ok) {
+      const body = await response.text().catch(() => "");
+      lastProbe = `${response.status} ${response.headers.get("content-type") ?? "unknown"} ${body.slice(0, 80)}`;
+      if (response.ok && isPreviewHtml(body)) {
         return;
       }
-    } catch {
-      await Bun.sleep(100);
+    } catch (error) {
+      lastProbe = error instanceof Error ? error.message : String(error);
     }
+
+    await Bun.sleep(100);
   }
 
-  throw new Error(`Vite preview did not start at ${url}\n${previewLogs}`);
+  throw new Error(`Vite preview did not start at ${url}\nLast probe: ${lastProbe}\n${previewLogs}`);
 }
 
 function startTestServer(
@@ -3352,18 +3371,6 @@ function startTestServer(
   }
 
   throw new Error("Could not start a test server on an available local port.");
-}
-
-function reservePort(): number {
-  const server = startTestServer(() => new Response("reserved"));
-  const { port } = server;
-  server.stop(true);
-
-  if (port === undefined) {
-    throw new Error("Could not reserve a free preview port.");
-  }
-
-  return port;
 }
 
 async function setupWebApp(): Promise<void> {
@@ -3406,8 +3413,9 @@ async function setupWebApp(): Promise<void> {
     return respondJson(response);
   });
 
-  const previewPort = reservePort();
+  const previewPort = choosePreviewPort();
   previewUrl = `http://127.0.0.1:${previewPort}`;
+  previewExited = false;
   previewProcess = Bun.spawn({
     cmd: [
       "bun",
@@ -3430,6 +3438,17 @@ async function setupWebApp(): Promise<void> {
   });
   void readProcessStream(toReadableStream(previewProcess.stdout));
   void readProcessStream(toReadableStream(previewProcess.stderr));
+  void previewProcess.exited
+    .then((exitCode) => {
+      previewExited = true;
+      previewLogs += `\n[vite preview exited with code ${exitCode}]`;
+    })
+    .catch((error) => {
+      previewExited = true;
+      previewLogs += `\n[vite preview exit check failed: ${
+        error instanceof Error ? error.message : String(error)
+      }]`;
+    });
 
   await waitForPreview(previewUrl);
 }
