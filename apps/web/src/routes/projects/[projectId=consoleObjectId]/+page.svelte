@@ -138,21 +138,24 @@
   type EnvironmentLifecycleAction = "archive" | "lock" | "unlock";
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
-    createConsoleQueries(browser);
+    createConsoleQueries(browser, {
+      health: false,
+      readiness: false,
+      version: false,
+      servers: false,
+      previewEnvironments: false,
+      domainBindings: false,
+      certificates: false,
+      providers: false,
+    });
 
   const projectId = $derived(page.params.projectId ?? "");
+  const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
+  let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
     queryOptions({
       queryKey: ["projects", "show", projectId],
       queryFn: () => orpcClient.projects.show({ projectId }),
-      enabled: browser && projectId.length > 0,
-      staleTime: 5_000,
-    }),
-  );
-  const projectDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "delete-check", projectId],
-      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
       enabled: browser && projectId.length > 0,
       staleTime: 5_000,
     }),
@@ -165,7 +168,7 @@
           projectId,
           limit: 50,
         }),
-      enabled: browser && projectId.length > 0,
+      enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
@@ -183,7 +186,7 @@
           includePreviewResources: true,
           limit: 100,
         }),
-      enabled: browser && projectId.length > 0,
+      enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
@@ -221,6 +224,14 @@
     })),
   );
   const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
+  const projectDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects", "delete-check", projectId],
+      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+      enabled: browser && projectLifecycleDialogOpen && isProjectArchived && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projectDeleteSafety = $derived(projectDeleteSafetyQuery.data ?? null);
   const projectDeleteBlockerCount = $derived(projectDeleteSafety?.blockers.length ?? 0);
   const canDeleteProject = $derived(
@@ -549,7 +560,6 @@
   let projectName = $state("");
   let quickDeployDialogOpen = $state(false);
   let projectRenameDialogOpen = $state(false);
-  let projectLifecycleDialogOpen = $state(false);
   let environmentCreateDialogOpen = $state(false);
   let environmentRenameDialogOpen = $state(false);
   let environmentCloneDialogOpen = $state(false);
@@ -568,7 +578,6 @@
   );
   let cloneEnvironmentNames = $state<Record<string, string>>({});
   let renameEnvironmentNames = $state<Record<string, string>>({});
-  const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
   const filteredProjectResources = $derived(
     projectResources.filter((resource) => {
       const query = resourceFilterQuery.trim().toLowerCase();
