@@ -818,6 +818,10 @@ describe("console page structure", () => {
     expect(resourceListTableSource).toContain("data-resource-record-list");
     expect(resourceListTableSource).toContain("data-resource-record-row");
     expect(resourceListTableSource).toContain("data-resource-owner-summary");
+    expect(resourceListTableSource).toContain("xl:items-center xl:py-3");
+    expect(resourceListTableSource).toContain(
+      "xl:grid-flow-col xl:grid-cols-none xl:auto-cols-fr",
+    );
     expect(resourceListTableSource).not.toContain('from "$lib/components/ui/table"');
     expect(resourceListTableSource).not.toContain("<Table.Root");
     expect(consoleStatePanelSource).toContain("{#if actionLabel && actionOnclick}");
