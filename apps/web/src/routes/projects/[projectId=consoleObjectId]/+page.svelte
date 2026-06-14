@@ -110,6 +110,7 @@
     "settings",
   ] as const;
   type ProjectAttentionItem = {
+    key: string;
     kind:
       | "failed-deployment"
       | "running-deployment"
@@ -425,6 +426,7 @@
     const items: ProjectAttentionItem[] = [];
     for (const work of actionableProjectOperatorWorkItems.slice(0, 2)) {
       items.push({
+        key: `operator-work-${work.id}`,
         kind: "operator-work",
         title:
           work.status === "failed" || work.status === "dead-lettered"
@@ -441,6 +443,7 @@
       if (items.length >= 3) break;
       const resource = findResource(projectResources, deployment.resourceId);
       items.push({
+        key: `failed-deployment-${deployment.id}`,
         kind: "failed-deployment",
         title: $t(i18nKeys.console.projects.attentionFailedDeploymentTitle),
         detail: `${resource?.name ?? deployment.resourceId} · ${formatTime(deployment.createdAt)}`,
@@ -453,6 +456,7 @@
     for (const deployment of runningProjectDeployments.slice(0, Math.max(0, 3 - items.length))) {
       const resource = findResource(projectResources, deployment.resourceId);
       items.push({
+        key: `running-deployment-${deployment.id}`,
         kind: "running-deployment",
         title: $t(i18nKeys.console.projects.attentionRunningDeploymentTitle),
         detail: `${resource?.name ?? deployment.resourceId} · ${deployment.status}`,
@@ -466,6 +470,7 @@
       const resource = primaryResource;
       if (resource) {
         items.push({
+          key: `missing-access-${resource.id}`,
           kind: "missing-access",
           title: $t(i18nKeys.console.projects.attentionNoAccessTitle),
           detail: $t(i18nKeys.console.projects.attentionNoAccessDetail),
@@ -480,6 +485,7 @@
       const resource = primaryResource;
       if (resource) {
         items.push({
+          key: `no-deployment-${resource.id}`,
           kind: "no-deployment",
           title: $t(i18nKeys.console.projects.attentionNoDeploymentTitle),
           detail: $t(i18nKeys.console.projects.attentionNoDeploymentDetail),
@@ -1784,7 +1790,7 @@
                 </h2>
                 {#if projectAttentionItems.length > 0}
                   <div class="space-y-2">
-                    {#each projectAttentionItems as item (`${item.kind}-${item.href ?? item.resourceId ?? item.title}`)}
+                    {#each projectAttentionItems as item (item.key)}
                       <article
                         class={[
                           "rounded-md border px-3 py-2 transition hover:bg-muted/40",

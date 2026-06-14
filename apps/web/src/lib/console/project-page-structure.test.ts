@@ -71,33 +71,48 @@ describe("project detail page structure", () => {
   });
 
   test("[PROJECT-DEPLOY-PROGRESS-001] exposes deployment progress without raw worker links", async () => {
-    const [projectSource, quickDeployProgressDialogSource, deploymentStatusBadgeSource] =
-      await Promise.all([
-        readFile(
-          new URL(
-            "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        readFile(
-          new URL("../components/console/QuickDeployProgressDialog.svelte", import.meta.url),
-          "utf8",
-        ),
-        readFile(
-          new URL("../components/console/DeploymentStatusBadge.svelte", import.meta.url),
-          "utf8",
-        ),
-      ]);
+    const [
+      projectSource,
+      quickDeployProgressDialogSource,
+      deploymentStatusBadgeSource,
+      quickDeploySheetSource,
+      operationProgressPanelSource,
+    ] = await Promise.all([
+      readFile(
+        new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/console/QuickDeployProgressDialog.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/console/DeploymentStatusBadge.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../components/console/QuickDeploySheet.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../components/console/OperationProgressPanel.svelte", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
     expect(projectSource).toContain("data-project-attention-progress-item");
     expect(projectSource).toContain("data-project-attention-progress-trigger");
     expect(projectSource).toContain("data-project-attention-status-signal");
     expect(projectSource).toContain("DropdownMenuContent");
     expect(projectSource).toContain("projectAttentionStatusLabel");
+    expect(projectSource).toContain("key: `operator-work-${work.id}`");
+    expect(projectSource).toContain("{#each projectAttentionItems as item (item.key)}");
     expect(projectSource).not.toContain("work.id, work.step");
+    expect(projectSource).not.toContain("item.href ?? item.resourceId ?? item.title");
     expect(quickDeployProgressDialogSource).not.toContain("work {operatorWorkId}");
     expect(quickDeployProgressDialogSource).not.toContain("onOpenOperatorWork");
+    expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
+    expect(quickDeploySheetSource).toContain("readBlueprintInstallProgressSummary");
+    expect(quickDeploySheetSource).toContain("Promise.race");
+    expect(quickDeploySheetSource).toContain('installSummary.terminalStatus !== "failed"');
+    expect(operationProgressPanelSource).toContain("{#if requestId}");
     expect(deploymentStatusBadgeSource).toContain("data-deployment-running-signal");
     expect(deploymentStatusBadgeSource).toContain("bg-amber-50");
   });
