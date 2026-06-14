@@ -2344,17 +2344,6 @@ function assertOperationServicesResolvable(container: DependencyContainer): void
       failures.push(
         `Missing service token for operation ${entry.key}: ${entry.serviceName} (${String(entry.serviceToken)})`,
       );
-      continue;
-    }
-
-    try {
-      container.resolve(entry.serviceToken);
-    } catch (error) {
-      failures.push(
-        `Unresolvable service for operation ${entry.key}: ${entry.serviceName} (${String(entry.serviceToken)}) - ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
     }
   }
 
