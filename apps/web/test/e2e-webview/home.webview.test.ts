@@ -5469,7 +5469,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
     const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
     const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
-    const projectId = "prj_delete_demo";
+    const projectId = `prj_delete_${Date.now().toString(36)}`;
     const archivedProject = {
       id: projectId,
       name: "Demo",

@@ -161,6 +161,14 @@
       staleTime: 5_000,
     }),
   );
+  const projectDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects", "delete-check", projectId],
+      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+      enabled: browser && projectId.length > 0 && projectDetailQuery.isSuccess,
+      staleTime: 5_000,
+    }),
+  );
   const projectPreviewEnvironmentsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["preview-environments", "project", projectId, { limit: 50 }],
