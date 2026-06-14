@@ -1122,6 +1122,23 @@ describe("console page structure", () => {
     expect(configurationProfileSource).toContain("<ResourceProfileSummary");
   });
 
+  test("[RESOURCE-HEALTH-IA-001] keeps health summary items visually bounded", () => {
+    const healthPolicySource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-health-policy"',
+      '{:else if activeResourceSection === "danger"}',
+    );
+
+    expect(healthPolicySource).toContain("healthRuntime");
+    expect(healthPolicySource).toContain("healthPolicy");
+    expect(healthPolicySource).toContain("healthPublicAccess");
+    expect(healthPolicySource).toContain("healthProxy");
+    expect(
+      healthPolicySource.match(/class="rounded-md border bg-background px-3 py-2"/g)?.length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(healthPolicySource).not.toContain('class="rounded-md bg-muted/25 px-3 py-2"');
+  });
+
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
     const resourceDomainBindingsSectionSource =
       resourceDetailPageSource.match(

@@ -7605,7 +7605,7 @@
                         {/if}
                       </div>
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthRuntime)}
                           </dt>
@@ -7613,7 +7613,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.runtime.lifecycle)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthPolicy)}
                           </dt>
@@ -7621,7 +7621,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthPublicAccess)}
                           </dt>
@@ -7629,7 +7629,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.publicAccess.status)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthProxy)}
                           </dt>
