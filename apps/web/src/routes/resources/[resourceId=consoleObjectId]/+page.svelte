@@ -5387,57 +5387,57 @@
 
 {#snippet resourceRuntimeControlPanel()}
   {#if resource}
-    <section id="resource-runtime-control" class="space-y-4 p-5">
-    <div class="rounded-md border bg-card p-4">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-lg font-semibold">
-              {$t(i18nKeys.console.resources.runtimeControlsTitle)}
-            </h2>
-            <DocsHelpLink
-              href={webDocsHrefs.resourceRuntimeControls}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {$t(i18nKeys.console.resources.runtimeControlsDescription)}
-          </p>
-          {#if resourceHealth?.latestRuntimeControl}
-            <p class="mt-2 text-xs text-muted-foreground">
-              {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
-              {resourceHealth.latestRuntimeControl.operation} ·
-              {resourceHealth.latestRuntimeControl.status} ·
-              {resourceHealth.latestRuntimeControl.runtimeState}
+    <section id="resource-runtime-control" class="space-y-4">
+      <div class="rounded-md border bg-card p-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-semibold">
+                {$t(i18nKeys.console.resources.runtimeControlsTitle)}
+              </h2>
+              <DocsHelpLink
+                href={webDocsHrefs.resourceRuntimeControls}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.resources.runtimeControlsDescription)}
             </p>
-          {/if}
+            {#if resourceHealth?.latestRuntimeControl}
+              <p class="mt-2 text-xs text-muted-foreground">
+                {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
+                {resourceHealth.latestRuntimeControl.operation} ·
+                {resourceHealth.latestRuntimeControl.status} ·
+                {resourceHealth.latestRuntimeControl.runtimeState}
+              </p>
+            {/if}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onclick={openRuntimeControlDialog}
+              disabled={isResourceArchived || runtimeControlPending}
+            >
+              <Gauge class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
+              {$t(i18nKeys.console.resources.runtimeControlManageAction)}
+            </Button>
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onclick={openRuntimeControlDialog}
-            disabled={isResourceArchived || runtimeControlPending}
+        {#if runtimeControlFeedback}
+          <div
+            class={[
+              "mt-4 rounded-md border px-3 py-2 text-sm",
+              runtimeControlFeedback.kind === "success"
+                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                : "border-destructive/30 bg-destructive/5 text-destructive",
+            ]}
           >
-            <Gauge class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
-            {$t(i18nKeys.console.resources.runtimeControlManageAction)}
-          </Button>
-        </div>
+            <span class="font-medium">{runtimeControlFeedback.title}</span>
+            <span class="ml-2">{runtimeControlFeedback.detail}</span>
+          </div>
+        {/if}
       </div>
-      {#if runtimeControlFeedback}
-        <div
-          class={[
-            "mt-4 rounded-md border px-3 py-2 text-sm",
-            runtimeControlFeedback.kind === "success"
-              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-              : "border-destructive/30 bg-destructive/5 text-destructive",
-          ]}
-        >
-          <span class="font-medium">{runtimeControlFeedback.title}</span>
-          <span class="ml-2">{runtimeControlFeedback.detail}</span>
-        </div>
-      {/if}
-    </div>
     </section>
   {/if}
 {/snippet}
