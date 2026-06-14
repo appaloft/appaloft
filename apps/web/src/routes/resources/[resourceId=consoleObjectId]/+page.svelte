@@ -9458,7 +9458,7 @@
           resourceLifecycleDialogOpen = true;
         }
       }}>
-        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
           <Dialog.Header>
             <Dialog.Title>{$t(i18nKeys.console.resources.lifecycleDialogTitle)}</Dialog.Title>
             <Dialog.Description>
@@ -9466,7 +9466,7 @@
             </Dialog.Description>
           </Dialog.Header>
           <form
-            class="space-y-5 px-5 pb-5"
+            class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"
             onsubmit={(event) => {
               event.preventDefault();
               if (selectedResourceLifecycleAction === "archive") {
@@ -9489,21 +9489,21 @@
               </p>
             </div>
 
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid min-w-0 gap-2 sm:grid-cols-2">
               {#if !isPreviewEnvironmentResource}
                 <Button
                   type="button"
                   variant={selectedResourceLifecycleAction === "archive" ? "destructive" : "outline"}
-                  class="h-auto justify-start px-3 py-3 text-left"
+                  class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                   disabled={isResourceArchived || archiveResourceMutation.isPending}
                   onclick={() => selectResourceLifecycleAction("archive")}
                 >
-                  <Archive class="size-4 shrink-0" />
-                  <span class="min-w-0">
+                  <Archive class="mt-0.5 size-4 shrink-0" />
+                  <span class="min-w-0 flex-1">
                     <span class="block font-medium">
                       {$t(i18nKeys.console.resources.archiveAction)}
                     </span>
-                    <span class="block text-xs font-normal opacity-80">
+                    <span class="block break-words text-xs font-normal leading-snug opacity-80">
                       {$t(i18nKeys.console.resources.lifecycleArchiveOption)}
                     </span>
                   </span>
@@ -9512,17 +9512,17 @@
               <Button
                 type="button"
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                 disabled={!isPreviewEnvironmentResource &&
                   (!isResourceArchived || deleteResourceMutation.isPending)}
                 onclick={() => selectResourceLifecycleAction("delete")}
               >
-                <Trash2 class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <Trash2 class="mt-0.5 size-4 shrink-0" />
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.resources.deleteAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs font-normal leading-snug opacity-80">
                     {#if isPreviewEnvironmentResource}
                       {$t(i18nKeys.console.resources.lifecyclePreviewDeleteOption)}
                     {:else}
