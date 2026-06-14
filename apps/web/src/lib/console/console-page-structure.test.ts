@@ -1325,6 +1325,23 @@ describe("console page structure", () => {
     expect(resourceLifecycleDialogSource).toContain("lifecycleArchiveOption");
     expect(resourceLifecycleDialogSource).toContain("lifecycleDeleteOption");
     expect(resourceLifecycleDialogSource).toContain("lifecyclePreviewDeleteOption");
+    expect(resourceLifecycleDialogSource).toContain(
+      '<Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">',
+    );
+    expect(resourceLifecycleDialogSource).toContain(
+      'class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"',
+    );
+    expect(resourceLifecycleDialogSource).toContain('class="grid min-w-0 gap-2 sm:grid-cols-2"');
+    expect(
+      resourceLifecycleDialogSource.match(
+        /class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"/g,
+      )?.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(resourceLifecycleDialogSource).toContain('class="mt-0.5 size-4 shrink-0"');
+    expect(resourceLifecycleDialogSource).toContain('class="min-w-0 flex-1"');
+    expect(resourceLifecycleDialogSource).toContain(
+      'class="block break-words text-xs font-normal leading-snug opacity-80"',
+    );
     expect(resourceLifecycleDialogSource).toContain("<Input");
     expect(resourceLifecycleDialogSource).toContain(
       "resourceDeleteConfirmation.trim() !== resource.slug",
