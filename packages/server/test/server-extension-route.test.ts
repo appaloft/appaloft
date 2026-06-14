@@ -9,6 +9,10 @@ import { join } from "node:path";
 import {
   type AppQuery,
   type CommandBus,
+  type ExecutionContext,
+  type OperationCheckRequest,
+  type OperationGuardDecision,
+  type OperationGuardPort,
   operationCatalog,
   PublishStaticArtifactCommand,
   type QueryBus,
@@ -107,6 +111,70 @@ describe("createAppaloftServer", () => {
       });
 
       expect(missing).toEqual([]);
+    } finally {
+      await server.shutdown();
+    }
+  }, 15_000);
+
+  test("[SERVER-DI-002] operation services use guards registered by application extensions", async () => {
+    const dataDir = await createTempDataDir();
+    const guard = new RecordingDenyingOperationGuardPort();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpHost: "localhost",
+        httpPort: 3001,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+      authRuntime: createTestAuthRuntime(),
+      extensions: [
+        {
+          name: "operation-guard-extension",
+          configureApplication(context) {
+            context.container.registerInstance(tokens.operationGuardPort, guard);
+          },
+        },
+      ],
+    });
+
+    try {
+      const registerServerUseCase = server.container.resolve<{
+        execute(
+          context: ExecutionContext,
+          input: {
+            name: string;
+            host: string;
+            providerKey: string;
+            port?: number;
+            proxyKind?: "none" | "traefik" | "caddy";
+            targetKind?: "single-server" | "orchestrator-cluster";
+          },
+        ): Promise<{ isErr(): boolean }>;
+      }>(tokens.registerServerUseCase);
+      const context = server.executionContextFactory.create({ entrypoint: "system" });
+      const result = await registerServerUseCase.execute(context, {
+        name: "extension-guarded-server",
+        host: "127.0.0.1",
+        providerKey: "local-shell",
+        port: 22,
+        proxyKind: "none",
+        targetKind: "single-server",
+      });
+
+      expect(result.isErr()).toBe(true);
+      expect(guard.requests).toHaveLength(1);
+      expect(guard.requests[0]).toMatchObject({
+        operationKey: "servers.register",
+        contextAttributes: {
+          host: "127.0.0.1",
+          providerKey: "local-shell",
+          targetKind: "single-server",
+        },
+      });
     } finally {
       await server.shutdown();
     }
@@ -545,6 +613,33 @@ class TestTerminalSession implements TerminalSession {
   async resize() {}
 
   async close() {}
+}
+
+class RecordingDenyingOperationGuardPort implements OperationGuardPort {
+  readonly requests: OperationCheckRequest[] = [];
+
+  async checkOperation(
+    _context: ExecutionContext,
+    request: OperationCheckRequest,
+  ): Promise<OperationGuardDecision> {
+    this.requests.push(request);
+    return {
+      allowed: false,
+      checks: [
+        {
+          allowed: false,
+          checkKey: "test.operation_guard",
+          kind: "validation",
+          reason: "test-operation-denied",
+        },
+      ],
+      deniedBy: {
+        checkKey: "test.operation_guard",
+        kind: "validation",
+      },
+      reason: "test-operation-denied",
+    };
+  }
 }
 
 function createZipArchive(entries: readonly { path: string; content: string }[]): Uint8Array {
