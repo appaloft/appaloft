@@ -30,6 +30,11 @@ surface available in the session.
    that command installs only this skill. Install the CLI from the Appaloft GitHub Release archive
    for the current platform, then rerun `appaloft --version`, `appaloft auth status`, and the
    requested operation.
+   When validating behavior from an Appaloft source checkout, use that checkout's source CLI
+   entrypoint instead of a possibly older globally installed `appaloft` binary. If the exact source
+   CLI command fails because the agent sandbox blocks network access, rerun the same source CLI
+   command outside the sandbox rather than bypassing Appaloft with direct HTTP, database, SSH,
+   Docker, or provider calls.
 3. Use existing Appaloft operations only. Do not invent hidden agent commands, bypass adapters, call
    provider SDKs directly, mutate Docker/SSH/database state directly, or inspect repositories/use
    cases/persistence internals for product behavior.
@@ -57,7 +62,12 @@ surface available in the session.
   `appaloft deployments events <deploymentId> --follow --json` and use deployment logs for log
   lines. For a parent durable work item that coordinates multiple resources or child deployments,
   follow `appaloft work events <workId> --follow --json` or
-  `appaloft work watch <workId> --json`. Treat `work show` as a snapshot, not a live log.
+  `appaloft work watch <workId> --json`. Remote CLI profiles use bounded JSON polling when the
+  control plane does not expose a direct SSE stream to the CLI, so these watch commands remain the
+  preferred AI-facing progress mechanism. Treat `work show` as a snapshot, not a live log, except
+  when operating an older CLI/control plane that still returns `control_plane_unsupported` for
+  remote watch; in that compatibility case, poll `work show`/`work list` explicitly and report the
+  watch capability gap.
 - Blueprint catalog deployment: use `appaloft blueprint list/show/plan-install` for neutral catalog
   discovery and dry-run planning, then use the Blueprint quick-deploy entrypoint when the source is
   an official or extension-provided Blueprint such as PocketBase. Do not invent a separate
@@ -69,7 +79,10 @@ surface available in the session.
   edge proxy are ready. If the control plane reports `Executable not found in $PATH: "ssh"` or
   `Docker is not available on the SSH target`, stop and report the server initialization blocker
   rather than manually SSHing around the Appaloft operation. Treat `blueprints.install` as a command:
-  submit it once, then observe any returned parent `workId` through work events/watch and any
+  submit it once with required acknowledgement flags
+  `accepts-blueprint-application-bundle`, `reviews-dependency-resource-bindings`, and
+  `preserves-user-owned-configuration`, then observe any returned parent `workId` through work
+  events/watch and any
   returned `deploymentId` through deployment events/logs; do not poll progress by repeatedly
   calling install with the same idempotency key.
 - GitHub Action deploy: default to Pure SSH Action when the user supplies an SSH target and no

@@ -145,7 +145,10 @@ Use this order:
    and dry-run planning. For Web quick deploy, use
    `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
    extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint
-   deploy command. Submit the install command once, then follow any returned parent work id through
+   deploy command. Submit the install command once with `--parameter KEY=value`,
+   `--secret KEY=value` or `--secret component:KEY=value`, and the required acknowledgements
+   `accepts-blueprint-application-bundle`, `reviews-dependency-resource-bindings`, and
+   `preserves-user-owned-configuration`; then follow any returned parent work id through
    `appaloft work events <workId> --follow --json` or `appaloft work watch <workId> --json`; follow
    any returned deployment id through `appaloft deployments events <deploymentId> --follow --json`,
    deployment detail, and deployment logs.
@@ -156,13 +159,17 @@ Progress monitoring is part of deployment, not an optional afterthought.
 
 - Use `appaloft deployments events <deploymentId> --follow --json` for a single deployment
   attempt. It is the user-level deployment event stream and remains paired with
-  `appaloft logs <deploymentId>` for deployment logs.
+  `appaloft logs <deploymentId>` for deployment logs. For remote CLI profiles, the CLI may satisfy
+  this by polling the bounded JSON event route until a terminal envelope when direct SSE streaming
+  is not available.
 - Use `appaloft work events <workId> --follow --json` or
   `appaloft work watch <workId> --json` for a parent durable work item that coordinates multiple
   resources, child deployments, retries, or long-running platform work such as Blueprint install.
   Report stable parent states such as accepted, running, progress, retry-scheduled, succeeded,
-  failed, canceled, dead-lettered, closed, gap, or error; do not expose worker leases, worker ids,
-  heartbeat ownership, or internal attempt details.
+  failed, canceled, dead-lettered, closed, gap, or error; include worker id/group only when the
+  operation result explicitly returns safe observed fields. If an older CLI/control plane returns
+  `control_plane_unsupported` for remote watch, fall back to explicit `work show`/`work list`
+  polling and report that the watch surface is unavailable.
 - Use `appaloft work show <workId>` only for a snapshot/detail read. Do not use repeated `work show`
   polling as the live progress mechanism when the event stream is available.
 

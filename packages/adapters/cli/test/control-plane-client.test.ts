@@ -1533,6 +1533,125 @@ describe("CLI remote control-plane client", () => {
     expect(output.stdout).toContain("completed");
   });
 
+  test("[OP-WORK-CLI-017] remote work watch polls bounded events until a terminal envelope", async () => {
+    const requests: Request[] = [];
+    const eventResponses = [
+      jsonResponse({
+        workId: "wrk_remote",
+        envelopes: [
+          {
+            schemaVersion: "operator-work.stream-events/v1",
+            kind: "progress",
+            status: "running",
+            cursor: "wrk_remote:1",
+          },
+        ],
+      }),
+      jsonResponse({
+        workId: "wrk_remote",
+        envelopes: [
+          {
+            schemaVersion: "operator-work.stream-events/v1",
+            kind: "closed",
+            reason: "completed",
+            cursor: "wrk_remote:2",
+          },
+        ],
+      }),
+    ];
+    const defaultFetch = createControlPlaneFetch([], {});
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: async (request) => {
+        requests.push(request);
+        const url = new URL(request.url);
+        if (url.pathname === "/api/operator-work/wrk_remote/events") {
+          return eventResponses.shift() ?? eventResponses[0]!;
+        }
+        return defaultFetch(request);
+      },
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "work",
+        "watch",
+        "wrk_remote",
+        "--json",
+        "--poll-interval-ms",
+        "50",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/operator-work/wrk_remote/events",
+        "GET /api/operator-work/wrk_remote/events",
+      ],
+    );
+    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe(
+      "false",
+    );
+    expect(new URL(requests[3]?.url ?? "http://localhost").searchParams.get("cursor")).toBe(
+      "wrk_remote:1",
+    );
+    expect(output.stdout).toContain("running");
+    expect(output.stdout).toContain("completed");
+  });
+
+  test("[DEP-EVENTS-CLI-004] remote deployment events follow uses the bounded JSON route", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/deployments/dep_remote/events": jsonResponse({
+          deploymentId: "dep_remote",
+          envelopes: [
+            {
+              schemaVersion: "deployments.stream-events/v1",
+              kind: "closed",
+              reason: "terminal-status",
+              cursor: "dep_remote:1",
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const output = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "deployments",
+        "events",
+        "dep_remote",
+        "--follow",
+        "--json",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/deployments/dep_remote/events",
+      ],
+    );
+    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe(
+      "false",
+    );
+    expect(output.stdout).toContain("dep_remote");
+    expect(output.stdout).toContain("terminal-status");
+  });
+
   test("[CONTROL-PLANE-CLI-015] remote GET diagnostics keep boolean query parameters explicit", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
