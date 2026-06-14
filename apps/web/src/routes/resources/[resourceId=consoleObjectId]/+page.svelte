@@ -8145,16 +8145,12 @@
         {:else if activeTab === "terminal"}
           <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
             <section class="space-y-3" data-resource-terminal-panel>
-              <div class="flex justify-end">
-                <DocsHelpLink
-                  href={webDocsHrefs.serverTerminalSession}
-                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                />
-              </div>
               {#if terminalDeploymentId}
                 <TerminalSessionPanel
                   title={$t(i18nKeys.console.terminal.resourceTitle)}
                   description={$t(i18nKeys.console.terminal.resourceDescription)}
+                  docsHref={webDocsHrefs.serverTerminalSession}
+                  docsAriaLabel={$t(i18nKeys.common.actions.openDocs)}
                   fallbackHref={latestDeployment?.serverId ? serverTerminalHref(latestDeployment.serverId) : ""}
                   fallbackLabel={$t(i18nKeys.console.terminal.serverTitle)}
                   scope={{
