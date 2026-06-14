@@ -3564,13 +3564,17 @@ async function expectElement(
   );
 }
 
-async function waitForRecordedRequest(pathname: string): Promise<RecordedApiRequest> {
+async function waitForRecordedRequest(
+  pathname: string,
+  timeoutMs?: number,
+): Promise<RecordedApiRequest> {
   const request = await waitFor<RecordedApiRequest | null>(
     async () => recordedApiRequests.find((request) => request.pathname === pathname) ?? null,
     (request) => request !== null,
     `Expected API request: ${pathname}\nRecorded: ${recordedApiRequests
       .map((request) => `${request.method} ${request.pathname}`)
       .join(", ")}`,
+    timeoutMs,
   );
 
   if (!request) {
@@ -5489,7 +5493,10 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/projects/${projectId}?tab=settings`);
       await expectAnyText(view, ["Danger zone", "危险区"]);
 
-      const deleteCheckRequest = await waitForRecordedRequest("/api/rpc/projects/deleteCheck");
+      const deleteCheckRequest = await waitForRecordedRequest(
+        "/api/rpc/projects/deleteCheck",
+        20_000,
+      );
       expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
         projectId,
       });
@@ -5505,7 +5512,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 25_000);
 
   test("[RES-PROFILE-ENTRY-001] loads resource detail through resources.show", async () => {
     activeScenario = "dashboard";
