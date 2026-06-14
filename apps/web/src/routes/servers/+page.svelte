@@ -44,60 +44,43 @@
   const serverPageSize = 12;
   let serverOffset = $state(0);
   let activeServerId = $state<string | null>(null);
-  let serverGridElement = $state<HTMLElement | null>(null);
+  let serverListElement = $state<HTMLElement | null>(null);
   let serverSortable: Sortable | null = null;
-  let serverSortableRectSnapshot = new Map<string, SortableCardRect>();
+  let serverSortableRectSnapshot = new Map<string, SortableRowRect>();
   let serverSortSnapshot = $state<ServerSummary[] | null>(null);
   let serverOptimisticOrderIds = $state<string[] | null>(null);
   let serverSortMode = $state(false);
   let serverReorderError = $state("");
   let visibleServers = $state<ServerSummary[]>([]);
 
-  type SortableCardRect = {
+  type SortableRowRect = {
     left: number;
     top: number;
   };
 
-  function getSortableGridDirection(
-    _event: Event,
-    target: HTMLElement | null,
-    dragElement: HTMLElement,
-  ): "horizontal" | "vertical" {
-    if (!target) {
-      return "vertical";
-    }
-
-    const targetRect = target.getBoundingClientRect();
-    const dragRect = dragElement.getBoundingClientRect();
-    const sameRow =
-      Math.abs(targetRect.top - dragRect.top) < Math.min(targetRect.height, dragRect.height) / 2;
-
-    return sameRow ? "horizontal" : "vertical";
-  }
-
-  function captureSortableCardRects(root: HTMLElement): Map<string, SortableCardRect> {
+  function captureSortableRowRects(root: HTMLElement): Map<string, SortableRowRect> {
     return new Map(
-      Array.from(root.querySelectorAll<HTMLElement>("[data-server-card]"))
-        .map((card) => {
-          const serverId = card.getAttribute("data-server-id");
+      Array.from(root.querySelectorAll<HTMLElement>("[data-server-row]"))
+        .map((row) => {
+          const serverId = row.getAttribute("data-server-id");
           if (!serverId) {
             return null;
           }
 
-          const rect = card.getBoundingClientRect();
+          const rect = row.getBoundingClientRect();
           return [serverId, { left: rect.left, top: rect.top }] as const;
         })
-        .filter((entry): entry is readonly [string, SortableCardRect] => Boolean(entry)),
+        .filter((entry): entry is readonly [string, SortableRowRect] => Boolean(entry)),
     );
   }
 
-  function animateSortableCardMovement(previousRects: Map<string, SortableCardRect>): void {
-    if (!serverGridElement || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  function animateSortableRowMovement(previousRects: Map<string, SortableRowRect>): void {
+    if (!serverListElement || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
 
-    for (const card of serverGridElement.querySelectorAll<HTMLElement>("[data-server-card]")) {
-      const serverId = card.getAttribute("data-server-id");
+    for (const row of serverListElement.querySelectorAll<HTMLElement>("[data-server-row]")) {
+      const serverId = row.getAttribute("data-server-id");
       if (!serverId || serverId === activeServerId) {
         continue;
       }
@@ -107,14 +90,14 @@
         continue;
       }
 
-      const currentRect = card.getBoundingClientRect();
+      const currentRect = row.getBoundingClientRect();
       const offsetX = previousRect.left - currentRect.left;
       const offsetY = previousRect.top - currentRect.top;
       if (Math.abs(offsetX) < 1 && Math.abs(offsetY) < 1) {
         continue;
       }
 
-      card.animate(
+      row.animate(
         [
           { transform: `translate3d(${offsetX}px, ${offsetY}px, 0)` },
           { transform: "translate3d(0, 0, 0)" },
@@ -182,25 +165,25 @@
   });
 
   $effect(() => {
-    if (!browser || !serverSortMode || reorderServersMutation.isPending || !serverGridElement) {
+    if (!browser || !serverSortMode || reorderServersMutation.isPending || !serverListElement) {
       serverSortable?.destroy();
       serverSortable = null;
       return;
     }
 
     serverSortable?.destroy();
-    const gridElement = serverGridElement;
-    serverSortable = Sortable.create(gridElement, {
+    const listElement = serverListElement;
+    serverSortable = Sortable.create(listElement, {
       animation: 220,
       easing: "cubic-bezier(0.2, 0, 0, 1)",
       handle: "[data-server-reorder-handle]",
-      draggable: "[data-server-card]",
+      draggable: "[data-server-row]",
       dataIdAttr: "data-server-id",
       ghostClass: "console-sortable-ghost",
       chosenClass: "console-sortable-chosen",
       dragClass: "console-sortable-drag",
       fallbackClass: "console-sortable-fallback",
-      direction: getSortableGridDirection,
+      direction: "vertical",
       swapThreshold: 0.5,
       forceFallback: true,
       fallbackOnBody: true,
@@ -208,15 +191,15 @@
       onStart: (event: Sortable.SortableEvent) => {
         activeServerId = event.item.getAttribute("data-server-id");
         serverSortSnapshot = [...visibleServers];
-        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+        serverSortableRectSnapshot = captureSortableRowRects(listElement);
       },
       onMove: () => {
-        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+        serverSortableRectSnapshot = captureSortableRowRects(listElement);
         return true;
       },
       onChange: () => {
-        animateSortableCardMovement(serverSortableRectSnapshot);
-        serverSortableRectSnapshot = captureSortableCardRects(gridElement);
+        animateSortableRowMovement(serverSortableRectSnapshot);
+        serverSortableRectSnapshot = captureSortableRowRects(listElement);
       },
       onEnd: () => {
         commitServerSort(serverSortable?.toArray() ?? []);
@@ -445,23 +428,21 @@
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.createServer)}
             </Button>
-            {#if visibleServers.length > 1}
-              <Button
-                type="button"
-                variant={serverSortMode ? "selected" : "outline"}
-                disabled={reorderServersMutation.isPending}
-                onclick={() => setServerSortMode(!serverSortMode)}
-                data-server-sort-toggle
-              >
-                {#if serverSortMode}
-                  <Check class="size-4" />
-                  {$t(i18nKeys.common.actions.done)}
-                {:else}
-                  <Pencil class="size-4" />
-                  {$t(i18nKeys.common.actions.edit)}
-                {/if}
-              </Button>
-            {/if}
+            <Button
+              type="button"
+              variant={serverSortMode ? "selected" : "outline"}
+              disabled={reorderServersMutation.isPending}
+              onclick={() => setServerSortMode(!serverSortMode)}
+              data-server-sort-toggle
+            >
+              {#if serverSortMode}
+                <Check class="size-4" />
+                {$t(i18nKeys.common.actions.done)}
+              {:else}
+                <Pencil class="size-4" />
+                {$t(i18nKeys.common.actions.edit)}
+              {/if}
+            </Button>
           </div>
         {/if}
       </section>
@@ -524,39 +505,35 @@
             </p>
           {/if}
 
-          <div
-            class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-            bind:this={serverGridElement}
-            data-server-grid
-          >
+          <div class="grid gap-3" bind:this={serverListElement} data-server-list>
             {#each visibleServers as server (server.id)}
               <article
                 class={[
-                  "group relative flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm transition-colors",
+                  "group relative min-w-0 rounded-md border bg-card p-4 shadow-sm transition-colors lg:grid lg:grid-cols-[minmax(16rem,1fr)_auto] lg:items-start lg:gap-x-4",
                   serverSortMode ? "select-none" : "",
                   activeServerId === server.id
                     ? "border-primary/60 bg-primary/5 opacity-80"
                     : "hover:border-primary/30 hover:bg-muted/20",
                 ]}
-                data-server-card
+                data-server-row
                 data-server-id={server.id}
               >
-                {#if serverSortMode}
-                  <button
-                    type="button"
-                    class="absolute right-3 top-3 z-10 inline-flex size-8 cursor-grab items-center justify-center rounded-md border bg-background/95 text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-foreground active:cursor-grabbing"
-                    aria-label={$t(i18nKeys.console.servers.reorderHandle)}
-                    title={$t(i18nKeys.console.servers.reorderHandle)}
-                    disabled={reorderServersMutation.isPending}
-                    data-server-reorder-handle
-                  >
-                    <GripVertical class="size-4" />
-                  </button>
-                {/if}
-                <div class="min-w-0 space-y-3 pr-10" data-server-card-header>
+                <div class="min-w-0" data-server-row-header>
                   <div class="flex min-w-0 items-start justify-between gap-3">
                     <div class="min-w-0 space-y-1">
                       <div class="flex min-w-0 items-center gap-2">
+                        {#if serverSortMode}
+                          <button
+                            type="button"
+                            class="inline-flex size-4 shrink-0 cursor-grab items-center justify-center text-muted-foreground transition hover:text-foreground active:cursor-grabbing"
+                            aria-label={$t(i18nKeys.console.servers.reorderHandle)}
+                            title={$t(i18nKeys.console.servers.reorderHandle)}
+                            disabled={reorderServersMutation.isPending}
+                            data-server-reorder-handle
+                          >
+                            <GripVertical class="size-3.5" />
+                          </button>
+                        {/if}
                         <Server class="size-4 shrink-0 text-muted-foreground" />
                         <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
                       </div>
@@ -567,14 +544,17 @@
                         {server.host}:{server.port}
                       </p>
                     </div>
-                    <Badge variant={serverLifecycleVariant(server.lifecycleStatus)} data-server-card-lifecycle>
+                    <Badge variant={serverLifecycleVariant(server.lifecycleStatus)} data-server-row-lifecycle>
                       {serverLifecycleLabel(server.lifecycleStatus)}
                     </Badge>
                   </div>
                 </div>
 
-                <div class="mt-5 grid gap-3 text-sm" data-server-card-readiness>
-                  <div class="grid gap-2 rounded-md border bg-background/60 p-3">
+                <div
+                  class="mt-4 grid min-w-0 gap-2 text-sm sm:grid-cols-3 lg:col-span-2"
+                  data-server-row-readiness
+                >
+                  <div class="grid min-w-0 gap-1 rounded-md border bg-background/60 px-3 py-2">
                     <div class="flex min-w-0 items-center justify-between gap-3">
                       <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
                         <Network class="size-3.5 shrink-0" />
@@ -591,7 +571,10 @@
                     {/if}
                   </div>
 
-                  <div class="grid gap-2 rounded-md border bg-background/60 p-3" data-server-card-proxy>
+                  <div
+                    class="grid min-w-0 gap-1 rounded-md border bg-background/60 px-3 py-2"
+                    data-server-row-proxy
+                  >
                     <div class="flex min-w-0 items-center justify-between gap-3">
                       <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
                         <ShieldCheck class="size-3.5 shrink-0" />
@@ -608,7 +591,10 @@
                     </p>
                   </div>
 
-                  <div class="grid gap-2 rounded-md border bg-background/60 p-3" data-server-card-capacity>
+                  <div
+                    class="grid min-w-0 gap-1 rounded-md border bg-background/60 px-3 py-2"
+                    data-server-row-capacity
+                  >
                     <div class="flex min-w-0 items-center justify-between gap-3">
                       <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
                         <Gauge class="size-3.5 shrink-0" />
@@ -626,7 +612,10 @@
                   </div>
                 </div>
 
-                <div class="mt-4 grid gap-2 border-t pt-4 text-sm text-muted-foreground" data-server-card-ownership>
+                <div
+                  class="mt-3 grid min-w-0 gap-x-4 gap-y-1 border-t pt-3 text-sm text-muted-foreground sm:grid-cols-2 lg:col-span-2 lg:grid-cols-4"
+                  data-server-row-ownership
+                >
                   <span class="inline-flex min-w-0 items-center gap-2">
                     <Boxes class="size-3.5 shrink-0" />
                     <span class="truncate" title={server.targetKind}>
@@ -645,7 +634,7 @@
                   <a
                     href={serverDeploymentsHref(server.id)}
                     class="inline-flex min-w-0 items-center gap-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    data-server-card-deployment-rollup
+                    data-server-row-deployment-rollup
                   >
                     <Terminal class="size-3.5 shrink-0" />
                     <span class="truncate">
@@ -658,8 +647,10 @@
                   </span>
                 </div>
 
-                <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-5">
-                  <div class="flex flex-wrap items-center gap-2" data-server-card-operational-links>
+                <div
+                  class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:justify-end lg:border-t-0 lg:pt-0"
+                >
+                  <div class="flex flex-wrap items-center gap-2 md:justify-end" data-server-row-operational-links>
                     <Button href={serverRuntimeHref(server.id)} size="sm" variant="outline">
                       <Terminal class="size-3.5" />
                       {$t(i18nKeys.console.servers.runtimeTab)}
@@ -671,7 +662,7 @@
                   </div>
                   <a
                     href={serverDetailHref(server.id)}
-                    class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:justify-end"
                   >
                     {$t(i18nKeys.common.actions.viewDetails)}
                     <ArrowRight class="size-4" />

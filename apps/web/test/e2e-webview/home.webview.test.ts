@@ -4481,7 +4481,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
   }, 45_000);
 
-  test("[SRV-LIFE-REORDER-003] renders paginated draggable server cards", async () => {
+  test("[SRV-LIFE-REORDER-003] renders paginated draggable server rows", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
@@ -4500,37 +4500,37 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     const desktopLayout = JSON.parse(
       await view.evaluate<string>(`(() => {
-        const cards = Array.from(document.querySelectorAll('[data-server-card]'));
-        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
-        const firstRowCards = cards.filter((card) =>
-          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        const rows = Array.from(document.querySelectorAll('[data-server-row]'));
+        const firstRowTop = rows[0]?.getBoundingClientRect().top ?? 0;
+        const firstVisualRowItems = rows.filter((row) =>
+          Math.abs(row.getBoundingClientRect().top - firstRowTop) <= 2
         );
         return JSON.stringify({
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
-          cardCount: cards.length,
-          firstRowCount: firstRowCards.length,
-          hasGrid: Boolean(document.querySelector('[data-server-grid]')),
+          rowCount: rows.length,
+          firstVisualRowItemCount: firstVisualRowItems.length,
+          hasList: Boolean(document.querySelector('[data-server-list]')),
           handleCount: document.querySelectorAll('[data-server-reorder-handle]').length,
           hasPagination: Boolean(document.querySelector('[data-server-pagination]')),
-          firstHeaderLeft: document.querySelector('[data-server-card-header]')?.getBoundingClientRect().left ?? null,
+          firstHeaderLeft: document.querySelector('[data-server-row-header]')?.getBoundingClientRect().left ?? null,
         });
       })()`),
     ) as {
       clientWidth: number;
       scrollWidth: number;
-      cardCount: number;
-      firstRowCount: number;
-      hasGrid: boolean;
+      rowCount: number;
+      firstVisualRowItemCount: number;
+      hasList: boolean;
       handleCount: number;
       hasPagination: boolean;
       firstHeaderLeft: number | null;
     };
-    expect(desktopLayout.hasGrid).toBe(true);
+    expect(desktopLayout.hasList).toBe(true);
     expect(desktopLayout.hasPagination).toBe(true);
-    expect(desktopLayout.cardCount).toBe(12);
+    expect(desktopLayout.rowCount).toBe(12);
     expect(desktopLayout.handleCount).toBe(0);
-    expect(desktopLayout.firstRowCount).toBe(3);
+    expect(desktopLayout.firstVisualRowItemCount).toBe(1);
     expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.clientWidth);
 
     await clickButtonByAnyText(view, ["Edit", "编辑"]);
@@ -4541,12 +4541,12 @@ describe.serial("console e2e with Bun.WebView", () => {
       "Expected server reorder handles to appear after enabling edit mode",
     );
     const editedServerHeaderLeft = await view.evaluate<number | null>(
-      `document.querySelector('[data-server-card-header]')?.getBoundingClientRect().left ?? null`,
+      `document.querySelector('[data-server-row-header]')?.getBoundingClientRect().left ?? null`,
     );
     expect(editedServerHeaderLeft).toBe(desktopLayout.firstHeaderLeft);
 
     await dragSortableItem(view, {
-      itemSelector: "[data-server-card]",
+      itemSelector: "[data-server-row]",
       handleSelector: "[data-server-reorder-handle]",
       idAttribute: "data-server-id",
       sourceIndex: 0,
@@ -4575,26 +4575,26 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectText(mobileView, "edge");
     const mobileLayout = JSON.parse(
       await mobileView.evaluate<string>(`(() => {
-        const cards = Array.from(document.querySelectorAll('[data-server-card]'));
-        const firstRowTop = cards[0]?.getBoundingClientRect().top ?? 0;
-        const firstRowCards = cards.filter((card) =>
-          Math.abs(card.getBoundingClientRect().top - firstRowTop) <= 2
+        const rows = Array.from(document.querySelectorAll('[data-server-row]'));
+        const firstRowTop = rows[0]?.getBoundingClientRect().top ?? 0;
+        const firstVisualRowItems = rows.filter((row) =>
+          Math.abs(row.getBoundingClientRect().top - firstRowTop) <= 2
         );
         return JSON.stringify({
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
-          cardCount: cards.length,
-          firstRowCount: firstRowCards.length,
+          rowCount: rows.length,
+          firstVisualRowItemCount: firstVisualRowItems.length,
         });
       })()`),
     ) as {
       clientWidth: number;
       scrollWidth: number;
-      cardCount: number;
-      firstRowCount: number;
+      rowCount: number;
+      firstVisualRowItemCount: number;
     };
-    expect(mobileLayout.cardCount).toBe(12);
-    expect(mobileLayout.firstRowCount).toBe(1);
+    expect(mobileLayout.rowCount).toBe(12);
+    expect(mobileLayout.firstVisualRowItemCount).toBe(1);
     expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
   }, 45_000);
 
@@ -7808,7 +7808,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await view.evaluate<void>(
       `(() => {
-        const link = document.querySelector("[data-server-card][data-server-id='srv_demo'] a[href='/servers/srv_demo']");
+        const link = document.querySelector("[data-server-row][data-server-id='srv_demo'] a[href='/servers/srv_demo']");
         if (!(link instanceof HTMLElement)) {
           throw new Error("Expected demo server detail link to be clickable");
         }
