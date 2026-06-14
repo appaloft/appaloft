@@ -3247,10 +3247,30 @@ describe("console page structure", () => {
       'value="environments"',
       'value="deployments"',
     );
+    const projectConsoleQueriesSource = sourceBetween(
+      projectDetailPageSource,
+      "const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
+      "const projectId = $derived",
+    );
+    const projectPreviewEnvironmentsQuerySource = sourceBetween(
+      projectDetailPageSource,
+      'queryKey: ["preview-environments", "project", projectId',
+      'queryKey: [\n        "resources",\n        "project-preview"',
+    );
+    const projectPreviewResourcesQuerySource = sourceBetween(
+      projectDetailPageSource,
+      'queryKey: [\n        "resources",\n        "project-preview"',
+      'queryKey: ["operator-work", "project", projectId',
+    );
     const projectLifecycleDialogSource =
       projectDetailPageSource.match(
         /<Dialog\.Root bind:open={projectLifecycleDialogOpen}[\s\S]*?<Dialog\.Root\s+bind:open={environmentLifecycleDialogOpen}/,
       )?.[0] ?? "";
+    const projectDeleteSafetyQuerySource = sourceBetween(
+      projectDetailPageSource,
+      'queryKey: ["projects", "delete-check", projectId]',
+      "const projectDeleteSafety = $derived",
+    );
     const environmentLifecycleDialogSource =
       projectDetailPageSource.match(
         /<Dialog\.Root\s+bind:open={environmentLifecycleDialogOpen}[\s\S]*?<Dialog\.Root bind:open={projectRenameDialogOpen}/,
@@ -3269,6 +3289,16 @@ describe("console page structure", () => {
     expect(projectSettingsSource).not.toContain("archiveProjectMutation.mutate");
     expect(projectSettingsSource).not.toContain("restoreProjectMutation.mutate");
     expect(projectSettingsSource).not.toContain("deleteProjectMutation.mutate");
+    expect(projectConsoleQueriesSource).toContain("health: false");
+    expect(projectConsoleQueriesSource).toContain("readiness: false");
+    expect(projectConsoleQueriesSource).toContain("version: false");
+    expect(projectConsoleQueriesSource).toContain("servers: false");
+    expect(projectConsoleQueriesSource).toContain("previewEnvironments: false");
+    expect(projectConsoleQueriesSource).toContain("domainBindings: false");
+    expect(projectConsoleQueriesSource).toContain("certificates: false");
+    expect(projectConsoleQueriesSource).toContain("providers: false");
+    expect(projectPreviewEnvironmentsQuerySource).toContain('activeProjectTab === "previews"');
+    expect(projectPreviewResourcesQuerySource).toContain('activeProjectTab === "previews"');
     expect(environmentsTabSource).toContain("openEnvironmentLifecycleDialog(environment)");
     expect(environmentsTabSource).toContain("lifecycleManageAction");
     expect(environmentsTabSource).not.toContain(
@@ -3290,6 +3320,11 @@ describe("console page structure", () => {
     expect(projectLifecycleDialogSource).toContain("lifecycleRestoreOption");
     expect(projectLifecycleDialogSource).toContain("lifecycleDeleteOption");
     expect(projectLifecycleDialogSource).toContain("onclick={submitProjectLifecycleAction}");
+    expect(projectDeleteSafetyQuerySource).toContain("projectLifecycleDialogOpen");
+    expect(projectDeleteSafetyQuerySource).toContain("isProjectArchived");
+    expect(projectDeleteSafetyQuerySource).not.toContain(
+      "enabled: browser && projectId.length > 0",
+    );
     expect(environmentLifecycleDialogSource).toContain(
       'selectedEnvironmentLifecycleAction = "archive"',
     );
