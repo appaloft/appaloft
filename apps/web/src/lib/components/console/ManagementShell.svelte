@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { ArrowLeft, Moon, Play, Sun } from "@lucide/svelte";
+  import { ArrowLeft, Moon, Sun } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
@@ -93,10 +93,6 @@
           {:else}
             <Moon class="size-4" />
           {/if}
-        </Button>
-        <Button href="/deploy" size="sm" variant="outline">
-          <Play class="size-4" />
-          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
       </div>
     </div>

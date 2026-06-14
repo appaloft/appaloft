@@ -10,7 +10,6 @@
   } from "@appaloft/contracts";
 
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
-  import * as Table from "$lib/components/ui/table";
   import {
     deploymentDetailHref,
     findEnvironment,
@@ -49,100 +48,98 @@
   }: Props = $props();
 </script>
 
-<div class="console-record-list">
-  <Table.Root>
-    <Table.Header>
-      <Table.Row class="hover:bg-transparent">
-        <Table.Head class="min-w-64">{$t(i18nKeys.common.domain.source)}</Table.Head>
-        <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
+<div class="console-record-list" data-deployment-record-list>
+  {#each deployments as deployment (deployment.id)}
+    {@const project = findProject(projects, deployment.projectId)}
+    {@const environment = findEnvironment(environments, deployment.environmentId)}
+    {@const resource = findResource(resources, deployment.resourceId)}
+    {@const server = deployment.serverId ? findServer(servers, deployment.serverId) : null}
+    {@const sourceVersion = sourceVersionForDeployment(deployment)}
+    <article
+      class="console-record-row gap-4 xl:grid-cols-[minmax(0,1.4fr)_8rem_minmax(0,1.1fr)_9rem_9rem_auto] xl:items-center"
+      data-deployment-record-row
+    >
+      <div class="min-w-0 space-y-1">
+        <a
+          href={deploymentDetailHref(deployment)}
+          class="block min-w-0 underline-offset-4 hover:underline"
+        >
+          <span class="block truncate font-medium">{deployment.runtimePlan.source.displayName}</span>
+          <span class="mt-1 block truncate text-xs text-muted-foreground">
+            {deployment.runtimePlan.source.locator}
+          </span>
+        </a>
+        {#if sourceVersion}
+          <p class="truncate font-mono text-xs text-muted-foreground" title={sourceVersion.value}>
+            {sourceVersion.label} {sourceVersion.requested ? `${sourceVersion.requested} -> ` : ""}{sourceVersion.shortValue}
+          </p>
+        {/if}
+      </div>
+
+      <div>
+        <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.status)}</p>
+        <div class="mt-1">
+          <DeploymentStatusBadge status={deployment.status} />
+        </div>
+      </div>
+
+      <div class="grid min-w-0 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1" data-deployment-owner-summary>
         {#if showProject}
-          <Table.Head>{$t(i18nKeys.common.domain.project)}</Table.Head>
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
+            <p class="mt-1 truncate">{project?.name ?? deployment.projectId}</p>
+          </div>
         {/if}
         {#if showEnvironment}
-          <Table.Head>{$t(i18nKeys.common.domain.environment)}</Table.Head>
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
+            <p class="mt-1 truncate">{environment?.name ?? deployment.environmentId}</p>
+          </div>
         {/if}
         {#if showResource}
-          <Table.Head>{$t(i18nKeys.common.domain.resource)}</Table.Head>
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
+            {#if resource}
+              <a
+                href={resourceDetailHref(resource)}
+                class="mt-1 block truncate underline-offset-4 hover:underline"
+              >
+                {resource.name}
+              </a>
+            {:else}
+              <p class="mt-1 truncate">{deployment.resourceId}</p>
+            {/if}
+          </div>
         {/if}
         {#if showServer}
-          <Table.Head>{$t(i18nKeys.common.domain.server)}</Table.Head>
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
+            <p class="mt-1 truncate">{server?.name ?? deployment.serverId}</p>
+          </div>
         {/if}
-        {#if showExecution}
-          <Table.Head>{$t(i18nKeys.console.deployments.executionShape)}</Table.Head>
-        {/if}
-        <Table.Head>{$t(i18nKeys.common.domain.createdAt)}</Table.Head>
-        <Table.Head class="w-12"><span class="sr-only">{$t(i18nKeys.common.actions.viewDetails)}</span></Table.Head>
-      </Table.Row>
-    </Table.Header>
-    <Table.Body>
-      {#each deployments as deployment (deployment.id)}
-        {@const project = findProject(projects, deployment.projectId)}
-        {@const environment = findEnvironment(environments, deployment.environmentId)}
-        {@const resource = findResource(resources, deployment.resourceId)}
-        {@const server = deployment.serverId ? findServer(servers, deployment.serverId) : null}
-        {@const sourceVersion = sourceVersionForDeployment(deployment)}
-        <Table.Row class="group">
-          <Table.Cell class="max-w-80">
-            <a href={deploymentDetailHref(deployment)} class="block min-w-0 underline-offset-4 group-hover:underline">
-              <span class="block truncate font-medium">{deployment.runtimePlan.source.displayName}</span>
-              <span class="mt-1 block truncate text-xs text-muted-foreground">
-                {deployment.runtimePlan.source.locator}
-              </span>
-              {#if sourceVersion}
-                <span class="mt-1 block truncate font-mono text-xs text-muted-foreground" title={sourceVersion.value}>
-                  {sourceVersion.label} {sourceVersion.requested ? `${sourceVersion.requested} -> ` : ""}{sourceVersion.shortValue}
-                </span>
-              {/if}
-            </a>
-          </Table.Cell>
-          <Table.Cell>
-            <DeploymentStatusBadge status={deployment.status} />
-          </Table.Cell>
-          {#if showProject}
-            <Table.Cell class="max-w-44 truncate">
-              {project?.name ?? deployment.projectId}
-            </Table.Cell>
-          {/if}
-          {#if showEnvironment}
-            <Table.Cell class="max-w-40 truncate">
-              {environment?.name ?? deployment.environmentId}
-            </Table.Cell>
-          {/if}
-          {#if showResource}
-            <Table.Cell class="max-w-44 truncate">
-              {#if resource}
-                <a href={resourceDetailHref(resource)} class="underline-offset-4 hover:underline">
-                  {resource.name}
-                </a>
-              {:else}
-                {deployment.resourceId}
-              {/if}
-            </Table.Cell>
-          {/if}
-          {#if showServer}
-            <Table.Cell class="max-w-44 truncate">
-              {server?.name ?? deployment.serverId}
-            </Table.Cell>
-          {/if}
-          {#if showExecution}
-            <Table.Cell class="max-w-40 truncate">
-              {deployment.runtimePlan.buildStrategy}
-            </Table.Cell>
-          {/if}
-          <Table.Cell class="text-muted-foreground">
-            {formatTime(deployment.createdAt)}
-          </Table.Cell>
-          <Table.Cell class="text-right">
-            <a
-              href={deploymentDetailHref(deployment)}
-              aria-label={$t(i18nKeys.common.actions.viewDetails)}
-              class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <ArrowRight class="size-4" />
-            </a>
-          </Table.Cell>
-        </Table.Row>
-      {/each}
-    </Table.Body>
-  </Table.Root>
+      </div>
+
+      {#if showExecution}
+        <div class="min-w-0 text-sm">
+          <p class="text-xs font-medium text-muted-foreground">
+            {$t(i18nKeys.console.deployments.executionShape)}
+          </p>
+          <p class="mt-1 truncate">{deployment.runtimePlan.buildStrategy}</p>
+        </div>
+      {/if}
+
+      <div class="text-sm text-muted-foreground">
+        <p class="text-xs font-medium">{$t(i18nKeys.common.domain.createdAt)}</p>
+        <p class="mt-1">{formatTime(deployment.createdAt)}</p>
+      </div>
+
+      <a
+        href={deploymentDetailHref(deployment)}
+        aria-label={$t(i18nKeys.common.actions.viewDetails)}
+        class="inline-flex size-8 items-center justify-center justify-self-start rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:justify-self-end"
+      >
+        <ArrowRight class="size-4" />
+      </a>
+    </article>
+  {/each}
 </div>

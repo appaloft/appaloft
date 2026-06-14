@@ -48,7 +48,7 @@ or diagnostic summaries. It is privileged manual operator access.
 
 ## Ownership Rules
 
-Server pages own server-scoped terminal entrypoints.
+Server pages own server-scoped terminal entrypoints inside the Runtime information domain.
 
 Resource detail pages own resource-scoped terminal entrypoints. Resource terminal access belongs
 behind operational tabs or actions together with runtime logs and diagnostics. It must not displace
@@ -61,8 +61,10 @@ Deployment detail pages may deep-link to a resource terminal with a selected `de
 the terminal scope remains resource-owned.
 
 The first Web placement is resolved as a resource-owned operational tab. Deployment detail pages
-link into that tab with `tab=terminal&deploymentId=<id>`, and the resource page preserves the
-selected deployment id when opening `terminal-sessions.open`.
+link into that tab with `tab=terminal&deploymentId=<id>`, and the resource page
+preserves the selected deployment id when opening `terminal-sessions.open`.
+Server terminal entrypoints link into the server Runtime information domain with
+`tab=runtime&section=terminal`.
 
 ## Workspace Resolution Rules
 

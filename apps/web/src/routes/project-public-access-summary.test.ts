@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 const projectPageSource = readFileSync(
-  fileURLToPath(new URL("./projects/[projectId]/+page.svelte", import.meta.url)),
+  fileURLToPath(new URL("./projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url)),
   "utf8",
 );
 

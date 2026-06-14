@@ -59,7 +59,7 @@ describe("GitHub App callback", () => {
     const commandBus = new CapturingCommandBus();
     const app = createTestApp(commandBus as unknown as CommandBus);
     const state = encodeURIComponent(
-      "https://console.example.com/deploy?source=github&githubMode=browser&step=source",
+      "https://console.example.com/?modal=quick-deploy&source=github&githubMode=browser&step=source",
     );
 
     const response = await app.handle(
@@ -71,7 +71,7 @@ describe("GitHub App callback", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
-      "https://console.example.com/deploy?source=github&githubMode=browser&step=source",
+      "https://console.example.com/?modal=quick-deploy&source=github&githubMode=browser&step=source",
     );
     expect(commandBus.commands[0]).toMatchObject({
       installationId: "123",
@@ -93,7 +93,7 @@ describe("GitHub App callback", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
-      "https://console.example.com/deploy?source=github&githubMode=browser&step=source",
+      "https://console.example.com/?modal=quick-deploy&source=github&githubMode=browser&step=source",
     );
   });
 });

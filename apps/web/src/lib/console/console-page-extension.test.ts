@@ -71,6 +71,8 @@ describe("Console page extension surface", () => {
 
     expect(rendererSource).toContain('type: "number" | "range" | "range-number"');
     expect(rendererSource).toContain("data-console-page-panel-field");
+    expect(rendererSource).toContain("data-console-page-record-list");
+    expect(rendererSource).toContain("data-console-page-record-row");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
     expect(rendererSource).toContain("requestActionBody(action, item)");
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
@@ -79,5 +81,7 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
     expect(rendererSource).toContain("noScroll: true");
     expect(rendererSource).not.toContain("href={filter.href}");
+    expect(rendererSource).not.toContain("<Table.Root");
+    expect(rendererSource).not.toContain('from "$lib/components/ui/table"');
   });
 });

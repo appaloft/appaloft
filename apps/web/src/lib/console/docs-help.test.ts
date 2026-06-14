@@ -123,14 +123,13 @@ describe("console docs help links", () => {
         [
           "routes/domain-bindings/+page.svelte",
           "routes/preview-environments/+page.svelte",
-          "routes/preview-environments/[previewEnvironmentId]/+page.svelte",
+          "routes/preview-environments/[previewEnvironmentId=consoleObjectId]/+page.svelte",
           "routes/preview-policies/+page.svelte",
           "routes/instance/+page.svelte",
-          "routes/projects/[projectId]/+page.svelte",
-          "routes/resources/[resourceId]/+page.svelte",
-          "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte",
+          "routes/projects/[projectId=consoleObjectId]/+page.svelte",
+          "routes/resources/[resourceId=consoleObjectId]/+page.svelte",
           "routes/servers/+page.svelte",
-          "routes/servers/[serverId]/+page.svelte",
+          "routes/servers/[serverId=consoleObjectId]/+page.svelte",
         ].map(async (path) => [
           path,
           await readFile(new URL(`../../${path}`, import.meta.url), "utf8"),
@@ -142,140 +141,130 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain(
       "domainCustomDomainBinding",
     );
-    expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("certificateReadiness");
-    expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("serverProxyReadiness");
     expect(sourceByPath["routes/preview-environments/+page.svelte"]).toContain(
       "productGradePreviews",
     );
     expect(
-      sourceByPath["routes/preview-environments/[previewEnvironmentId]/+page.svelte"],
+      sourceByPath[
+        "routes/preview-environments/[previewEnvironmentId=consoleObjectId]/+page.svelte"
+      ],
     ).toContain("productGradePreviews");
     expect(sourceByPath["routes/preview-policies/+page.svelte"]).toContain("productGradePreviews");
     expect(sourceByPath["routes/instance/+page.svelte"]).toContain("DocsHelpLink");
     expect(sourceByPath["routes/instance/+page.svelte"]).toContain("serverTerminalSession");
     expect(sourceByPath["routes/instance/+page.svelte"]).toContain("maintenanceWorkerActivation");
-    expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/projects/[projectId=consoleObjectId]/+page.svelte"]).toContain(
       "environmentLifecycle",
     );
 
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "resourceSourceProfile",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "resourceRuntimeProfile",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "resourceNetworkProfile",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "observabilityRuntimeLogs",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "diagnosticsSafeSupportPayload",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.resources.diagnosticSummary",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.resources.importVariables",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
-      "resource-configuration-import-form",
-    );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(
+      sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"],
+    ).not.toContain("resource-configuration-import-form");
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "resource-diagnostic-summary-copy",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
-      "accessFailureRouteSource",
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
+      "accessFailureTitle",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
-      "accessFailureRouteId",
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
+      "selectCurrentResourceAccessRoute",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "resourceProfileDrift",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "profileDiagnosticsSuggestedCommand",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "certificateReadiness",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "domainCustomDomainBinding",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.domainBindings.create",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.domainBindings.confirmOwnership",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
-      "resource-domain-binding-create-form",
-    );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(
+      sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"],
+    ).not.toContain("resource-domain-binding-create-form");
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "scheduledTaskLifecycle",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.scheduledTasks.runNow",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "scheduledTaskRunLogs",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.certificates.retry",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.certificates.revoke",
     );
-    expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
-      "orpcClient.certificates.delete",
-    );
 
-    expect(
-      sourceByPath[
-        "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte"
-      ],
-    ).toContain("deploymentLifecycle");
-    expect(
-      sourceByPath[
-        "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte"
-      ],
-    ).toContain("deploymentPlanPreview");
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
+      "deploymentLifecycle",
+    );
+    expect(sourceByPath["routes/resources/[resourceId=consoleObjectId]/+page.svelte"]).toContain(
+      "deploymentPlanPreview",
+    );
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "serverConnectivityTest",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.servers.deleteCheck",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.servers.delete",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.servers.deactivate",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "runtimeTargetCapacity",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.servers.capacity.inspect",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
-      "deactivateServerDialogTitle",
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
+      "lifecycleDialogTitle",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
-      "serverDeactivateConfirmation.trim() === server?.id",
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
+      "data-server-lifecycle-dialog",
     );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
-      "deleteServerDialogTitle",
-    );
-    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
-      "serverDeleteConfirmation.trim() === server?.id",
+    expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
+      "serverLifecycleConfirmation.trim() === server?.id",
     );
     expect(
       await readFile(

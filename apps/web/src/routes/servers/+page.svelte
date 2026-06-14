@@ -4,7 +4,11 @@
   import { page } from "$app/state";
   import {
     ArrowRight,
+    Boxes,
     Check,
+    CircleDashed,
+    Clock,
+    Gauge,
     GripVertical,
     Network,
     Pencil,
@@ -22,6 +26,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte";
+  import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -242,8 +247,104 @@
     return `/servers/${encodeURIComponent(serverId)}`;
   }
 
-  function serverTerminalHref(serverId: string): string {
-    return `${serverDetailHref(serverId)}?tab=terminal`;
+  function serverRuntimeHref(serverId: string): string {
+    return `${serverDetailHref(serverId)}?tab=runtime`;
+  }
+
+  function serverConnectivityHref(serverId: string): string {
+    return `${serverDetailHref(serverId)}?tab=connectivity`;
+  }
+
+  function serverCapacityHref(serverId: string): string {
+    return `${serverDetailHref(serverId)}?tab=capacity`;
+  }
+
+  function serverDeploymentsHref(serverId: string): string {
+    return `${serverDetailHref(serverId)}?tab=deployments`;
+  }
+
+  function serverLifecycleLabel(status: ServerSummary["lifecycleStatus"]): string {
+    switch (status) {
+      case "active":
+        return $t(i18nKeys.common.status.active);
+      case "inactive":
+        return $t(i18nKeys.common.status.inactive);
+    }
+  }
+
+  function serverLifecycleVariant(
+    status: ServerSummary["lifecycleStatus"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "active":
+        return "default";
+      case "inactive":
+        return "outline";
+    }
+  }
+
+  function edgeProxyStatusLabel(status: NonNullable<ServerSummary["edgeProxy"]>["status"]): string {
+    switch (status) {
+      case "pending":
+        return $t(i18nKeys.common.status.requested);
+      case "starting":
+        return $t(i18nKeys.common.status.starting);
+      case "ready":
+        return $t(i18nKeys.common.status.ready);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "disabled":
+        return $t(i18nKeys.common.status.notConfigured);
+    }
+  }
+
+  function edgeProxyStatusVariant(
+    status: NonNullable<ServerSummary["edgeProxy"]>["status"] | undefined,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "ready":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "starting":
+      case "pending":
+        return "secondary";
+      case "disabled":
+      default:
+        return "outline";
+    }
+  }
+
+  function runtimeAvailabilityLabel(status: ServerSummary["runtimeAvailability"]): string {
+    if (!status) {
+      return $t(i18nKeys.common.status.unknown);
+    }
+
+    switch (status.status) {
+      case "available":
+        return $t(i18nKeys.common.status.ready);
+      case "unavailable":
+        return $t(i18nKeys.common.status.unreachable);
+    }
+  }
+
+  function runtimeAvailabilityVariant(
+    status: ServerSummary["runtimeAvailability"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    if (!status) {
+      return "outline";
+    }
+
+    switch (status.status) {
+      case "available":
+        return "default";
+      case "unavailable":
+        return "destructive";
+    }
+  }
+
+  function edgeProxyKindLabel(server: ServerSummary): string {
+    return server.edgeProxy?.kind ?? $t(i18nKeys.common.status.notConfigured);
   }
 
   function openServerCreateDialog(): void {
@@ -324,7 +425,7 @@
       </div>
     </div>
   {:else}
-    <ConsoleResourceCanvas>
+    <ConsoleResourceCanvas data-servers-display-surface>
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
           <div class="flex items-center gap-2">
@@ -452,19 +553,88 @@
                     <GripVertical class="size-4" />
                   </button>
                 {/if}
-                <div class="min-w-0 space-y-2 pr-10" data-server-card-header>
-                  <div class="flex min-w-0 items-center gap-2">
-                    <Server class="size-4 shrink-0 text-muted-foreground" />
-                    <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
+                <div class="min-w-0 space-y-3 pr-10" data-server-card-header>
+                  <div class="flex min-w-0 items-start justify-between gap-3">
+                    <div class="min-w-0 space-y-1">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <Server class="size-4 shrink-0 text-muted-foreground" />
+                        <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
+                      </div>
+                      <p
+                        class="truncate font-mono text-sm text-muted-foreground"
+                        title={`${server.host}:${server.port}`}
+                      >
+                        {server.host}:{server.port}
+                      </p>
+                    </div>
+                    <Badge variant={serverLifecycleVariant(server.lifecycleStatus)} data-server-card-lifecycle>
+                      {serverLifecycleLabel(server.lifecycleStatus)}
+                    </Badge>
                   </div>
-                  <p class="truncate font-mono text-sm text-muted-foreground" title={`${server.host}:${server.port}`}>
-                    {server.host}:{server.port}
-                  </p>
                 </div>
 
-                <div class="mt-5 grid gap-2 text-sm text-muted-foreground">
+                <div class="mt-5 grid gap-3 text-sm" data-server-card-readiness>
+                  <div class="grid gap-2 rounded-md border bg-background/60 p-3">
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
+                        <Network class="size-3.5 shrink-0" />
+                        <span class="truncate">{$t(i18nKeys.console.servers.connectivitySurfaceTitle)}</span>
+                      </span>
+                      <Badge variant={runtimeAvailabilityVariant(server.runtimeAvailability)}>
+                        {runtimeAvailabilityLabel(server.runtimeAvailability)}
+                      </Badge>
+                    </div>
+                    {#if server.runtimeAvailability?.message}
+                      <p class="line-clamp-2 text-xs leading-5 text-muted-foreground" title={server.runtimeAvailability.message}>
+                        {server.runtimeAvailability.message}
+                      </p>
+                    {/if}
+                  </div>
+
+                  <div class="grid gap-2 rounded-md border bg-background/60 p-3" data-server-card-proxy>
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
+                        <ShieldCheck class="size-3.5 shrink-0" />
+                        <span class="truncate">{$t(i18nKeys.common.domain.proxy)}</span>
+                      </span>
+                      <Badge variant={edgeProxyStatusVariant(server.edgeProxy?.status)}>
+                        {server.edgeProxy
+                          ? edgeProxyStatusLabel(server.edgeProxy.status)
+                          : $t(i18nKeys.common.status.notConfigured)}
+                      </Badge>
+                    </div>
+                    <p class="truncate text-xs text-muted-foreground" title={edgeProxyKindLabel(server)}>
+                      {edgeProxyKindLabel(server)}
+                    </p>
+                  </div>
+
+                  <div class="grid gap-2 rounded-md border bg-background/60 p-3" data-server-card-capacity>
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <span class="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
+                        <Gauge class="size-3.5 shrink-0" />
+                        <span class="truncate">{$t(i18nKeys.console.servers.capacitySurfaceTitle)}</span>
+                      </span>
+                      <Badge variant="outline">{$t(i18nKeys.common.status.unknown)}</Badge>
+                    </div>
+                    <a
+                      href={serverCapacityHref(server.id)}
+                      class="inline-flex min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span class="truncate">{$t(i18nKeys.console.servers.capacityGovernanceAction)}</span>
+                      <ArrowRight class="size-3 shrink-0" />
+                    </a>
+                  </div>
+                </div>
+
+                <div class="mt-4 grid gap-2 border-t pt-4 text-sm text-muted-foreground" data-server-card-ownership>
                   <span class="inline-flex min-w-0 items-center gap-2">
-                    <Network class="size-3.5" />
+                    <Boxes class="size-3.5 shrink-0" />
+                    <span class="truncate" title={server.targetKind}>
+                      {server.targetKind}
+                    </span>
+                  </span>
+                  <span class="inline-flex min-w-0 items-center gap-2">
+                    <CircleDashed class="size-3.5 shrink-0" />
                     <span class="truncate" title={server.providerKey}>
                       {serverProviderDisplayLabel(
                         server.providerKey,
@@ -472,18 +642,33 @@
                       )}
                     </span>
                   </span>
-                  <span class="inline-flex items-center gap-2">
-                    <ShieldCheck class="size-3.5" />
-                    {countServerDeployments(server)} {$t(i18nKeys.common.domain.deployments)}
+                  <a
+                    href={serverDeploymentsHref(server.id)}
+                    class="inline-flex min-w-0 items-center gap-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-server-card-deployment-rollup
+                  >
+                    <Terminal class="size-3.5 shrink-0" />
+                    <span class="truncate">
+                      {countServerDeployments(server)} {$t(i18nKeys.common.domain.deployments)}
+                    </span>
+                  </a>
+                  <span class="inline-flex min-w-0 items-center gap-2">
+                    <Clock class="size-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{formatTime(server.createdAt)}</span>
                   </span>
-                  <span>{formatTime(server.createdAt)}</span>
                 </div>
 
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-5">
-                  <Button href={serverTerminalHref(server.id)} size="sm" variant="outline">
-                    <Terminal class="size-3.5" />
-                    {$t(i18nKeys.common.actions.openTerminal)}
-                  </Button>
+                  <div class="flex flex-wrap items-center gap-2" data-server-card-operational-links>
+                    <Button href={serverRuntimeHref(server.id)} size="sm" variant="outline">
+                      <Terminal class="size-3.5" />
+                      {$t(i18nKeys.console.servers.runtimeTab)}
+                    </Button>
+                    <Button href={serverConnectivityHref(server.id)} size="sm" variant="outline">
+                      <Network class="size-3.5" />
+                      {$t(i18nKeys.console.servers.connectivityTab)}
+                    </Button>
+                  </div>
                   <a
                     href={serverDetailHref(server.id)}
                     class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

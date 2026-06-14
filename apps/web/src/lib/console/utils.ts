@@ -94,17 +94,6 @@ export function projectDetailHref(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;
 }
 
-export function projectQuickDeployHref(projectId: string): string {
-  const encodedProjectId = encodeURIComponent(projectId);
-  const params = new URLSearchParams({
-    modal: "quick-deploy",
-    projectMode: "existing",
-    projectId,
-  });
-
-  return `/projects/${encodedProjectId}?${params.toString()}`;
-}
-
 export function resourceDetailHref(
   resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
 ): string {
@@ -138,12 +127,6 @@ export function resourcePreviewEnvironmentDetailHref(
   previewEnvironmentId: string,
 ): string {
   return `${resourceDetailHref(resource)}/preview-environments/${encodeURIComponent(previewEnvironmentId)}`;
-}
-
-export function resourceNewDeploymentHref(
-  resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
-): string {
-  return `/projects/${encodeURIComponent(resource.projectId)}/environments/${encodeURIComponent(resource.environmentId)}/resources/${encodeURIComponent(resource.id)}/deployments/new`;
 }
 
 export function countProjectDeployments(

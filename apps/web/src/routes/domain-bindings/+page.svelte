@@ -1,12 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { page } from "$app/state";
+  import { goto } from "$app/navigation";
   import { createMutation } from "@tanstack/svelte-query";
   import {
-    ArrowRight,
     Check,
     Globe2,
-    Plus,
     RefreshCw,
     Route,
     Save,
@@ -17,7 +15,6 @@
   import type {
     ConfirmDomainBindingOwnershipInput,
     ConfigureDomainBindingRouteInput,
-    CreateDomainBindingInput,
     DeleteDomainBindingInput,
     DomainBindingSummary,
     RetryDomainBindingVerificationInput,
@@ -44,7 +41,6 @@
     findServer,
     formatTime,
   } from "$lib/console/utils";
-  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -74,83 +70,34 @@
   const servers = $derived(serversQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
   const allProjectsFilterValue = "__all_projects__";
-  const pageLoading = $derived(
+  const domainBindingsLoading = $derived(domainBindingsQuery.isPending);
+  const domainBindingEnrichmentLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
       resourcesQuery.isPending ||
-      serversQuery.isPending ||
-      domainBindingsQuery.isPending,
+      serversQuery.isPending,
   );
 
-  let projectId = $state("");
-  let environmentId = $state("");
-  let resourceId = $state("");
-  let serverId = $state("");
-  let destinationId = $state("");
-  let domainName = $state("");
-  let pathPrefix = $state("/");
-  let proxyKind = $state<CreateDomainBindingInput["proxyKind"]>("traefik");
-  let tlsMode = $state<NonNullable<CreateDomainBindingInput["tlsMode"]>>("auto");
-  let routeMode = $state<DomainRouteMode>("serve");
-  let redirectTo = $state("");
-  let redirectStatus = $state<RedirectStatusText>("308");
-  let certificatePolicy = $state<NonNullable<CreateDomainBindingInput["certificatePolicy"]>>(
-    "auto",
-  );
   let projectFilter = $state("");
-  let createFeedback = $state<{
-    kind: "success" | "error";
-    title: string;
-    detail: string;
-  } | null>(null);
   let lifecycleFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
   } | null>(null);
   let bindingDetails = $state<Record<string, ShowDomainBindingResponse>>({});
-  let routeRedirectDrafts = $state<Record<string, string>>({});
-  let routeRedirectStatusDrafts = $state<Record<string, RedirectStatusText>>({});
-  let deleteConfirmationDrafts = $state<Record<string, string>>({});
+  let routeRedirectDraft = $state("");
+  let routeRedirectStatusDraft = $state<RedirectStatusText>("308");
+  let deleteConfirmationDraft = $state("");
+  let domainBindingVerificationDialogOpen = $state(false);
+  let domainBindingRouteDialogOpen = $state(false);
+  let domainBindingDeleteDialogOpen = $state(false);
+  let selectedDomainBindingId = $state("");
+  let selectedVerificationBindingId = $state("");
+  let selectedRouteBindingId = $state("");
+  let selectedDeleteBindingId = $state("");
 
-  const filteredEnvironments = $derived.by(() =>
-    projectId
-      ? environments.filter((environment) => environment.projectId === projectId)
-      : environments,
-  );
-  const filteredResources = $derived.by(() =>
-    resources.filter((resource) => {
-      if (projectId && resource.projectId !== projectId) {
-        return false;
-      }
-
-      if (environmentId && resource.environmentId !== environmentId) {
-        return false;
-      }
-
-      return true;
-    }),
-  );
-  const selectedProject = $derived(findProject(projects, projectId));
-  const selectedEnvironment = $derived(findEnvironment(environments, environmentId));
-  const selectedResource = $derived(findResource(resources, resourceId));
-  const selectedServer = $derived(findServer(servers, serverId));
   const selectedProjectFilter = $derived(
     projectFilter ? findProject(projects, projectFilter) : null,
-  );
-  const canonicalRedirectTargets = $derived.by(() =>
-    domainBindings.filter(
-      (binding) =>
-        !binding.redirectTo &&
-        binding.projectId === projectId &&
-        binding.environmentId === environmentId &&
-        binding.resourceId === resourceId &&
-        binding.domainName !== domainName.trim().toLowerCase() &&
-        binding.pathPrefix === (pathPrefix.trim() || "/"),
-    ),
-  );
-  const selectedCanonicalRedirectTarget = $derived(
-    canonicalRedirectTargets.find((binding) => binding.domainName === redirectTo) ?? null,
   );
   const projectFilterSelectValue = $derived(projectFilter || allProjectsFilterValue);
   const visibleDomainBindings = $derived.by(() =>
@@ -158,59 +105,43 @@
       ? domainBindings.filter((binding) => binding.projectId === projectFilter)
       : domainBindings,
   );
-  const canSubmit = $derived(
-    Boolean(
-      projectId &&
-        environmentId &&
-        resourceId &&
-        serverId &&
-        destinationId &&
-        domainName.trim() &&
-        pathPrefix.trim() &&
-        proxyKind !== "none" &&
-        (routeMode === "serve" || redirectTo),
-    ),
+  const selectedDomainBinding = $derived.by(
+    () =>
+      visibleDomainBindings.find((binding) => binding.id === selectedDomainBindingId) ??
+      visibleDomainBindings[0] ??
+      null,
   );
-  let domainBindingCreateDialogOpen = $state(false);
+  const selectedDomainBindingDetail = $derived(
+    selectedDomainBinding ? (bindingDetails[selectedDomainBinding.id] ?? null) : null,
+  );
+  const selectedRouteBinding = $derived(
+    domainBindings.find((binding) => binding.id === selectedRouteBindingId) ?? null,
+  );
+  const selectedVerificationBinding = $derived(
+    domainBindings.find((binding) => binding.id === selectedVerificationBindingId) ?? null,
+  );
+  const selectedDeleteBinding = $derived(
+    domainBindings.find((binding) => binding.id === selectedDeleteBindingId) ?? null,
+  );
+  const selectedRouteRedirectTargets = $derived(
+    selectedRouteBinding ? domainBindingRedirectTargets(selectedRouteBinding) : [],
+  );
 
-  $effect(() => {
-    domainBindingCreateDialogOpen = modalIsOpen(page, "create-domain-binding");
-  });
-
-  const createDomainBindingMutation = createMutation(() => ({
-    mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
-    onSuccess: (result) => {
-      createFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.domainBindings.createSuccessTitle),
-        detail: result.id,
-      };
-      domainName = "";
-      redirectTo = "";
-      void setModalOpen(page, "create-domain-binding", false);
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-    },
-    onError: (error) => {
-      createFeedback = {
-        kind: "error",
-        title: $t(i18nKeys.console.domainBindings.createErrorTitle),
-        detail: readErrorMessage(error),
-      };
-    },
-  }));
   const confirmDomainBindingOwnershipMutation = createMutation(() => ({
     mutationFn: (input: ConfirmDomainBindingOwnershipInput) =>
       orpcClient.domainBindings.confirmOwnership(input),
     onSuccess: () => {
-      createFeedback = {
+      lifecycleFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
         detail: $t(i18nKeys.common.status.bound),
       };
+      domainBindingVerificationDialogOpen = false;
+      selectedVerificationBindingId = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
     },
     onError: (error) => {
-      createFeedback = {
+      lifecycleFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
         detail: readErrorMessage(error),
@@ -247,6 +178,8 @@
         title: $t(i18nKeys.console.domainBindings.configureRouteSuccessTitle),
         detail: variables.domainBindingId,
       };
+      domainBindingRouteDialogOpen = false;
+      selectedRouteBindingId = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
@@ -297,10 +230,9 @@
         title: $t(i18nKeys.console.domainBindings.deleteSuccessTitle),
         detail: variables.domainBindingId,
       };
-      deleteConfirmationDrafts = {
-        ...deleteConfirmationDrafts,
-        [variables.domainBindingId]: "",
-      };
+      domainBindingDeleteDialogOpen = false;
+      selectedDeleteBindingId = "";
+      deleteConfirmationDraft = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
@@ -321,6 +253,8 @@
         title: $t(i18nKeys.console.domainBindings.retryVerificationSuccessTitle),
         detail: result.verificationAttemptId,
       };
+      domainBindingVerificationDialogOpen = false;
+      selectedVerificationBindingId = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
@@ -332,90 +266,6 @@
       };
     },
   }));
-
-  $effect(() => {
-    if (!browser || projectId || projects.length === 0) {
-      return;
-    }
-
-    projectId = projects[0]?.id ?? "";
-  });
-
-  $effect(() => {
-    if (!browser) {
-      return;
-    }
-
-    if (!filteredEnvironments.some((environment) => environment.id === environmentId)) {
-      environmentId = filteredEnvironments[0]?.id ?? "";
-    }
-  });
-
-  $effect(() => {
-    if (!browser) {
-      return;
-    }
-
-    if (!filteredResources.some((resource) => resource.id === resourceId)) {
-      resourceId = filteredResources[0]?.id ?? "";
-    }
-  });
-
-  $effect(() => {
-    if (!browser || serverId || servers.length === 0) {
-      return;
-    }
-
-    serverId = servers[0]?.id ?? "";
-  });
-
-  $effect(() => {
-    if (!browser || !selectedResource?.destinationId) {
-      return;
-    }
-
-    destinationId = selectedResource.destinationId;
-  });
-
-  $effect(() => {
-    if (!browser || routeMode !== "redirect") {
-      return;
-    }
-
-    if (canonicalRedirectTargets.some((binding) => binding.domainName === redirectTo)) {
-      return;
-    }
-
-    redirectTo = canonicalRedirectTargets[0]?.domainName ?? "";
-  });
-
-  function createDomainBinding(event: SubmitEvent): void {
-    event.preventDefault();
-
-    if (!canSubmit || createDomainBindingMutation.isPending) {
-      return;
-    }
-
-    createFeedback = null;
-    createDomainBindingMutation.mutate({
-      projectId,
-      environmentId,
-      resourceId,
-      serverId,
-      destinationId,
-      domainName: domainName.trim(),
-      pathPrefix: pathPrefix.trim() || "/",
-      proxyKind,
-      tlsMode,
-      ...(routeMode === "redirect"
-        ? {
-            redirectTo,
-            redirectStatus: parseRedirectStatus(redirectStatus),
-          }
-        : {}),
-      certificatePolicy,
-    });
-  }
 
   function parseRedirectStatus(value: RedirectStatusText): 301 | 302 | 307 | 308 {
     switch (value) {
@@ -470,12 +320,18 @@
     }
   }
 
+  function domainBindingLifecycleStatusLabel(detail: ShowDomainBindingResponse): string {
+    return detail.deleteSafety.safeToDelete
+      ? $t(i18nKeys.console.domainBindings.lifecycleReady)
+      : $t(i18nKeys.console.domainBindings.lifecycleBlocked);
+  }
+
   function confirmDomainBindingOwnership(binding: DomainBindingSummary): void {
     if (binding.status !== "pending_verification" || confirmDomainBindingOwnershipMutation.isPending) {
       return;
     }
 
-    createFeedback = null;
+    lifecycleFeedback = null;
     confirmDomainBindingOwnershipMutation.mutate({
       domainBindingId: binding.id,
     });
@@ -483,40 +339,52 @@
 
   function selectProjectFilter(value: string): void {
     projectFilter = value === allProjectsFilterValue ? "" : value;
+    selectedDomainBindingId = "";
   }
 
-  function setRouteRedirectDraft(bindingId: string, value: string): void {
-    routeRedirectDrafts = {
-      ...routeRedirectDrafts,
-      [bindingId]: value,
-    };
+  function selectDomainBinding(binding: DomainBindingSummary): void {
+    selectedDomainBindingId = binding.id;
   }
 
-  function setRouteRedirectStatusDraft(bindingId: string, value: string): void {
-    routeRedirectStatusDrafts = {
-      ...routeRedirectStatusDrafts,
-      [bindingId]: value as RedirectStatusText,
-    };
+  function showSelectedDomainBindingDetail(binding: DomainBindingSummary): void {
+    selectedDomainBindingId = binding.id;
+    showDomainBindingMutation.mutate({ domainBindingId: binding.id });
   }
 
-  function setDeleteConfirmationDraft(bindingId: string, value: string): void {
-    deleteConfirmationDrafts = {
-      ...deleteConfirmationDrafts,
-      [bindingId]: value,
-    };
+  function setRouteRedirectDraft(value: string): void {
+    routeRedirectDraft = value;
+  }
+
+  function setRouteRedirectStatusDraft(value: string): void {
+    routeRedirectStatusDraft = value as RedirectStatusText;
+  }
+
+  function setDeleteConfirmationDraft(value: string): void {
+    deleteConfirmationDraft = value;
+  }
+
+  function domainBindingRedirectTargets(binding: DomainBindingSummary): DomainBindingSummary[] {
+    return domainBindings.filter(
+      (candidate) =>
+        candidate.id !== binding.id &&
+        !candidate.redirectTo &&
+        candidate.projectId === binding.projectId &&
+        candidate.environmentId === binding.environmentId &&
+        candidate.resourceId === binding.resourceId &&
+        candidate.pathPrefix === binding.pathPrefix &&
+        candidate.status !== "deleted",
+    );
   }
 
   function configureDomainBindingRoute(binding: DomainBindingSummary, mode: DomainRouteMode): void {
-    const redirectDraft = routeRedirectDrafts[binding.id] ?? binding.redirectTo ?? "";
+    const redirectDraft = routeRedirectDraft || binding.redirectTo || "";
     lifecycleFeedback = null;
     configureDomainBindingRouteMutation.mutate({
       domainBindingId: binding.id,
       ...(mode === "redirect"
         ? {
             redirectTo: redirectDraft.trim(),
-            redirectStatus: parseRedirectStatus(
-              routeRedirectStatusDrafts[binding.id] ?? `${binding.redirectStatus ?? 308}`,
-            ),
+            redirectStatus: parseRedirectStatus(routeRedirectStatusDraft),
           }
         : {}),
     });
@@ -527,18 +395,51 @@
     deleteDomainBindingMutation.mutate({
       domainBindingId: binding.id,
       confirmation: {
-        domainBindingId: deleteConfirmationDrafts[binding.id] ?? "",
+        domainBindingId: deleteConfirmationDraft,
       },
     });
   }
 
-  function openDomainBindingCreateDialog(): void {
-    void setModalOpen(page, "create-domain-binding", true);
+  function openDomainBindingVerificationDialog(binding: DomainBindingSummary): void {
+    selectedDomainBindingId = binding.id;
+    selectedVerificationBindingId = binding.id;
+    domainBindingVerificationDialogOpen = true;
   }
 
-  function setDomainBindingCreateDialogOpen(open: boolean): void {
-    domainBindingCreateDialogOpen = open;
-    void setModalOpen(page, "create-domain-binding", open);
+  function setDomainBindingVerificationDialogOpen(open: boolean): void {
+    domainBindingVerificationDialogOpen = open;
+    if (!open) {
+      selectedVerificationBindingId = "";
+    }
+  }
+
+  function openDomainBindingRouteDialog(binding: DomainBindingSummary): void {
+    selectedDomainBindingId = binding.id;
+    selectedRouteBindingId = binding.id;
+    routeRedirectDraft = binding.redirectTo ?? "";
+    routeRedirectStatusDraft = `${binding.redirectStatus ?? 308}` as RedirectStatusText;
+    domainBindingRouteDialogOpen = true;
+  }
+
+  function setDomainBindingRouteDialogOpen(open: boolean): void {
+    domainBindingRouteDialogOpen = open;
+    if (!open) {
+      selectedRouteBindingId = "";
+    }
+  }
+
+  function openDomainBindingDeleteDialog(binding: DomainBindingSummary): void {
+    selectedDomainBindingId = binding.id;
+    selectedDeleteBindingId = binding.id;
+    deleteConfirmationDraft = "";
+    domainBindingDeleteDialogOpen = true;
+  }
+
+  function setDomainBindingDeleteDialogOpen(open: boolean): void {
+    domainBindingDeleteDialogOpen = open;
+    if (!open) {
+      selectedDeleteBindingId = "";
+    }
   }
 </script>
 
@@ -550,13 +451,13 @@
   title={$t(i18nKeys.console.domainBindings.pageTitle)}
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
-  {#if pageLoading}
+  {#if domainBindingsLoading}
     <div class="space-y-5">
       <Skeleton class="h-52 w-full" />
       <Skeleton class="h-80 w-full" />
     </div>
   {:else}
-    <ConsoleResourceCanvas>
+    <ConsoleResourceCanvas data-domain-bindings-display-surface>
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
@@ -598,10 +499,14 @@
               {/each}
             </Select.Content>
           </Select.Root>
-          <Button type="button" onclick={openDomainBindingCreateDialog}>
-            <Plus class="size-4" />
-            {$t(i18nKeys.console.domainBindings.createTitle)}
-          </Button>
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.domainBindings.createOwnerHint)}
+          </p>
+          {#if domainBindingEnrichmentLoading}
+            <p class="w-full text-xs text-muted-foreground">
+              {$t(i18nKeys.common.status.loading)}
+            </p>
+          {/if}
         </div>
       {/if}
 
@@ -609,578 +514,107 @@
         <ConsoleEmptyState
           tone="domain"
           title={$t(i18nKeys.console.domainBindings.emptyTitle)}
-          description={$t(i18nKeys.console.domainBindings.emptyBody)}
-          actionLabel={$t(i18nKeys.console.domainBindings.createTitle)}
+          description={$t(i18nKeys.console.domainBindings.emptyGlobalBody)}
+          secondaryActionLabel={$t(i18nKeys.console.domainBindings.openResourceNetworking)}
+          onSecondaryAction={() => {
+            void goto("/resources");
+          }}
           learnMoreHref={webDocsHrefs.domainCustomDomainBinding}
-          onAction={openDomainBindingCreateDialog}
         />
       {/if}
 
-      <Dialog.Root
-        bind:open={domainBindingCreateDialogOpen}
-        onOpenChange={setDomainBindingCreateDialogOpen}
-      >
-        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
-          <Dialog.Header>
-            <Dialog.Title>{$t(i18nKeys.console.domainBindings.createTitle)}</Dialog.Title>
-            <Dialog.Description>
-              {$t(i18nKeys.console.domainBindings.createDescription)}
-            </Dialog.Description>
-          </Dialog.Header>
-          <section class="space-y-4 px-5 pb-5">
-          <div class="flex items-start gap-3">
-            <div class="bg-muted p-2">
-              <Plus class="size-4" />
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
+      {#if domainBindings.length > 0}
+        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div class="console-panel space-y-4 p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
                 <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.domainBindings.createTitle)}
+                  {$t(i18nKeys.console.domainBindings.listTitle)}
                 </h2>
-                <DocsHelpLink
-                  href={webDocsHrefs.domainCustomDomainBinding}
-                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                />
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.domainBindings.listDescription)}
+                </p>
+                {#if domainBindingEnrichmentLoading}
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.common.status.loading)}
+                  </p>
+                {/if}
               </div>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.domainBindings.createDescription)}
-              </p>
-            </div>
-          </div>
-
-          <form class="mt-5 space-y-4" onsubmit={createDomainBinding}>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.project)}</span>
-                <Select.Root bind:value={projectId} type="single" disabled={projects.length === 0}>
-                  <Select.Trigger class="w-full">
-                    {selectedProject?.name ?? $t(i18nKeys.console.domainBindings.noProjectOptions)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each projects as project (project.id)}
-                      <Select.Item value={project.id}>{project.name}</Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.environment)}</span>
-                <Select.Root
-                  bind:value={environmentId}
-                  type="single"
-                  disabled={filteredEnvironments.length === 0}
-                >
-                  <Select.Trigger class="w-full">
-                    {selectedEnvironment?.name ??
-                      $t(i18nKeys.console.domainBindings.noEnvironmentOptions)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each filteredEnvironments as environment (environment.id)}
-                      <Select.Item value={environment.id}>{environment.name}</Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.resource)}</span>
-                <Select.Root
-                  bind:value={resourceId}
-                  type="single"
-                  disabled={filteredResources.length === 0}
-                >
-                  <Select.Trigger class="w-full">
-                    {selectedResource?.name ?? $t(i18nKeys.console.domainBindings.noResourceOptions)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each filteredResources as resource (resource.id)}
-                      <Select.Item value={resource.id}>{resource.name}</Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.server)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.serverDeploymentTarget}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Select.Root bind:value={serverId} type="single" disabled={servers.length === 0}>
-                  <Select.Trigger class="w-full">
-                    {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each servers as server (server.id)}
-                      <Select.Item value={server.id}>{server.name}</Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.domainName)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.domainCustomDomainBinding}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Input
-                  bind:value={domainName}
-                  autocomplete="off"
-                  placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
-                />
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.pathPrefix)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.domainGeneratedAccessRoute}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.proxy)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.serverProxyReadiness}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Select.Root bind:value={proxyKind} type="single">
-                  <Select.Trigger class="w-full">{proxyKind}</Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="traefik">traefik</Select.Item>
-                    <Select.Item value="caddy">caddy</Select.Item>
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.tls)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.certificateReadiness}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Select.Root bind:value={tlsMode} type="single">
-                  <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="auto">auto</Select.Item>
-                    <Select.Item value="disabled">disabled</Select.Item>
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.routeBehavior)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.domainGeneratedAccessRoute}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Select.Root bind:value={routeMode} type="single">
-                  <Select.Trigger class="w-full">
-                    {routeMode === "redirect"
-                      ? $t(i18nKeys.console.domainBindings.routeModeRedirect)
-                      : $t(i18nKeys.console.domainBindings.routeModeServe)}
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="serve">
-                      {$t(i18nKeys.console.domainBindings.routeModeServe)}
-                    </Select.Item>
-                    <Select.Item value="redirect">
-                      {$t(i18nKeys.console.domainBindings.routeModeRedirect)}
-                    </Select.Item>
-                  </Select.Content>
-                </Select.Root>
-              </label>
-
-              {#if routeMode === "redirect"}
-                <label class="space-y-1.5 text-sm font-medium">
-                  <span class="inline-flex items-center gap-1.5">
-                    {$t(i18nKeys.common.domain.redirectTo)}
-                    <DocsHelpLink
-                      href={webDocsHrefs.domainCustomDomainBinding}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      className="size-5"
-                    />
-                  </span>
-                  <Select.Root
-                    bind:value={redirectTo}
-                    type="single"
-                    disabled={canonicalRedirectTargets.length === 0}
-                  >
-                    <Select.Trigger class="w-full">
-                      {selectedCanonicalRedirectTarget?.domainName ??
-                        $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
-                    </Select.Trigger>
-                    <Select.Content>
-                      {#each canonicalRedirectTargets as binding (binding.id)}
-                        <Select.Item value={binding.domainName}>{binding.domainName}</Select.Item>
-                      {/each}
-                    </Select.Content>
-                  </Select.Root>
-                </label>
-
-                <label class="space-y-1.5 text-sm font-medium">
-                  <span class="inline-flex items-center gap-1.5">
-                    {$t(i18nKeys.common.domain.redirectStatus)}
-                    <DocsHelpLink
-                      href={webDocsHrefs.domainCustomDomainBinding}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                      className="size-5"
-                    />
-                  </span>
-                  <Select.Root bind:value={redirectStatus} type="single">
-                    <Select.Trigger class="w-full">{redirectStatus}</Select.Trigger>
-                    <Select.Content>
-                      <Select.Item value="308">308</Select.Item>
-                      <Select.Item value="301">301</Select.Item>
-                      <Select.Item value="307">307</Select.Item>
-                      <Select.Item value="302">302</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </label>
-              {/if}
-
-              <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
-                <span class="inline-flex items-center gap-1.5">
-                  {$t(i18nKeys.common.domain.destination)}
-                  <DocsHelpLink
-                    href={webDocsHrefs.domainGeneratedAccessRoute}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                    className="size-5"
-                  />
-                </span>
-                <Input bind:value={destinationId} autocomplete="off" placeholder="dst_..." />
-                <span class="block text-xs font-normal leading-5 text-muted-foreground">
-                  {#if selectedResource?.destinationId}
-                    {$t(i18nKeys.console.domainBindings.selectedResourceDestination, {
-                      destinationId: selectedResource.destinationId,
-                    })}
-                  {:else}
-                    {$t(i18nKeys.console.domainBindings.destinationHelp)}
-                  {/if}
-                </span>
-              </label>
             </div>
 
-            {#if createFeedback}
+            {#if lifecycleFeedback}
               <div
                 class={[
                   "rounded-md border px-3 py-2 text-sm",
-                  createFeedback.kind === "success"
+                  lifecycleFeedback.kind === "success"
                     ? "border-primary/25 bg-primary/5"
                     : "border-destructive/30 bg-destructive/5 text-destructive",
                 ]}
               >
-                <p class="font-medium">{createFeedback.title}</p>
-                <p class="mt-1 break-all text-xs">{createFeedback.detail}</p>
+                <p class="font-medium">{lifecycleFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{lifecycleFeedback.detail}</p>
               </div>
             {/if}
 
-            <Button type="submit" disabled={!canSubmit || createDomainBindingMutation.isPending}>
-              <Globe2 class="size-4" />
-              {createDomainBindingMutation.isPending
-                ? $t(i18nKeys.console.domainBindings.formSubmitting)
-                : $t(i18nKeys.console.domainBindings.formSubmit)}
-            </Button>
-          </form>
-          </section>
-        </Dialog.Content>
-      </Dialog.Root>
-
-      {#if domainBindings.length > 0}
-        <section class="console-panel space-y-4 p-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.domainBindings.listTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.domainBindings.listDescription)}
-              </p>
-            </div>
-          </div>
-
-          {#if lifecycleFeedback}
-            <div
-              class={[
-                "rounded-md border px-3 py-2 text-sm",
-                lifecycleFeedback.kind === "success"
-                  ? "border-primary/25 bg-primary/5"
-                  : "border-destructive/30 bg-destructive/5 text-destructive",
-              ]}
-            >
-              <p class="font-medium">{lifecycleFeedback.title}</p>
-              <p class="mt-1 break-all text-xs">{lifecycleFeedback.detail}</p>
-            </div>
-          {/if}
-
-          <div>
             {#if visibleDomainBindings.length > 0}
-              <div class="console-record-list">
-              {#each visibleDomainBindings as binding (binding.id)}
-                {@const project = findProject(projects, binding.projectId)}
-                {@const environment = findEnvironment(environments, binding.environmentId)}
-                {@const resource = findResource(resources, binding.resourceId)}
-                {@const server = binding.serverId ? findServer(servers, binding.serverId) : null}
-                {@const detail = bindingDetails[binding.id]}
-                {@const redirectTargets = domainBindings.filter(
-                  (candidate) =>
-                    candidate.id !== binding.id &&
-                    !candidate.redirectTo &&
-                    candidate.projectId === binding.projectId &&
-                    candidate.environmentId === binding.environmentId &&
-                    candidate.resourceId === binding.resourceId &&
-                    candidate.pathPrefix === binding.pathPrefix &&
-                    candidate.status !== "deleted",
-                )}
-                <article class="py-4 sm:px-3">
-                  <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div class="min-w-0 space-y-2">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Globe2 class="size-4 text-muted-foreground" />
+              <div class="console-record-list" data-domain-binding-list-display-surface>
+                {#each visibleDomainBindings as binding (binding.id)}
+                  {@const project = findProject(projects, binding.projectId)}
+                  {@const environment = findEnvironment(environments, binding.environmentId)}
+                  {@const resource = findResource(resources, binding.resourceId)}
+                  <article
+                    class={[
+                      "console-record-row lg:grid-cols-[minmax(0,1fr)_auto]",
+                      selectedDomainBinding?.id === binding.id ? "bg-muted/50" : "",
+                    ]}
+                    data-domain-binding-row
+                  >
+                    <div class="min-w-0 space-y-3">
+                      <div class="flex min-w-0 flex-wrap items-center gap-2">
+                        <Globe2 class="size-4 shrink-0 text-muted-foreground" />
                         <h3 class="truncate font-medium">{binding.domainName}</h3>
                         <Badge variant={domainBindingStatusVariant(binding.status)}>
                           {domainBindingStatusLabel(binding.status)}
                         </Badge>
                       </div>
-                      <p class="text-sm text-muted-foreground">
-                        {project?.name ?? binding.projectId} · {environment?.name ?? binding.environmentId}
-                      </p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      {#if binding.status === "pending_verification"}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={confirmDomainBindingOwnershipMutation.isPending}
-                          onclick={() => confirmDomainBindingOwnership(binding)}
-                        >
-                          <Check class="size-4" />
-                          {confirmDomainBindingOwnershipMutation.isPending
-                            ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
-                            : $t(i18nKeys.console.domainBindings.confirmOwnership)}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={retryDomainBindingVerificationMutation.isPending}
-                          onclick={() =>
-                            retryDomainBindingVerificationMutation.mutate({
-                              domainBindingId: binding.id,
-                            })}
-                        >
-                          <RefreshCw class="size-4" />
-                          {$t(i18nKeys.console.domainBindings.retryVerification)}
-                        </Button>
-                      {/if}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={showDomainBindingMutation.isPending}
-                        onclick={() =>
-                          showDomainBindingMutation.mutate({ domainBindingId: binding.id })}
-                      >
-                        <Search class="size-4" />
-                        {$t(i18nKeys.console.domainBindings.showDetails)}
-                      </Button>
-                      <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
-                    </div>
-                  </div>
-
-                  <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                    <div class="bg-muted/25 px-3 py-2">
-                      <p class="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Route class="size-3.5" />
-                        {$t(i18nKeys.common.domain.resource)}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">
-                        {resource?.name ?? binding.resourceId}
-                      </p>
-                    </div>
-                    <div class="bg-muted/25 px-3 py-2">
-                      <p class="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ShieldCheck class="size-3.5" />
-                        {$t(i18nKeys.common.domain.server)}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">
-                        {server?.name ?? binding.serverId}
-                      </p>
-                    </div>
-                    <div class="bg-muted/25 px-3 py-2">
-                      <p class="text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.domainBindings.verificationAttempts, {
-                          count: binding.verificationAttemptCount,
-                        })}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">
+                      <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+                        <div class="rounded-md bg-muted/20 px-3 py-2">
+                          <p class="uppercase tracking-wide">
+                            {$t(i18nKeys.common.domain.project)}
+                          </p>
+                          <p class="mt-1 truncate font-medium text-foreground">
+                            {project?.name ?? binding.projectId}
+                          </p>
+                        </div>
+                        <div class="rounded-md bg-muted/20 px-3 py-2">
+                          <p class="uppercase tracking-wide">
+                            {$t(i18nKeys.common.domain.environment)}
+                          </p>
+                          <p class="mt-1 truncate font-medium text-foreground">
+                            {environment?.name ?? binding.environmentId}
+                          </p>
+                        </div>
+                        <div class="rounded-md bg-muted/20 px-3 py-2">
+                          <p class="uppercase tracking-wide">
+                            {$t(i18nKeys.common.domain.resource)}
+                          </p>
+                          <p class="mt-1 truncate font-medium text-foreground">
+                            {resource?.name ?? binding.resourceId}
+                          </p>
+                        </div>
+                      </div>
+                      <p class="truncate text-xs text-muted-foreground">
                         {binding.pathPrefix} · {binding.proxyKind} · {$t(i18nKeys.common.domain.tls)}
-                        {binding.tlsMode}
-                        {#if binding.redirectTo}
-                          · {$t(i18nKeys.common.domain.redirectTo)} {binding.redirectTo}
-                          ({binding.redirectStatus ?? 308})
-                        {/if}
+                        {binding.tlsMode} · {formatTime(binding.createdAt)}
                       </p>
                     </div>
-                  </div>
-
-                  {#if detail}
-                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                      <div class="bg-muted/15 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.domainBindings.routeReadiness)}
-                        </p>
-                        <p class="mt-1 text-sm font-medium">
-                          {detail.routeReadiness.status} · {detail.routeReadiness.routeBehavior}
-                        </p>
-                      </div>
-                      <div class="bg-muted/15 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.domainBindings.proxyReadiness)}
-                        </p>
-                        <p class="mt-1 text-sm font-medium">
-                          {detail.proxyReadiness ?? $t(i18nKeys.common.status.unknown)}
-                        </p>
-                      </div>
-                      <div class="bg-muted/15 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.domainBindings.deleteSafety)}
-                        </p>
-                        <p class="mt-1 text-sm font-medium">
-                          {detail.deleteSafety.safeToDelete
-                            ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
-                            : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle)}
-                        </p>
-                      </div>
-                    </div>
-                  {/if}
-
-                  <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
-                    <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto_auto]">
-                      <Select.Root
-                        type="single"
-                        value={routeRedirectDrafts[binding.id] ?? binding.redirectTo ?? ""}
-                        onValueChange={(value) => setRouteRedirectDraft(binding.id, value)}
-                        disabled={redirectTargets.length === 0 || binding.status === "deleted"}
-                      >
-                        <Select.Trigger class="w-full">
-                          {routeRedirectDrafts[binding.id] ??
-                            binding.redirectTo ??
-                            $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
-                        </Select.Trigger>
-                        <Select.Content>
-                          {#each redirectTargets as target (target.id)}
-                            <Select.Item value={target.domainName}>{target.domainName}</Select.Item>
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                      <Select.Root
-                        type="single"
-                        value={routeRedirectStatusDrafts[binding.id] ??
-                          `${binding.redirectStatus ?? 308}`}
-                        onValueChange={(value) => setRouteRedirectStatusDraft(binding.id, value)}
-                        disabled={binding.status === "deleted"}
-                      >
-                        <Select.Trigger class="w-full">
-                          {routeRedirectStatusDrafts[binding.id] ?? binding.redirectStatus ?? 308}
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="308">308</Select.Item>
-                          <Select.Item value="301">301</Select.Item>
-                          <Select.Item value="307">307</Select.Item>
-                          <Select.Item value="302">302</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={
-                          binding.status === "deleted" ||
-                          configureDomainBindingRouteMutation.isPending ||
-                          !(routeRedirectDrafts[binding.id] ?? binding.redirectTo)
-                        }
-                        onclick={() => configureDomainBindingRoute(binding, "redirect")}
-                      >
-                        <Save class="size-4" />
-                        {$t(i18nKeys.console.domainBindings.configureRedirect)}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={binding.status === "deleted" || configureDomainBindingRouteMutation.isPending}
-                        onclick={() => configureDomainBindingRoute(binding, "serve")}
-                      >
-                        <Route class="size-4" />
-                        {$t(i18nKeys.console.domainBindings.configureServe)}
+                    <div class="flex flex-wrap gap-2 lg:justify-end">
+                      <Button size="sm" variant="outline" onclick={() => selectDomainBinding(binding)}>
+                        {$t(i18nKeys.common.actions.viewDetails)}
                       </Button>
                     </div>
-
-                    <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                      <Input
-                        value={deleteConfirmationDrafts[binding.id] ?? ""}
-                        disabled={binding.status === "deleted"}
-                        placeholder={binding.id}
-                        oninput={(event) =>
-                          setDeleteConfirmationDraft(
-                            binding.id,
-                            (event.currentTarget as HTMLInputElement).value,
-                          )}
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={checkDomainBindingDeleteSafetyMutation.isPending}
-                        onclick={() =>
-                          checkDomainBindingDeleteSafetyMutation.mutate({
-                            domainBindingId: binding.id,
-                          })}
-                      >
-                        <Search class="size-4" />
-                        {$t(i18nKeys.console.domainBindings.deleteCheck)}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        disabled={
-                          binding.status === "deleted" ||
-                          deleteDomainBindingMutation.isPending ||
-                          (deleteConfirmationDrafts[binding.id] ?? "") !== binding.id
-                        }
-                        onclick={() => deleteDomainBinding(binding)}
-                      >
-                        <Trash2 class="size-4" />
-                        {$t(i18nKeys.console.domainBindings.deleteBinding)}
-                      </Button>
-                    </div>
-                  </div>
-                </article>
-              {/each}
+                  </article>
+                {/each}
               </div>
             {:else}
               <div class="console-subtle-panel px-4 py-6">
@@ -1199,14 +633,420 @@
             {/if}
           </div>
 
-          <div class="mt-4">
-            <Button href="/deploy" variant="outline">
-              {$t(i18nKeys.common.actions.quickDeploy)}
-              <ArrowRight class="size-4" />
-            </Button>
-          </div>
+          <aside class="console-side-panel space-y-5" data-domain-binding-detail-display-surface>
+            {#if selectedDomainBinding}
+              {@const project = findProject(projects, selectedDomainBinding.projectId)}
+              {@const environment = findEnvironment(environments, selectedDomainBinding.environmentId)}
+              {@const resource = findResource(resources, selectedDomainBinding.resourceId)}
+              {@const server = selectedDomainBinding.serverId
+                ? findServer(servers, selectedDomainBinding.serverId)
+                : null}
+              <div class="space-y-3" data-domain-binding-identity-summary>
+                <Badge variant="outline">
+                  <Globe2 class="size-3.5" />
+                  {$t(i18nKeys.console.domainBindings.selectedBinding)}
+                </Badge>
+                <h2 class="truncate text-lg font-semibold">{selectedDomainBinding.domainName}</h2>
+                <dl class="grid gap-2 text-sm">
+                  <div class="rounded-md border bg-background px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">ID</dt>
+                    <dd class="mt-1 break-all font-mono text-xs">{selectedDomainBinding.id}</dd>
+                  </div>
+                  <div class="rounded-md border bg-background px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.common.domain.status)}
+                    </dt>
+                    <dd class="mt-1 font-medium">
+                      {domainBindingStatusLabel(selectedDomainBinding.status)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="console-section space-y-3" data-domain-binding-owner-summary>
+                <div class="space-y-1">
+                  <h3 class="font-semibold">{$t(i18nKeys.common.domain.resource)}</h3>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.domainBindings.createOwnerHint)}
+                  </p>
+                </div>
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.project)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {project?.name ?? selectedDomainBinding.projectId}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {environment?.name ?? selectedDomainBinding.environmentId}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {resource?.name ?? selectedDomainBinding.resourceId}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {server?.name ?? selectedDomainBinding.serverId ?? "-"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="console-section space-y-3" data-domain-binding-route-summary>
+                <div class="space-y-1">
+                  <h3 class="flex items-center gap-2 font-semibold">
+                    <Route class="size-4" />
+                    {$t(i18nKeys.common.domain.routeBehavior)}
+                  </h3>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.domainBindings.routeManagedInDialog)}
+                  </p>
+                </div>
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.console.domainBindings.routeReadiness)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {selectedDomainBindingDetail
+                        ? `${selectedDomainBindingDetail.routeReadiness.status} · ${selectedDomainBindingDetail.routeReadiness.routeBehavior}`
+                        : $t(i18nKeys.common.status.unknown)}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.console.domainBindings.proxyReadiness)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {selectedDomainBindingDetail?.proxyReadiness ??
+                        $t(i18nKeys.common.status.unknown)}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.redirectTo)}</dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {selectedDomainBinding.redirectTo ?? $t(i18nKeys.console.domainBindings.routeModeServe)}
+                    </dd>
+                  </div>
+                </dl>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    class="w-full"
+                    type="button"
+                    variant="outline"
+                    disabled={showDomainBindingMutation.isPending}
+                    onclick={() => showSelectedDomainBindingDetail(selectedDomainBinding)}
+                  >
+                    <Search class="size-4" />
+                    {$t(i18nKeys.console.domainBindings.showDetails)}
+                  </Button>
+                  <Button
+                    class="w-full"
+                    type="button"
+                    variant="outline"
+                    disabled={selectedDomainBinding.status === "deleted"}
+                    onclick={() => openDomainBindingRouteDialog(selectedDomainBinding)}
+                  >
+                    <Route class="size-4" />
+                    {$t(i18nKeys.console.domainBindings.manageRoute)}
+                  </Button>
+                </div>
+              </div>
+
+              <div class="console-section space-y-3" data-domain-binding-verification-summary>
+                <div class="space-y-1">
+                  <h3 class="flex items-center gap-2 font-semibold">
+                    <ShieldCheck class="size-4" />
+                    {$t(i18nKeys.console.domainBindings.dnsStepTitle)}
+                  </h3>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.domainBindings.verificationAttempts, {
+                      count: selectedDomainBinding.verificationAttemptCount,
+                    })}
+                  </p>
+                </div>
+                <Button
+                  class="w-full"
+                  type="button"
+                  variant="outline"
+                  disabled={selectedDomainBinding.status === "deleted"}
+                  onclick={() => openDomainBindingVerificationDialog(selectedDomainBinding)}
+                >
+                  <Check class="size-4" />
+                  {$t(i18nKeys.console.domainBindings.confirmOwnership)}
+                </Button>
+              </div>
+
+              <div class="console-section space-y-3" data-domain-binding-lifecycle-handoff>
+                <div class="space-y-1">
+                  <h3 class="font-semibold">
+                    {$t(i18nKeys.console.domainBindings.lifecycleStatus)}
+                  </h3>
+                  <p class="text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.domainBindings.lifecycleDescription)}
+                  </p>
+                </div>
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.console.domainBindings.lifecycleStatus)}</dt>
+                    <dd class="font-medium">
+                      {selectedDomainBindingDetail
+                        ? domainBindingLifecycleStatusLabel(selectedDomainBindingDetail)
+                        : $t(i18nKeys.common.status.unknown)}
+                    </dd>
+                  </div>
+                </dl>
+                <Button
+                  class="w-full"
+                  type="button"
+                  variant="outline"
+                  disabled={selectedDomainBinding.status === "deleted"}
+                  onclick={() => openDomainBindingDeleteDialog(selectedDomainBinding)}
+                >
+                  <ShieldCheck class="size-4" />
+                  {$t(i18nKeys.console.domainBindings.lifecycleManageAction)}
+                </Button>
+              </div>
+            {:else}
+              <div class="space-y-3 text-sm text-muted-foreground">
+                <Globe2 class="size-5" />
+                <p>{$t(i18nKeys.console.domainBindings.emptyBody)}</p>
+              </div>
+            {/if}
+          </aside>
         </section>
       {/if}
     </ConsoleResourceCanvas>
   {/if}
+
+  <Dialog.Root
+    bind:open={domainBindingVerificationDialogOpen}
+    onOpenChange={setDomainBindingVerificationDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      {#if selectedVerificationBinding}
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.domainBindings.dnsStepTitle)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.domainBindings.listDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <section class="space-y-5 px-5 pb-5" data-domain-binding-verification-dialog>
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainName)}</p>
+            <p class="mt-1 truncate text-sm font-medium">
+              {selectedVerificationBinding.domainName}
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {domainBindingStatusLabel(selectedVerificationBinding.status)} ·
+              {$t(i18nKeys.console.domainBindings.verificationAttempts, {
+                count: selectedVerificationBinding.verificationAttemptCount,
+              })}
+            </p>
+          </div>
+
+          <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={retryDomainBindingVerificationMutation.isPending}
+              onclick={() =>
+                retryDomainBindingVerificationMutation.mutate({
+                  domainBindingId: selectedVerificationBinding.id,
+                })}
+            >
+              <RefreshCw class="size-4" />
+              {$t(i18nKeys.console.domainBindings.retryVerification)}
+            </Button>
+            <Button
+              type="button"
+              disabled={selectedVerificationBinding.status !== "pending_verification" ||
+                confirmDomainBindingOwnershipMutation.isPending}
+              onclick={() => confirmDomainBindingOwnership(selectedVerificationBinding)}
+            >
+              <Check class="size-4" />
+              {confirmDomainBindingOwnershipMutation.isPending
+                ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
+                : $t(i18nKeys.console.domainBindings.confirmOwnership)}
+            </Button>
+          </div>
+        </section>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={domainBindingRouteDialogOpen}
+    onOpenChange={setDomainBindingRouteDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
+      {#if selectedRouteBinding}
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.domainBindings.routeDialogTitle)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.domainBindings.routeDialogDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <section class="space-y-5 px-5 pb-5" data-domain-binding-route-dialog>
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainName)}</p>
+            <p class="mt-1 truncate text-sm font-medium">{selectedRouteBinding.domainName}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {selectedRouteBinding.pathPrefix} · {selectedRouteBinding.proxyKind} · {$t(i18nKeys.common.domain.tls)}
+              {selectedRouteBinding.tlsMode}
+            </p>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+            <label class="space-y-1.5 text-sm font-medium">
+              <span class="console-field-label">{$t(i18nKeys.common.domain.redirectTo)}</span>
+              <Select.Root
+                type="single"
+                value={routeRedirectDraft}
+                onValueChange={setRouteRedirectDraft}
+                disabled={selectedRouteRedirectTargets.length === 0 ||
+                  selectedRouteBinding.status === "deleted"}
+              >
+                <Select.Trigger class="w-full">
+                  {routeRedirectDraft || $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
+                </Select.Trigger>
+                <Select.Content>
+                  {#each selectedRouteRedirectTargets as target (target.id)}
+                    <Select.Item value={target.domainName}>{target.domainName}</Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </label>
+
+            <label class="space-y-1.5 text-sm font-medium">
+              <span class="console-field-label">{$t(i18nKeys.common.domain.redirectStatus)}</span>
+              <Select.Root
+                type="single"
+                value={routeRedirectStatusDraft}
+                onValueChange={setRouteRedirectStatusDraft}
+                disabled={selectedRouteBinding.status === "deleted"}
+              >
+                <Select.Trigger class="w-full">
+                  {routeRedirectStatusDraft}
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="308">308</Select.Item>
+                  <Select.Item value="301">301</Select.Item>
+                  <Select.Item value="307">307</Select.Item>
+                  <Select.Item value="302">302</Select.Item>
+                </Select.Content>
+              </Select.Root>
+            </label>
+          </div>
+
+          <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={selectedRouteBinding.status === "deleted" ||
+                configureDomainBindingRouteMutation.isPending}
+              onclick={() => configureDomainBindingRoute(selectedRouteBinding, "serve")}
+            >
+              <Route class="size-4" />
+              {$t(i18nKeys.console.domainBindings.configureServe)}
+            </Button>
+            <Button
+              type="button"
+              disabled={selectedRouteBinding.status === "deleted" ||
+                configureDomainBindingRouteMutation.isPending ||
+                !routeRedirectDraft}
+              onclick={() => configureDomainBindingRoute(selectedRouteBinding, "redirect")}
+            >
+              <Save class="size-4" />
+              {$t(i18nKeys.console.domainBindings.configureRedirect)}
+            </Button>
+          </div>
+        </section>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={domainBindingDeleteDialogOpen}
+    onOpenChange={setDomainBindingDeleteDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      {#if selectedDeleteBinding}
+        {@const selectedDeleteDetail = bindingDetails[selectedDeleteBinding.id]}
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.console.domainBindings.deleteDialogTitle)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.domainBindings.deleteDialogDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+        <section class="space-y-5 px-5 pb-5" data-domain-binding-delete-dialog>
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainName)}</p>
+            <p class="mt-1 truncate text-sm font-medium">{selectedDeleteBinding.domainName}</p>
+            <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+              {selectedDeleteBinding.id}
+            </p>
+          </div>
+
+          <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm">
+            <p class="font-medium text-destructive">
+              {$t(i18nKeys.console.domainBindings.deleteSafety)}
+            </p>
+            <p class="mt-1 text-muted-foreground">
+              {#if selectedDeleteDetail}
+                {selectedDeleteDetail.deleteSafety.safeToDelete
+                  ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+                  : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle)}
+              {:else}
+                {$t(i18nKeys.console.domainBindings.deleteCheckFirst)}
+              {/if}
+            </p>
+          </div>
+
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">
+              {$t(i18nKeys.console.domainBindings.deleteConfirmLabel)}
+            </span>
+            <Input
+              value={deleteConfirmationDraft}
+              disabled={selectedDeleteBinding.status === "deleted"}
+              placeholder={selectedDeleteBinding.id}
+              oninput={(event) =>
+                setDeleteConfirmationDraft(
+                  (event.currentTarget as HTMLInputElement).value,
+                )}
+            />
+          </label>
+
+          <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={checkDomainBindingDeleteSafetyMutation.isPending}
+              onclick={() =>
+                checkDomainBindingDeleteSafetyMutation.mutate({
+                  domainBindingId: selectedDeleteBinding.id,
+                })}
+            >
+              <Search class="size-4" />
+              {$t(i18nKeys.console.domainBindings.deleteCheck)}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={selectedDeleteBinding.status === "deleted" ||
+                deleteDomainBindingMutation.isPending ||
+                deleteConfirmationDraft !== selectedDeleteBinding.id}
+              onclick={() => deleteDomainBinding(selectedDeleteBinding)}
+            >
+              <Trash2 class="size-4" />
+              {$t(i18nKeys.console.domainBindings.deleteBinding)}
+            </Button>
+          </div>
+        </section>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
 </ConsoleShell>

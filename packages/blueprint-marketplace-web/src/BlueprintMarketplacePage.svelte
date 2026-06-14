@@ -316,11 +316,12 @@
     {/if}
   </header>
 
-  <div class="marketplace-controls">
+  <div class="marketplace-controls" data-blueprint-marketplace-controls>
     <div class="marketplace-toolbar">
       <label class="search-field">
         <span class="sr-only">搜索 Blueprint 目录</span>
         <input
+          data-blueprint-marketplace-search
           type="search"
           placeholder="搜索应用、分类、依赖或标签"
           bind:value={searchTerm}
@@ -336,7 +337,7 @@
     </div>
 
     {#if !isLoading && !errorMessage}
-      <nav class="category-tabs" aria-label="Blueprint categories">
+      <nav class="category-tabs" aria-label="Blueprint categories" data-blueprint-marketplace-category-tabs>
         <button
           type="button"
           class:selected={selectedCategoryKey === "all"}
@@ -416,7 +417,7 @@
       </p>
     {/if}
 
-    <div class="marketplace-groups">
+    <div class="marketplace-groups" data-blueprint-marketplace-groups>
       {#each groupedListings as group (group.category.key)}
         <section class="marketplace-group">
           <div class="group-heading">
@@ -529,8 +530,6 @@
   }
 
   .badge-row span,
-  .tag-row span,
-  .status-badges span,
   .group-heading > span {
     border: 1px solid var(--marketplace-border);
     border-radius: 999px;
@@ -548,7 +547,6 @@
 
   h1,
   h2,
-  h3,
   p {
     margin: 0;
   }
@@ -579,9 +577,6 @@
   }
 
   .secondary-link,
-  .primary-action,
-  .outline-action,
-  .icon-link,
   .marketplace-empty button {
     display: inline-flex;
     min-height: 32px;
@@ -602,24 +597,13 @@
       background 160ms ease;
   }
 
-  .secondary-link,
-  .outline-action,
-  .icon-link {
+  .secondary-link {
     background: white;
     border-color: var(--marketplace-border-strong);
     color: var(--marketplace-foreground);
   }
 
-  .icon-link {
-    width: 32px;
-    padding: 0;
-    font-size: 1rem;
-  }
-
   .secondary-link:hover,
-  .primary-action:hover,
-  .outline-action:hover,
-  .icon-link:hover,
   .marketplace-empty button:hover {
     transform: translateY(-1px);
   }
@@ -752,7 +736,6 @@
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   }
 
-  .listing-card,
   .marketplace-empty {
     border: 1px solid var(--marketplace-border);
     border-radius: 8px;
@@ -760,174 +743,11 @@
     box-shadow: var(--marketplace-panel-shadow);
   }
 
-  .listing-card {
-    display: flex;
-    min-height: 300px;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 16px;
-  }
-
-  .listing-card.selected {
-    border-color: rgba(15, 118, 110, 0.48);
-    box-shadow:
-      0 0 0 1px rgba(15, 118, 110, 0.16),
-      var(--marketplace-panel-shadow);
-  }
-
-  .listing-card-header {
-    display: flex;
-    min-width: 0;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
   .listing-card-main {
     display: grid;
     min-width: 0;
     grid-template-columns: 44px minmax(0, 1fr);
     gap: 12px;
-  }
-
-  .listing-icon {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 auto;
-    place-items: center;
-    overflow: hidden;
-    border: 1px solid var(--marketplace-border-strong);
-    border-radius: 8px;
-    background: #eef2ff;
-    color: var(--marketplace-foreground);
-    font-size: 0.78rem;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-
-  .listing-icon.has-image {
-    border-color: var(--marketplace-border);
-    background: white;
-    color: var(--marketplace-foreground);
-  }
-
-  .listing-icon img {
-    width: 26px;
-    height: 26px;
-    object-fit: contain;
-  }
-
-  .listing-title {
-    min-width: 0;
-  }
-
-  .status-badges {
-    display: flex;
-    flex-wrap: wrap;
-    flex: 0 0 auto;
-    justify-content: flex-end;
-    gap: 6px;
-  }
-
-  .listing-title h3 {
-    overflow: hidden;
-    font-size: 1rem;
-    letter-spacing: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .listing-title p,
-  .listing-summary {
-    color: var(--marketplace-muted);
-    font-size: 0.92rem;
-    line-height: 1.55;
-  }
-
-  .listing-title p {
-    display: -webkit-box;
-    margin-top: 5px;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
-  .listing-summary {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
-  .listing-facts {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin: 0;
-  }
-
-  .listing-facts div {
-    display: grid;
-    min-width: 0;
-    gap: 2px;
-    border: 1px solid var(--marketplace-border);
-    border-radius: 8px;
-    background: color-mix(in srgb, #f8fafc 68%, white);
-    padding: 8px 10px;
-  }
-
-  .listing-facts dt {
-    color: #64748b;
-    font-size: 0.74rem;
-    font-weight: 800;
-  }
-
-  .listing-facts dd {
-    min-width: 0;
-    margin: 0;
-    overflow: hidden;
-    color: #26364a;
-    font-size: 0.88rem;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .tag-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .listing-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    border-top: 1px solid #e6ebf1;
-    padding-top: 14px;
-  }
-
-  .listing-footer > span {
-    min-width: 0;
-    overflow: hidden;
-    color: #64748b;
-    font-size: 0.82rem;
-    font-weight: 800;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .action-row {
-    display: flex;
-    flex: 0 0 auto;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: flex-end;
   }
 
   .marketplace-empty {
@@ -986,17 +806,11 @@
 
     .marketplace-hero,
     .standalone .marketplace-hero,
-    .marketplace-toolbar,
-    .listing-footer {
+    .marketplace-toolbar {
       grid-template-columns: 1fr;
     }
 
-    .listing-footer {
-      align-items: stretch;
-    }
-
-    .hero-actions,
-    .action-row {
+    .hero-actions {
       justify-content: flex-start;
     }
 
