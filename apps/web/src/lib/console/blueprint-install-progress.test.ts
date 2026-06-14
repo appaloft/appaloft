@@ -164,4 +164,49 @@ describe("Blueprint install progress helpers", () => {
       failureReason: "rollback-required",
     });
   });
+
+  test("[CLOUD-BLUEPRINT-QD-033] treats failed component deployment readback as install failure", () => {
+    const snapshot: BlueprintInstallProgressSnapshot = {
+      schemaVersion: "appaloft.cloud.installed-application.command-result/v1",
+      applicationId: "cia_component_failed",
+      executionStatus: "installing",
+      monitoring: {
+        workId: "dw_blueprint_install_cia_component_failed",
+        deploymentIds: ["dep_component_failed"],
+      },
+      installedApplication: {
+        applicationId: "cia_component_failed",
+        status: "installing",
+        components: [
+          {
+            resource: { resourceId: "res_component_failed" },
+            deployment: {
+              deploymentId: "dep_component_failed",
+              status: "failed",
+              reason: "deploy failed",
+            },
+            endpoints: [],
+          },
+        ],
+      },
+      progress: {
+        status: "installing",
+        userStatus: "running",
+        currentStep: "deploy-component-readback",
+        deploymentIds: ["dep_component_failed"],
+        operatorWorkId: "dw_blueprint_install_cia_component_failed",
+      },
+    };
+
+    expect(summarizeBlueprintInstallProgress(snapshot)).toMatchObject({
+      applicationId: "cia_component_failed",
+      executionStatus: "installing",
+      userStatus: "running",
+      terminalStatus: "failed",
+      deploymentId: "dep_component_failed",
+      resourceId: "res_component_failed",
+      currentStep: "deploy-component-readback",
+      failureReason: "deploy failed",
+    });
+  });
 });

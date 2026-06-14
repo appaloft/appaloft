@@ -173,7 +173,7 @@
       aria-labelledby="quick-deploy-progress-title"
       aria-modal="true"
       role="dialog"
-      class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border bg-background shadow-lg"
+      class="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
     >
       <header class="border-b px-5 py-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -222,7 +222,6 @@
               type="button"
               size="sm"
               variant="outline"
-              disabled={pending}
               onclick={() => onClose?.()}
             >
               {$t(i18nKeys.common.actions.close)}
@@ -231,18 +230,9 @@
         </div>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-auto p-5">
-        <div class="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
-          <aside class="console-side-panel space-y-4">
-            <div class="space-y-1">
-              <h3 class="text-sm font-semibold">
-                {$t(i18nKeys.console.quickDeploy.workflowProgressTitle)}
-              </h3>
-              <p class="text-sm leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.quickDeploy.workflowProgressDescription)}
-              </p>
-            </div>
-
+      <div class="min-h-0 flex-1 space-y-4 overflow-auto p-5">
+        <section class="rounded-md border bg-muted/10 p-4">
+          <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
             <div class="console-record-list">
               {#if progressItems.length === 0}
                 <div class="console-record-row flex items-center gap-2">
@@ -274,40 +264,42 @@
               {/if}
             </div>
 
-            {#if progressError}
-              <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {progressError}
-              </div>
-            {/if}
+            <div class="space-y-3">
+              {#if progressError}
+                <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {progressError}
+                </div>
+              {/if}
 
-            {#if feedback}
-              <div
-                class={[
-                  "rounded-md border px-3 py-2 text-sm",
-                  feedback.kind === "success"
-                    ? "border-primary/25 bg-primary/5"
-                    : feedback.kind === "running"
-                      ? "border-border bg-muted/20"
-                      : "border-destructive/25 bg-destructive/5 text-destructive",
-                ]}
-              >
-                <p class="font-medium">{feedback.title}</p>
-                <p class="mt-1 break-words text-xs text-muted-foreground">{feedback.detail}</p>
-              </div>
-            {/if}
-          </aside>
+              {#if feedback}
+                <div
+                  class={[
+                    "rounded-md border px-3 py-2 text-sm",
+                    feedback.kind === "success"
+                      ? "border-primary/25 bg-primary/5"
+                      : feedback.kind === "running"
+                        ? "border-border bg-background"
+                        : "border-destructive/25 bg-destructive/5 text-destructive",
+                  ]}
+                >
+                  <p class="font-medium">{feedback.title}</p>
+                  <p class="mt-1 break-words text-xs text-muted-foreground">{feedback.detail}</p>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </section>
 
-          <OperationProgressPanel
-            status={deploymentPanelStatus()}
-            events={deploymentEvents}
-            streamError={progressError}
-            {deploymentId}
-            {traceLink}
-            title={$t(i18nKeys.console.deployments.progressTitle)}
-            description={$t(i18nKeys.console.deployments.progressDescription)}
-            {onOpenDeployment}
-          />
-        </div>
+        <OperationProgressPanel
+          status={deploymentPanelStatus()}
+          events={deploymentEvents}
+          streamError={progressError}
+          {deploymentId}
+          {traceLink}
+          title={$t(i18nKeys.console.deployments.progressTitle)}
+          description={$t(i18nKeys.console.deployments.progressDescription)}
+          {onOpenDeployment}
+        />
       </div>
     </div>
   </div>

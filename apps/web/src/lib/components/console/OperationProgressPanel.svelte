@@ -129,7 +129,9 @@
           {description ?? $t(i18nKeys.console.deployments.progressDescription)}
         </p>
         <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
-          <span>{$t(i18nKeys.console.deployments.progressRequestLabel)} {requestId || "-"}</span>
+          {#if requestId}
+            <span>{$t(i18nKeys.console.deployments.progressRequestLabel)} {requestId}</span>
+          {/if}
           {#if deploymentId}
             <span>
               {$t(i18nKeys.console.deployments.progressDeploymentLabel)} {deploymentId}

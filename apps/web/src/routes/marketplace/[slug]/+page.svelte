@@ -789,10 +789,6 @@
     return "进行中";
   }
 
-  function progressSupportCommand(progress: InstalledApplicationProgress): string {
-    return progress.operatorWorkId ? `appaloft work show ${progress.operatorWorkId}` : "";
-  }
-
   function progressDeploymentHref(deploymentId: string): string {
     return `/deployments/${encodeURIComponent(deploymentId)}`;
   }
@@ -1725,22 +1721,6 @@
                   <ArrowRight class="size-4" />
                 </Button>
               </div>
-
-              {#if installResult.progress.operatorWorkId}
-                <details
-                  class="rounded-md border bg-background px-3 py-2 text-xs"
-                  data-blueprint-install-operator-work
-                >
-                  <summary class="cursor-pointer font-medium">支持详情</summary>
-                  <div class="mt-2 space-y-2">
-                    <div class="flex items-center justify-between gap-3">
-                      <span class="text-muted-foreground">工作项</span>
-                      <span class="break-all font-mono">{installResult.progress.operatorWorkId}</span>
-                    </div>
-                    <pre class="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs"><code>{progressSupportCommand(installResult.progress)}</code></pre>
-                  </div>
-                </details>
-              {/if}
             </div>
           {/if}
         </section>
