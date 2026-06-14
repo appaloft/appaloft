@@ -1329,6 +1329,10 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openRuntimeControlDialog");
     expect(resourceDetailPageSource).toContain("confirmSelectedRuntimeControl");
     expect(resourceDetailPageSource).toContain("data-resource-runtime-control-dialog");
+    expect(runtimeControlPanelSource).toContain(
+      '<section id="resource-runtime-control" class="space-y-4">',
+    );
+    expect(runtimeControlPanelSource).not.toContain('id="resource-runtime-control" class="space-y-4 p-5"');
     expect(runtimeControlPanelSource).toContain("onclick={openRuntimeControlDialog}");
     expect(runtimeControlPanelSource).toContain("runtimeControlManageAction");
     expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("stop")');
