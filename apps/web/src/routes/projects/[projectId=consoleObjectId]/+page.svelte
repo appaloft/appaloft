@@ -44,6 +44,7 @@
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
@@ -1636,9 +1637,9 @@
                                     {resource.name}
                                   </a>
                                   <Badge variant="secondary">{resource.kind}</Badge>
-                                  <Badge variant="outline">
-                                    {resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}
-                                  </Badge>
+                                  <DeploymentStatusBadge
+                                    status={resource.lastDeploymentStatus ?? latestDeployment?.status}
+                                  />
                                 </div>
                                 <p class="mt-1 truncate text-xs text-muted-foreground">
                                   {currentAccessRoute?.route.url ?? $t(i18nKeys.console.projects.noPublicAccess)}
