@@ -114,9 +114,11 @@ describe("Blueprint install progress helpers", () => {
         status: "failed",
         level: "error",
         message:
-          "step: rollback-required · worker: appaloft-cloud-production-worker/appaloft-cloud-production-worker-replica-2 · error: blueprint_install_failed · failure: resource_slug_conflict · phase: resource-admission · operation: CreateResourceCommand",
+          "step: rollback-required · error: blueprint_install_failed · failure: resource_slug_conflict · phase: resource-admission · operation: CreateResourceCommand",
       },
     ]);
+    expect(progressEvents[1]?.message).not.toContain("worker:");
+    expect(progressEvents[1]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
   });
 
   test("[CLOUD-BLUEPRINT-QD-032] treats rollback-required install readback as failed even without deployment ids", () => {

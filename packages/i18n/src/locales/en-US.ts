@@ -1374,7 +1374,7 @@ export const enUS = {
       deleteFailed: "Project was not deleted",
       deleteSucceeded: "Project deleted",
       attentionFailedDeploymentTitle: "Failed deployment",
-      attentionFailedOperatorWorkTitle: "Background install failed",
+      attentionFailedOperatorWorkTitle: "Blueprint install failed",
       attentionNoAccessDetail:
         "No resource currently has a public access route. Open networking on a resource to manage access.",
       attentionNoAccessTitle: "No public access",
@@ -1383,7 +1383,7 @@ export const enUS = {
       attentionNoDeploymentTitle: "Deploy a resource",
       attentionOperatorWorkRefreshAction: "Refresh status",
       attentionRunningDeploymentTitle: "Deployment running",
-      attentionRunningOperatorWorkTitle: "Background install running",
+      attentionRunningOperatorWorkTitle: "Blueprint install running",
       attentionTitle: "Attention",
       deployedResourcesLabel: "deployed",
       detailDescription: "Environments, resources, and deployment records for this project",
@@ -2455,10 +2455,11 @@ export const enUS = {
         "The workload listens on this internal port. Reverse proxy routing targets this port.",
       applicationPortInvalid: "Application port must be an integer between 1 and 65535.",
       buildTarget: "Build target",
-      blueprintInstallAcceptedDetail: "Background work {{workId}} is waiting for a Worker handoff.",
-      blueprintInstallAcceptedFallback: "{{status}}, waiting for a background Worker handoff.",
+      blueprintInstallAcceptedDetail:
+        "Blueprint install is queued and waiting for deployment progress updates.",
+      blueprintInstallAcceptedFallback: "{{status}}, waiting for deployment progress updates.",
       blueprintInstallAcceptedTitle: "Blueprint install queued",
-      blueprintInstallOpenWork: "View background work",
+      blueprintInstallOpenWork: "View install progress",
       chooseSourceDirectoryBrowserHint:
         "Plain browsers cannot read local paths only; enter the path manually.",
       commandPreview: "Command preview",

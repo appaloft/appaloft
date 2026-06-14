@@ -69,4 +69,36 @@ describe("project detail page structure", () => {
     expect(englishLocaleSource).not.toContain("Project activity is not available yet");
     expect(chineseLocaleSource).not.toContain("项目活动暂不可用");
   });
+
+  test("[PROJECT-DEPLOY-PROGRESS-001] exposes deployment progress without raw worker links", async () => {
+    const [projectSource, quickDeployProgressDialogSource, deploymentStatusBadgeSource] =
+      await Promise.all([
+        readFile(
+          new URL(
+            "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL("../components/console/QuickDeployProgressDialog.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL("../components/console/DeploymentStatusBadge.svelte", import.meta.url),
+          "utf8",
+        ),
+      ]);
+
+    expect(projectSource).toContain("data-project-attention-progress-item");
+    expect(projectSource).toContain("data-project-attention-progress-trigger");
+    expect(projectSource).toContain("data-project-attention-status-signal");
+    expect(projectSource).toContain("DropdownMenuContent");
+    expect(projectSource).toContain("projectAttentionStatusLabel");
+    expect(projectSource).not.toContain("work.id, work.step");
+    expect(quickDeployProgressDialogSource).not.toContain("work {operatorWorkId}");
+    expect(quickDeployProgressDialogSource).not.toContain("onOpenOperatorWork");
+    expect(deploymentStatusBadgeSource).toContain("data-deployment-running-signal");
+    expect(deploymentStatusBadgeSource).toContain("bg-amber-50");
+  });
 });
