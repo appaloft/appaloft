@@ -4,6 +4,7 @@ import {
   type ProjectDeleteBlockerKind,
   type ProjectDeletionBlocker,
   type ProjectDeletionBlockerReader,
+  type ProjectEmptyEnvironmentArchiveCandidate,
   type RepositoryContext,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
@@ -34,6 +35,73 @@ function blockerFromRows(
 export class PgProjectDeletionBlockerReader implements ProjectDeletionBlockerReader {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async findEmptyEnvironmentArchiveCandidates(
+    context: RepositoryContext,
+    input: { projectId: string },
+  ): Promise<Result<ProjectEmptyEnvironmentArchiveCandidate[]>> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createRepositorySpanName(
+        "project_deletion_blocker",
+        "find_empty_environment_archive_candidates",
+      ),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "project_deletion_blocker",
+        },
+      },
+      async () => {
+        try {
+          const rows = await executor
+            .selectFrom("environments")
+            .select([
+              "environments.id as environmentId",
+              "environments.lifecycle_status as lifecycleStatus",
+            ])
+            .where("environments.project_id", "=", input.projectId)
+            .where("environments.lifecycle_status", "in", ["active", "locked"])
+            .where(({ not, exists, selectFrom }) =>
+              not(
+                exists(
+                  selectFrom("environment_variables")
+                    .select("environment_variables.id")
+                    .whereRef("environment_variables.environment_id", "=", "environments.id"),
+                ),
+              ),
+            )
+            .where(({ not, exists, selectFrom }) =>
+              not(
+                exists(
+                  selectFrom("resources")
+                    .select("resources.id")
+                    .whereRef("resources.environment_id", "=", "environments.id")
+                    .where("resources.lifecycle_status", "!=", "deleted"),
+                ),
+              ),
+            )
+            .execute();
+
+          return ok(
+            rows.map((row) => ({
+              environmentId: row.environmentId,
+              lifecycleStatus: row.lifecycleStatus as "active" | "locked",
+            })),
+          );
+        } catch (error) {
+          return err(
+            domainError.infra("Project empty environment archive candidates could not be read", {
+              phase: "project-delete-empty-environment-read",
+              projectId: input.projectId,
+              adapter: "persistence.pg",
+              operation: "project-deletion-blocker.find-empty-environment-archive-candidates",
+              errorMessage: error instanceof Error ? error.message : String(error),
+            }),
+          );
+        }
+      },
+    );
+  }
+
   async findBlockers(
     context: RepositoryContext,
     input: { projectId: string },
@@ -53,6 +121,21 @@ export class PgProjectDeletionBlockerReader implements ProjectDeletionBlockerRea
             .select("id")
             .where("project_id", "=", input.projectId)
             .where("lifecycle_status", "!=", "archived")
+            .where(({ exists, or, selectFrom }) =>
+              or([
+                exists(
+                  selectFrom("environment_variables")
+                    .select("environment_variables.id")
+                    .whereRef("environment_variables.environment_id", "=", "environments.id"),
+                ),
+                exists(
+                  selectFrom("resources")
+                    .select("resources.id")
+                    .whereRef("resources.environment_id", "=", "environments.id")
+                    .where("resources.lifecycle_status", "!=", "deleted"),
+                ),
+              ]),
+            )
             .execute();
           const resourceRows = await executor
             .selectFrom("resources")

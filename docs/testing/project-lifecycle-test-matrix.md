@@ -59,9 +59,11 @@ It also verifies that no entrypoint exposes generic `projects.update`.
 | PROJ-LIFE-RESTORE-003 | `projects.restore` | integration | Project has resources or deployments. | Restore succeeds without creating, retrying, or mutating child resources, environments, deployments, source links, domains, certificates, logs, audit retention, or runtime state. |
 | PROJ-LIFE-DELETE-CHECK-001 | `projects.delete-check` | integration | Active project checked. | Returns `projects.delete-check/v1`, `eligible = false`, and an `active-project` blocker. |
 | PROJ-LIFE-DELETE-CHECK-002 | `projects.delete-check` | integration | Archived project has retained blockers. | Returns `eligible = false` with safe typed blockers. |
+| PROJ-LIFE-DELETE-CHECK-003 | `projects.delete-check` | integration | Archived project has only empty active or locked environments. | Returns `eligible = true` and does not report those empty environments as blockers. |
 | PROJ-LIFE-DELETE-001 | `projects.delete` | integration | Archived project has no blockers and confirmation matches. | Persists deleted tombstone, publishes `project-deleted`, omits project from normal read models, and does not cascade child cleanup. |
 | PROJ-LIFE-DELETE-002 | `projects.delete` | integration | Archived project has retained blockers. | Returns `project_delete_blocked`, no mutation, no event. |
 | PROJ-LIFE-DELETE-003 | `projects.delete` | integration | Active project deleted. | Returns `project_delete_blocked` with `active-project`, no mutation, no event. |
+| PROJ-LIFE-DELETE-004 | `projects.delete` | integration | Archived project has only empty active or locked environments and matching confirmation. | Auto-archives the empty environments through `Environment.archive`, publishes `environment-archived`, then persists the project tombstone and `project-deleted`. |
 | PROJ-LIFE-GUARD-001 | `environments.create` | integration | Archived project selected. | Returns `project_archived`, `phase = project-lifecycle-guard`. |
 | PROJ-LIFE-GUARD-002 | `resources.create` | integration | Archived project selected. | Returns `project_archived`, `phase = project-lifecycle-guard`. |
 | PROJ-LIFE-GUARD-003 | `deployments.create` | integration | Archived project selected. | Returns `project_archived`, `phase = project-lifecycle-guard`. |
@@ -86,7 +88,7 @@ Tests must assert project lifecycle operations do not:
 
 - create deployments;
 - create or mutate resources;
-- create or mutate environments except through child-operation guards;
+- create or mutate environments except through child-operation guards and empty-environment auto-archive during `projects.delete`;
 - mutate source links, domains, certificates, runtime state, logs, or audit retention;
 - expose generic `projects.update`, `UpdateProjectCommand`, or `PATCH /api/projects/{id}`.
 
