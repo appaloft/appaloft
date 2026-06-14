@@ -144,9 +144,25 @@ describe("QuickDeploySheet structure", () => {
       'class="block w-full text-xs font-normal leading-5 text-muted-foreground"',
     );
     expect(quickDeploySheetSource).toContain('<SourceIcon class="size-3.5" />');
-    expect(quickDeploySheetSource).toContain('<GitFork class="size-3.5" />');
-    expect(quickDeploySheetSource).toContain('<GitHubIcon class="size-3.5" />');
     expect(quickDeploySheetSource).not.toContain('<SourceIcon class="size-4 shrink-0" />');
+  });
+
+  test("[QUICK-DEPLOY-UX-003C] renders GitHub access mode as a secondary radio list", () => {
+    expect(quickDeploySheetSource).toContain("data-github-source-mode-radios");
+    expect(quickDeploySheetSource).toContain('role="radiogroup"');
+    expect(quickDeploySheetSource).toContain('id="github-source-mode-url"');
+    expect(quickDeploySheetSource).toContain('id="github-source-mode-browser"');
+    expect(quickDeploySheetSource).toContain('type="radio"');
+    expect(quickDeploySheetSource).toContain('name="github-source-mode"');
+    expect(quickDeploySheetSource).toContain('class="mt-0.5 size-4 shrink-0 accent-primary"');
+    expect(quickDeploySheetSource).toContain('checked={githubSourceMode === "url"}');
+    expect(quickDeploySheetSource).toContain('checked={githubSourceMode === "browser"}');
+    expect(quickDeploySheetSource).not.toContain(
+      'variant={githubSourceMode === "url" ? "selected" : "outline"}',
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'variant={githubSourceMode === "browser" ? "selected" : "outline"}',
+    );
   });
 
   test("[QUICK-DEPLOY-UX-004] locks the source picker after a Blueprint is selected", () => {

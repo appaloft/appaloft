@@ -5342,54 +5342,59 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             {/if}
             {#if sourceKind === "github"}
               <div class="space-y-3">
-                <div class="grid gap-2 sm:grid-cols-2">
-                  <Button
-                    type="button"
-                    variant={githubSourceMode === "url" ? "selected" : "outline"}
-                    class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
+                <div
+                  class="space-y-3"
+                  role="radiogroup"
+                  aria-label={$t(i18nKeys.console.quickDeploy.sourceGitMethod)}
+                  data-github-source-mode-radios
+                >
+                  <label
+                    class="flex cursor-pointer items-start gap-3 rounded-sm py-1.5 text-left"
                     data-github-public-url-mode
-                    onclick={() => selectGithubSourceMode("url")}
+                    for="github-source-mode-url"
                   >
-                    <span class="flex w-full min-w-0 items-center gap-2">
-                      <span
-                        class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
-                          githubSourceMode === "url" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <GitFork class="size-3.5" />
-                      </span>
-                      <span class="min-w-0 truncate text-sm font-medium leading-5">
+                    <input
+                      id="github-source-mode-url"
+                      class="mt-0.5 size-4 shrink-0 accent-primary"
+                      type="radio"
+                      name="github-source-mode"
+                      value="url"
+                      checked={githubSourceMode === "url"}
+                      onchange={() => selectGithubSourceMode("url")}
+                    />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium leading-5">
                         {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
                       </span>
-                    </span>
-                    <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
-                      {$t(i18nKeys.console.quickDeploy.githubSourceUrlModeHint)}
-                    </span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={githubSourceMode === "browser" ? "selected" : "outline"}
-                    class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
-                    onclick={() => selectGithubSourceMode("browser")}
-                  >
-                    <span class="flex w-full min-w-0 items-center gap-2">
-                      <span
-                        class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
-                          githubSourceMode === "browser" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <GitHubIcon class="size-3.5" />
+                      <span class="mt-1 block text-xs font-normal leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.githubSourceUrlModeHint)}
                       </span>
-                      <span class="min-w-0 truncate text-sm font-medium leading-5">
+                    </span>
+                  </label>
+                  <label
+                    class="flex cursor-pointer items-start gap-3 rounded-sm py-1.5 text-left"
+                    for="github-source-mode-browser"
+                  >
+                    <input
+                      id="github-source-mode-browser"
+                      class="mt-0.5 size-4 shrink-0 accent-primary"
+                      type="radio"
+                      name="github-source-mode"
+                      value="browser"
+                      checked={githubSourceMode === "browser"}
+                      onchange={() => selectGithubSourceMode("browser")}
+                    />
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium leading-5">
                         {$t(i18nKeys.console.quickDeploy.githubSourceBrowserMode)}
                       </span>
+                      <span class="mt-1 block text-xs font-normal leading-5 text-muted-foreground">
+                        {githubUsesHostedProviderApp
+                          ? $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeHostedHint)
+                          : $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeOAuthHint)}
+                      </span>
                     </span>
-                    <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
-                      {githubUsesHostedProviderApp
-                        ? $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeHostedHint)
-                        : $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeOAuthHint)}
-                    </span>
-                  </Button>
+                  </label>
                 </div>
                 {#if githubSourceMode === "url"}
                   <div class="space-y-2">
