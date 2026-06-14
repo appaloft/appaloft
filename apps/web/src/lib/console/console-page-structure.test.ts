@@ -106,6 +106,10 @@ const retiredIntentRoutesSource = readFileSync(
   fileURLToPath(new URL("./retired-intent-routes.ts", import.meta.url)),
   "utf8",
 );
+const consoleLayoutCssSource = readFileSync(
+  fileURLToPath(new URL("../../routes/layout.css", import.meta.url)),
+  "utf8",
+);
 const serverDetailPageSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/servers/[serverId=consoleObjectId]/+page.svelte", import.meta.url),
@@ -1702,8 +1706,19 @@ describe("console page structure", () => {
     expect(serverDetailPageSource).toContain('<div class="console-detail-page">');
     expect(serverDetailPageSource).toContain("console-detail-header");
     expect(serverDetailPageSource).toContain(
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body > .console-detail-tab-panel",
+    );
+    expect(consoleLayoutCssSource).toContain("margin-top: 0;");
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body > .console-detail-tab-panel-scroll",
+    );
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body .console-detail-subnav-layout > .console-subnav-content",
+    );
+    expect(consoleLayoutCssSource).toContain("padding-top: 0;");
     expect(serverDetailPageSource).toContain(
       'class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"',
     );
@@ -1732,7 +1747,7 @@ describe("console page structure", () => {
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
       '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
 
     expect(serverOverviewSource).toContain("data-server-overview-operational-surfaces");
@@ -1768,7 +1783,7 @@ describe("console page structure", () => {
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
       '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
     const serverConnectivityTabSource = sourceBetween(
       serverDetailPageSource,
