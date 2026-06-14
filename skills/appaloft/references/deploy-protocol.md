@@ -209,11 +209,13 @@ deployment, or runtime state:
    for runtime realizations, and delete the storage volume only when it is seed-owned.
 9. After Appaloft cleanup completes, use `appaloft server test <serverId>` and
    `appaloft server capacity inspect <serverId>` as the first read-only orphan check when the server
-   credential is managed by Appaloft. Direct read-only SSH/Docker inspection is acceptable only for
-   verification, not mutation, and only when the needed credential is available. If orphan
-   containers, networks, or volumes with the test resource/deployment identifiers remain, fix or add
-   an Appaloft cleanup operation and rerun it; do not manually remove the remote artifacts as the
-   primary cleanup path.
+   credential is managed by Appaloft. When a specific stopped container or runtime artifact is
+   suspected, run `appaloft server capacity prune <serverId> --before <iso> --target <id-or-target> --dry-run true`
+   before executing the same command with `--dry-run false`. Direct read-only
+   SSH/Docker inspection is acceptable only for verification, not mutation, and only when the needed
+   credential is available. If orphan containers, networks, or volumes with the test
+   resource/deployment identifiers remain, fix or add an Appaloft cleanup operation and rerun it; do
+   not manually remove the remote artifacts as the primary cleanup path.
 
 ## Follow-Up Commands
 

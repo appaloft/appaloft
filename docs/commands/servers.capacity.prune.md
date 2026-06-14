@@ -32,6 +32,7 @@ subdirectories.
 | `serverId` | Required | Deployment target/server whose runtime target capacity should be pruned. |
 | `before` | Required | ISO timestamp cutoff. Only candidates with `updatedAt < before` are eligible. |
 | `categories` | Optional | Defaults to `stopped-containers`, `preview-workspaces`, and `source-workspaces`; `docker-build-cache`, `unused-images`, and `remote-state-markers` require explicit opt-in. |
+| `target` | Optional | Exact candidate id or target filter. When present, dry-run and destructive prune report or mutate only candidates whose `id` or `target` exactly matches this value. |
 | `dryRun` | Optional | Defaults to `true`. When true, returns candidates without deleting target artifacts. |
 
 Allowed categories are:
@@ -81,6 +82,8 @@ The command must:
   `state/backend.json`.
 - Large dry-runs must keep returned candidate details bounded while still returning complete
   summary counts and estimated reclaimable bytes.
+- `target` is an exact filter, not a prefix, glob, or label selector. It must narrow candidate
+  reporting and deletion before summary counts are accumulated.
 - Remote PGlite upload safety backups under `state/backups/sync-*` must remain protected by the
   configured recovery window and bounded sync-backup count before explicit marker cleanup can remove
   older remaining archives.
@@ -103,7 +106,7 @@ The command must:
 
 | Entrypoint | Contract |
 | --- | --- |
-| CLI | `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--dry-run false]` dispatches this command. |
+| CLI | `appaloft server capacity prune <serverId> --before <iso> [--category <category>] [--target <id-or-target>] [--dry-run false]` dispatches this command. |
 | API/oRPC | `POST /api/servers/{serverId}/capacity/prune` uses the same command schema. |
 | Web | Server detail Capacity calls the same command after showing a dry-run-first prune surface. The Monitor handoff may prefill `before` from the observation window, but Web still dispatches an explicit dry-run preview before any destructive action. |
 

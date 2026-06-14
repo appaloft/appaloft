@@ -108,9 +108,12 @@ surface available in the session.
   `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso>`
   for runtime realizations, then delete the volume through Appaloft if it is seed-owned. After
   cleanup, use `appaloft server test <serverId>` and `appaloft server capacity inspect <serverId>`
-  first when Appaloft owns the SSH credential; direct read-only SSH/Docker inspection may be used
-  only to verify no orphan containers, networks, or volumes remain. If orphans are found, add/fix
-  the corresponding Appaloft cleanup command rather than deleting them manually.
+  first when Appaloft owns the SSH credential; if a specific stopped container or runtime artifact
+  is suspected, run `appaloft server capacity prune <serverId> --before <iso> --target <id-or-target> --dry-run true`
+  before executing the same command with `--dry-run false`. Direct read-only
+  SSH/Docker inspection may be used only to verify no orphan containers, networks, or volumes
+  remain. If orphans are found, add/fix the corresponding Appaloft cleanup command rather than
+  deleting them manually.
 - Add access: use default access policy, domain binding, certificate, and route configuration
   operations rather than editing proxy/provider state by hand.
 - Manage backing services: use dependency-resource provision/import/backup/restore and resource

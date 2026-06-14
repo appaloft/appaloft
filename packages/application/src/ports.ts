@@ -2322,6 +2322,7 @@ export interface RuntimeTargetCapacityPruner {
       server: DeploymentTargetState;
       before: string;
       categories: RuntimeTargetCapacityPruneCategory[];
+      target?: string;
       dryRun: boolean;
     },
   ): Promise<Result<RuntimeTargetCapacityPruneResult>>;
