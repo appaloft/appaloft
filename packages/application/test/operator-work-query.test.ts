@@ -126,6 +126,7 @@ class StaticProcessAttemptReadModel implements ProcessAttemptReadModel {
       (attempt) =>
         (!filter?.kind || attempt.kind === filter.kind) &&
         (!filter?.status || attempt.status === filter.status) &&
+        (!filter?.projectId || attempt.projectId === filter.projectId) &&
         (!filter?.resourceId || attempt.resourceId === filter.resourceId) &&
         (!filter?.serverId || attempt.serverId === filter.serverId) &&
         (!filter?.deploymentId || attempt.deploymentId === filter.deploymentId),
@@ -210,6 +211,7 @@ class StaticDurableWorkLedger implements DurableWorkLedger {
         (item) =>
           (!filter?.kind || item.kind === filter.kind) &&
           (!filter?.status || item.status === filter.status) &&
+          (!filter?.projectId || item.projectId === filter.projectId) &&
           (!filter?.resourceId || item.resourceId === filter.resourceId) &&
           (!filter?.serverId || item.serverId === filter.serverId) &&
           (!filter?.deploymentId || item.deploymentId === filter.deploymentId),
@@ -440,7 +442,15 @@ describe("operator work query service", () => {
     const service = createService();
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("deployment", "failed", undefined, undefined, undefined, 10),
+      new ListOperatorWorkQuery(
+        "deployment",
+        "failed",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        10,
+      ),
     );
 
     expect(result).toMatchObject({
@@ -491,12 +501,36 @@ describe("operator work query service", () => {
             privateKey: "SECRET_KEY=raw",
           },
         },
+        {
+          id: "dw_deployment_other_project",
+          kind: "deployment",
+          status: "pending",
+          operationKey: "deployments.create",
+          queueBackend: "database",
+          projectId: "prj_other",
+          resourceId: "res_web",
+          deploymentId: "dep_async",
+          serverId: "srv_primary",
+          priority: 0,
+          attemptCount: 0,
+          maxAttempts: 3,
+          availableAt: "2026-01-01T00:00:01.000Z",
+          updatedAt: "2026-01-01T00:00:02.000Z",
+        },
       ],
     });
 
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("deployment", "pending", "res_web", "srv_primary", "dep_async", 10),
+      new ListOperatorWorkQuery(
+        "deployment",
+        "pending",
+        "prj_demo",
+        "res_web",
+        "srv_primary",
+        "dep_async",
+        10,
+      ),
     );
 
     expect(result.items).toEqual([
@@ -625,6 +659,7 @@ describe("operator work query service", () => {
         "proxy-bootstrap",
         "failed",
         undefined,
+        undefined,
         "srv_primary",
         undefined,
         10,
@@ -649,7 +684,15 @@ describe("operator work query service", () => {
     const service = createService();
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("certificate", "failed", "res_web", undefined, undefined, 10),
+      new ListOperatorWorkQuery(
+        "certificate",
+        "failed",
+        undefined,
+        "res_web",
+        undefined,
+        undefined,
+        10,
+      ),
     );
 
     expect(result.items).toEqual([
@@ -680,7 +723,15 @@ describe("operator work query service", () => {
     });
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("deployment", undefined, undefined, undefined, "dep_new", 1),
+      new ListOperatorWorkQuery(
+        "deployment",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "dep_new",
+        1,
+      ),
     );
 
     expect(result.items.map((item) => item.id)).toEqual(["dep_new"]);
@@ -744,6 +795,7 @@ describe("operator work query service", () => {
         "proxy-bootstrap",
         undefined,
         undefined,
+        undefined,
         "srv_primary",
         undefined,
         10,
@@ -786,7 +838,15 @@ describe("operator work query service", () => {
 
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("system", "succeeded", "res_web", "srv_primary", undefined, 10),
+      new ListOperatorWorkQuery(
+        "system",
+        "succeeded",
+        undefined,
+        "res_web",
+        "srv_primary",
+        undefined,
+        10,
+      ),
     );
 
     expect(result.items).toEqual([
@@ -839,6 +899,7 @@ describe("operator work query service", () => {
       new ListOperatorWorkQuery(
         "route-realization",
         "failed",
+        "prj_demo",
         "res_web",
         "srv_primary",
         "dep_failed",
@@ -891,6 +952,7 @@ describe("operator work query service", () => {
       new ListOperatorWorkQuery(
         "runtime-maintenance",
         "running",
+        undefined,
         "res_web",
         "srv_primary",
         undefined,
@@ -989,7 +1051,15 @@ describe("operator work query service", () => {
 
     const result = await service.list(
       context(),
-      new ListOperatorWorkQuery("remote-state", undefined, undefined, "srv_primary", undefined, 10),
+      new ListOperatorWorkQuery(
+        "remote-state",
+        undefined,
+        undefined,
+        undefined,
+        "srv_primary",
+        undefined,
+        10,
+      ),
     );
 
     expect(result.items.map((item) => item.phase)).toEqual([

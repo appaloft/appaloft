@@ -58,6 +58,7 @@ function durableWorkItem(input: Partial<DurableWorkItemRecord> = {}): DurableWor
 class MemoryDurableWorkAdapter implements DurableWorkQueueAdapter {
   readonly claims: DurableWorkClaimInput[] = [];
   readonly completions: DurableWorkCompletionInput[] = [];
+  readonly events: DurableWorkEventRecord[] = [];
 
   constructor(private readonly candidates: DurableWorkItemRecord[]) {}
 
@@ -72,6 +73,7 @@ class MemoryDurableWorkAdapter implements DurableWorkQueueAdapter {
     _context: RepositoryContext,
     event: DurableWorkEventRecord,
   ): Promise<Result<DurableWorkEventRecord>> {
+    this.events.push(event);
     return ok(event);
   }
 
@@ -91,9 +93,9 @@ class MemoryDurableWorkAdapter implements DurableWorkQueueAdapter {
 
   async listEvents(
     _context: RepositoryContext,
-    _workItemId: string,
+    workItemId: string,
   ): Promise<Result<DurableWorkEventRecord[]>> {
-    return ok([]);
+    return ok(this.events.filter((event) => event.workItemId === workItemId));
   }
 
   async listDueCandidates(
@@ -142,6 +144,12 @@ class MemoryDurableWorkAdapter implements DurableWorkQueueAdapter {
       workItem: {
         ...item,
         status: input.status,
+        ...(input.phase ? { phase: input.phase } : {}),
+        ...(input.step ? { step: input.step } : {}),
+        ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+        ...(input.errorCategory ? { errorCategory: input.errorCategory } : {}),
+        ...(input.retriable === undefined ? {} : { retriable: input.retriable }),
+        ...(input.safeDetails ? { safeDetails: input.safeDetails } : {}),
         updatedAt: input.completedAt,
         finishedAt: input.completedAt,
       },
@@ -406,6 +414,37 @@ describe("durable work drain", () => {
         },
       },
     ]);
+    expect(adapter.events).toEqual([
+      {
+        id: "dw_test_1_claimed_1",
+        workItemId: "dw_test_1",
+        sequence: 1,
+        kind: "claimed",
+        status: "running",
+        phase: "worker-claim",
+        step: "claimed",
+        message: "Operator work was claimed by a worker.",
+        workerId: "worker-1",
+        workerGroup: "worker",
+        occurredAt: "2026-06-08T00:00:01.000Z",
+      },
+      {
+        id: "dw_test_1_completed_2",
+        workItemId: "dw_test_1",
+        sequence: 2,
+        kind: "completed",
+        status: "succeeded",
+        phase: "release",
+        step: "finished",
+        message: "Operator work completed.",
+        workerId: "worker-1",
+        workerGroup: "worker",
+        occurredAt: "2026-06-08T00:00:01.000Z",
+        safeDetails: {
+          imageDigest: "sha256:abc",
+        },
+      },
+    ]);
   });
 
   test("[PROC-DELIVERY-WORKER-018] worker skips due work without a registered handler", async () => {
@@ -488,6 +527,28 @@ describe("durable work drain", () => {
         errorCategory: "infra",
         retriable: true,
       },
+    ]);
+    expect(adapter.events).toEqual([
+      expect.objectContaining({
+        id: "dw_test_1_claimed_1",
+        workItemId: "dw_test_1",
+        sequence: 1,
+        kind: "claimed",
+        status: "running",
+        message: "Operator work was claimed by a worker.",
+      }),
+      expect.objectContaining({
+        id: "dw_test_1_completed_2",
+        workItemId: "dw_test_1",
+        sequence: 2,
+        kind: "completed",
+        status: "failed",
+        phase: "worker-claim",
+        step: "claimed",
+        message: "Operator work failed.",
+        workerId: "worker-1",
+        workerGroup: "worker",
+      }),
     ]);
   });
 });

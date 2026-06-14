@@ -5121,6 +5121,8 @@ export const operatorWorkObservedEventSchema = z.object({
   resourceId: z.string().optional(),
   deploymentId: z.string().optional(),
   serverId: z.string().optional(),
+  workerId: z.string().optional(),
+  workerGroup: z.string().optional(),
   errorCode: z.string().optional(),
   errorCategory: z.string().optional(),
   retriable: z.boolean().optional(),

@@ -1374,13 +1374,16 @@ export const enUS = {
       deleteFailed: "Project was not deleted",
       deleteSucceeded: "Project deleted",
       attentionFailedDeploymentTitle: "Failed deployment",
+      attentionFailedOperatorWorkTitle: "Background install failed",
       attentionNoAccessDetail:
         "No resource currently has a public access route. Open networking on a resource to manage access.",
       attentionNoAccessTitle: "No public access",
       attentionNoDeploymentDetail:
         "Resources exist, but no deployment record has been created for this project.",
       attentionNoDeploymentTitle: "Deploy a resource",
+      attentionOperatorWorkRefreshAction: "Refresh status",
       attentionRunningDeploymentTitle: "Deployment running",
+      attentionRunningOperatorWorkTitle: "Background install running",
       attentionTitle: "Attention",
       deployedResourcesLabel: "deployed",
       detailDescription: "Environments, resources, and deployment records for this project",

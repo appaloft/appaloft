@@ -35,6 +35,7 @@
     RuntimeMonitoringRollupResponse,
     UnlockEnvironmentInput,
     EnvironmentSummary,
+    OperatorWorkItem,
     ResourceSummary,
   } from "@appaloft/contracts";
 
@@ -100,12 +101,17 @@
     "settings",
   ] as const;
   type ProjectAttentionItem = {
-    kind: "failed-deployment" | "running-deployment" | "missing-access" | "no-deployment";
+    kind:
+      | "failed-deployment"
+      | "running-deployment"
+      | "operator-work"
+      | "missing-access"
+      | "no-deployment";
     title: string;
     detail: string;
     href?: string;
     action: string;
-    intent?: "resource-quick-deploy";
+    intent?: "resource-quick-deploy" | "operator-work-refresh";
     resourceId?: string;
     tone: "destructive" | "warning" | "neutral";
   };
@@ -169,6 +175,19 @@
         }),
       enabled: browser && projectId.length > 0,
       staleTime: 5_000,
+    }),
+  );
+  const projectOperatorWorkQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["operator-work", "project", projectId, { limit: 25 }],
+      queryFn: () =>
+        orpcClient.operatorWork.list({
+          projectId,
+          limit: 25,
+        }),
+      enabled: browser && projectId.length > 0,
+      staleTime: 2_000,
+      refetchInterval: 5_000,
     }),
   );
   const projects = $derived(projectsQuery.data?.items ?? []);
@@ -290,6 +309,18 @@
       ["created", "planning", "planned", "running", "cancel-requested"].includes(deployment.status),
     ),
   );
+  const projectOperatorWorkItems = $derived(projectOperatorWorkQuery.data?.items ?? []);
+  const actionableProjectOperatorWorkItems = $derived(
+    projectOperatorWorkItems.filter(
+      (item) =>
+        item.kind === "blueprint-install" &&
+        (item.status === "failed" ||
+          item.status === "dead-lettered" ||
+          item.status === "running" ||
+          item.status === "pending" ||
+          item.status === "retry-scheduled"),
+    ),
+  );
   const projectRuntimeMonitoringScope = $derived({
     kind: "project" as const,
     projectId,
@@ -383,7 +414,22 @@
   );
   const projectAttentionItems = $derived.by<ProjectAttentionItem[]>(() => {
     const items: ProjectAttentionItem[] = [];
+    for (const work of actionableProjectOperatorWorkItems.slice(0, 2)) {
+      items.push({
+        kind: "operator-work",
+        title:
+          work.status === "failed" || work.status === "dead-lettered"
+            ? $t(i18nKeys.console.projects.attentionFailedOperatorWorkTitle)
+            : $t(i18nKeys.console.projects.attentionRunningOperatorWorkTitle),
+        detail: operatorWorkAttentionDetail(work),
+        action: $t(i18nKeys.console.projects.attentionOperatorWorkRefreshAction),
+        intent: "operator-work-refresh",
+        tone: work.status === "failed" || work.status === "dead-lettered" ? "destructive" : "warning",
+      });
+    }
+
     for (const deployment of failedProjectDeployments.slice(0, 2)) {
+      if (items.length >= 3) break;
       const resource = findResource(projectResources, deployment.resourceId);
       items.push({
         kind: "failed-deployment",
@@ -1079,6 +1125,27 @@
     }));
   }
 
+  function operatorWorkAttentionDetail(work: OperatorWorkItem): string {
+    const safeDetails = work.safeDetails ?? {};
+    const failureCode =
+      stringSafeDetail(safeDetails.failure_code) ??
+      stringSafeDetail(safeDetails.code) ??
+      work.errorCode ??
+      work.status;
+    const failurePhase =
+      stringSafeDetail(safeDetails.failure_phase) ?? work.phase ?? work.step ?? work.status;
+    const operation =
+      stringSafeDetail(safeDetails.failure_operation) ?? work.operationKey;
+
+    return [work.id, work.step ?? work.status, failureCode, failurePhase, operation, formatTime(work.updatedAt)]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function stringSafeDetail(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() ? value : undefined;
+  }
+
   function parseProjectDetailTab(value: string | null): ProjectDetailTab {
     return projectDetailTabs.includes(value as ProjectDetailTab)
       ? (value as ProjectDetailTab)
@@ -1187,6 +1254,11 @@
   }
 
   function openProjectAttentionAction(item: ProjectAttentionItem): void {
+    if (item.intent === "operator-work-refresh") {
+      void queryClient.invalidateQueries({ queryKey: ["operator-work", "project", projectId] });
+      return;
+    }
+
     if (item.intent !== "resource-quick-deploy") return;
 
     const resource = projectResources.find((projectResource) => projectResource.id === item.resourceId);

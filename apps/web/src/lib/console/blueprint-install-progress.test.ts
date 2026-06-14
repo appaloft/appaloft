@@ -90,7 +90,14 @@ describe("Blueprint install progress helpers", () => {
           workKind: "blueprint-install",
           phase: "install-execution",
           step: "rollback-required",
+          workerGroup: "appaloft-cloud-production-worker",
+          workerId: "appaloft-cloud-production-worker-replica-2",
           errorCode: "blueprint_install_failed",
+          safeDetails: {
+            failure_code: "resource_slug_conflict",
+            failure_phase: "resource-admission",
+            failure_operation: "CreateResourceCommand",
+          },
         },
       },
     ]);
@@ -106,7 +113,8 @@ describe("Blueprint install progress helpers", () => {
         phase: "verify",
         status: "failed",
         level: "error",
-        message: "step: rollback-required · error: blueprint_install_failed",
+        message:
+          "step: rollback-required · worker: appaloft-cloud-production-worker/appaloft-cloud-production-worker-replica-2 · error: blueprint_install_failed · failure: resource_slug_conflict · phase: resource-admission · operation: CreateResourceCommand",
       },
     ]);
   });

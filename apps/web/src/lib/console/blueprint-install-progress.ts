@@ -189,10 +189,35 @@ function operatorWorkMessage(event: OperatorWorkObservedEvent): string {
   const parts = [
     event.message,
     event.step ? `step: ${event.step}` : undefined,
+    operatorWorkWorkerMessagePart(event),
     event.errorCode ? `error: ${event.errorCode}` : undefined,
+    ...operatorWorkSafeDetailMessageParts(event.safeDetails),
   ].filter(Boolean);
 
   return parts.join(" · ") || `Operator work ${event.kind}`;
+}
+
+function operatorWorkWorkerMessagePart(event: OperatorWorkObservedEvent): string | undefined {
+  const worker = [event.workerGroup, event.workerId].filter(Boolean).join("/");
+  return worker ? `worker: ${worker}` : undefined;
+}
+
+function operatorWorkSafeDetailMessageParts(
+  safeDetails: OperatorWorkObservedEvent["safeDetails"],
+): string[] {
+  if (!safeDetails) {
+    return [];
+  }
+
+  return [
+    ["failure_code", "failure"],
+    ["failure_phase", "phase"],
+    ["failure_operation", "operation"],
+    ["resourceSlug", "resource"],
+  ].flatMap(([key, label]) => {
+    const value = safeDetails[key];
+    return typeof value === "string" && value.trim() ? [`${label}: ${value}`] : [];
+  });
 }
 
 export function operatorWorkEventToProgressEvent(
