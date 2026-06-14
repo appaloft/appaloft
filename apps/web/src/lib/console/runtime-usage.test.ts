@@ -101,6 +101,11 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("refreshNow");
     expect(monitorSource).toContain("onTimeRangeChange");
     expect(monitorSource).toContain("aria-pressed={timeRange === option}");
+    expect(monitorSource).toContain("data-runtime-time-range-option={option}");
+    expect(monitorSource).toContain("bg-primary/10");
+    expect(monitorSource).toContain("bg-transparent text-muted-foreground");
+    expect(monitorSource).toContain("hover:bg-primary/5");
+    expect(monitorSource).not.toContain('variant={timeRange === option ? "default" : "ghost"}');
     expect(monitorSource).toContain("onclick={() => selectTimeRange(option)}");
     expect(monitorSource).not.toContain("<select");
     expect(componentSource).toContain("runtimeUsageInspect");
