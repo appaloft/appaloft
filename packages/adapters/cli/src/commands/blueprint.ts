@@ -28,6 +28,30 @@ const applicationIdOption = Options.text("application-id").pipe(Options.optional
 const acceptedByOption = Options.text("accepted-by").pipe(Options.optional);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 const acknowledgementOption = Options.text("acknowledgement").pipe(Options.repeated);
+const installCommandDescription = `Accept and run a Blueprint install command.
+
+Inputs:
+  --parameter KEY=value
+  --secret KEY=value or --secret component:KEY=value
+  --dependency-create requirementId[:kind]
+
+Required application-bundle acknowledgements:
+  --acknowledgement accepts-blueprint-application-bundle
+  --acknowledgement reviews-dependency-resource-bindings
+  --acknowledgement preserves-user-owned-configuration
+
+Example:
+  appaloft blueprint install pocketbase \\
+    --project-id prj_123 \\
+    --environment-id env_123 \\
+    --target-server srv_123 \\
+    --resource-slug-prefix pocketbase-demo \\
+    --parameter APP_NAME=PocketBase \\
+    --dependency-create data \\
+    --secret POCKETBASE_ADMIN_PASSWORD=change-me \\
+    --acknowledgement accepts-blueprint-application-bundle \\
+    --acknowledgement reviews-dependency-resource-bindings \\
+    --acknowledgement preserves-user-owned-configuration`;
 
 function nonEmptyOptional(value: Option.Option<string>): string | undefined {
   const raw = optionalValue(value)?.trim();
@@ -257,7 +281,7 @@ const installCommand = EffectCommand.make(
         secretValues: secretValuesInput(secret),
       }),
     ),
-).pipe(EffectCommand.withDescription("Accept and run a Blueprint install command"));
+).pipe(EffectCommand.withDescription(installCommandDescription));
 
 const showInstallationCommand = EffectCommand.make(
   "show",

@@ -276,3 +276,22 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft upgrade apply` - `system.instance-upgrade.apply`
 - `appaloft db status` - `system.db-status`
 - `appaloft db migrate` - `system.db-migrate`
+
+## Blueprint Install Input Notes
+
+`appaloft blueprint install <slug>` accepts repeated structured text flags:
+
+- `--parameter KEY=value`
+- `--secret KEY=value` or `--secret component:KEY=value`
+- `--dependency-create requirementId[:kind]`
+
+Accepted application-bundle installs must include all three acknowledgement values:
+
+- `--acknowledgement accepts-blueprint-application-bundle`
+- `--acknowledgement reviews-dependency-resource-bindings`
+- `--acknowledgement preserves-user-owned-configuration`
+
+After install returns, use `monitoring.workId` with `appaloft work watch <workId> --json` or
+`appaloft work events <workId> --follow --json`. Use `monitoring.deploymentIds[]` with
+`appaloft deployments events <deploymentId> --follow --json` and
+`appaloft deployments show <deploymentId>`.
