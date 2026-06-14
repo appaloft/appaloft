@@ -6,6 +6,7 @@
     AlertCircle,
     CheckCircle2,
     ChevronDown,
+    Circle,
     Code2,
     ExternalLink,
     Eye,
@@ -15,10 +16,12 @@
     LoaderCircle,
     Package,
     Play,
+    Plus,
     Server,
     Settings2,
     ShieldCheck,
     TerminalSquare,
+    Trash2,
     Upload,
     Wrench,
     Waypoints,
@@ -184,6 +187,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     optional?: boolean;
   };
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
+  type VariableDraft = {
+    id: string;
+    key: string;
+    value: string;
+    isSecret: boolean;
+  };
+  type VariableInputMode = "rows" | "env";
   type SummaryRow = {
     label: string;
     value: string;
@@ -392,6 +402,80 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   function brandIcon(icon: BrandIconModule, variant = "default"): DependencyKindIcon {
     return { title: icon.title, svg: icon.variants[variant] ?? icon.svg };
+  }
+
+  let variableDraftIdCounter = 0;
+
+  function createVariableDraft(input: Partial<Omit<VariableDraft, "id">> = {}): VariableDraft {
+    variableDraftIdCounter += 1;
+    return {
+      id: `variable-draft-${variableDraftIdCounter}`,
+      key: input.key ?? "",
+      value: input.value ?? "",
+      isSecret: input.isSecret ?? true,
+    };
+  }
+
+  function parseVariableDraftsParam(params: URLSearchParams): VariableDraft[] {
+    const encodedVariables = params.get("variables");
+    if (encodedVariables) {
+      try {
+        const parsed = JSON.parse(encodedVariables) as Array<{
+          key?: unknown;
+          secret?: unknown;
+        }>;
+        const drafts = parsed
+          .filter((entry) => typeof entry.key === "string")
+          .map((entry) =>
+            createVariableDraft({
+              key: String(entry.key),
+              isSecret: entry.secret !== false,
+            }),
+          );
+        if (drafts.length > 0) {
+          return drafts;
+        }
+      } catch {
+        // Fall back to the legacy single-variable query params below.
+      }
+    }
+
+    const legacyKey = params.get("variableKey") ?? "";
+    return [
+      createVariableDraft({
+        key: legacyKey,
+        isSecret: params.get("variableSecret") !== "false",
+      }),
+    ];
+  }
+
+  function parseEnvVariableEntries(content: string): Array<Omit<VariableDraft, "id">> {
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .flatMap((line) => {
+        const withoutExport = line.startsWith("export ") ? line.slice("export ".length).trim() : line;
+        const separatorIndex = withoutExport.indexOf("=");
+        if (separatorIndex <= 0) {
+          return [];
+        }
+
+        const key = withoutExport.slice(0, separatorIndex).trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+          return [];
+        }
+
+        let value = withoutExport.slice(separatorIndex + 1).trim();
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1);
+        }
+
+        return [{ key, value, isSecret: true }];
+      });
   }
 
   const resourceKinds = [
@@ -796,9 +880,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let resourceHealthCheckStartPeriodSeconds = $state(
     browser ? (page.url.searchParams.get("resourceHealthCheckStartPeriodSeconds") ?? "5") : "5",
   );
-  let variableKey = $state(browser ? (page.url.searchParams.get("variableKey") ?? "") : "");
-  let variableValue = $state("");
-  let variableIsSecret = $state(browser ? page.url.searchParams.get("variableSecret") !== "false" : true);
+  let variableInputMode = $state<VariableInputMode>("rows");
+  let variableDrafts = $state<VariableDraft[]>(
+    browser ? parseVariableDraftsParam(page.url.searchParams) : [createVariableDraft()],
+  );
+  let variableEnvText = $state("");
   let selectedGitHubRepositoryId = $state(browser ? (page.url.searchParams.get("githubRepositoryId") ?? "") : "");
   let selectedGitHubRepository = $state<GitHubRepositorySummary | null>(null);
 
@@ -1850,6 +1936,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       ? `${healthCheck.http?.method ?? "GET"} ${healthCheck.http?.path ?? "/"} · ${healthCheck.intervalSeconds}s/${healthCheck.timeoutSeconds}s · ${healthCheck.retries}x`
       : $t(i18nKeys.common.status.notConfigured);
   });
+  const configuredVariableDrafts = $derived(
+    variableDrafts.filter((variable) => variable.key.trim()),
+  );
+  const parsedEnvVariableCount = $derived(parseEnvVariableEntries(variableEnvText).length);
   const variableSummary = $derived.by(() => {
     const configuredVariables = [
       ...(sourceKind === "blueprint"
@@ -1864,13 +1954,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             kind: "secret",
           }))
         : []),
-      ...(variableContextEnabled && variableKey.trim()
-        ? [
-            {
-              key: variableKey.trim(),
-              kind: variableIsSecret ? "secret" : "plain-config",
-            },
-          ]
+      ...(variableContextEnabled
+        ? configuredVariableDrafts.map((variable) => ({
+            key: variable.key.trim(),
+            kind: variable.isSecret ? "secret" : "plain-config",
+          }))
         : []),
     ];
 
@@ -2371,8 +2459,33 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     return sourceKind !== "blueprint" || missingBlueprintSecrets().length === 0;
   }
 
+  function updateVariableDraft(id: string, patch: Partial<Omit<VariableDraft, "id">>): void {
+    variableDrafts = variableDrafts.map((variable) =>
+      variable.id === id ? { ...variable, ...patch } : variable,
+    );
+  }
+
+  function addVariableDraft(input: Partial<Omit<VariableDraft, "id">> = {}): void {
+    variableDrafts = [...variableDrafts, createVariableDraft(input)];
+  }
+
+  function removeVariableDraft(id: string): void {
+    const remaining = variableDrafts.filter((variable) => variable.id !== id);
+    variableDrafts = remaining.length > 0 ? remaining : [createVariableDraft()];
+  }
+
+  function applyEnvVariableText(): void {
+    const parsedVariables = parseEnvVariableEntries(variableEnvText);
+    if (parsedVariables.length === 0) {
+      return;
+    }
+
+    variableDrafts = parsedVariables.map((variable) => createVariableDraft(variable));
+    variableInputMode = "rows";
+  }
+
   function statusIconClasses(complete: boolean): string {
-    return complete ? "text-emerald-600" : "text-destructive";
+    return complete ? "text-emerald-600" : "text-muted-foreground";
   }
 
   function readinessIssues(): string[] {
@@ -2794,11 +2907,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
     setSearchParam(params, "editVariables", variableContextEnabled ? "true" : "false", "false");
     if (variableContextEnabled) {
-      setSearchParam(params, "variableKey", variableKey);
-      if (variableKey.trim()) {
-        setSearchParam(params, "variableSecret", variableIsSecret ? "true" : "false", "true");
-      }
+      const urlVariables = configuredVariableDrafts.map((variable) => ({
+        key: variable.key.trim(),
+        secret: variable.isSecret,
+      }));
+      setSearchParam(params, "variables", urlVariables.length > 0 ? JSON.stringify(urlVariables) : "");
     }
+    params.delete("variableKey");
+    params.delete("variableSecret");
 
     return url;
   }
@@ -2868,8 +2984,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     resourceHealthCheckTimeoutSeconds = params.get("resourceHealthCheckTimeoutSeconds") ?? "5";
     resourceHealthCheckRetries = params.get("resourceHealthCheckRetries") ?? "10";
     resourceHealthCheckStartPeriodSeconds = params.get("resourceHealthCheckStartPeriodSeconds") ?? "5";
-    variableKey = params.get("variableKey") ?? "";
-    variableIsSecret = params.get("variableSecret") !== "false";
+    variableDrafts = parseVariableDraftsParam(params);
+    variableInputMode = "rows";
+    variableEnvText = "";
     githubSourceMode = parseGithubSourceMode(params.get("githubMode"));
     githubSourceModeTouched = params.has("githubMode") || Boolean(nextSourceLocator);
     githubRepositorySearch = params.get("repository") ?? "";
@@ -5034,17 +5151,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         };
       }
 
-      const workflowEnvironmentVariables = variableContextEnabled && variableKey.trim()
-        ? [
-            {
-              key: variableKey.trim(),
-              value: variableValue,
-              exposure: "runtime" as const,
-              kind: variableIsSecret ? ("secret" as const) : ("plain-config" as const),
-              isSecret: variableIsSecret,
-              scope: "environment" as const,
-            },
-          ]
+      const workflowEnvironmentVariables = variableContextEnabled
+        ? configuredVariableDrafts.map((variable) => ({
+            key: variable.key.trim(),
+            value: variable.value,
+            exposure: "runtime" as const,
+            kind: variable.isSecret ? ("secret" as const) : ("plain-config" as const),
+            isSecret: variable.isSecret,
+            scope: "environment" as const,
+          }))
         : [];
       const workflowInput: QuickDeployWorkflowInput = {
         project: workflowProject,
@@ -5124,36 +5239,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               : "选择来源，并在同一页确认项目、服务器与运行配置。"}
           </p>
         </div>
-        <div
-          class={`rounded-md border px-3 py-3 text-sm ${
-            quickDeployReady
-              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-              : "border-destructive/30 bg-destructive/5 text-foreground"
-          }`}
-          data-quick-deploy-readiness-panel
-        >
-          <div class="flex items-start gap-2">
-            {#if quickDeployReady}
-              <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-emerald-600" />
-              <div class="min-w-0">
-                <p class="font-medium">安装前置配置已完成</p>
-                <p class="mt-1 text-xs text-emerald-800">
-                  可以继续提交，运行时仍会在后端做最终校验。
-                </p>
-              </div>
-            {:else}
-              <AlertCircle class="mt-0.5 size-4 shrink-0 text-destructive" />
-              <div class="min-w-0">
-                <p class="font-medium">还差 {quickDeployReadinessIssues.length} 项才能继续</p>
-                <ul class="mt-2 space-y-1 text-xs text-muted-foreground">
-                  {#each quickDeployReadinessIssues as issue (issue)}
-                    <li>{issue}</li>
-                  {/each}
-                </ul>
-              </div>
-            {/if}
-          </div>
-        </div>
         <div class="space-y-6">
           <section class="space-y-3">
           <div class="space-y-3">
@@ -5162,7 +5247,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if stepIsComplete("source")}
                   <CheckCircle2 class={`size-4 ${statusIconClasses(true)}`} />
                 {:else}
-                  <AlertCircle class={`size-4 ${statusIconClasses(false)}`} />
+                  <Circle class={`size-4 ${statusIconClasses(false)}`} />
                 {/if}
                 <Waypoints class="size-4 text-muted-foreground" />
                 <span>{$t(i18nKeys.common.domain.source)}</span>
@@ -5198,18 +5283,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 <div class="grid gap-2 sm:grid-cols-2">
                   {#each gitSourceOptions as option (option.key)}
                     {@const SourceIcon = option.icon}
+                    {@const sourceOptionSelected = sourceKind === option.key}
                     <Button
                       type="button"
-                      variant={sourceKind === option.key ? "selected" : "outline"}
-                      class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                      variant={sourceOptionSelected ? "selected" : "outline"}
+                      class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
                       onclick={() => selectSourceKind(option.key)}
                     >
-                      <SourceIcon class="size-4 shrink-0" />
-                      <span class="min-w-0">
-                        <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
-                        <span class="mt-1 block text-xs font-normal text-muted-foreground">
-                          {$t(option.hintKey)}
+                      <span class="flex w-full min-w-0 items-center gap-2">
+                        <span
+                          class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
+                            sourceOptionSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <SourceIcon class="size-3.5" />
                         </span>
+                        <span class="min-w-0 truncate text-sm font-medium leading-5">{$t(option.labelKey)}</span>
+                      </span>
+                      <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
+                        {$t(option.hintKey)}
                       </span>
                     </Button>
                   {/each}
@@ -5223,18 +5315,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 <div class="grid gap-2 sm:grid-cols-3">
                   {#each dockerSourceOptions as option (option.key)}
                     {@const SourceIcon = option.icon}
+                    {@const sourceOptionSelected = sourceKind === option.key}
                     <Button
                       type="button"
-                      variant={sourceKind === option.key ? "selected" : "outline"}
-                      class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                      variant={sourceOptionSelected ? "selected" : "outline"}
+                      class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
                       onclick={() => selectSourceKind(option.key)}
                     >
-                      <SourceIcon class="size-4 shrink-0" />
-                      <span class="min-w-0">
-                        <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
-                        <span class="mt-1 block text-xs font-normal text-muted-foreground">
-                          {$t(option.hintKey)}
+                      <span class="flex w-full min-w-0 items-center gap-2">
+                        <span
+                          class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
+                            sourceOptionSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <SourceIcon class="size-3.5" />
                         </span>
+                        <span class="min-w-0 truncate text-sm font-medium leading-5">{$t(option.labelKey)}</span>
+                      </span>
+                      <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
+                        {$t(option.hintKey)}
                       </span>
                     </Button>
                   {/each}
@@ -5247,36 +5346,48 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                   <Button
                     type="button"
                     variant={githubSourceMode === "url" ? "selected" : "outline"}
-                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                    class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
                     data-github-public-url-mode
                     onclick={() => selectGithubSourceMode("url")}
                   >
-                    <GitFork class="size-4 shrink-0" />
-                    <span class="min-w-0">
-                      <span class="block text-sm font-medium">
+                    <span class="flex w-full min-w-0 items-center gap-2">
+                      <span
+                        class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
+                          githubSourceMode === "url" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <GitFork class="size-3.5" />
+                      </span>
+                      <span class="min-w-0 truncate text-sm font-medium leading-5">
                         {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
                       </span>
-                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
-                        {$t(i18nKeys.console.quickDeploy.githubSourceUrlModeHint)}
-                      </span>
+                    </span>
+                    <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.githubSourceUrlModeHint)}
                     </span>
                   </Button>
                   <Button
                     type="button"
                     variant={githubSourceMode === "browser" ? "selected" : "outline"}
-                    class="h-auto justify-start whitespace-normal px-3 py-3 text-left"
+                    class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"
                     onclick={() => selectGithubSourceMode("browser")}
                   >
-                    <GitHubIcon class="size-4 shrink-0" />
-                    <span class="min-w-0">
-                      <span class="block text-sm font-medium">
+                    <span class="flex w-full min-w-0 items-center gap-2">
+                      <span
+                        class={`flex size-5 shrink-0 items-center justify-center rounded-sm ${
+                          githubSourceMode === "browser" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <GitHubIcon class="size-3.5" />
+                      </span>
+                      <span class="min-w-0 truncate text-sm font-medium leading-5">
                         {$t(i18nKeys.console.quickDeploy.githubSourceBrowserMode)}
                       </span>
-                      <span class="mt-1 block text-xs font-normal text-muted-foreground">
-                        {githubUsesHostedProviderApp
-                          ? $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeHostedHint)
-                          : $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeOAuthHint)}
-                      </span>
+                    </span>
+                    <span class="block w-full text-xs font-normal leading-5 text-muted-foreground">
+                      {githubUsesHostedProviderApp
+                        ? $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeHostedHint)
+                        : $t(i18nKeys.console.quickDeploy.githubSourceBrowserModeOAuthHint)}
                     </span>
                   </Button>
                 </div>
@@ -6040,7 +6151,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if stepIsComplete("project")}
                   <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
                 {:else}
-                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                  <Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
                 {/if}
                 <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.project)}</span>
@@ -6129,7 +6240,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if stepIsComplete("server")}
                   <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
                 {:else}
-                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                  <Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
                 {/if}
                 <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.server)}</span>
@@ -6169,30 +6280,26 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             </div>
             {#if serverMode === "existing"}
               <div class="max-h-44 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
-                {#if servers.length > 0}
-                  {#each servers as server (server.id)}
+                {#if deployableServers.length > 0}
+                  {#each deployableServers as server (server.id)}
                     <Button
-                      class="w-full justify-start border border-transparent bg-card text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
-                      size="sm"
+                      class="h-auto min-h-14 w-full justify-start border border-transparent bg-card px-3 py-2.5 text-foreground shadow-none ring-1 ring-transparent hover:border-primary/25 hover:bg-primary/5 hover:text-foreground data-[selected=true]:border-primary/40 data-[selected=true]:bg-primary/5 data-[selected=true]:ring-primary/25 data-[selected=true]:hover:bg-primary/10"
                       variant="ghost"
-                      disabled={!serverIsRuntimeAvailable(server)}
+                      data-quick-deploy-server-option
                       data-selected={selectedServerId === server.id ? "true" : undefined}
                       onclick={() => {
-                        if (!serverIsRuntimeAvailable(server)) {
-                          return;
-                        }
                         selectedServerId = server.id;
                       }}
                     >
-                      <span class="min-w-0 text-left">
-                        <span class="block truncate">
-                          {server.name} · {server.host}
+                      <span class="flex w-full min-w-0 flex-col items-start gap-1 text-left">
+                        <span class="block w-full truncate text-sm font-medium">
+                          {server.name}
+                        </span>
+                        <span class="block w-full truncate text-xs text-muted-foreground">
+                          {server.host}
                           {#if server.credential}
                             · {server.credential.kind === "ssh-private-key" ? "SSH key" : "SSH agent"}
                           {/if}
-                        </span>
-                        <span class="block truncate text-xs text-muted-foreground">
-                          {serverRuntimeAvailabilityLabel(server)}
                         </span>
                       </span>
                     </Button>
@@ -6222,7 +6329,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if stepIsComplete("environment")}
                   <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
                 {:else}
-                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                  <Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
                 {/if}
                 <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</span>
@@ -6321,7 +6428,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                 {#if variableSectionComplete()}
                   <CheckCircle2 class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(true)}`} />
                 {:else}
-                  <AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
+                  <Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />
                 {/if}
                 <span class="min-w-0">
                 <span class="block text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</span>
@@ -6477,19 +6584,107 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                   </div>
                   <Separator />
                 {/if}
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <Input bind:value={variableKey} placeholder="DATABASE_URL" />
-                  <Input bind:value={variableValue} placeholder="postgres://..." />
+                <div class="space-y-3" data-quick-deploy-variable-editor>
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="grid grid-cols-2 gap-2 sm:w-72" data-quick-deploy-variable-tabs>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={variableInputMode === "rows" ? "selected" : "outline"}
+                        onclick={() => {
+                          variableInputMode = "rows";
+                        }}
+                      >
+                        {$t(i18nKeys.console.quickDeploy.variableRowsMode)}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={variableInputMode === "env" ? "selected" : "outline"}
+                        onclick={() => {
+                          variableInputMode = "env";
+                        }}
+                      >
+                        {$t(i18nKeys.console.quickDeploy.variableEnvMode)}
+                      </Button>
+                    </div>
+                    {#if variableInputMode === "rows"}
+                      <Button type="button" size="sm" variant="outline" onclick={() => addVariableDraft()}>
+                        <Plus class="size-4" />
+                        {$t(i18nKeys.console.quickDeploy.variableAdd)}
+                      </Button>
+                    {/if}
+                  </div>
+
+                  {#if variableInputMode === "env"}
+                    <div class="space-y-2" data-quick-deploy-env-paste>
+                      <Textarea
+                        bind:value={variableEnvText}
+                        class="min-h-36 font-mono text-xs"
+                        placeholder={$t(i18nKeys.console.quickDeploy.variableEnvPlaceholder)}
+                      />
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.quickDeploy.variableEnvPasteHint)}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={parsedEnvVariableCount === 0}
+                          onclick={applyEnvVariableText}
+                        >
+                          <Plus class="size-4" />
+                          {$t(i18nKeys.console.quickDeploy.variableApplyParsedEnv, {
+                            count: parsedEnvVariableCount,
+                          })}
+                        </Button>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="space-y-2" data-quick-deploy-variable-rows>
+                      {#each variableDrafts as variable (variable.id)}
+                        <div
+                          class="grid gap-2 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)_auto_auto] sm:items-center"
+                          data-quick-deploy-variable-row
+                        >
+                          <Input
+                            value={variable.key}
+                            placeholder="DATABASE_URL"
+                            aria-label={$t(i18nKeys.console.quickDeploy.variableNameLabel)}
+                            oninput={(event) => updateVariableDraft(variable.id, { key: event.currentTarget.value })}
+                          />
+                          <Input
+                            value={variable.value}
+                            placeholder="postgres://..."
+                            aria-label={$t(i18nKeys.console.quickDeploy.variableValueLabel)}
+                            oninput={(event) => updateVariableDraft(variable.id, { value: event.currentTarget.value })}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={variable.isSecret ? "selected" : "outline"}
+                            class="justify-start sm:justify-center"
+                            onclick={() => updateVariableDraft(variable.id, { isSecret: !variable.isSecret })}
+                          >
+                            {variable.isSecret
+                              ? $t(i18nKeys.console.quickDeploy.secretStorage)
+                              : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={$t(i18nKeys.console.quickDeploy.variableRemove)}
+                            onclick={() => removeVariableDraft(variable.id)}
+                          >
+                            <Trash2 class="size-4" />
+                          </Button>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
-                <Button
-                  variant={variableIsSecret ? "selected" : "outline"}
-                  size="sm"
-                  onclick={() => {
-                    variableIsSecret = !variableIsSecret;
-                  }}
-                >
-                  {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
-                </Button>
               </div>
             </div>
           </details>
@@ -6497,8 +6692,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       </div>
     </div>
 
-  <aside class="min-w-0 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100svh-10rem)] lg:self-start lg:overflow-y-auto lg:pb-3">
-      <section class="console-side-panel min-w-0 space-y-4">
+  <aside class="min-w-0 space-y-5 lg:mt-20 lg:sticky lg:top-0 lg:flex lg:max-h-[calc(100svh-17rem)] lg:flex-col lg:gap-5 lg:space-y-0 lg:self-start lg:overflow-hidden lg:pb-3">
+      <section class="console-side-panel min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto" data-quick-deploy-summary-panel>
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
           <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</p>
@@ -6621,18 +6816,24 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       </section>
 
       <section
-        class="console-side-panel sticky bottom-3 z-20 space-y-3 bg-background/95 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
+        class="console-side-panel sticky bottom-3 z-20 space-y-3 bg-background/95 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:shrink-0"
         data-quick-deploy-action-panel
       >
-        <p class="min-w-0 text-xs text-muted-foreground">
-          {quickDeployActionHint}
-        </p>
-        {#if !quickDeployReady && quickDeployReadinessIssues.length > 1}
-          <ul class="space-y-1 text-xs text-muted-foreground">
-            {#each quickDeployReadinessIssues.slice(1, 4) as issue (issue)}
-              <li>{issue}</li>
-            {/each}
-          </ul>
+        {#if quickDeployReady}
+          <p class="min-w-0 text-xs text-muted-foreground">
+            {quickDeployActionHint}
+          </p>
+        {:else}
+          <div class="space-y-1.5">
+            <p class="min-w-0 text-xs font-medium text-foreground">
+              还差 {quickDeployReadinessIssues.length} 项才能继续
+            </p>
+            <ul class="space-y-1 text-xs text-muted-foreground">
+              {#each quickDeployReadinessIssues as issue (issue)}
+                <li>{issue}</li>
+              {/each}
+            </ul>
+          </div>
         {/if}
         <Button
           class="w-full"

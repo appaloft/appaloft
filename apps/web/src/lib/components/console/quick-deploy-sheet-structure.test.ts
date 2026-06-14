@@ -14,10 +14,35 @@ const resourceSourceOptionSource = readFileSync(
 describe("QuickDeploySheet structure", () => {
   test("[QUICK-DEPLOY-UX-001] keeps the lower quick deploy section scoped to variables", () => {
     expect(quickDeploySheetSource).toContain("data-quick-deploy-variables-section");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-variable-editor");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-variable-tabs");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-env-paste");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-variable-rows");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-variable-row");
+    expect(quickDeploySheetSource).toContain("parseEnvVariableEntries");
+    expect(quickDeploySheetSource).toContain("applyEnvVariableText");
+    expect(quickDeploySheetSource).toContain("addVariableDraft");
+    expect(quickDeploySheetSource).toContain("removeVariableDraft");
+    expect(quickDeploySheetSource).toContain("{#each variableDrafts as variable (variable.id)}");
+    expect(quickDeploySheetSource).toContain(
+      "sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)_auto_auto]",
+    );
+    expect(quickDeploySheetSource).toContain("variableRowsMode");
+    expect(quickDeploySheetSource).toContain("variableEnvMode");
+    expect(quickDeploySheetSource).toContain("variableAdd");
+    expect(quickDeploySheetSource).toContain("variableApplyParsedEnv");
+    expect(quickDeploySheetSource).toContain("variableEnvPasteHint");
+    expect(quickDeploySheetSource).toContain("variableEnvPlaceholder");
+    expect(quickDeploySheetSource).toContain("variableNameLabel");
+    expect(quickDeploySheetSource).toContain("variableValueLabel");
+    expect(quickDeploySheetSource).toContain("variableRemove");
     expect(quickDeploySheetSource).toContain("<details");
     expect(quickDeploySheetSource).toContain("ontoggle={(event) =>");
     expect(quickDeploySheetSource).toContain("未配置变量");
     expect(quickDeploySheetSource).toContain("已配置 1 项");
+    expect(quickDeploySheetSource).not.toContain("let variableKey = $state");
+    expect(quickDeploySheetSource).not.toContain("let variableValue = $state");
+    expect(quickDeploySheetSource).not.toContain("let variableIsSecret = $state");
     expect(quickDeploySheetSource).not.toContain("<span>部署配置</span>");
     expect(quickDeploySheetSource).not.toContain('{variableContextEnabled ? "跳过" : "编辑"}');
     expect(quickDeploySheetSource).not.toContain('return "跳过";');
@@ -31,9 +56,42 @@ describe("QuickDeploySheet structure", () => {
 
   test("[QUICK-DEPLOY-UX-002] docks the submit action inside the right summary panel", () => {
     expect(quickDeploySheetSource).toContain("data-quick-deploy-action-panel");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-summary-panel");
+    expect(quickDeploySheetSource).toContain("lg:mt-20 lg:sticky lg:top-0 lg:flex");
+    expect(quickDeploySheetSource).toContain("lg:max-h-[calc(100svh-17rem)]");
+    expect(quickDeploySheetSource).toContain("lg:min-h-0 lg:overflow-y-auto");
+    expect(quickDeploySheetSource).toContain("lg:shrink-0");
+    expect(quickDeploySheetSource).not.toContain("lg:top-20");
+    expect(quickDeploySheetSource).not.toContain("lg:overflow-y-auto lg:pb-3");
+    expect(quickDeploySheetSource).not.toContain("data-quick-deploy-readiness-panel");
+    expect(quickDeploySheetSource).not.toContain("安装前置配置已完成");
     expect(quickDeploySheetSource).not.toContain("fixed inset-x-0 bottom-0");
     expect(quickDeploySheetSource).not.toContain("min-h-16 w-full items-center justify-between");
+    expect(quickDeploySheetSource).toContain("还差 {quickDeployReadinessIssues.length} 项才能继续");
+    expect(quickDeploySheetSource).toContain("{#each quickDeployReadinessIssues as issue (issue)}");
     expect(quickDeploySheetSource).toContain('class="w-full"');
+  });
+
+  test("[QUICK-DEPLOY-UX-002C] uses neutral pending status for incomplete quick deploy steps", () => {
+    expect(quickDeploySheetSource).toContain("Circle,");
+    expect(quickDeploySheetSource).toContain(
+      'return complete ? "text-emerald-600" : "text-muted-foreground";',
+    );
+    expect(quickDeploySheetSource).toContain(
+      "<Circle class={`size-4 ${statusIconClasses(false)}`} />",
+    );
+    expect(quickDeploySheetSource).toContain(
+      "<Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      "<AlertCircle class={`size-4 ${statusIconClasses(false)}`} />",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      "<AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      'return complete ? "text-emerald-600" : "text-destructive";',
+    );
   });
 
   test("[QUICK-DEPLOY-UX-002B] keeps modal state URL-addressable inside QuickDeploySheet", () => {
@@ -71,6 +129,24 @@ describe("QuickDeploySheet structure", () => {
     expect(resourceSourceOptionSource).toContain("block w-full text-xs font-normal leading-5");
     expect(resourceSourceOptionSource).not.toContain("space-y-1");
     expect(resourceSourceOptionSource).not.toContain("block truncate text-sm font-medium");
+  });
+
+  test("[QUICK-DEPLOY-UX-003B] aligns nested source method cards with source picker cards", () => {
+    expect(quickDeploySheetSource).toContain("sourceOptionSelected");
+    expect(quickDeploySheetSource).toContain(
+      'class="h-auto min-h-20 flex-col items-start justify-start gap-2 whitespace-normal px-3 py-3 text-left"',
+    );
+    expect(quickDeploySheetSource).toContain('class="flex w-full min-w-0 items-center gap-2"');
+    expect(quickDeploySheetSource).toContain(
+      'class="min-w-0 truncate text-sm font-medium leading-5"',
+    );
+    expect(quickDeploySheetSource).toContain(
+      'class="block w-full text-xs font-normal leading-5 text-muted-foreground"',
+    );
+    expect(quickDeploySheetSource).toContain('<SourceIcon class="size-3.5" />');
+    expect(quickDeploySheetSource).toContain('<GitFork class="size-3.5" />');
+    expect(quickDeploySheetSource).toContain('<GitHubIcon class="size-3.5" />');
+    expect(quickDeploySheetSource).not.toContain('<SourceIcon class="size-4 shrink-0" />');
   });
 
   test("[QUICK-DEPLOY-UX-004] locks the source picker after a Blueprint is selected", () => {
@@ -194,6 +270,13 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("data-[selected=true]:bg-primary/5");
     expect(quickDeploySheetSource).toContain(
       "data-selected={selectedGitHubRepositoryId === repository.id",
+    );
+    expect(quickDeploySheetSource).toContain("{#each deployableServers as server (server.id)}");
+    expect(quickDeploySheetSource).toContain("data-quick-deploy-server-option");
+    expect(quickDeploySheetSource).toContain("h-auto min-h-14 w-full justify-start");
+    expect(quickDeploySheetSource).toContain("flex w-full min-w-0 flex-col items-start");
+    expect(quickDeploySheetSource).not.toContain(
+      '<span class="block truncate text-xs text-muted-foreground">',
     );
     expect(quickDeploySheetSource).not.toContain("hover:bg-muted/50");
     expect(quickDeploySheetSource).not.toContain(
